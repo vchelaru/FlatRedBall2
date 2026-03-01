@@ -1,3 +1,4 @@
+using Shouldly;
 using Xunit;
 
 namespace FlatRedBall2.Tests;
@@ -17,7 +18,7 @@ public class FactoryTests
 
         factory.Create();
 
-        Assert.Single(factory.Instances);
+        factory.Instances.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public class FactoryTests
         var entity = factory.Create();
         factory.Destroy(entity);
 
-        Assert.Empty(factory.Instances);
+        factory.Instances.ShouldBeEmpty();
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class FactoryTests
         factory.Create();
         factory.DestroyAll();
 
-        Assert.Empty(factory.Instances);
+        factory.Instances.ShouldBeEmpty();
     }
 
     [Fact]
@@ -61,7 +62,7 @@ public class FactoryTests
 
         factory.Create();
 
-        Assert.Equal(1, InitTrackingEntity.InitCount);
+        InitTrackingEntity.InitCount.ShouldBe(1);
     }
 
     private class InitTrackingEntity : Entity

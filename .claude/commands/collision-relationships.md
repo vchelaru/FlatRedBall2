@@ -28,10 +28,33 @@ public class GameScreen : Screen
 
 | Method | Effect |
 |--------|--------|
-| `.MoveFirstOnCollision()` | A gets pushed out, B stays fixed (firstMass=1, secondMass=0). Use for player vs. solid walls. |
-| `.MoveSecondOnCollision()` | B gets pushed out, A stays fixed (firstMass=0, secondMass=1). |
-| `.MoveBothOnCollision()` | Both objects share the separation equally (firstMass=1, secondMass=1). |
-| `.BounceOnCollision(float elasticity)` | Applies an impulse to reverse velocity components on overlap. 1.0 = perfectly elastic. |
+| `.MoveFirstOnCollision()` | A gets pushed out, B stays fixed. Use for player vs. solid walls. |
+| `.MoveSecondOnCollision()` | B gets pushed out, A stays fixed. |
+| `.MoveBothOnCollision(firstMass, secondMass)` | Both objects share the separation weighted by mass. Equal masses = 50/50 split. |
+| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B using impulse physics. Separates positions automatically. |
+
+### BounceOnCollision — Mass Semantics
+
+```csharp
+// Signature:
+BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
+```
+
+- **`firstMass = 0f`** — A (the ball) is fully displaced; B (the wall) stays fixed. Use this for a ball bouncing off immovable walls.
+- **`secondMass = 0f`** — B is fully displaced; A stays fixed. Rarely used for bounce.
+- **`elasticity = 1.0f`** — perfectly elastic (no energy loss). `0.9f` = 10% energy loss per bounce, ball slowly settles.
+
+```csharp
+// Ball bounces off immovable walls — ball moves, walls don't
+AddCollisionRelationship(_balls, _walls)
+    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f);
+
+// Two-body elastic bounce (equal masses exchange velocities)
+AddCollisionRelationship(_bulletsA, _bulletsB)
+    .BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 1.0f);
+```
+
+> **Note:** `BounceOnCollision` only adjusts the velocity of A (the first group). B's velocity is unchanged when `firstMass == 0f`. `AdjustVelocityFrom` requires both objects to be `Entity` instances — it has no effect if either is a bare shape.
 
 ## Responding to Collision Events
 

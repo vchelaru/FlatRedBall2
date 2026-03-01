@@ -1,6 +1,7 @@
 using System;
-using Xunit;
 using FlatRedBall2.Collision;
+using Shouldly;
+using Xunit;
 
 namespace FlatRedBall2.Tests;
 
@@ -18,7 +19,7 @@ public class ScreenTests
 
         screen.Register(entity);
 
-        Assert.Equal(engine, entity.Engine);
+        entity.Engine.ShouldBe(engine);
     }
 
     [Fact]
@@ -33,7 +34,7 @@ public class ScreenTests
 
         screen.Register(entity);
 
-        Assert.Contains(rect, screen.RenderList);
+        screen.RenderList.ShouldContain(rect);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public class ScreenTests
 
         screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
-        Assert.Equal(expectedActivityCount, entity.ActivityCount);
+        entity.ActivityCount.ShouldBe(expectedActivityCount);
     }
 
     private class ActivityTrackingEntity : Entity

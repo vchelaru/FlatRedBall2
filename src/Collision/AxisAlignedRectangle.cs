@@ -71,12 +71,9 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
         if (sep == Vector2.Zero) return;
         float total = thisMass + otherMass;
         if (total == 0) return;
-        if (thisMass != 0)
-        {
-            float r = otherMass == 0 ? 1f : otherMass / total;
-            X += sep.X * r;
-            Y += sep.Y * r;
-        }
+        float r = otherMass / total;
+        X += sep.X * r;
+        Y += sep.Y * r;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }

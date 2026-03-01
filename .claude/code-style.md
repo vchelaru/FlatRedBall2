@@ -6,17 +6,24 @@ Naming conventions and formatting rules will be established as the architecture 
 
 Use `System.Diagnostics.Debug.WriteLine` for all diagnostic or debug output — never `Console.WriteLine`. Debug output is visible in the Visual Studio Output window (Debug pane) and is automatically stripped from Release builds.
 
+## Test Organization
+
+Test files must mirror the engine's namespace and folder structure. A test for a type in `FlatRedBall2.Collision` goes in a `Collision/` subfolder with `namespace FlatRedBall2.Tests.Collision`. Tests for root-namespace types (`FlatRedBall2`) stay at the test project root with `namespace FlatRedBall2.Tests`.
+
 ## Test Guidelines
 
-### Philosophy — Quality over Coverage
+### Philosophy — Minimal Coverage
 
-Prioritize maintainability and clarity over exhaustive coverage:
+We are not targeting 100% coverage. Write the fewest tests that meaningfully verify the feature:
 
-- **Critical paths**: Test the main success path and the most important failure scenarios
-- **Key edge cases**: Null/empty inputs, boundary conditions — but only those likely to cause real issues
-- **High-value tests**: Tests that would catch real bugs, not every possible permutation
-- **Avoid verbosity**: If similar scenarios require nearly identical tests, consider combining them or testing only the most representative case
-- **Maintainability**: Prefer fewer, clear tests over many verbose tests. Each test should justify its existence by testing something meaningfully different. If a single feature was added, aim for 1-3 tests, not more.
+- **Minimal by default**: If a single feature was added, aim for 1–3 tests. Do not write tests for every permutation.
+- **Critical paths only**: Test the main success path and the most important failure scenario. Skip edge cases unless they are a realistic source of bugs.
+- **Short**: Each test should be as short as possible. Remove any line that does not directly contribute to the assertion.
+- **Comments when needed**: Add a brief comment if there is any realistic chance a reader will be confused about *why* a value was chosen or what the test is verifying. Omit comments when the test is self-evident.
+
+### Assertion Library
+
+Always use **Shouldly** for assertions — never `Assert.*` from xunit. Use `ShouldBe`, `ShouldBeTrue`, `ShouldBeFalse`, `ShouldBeNull`, `ShouldContain`, `ShouldBeEmpty`, `Should.Throw`, etc. For floats with rounding error, pass a `tolerance:` parameter.
 
 ### Explicit Test Arrangements
 

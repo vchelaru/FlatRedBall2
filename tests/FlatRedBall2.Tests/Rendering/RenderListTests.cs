@@ -2,9 +2,10 @@ using System;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
+using Shouldly;
 using Xunit;
 
-namespace FlatRedBall2.Tests;
+namespace FlatRedBall2.Tests.Rendering;
 
 public class RenderListTests
 {
@@ -35,7 +36,7 @@ public class RenderListTests
         var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
 
-        Assert.Equal(2, screen.RenderList.Count);
+        screen.RenderList.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -56,9 +57,9 @@ public class RenderListTests
         var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
 
-        Assert.Equal(2, screen.RenderList.Count);
-        Assert.Contains(fgItem, screen.RenderList);
-        Assert.Contains(bgItem, screen.RenderList);
+        screen.RenderList.Count.ShouldBe(2);
+        screen.RenderList.ShouldContain(fgItem);
+        screen.RenderList.ShouldContain(bgItem);
     }
 
     [Fact]
@@ -76,8 +77,8 @@ public class RenderListTests
         screen.RenderList.Add(second);
         screen.RenderList.Add(third);
 
-        Assert.Equal("first", screen.RenderList[0].Name);
-        Assert.Equal("second", screen.RenderList[1].Name);
-        Assert.Equal("third", screen.RenderList[2].Name);
+        screen.RenderList[0].Name.ShouldBe("first");
+        screen.RenderList[1].Name.ShouldBe("second");
+        screen.RenderList[2].Name.ShouldBe("third");
     }
 }

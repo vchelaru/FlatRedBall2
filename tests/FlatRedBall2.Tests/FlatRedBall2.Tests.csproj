@@ -9,6 +9,7 @@
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Shouldly" Version="4.*" />
     <PackageReference Include="xunit" Version="2.9.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

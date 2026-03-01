@@ -36,12 +36,21 @@ public class Circle : IAttachable, IRenderable, ICollidable
     {
         if (!Visible || Batch is not ShapesBatch sb) return;
 
-        var center = new XnaVec2(AbsoluteX, AbsoluteY);
+        // Convert world-space center to screen pixels (Y-flip handled by WorldToScreen).
+        var screenCenter = camera.WorldToScreen(new Vector2(AbsoluteX, AbsoluteY));
+        var center = new XnaVec2(screenCenter.X, screenCenter.Y);
+
+        // Scale radius from world units to screen pixels by converting a point one radius
+        // along X and measuring the pixel distance.
+        var screenEdge = camera.WorldToScreen(new Vector2(AbsoluteX + Radius, AbsoluteY));
+        float screenRadius = screenEdge.X - screenCenter.X;
+
+        screenRadius -= 1; // to account for anti-aliasing, so the circle doesn't draw outside its bounds
 
         if (IsFilled)
-            sb.Shapes.FillCircle(center, Radius, Color);
+            sb.Shapes.FillCircle(center, screenRadius, Color, aaSize:1);
         else
-            sb.Shapes.BorderCircle(center, Radius, Color, OutlineThickness);
+            sb.Shapes.BorderCircle(center, screenRadius, Color, OutlineThickness, aaSize:1);
     }
 
     public void Destroy()
@@ -64,12 +73,9 @@ public class Circle : IAttachable, IRenderable, ICollidable
         if (sep == Vector2.Zero) return;
         float total = thisMass + otherMass;
         if (total == 0) return;
-        if (thisMass != 0)
-        {
-            float r = otherMass == 0 ? 1f : otherMass / total;
-            X += sep.X * r;
-            Y += sep.Y * r;
-        }
+        float r = otherMass / total;
+        X += sep.X * r;
+        Y += sep.Y * r;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }

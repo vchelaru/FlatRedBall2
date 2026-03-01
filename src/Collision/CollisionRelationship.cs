@@ -11,11 +11,10 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private readonly IEnumerable<B> _listB;
 
     private bool _moveFirst;
-    private float _firstMass = 1f;
-    private float _secondMass = 0f;
-
     private bool _moveSecond;
     private bool _moveBoth;
+    private float _bothFirstMass = 1f;
+    private float _bothSecondMass = 1f;
 
     private bool _bounce;
     private float _bounceMassA = 1f;
@@ -30,19 +29,19 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _listB = listB;
     }
 
-    public CollisionRelationship<A, B> MoveFirstOnCollision(float firstMass = 1f, float secondMass = 0f)
+    public CollisionRelationship<A, B> MoveFirstOnCollision()
     {
-        _moveFirst = true; _firstMass = firstMass; _secondMass = secondMass; return this;
+        _moveFirst = true; return this;
     }
 
-    public CollisionRelationship<A, B> MoveSecondOnCollision(float firstMass = 0f, float secondMass = 1f)
+    public CollisionRelationship<A, B> MoveSecondOnCollision()
     {
-        _moveSecond = true; _firstMass = firstMass; _secondMass = secondMass; return this;
+        _moveSecond = true; return this;
     }
 
     public CollisionRelationship<A, B> MoveBothOnCollision(float firstMass = 1f, float secondMass = 1f)
     {
-        _moveBoth = true; _firstMass = firstMass; _secondMass = secondMass; return this;
+        _moveBoth = true; _bothFirstMass = firstMass; _bothSecondMass = secondMass; return this;
     }
 
     public CollisionRelationship<A, B> BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
@@ -60,11 +59,21 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             {
                 if (!a.CollidesWith(b)) continue;
 
-                if (_moveFirst || _moveSecond || _moveBoth)
-                    a.SeparateFrom(b, _firstMass, _secondMass);
+                if (_moveFirst)
+                    a.SeparateFrom(b, 0f, 1f);
+                if (_moveSecond)
+                    b.SeparateFrom(a, 0f, 1f);
+                if (_moveBoth)
+                {
+                    a.SeparateFrom(b, _bothFirstMass, _bothSecondMass);
+                    b.SeparateFrom(a, _bothSecondMass, _bothFirstMass);
+                }
 
                 if (_bounce)
+                {
                     a.AdjustVelocityFrom(b, _bounceMassA, _bounceMassB, _bounceElasticity);
+                    a.SeparateFrom(b, _bounceMassA, _bounceMassB);
+                }
 
                 CollisionOccurred?.Invoke(a, b);
             }

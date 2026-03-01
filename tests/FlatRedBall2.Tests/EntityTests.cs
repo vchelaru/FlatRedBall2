@@ -1,5 +1,6 @@
-using Xunit;
 using FlatRedBall2.Collision;
+using Shouldly;
+using Xunit;
 
 namespace FlatRedBall2.Tests;
 
@@ -13,7 +14,7 @@ public class EntityTests
 
         parent.AddChild(child);
 
-        Assert.Equal(parent, child.Parent);
+        child.Parent.ShouldBe(parent);
     }
 
     [Fact]
@@ -28,8 +29,8 @@ public class EntityTests
         var child = new Entity { X = childX, Y = childY };
         parent.AddChild(child);
 
-        Assert.Equal(expectedAbsoluteX, child.AbsoluteX);
-        Assert.Equal(expectedAbsoluteY, child.AbsoluteY);
+        child.AbsoluteX.ShouldBe(expectedAbsoluteX);
+        child.AbsoluteY.ShouldBe(expectedAbsoluteY);
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public class EntityTests
 
         parent.RemoveChild(child);
 
-        Assert.Null(child.Parent);
+        child.Parent.ShouldBeNull();
     }
 
     [Fact]
@@ -51,7 +52,7 @@ public class EntityTests
 
         entity.Destroy();
 
-        Assert.True(entity.WasDestroyed);
+        entity.WasDestroyed.ShouldBeTrue();
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public class EntityTests
 
         child.Destroy();
 
-        Assert.Empty(parent.Children);
+        parent.Children.ShouldBeEmpty();
     }
 
     private class DestroyTrackingEntity : Entity

@@ -18,8 +18,8 @@ internal static class CollisionDispatcher
         {
             (AxisAlignedRectangle ra, AxisAlignedRectangle rb) => AabbVsAabb(ra, rb),
             (Circle ca, Circle cb)                             => CircleVsCircle(ca, cb),
-            (AxisAlignedRectangle ra, Circle cb)               => AabbVsCircle(ra, cb),
-            (Circle ca, AxisAlignedRectangle rb)               => -AabbVsCircle(rb, ca),
+            (AxisAlignedRectangle ra, Circle cb)               => -AabbVsCircle(ra, cb),
+            (Circle ca, AxisAlignedRectangle rb)               => AabbVsCircle(rb, ca),
             (Polygon pa, Polygon pb)                           => PolygonVsPolygon(pa, pb),
             (Polygon pa, AxisAlignedRectangle rb)              => PolygonVsAabb(pa, rb),
             (AxisAlignedRectangle ra, Polygon pb)              => -PolygonVsAabb(pb, ra),

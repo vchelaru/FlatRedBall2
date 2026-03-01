@@ -152,24 +152,18 @@ public class Entity : ICollidable, IAttachable
         float totalMass = thisMass + otherMass;
         if (totalMass == 0) return;
 
-        if (thisMass != 0)
-        {
-            float ratio = otherMass == 0 ? 1f : otherMass / totalMass;
-            X += sep.X * ratio;
-            Y += sep.Y * ratio;
-        }
-
-        if (otherMass != 0 && other is Entity otherEntity)
-        {
-            float ratio = thisMass == 0 ? 1f : thisMass / totalMass;
-            otherEntity.X -= sep.X * ratio;
-            otherEntity.Y -= sep.Y * ratio;
-        }
+        float ratio = otherMass / totalMass;
+        X += sep.X * ratio;
+        Y += sep.Y * ratio;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
     {
-        if (!CollidesWith(other)) return;
+        var sep = GetSeparationVector(other);
+        if (sep == Vector2.Zero) return;
+
+        // Collision normal: the direction to push 'this' out of 'other'.
+        var normal = Vector2.Normalize(sep);
 
         if (other is Entity otherEntity)
         {
@@ -177,17 +171,25 @@ public class Entity : ICollidable, IAttachable
             if (totalMass == 0) return;
 
             float thisRatio = otherMass == 0 ? 1f : otherMass / totalMass;
-            float otherRatio = thisMass == 0 ? 1f : thisMass / totalMass;
+            float otherRatio = thisMass == 0 ? 0f : thisMass / totalMass;
 
-            float dvx = (otherEntity.VelocityX - VelocityX) * elasticity;
-            float dvy = (otherEntity.VelocityY - VelocityY) * elasticity;
+            // Project relative velocity onto the collision normal.
+            // Negative means 'this' is moving into 'other'.
+            float relVelAlongNormal = Vector2.Dot(
+                new Vector2(VelocityX - otherEntity.VelocityX, VelocityY - otherEntity.VelocityY),
+                normal);
 
-            VelocityX += dvx * thisRatio;
-            VelocityY += dvy * thisRatio;
+            // Skip if already separating — prevents double-bouncing on the same frame.
+            if (relVelAlongNormal >= 0) return;
+
+            float impulse = -(1f + elasticity) * relVelAlongNormal;
+
+            VelocityX += impulse * thisRatio * normal.X;
+            VelocityY += impulse * thisRatio * normal.Y;
             if (otherMass != 0)
             {
-                otherEntity.VelocityX -= dvx * otherRatio;
-                otherEntity.VelocityY -= dvy * otherRatio;
+                otherEntity.VelocityX -= impulse * otherRatio * normal.X;
+                otherEntity.VelocityY -= impulse * otherRatio * normal.Y;
             }
         }
     }

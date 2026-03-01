@@ -74,18 +74,19 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 
         for (int i = 0; i < _points.Count; i++)
         {
-            var a = WorldPoint(_points[i], cos, sin);
-            var b = WorldPoint(_points[(i + 1) % _points.Count], cos, sin);
+            var a = ScreenPoint(_points[i], cos, sin, camera);
+            var b = ScreenPoint(_points[(i + 1) % _points.Count], cos, sin, camera);
             sb.Shapes.FillLine(a, b, thickness, Color);
         }
     }
 
-    private XnaVec2 WorldPoint(Vector2 local, float cos, float sin)
+    private XnaVec2 ScreenPoint(Vector2 local, float cos, float sin, Camera camera)
     {
-        // Rotate in Y-up space, then translate to world position.
+        // Rotate in Y-up world space, translate to world position, then convert to screen pixels.
         float rx = local.X * cos - local.Y * sin;
         float ry = local.X * sin + local.Y * cos;
-        return new XnaVec2(AbsoluteX + rx, AbsoluteY + ry);
+        var screen = camera.WorldToScreen(new Vector2(AbsoluteX + rx, AbsoluteY + ry));
+        return new XnaVec2(screen.X, screen.Y);
     }
 
     public void Destroy()
@@ -108,12 +109,9 @@ public class Polygon : IAttachable, IRenderable, ICollidable
         if (sep == Vector2.Zero) return;
         float total = thisMass + otherMass;
         if (total == 0) return;
-        if (thisMass != 0)
-        {
-            float r = otherMass == 0 ? 1f : otherMass / total;
-            X += sep.X * r;
-            Y += sep.Y * r;
-        }
+        float r = otherMass / total;
+        X += sep.X * r;
+        Y += sep.Y * r;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }

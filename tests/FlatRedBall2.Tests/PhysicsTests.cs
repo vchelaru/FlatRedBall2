@@ -1,4 +1,5 @@
 using System;
+using Shouldly;
 using Xunit;
 
 namespace FlatRedBall2.Tests;
@@ -23,7 +24,7 @@ public class PhysicsTests
         entity.PhysicsUpdate(frame);
         entity.PhysicsUpdate(frame);
 
-        Assert.Equal(expectedX, entity.X, 4);
+        entity.X.ShouldBe(expectedX, tolerance: 0.0001f);
     }
 
     [Fact]
@@ -39,8 +40,8 @@ public class PhysicsTests
 
         entity.PhysicsUpdate(MakeFrame(dt));
 
-        Assert.Equal(expectedX, entity.X, 4);
-        Assert.Equal(expectedVx, entity.VelocityX, 4);
+        entity.X.ShouldBe(expectedX, tolerance: 0.0001f);
+        entity.VelocityX.ShouldBe(expectedVx, tolerance: 0.0001f);
     }
 
     [Fact]
@@ -57,7 +58,7 @@ public class PhysicsTests
 
         entity.PhysicsUpdate(MakeFrame(dt));
 
-        Assert.Equal(expectedVx, entity.VelocityX, 5);
+        entity.VelocityX.ShouldBe(expectedVx, tolerance: 0.00001f);
     }
 
     [Fact]
@@ -70,6 +71,6 @@ public class PhysicsTests
 
         parent.PhysicsUpdate(MakeFrame(1f / 60f));
 
-        Assert.Equal(0f, child.X);
+        child.X.ShouldBe(0f);
     }
 }

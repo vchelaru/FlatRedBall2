@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using FlatRedBall2.Math;
+using Shouldly;
 using Xunit;
 
 namespace FlatRedBall2.Tests.Math;
@@ -14,7 +15,7 @@ public class AngleTests
 
         var angle = Angle.FromDegrees(180f);
 
-        Assert.Equal(expectedRadians, angle.Radians, 5);
+        angle.Radians.ShouldBe(expectedRadians, tolerance: 0.00001f);
     }
 
     [Fact]
@@ -24,7 +25,7 @@ public class AngleTests
 
         var angle = Angle.FromRadians(MathF.PI / 2f);
 
-        Assert.Equal(expectedDegrees, angle.Degrees, 4);
+        angle.Degrees.ShouldBe(expectedDegrees, tolerance: 0.0001f);
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public class AngleTests
 
         var angle = Angle.FromRadians(inputRadians).Normalized();
 
-        Assert.Equal(expectedRadians, angle.Radians, 5);
+        angle.Radians.ShouldBe(expectedRadians, tolerance: 0.00001f);
     }
 
     [Fact]
@@ -47,8 +48,8 @@ public class AngleTests
 
         var vec = Angle.FromRadians(0f).ToVector2();
 
-        Assert.Equal(expectedX, vec.X, 5);
-        Assert.Equal(expectedY, vec.Y, 5);
+        vec.X.ShouldBe(expectedX, tolerance: 0.00001f);
+        vec.Y.ShouldBe(expectedY, tolerance: 0.00001f);
     }
 
     [Fact]
@@ -58,7 +59,7 @@ public class AngleTests
 
         var result = Angle.FromRadians(MathF.PI / 2f) + Angle.FromRadians(MathF.PI / 2f);
 
-        Assert.Equal(expectedRadians, result.Radians, 5);
+        result.Radians.ShouldBe(expectedRadians, tolerance: 0.00001f);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public class AngleTests
 
         var result = Angle.Lerp(a, b, 0.5f);
 
-        Assert.Equal(expectedDegrees, result.Degrees, 3);
+        result.Degrees.ShouldBe(expectedDegrees, tolerance: 0.001f);
     }
 
     [Fact]
@@ -79,7 +80,7 @@ public class AngleTests
         var a = Angle.FromDegrees(45f);
         var b = Angle.FromDegrees(45f);
 
-        Assert.Equal(a, b);
-        Assert.True(a == b);
+        b.ShouldBe(a);
+        (a == b).ShouldBeTrue();
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using FlatRedBall2.Input;
 using Microsoft.Xna.Framework.Input;
+using Shouldly;
 using Xunit;
 
 namespace FlatRedBall2.Tests.Input;
@@ -40,7 +41,7 @@ public class KeyboardPressableInputTests
         var fake = new FakeKeyboard { KeyReleased = true };
         var input = new KeyboardPressableInput(fake, Keys.Space);
 
-        Assert.True(input.WasJustReleased);
+        input.WasJustReleased.ShouldBeTrue();
     }
 
     [Fact]
@@ -49,7 +50,7 @@ public class KeyboardPressableInputTests
         var fake = new FakeKeyboard { KeyReleased = false };
         var input = new KeyboardPressableInput(fake, Keys.Space);
 
-        Assert.False(input.WasJustReleased);
+        input.WasJustReleased.ShouldBeFalse();
     }
 
     [Fact]
@@ -58,7 +59,7 @@ public class KeyboardPressableInputTests
         var fake = new FakeKeyboard { KeyPressed = true };
         var input = new KeyboardPressableInput(fake, Keys.Space);
 
-        Assert.True(input.WasJustPressed);
+        input.WasJustPressed.ShouldBeTrue();
     }
 }
 
@@ -72,7 +73,7 @@ public class GamepadPressableInputTests
         var fake = new FakeGamepad { ButtonJustPressed = true };
         var input = new GamepadPressableInput(fake, Buttons.A);
 
-        Assert.True(input.WasJustPressed);
+        input.WasJustPressed.ShouldBeTrue();
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public class GamepadPressableInputTests
         var fake = new FakeGamepad { ButtonJustReleased = true };
         var input = new GamepadPressableInput(fake, Buttons.A);
 
-        Assert.True(input.WasJustReleased);
+        input.WasJustReleased.ShouldBeTrue();
     }
 
     [Fact]
@@ -90,7 +91,7 @@ public class GamepadPressableInputTests
         var fake = new FakeGamepad { ButtonJustPressed = false };
         var input = new GamepadPressableInput(fake, Buttons.A);
 
-        Assert.False(input.WasJustPressed);
+        input.WasJustPressed.ShouldBeFalse();
     }
 }
 
@@ -105,7 +106,7 @@ public class InputManagerGetGamepadTests
     {
         var manager = new InputManager();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => manager.GetGamepad(index));
+        Should.Throw<ArgumentOutOfRangeException>(() => manager.GetGamepad(index));
     }
 
     [Theory]
@@ -117,6 +118,6 @@ public class InputManagerGetGamepadTests
 
         var result = manager.GetGamepad(index);
 
-        Assert.NotNull(result);
+        result.ShouldNotBeNull();
     }
 }

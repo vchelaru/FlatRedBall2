@@ -6,6 +6,7 @@ using FlatRedBall2.Diagnostics;
 using FlatRedBall2.Input;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
+using FlatRedBall2.Utilities;
 
 namespace FlatRedBall2;
 
@@ -70,6 +71,7 @@ public class FlatRedBallService
     }
 
     // Sub-systems
+    public GameRandom Random { get; } = new GameRandom();
     public InputManager InputManager { get; } = new InputManager();
     public AudioManager AudioManager { get; } = new AudioManager();
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
