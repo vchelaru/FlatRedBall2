@@ -1,258 +1,146 @@
-# ARCHITECTURE.md — Product Manager Suggestions
+# ARCHITECTURE.md — Product Manager Suggestions (v2 — AI-Friendly Lens)
 
-## Overview
+## Core Premise
 
-After reviewing the ARCHITECTURE.md against the existing FlatRedBall (FRB1) codebase at `C:\git\FlatRedBall\` and the Gum codebase at `C:\git\Gum\`, here are findings organized by topic. Each item is tagged with a category:
-
-- **[Accuracy]** — Something that doesn't match FRB1 behavior and may be an intentional break or an oversight
-- **[Gap]** — Missing concept/section that would strengthen the document
-- **[Risk]** — Potential design pitfall or gotcha
-- **[Suggestion]** — Improvement or clarification idea
-- **[Naming]** — Naming inconsistency or concern
+FRB2's #1 goal is **AI-friendliness**: an AI reads ARCHITECTURE.md and writes correct game code on the first try. Every suggestion below is evaluated against: **"Does this help AI write better code, or does it add complexity that makes AI's job harder?"**
 
 ---
 
-## 1. Static State — The Biggest Architectural Delta
+## HIGH PRIORITY — AI Will Generate Broken Code Without These
 
-**[Accuracy / Risk]** The doc says "No static state except `FlatRedBallService.Default`." In FRB1, virtually *everything* is static:
-- `FlatRedBallServices` — static class
-- `TimeManager` — static class
-- `InputManager` — static class
-- `ScreenManager` — static class
-- `AudioManager` — static class
-- `SpriteManager` — static class
-- `Camera.Main` — static property
+### 1. Code Examples Must Compile — They Don't Currently
 
-This is the most significant breaking change in the entire architecture. The document should explicitly acknowledge this delta and discuss the migration strategy or at least call it out as a conscious design decision. Anyone familiar with FRB1 will immediately wonder "how do I access the camera?" when there's no `Camera.Main`.
+AI will copy code examples verbatim. Three examples in the doc will produce broken code:
 
-**Suggestion**: Add a short "Breaking Changes from FRB1" section (or "Key Differences from FRB1") that lists the major shifts so readers coming from FRB1 understand the scope.
-
----
-
-## 2. Entity vs PositionedObject
-
-**[Accuracy]** In FRB1, the base class is `PositionedObject`, not `Entity`. Entities in FRB1 are a Glue-level concept (code-generated classes that extend PositionedObject). The ARCHITECTURE.md uses `Entity` as the base class name.
-
-This is likely an intentional rename, but it's worth noting:
-- `Entity` implies "game object" which may be too specific for things like particle positions or helper nodes
-- FRB1's `PositionedObject` is used for cameras, collision shapes, sprites — not just "entities"
-- **Consider**: Is `Entity` the right name if collision shapes and sprites also need position/hierarchy? The doc already has shapes and sprites that are `IAttachable` but not `Entity`. This split is fine, but the naming might confuse FRB1 users who expect PositionedObject-like universality.
-
-**[Gap]** The FRB1 `PositionedObject` has these features not mentioned in the ARCHITECTURE.md Entity:
-- **Relative position/velocity/acceleration** — In FRB1, when attached, you set `RelativeX`, `RelativeY` etc. The ARCHITECTURE.md says `X`/`Y` are "relative to parent when attached, world when not" — this dual-meaning is different from FRB1's explicit `RelativeX`/`X` split. This needs clarification on whether it's intentional.
-- **Rotation velocity** (`RotationZVelocity`) — FRB1 has rotational velocity. Not mentioned.
-- **KeepTrackOfReal** — FRB1 can track real velocity/acceleration. Not mentioned (maybe intentionally dropped).
-- **ParentRotationChangesPosition / ParentRotationChangesRotation** — Configurable attachment behavior. Not mentioned.
-- **Instructions system** (`IInstructable`) — FRB1 has a built-in instruction/tween system. The doc doesn't mention this. Is it being dropped in favor of letting users use external tween libraries?
-- **ListsBelongingTo** — Two-way list membership. Not mentioned.
-- **Name property** — Entities in FRB1 have names. The ARCHITECTURE.md Entity doesn't show a `Name` property.
-
----
-
-## 3. ICollidable Interface — Significant Redesign
-
-**[Accuracy / Risk]** The FRB1 `ICollidable` interface is:
+**FrameTime** — No constructor shown, but the test example uses one:
 ```csharp
-public interface ICollidable : INameable
-{
-    ShapeCollection Collision { get; }
-    HashSet<string> ItemsCollidedAgainst { get; }
-    HashSet<string> LastFrameItemsCollidedAgainst { get; }
-    HashSet<object> ObjectsCollidedAgainst { get; }
-    HashSet<object> LastFrameObjectsCollidedAgainst { get; }
-}
+// Doc shows this, but FrameTime has no constructor defined:
+var frameTime = new FrameTime(delta: TimeSpan.FromSeconds(1/60.0));
+```
+**Fix**: Add the constructor to the FrameTime struct definition.
+
+**CollisionRelationship** — Uses Factory directly but AddCollisionRelationship takes IEnumerable:
+```csharp
+// Does Factory<T> implement IEnumerable<T>? Not shown.
+AddCollisionRelationship(bulletFactory, enemyFactory)
+```
+**Fix**: Either show that Factory implements IEnumerable, or use `bulletFactory.Instances`.
+
+**Draw** — `_frb.Draw()` takes no args but MonoGame's Draw(GameTime) does:
+```csharp
+protected override void Draw(GameTime gameTime) => _frb.Draw();
+```
+**Fix**: Add a comment explaining why gameTime is unused, or accept GameTime.
+
+### 2. X/Y Dual-Meaning Will Cause AI Bugs
+
+The Entity says `X` is "relative to parent when attached, world when not." This is the #1 source of AI confusion. When AI writes:
+```csharp
+entity.X = 100; // Is this world position or offset from parent?
+```
+It can't know without checking if the entity has a parent. AI will write bugs here constantly.
+
+**Options for Vic:**
+- Keep the dual-meaning but document it VERY explicitly with examples of both cases
+- Or use separate properties (`LocalX`/`WorldX` or `X`/`AbsoluteX` where X is always local)
+
+### 3. No Complete Example — AI Can't See How Pieces Connect
+
+This is the single biggest gap for AI. The doc has fragments across 15 sections but no complete program. AI needs ONE example showing:
+- Game class setup
+- Screen with entities
+- Sprite on a layer
+- Input handling
+- Collision
+- Screen transition
+
+Without this, AI has to assemble pieces from different sections and guess at the wiring. It will guess wrong.
+
+### 4. Entity Registration — How Does the Engine Know Entities Exist?
+
+The update loop says it runs "all entity CustomActivity calls" and "applies physics." But there's no mechanism shown for how entities register with the engine. AI will create an Entity and wonder why Update/physics/collision aren't running on it.
+
+**AI needs to know**: Do you add entities to a Screen list? Does Factory handle this? Is it automatic?
+
+### 5. Gum Section — AI Can't Write UI Code From This
+
+The Gum section is 4 bullet points. AI asked to "add a health bar" or "add a start button" has zero information about:
+- How to initialize Gum
+- How to create a UI element
+- How to respond to button clicks
+- Where UI elements go (which layer, which root)
+
+At minimum, show one working UI example.
+
+---
+
+## MEDIUM PRIORITY — AI Will Write Suboptimal Code
+
+### 6. Sprite Missing Source Rectangle
+
+AI writing sprite sheet code will fail. Every 2D game uses sprite sheets. The Sprite class has no `SourceRectangle` property. AI will try to render individual frames and have no way to do it (other than through AnimationChain, which only covers the animation case, not static sprite sheet frames).
+
+### 7. Sprite Missing Flip, Alpha, Rotation
+
+AI writing a platformer will immediately need:
+- `FlipHorizontal` — character faces left/right
+- Alpha/opacity — fade effects
+- Rotation — projectile rotation
+
+These are missing from the Sprite definition.
+
+### 8. Collision Shapes — No Properties Shown
+
+AI can't create collision shapes because the doc shows `{ ... }` for all three shapes. It needs to see:
+- `AxisAlignedRectangle`: Width, Height (or is it ScaleX/ScaleY like FRB1?)
+- `Circle`: Radius
+- `Polygon`: how to define vertices
+
+### 9. ICollidable Double-Dispatch — Will Be Hard to Extend
+
+Each shape implementing `CollidesWith(ICollidable other)` means each shape must handle every other shape type. AI writing a custom collidable type would need to modify all existing shapes. FRB1's approach (expose a ShapeCollection, let centralized code handle dispatch) is actually simpler for AI because there's one collision entry point.
+
+**But**: The current design is fine if the engine handles all shape-vs-shape combinations internally and AI never needs to add new shape types. Document this constraint.
+
+### 10. Tiled Section — AI Can't Load a Level From This
+
+Same problem as Gum. AI asked to "load a Tiled map" has 4 bullet points and no code. Show:
+```csharp
+var map = ContentManager.Load<TiledMap>("level1");
+// How to render it? How to get collision from it?
 ```
 
-The ARCHITECTURE.md proposes a very different interface:
-```csharp
-public interface ICollidable
-{
-    bool CollidesWith(ICollidable other);
-    Vector2 GetSeparationVector(ICollidable other);
-    void SeparateFrom(ICollidable other);
-    void AdjustVelocityFrom(ICollidable other);
-}
-```
+### 11. Factory Destroy Lifecycle — How Do Dead Entities Leave?
 
-Key differences:
-- FRB1 uses `ShapeCollection` as the backing data; the new design puts collision logic directly on the interface
-- FRB1 tracks collision history (`ItemsCollidedAgainst`, `LastFrameItemsCollidedAgainst`) — important for platformer ground detection, "just landed" checks, etc. This is missing from the new design.
-- FRB1 collision methods are `CollideAgainst`, `CollideAgainstMove`, `CollideAgainstBounce` with mass parameters. The new design doesn't show mass parameters anywhere on the interface.
-- **The shapes themselves don't implement ICollidable in FRB1** — `AxisAlignedRectangle`, `Circle`, `Polygon` extend `PositionedObject` but implement separate collision methods. The ARCHITECTURE.md says shapes implement `ICollidable` directly.
-
-**[Risk]** Having shapes implement `ICollidable` means each shape needs `SeparateFrom(ICollidable other)` and `AdjustVelocityFrom(ICollidable other)` which modify the "parent entity if attached, else self." This creates a tight coupling between collision shapes and the entity hierarchy inside a low-level interface.
+AI will create entities via Factory, then call `entity.Destroy()`. Does the Factory's `Instances` list automatically update? If not, AI code will have stale references. This needs to be explicit.
 
 ---
 
-## 4. CollisionRelationship — Missing Features
+## LOW PRIORITY — Polish
 
-**[Gap]** The FRB1 `CollisionRelationship` has significant features not in the doc:
-- **CollisionType enum**: `EventOnlyCollision`, `MoveCollision`, `BounceCollision`, `MoveSoftCollision` — the "soft" collision type (spring-like separation) is not mentioned
-- **Mass parameters** — FRB1 uses `moveFirstMass`/`moveSecondMass` for controlling which object moves more. The doc shows `MoveFirstOnCollision()` / `MoveSecondOnCollision()` without mass ratios.
-- **Spatial partitioning** — FRB1 has built-in partitioning support (`Partitions`, `firstPartitioningSize`, `secondPartitioningSize`). This is critical for performance with large entity counts. Not mentioned.
-- **CollisionLimit** — `All`, `First`, `Closest` — controls whether collision checks stop after first hit. Not mentioned.
-- **FrameSkip** — For performance, skip N frames between checks. Not mentioned.
-- **IsActive** — Enable/disable relationships. Not mentioned.
-- **SubObject collision** — Ability to collide against specific sub-shapes of an entity. Not mentioned.
-- **CollidedThisFrame** — Boolean query. Not mentioned.
+### 12. Drag Behavior Unspecified
+AI will set `Drag = 0.5f` and not know if that's a multiplier or flat subtraction. One sentence fixes this.
 
-**[Suggestion]** At minimum, document spatial partitioning plans. Without it, any game with >100 entities will have O(N^2) collision performance.
+### 13. Camera Zoom
+AI writing a zoom feature will look for a Zoom property and not find one. Document that TargetWidth/TargetHeight IS the zoom mechanism (if that's the intent).
 
----
+### 14. AudioManager — Minimal but Functional
+The API shown is enough for AI to play sounds. Could add pause/resume but it's not blocking.
 
-## 5. Camera — Missing Features
-
-**[Gap]** The FRB1 Camera extends PositionedObject and has many features not in the doc:
-- **Zoom/Orthogonal settings** — FRB1 Camera has `Orthogonal`, `OrthogonalWidth`, `OrthogonalHeight`. The doc's Camera has `TargetWidth`/`TargetHeight` which seem different.
-- **Split-screen viewport** — FRB1 has `SplitScreenViewport` enum and `DestinationRectangle`. Not mentioned.
-- **DrawsWorld / DrawsCameraLayer / DrawsShapes** — Layer-selective rendering. Not mentioned.
-- **ClearsDepthBuffer** — Not mentioned.
-- **Zoom property** — How does zoom work? `TargetWidth`/`TargetHeight` might serve this purpose but it's not explicit.
-
-**[Risk]** The doc says "Y+ up" for world space and "Y+ down" for screen space. This is correct and matches FRB1, but the Camera section should explicitly document the default Camera position and how the coordinate system is set up for a new screen.
+### 15. Children Type Safety
+`IReadOnlyList<object>` means AI has to cast. `IReadOnlyList<IAttachable>` lets AI use the children directly. Small but AI will write cleaner code with the typed version.
 
 ---
 
-## 6. Gum Integration — Needs More Detail
+## THINGS THE DOC GETS RIGHT FOR AI
 
-**[Gap]** The Gum integration section is very sparse. Based on reviewing `GumService.cs`:
-- **GumService.Default** uses a static singleton pattern just like the proposed `FlatRedBallService.Default`. How do these two coexist? Who initializes Gum? Does `FlatRedBallService` call `GumService.Initialize(game)` internally?
-- **Gum has its own SystemManagers** — renderer, input, content loading. How does this interact with FRB2's managers?
-- **Gum has its own Cursor and Keyboard** — `FormsUtilities.Cursor`, `FormsUtilities.Keyboard`. Does FRB2's `InputManager` feed into these, or does Gum run its own input?
-- **Root/PopupRoot/ModalRoot** — Gum has a visual tree hierarchy. The doc doesn't mention this.
-- **CanvasWidth/CanvasHeight** — Gum has its own coordinate system. How does this relate to the Camera's `TargetWidth`/`TargetHeight`?
-- **GumBatch** — The doc mentions `GumBatch` as a built-in batch but doesn't explain how it delegates. In practice, Gum's rendering goes through `SystemManagers.Renderer` which has its own sprite batching separate from MonoGame's `SpriteBatch`.
-- **Forms controls** — Gum ships with a full Forms control set (Button, TextBox, CheckBox, ComboBox, ListBox, etc.). Worth mentioning these are available.
+These are good decisions that should NOT change:
 
-**[Suggestion]** Add a subsection showing how to add a Gum UI element to a screen:
-```csharp
-// How would this look in FRB2?
-var button = new Button();
-button.Text = "Start";
-// Where does it go? Which layer? How is it rendered?
-```
-
----
-
-## 7. Tiled Integration — Incorrect Dependency
-
-**[Accuracy]** The doc says "Via MonoGame.Extended.Tiled." However, FRB1 does NOT use MonoGame.Extended for Tiled support — it has its own TMX loading/rendering code. MonoGame.Extended is a separate library.
-
-**[Suggestion]** Clarify whether FRB2 actually intends to use MonoGame.Extended.Tiled (which would be a new dependency) or will port/rewrite FRB1's Tiled support. If using MonoGame.Extended, document that this is a change from FRB1.
-
-Also missing:
-- **TileShapeCollection** — FRB1's optimized tile-based collision. Critical for performant level collision. Not mentioned.
-- **TMX layer properties** — How are tile properties exposed for game logic?
-
----
-
-## 8. Screen System — Missing Features
-
-**[Gap]** FRB1's Screen has features not mentioned:
-- **Pause support** — `IsPaused`, `AccumulatedPauseTime`, `PauseAdjustedCurrentTime`. Pausing is a fundamental game feature.
-- **Async loading** — `AsyncLoadingState`, loading next screen while current is still active. Not mentioned.
-- **CancellationTokenSource** — FRB1 Screen has this for async operations. Not mentioned.
-- **Restart support** — `RestartVariables`, `RestartVariableValues`. Not mentioned.
-- **Screen timing** — Time since screen started (the doc has `FrameTime.SinceScreenStart` but doesn't show how Screen connects to this).
-
-**[Risk]** The doc says "When a screen is destroyed, its scoped ContentManager is unloaded. The new screen gets a fresh Camera." — What happens to entities that were on the old screen? Are they automatically destroyed? FRB1 has a check (`WarnIfNotEmptyBetweenScreens`) that warns if objects leak between screens.
-
----
-
-## 9. Factory — Missing Key Details
-
-**[Gap]** The Factory section mentions "Optional pooling (future version)" but doesn't discuss:
-- How does Factory register entities with the Screen for lifecycle management?
-- How does Factory register entities with collision relationships?
-- In FRB1, factories are auto-generated by Glue with entity list management. How will FRB2 handle this without an editor?
-- **Destroy callback** — When an entity is destroyed, how does the Factory know to remove it from its `Instances` list?
-
----
-
-## 10. Rendering — Missing Details
-
-**[Gap]** Missing from the rendering section:
-- **Color operations / Blend operations** — FRB1 Sprite has `ColorOperation` and `BlendOperation` enums. Not mentioned.
-- **FlipHorizontal / FlipVertical** — Common sprite feature. Not mentioned.
-- **Source rectangle / texture coordinates** — For sprite sheets. Not mentioned.
-- **Text rendering** — FRB1 has a `Text` class. How will text be rendered in FRB2? Through Gum only?
-- **Particle system** — FRB1 has `Emitter`/`EmissionSettings`. Not mentioned. Intentionally dropped?
-
----
-
-## 11. Input System — Missing Features
-
-**[Gap]** Missing from the input section:
-- **IInputDevice** — The doc shows this interface with action mapping (`IsActionDown(string action)`) but doesn't explain how actions are defined or mapped. This is a significant feature that needs more detail.
-- **Touch input** — FRB1 has `TouchScreen`. The doc's `ICursor` says "handles mouse + touch unified" but doesn't detail touch-specific features (multi-touch, gestures).
-- **Input receiving** — FRB1 has `IInputReceiver` for focused text input. Important for UI integration with Gum.
-
----
-
-## 12. Naming Inconsistencies
-
-**[Naming]** Several naming items:
-- `FlatRedBallService` (singular) vs FRB1's `FlatRedBallServices` (plural) — intentional but worth noting
-- `ContentManagerService` — the name includes "Service" which conflicts with the "Service" in `FlatRedBallService`. In FRB1 it's just `ContentManager`. Consider just `ContentManager` or `ContentService`.
-- `CollisionOccurred` event on `CollisionRelationship` — this is past tense which is good, but FRB1 uses present tense for some events. The naming conventions section should clarify: are events past-tense (thing happened) or present-tense (thing happening)?
-- `MoveToScreen<T>()` — in FRB1 this is handled by `ScreenManager` statically. Making it a method on Screen is cleaner but changes the pattern.
-
----
-
-## 13. Missing Sections
-
-**[Gap]** Concepts from FRB1 that have no mention in the ARCHITECTURE.md:
-- **SpriteManager** — Who manages sprite lifecycle? Automatic management vs manual?
-- **ShapeManager** — Who manages shape lifecycle?
-- **Emitter / Particle system** — Dropped?
-- **Text / TextManager** — How is text rendered?
-- **IDestroyable** — FRB1 has this interface. How does `Entity.Destroy()` relate?
-- **IVisible** — FRB1 has this interface with `AbsoluteVisible` (hierarchical). Mentioned implicitly but not as an interface.
-- **Threading / async** — The update loop mentions "Flush async synchronization context" but doesn't explain what this means or how async code works in screens.
-- **Error handling** — What happens when a screen transition fails? When content fails to load?
-
----
-
-## 14. The `IAttachable` Interface — Children Type
-
-**[Risk]** The doc shows:
-```csharp
-public IReadOnlyList<object> Children { get; }  // entities or any IAttachable
-```
-
-Using `object` loses type safety. FRB1 uses `AttachableList<PositionedObject>` which is typed. Consider:
-```csharp
-public IReadOnlyList<IAttachable> Children { get; }
-```
-
----
-
-## 15. Drag Behavior — Clarification Needed
-
-**[Gap]** The doc says `public float Drag { get; set; }  // reduces velocity each frame` but doesn't specify:
-- Is this a multiplier (0-1 range) or a flat subtraction?
-- Is it applied before or after acceleration?
-- FRB1 applies drag as: `Velocity *= (1 - Drag * SecondDifference)` — essentially a deceleration coefficient per second
-
----
-
-## 16. Package Structure — MonoGame.Extended Concern
-
-**[Risk]** The doc lists `MonoGame.Extended` as a dependency for Tiled rendering. MonoGame.Extended is a large library with many features. If you only need Tiled support, pulling in the entire library adds significant dependency weight. Consider:
-- Using just `MonoGame.Extended.Tiled` if it's available as a separate package
-- Or rolling a minimal Tiled loader (FRB1 does this)
-
----
-
-## Summary of Priority Items
-
-1. **High**: Static state migration strategy — document the FRB1 delta
-2. **High**: ICollidable redesign — the new interface is very different from FRB1; collision history tracking is missing
-3. **High**: Gum integration — needs significantly more detail on initialization, coordinate systems, and rendering pipeline
-4. **High**: Spatial partitioning — needed for any real game
-5. **Medium**: Tiled integration — clarify dependency (MonoGame.Extended vs custom)
-6. **Medium**: Screen pause/async loading — fundamental game features
-7. **Medium**: Missing Manager classes — who manages sprites, shapes, text?
-8. **Low**: Entity naming (vs PositionedObject)
-9. **Low**: Children list type safety
-10. **Low**: Drag behavior specification
+1. **Entity as a single class with position+velocity+rotation** — Simple. One type to learn. AI loves this.
+2. **Screen lifecycle (CustomInitialize/CustomActivity/CustomDestroy)** — Clear, predictable pattern.
+3. **FlatRedBallService as the single entry point** — AI knows where everything is.
+4. **Layer system** — Simple concept, easy for AI to use.
+5. **CollisionRelationship with fluent API** — AI can chain `.MoveFirstOnCollision()` naturally.
+6. **Factory pattern** — Simple creation/destruction. AI gets this immediately.
+7. **No static state (mostly)** — Makes the API predictable through the service instance.
+8. **Naming conventions** — PascalCase, no abbreviations. AI relies on consistent naming.

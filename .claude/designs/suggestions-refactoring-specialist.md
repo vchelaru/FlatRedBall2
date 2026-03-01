@@ -1,231 +1,102 @@
-# ARCHITECTURE.md -- Refactoring Specialist Suggestions
+# ARCHITECTURE.md — Refactoring Specialist Suggestions (v2 — AI-Friendly Lens)
 
-After reviewing ARCHITECTURE.md against FRB1 (`C:\git\FlatRedBall\`) and Gum (`C:\git\Gum\`), here are structural design concerns, interface segregation issues, dependency patterns, and architectural improvement suggestions. Each item is tagged:
-
-- **[High]** -- Fundamental design concern that will cause significant problems
-- **[Medium]** -- Design concern that will cause friction or confusion
-- **[Low]** -- Minor improvement or polish item
+Reviewed through the lens: **"Is this design simple enough for AI to use correctly? Does every type/interface earn its keep?"**
 
 ---
 
 ## High Priority
 
-### 1. Entity Is Still a God-Object
+### 1. [High] ICollidable Has Methods That Are Internal Plumbing
 
-**[High]** The proposed `Entity` class combines too many responsibilities:
-- Spatial transform (position, rotation)
-- Physics (velocity, acceleration, drag)
-- Scene graph (parent/child hierarchy)
-- Collision (ICollidable implementation)
-- Rendering hooks (CustomDraw)
-- Game logic hooks (CustomInitialize, CustomActivity, CustomDestroy)
-- Visibility control
+`SeparateFrom(ICollidable)` and `AdjustVelocityFrom(ICollidable)` are low-level primitives that AI should never call directly. In practice, AI uses `CollisionRelationship` to set up responses (`.MoveFirstOnCollision()`, `.BounceOnCollision()`). These methods are implementation details leaking into the public interface.
 
-This is the same fundamental problem as FRB1's `PositionedObject` -- it violates the Single Responsibility Principle. The philosophy section says "No single heavy base class" and "Lightweight entities" but the proposed Entity still aggregates 6+ concerns.
+**Suggestion**: Consider making `SeparateFrom`/`AdjustVelocityFrom` internal. ICollidable should only need `CollidesWith` and `GetSeparationVector` for AI-facing code.
 
-**Suggestion**: Consider a composition-based approach where Entity is a thin container:
-- `Transform` component (position, rotation, parent/child)
-- `PhysicsBody` component (velocity, acceleration, drag)
-- Collision shapes are already separate (ICollidable via aggregation)
-- Rendering is already separate (IRenderable on Sprite)
+### 2. [High] No Support for Entity-vs-Static-Geometry Collision
 
-Even without full ECS, breaking Transform and Physics into composable structs/components would make Entity significantly lighter and more testable.
+`CollisionRelationship<A, B>` requires two `IEnumerable<ICollidable>` lists. But the most common collision in games is entity-vs-level-geometry (walls, platforms, tiles). In FRB1, you collide an entity list against a `ShapeCollection` (walls). The FRB2 architecture has no path for this.
 
-### 2. Entity Forces ICollidable on Everything
+AI will need this on day one for any platformer or top-down game. Either CollisionRelationship needs overloads for static shapes, or there needs to be a clear alternative.
 
-**[High]** The doc states "Entity implements `ICollidable` by aggregating all attached collision shapes." This means every Entity is collidable, whether or not it has collision shapes. In FRB1, `ICollidable` is opt-in -- only entities that need collision implement it (via Glue code generation).
+### 3. [High] FRB2 Correctly Eliminates Manager Registration Boilerplate (Preserve This)
 
-Making all entities collidable:
-- Adds overhead for entities that don't need collision (checking empty shape lists)
-- Muddies the type system (a decorative particle is "collidable" even if it has no shapes)
-- Makes collision relationship generic constraints less meaningful
+FRB1 required every entity constructor to manually register with SpriteManager, ShapeManager, etc. FRB2's auto-registration through `AddChild` eliminates this. This is the single biggest AI-friendliness improvement. **Do not regress.**
 
-**Suggestion**: Keep ICollidable as opt-in. Entity should NOT implement ICollidable by default. Let users add collision capability by either inheriting from a `CollidableEntity` subclass or implementing `ICollidable` themselves.
+### 4. [High] CollisionRelationship Missing Single-vs-List Overload
 
-### 3. ICollidable Interface Is Too Broad -- Violates ISP
-
-**[High]** The proposed `ICollidable` interface mixes collision detection with collision response:
-
-```csharp
-public interface ICollidable
-{
-    bool CollidesWith(ICollidable other);          // detection
-    Vector2 GetSeparationVector(ICollidable other); // detection
-    void SeparateFrom(ICollidable other);           // response (mutates position)
-    void AdjustVelocityFrom(ICollidable other);     // response (mutates velocity)
-}
-```
-
-Detection and response are separate concerns. A wall needs to be collidable (detection) but should never be moved (response). A trigger zone needs detection but no response at all.
-
-**Suggestion**: Split into two interfaces:
-```
-ICollidable -- detection only (CollidesWith, GetSeparationVector)
-ICollisionResponder -- response only (SeparateFrom, AdjustVelocityFrom)
-```
-
-CollisionRelationship can then work with `ICollidable` for detection and optionally `ICollisionResponder` for physics responses.
-
-### 4. IAttachable.Parent Typed as Entity -- Too Restrictive
-
-**[High]** The `IAttachable` interface specifies:
-```csharp
-public interface IAttachable
-{
-    Entity Parent { get; set; }
-    ...
-}
-```
-
-Typing `Parent` as `Entity` prevents:
-- Sprite-to-Sprite parenting (a Sprite is IAttachable but not Entity)
-- Shape-to-Shape parenting
-- Any future IAttachable type that isn't an Entity
-
-FRB1 solved this by having `IAttachable.ParentAsIAttachable` return `IAttachable`, while `PositionedObject.Parent` returned `PositionedObject`. The FRB2 design should either:
-- Type Parent as `IAttachable` on the interface
-- Or introduce a separate property like `ParentEntity` for the typed version
-
-### 5. Screen Cleanup Validation Is Missing
-
-**[High]** FRB1's `ScreenManager` has 400+ lines of `CheckAndWarnIfNotEmpty` code that detects resource leaks between screen transitions. It checks for orphaned sprites, shapes, texts, sounds, cameras, and other managed objects. This is one of FRB1's most valuable debugging features.
-
-The FRB2 architecture has no mention of this. Without leak detection:
-- Memory leaks will be silent and hard to track down
-- Entities that aren't properly destroyed will accumulate
-- Content that should be unloaded will persist
-
-**Suggestion**: Add a leak detection system or at least document the intent. Even a simple count check ("were there 0 entities when the screen was destroyed?") would be valuable.
+`AddCollisionRelationship(IEnumerable<A>, IEnumerable<B>)` only handles list-vs-list. AI will frequently need "player vs enemies" (single vs list). Without an overload, AI must write `new[] { player }` which is non-obvious.
 
 ---
 
 ## Medium Priority
 
-### 6. Entity.CustomDraw Conflicts with IRenderable
+### 5. [Medium] IInputDevice String-Based Actions Lack Discoverability
 
-**[Medium]** Entity has `public virtual void CustomDraw(SpriteBatch spriteBatch, Camera camera)` but Entity does NOT implement `IRenderable`. This means:
-- The CustomDraw method won't be called by the render system (which iterates IRenderable objects)
-- It's unclear who calls CustomDraw and when
-- It creates a parallel rendering path outside the batched render pipeline
+`IsActionDown(string action)` means AI must guess action names. It will write `"jump"` when the game uses `"Jump"`. Consider typed constants or an enum instead of raw strings. Or drop `IInputDevice` entirely — `IKeyboard`/`IGamepad` directly are more explicit and AI can see exactly what's available.
 
-Either Entity should implement IRenderable (and participate in Z-sorted rendering), or CustomDraw should be removed in favor of attaching IRenderable children.
+### 6. [Medium] Missing I2DInput / IPressableInput Equivalents from FRB1
 
-### 7. Collision Shapes Always in the Render List
-
-**[Medium]** Collision shapes implement `IRenderable` "for debug drawing." This means every collision shape is always in the render list, even in release builds. For a game with thousands of collision tiles (common with Tiled maps), this adds significant overhead to the render list.
-
-**Suggestion**: Debug rendering for shapes should be opt-in (a flag), not default. Consider having shapes implement `IRenderable` only when debug mode is active, or have the DebugRenderer handle shape visualization separately.
-
-### 8. Manager Proliferation
-
-**[Medium]** `FlatRedBallService` exposes 7 managers:
-- ScreenManager
-- LayerManager
-- InputManager
-- AudioManager
-- ContentManagerService
-- TimeManager
-- DebugRenderer
-
-Some of these could be combined or simplified:
-- `DebugRenderer` is more of a utility than a manager
-- `LayerManager` might not need to be a separate manager if Layer registration happens on the render system
-- `TimeManager` could be a value type or simple property bag rather than a full manager
-
-### 9. FlatRedBallService.Default Risks Becoming a Static Service Locator
-
-**[Medium]** The single static accessor `FlatRedBallService.Default` is a necessary convenience, but it risks becoming a service locator anti-pattern if code throughout the engine accesses subsystems through `FlatRedBallService.Default.InputManager` etc.
-
-**Suggestion**:
-- Make `Default` settable only once (throw on second assignment)
-- Prefer constructor injection for engine internals
-- Reserve `Default` for game code convenience only
-
-### 10. Entity.Children Typed as IReadOnlyList<object>
-
-**[Medium]** Using `IReadOnlyList<object>` for Children loses type safety and forces boxing for value types. FRB1 uses `AttachableList<PositionedObject>` which is fully typed.
-
-**Suggestion**: Use `IReadOnlyList<IAttachable>` instead:
+FRB1's most AI-friendly pattern:
 ```csharp
-public IReadOnlyList<IAttachable> Children { get; }
+public I2DInput MovementInput { get; set; }
+public IPressableInput BoostInput { get; set; }
 ```
+These let entities be input-device-independent. AI writes entity logic once, and input source is swapped externally. This is a great pattern that makes AI code more correct. Consider preserving.
 
-### 11. Camera Missing Zoom Property
+### 7. [Medium] Sprite Missing Rotation — Inconsistency with Entity
 
-**[Medium]** The Camera class has `TargetWidth` and `TargetHeight` but no explicit zoom mechanism. In FRB1, Camera has `OrthogonalWidth`/`OrthogonalHeight` which effectively control zoom. The relationship between TargetWidth/TargetHeight and zoom should be explicit.
+Entity has `Angle Rotation`. Sprite attached to a rotating Entity should rotate too. But `IAttachable` has no rotation, so it's unclear if rotation propagates. Either add `Rotation` to `IAttachable` or document how rotation propagation works through the parent-child transform.
 
-**Suggestion**: Either add a `Zoom` property that scales TargetWidth/TargetHeight, or document that changing TargetWidth/TargetHeight IS the zoom mechanism.
+### 8. [Medium] Children Typed as IReadOnlyList<object>
 
-### 12. Entity Missing Name Property
+Should be `IReadOnlyList<IAttachable>`. Using `object` means AI gets no type info when iterating children. This is a simple fix with high AI benefit.
 
-**[Medium]** FRB1's PositionedObject has a `Name` property used extensively for debugging, collision tracking (`ItemsCollidedAgainst` stores names), and object lookup. The FRB2 Entity has no Name. IRenderable has an optional `Name` but Entity doesn't.
+### 9. [Medium] RenderDiagnostics Not Listed on FlatRedBallService
 
-### 13. No Lifecycle Diagram for Entity/Screen Interaction
+The doc says "Accessed via `FlatRedBallService.RenderDiagnostics`" but the FlatRedBallService class listing doesn't include it. AI will try to access it and get a compile error.
 
-**[Medium]** The document shows Entity and Screen lifecycle methods separately but doesn't explain:
-- Who calls Entity.CustomInitialize? (the user? the factory? the screen?)
-- When in the update loop does Entity.CustomActivity get called relative to physics and collision?
-- Does Entity.Destroy remove it from the screen's render list automatically?
-- What order are entity CustomActivity calls made in? (creation order? hierarchy order?)
+### 10. [Medium] Entity Has No Path to Access Camera
+
+Entity doesn't reference Screen or Camera. AI writing "keep entity on screen" or "camera follow" code needs Camera access from an Entity. How? Through `FlatRedBallService.Default`? Through some injected reference? This is a common operation with no documented path.
 
 ---
 
 ## Low Priority
 
-### 14. Render List Scaling Concerns
+### 11. [Low] Factory.Destroy Is Redundant With Entity.Destroy
 
-**[Low]** The render list uses "insertion sort (O(N) for nearly-sorted data)" which is good for the common case but could degrade for large scenes. With thousands of renderables (common in tile-based games), consider:
-- A skip list or tree structure for better worst-case performance
-- Dirty-flag approach: only re-sort if something actually changed Z or layer
+Two ways to destroy: `factory.Destroy(enemy)` vs `enemy.Destroy()`. AI won't know which to use. `Entity.Destroy()` should auto-remove from Factory. One path, not two.
 
-### 15. Input Clearing Between Screens
+### 12. [Low] Camera Missing Drag for Consistency
 
-**[Low]** FRB1's InputManager has `ClearInput` and `mIgnorePushesNextFrame`/`mIgnorePushesThisFrame` to prevent input from "leaking" across screen transitions (e.g., a button press on screen A firing in screen B). The doc doesn't mention this.
+Camera has VelocityX/Y and AccelerationX/Y (same as Entity) but no Drag. If Camera has velocity/acceleration, should it also have drag? Either add for consistency or remove acceleration if camera physics aren't a real use case.
 
-### 16. Per-Entity Time Scale
+### 13. [Low] IAudioBackend Is Premature Abstraction
 
-**[Low]** Some games need per-entity time scaling (e.g., bullet time that doesn't affect UI). The current design has only a global TimeScale. Consider whether Entity could have a local time scale multiplier.
+`public IAudioBackend Backend { get; set; }` adds a type for no AI benefit. Games use MonoGame audio. AI will wonder "do I need to set this?" Remove from initial architecture — add later if needed.
 
-### 17. GumBatch Rendering Order
+### 14. [Low] Collision Shapes Should Use Width/Height Not ScaleX/ScaleY
 
-**[Low]** The doc says Gum objects should be placed on screen-space layers, but doesn't explain what happens if someone puts a Gum element on a world-space layer. Does it render correctly? Does it ignore the camera transform? This edge case should be documented.
+FRB1's `ScaleX`/`ScaleY` (half-dimensions) was a constant confusion source. `Width`/`Height` (full dimensions) is more AI-predictable. Document that shapes use Width/Height to match Sprite.
 
-### 18. Missing Dispose/IDisposable Pattern
+### 15. [Low] IAttachable.Destroy() Semantics Unclear for Shapes
 
-**[Low]** `FlatRedBallService` holds references to MonoGame resources but doesn't implement `IDisposable`. For proper cleanup (especially in testing where multiple instances are created), consider implementing `IDisposable`.
-
-### 19. Factory-Screen Coupling
-
-**[Low]** The Factory section says it's "Associated with the current Screen at construction time" but doesn't explain the lifecycle implications. When the screen is destroyed, are all factory instances automatically destroyed? Is the factory itself destroyed? Can a factory outlive its screen?
+What does destroying a Circle do? Remove it from parent Entity's collision shapes? Remove from render list? AI might call `circle.Destroy()` expecting shape removal and get unexpected behavior.
 
 ---
 
-## Patterns from FRB1 Worth Preserving
+## Patterns FRB1 Got Right for AI (Preserve These)
 
-These are good patterns in FRB1 that the FRB2 architecture should not lose:
+1. **Flat property surface**: `X`, `Y`, `VelocityX`, `VelocityY`, `Drag` all directly on the object. No `.Transform.Position.X`. FRB2 preserves this — good.
+2. **CollisionRelationship event**: `CollisionOccurred += (a, b) => { }`. One-line subscription. FRB2 preserves this — good.
+3. **Screen lifecycle**: `CustomInitialize`, `CustomActivity`, `CustomDestroy`. Three methods, always the same. FRB2 preserves this — good.
+4. **Factory with typed list**: `Factory<T>.Instances`. Simple creation + typed iteration. FRB2 preserves this — good.
+5. **I2DInput / IPressableInput**: Device-independent input abstractions. FRB2 should preserve these.
 
-1. **Two-way list membership** (`ListsBelongingTo`) -- Objects know which lists contain them. This enables proper cleanup and prevents orphaned references.
+## Patterns FRB1 Got Wrong (Correctly Avoided)
 
-2. **Collision history tracking** (`ItemsCollidedAgainst`, `LastFrameItemsCollidedAgainst`) -- Essential for detecting "just started colliding" vs "still colliding" vs "just stopped colliding."
-
-3. **Screen leak detection** (`CheckAndWarnIfNotEmpty`) -- Catches resource leaks between screen transitions.
-
-4. **Relative vs Absolute separation** -- Having explicit `RelativeX`/`X` properties avoids the ambiguity of dual-meaning properties.
-
-5. **ShapeCollection as collision aggregate** -- FRB1's approach of having ICollidable expose a ShapeCollection is cleaner than putting collision logic on each shape individually.
-
----
-
-## Patterns from FRB1 to Avoid
-
-These are problematic patterns in FRB1 that FRB2 should NOT carry forward:
-
-1. **Everything being static** -- The move to instance-based is correct and important.
-
-2. **Public Vector3 fields** -- FRB1's `public Vector3 Position` as a public field (not property) allows direct mutation and prevents change notification. Properties are better.
-
-3. **Manager-based object creation** -- FRB1 requires `SpriteManager.AddSprite()` to create visible sprites. Direct construction (`new Sprite()`) is better.
-
-4. **PositionedObject having 40+ fields** -- The "lightweight entity" goal is correct.
-
-5. **Instruction system** -- FRB1's `IInstructable`/`InstructionManager` is an overcomplicated tween/scheduling system that is better served by modern alternatives.
+1. **Everything static** — Can't test, can't run multiple instances. FRB2 correctly uses instance-based.
+2. **Manual manager registration** — `SpriteManager.AddPositionedObject(this)` in every constructor. FRB2's `AddChild` auto-registration eliminates this.
+3. **Manual Destroy cleanup** — Miss one unregister and you get a silent leak. FRB2's recursive destroy eliminates this.
+4. **ICollidable 5-property boilerplate** — Copy-paste into every entity. FRB2 putting it on Entity base eliminates this.
+5. **Screen navigation by string** — `MoveToScreen(typeof(T).FullName)`. FRB2's `MoveToScreen<T>()` is type-safe.
