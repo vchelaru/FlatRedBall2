@@ -10,6 +10,7 @@
 - **Unit testable**: Engine runs headless. Logic is separated from rendering. Time and input are injectable.
 - **Avoid unnecessary systems**: No damage system, no built-in game-specific logic. Keep the engine lean.
 - **Center-based positioning**: All objects (entities, sprites, shapes) are positioned from their center point, matching existing FRB behavior.
+- **Auto-registration via AddChild**: Attaching a child to an entity automatically registers it for update, rendering, and collision. No manual manager registration required.
 
 ---
 
@@ -38,16 +39,13 @@ public readonly struct Angle
 }
 ```
 
-### `FrameTime` (struct)
+### `FrameTime` (record struct)
 
-Passed into all update methods. Reflects TimeManager scaling (slow motion etc.).
+Passed into all update methods. Reflects TimeManager scaling (slow motion etc.). Declared as a `record struct` — primary constructor and value equality are generated automatically.
 
 ```csharp
-public readonly struct FrameTime
+public readonly record struct FrameTime(TimeSpan Delta, TimeSpan SinceScreenStart, TimeSpan SinceGameStart)
 {
-    public TimeSpan Delta { get; }             // time since last frame
-    public TimeSpan SinceScreenStart { get; }  // time since current screen started
-    public TimeSpan SinceGameStart { get; }    // time since engine started
     public float DeltaSeconds => (float)Delta.TotalSeconds; // convenience
 }
 ```
@@ -70,8 +68,11 @@ public class FlatRedBallService
     public FlatRedBallService();           // empty constructor
     public void Initialize(Game game);     // wires into MonoGame Game instance
 
+    // Screen management
+    public Screen CurrentScreen { get; }
+    public void Start<T>() where T : Screen, new();  // creates and activates the first screen
+
     // Sub-systems (all instance-based, injected into screens/entities)
-    public ScreenManager ScreenManager { get; }
     public InputManager InputManager { get; }
     public AudioManager AudioManager { get; }
     public ContentManagerService ContentManager { get; }  // global-scoped
@@ -91,7 +92,7 @@ Users wire the engine into their own `Game` subclass — no base class required:
 protected override void Initialize()
 {
     FlatRedBallService.Default.Initialize(this);
-    FlatRedBallService.Default.ScreenManager.Start<MainMenuScreen>();
+    FlatRedBallService.Default.Start<MainMenuScreen>();
 }
 
 protected override void Update(GameTime gameTime) => FlatRedBallService.Default.Update(gameTime);
@@ -100,20 +101,7 @@ protected override void Draw(GameTime gameTime) => FlatRedBallService.Default.Dr
 
 ---
 
-## `ScreenManager`
-
-Manages screen transitions. Accessible via `FlatRedBallService.ScreenManager`.
-
-```csharp
-public class ScreenManager
-{
-    public Screen CurrentScreen { get; }
-
-    public void Start<T>() where T : Screen, new();  // creates and activates the first screen
-}
-```
-
-When a new screen starts, the previous screen's `CustomDestroy` is called and its scoped `ContentManager` is unloaded.
+When a new screen starts, the previous screen's `CustomDestroy` is called and its scoped `ContentManager` is unloaded. The new screen gets a fresh `Camera`.
 
 ---
 
@@ -122,7 +110,7 @@ When a new screen starts, the previous screen's `CustomDestroy` is called and it
 Driven by `FlatRedBallService.Update`, which delegates to the active Screen:
 
 1. **Read input** — `InputManager.Update()`
-2. **Apply physics** — velocity → position, acceleration → velocity, drag applied; traverses entity hierarchy top-down
+2. **Apply physics** — integration-based; position, velocity, and drag updated per frame using the same formulas as FRB1. Traverses entity hierarchy top-down.
 3. **Run collision relationships** — collision events fire inline
 4. **Flush async synchronization context** — pending continuations run
 5. **CustomActivity** — `Screen.CustomActivity(frameTime)`, then all entity `CustomActivity(frameTime)` calls top-down
@@ -188,6 +176,9 @@ public class Entity : IAttachable, ICollidable
     // Visibility — hierarchical; invisible parent hides all children
     public bool IsVisible { get; set; }
 
+    // Engine reference — injected by the framework when entity enters the hierarchy
+    public FlatRedBallService Engine { get; }
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }
@@ -199,6 +190,10 @@ public class Entity : IAttachable, ICollidable
 ```
 
 No `Scale` property. Children Z is relative to entity Z.
+
+**Entity registration**: Entities enter the update/physics/collision loop when created via `Factory.Create()` (which registers with the screen automatically). Standalone entities created with `new` must be registered manually.
+
+**Destroy lifecycle**: `Destroy()` calls `CustomDestroy()`, removes this entity from its parent, recursively destroys all children, removes from `Factory.Instances` if factory-created, and removes all attached `IRenderable` children from the render list.
 
 Entity implements `ICollidable` by aggregating all attached collision shapes. When `CollidesWith` is called on an entity, it checks all of its shapes against all shapes of the other `ICollidable`.
 
@@ -237,6 +232,10 @@ public class Screen
     // Modify directly: add, remove, or reorder as needed.
     public List<Layer> Layers { get; }
 
+    // Render list — all IRenderable objects drawn this screen.
+    // Entity children are auto-registered via AddChild; add standalone renderables (Tiled layers, Gum UI) directly.
+    public List<IRenderable> RenderList { get; }
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }
@@ -245,12 +244,25 @@ public class Screen
     // Navigation
     public void MoveToScreen<T>() where T : Screen, new();
 
-    // Collision
+    // Collision — list vs list (Factory implements IEnumerable<T>)
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
         IEnumerable<A> listA,
         IEnumerable<B> listB)
         where A : ICollidable
         where B : ICollidable;
+
+    // Collision — single vs list
+    public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
+        A single,
+        IEnumerable<B> list)
+        where A : ICollidable
+        where B : ICollidable;
+
+    // Collision — entities vs static geometry
+    public CollisionRelationship<A, ShapeCollection> AddCollisionRelationship<A>(
+        IEnumerable<A> entities,
+        ShapeCollection staticGeometry)
+        where A : ICollidable;
 }
 ```
 
@@ -294,9 +306,11 @@ public class Camera
     public float AccelerationX { get; set; }
     public float AccelerationY { get; set; }
 
-    public Color BackgroundColor { get; set; }
+    public Color BackgroundColor { get; set; }  // Microsoft.Xna.Framework.Color
 
-    // Resolution / scaling
+    // Resolution / scaling — this IS the zoom mechanism.
+    // Smaller values = zoom in (fewer world units visible). Larger values = zoom out. No separate Zoom property.
+    // Defaults to the game window's resolution — no explicit configuration required for basic games.
     public int TargetWidth { get; set; }
     public int TargetHeight { get; set; }
 
@@ -338,7 +352,7 @@ public interface IRenderBatch
 
 ### Render List
 
-- A single persistent `List<IRenderable>` maintained by the engine
+- A per-screen `List<IRenderable>` accessible via `Screen.RenderList`; torn down with the screen
 - Objects are **inserted in sorted position** on add (binary search, O(log N) find + O(N) shift)
 - Each frame: **insertion sort** (O(N) for nearly-sorted data — the common case)
 - Sort key: Layer order (primary), Z (secondary)
@@ -361,25 +375,46 @@ Custom batches (FontStashSharp, Apos.Shapes, etc.) implement `IRenderBatch` — 
 
 Implements `IRenderable` and `IAttachable`. Positioned from its center. Animation chains can adjust the sprite's relative X/Y offset per frame (e.g. for walk cycles or root-motion offsets baked into an ACHX file).
 
+Sprites are drawn rotated around their center point. The origin is always `(Width/2, Height/2)`.
+
 ```csharp
 public class Sprite : IRenderable, IAttachable
 {
+    // IAttachable
+    public Entity Parent { get; set; }
     public float X { get; set; }
     public float Y { get; set; }
     public float AbsoluteX { get; }
     public float AbsoluteY { get; }
     public float Z { get; set; }
+    public float AbsoluteZ { get; }
+
+    // Rotation
+    public Angle Rotation { get; set; }
+    public Angle AbsoluteRotation { get; }
+
+    // IRenderable
     public Layer Layer { get; set; }
     public IRenderBatch Batch { get; set; }  // defaults to WorldSpaceBatch
+    public string? Name { get; set; }
 
+    // Visual
     public Texture2D Texture { get; set; }
     public float Width { get; set; }
     public float Height { get; set; }
-    public Color Color { get; set; }
+    public Color Color { get; set; }           // Microsoft.Xna.Framework.Color
+    public float Alpha { get; set; }           // 0.0 = fully transparent, 1.0 = fully opaque (default)
     public bool IsVisible { get; set; }
 
+    // Sprite sheets
+    public Rectangle? SourceRectangle { get; set; }  // null = full texture
+
+    // Flip
+    public bool FlipHorizontal { get; set; }
+    public bool FlipVertical { get; set; }
+
     // Animation
-    public AnimationChain CurrentAnimation { get; }
+    public AnimationChain? CurrentAnimation { get; }
     public void PlayAnimation(string name);
     public void PlayAnimation(AnimationChain chain);
 
@@ -396,6 +431,8 @@ Animation chains are loaded from external files (ACHX format, ported from FRB).
 
 All shapes implement `IAttachable`, `IRenderable` (for debug drawing), and `ICollidable`. Rotation is not modified by collision responses. All shapes are positioned from their center.
 
+Game code typically uses `CollisionRelationship` responses (`.MoveFirstOnCollision()`, etc.) rather than calling `SeparateFrom`/`AdjustVelocityFrom` directly.
+
 ```csharp
 public interface ICollidable
 {
@@ -411,20 +448,59 @@ public interface ICollidable
     // than energy-conserving — intentionally game-friendly, not physically realistic.
     void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f);
 }
+```
 
-// Shapes implement ICollidable directly
-public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable { ... }
-public class Circle : IAttachable, IRenderable, ICollidable { ... }
-public class Polygon : IAttachable, IRenderable, ICollidable { ... }
+### Shape Classes
 
-// Entity implements ICollidable by aggregating its attached shapes
-public class Entity : IAttachable, ICollidable
+```csharp
+public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
 {
-    // CollidesWith checks all attached shapes against all shapes of the other ICollidable
+    public float Width { get; set; }   // full width, not half
+    public float Height { get; set; }  // full height, not half
+
+    // IAttachable: Parent, X, Y, Z, AbsoluteX, AbsoluteY, AbsoluteZ, Destroy()
+    // IRenderable: Layer, Batch, Name, Draw() — used for debug visualization
+}
+
+public class Circle : IAttachable, IRenderable, ICollidable
+{
+    public float Radius { get; set; }
+
+    // IAttachable: Parent, X, Y, Z, AbsoluteX, AbsoluteY, AbsoluteZ, Destroy()
+    // IRenderable: Layer, Batch, Name, Draw()
+}
+
+public class Polygon : IAttachable, IRenderable, ICollidable
+{
+    public IReadOnlyList<Vector2> Points { get; }
+
+    public static Polygon CreateRectangle(float width, float height);
+    public static Polygon FromPoints(IEnumerable<Vector2> points);
+
+    // IAttachable: Parent, X, Y, Z, AbsoluteX, AbsoluteY, AbsoluteZ, Destroy()
+    // IRenderable: Layer, Batch, Name, Draw()
 }
 ```
 
-This means collision relationships work with any `ICollidable` — entities, individual shapes, or custom types.
+### `ShapeCollection`
+
+Used for static level geometry (walls, platforms, tile-based collision):
+
+```csharp
+public class ShapeCollection : ICollidable
+{
+    public void Add(AxisAlignedRectangle rect);
+    public void Add(Circle circle);
+    public void Add(Polygon polygon);
+
+    public bool CollidesWith(ICollidable other);
+    public Vector2 GetSeparationVector(ICollidable other);
+    public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f);
+    public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f);
+}
+```
+
+The engine handles all shape-vs-shape collision dispatch internally (AABB-AABB, AABB-Circle, Circle-Circle, Polygon-AABB, etc.). Game code should not implement `ICollidable` on custom types.
 
 ---
 
@@ -452,10 +528,10 @@ public class CollisionRelationship<A, B>
 }
 ```
 
-Usage:
+### Usage Examples
 
+Factory vs Factory:
 ```csharp
-// In Screen.CustomInitialize:
 AddCollisionRelationship(bulletFactory, enemyFactory)
     .MoveSecondOnCollision()
     .CollisionOccurred += (bullet, enemy) =>
@@ -465,22 +541,36 @@ AddCollisionRelationship(bulletFactory, enemyFactory)
     };
 ```
 
+Single entity vs Factory:
+```csharp
+AddCollisionRelationship(player, enemyFactory)
+    .MoveBothOnCollision();
+```
+
+Entities vs static geometry:
+```csharp
+AddCollisionRelationship(playerFactory, levelWalls)
+    .MoveFirstOnCollision();  // entities separate from static walls
+```
+
 ---
 
 ## Factory
 
-A built-in generic base class. Associated with the current Screen at construction time.
+A built-in generic base class. Associated with the current Screen at construction time. Implements `IEnumerable<T>` so it can be passed directly to `AddCollisionRelationship`.
+
+`Factory.Create()` calls `new T()`, registers the entity with the screen, injects `Engine`, then calls `CustomInitialize()`. Entities load their own content in `CustomInitialize()` via `Engine.ContentManager` — factories do not load content.
 
 ```csharp
-public class Factory<T> where T : Entity, new()
+public class Factory<T> : IEnumerable<T> where T : Entity, new()
 {
+    public Factory(Screen screen);
+
     public IReadOnlyList<T> Instances { get; }
 
-    public T Create();         // creates instance, registers with screen
+    public T Create();         // allocates, injects Engine, calls CustomInitialize, registers with screen
     public void Destroy(T instance);
     public void DestroyAll();
-
-    // Optional pooling (future version)
 }
 ```
 
@@ -489,9 +579,11 @@ Users can inherit to add custom Create logic:
 ```csharp
 public class EnemyFactory : Factory<Enemy>
 {
+    public EnemyFactory(Screen screen) : base(screen) { }
+
     public Enemy Create(Vector2 position)
     {
-        var enemy = Create();
+        var enemy = Create();  // engine injected, CustomInitialize called
         enemy.Position = position;
         return enemy;
     }
@@ -502,20 +594,141 @@ public class EnemyFactory : Factory<Enemy>
 
 ## Input
 
+### `InputManager`
+
+```csharp
+public class InputManager
+{
+    public IKeyboard Keyboard { get; }
+    public ICursor Cursor { get; }
+    public IGamepad GetGamepad(int index);  // player index 0-3
+
+    internal void Update();  // called by FlatRedBallService.Update
+}
+```
+
+### Core Input Interfaces
+
 Hard classes for direct access, interfaces for testability and injection:
 
 ```csharp
-public interface IKeyboard { bool IsKeyDown(Keys key); bool WasKeyPressed(Keys key); }
-public interface ICursor { Vector2 WorldPosition { get; } Vector2 ScreenPosition { get; } bool PrimaryDown { get; } bool PrimaryPressed { get; } }
-public interface IGamepad { bool IsButtonDown(Buttons button); float GetAxis(GamepadAxis axis); }
-public interface IInputDevice { bool IsActionDown(string action); bool WasActionPressed(string action); }
+public interface IKeyboard
+{
+    bool IsKeyDown(Keys key);
+    bool WasKeyPressed(Keys key);
+}
 
-public class Keyboard : IKeyboard { ... }
-public class Cursor : ICursor { ... }    // handles mouse + touch unified
-public class Gamepad : IGamepad { ... }
+public interface ICursor
+{
+    Vector2 WorldPosition { get; }
+    Vector2 ScreenPosition { get; }
+    bool PrimaryDown { get; }
+    bool PrimaryPressed { get; }
+}
+
+public interface IGamepad
+{
+    bool IsButtonDown(Buttons button);
+    float GetAxis(GamepadAxis axis);
+}
+
+public enum GamepadAxis
+{
+    LeftStickX, LeftStickY,
+    RightStickX, RightStickY,
+    LeftTrigger, RightTrigger
+}
+
+public interface IInputDevice { bool IsActionDown(string action); bool WasActionPressed(string action); }
 ```
 
-Accessed via `Screen.Engine.InputManager` or injected directly in tests.
+### Concrete Implementations
+
+```csharp
+public class Keyboard : IKeyboard { }
+public class Cursor : ICursor { }    // handles mouse + touch unified
+public class Gamepad : IGamepad { }
+```
+
+Accessed via `Engine.InputManager` or injected directly in tests.
+
+### Device-Independent Input Abstractions
+
+For entities that should work with any input device (keyboard, gamepad, or test stubs):
+
+```csharp
+public interface I2DInput
+{
+    float X { get; }  // -1 to 1 horizontal
+    float Y { get; }  // -1 to 1 vertical
+}
+
+public interface IPressableInput
+{
+    bool IsDown { get; }
+    bool WasJustPressed { get; }
+    bool WasJustReleased { get; }
+}
+```
+
+Usage on an entity:
+
+```csharp
+public class Player : Entity
+{
+    public I2DInput MovementInput { get; set; }
+    public IPressableInput ShootInput { get; set; }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        VelocityX = MovementInput.X * MoveSpeed;
+        VelocityY = MovementInput.Y * MoveSpeed;
+        if (ShootInput.WasJustPressed) Shoot();
+    }
+}
+```
+
+### Built-in Input Adapters
+
+```csharp
+public class KeyboardInput2D : I2DInput
+{
+    public KeyboardInput2D(IKeyboard keyboard, Keys left, Keys right, Keys up, Keys down);
+    public float X { get; }
+    public float Y { get; }
+}
+
+public class KeyboardPressableInput : IPressableInput
+{
+    public KeyboardPressableInput(IKeyboard keyboard, Keys key);
+    public bool IsDown { get; }
+    public bool WasJustPressed { get; }
+    public bool WasJustReleased { get; }
+}
+
+public class GamepadInput2D : I2DInput
+{
+    public GamepadInput2D(IGamepad gamepad, GamepadAxis xAxis, GamepadAxis yAxis);
+    public float X { get; }
+    public float Y { get; }
+}
+
+public class GamepadPressableInput : IPressableInput
+{
+    public GamepadPressableInput(IGamepad gamepad, Buttons button);
+    public bool IsDown { get; }
+    public bool WasJustPressed { get; }
+    public bool WasJustReleased { get; }
+}
+```
+
+Wiring in Screen:
+
+```csharp
+player.MovementInput = new KeyboardInput2D(Engine.InputManager.Keyboard,
+    Keys.Left, Keys.Right, Keys.Up, Keys.Down);
+player.ShootInput = new KeyboardPressableInput(Engine.InputManager.Keyboard, Keys.Space);
+```
 
 ---
 
@@ -551,6 +764,8 @@ public class ContentManagerService
     public static ContentManagerService CreateNull();
 }
 ```
+
+**Path format**: Content paths use MonoGame content pipeline format — forward slashes, no file extension. Example: `ContentManager.Load<Texture2D>("Sprites/player")` loads the corresponding `.xnb` asset. For raw file loading (PNG, WAV, etc.), use the full relative path with extension: `ContentManager.Load<Texture2D>("Sprites/player.png")`.
 
 ---
 
@@ -665,6 +880,30 @@ Key testability affordances:
 
 ---
 
+## Namespace Structure
+
+```
+FlatRedBall2                    — FlatRedBallService, Entity, Screen,
+                                   Camera, Factory<T>, IAttachable, FrameTime,
+                                   ContentManagerService
+FlatRedBall2.Math               — Angle
+FlatRedBall2.Rendering          — IRenderable, IRenderBatch, Sprite, Layer
+FlatRedBall2.Rendering.Batches  — WorldSpaceBatch, ScreenSpaceBatch
+FlatRedBall2.Collision          — ICollidable, AxisAlignedRectangle, Circle, Polygon,
+                                   ShapeCollection, CollisionRelationship<A,B>
+FlatRedBall2.Input              — InputManager, IKeyboard, ICursor, IGamepad, GamepadAxis,
+                                   IInputDevice, I2DInput, IPressableInput,
+                                   Keyboard, Cursor, Gamepad,
+                                   KeyboardInput2D, KeyboardPressableInput,
+                                   GamepadInput2D, GamepadPressableInput
+FlatRedBall2.Audio              — AudioManager, IAudioBackend
+FlatRedBall2.Diagnostics        — DebugRenderer, RenderDiagnostics, BatchBreakInfo
+FlatRedBall2.Gum                — GumBatch, GumRenderable
+FlatRedBall2.Tiled              — TiledMapLayerRenderable, TiledCollisionGenerator
+```
+
+---
+
 ## Package Structure
 
 Single NuGet package: **FlatRedBall2**
@@ -676,6 +915,33 @@ Dependencies (referenced, not bundled):
 - `System.Numerics` (built into .NET)
 
 Tiled and Gum support are built in (dependencies pulled automatically). No separate add-on packages required.
+
+---
+
+## Patterns to Preserve from FRB1
+
+These patterns from the original FlatRedBall are intentionally carried forward. Do not regress:
+
+1. **Flat property surface** — `entity.X`, `entity.VelocityX`, not `entity.Transform.Position.X`
+2. **Auto-registration via AddChild** — no manual `SpriteManager.AddPositionedObject()` calls
+3. **Recursive Destroy** — destroying a parent cleans up all children automatically
+4. **ICollidable on Entity base class** — no per-entity boilerplate to opt into collision
+5. **Type-safe screen navigation** — `MoveToScreen<T>()`, not string-based
+6. **I2DInput / IPressableInput** — device-independent input abstractions that make entities testable
+7. **Center-based positioning** — all objects positioned from center, not top-left
+
+---
+
+## Anti-Patterns Intentionally Avoided
+
+These patterns from FRB1 are explicitly **not** carried forward:
+
+1. **Static state everywhere** — FRB2 uses instance-based services, no `SpriteManager.AddXxx` statics
+2. **Manual manager registration** — FRB2 auto-registers via `AddChild`
+3. **Manual Destroy cleanup for each manager** — FRB2's `Destroy()` handles all cleanup recursively
+4. **ScaleX/ScaleY half-dimensions** on collision shapes — FRB2 uses `Width`/`Height` (full dimensions)
+5. **Vector3 for 2D positions** — FRB2 uses `System.Numerics.Vector2` (with separate `Z` for depth)
+6. **Screen navigation by string name** — FRB2 uses generic `MoveToScreen<T>()`
 
 ---
 
@@ -702,10 +968,10 @@ public class GameScreen : Screen
         Layers.Add(_gameplayLayer);
         Layers.Add(hud);
 
-        // Create factories (pass layer so factories can set it on sprites)
-        _playerFactory = new PlayerFactory(this, _gameplayLayer);
-        _bulletFactory = new BulletFactory(this, _gameplayLayer);
-        _enemyFactory = new EnemyFactory(this, _gameplayLayer);
+        // Create factories
+        _playerFactory = new PlayerFactory(this);
+        _bulletFactory = new BulletFactory(this);
+        _enemyFactory = new EnemyFactory(this);
 
         // Create instances
         _playerFactory.Create(Vector2.Zero);
@@ -750,7 +1016,7 @@ public class GameScreen : Screen
 
 ### Full Entity
 
-Loading content, creating collision, and displaying a sprite. Factories load content using the screen-scoped `ContentManager` and pass it into the entity on creation.
+Entities load their own content in `CustomInitialize()` via `Engine.ContentManager`. The factory is a pure spawner.
 
 ```csharp
 public class Enemy : Entity
@@ -761,19 +1027,17 @@ public class Enemy : Entity
 
     public bool IsDead => _health <= 0;
 
-    // Called by EnemyFactory immediately after Create()
-    public void Setup(Texture2D texture, Layer layer)
+    public override void CustomInitialize()
     {
-        // Display a sprite (centered, as all objects are)
+        var texture = Engine.ContentManager.Load<Texture2D>("Enemies/goblin");
+
         _sprite = new Sprite
         {
             Texture = texture,
             Width = 32,
             Height = 32,
-            Layer = layer
         };
         AddChild(_sprite);
-        _sprite.PlayAnimation("Walk");
 
         // Attach collision shape (slightly smaller than visual)
         _collision = new AxisAlignedRectangle { Width = 28, Height = 28 };
@@ -798,22 +1062,12 @@ public class Enemy : Entity
 
 public class EnemyFactory : Factory<Enemy>
 {
-    private readonly Texture2D _texture;
-    private readonly Layer _layer;
-
-    public EnemyFactory(Screen screen, Layer layer) : base(screen)
-    {
-        // Screen-scoped: texture is unloaded when the screen is destroyed.
-        // For content that should persist across screens, use screen.Engine.ContentManager instead.
-        _texture = screen.ContentManager.Load<Texture2D>("Enemies/goblin");
-        _layer = layer;
-    }
+    public EnemyFactory(Screen screen) : base(screen) { }
 
     public Enemy Create(Vector2 position)
     {
-        var enemy = Create();  // base Factory.Create() allocates and registers
+        var enemy = Create();  // engine injected, CustomInitialize called
         enemy.Position = position;
-        enemy.Setup(_texture, _layer);
         return enemy;
     }
 }
@@ -838,7 +1092,7 @@ public override void CustomInitialize()
             Layer = gameplayLayer,
             Z = 0f
         };
-        Engine.RenderList.Add(renderable);
+        RenderList.Add(renderable);
     }
 
     // Optionally generate static collision shapes from tile properties (e.g. "Solid" = true)
@@ -865,7 +1119,7 @@ public override void CustomInitialize()
         Layer = hud,
         Z = 0f
     };
-    Engine.RenderList.Add(gumRenderable);
+    RenderList.Add(gumRenderable);
 
     // Access Gum components directly — no FRB wrappers around Gum types
     var healthBar = (NineSliceRuntime)hudScreen.GetGraphicalUiElementByName("HealthBar");
