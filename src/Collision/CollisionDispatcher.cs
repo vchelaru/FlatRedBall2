@@ -7,6 +7,21 @@ namespace FlatRedBall2.Collision;
 
 internal static class CollisionDispatcher
 {
+    /// <summary>
+    /// Computes how far to move an object with <paramref name="thisMass"/> out of a collision,
+    /// given the full separation vector and the mass of the other party.
+    /// The result is the fraction of the separation each object absorbs, weighted by mass:
+    /// a wall (otherMass = 0) absorbs none, so the moving object absorbs all of it.
+    /// Returns Vector2.Zero if there is no collision or total mass is zero.
+    /// </summary>
+    internal static Vector2 ComputeSeparationOffset(Vector2 sep, float thisMass, float otherMass)
+    {
+        if (sep == Vector2.Zero) return Vector2.Zero;
+        float total = thisMass + otherMass;
+        if (total == 0) return Vector2.Zero;
+        return sep * (otherMass / total);
+    }
+
     public static bool CollidesWith(ICollidable a, ICollidable b)
         => GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
 

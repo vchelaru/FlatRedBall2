@@ -21,6 +21,25 @@ We are not targeting 100% coverage. Write the fewest tests that meaningfully ver
 - **Short**: Each test should be as short as possible. Remove any line that does not directly contribute to the assertion.
 - **Comments when needed**: Add a brief comment if there is any realistic chance a reader will be confused about *why* a value was chosen or what the test is verifying. Omit comments when the test is self-evident.
 
+### Test Naming
+
+Test method names follow the pattern `MethodOrProperty_Scenario_ExpectedResult`:
+
+- **Start with the method or property under test**: e.g., `CollidesWith_`, `SeparateFrom_`, `VelocityX_`. This keeps tests sorted and findable — all tests for a given method group together alphabetically.
+- **Scenario**: brief description of the input or setup condition.
+- **Expected result**: what the test asserts.
+
+Example: a test verifying that `CollidesWith` returns false for a non-overlapping AARect vs Circle should be named `CollidesWith_AARectVsCircle_NotOverlapping_ReturnsFalse`, not `AabbVsCircle_NotOverlapping_ReturnsFalse`.
+
+### Test Ordering
+
+Tests within a class must be kept in **alphabetical order** by method name. This makes specific tests easy to find without searching.
+
+### Terminology
+
+Use project-standard names in test method names and comments:
+- **AARect** — not "AABB", "BoundingBox", or "Aabb". Example: `CollidesWith_AARectVsCircle_...`
+
 ### Assertion Library
 
 Always use **Shouldly** for assertions — never `Assert.*` from xunit. Use `ShouldBe`, `ShouldBeTrue`, `ShouldBeFalse`, `ShouldBeNull`, `ShouldContain`, `ShouldBeEmpty`, `Should.Throw`, etc. For floats with rounding error, pass a `tolerance:` parameter.

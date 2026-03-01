@@ -69,14 +69,12 @@ public class Circle : IAttachable, IRenderable, ICollidable
 
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
     {
-        var sep = GetSeparationVector(other);
-        if (sep == Vector2.Zero) return;
-        float total = thisMass + otherMass;
-        if (total == 0) return;
-        float r = otherMass / total;
-        X += sep.X * r;
-        Y += sep.Y * r;
+        var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
+        X += offset.X;
+        Y += offset.Y;
     }
 
+    // Shapes don't carry velocity — only Entity does. AdjustVelocityFrom is intentionally a no-op here.
+    // Velocity bounce is handled by Entity.AdjustVelocityFrom, which is called on the owning entity.
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 }

@@ -77,6 +77,53 @@ public class BounceTests
     }
 
     [Fact]
+    public void BounceOnCollision_TwoMovingEntities_BothVelocitiesAdjusted()
+    {
+        // Both entities moving toward each other — equal mass, perfect elasticity → velocities swap.
+        var entityA = new Entity { X = 0f, VelocityX = 100f };
+        entityA.AddChild(new Circle { Radius = 16f });
+
+        var entityB = new Entity { X = 20f, VelocityX = -100f };
+        entityB.AddChild(new Circle { Radius = 16f });
+
+        // Distance = 20, combined radii = 32 → 12px overlap; they are colliding.
+        entityA.CollidesWith(entityB).ShouldBeTrue();
+
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 1f);
+        rel.RunCollisions();
+
+        // Perfect elastic collision with equal masses → velocities exchange.
+        entityA.VelocityX.ShouldBe(-100f, tolerance: 0.01f);
+        entityB.VelocityX.ShouldBe(100f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void BounceOnCollision_ShapeOnGrandchildEntity_UsesTopParentVelocity()
+    {
+        // Hierarchy: grandparent (VelX=100) → child entity P → Circle grandchild.
+        // The grandparent is what moves; P and Circle have no independent velocity.
+        // When grandparent collides with a wall, its velocity should be reversed.
+        var grandparent = new Entity { X = 0f, VelocityX = 100f };
+        var child = new Entity();
+        grandparent.AddChild(child);
+        child.AddChild(new Circle { Radius = 16f });
+
+        // Wall at X=20, width=16 → left edge at 12; circle right edge at 16 → 4px overlap.
+        var wall = new Entity { X = 20f };
+        wall.AddChild(new AxisAlignedRectangle { Width = 16f, Height = 100f });
+
+        grandparent.CollidesWith(wall).ShouldBeTrue();
+
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { grandparent }, new[] { wall });
+        rel.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 1f);
+        rel.RunCollisions();
+
+        // Grandparent should now be moving left (velocity reversed).
+        grandparent.VelocityX.ShouldBeLessThan(0f);
+    }
+
+    [Fact]
     public void Ball_WithGravityAndBounce_RemainsInsideArena()
     {
         // Seeded random for determinism

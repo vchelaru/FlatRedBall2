@@ -120,24 +120,22 @@ public class Entity : ICollidable, IAttachable
         _shapes.Clear();
     }
 
-    // ICollidable — aggregates all attached shapes
+    // ICollidable — aggregates all attached shapes, recursing through child entities.
     public bool CollidesWith(ICollidable other)
     {
-        var otherShapes = GetShapes(other);
-        foreach (var myShape in _shapes)
-            foreach (var otherShape in otherShapes)
-                if (CollisionDispatcher.CollidesWith(myShape, otherShape))
+        foreach (var myLeaf in GetLeafShapes(this))
+            foreach (var otherLeaf in GetLeafShapes(other))
+                if (CollisionDispatcher.CollidesWith(myLeaf, otherLeaf))
                     return true;
         return false;
     }
 
     public Vector2 GetSeparationVector(ICollidable other)
     {
-        var otherShapes = GetShapes(other);
-        foreach (var myShape in _shapes)
-            foreach (var otherShape in otherShapes)
+        foreach (var myLeaf in GetLeafShapes(this))
+            foreach (var otherLeaf in GetLeafShapes(other))
             {
-                var sep = CollisionDispatcher.GetSeparationVector(myShape, otherShape);
+                var sep = CollisionDispatcher.GetSeparationVector(myLeaf, otherLeaf);
                 if (sep != Vector2.Zero)
                     return sep;
             }
@@ -146,15 +144,9 @@ public class Entity : ICollidable, IAttachable
 
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
     {
-        var sep = GetSeparationVector(other);
-        if (sep == Vector2.Zero) return;
-
-        float totalMass = thisMass + otherMass;
-        if (totalMass == 0) return;
-
-        float ratio = otherMass / totalMass;
-        X += sep.X * ratio;
-        Y += sep.Y * ratio;
+        var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
+        X += offset.X;
+        Y += offset.Y;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
@@ -194,9 +186,21 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
-    private static IReadOnlyList<ICollidable> GetShapes(ICollidable collidable)
+    // Recursively yields the primitive shapes (Circle, AxisAlignedRectangle, Polygon) reachable
+    // from this collidable. Child entities are transparent containers — their shapes are yielded
+    // in-place rather than the child entity itself, so CollisionDispatcher always receives
+    // concrete shape types it can handle.
+    private static IEnumerable<ICollidable> GetLeafShapes(ICollidable collidable)
     {
-        if (collidable is Entity entity) return entity._shapes;
-        return new[] { collidable };
+        if (collidable is Entity entity)
+        {
+            foreach (var child in entity._shapes)
+                foreach (var leaf in GetLeafShapes(child))
+                    yield return leaf;
+        }
+        else
+        {
+            yield return collidable;
+        }
     }
 }
