@@ -188,6 +188,10 @@ public class Entity : IAttachable, ICollidable
     // Visibility — hierarchical; invisible parent hides all children
     public bool IsVisible { get; set; }
 
+    // Injected by the framework before CustomInitialize is called.
+    // Provides access to ContentManager, Layers, Engine, etc.
+    protected Screen Screen { get; }
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }
@@ -469,14 +473,17 @@ AddCollisionRelationship(bulletFactory, enemyFactory)
 
 ## Factory
 
-A built-in generic base class. Associated with the current Screen at construction time.
+A built-in generic base class. Associated with the current Screen at construction time. No subclassing required for the common case — entities load their own content in `CustomInitialize` using the injected `Screen` reference.
 
 ```csharp
 public class Factory<T> where T : Entity, new()
 {
+    public Factory(Screen screen);
+
     public IReadOnlyList<T> Instances { get; }
 
-    public T Create();         // creates instance, registers with screen
+    // Creates the instance, injects Screen, calls CustomInitialize, registers with screen
+    public T Create();
     public void Destroy(T instance);
     public void DestroyAll();
 
@@ -484,15 +491,26 @@ public class Factory<T> where T : Entity, new()
 }
 ```
 
-Users can inherit to add custom Create logic:
+Basic usage — no subclass needed:
+
+```csharp
+var enemyFactory = new Factory<Enemy>(this);
+var enemy = enemyFactory.Create();
+enemy.Position = new Vector2(200, 100);
+```
+
+Subclass only when you need a typed convenience method (e.g. a multi-parameter Create):
 
 ```csharp
 public class EnemyFactory : Factory<Enemy>
 {
-    public Enemy Create(Vector2 position)
+    public EnemyFactory(Screen screen) : base(screen) { }
+
+    public Enemy Create(Vector2 position, EnemyType type)
     {
-        var enemy = Create();
+        var enemy = base.Create();
         enemy.Position = position;
+        enemy.Type = type;
         return enemy;
     }
 }
@@ -688,29 +706,29 @@ Declaring a screen, creating factories, creating instances, declaring collision 
 ```csharp
 public class GameScreen : Screen
 {
-    private PlayerFactory _playerFactory;
-    private BulletFactory _bulletFactory;
-    private EnemyFactory _enemyFactory;
-
-    private Layer _gameplayLayer;
+    private Factory<Player> _playerFactory;
+    private Factory<Bullet> _bulletFactory;
+    private Factory<Enemy> _enemyFactory;
 
     public override void CustomInitialize()
     {
-        // Set up layers
-        _gameplayLayer = new Layer("Gameplay");
-        var hud = new Layer("HUD") { IsScreenSpace = true };
-        Layers.Add(_gameplayLayer);
-        Layers.Add(hud);
+        // Set up layers — entities read these in their own CustomInitialize via Screen.Layers
+        Layers.Add(new Layer("Gameplay"));
+        Layers.Add(new Layer("HUD") { IsScreenSpace = true });
 
-        // Create factories (pass layer so factories can set it on sprites)
-        _playerFactory = new PlayerFactory(this, _gameplayLayer);
-        _bulletFactory = new BulletFactory(this, _gameplayLayer);
-        _enemyFactory = new EnemyFactory(this, _gameplayLayer);
+        // No custom factory subclasses needed — entities load their own content
+        _playerFactory = new Factory<Player>(this);
+        _bulletFactory = new Factory<Bullet>(this);
+        _enemyFactory = new Factory<Enemy>(this);
 
         // Create instances
-        _playerFactory.Create(Vector2.Zero);
-        _enemyFactory.Create(new Vector2(200, 100));
-        _enemyFactory.Create(new Vector2(-150, 80));
+        _playerFactory.Create().Position = Vector2.Zero;
+
+        var enemy1 = _enemyFactory.Create();
+        enemy1.Position = new Vector2(200, 100);
+
+        var enemy2 = _enemyFactory.Create();
+        enemy2.Position = new Vector2(-150, 80);
 
         // Bullets destroy themselves and deal damage to enemies
         AddCollisionRelationship(_bulletFactory, _enemyFactory)
@@ -750,7 +768,7 @@ public class GameScreen : Screen
 
 ### Full Entity
 
-Loading content, creating collision, and displaying a sprite. Factories load content using the screen-scoped `ContentManager` and pass it into the entity on creation.
+Loading content, creating collision, and displaying a sprite. Entities load their own content in `CustomInitialize` using the injected `Screen` reference — no custom factory needed.
 
 ```csharp
 public class Enemy : Entity
@@ -761,16 +779,21 @@ public class Enemy : Entity
 
     public bool IsDead => _health <= 0;
 
-    // Called by EnemyFactory immediately after Create()
-    public void Setup(Texture2D texture, Layer layer)
+    public override void CustomInitialize()
     {
+        // Screen-scoped content: unloads automatically when the screen is destroyed.
+        // Use Screen.Engine.ContentManager for content that persists across screens.
+        var texture = Screen.ContentManager.Load<Texture2D>("Enemies/goblin");
+
+        var gameplayLayer = Screen.Layers.First(l => l.Name == "Gameplay");
+
         // Display a sprite (centered, as all objects are)
         _sprite = new Sprite
         {
             Texture = texture,
             Width = 32,
             Height = 32,
-            Layer = layer
+            Layer = gameplayLayer
         };
         AddChild(_sprite);
         _sprite.PlayAnimation("Walk");
@@ -793,28 +816,6 @@ public class Enemy : Entity
     {
         _sprite.Destroy();
         _collision.Destroy();
-    }
-}
-
-public class EnemyFactory : Factory<Enemy>
-{
-    private readonly Texture2D _texture;
-    private readonly Layer _layer;
-
-    public EnemyFactory(Screen screen, Layer layer) : base(screen)
-    {
-        // Screen-scoped: texture is unloaded when the screen is destroyed.
-        // For content that should persist across screens, use screen.Engine.ContentManager instead.
-        _texture = screen.ContentManager.Load<Texture2D>("Enemies/goblin");
-        _layer = layer;
-    }
-
-    public Enemy Create(Vector2 position)
-    {
-        var enemy = Create();  // base Factory.Create() allocates and registers
-        enemy.Position = position;
-        enemy.Setup(_texture, _layer);
-        return enemy;
     }
 }
 ```
