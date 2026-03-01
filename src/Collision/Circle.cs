@@ -2,6 +2,8 @@ using System.Numerics;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
+using XnaColor = Microsoft.Xna.Framework.Color;
+using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Collision;
 
@@ -18,16 +20,28 @@ public class Circle : IAttachable, IRenderable, ICollidable
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
-    // IRenderable (for debug drawing)
+    // IRenderable
     public bool Visible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
-    public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
+    public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     public string? Name { get; set; }
+
+    // Visual — semi-transparent white so overlapping shapes are obvious.
+    // Swap IsFilled to false for an outline-only view.
+    public XnaColor Color { get; set; } = new XnaColor(255, 255, 255, 128);
+    public bool IsFilled { get; set; } = true;
+    public float OutlineThickness { get; set; } = 2f;
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        if (!Visible) return;
-        // TODO: Draw debug circle outline (requires primitive renderer, e.g. Apos.Shapes)
+        if (!Visible || Batch is not ShapesBatch sb) return;
+
+        var center = new XnaVec2(AbsoluteX, AbsoluteY);
+
+        if (IsFilled)
+            sb.Shapes.FillCircle(center, Radius, Color);
+        else
+            sb.Shapes.BorderCircle(center, Radius, Color, OutlineThickness);
     }
 
     public void Destroy()

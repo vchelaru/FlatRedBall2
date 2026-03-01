@@ -2,6 +2,10 @@
 
 Naming conventions and formatting rules will be established as the architecture finalizes. See `ARCHITECTURE.md` for the current design direction.
 
+## Diagnostics / Logging
+
+Use `System.Diagnostics.Debug.WriteLine` for all diagnostic or debug output — never `Console.WriteLine`. Debug output is visible in the Visual Studio Output window (Debug pane) and is automatically stripped from Release builds.
+
 ## Test Guidelines
 
 ### Philosophy — Quality over Coverage

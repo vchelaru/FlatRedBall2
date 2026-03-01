@@ -1,9 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
+using XnaColor = Microsoft.Xna.Framework.Color;
+using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Collision;
 
@@ -47,16 +50,42 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
-    // IRenderable (for debug drawing)
+    // IRenderable
     public bool Visible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
-    public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
+    public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     public string? Name { get; set; }
+
+    // Visual — semi-transparent white so overlapping shapes are obvious.
+    // IsFilled is accepted but Polygon always draws as an outline (no fill triangulation yet).
+    // Use IsFilled = true (default) for a thicker outline that reads as "solid" at a glance.
+    public XnaColor Color { get; set; } = new XnaColor(255, 255, 255, 128);
+    public bool IsFilled { get; set; } = true;
+    public float OutlineThickness { get; set; } = 2f;
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        if (!Visible) return;
-        // TODO: Draw debug polygon outline (requires primitive renderer, e.g. Apos.Shapes)
+        if (!Visible || Batch is not ShapesBatch sb || _points.Count < 2) return;
+
+        float thickness = IsFilled ? OutlineThickness * 2f : OutlineThickness;
+        float angle = AbsoluteRotation.Radians;
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+
+        for (int i = 0; i < _points.Count; i++)
+        {
+            var a = WorldPoint(_points[i], cos, sin);
+            var b = WorldPoint(_points[(i + 1) % _points.Count], cos, sin);
+            sb.Shapes.FillLine(a, b, thickness, Color);
+        }
+    }
+
+    private XnaVec2 WorldPoint(Vector2 local, float cos, float sin)
+    {
+        // Rotate in Y-up space, then translate to world position.
+        float rx = local.X * cos - local.Y * sin;
+        float ry = local.X * sin + local.Y * cos;
+        return new XnaVec2(AbsoluteX + rx, AbsoluteY + ry);
     }
 
     public void Destroy()

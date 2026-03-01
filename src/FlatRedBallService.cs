@@ -5,6 +5,7 @@ using FlatRedBall2.Audio;
 using FlatRedBall2.Diagnostics;
 using FlatRedBall2.Input;
 using FlatRedBall2.Rendering;
+using FlatRedBall2.Rendering.Batches;
 
 namespace FlatRedBall2;
 
@@ -23,6 +24,7 @@ public class FlatRedBallService
         _game = game;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
         ContentManager.Initialize(game.Content);
+        ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
 
         var viewport = game.GraphicsDevice.Viewport;
         Camera.SetViewport(viewport);
