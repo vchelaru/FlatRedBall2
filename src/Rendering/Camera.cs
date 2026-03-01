@@ -13,7 +13,7 @@ public class Camera
     public float AccelerationX { get; set; }
     public float AccelerationY { get; set; }
 
-    public Color BackgroundColor { get; set; } = Color.CornflowerBlue;
+    public Color BackgroundColor { get; set; } = Color.Black;
 
     public int TargetWidth { get; set; } = 1280;
     public int TargetHeight { get; set; } = 720;
