@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Audio;
@@ -55,6 +56,7 @@ public class FlatRedBallService
 
     private void ActivateScreen(Screen screen)
     {
+        _factories.Clear();
         screen.Engine = this;
         screen.ContentManager.Initialize(_game!.Content);
 
@@ -68,6 +70,24 @@ public class FlatRedBallService
 
         CurrentScreen = screen;
         screen.CustomInitialize();
+    }
+
+    // Factory registry — populated automatically when a Factory<T> is constructed
+    private readonly Dictionary<Type, object> _factories = new();
+
+    /// <summary>Registers a factory so entities can retrieve it via <see cref="GetFactory{T}"/>.</summary>
+    /// <remarks>Called automatically by <see cref="Factory{T}"/>; you should not need to call this directly.</remarks>
+    public void RegisterFactory<T>(Factory<T> factory) where T : Entity, new()
+        => _factories[typeof(T)] = factory;
+
+    /// <summary>Returns the factory registered for <typeparamref name="T"/>.</summary>
+    /// <exception cref="InvalidOperationException">Thrown when no factory for <typeparamref name="T"/> has been created yet.</exception>
+    public Factory<T> GetFactory<T>() where T : Entity, new()
+    {
+        if (_factories.TryGetValue(typeof(T), out var factory))
+            return (Factory<T>)factory;
+        throw new InvalidOperationException(
+            $"No factory registered for {typeof(T).Name}. Create a Factory<{typeof(T).Name}> in CustomInitialize before calling GetFactory.");
     }
 
     // Sub-systems

@@ -107,6 +107,26 @@ private void SpawnWall(float x, float y, float w, float h)
 }
 ```
 
+## Spawning Entities from Within Another Entity
+
+Entities can spawn other entities without receiving a factory reference. Call `Engine.GetFactory<T>()` — it returns the factory registered for that type. The factory is registered automatically when `new Factory<T>(screen)` is called in the screen's `CustomInitialize`.
+
+```csharp
+// Player.cs — spawns a Ball on Space press, no factory field needed
+public override void CustomActivity(FrameTime time)
+{
+    if (Engine!.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+    {
+        var ball = Engine.GetFactory<Ball>().Create();
+        ball.X = X;
+        ball.Y = Y;
+        ball.VelocityY = 300f;
+    }
+}
+```
+
+`GetFactory<T>()` throws `InvalidOperationException` if no factory for `T` has been created yet — check that the screen calls `new Factory<Ball>(this)` before any entity tries to spawn one.
+
 ## Common Pitfalls
 
 - **`Engine` is null in the entity constructor** — Do not call `AddChild` or access `Engine.InputManager` in the constructor. Use `CustomInitialize` instead.

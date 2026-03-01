@@ -8,7 +8,11 @@ public class Factory<T> : IEnumerable<T> where T : Entity, new()
     private readonly Screen _screen;
     private readonly List<T> _instances = new();
 
-    public Factory(Screen screen) => _screen = screen;
+    public Factory(Screen screen)
+    {
+        _screen = screen;
+        screen.Engine.RegisterFactory(this);
+    }
 
     public IReadOnlyList<T> Instances => _instances;
 
