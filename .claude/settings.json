@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/git/Gum/**)",
+      "Read(//c/git/FlatRedBall/**)",
+      "Read(//c/git/FlatRedBall/Engines/FlatRedBallXNA/FlatRedBall/Screens/**)",
+      "Read(//c/git/Gum/MonoGameGum/**)",
+      "Read(//c/git/FlatRedBall/Engines/FlatRedBallXNA/FlatRedBall/**)",
+      "Read(//c/git/FlatRedBall/Engines/FlatRedBallXNA/FlatRedBall/Graphics/**)"
+    ]
+  }
+}
