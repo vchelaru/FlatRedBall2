@@ -142,7 +142,7 @@ public class FlatRedBallService
 
         // Route input events (click, hover, etc.) to all active Gum elements.
         // GumService.Default.Root covers anything added via AddToRoot();
-        // screen GumRenderables cover elements added via AddGumRenderable().
+        // screen GumRenderables cover elements added via AddGum().
         _gumUpdateList.Clear();
         _gumUpdateList.Add(GumService.Default.Root);
         foreach (var r in CurrentScreen.GumRenderables)

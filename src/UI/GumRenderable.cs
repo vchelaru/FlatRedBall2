@@ -10,21 +10,21 @@ namespace FlatRedBall2.UI;
 /// Renders in screen space by default.
 /// </summary>
 /// <remarks>
-/// Add to a Screen via <see cref="Screen.AddGumRenderable"/>, which registers it for both
+/// Add to a Screen via <see cref="Screen.AddGum(GumRenderable)"/>, which registers it for both
 /// rendering and input updates (click, hover, etc. on Forms controls).
 /// <para>
 /// To build up UI, add child controls to <see cref="Visual"/>:
 /// <code>
 /// var button = new Button();
 /// var hud = new GumRenderable(button.Visual);
-/// AddGumRenderable(hud);
+/// AddGum(hud);
 /// </code>
 /// Or wrap a container that holds multiple controls:
 /// <code>
 /// var panel = new StackPanel();
 /// panel.AddChild(new Button());
 /// var hud = new GumRenderable(panel.Visual);
-/// AddGumRenderable(hud);
+/// AddGum(hud);
 /// </code>
 /// </para>
 /// <para>

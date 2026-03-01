@@ -15,7 +15,7 @@ var scoreLabel = new Label();
 scoreLabel.Text = "0";
 scoreLabel.X = 20;   // screen pixels from left
 scoreLabel.Y = 20;   // screen pixels from TOP (Gum is Y-down)
-AddGumRenderable(new GumRenderable(scoreLabel.Visual));
+AddGum(scoreLabel);
 
 // Update each frame in CustomActivity:
 scoreLabel.Text = _score.ToString();

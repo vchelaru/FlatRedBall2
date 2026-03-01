@@ -5,6 +5,7 @@ using FlatRedBall2.Collision;
 using FlatRedBall2.Diagnostics;
 using FlatRedBall2.UI;
 using FlatRedBall2.Rendering;
+using Gum.Forms.Controls;
 
 namespace FlatRedBall2;
 
@@ -36,18 +37,30 @@ public class Screen
     // Gum integration
 
     /// <summary>
+    /// Adds a Gum Forms control to this screen. The control's visual is inserted into the render list
+    /// and registered for input updates so it receives click and hover events.
+    /// </summary>
+    /// <returns>The <see cref="GumRenderable"/> wrapper — hold on to it if you need to call <see cref="RemoveGum"/> later.</returns>
+    public GumRenderable AddGum(FrameworkElement element)
+    {
+        var renderable = new GumRenderable(element.Visual);
+        AddGum(renderable);
+        return renderable;
+    }
+
+    /// <summary>
     /// Adds a Gum renderable to this screen. The element is inserted into the render list
     /// (sorted by <see cref="GumRenderable.Layer"/> and <see cref="GumRenderable.Z"/>)
     /// and registered for input updates so Forms controls receive click and hover events.
     /// </summary>
-    public void AddGumRenderable(GumRenderable renderable)
+    public void AddGum(GumRenderable renderable)
     {
         _gumRenderables.Add(renderable);
         RenderList.Add(renderable);
     }
 
     /// <summary>Removes a previously added Gum renderable from rendering and input updates.</summary>
-    public void RemoveGumRenderable(GumRenderable renderable)
+    public void RemoveGum(GumRenderable renderable)
     {
         _gumRenderables.Remove(renderable);
         RenderList.Remove(renderable);

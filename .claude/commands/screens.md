@@ -74,6 +74,8 @@ The old screen's `CustomDestroy` runs, its content is unloaded, and then the new
 Declare public properties on the destination screen. The `configure` callback receives the new screen instance *before* `CustomInitialize` is called, so the data is available immediately:
 
 ```csharp
+using Gum.Forms.Controls;
+
 public class GameOverScreen : Screen
 {
     // Set by the caller via MoveToScreen configure
@@ -84,7 +86,7 @@ public class GameOverScreen : Screen
     {
         var label = new Label();
         label.Text = $"{Winner} wins! Score: {FinalScore}";
-        AddGumRenderable(new GumRenderable(label.Visual));
+        AddGum(label);
     }
 }
 ```
@@ -118,6 +120,6 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 
 - **`MoveToScreen` is deferred** — the transition does not happen immediately. Code after `MoveToScreen<T>()` in the same frame still runs. If you want to stop processing, `return` after the call.
 - **All entities and factories are destroyed automatically** on screen change. You do not need to manually destroy them in `CustomDestroy`.
-- **Gum elements are also cleared automatically** — no teardown needed for `AddGumRenderable` elements.
+- **Gum elements are also cleared automatically** — no teardown needed for `AddGum` elements.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
