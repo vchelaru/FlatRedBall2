@@ -107,6 +107,32 @@ private void SpawnWall(float x, float y, float w, float h)
 }
 ```
 
+## Always Use Factory — Even for Single Instances
+
+Even when you only ever need one of an entity (e.g., a single ball in Pong), create it through a `Factory<T>`. This keeps:
+
+- **Lifecycle consistent** — `CustomInitialize` is called the same way whether there's one or fifty instances.
+- **Collision consistent** — `AddCollisionRelationship` takes `IEnumerable<A>` and `IEnumerable<B>`. A `Factory<T>` implements `IEnumerable<T>`, so ball-vs-paddles is just factory-vs-factory with no special cases.
+- **`Engine.GetFactory<T>()` works** — other entities can spawn or reference the ball's factory without a direct reference.
+
+```csharp
+// Correct — always through Factory, even for one ball
+private Factory<Ball> _ballFactory = null!;
+
+public override void CustomInitialize()
+{
+    _ballFactory = new Factory<Ball>(this);
+    var ball = _ballFactory.Create();
+    ball.X = 0; ball.Y = 0;
+
+    // Collision: same pattern regardless of how many balls
+    AddCollisionRelationship<Ball, Paddle>(_ballFactory, _paddleFactory)
+        .BounceOnCollision(firstMass: 0f, secondMass: 1f);
+}
+```
+
+Avoid creating entities with `new Ball()` or `Screen.Register`. Those bypass the factory and break `Engine.GetFactory<T>()` and the collision system.
+
 ## Spawning Entities from Within Another Entity
 
 Entities can spawn other entities without receiving a factory reference. Call `Engine.GetFactory<T>()` — it returns the factory registered for that type. The factory is registered automatically when `new Factory<T>(screen)` is called in the screen's `CustomInitialize`.

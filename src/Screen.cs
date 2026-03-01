@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Diagnostics;
+using FlatRedBall2.UI;
 using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2;
@@ -10,6 +12,7 @@ public class Screen
 {
     private readonly List<Entity> _entities = new();
     private readonly List<ICollisionRelationship> _collisionRelationships = new();
+    private readonly List<GumRenderable> _gumRenderables = new();
 
     public Camera Camera { get; } = new Camera();
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
@@ -30,14 +33,42 @@ public class Screen
         }
     }
 
+    // Gum integration
+
+    /// <summary>
+    /// Adds a Gum renderable to this screen. The element is inserted into the render list
+    /// (sorted by <see cref="GumRenderable.Layer"/> and <see cref="GumRenderable.Z"/>)
+    /// and registered for input updates so Forms controls receive click and hover events.
+    /// </summary>
+    public void AddGumRenderable(GumRenderable renderable)
+    {
+        _gumRenderables.Add(renderable);
+        RenderList.Add(renderable);
+    }
+
+    /// <summary>Removes a previously added Gum renderable from rendering and input updates.</summary>
+    public void RemoveGumRenderable(GumRenderable renderable)
+    {
+        _gumRenderables.Remove(renderable);
+        RenderList.Remove(renderable);
+    }
+
+    /// <summary>Gum visuals that need per-frame input updates. Used by FlatRedBallService.</summary>
+    internal IReadOnlyList<GumRenderable> GumRenderables => _gumRenderables;
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }
     public virtual void CustomDestroy() { }
 
     // Navigation
-    public void MoveToScreen<T>() where T : Screen, new()
-        => Engine.RequestScreenChange<T>();
+
+    /// <param name="configure">
+    /// Optional callback invoked on the new screen instance before <see cref="CustomInitialize"/> runs.
+    /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// </param>
+    public void MoveToScreen<T>(Action<T>? configure = null) where T : Screen, new()
+        => Engine.RequestScreenChange(configure);
 
     // Collision relationship overloads
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(

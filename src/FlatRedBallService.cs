@@ -4,10 +4,15 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Audio;
 using FlatRedBall2.Diagnostics;
+using FlatRedBall2.UI;
 using FlatRedBall2.Input;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
 using FlatRedBall2.Utilities;
+using Gum.Forms;
+using Gum.Wireframe;
+using MonoGameGum;
+using Microsoft.Xna.Framework.Content;
 
 namespace FlatRedBall2;
 
@@ -18,6 +23,7 @@ public class FlatRedBallService
     private Game? _game;
     private SpriteBatch? _spriteBatch;
     private Action? _pendingScreenChange;
+    private readonly List<GraphicalUiElement> _gumUpdateList = new();
 
     public FlatRedBallService() { }
 
@@ -34,31 +40,50 @@ public class FlatRedBallService
         Camera.TargetHeight = viewport.Height;
 
         InputManager.SetCamera(Camera);
+
+        GumService.Default.Initialize(game, DefaultVisualsVersion.V2);
+        GumRenderBatch.Instance.Initialize();
     }
 
     // Screen management
     public Screen CurrentScreen { get; private set; } = new Screen();
 
-    public void Start<T>() where T : Screen, new()
+    /// <param name="configure">
+    /// Optional callback invoked on the new screen instance before <see cref="Screen.CustomInitialize"/> runs.
+    /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// </param>
+    public void Start<T>(Action<T>? configure = null) where T : Screen, new()
     {
-        ActivateScreen(new T());
+        var screen = new T();
+        configure?.Invoke(screen);
+        ActivateScreen(screen);
     }
 
-    internal void RequestScreenChange<T>() where T : Screen, new()
+    internal void RequestScreenChange<T>(Action<T>? configure = null) where T : Screen, new()
     {
         _pendingScreenChange = () =>
         {
             CurrentScreen.CustomDestroy();
             CurrentScreen.ContentManager.UnloadAll();
-            ActivateScreen(new T());
+            var screen = new T();
+            configure?.Invoke(screen);
+            ActivateScreen(screen);
         };
     }
 
     private void ActivateScreen(Screen screen)
     {
         _factories.Clear();
+
+        // Clear any Gum elements left over from the previous screen.
+        // This covers controls added via AddToRoot() as well as screen-specific GumRenderables,
+        // which are abandoned with the old Screen object.
+        GumService.Default.Root.Children.Clear();
+
         screen.Engine = this;
-        screen.ContentManager.Initialize(_game!.Content);
+        // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
+        // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
+        screen.ContentManager.Initialize(new ContentManager(_game!.Services, _game!.Content.RootDirectory));
 
         var viewport = _game!.GraphicsDevice.Viewport;
         screen.Camera.SetViewport(viewport);
@@ -114,6 +139,15 @@ public class FlatRedBallService
 
         TimeManager.Update(gameTime);
         InputManager.Update();
+
+        // Route input events (click, hover, etc.) to all active Gum elements.
+        // GumService.Default.Root covers anything added via AddToRoot();
+        // screen GumRenderables cover elements added via AddGumRenderable().
+        _gumUpdateList.Clear();
+        _gumUpdateList.Add(GumService.Default.Root);
+        foreach (var r in CurrentScreen.GumRenderables)
+            _gumUpdateList.Add(r.Visual);
+        GumService.Default.Update(gameTime, _gumUpdateList);
 
         CurrentScreen.Update(TimeManager.CurrentFrameTime);
     }

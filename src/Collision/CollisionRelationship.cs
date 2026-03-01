@@ -44,6 +44,18 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _moveBoth = true; _bothFirstMass = firstMass; _bothSecondMass = secondMass; return this;
     }
 
+    /// <summary>
+    /// Reflects A's velocity off B using impulse physics and separates their positions.
+    /// </summary>
+    /// <param name="firstMass">
+    /// Mass of A. Pass <c>0f</c> when A should absorb the full separation (e.g., a ball bouncing
+    /// off an immovable wall). Higher values relative to <paramref name="secondMass"/> mean A moves less.
+    /// </param>
+    /// <param name="secondMass">
+    /// Mass of B. Pass <c>1f</c> (or any non-zero value) when B is immovable. Pass <c>0f</c> only if
+    /// B should absorb all separation instead.
+    /// </param>
+    /// <param name="elasticity">1.0 = perfectly elastic; &lt;1.0 = energy loss per bounce.</param>
     public CollisionRelationship<A, B> BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
     {
         _bounce = true; _bounceMassA = firstMass; _bounceMassB = secondMass; _bounceElasticity = elasticity; return this;

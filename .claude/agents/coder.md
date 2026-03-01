@@ -34,6 +34,20 @@ NEVER run git push, git reset --hard, or other destructive git commands.
 
 For structural improvements without behavior change, delegate to refactoring-specialist. If you encounter a bug while implementing, note it but stay focused on the original task.
 
+# XML Documentation
+
+Add XML doc comments only on **public-facing members** where the behavior is **not obvious from the name and signature alone**. Docs are a maintenance burden — stale or redundant comments are worse than no comments because they actively mislead.
+
+**Document when:**
+- The behavior has a non-obvious gotcha (e.g., "this runs before `CustomInitialize`")
+- A parameter's valid range or semantics need clarification (e.g., mass = 0 means immovable)
+- The method has a side effect or ordering constraint the caller must know about
+
+**Do not document when:**
+- The name and type signature already tell the full story
+- The member is `internal` or `private` — IDE tooltips won't surface it
+- You'd just be restating the name in prose (e.g., `/// <summary>Gets the width.</summary>` on `Width`)
+
 # High-Level Project Structure
 
 TODO: Document the project structure here.
