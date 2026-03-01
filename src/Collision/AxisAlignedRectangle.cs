@@ -20,13 +20,15 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
     // IRenderable (for debug drawing)
+    public bool Visible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
     public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
     public string? Name { get; set; }
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        // TODO: Draw debug outline via DebugRenderer
+        if (!Visible) return;
+        // TODO: Draw debug rectangle outline (requires primitive renderer, e.g. Apos.Shapes)
     }
 
     public void Destroy()

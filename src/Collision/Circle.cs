@@ -18,14 +18,16 @@ public class Circle : IAttachable, IRenderable, ICollidable
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
-    // IRenderable
+    // IRenderable (for debug drawing)
+    public bool Visible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
     public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
     public string? Name { get; set; }
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        // TODO: Draw debug circle via DebugRenderer
+        if (!Visible) return;
+        // TODO: Draw debug circle outline (requires primitive renderer, e.g. Apos.Shapes)
     }
 
     public void Destroy()
