@@ -6,6 +6,7 @@ using FlatRedBall2.Diagnostics;
 using FlatRedBall2.UI;
 using FlatRedBall2.Rendering;
 using Gum.Forms.Controls;
+using Gum.Wireframe;
 
 namespace FlatRedBall2;
 
@@ -35,35 +36,47 @@ public class Screen
     }
 
     // Gum integration
+    private readonly Dictionary<GraphicalUiElement, GumRenderable> _gumByVisual = new();
 
     /// <summary>
-    /// Adds a Gum Forms control to this screen. The control's visual is inserted into the render list
-    /// and registered for input updates so it receives click and hover events.
+    /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.
     /// </summary>
-    /// <returns>The <see cref="GumRenderable"/> wrapper — hold on to it if you need to call <see cref="RemoveGum"/> later.</returns>
-    public GumRenderable AddGum(FrameworkElement element)
-    {
-        var renderable = new GumRenderable(element.Visual);
-        AddGum(renderable);
-        return renderable;
-    }
+    /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
+    public void AddGum(FrameworkElement element, float z = 0f)
+        => AddGumVisual(element.Visual, z);
 
     /// <summary>
-    /// Adds a Gum renderable to this screen. The element is inserted into the render list
-    /// (sorted by <see cref="GumRenderable.Layer"/> and <see cref="GumRenderable.Z"/>)
-    /// and registered for input updates so Forms controls receive click and hover events.
+    /// Adds a Gum visual element to this screen. Registered for rendering and input updates.
+    /// Prefer <see cref="AddGum(FrameworkElement, float)"/> when a Forms control is available.
     /// </summary>
-    public void AddGum(GumRenderable renderable)
+    /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
+    public void AddGum(GraphicalUiElement visual, float z = 0f)
+        => AddGumVisual(visual, z);
+
+    /// <summary>Removes a Gum element previously added with <see cref="AddGum(FrameworkElement, float)"/>.</summary>
+    public void RemoveGum(FrameworkElement element)
+        => RemoveGumVisual(element.Visual);
+
+    /// <summary>Removes a Gum visual previously added with <see cref="AddGum(GraphicalUiElement, float)"/>.</summary>
+    public void RemoveGum(GraphicalUiElement visual)
+        => RemoveGumVisual(visual);
+
+    private void AddGumVisual(GraphicalUiElement visual, float z)
     {
+        var renderable = new GumRenderable(visual) { Z = z };
         _gumRenderables.Add(renderable);
+        _gumByVisual[visual] = renderable;
         RenderList.Add(renderable);
     }
 
-    /// <summary>Removes a previously added Gum renderable from rendering and input updates.</summary>
-    public void RemoveGum(GumRenderable renderable)
+    private void RemoveGumVisual(GraphicalUiElement visual)
     {
-        _gumRenderables.Remove(renderable);
-        RenderList.Remove(renderable);
+        if (_gumByVisual.TryGetValue(visual, out var renderable))
+        {
+            _gumRenderables.Remove(renderable);
+            _gumByVisual.Remove(visual);
+            RenderList.Remove(renderable);
+        }
     }
 
     /// <summary>Gum visuals that need per-frame input updates. Used by FlatRedBallService.</summary>

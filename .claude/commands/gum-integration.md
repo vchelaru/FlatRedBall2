@@ -5,7 +5,7 @@
 Gum is FlatRedBall2's UI system, backed by the `Gum.MonoGame` NuGet package. It is **automatically initialized** by `FlatRedBallService.Initialize` — no setup required in `Game1`. Gum elements render interleaved with game-world objects via the same Layer/Z sort used by sprites and shapes.
 
 Key types live in `FlatRedBall2.UI`:
-- `GumRenderable` — wraps a Gum `GraphicalUiElement` as an `IRenderable`
+- `GumRenderable` — wraps a Gum `GraphicalUiElement` as an `IRenderable` (internal implementation detail — users do not construct this directly)
 - `GumRenderBatch` — the `IRenderBatch` that drives Gum's draw pass (internal, singleton)
 
 ## Two Levels of Gum API
@@ -14,7 +14,7 @@ Choose the right level for your use case:
 
 **FrameworkElement controls (high-level, preferred)**: `Button`, `Label`, `TextBox`, `CheckBox`, `StackPanel`, `Panel`, etc. from `Gum.Forms.Controls`. These have built-in functionality — click events, hover, focus, keyboard navigation, layout. Pass directly to `AddGum(control)`.
 
-**GraphicalUiElement visuals (low-level)**: The raw visual tree. Must be wrapped in `GumRenderable`. Use only when Forms controls do not expose what you need — for example, `TextRuntime` for a custom `FontSize` that `Label` does not surface.
+**GraphicalUiElement visuals (low-level)**: The raw visual tree. Pass directly to `AddGum(visual)`. Use only when Forms controls do not expose what you need — for example, `TextRuntime` for a custom `FontSize` that `Label` does not surface.
 
 **Rule: prefer FrameworkElement. Drop to visuals only when necessary.**
 
@@ -28,7 +28,7 @@ var button = new Button();
 button.Text = "Click Me";
 button.Click += (_, _) => Debug.WriteLine("clicked");
 
-AddGum(button);   // pass FrameworkElement directly — no GumRenderable needed
+AddGum(button);   // pass FrameworkElement directly
 ```
 
 ## Layout
@@ -123,11 +123,11 @@ AddGum(hud);
 
 ## GumRenderable (Low-Level)
 
-`GumRenderable` wraps any `GraphicalUiElement`. Use it only when working at the visual level (e.g., `TextRuntime` with `FontSize`):
+`GumRenderable` is an internal implementation detail — the screen creates it for you. You never construct it directly. Simply pass any `GraphicalUiElement` to `AddGum`:
 
 ```csharp
 var text = new TextRuntime { Text = "Score", FontSize = 48 };
-AddGum(new GumRenderable(text));
+AddGum(text);
 ```
 
 ## Screen.AddGum / RemoveGum
@@ -135,31 +135,28 @@ AddGum(new GumRenderable(text));
 Always use `AddGum` instead of adding directly to `RenderList`:
 
 ```csharp
-// FrameworkElement overload — returns the GumRenderable wrapper:
-var renderable = AddGum(button);
-
-// GumRenderable overload — for low-level visuals:
-AddGum(new GumRenderable(text));
-
-// Remove by the GumRenderable handle:
-RemoveGum(renderable);
+AddGum(button);          // FrameworkElement
+AddGum(textRuntime);     // GraphicalUiElement (low-level visual)
+RemoveGum(button);
+RemoveGum(textRuntime);
 ```
 
 **Do not call `button.AddToRoot()`** — this bypasses the FRB2 render-order system.
 
 ## Render Ordering (Layer / Z)
 
-`GumRenderable` sorts into `Screen.RenderList` by Layer + Z, exactly like sprites and shapes.
+Gum elements sort into `Screen.RenderList` by Layer + Z, exactly like sprites and shapes.
 
 | Setting | Effect |
 |---|---|
 | `Layer = null` (default) | Drawn last — on top of all world objects. Right for HUDs and menus. |
-| `hud.Z = 50f` | Control ordering among multiple GumRenderables or between Gum and sprites |
-| `hud.Layer = someLayer` | Place on a named Layer for explicit interleaving with game world |
+| `z: 50f` parameter | Control ordering among multiple Gum elements or between Gum and sprites |
+| `Layer` on a named Layer | Place on a named Layer for explicit interleaving with game world |
 
-When using `AddGum(FrameworkElement)`, set Z on the returned `GumRenderable`:
+Pass Z at the call site:
 ```csharp
-AddGum(scoreLabel).Z = 100;
+AddGum(bgPanel, z: 0f);
+AddGum(hudPanel, z: 100f);
 ```
 
 ## Displaying Text (HUD, Score, Labels)
@@ -184,7 +181,7 @@ scoreLabel.Text = _score.ToString();
 using MonoGameGum.GueDeriving;   // TextRuntime lives here, NOT Gum.Wireframe
 
 var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
-AddGum(new GumRenderable(scoreText));
+AddGum(scoreText);
 ```
 
 **Coordinate gotcha**: Gum X/Y are screen pixels, Y-down from the top-left corner — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
@@ -211,9 +208,9 @@ Gum is fully cleaned up on every screen transition — no manual teardown needed
 
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving` — not `Gum.Wireframe`. Forms controls are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. FRB2's wrapper types are in `FlatRedBall2.UI`.
 - **`GumRenderBatch`** is the FRB2 `IRenderBatch` wrapper. Do not confuse it with Gum's own `RenderingLibrary.Graphics.GumBatch`.
-- **Initialize order**: Do not create `GumRenderable` before `FlatRedBallService.Initialize` is called.
+- **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize` is called.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `AddGum` instead.
 
 ## TODO: World-Space Attachment
 
-Currently all `GumRenderable` instances render in screen space. Future work: if a `GumRenderable` is attached to an `Entity`, project `AbsoluteX/Y` through `camera.WorldToScreen` to follow the entity (e.g., a health bar above a character). See the `TODO` comment in `GumRenderable.Draw`.
+Currently all Gum elements render in screen space. Future work: if a Gum element is attached to an `Entity`, project `AbsoluteX/Y` through `camera.WorldToScreen` to follow the entity (e.g., a health bar above a character). See the `TODO` comment in `GumRenderable.Draw`.
