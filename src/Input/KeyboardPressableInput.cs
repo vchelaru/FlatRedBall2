@@ -15,5 +15,5 @@ public class KeyboardPressableInput : IPressableInput
 
     public bool IsDown => _keyboard.IsKeyDown(_key);
     public bool WasJustPressed => _keyboard.WasKeyPressed(_key);
-    public bool WasJustReleased => !_keyboard.IsKeyDown(_key) && !_keyboard.WasKeyPressed(_key);
+    public bool WasJustReleased => _keyboard.WasKeyJustReleased(_key);
 }

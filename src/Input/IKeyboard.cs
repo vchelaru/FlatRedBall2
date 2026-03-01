@@ -6,4 +6,5 @@ public interface IKeyboard
 {
     bool IsKeyDown(Keys key);
     bool WasKeyPressed(Keys key);
+    bool WasKeyJustReleased(Keys key);
 }

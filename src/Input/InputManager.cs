@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Input;
@@ -18,7 +19,12 @@ public class InputManager
     public IKeyboard Keyboard => _keyboard;
     public ICursor Cursor => _cursor;
 
-    public IGamepad GetGamepad(int index) => _gamepads[index];
+    public IGamepad GetGamepad(int index)
+    {
+        if (index < 0 || index > 3)
+            throw new ArgumentOutOfRangeException(nameof(index), "Gamepad index must be between 0 and 3.");
+        return _gamepads[index];
+    }
 
     internal void SetCamera(Camera camera) => _cursor.SetCamera(camera);
 

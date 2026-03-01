@@ -17,6 +17,8 @@ public class Gamepad : IGamepad
     }
 
     public bool IsButtonDown(Buttons button) => _current.IsButtonDown(button);
+    public bool WasButtonJustPressed(Buttons button) => !_previous.IsButtonDown(button) && _current.IsButtonDown(button);
+    public bool WasButtonJustReleased(Buttons button) => _previous.IsButtonDown(button) && !_current.IsButtonDown(button);
 
     public float GetAxis(GamepadAxis axis) => axis switch
     {

@@ -45,9 +45,9 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
         var size = new XnaVec2(screenBR.X - screenTL.X, screenBR.Y - screenTL.Y);
 
         if (IsFilled)
-            sb.Shapes.FillRectangle(xy, size, Color);
+            sb.Shapes.FillRectangle(xy, size, Color, aaSize:0f);
         else
-            sb.Shapes.BorderRectangle(xy, size, Color, OutlineThickness);
+            sb.Shapes.BorderRectangle(xy, size, Color, OutlineThickness, aaSize: 0f);
     }
 
     public void Destroy()

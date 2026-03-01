@@ -14,6 +14,6 @@ public class GamepadPressableInput : IPressableInput
     }
 
     public bool IsDown => _gamepad.IsButtonDown(_button);
-    public bool WasJustPressed => false; // TODO: needs previous state tracking
-    public bool WasJustReleased => false; // TODO: needs previous state tracking
+    public bool WasJustPressed => _gamepad.WasButtonJustPressed(_button);
+    public bool WasJustReleased => _gamepad.WasButtonJustReleased(_button);
 }

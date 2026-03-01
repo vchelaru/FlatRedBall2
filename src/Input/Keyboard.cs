@@ -15,4 +15,5 @@ public class Keyboard : IKeyboard
 
     public bool IsKeyDown(Keys key) => _current.IsKeyDown(key);
     public bool WasKeyPressed(Keys key) => _current.IsKeyDown(key) && !_previous.IsKeyDown(key);
+    public bool WasKeyJustReleased(Keys key) => _previous.IsKeyDown(key) && !_current.IsKeyDown(key);
 }
