@@ -8,6 +8,20 @@ namespace FlatRedBall2.Tests.Utilities;
 public class GameRandomTests
 {
     [Fact]
+    public void Between_Float_ReturnsValueInRange()
+    {
+        var random = new GameRandom(seed: 42);
+        float lower = 5f, upper = 10f;
+
+        for (int i = 0; i < 100; i++)
+        {
+            var value = random.Between(lower, upper);
+            value.ShouldBeGreaterThanOrEqualTo(lower);
+            value.ShouldBeLessThanOrEqualTo(upper);
+        }
+    }
+
+    [Fact]
     public void In_ReturnsSomeElementFromList()
     {
         var random = new GameRandom(seed: 42);
@@ -28,20 +42,6 @@ public class GameRandomTests
 
         result.Count.ShouldBe(3);
         result.Distinct().Count().ShouldBe(3);
-    }
-
-    [Fact]
-    public void Between_Float_ReturnsValueInRange()
-    {
-        var random = new GameRandom(seed: 42);
-        float lower = 5f, upper = 10f;
-
-        for (int i = 0; i < 100; i++)
-        {
-            var value = random.Between(lower, upper);
-            value.ShouldBeGreaterThanOrEqualTo(lower);
-            value.ShouldBeLessThanOrEqualTo(upper);
-        }
     }
 
     [Fact]

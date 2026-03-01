@@ -22,6 +22,20 @@ public class FactoryTests
     }
 
     [Fact]
+    public void Create_CallsCustomInitialize()
+    {
+        var screen = new TestScreen();
+        var engine = new FlatRedBallService();
+        screen.Engine = engine;
+        var factory = new Factory<InitTrackingEntity>(screen);
+        InitTrackingEntity.InitCount = 0;
+
+        factory.Create();
+
+        InitTrackingEntity.InitCount.ShouldBe(1);
+    }
+
+    [Fact]
     public void Destroy_RemovesFromInstances()
     {
         var screen = new TestScreen();
@@ -49,20 +63,6 @@ public class FactoryTests
         factory.DestroyAll();
 
         factory.Instances.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Create_CallsCustomInitialize()
-    {
-        var screen = new TestScreen();
-        var engine = new FlatRedBallService();
-        screen.Engine = engine;
-        var factory = new Factory<InitTrackingEntity>(screen);
-        InitTrackingEntity.InitCount = 0;
-
-        factory.Create();
-
-        InitTrackingEntity.InitCount.ShouldBe(1);
     }
 
     private class InitTrackingEntity : Entity

@@ -29,6 +29,45 @@ public class BounceTests
         => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
+    public void Ball_WithGravityAndBounce_RemainsInsideArena()
+    {
+        // Seeded random for determinism
+        var random = new GameRandom(seed: 42);
+        float half = 200f;
+
+        var ball = new Ball();
+        ball.Y = random.Between(50f, 100f);       // spawn in upper half
+        ball.VelocityX = random.Between(-150f, 150f);
+
+        // Four walls forming a closed arena
+        var floor   = MakeWall(  0f,  -half, 400f,  20f);
+        var ceiling = MakeWall(  0f,   half, 400f,  20f);
+        var left    = MakeWall(-half,    0f,  20f, 400f);
+        var right   = MakeWall( half,    0f,  20f, 400f);
+
+        var engine = new FlatRedBallService();
+        var screen = new Screen();
+        screen.Engine = engine;
+        screen.Register(ball);
+        screen.Register(floor);
+        screen.Register(ceiling);
+        screen.Register(left);
+        screen.Register(right);
+
+        screen.AddCollisionRelationship(new[] { (Entity)ball }, new[] { floor, ceiling, left, right })
+              .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f);
+
+        var frame = MakeFrame(1f / 60f);
+        for (int i = 0; i < 300; i++) // 5 seconds of simulation
+            screen.Update(frame);
+
+        ball.X.ShouldBeGreaterThan(-half);
+        ball.X.ShouldBeLessThan(half);
+        ball.Y.ShouldBeGreaterThan(-half);
+        ball.Y.ShouldBeLessThan(half);
+    }
+
+    [Fact]
     public void BounceOnCollision_BallHitsFloor_VelocityReversedWithElasticity()
     {
         float initialVelY = -100f;
@@ -77,28 +116,6 @@ public class BounceTests
     }
 
     [Fact]
-    public void BounceOnCollision_TwoMovingEntities_BothVelocitiesAdjusted()
-    {
-        // Both entities moving toward each other — equal mass, perfect elasticity → velocities swap.
-        var entityA = new Entity { X = 0f, VelocityX = 100f };
-        entityA.AddChild(new Circle { Radius = 16f });
-
-        var entityB = new Entity { X = 20f, VelocityX = -100f };
-        entityB.AddChild(new Circle { Radius = 16f });
-
-        // Distance = 20, combined radii = 32 → 12px overlap; they are colliding.
-        entityA.CollidesWith(entityB).ShouldBeTrue();
-
-        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
-        rel.BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 1f);
-        rel.RunCollisions();
-
-        // Perfect elastic collision with equal masses → velocities exchange.
-        entityA.VelocityX.ShouldBe(-100f, tolerance: 0.01f);
-        entityB.VelocityX.ShouldBe(100f, tolerance: 0.01f);
-    }
-
-    [Fact]
     public void BounceOnCollision_ShapeOnGrandchildEntity_UsesTopParentVelocity()
     {
         // Hierarchy: grandparent (VelX=100) → child entity P → Circle grandchild.
@@ -124,41 +141,24 @@ public class BounceTests
     }
 
     [Fact]
-    public void Ball_WithGravityAndBounce_RemainsInsideArena()
+    public void BounceOnCollision_TwoMovingEntities_BothVelocitiesAdjusted()
     {
-        // Seeded random for determinism
-        var random = new GameRandom(seed: 42);
-        float half = 200f;
+        // Both entities moving toward each other — equal mass, perfect elasticity → velocities swap.
+        var entityA = new Entity { X = 0f, VelocityX = 100f };
+        entityA.AddChild(new Circle { Radius = 16f });
 
-        var ball = new Ball();
-        ball.Y = random.Between(50f, 100f);       // spawn in upper half
-        ball.VelocityX = random.Between(-150f, 150f);
+        var entityB = new Entity { X = 20f, VelocityX = -100f };
+        entityB.AddChild(new Circle { Radius = 16f });
 
-        // Four walls forming a closed arena
-        var floor   = MakeWall(  0f,  -half, 400f,  20f);
-        var ceiling = MakeWall(  0f,   half, 400f,  20f);
-        var left    = MakeWall(-half,    0f,  20f, 400f);
-        var right   = MakeWall( half,    0f,  20f, 400f);
+        // Distance = 20, combined radii = 32 → 12px overlap; they are colliding.
+        entityA.CollidesWith(entityB).ShouldBeTrue();
 
-        var engine = new FlatRedBallService();
-        var screen = new Screen();
-        screen.Engine = engine;
-        screen.Register(ball);
-        screen.Register(floor);
-        screen.Register(ceiling);
-        screen.Register(left);
-        screen.Register(right);
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 1f);
+        rel.RunCollisions();
 
-        screen.AddCollisionRelationship(new[] { (Entity)ball }, new[] { floor, ceiling, left, right })
-              .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f);
-
-        var frame = MakeFrame(1f / 60f);
-        for (int i = 0; i < 300; i++) // 5 seconds of simulation
-            screen.Update(frame);
-
-        ball.X.ShouldBeGreaterThan(-half);
-        ball.X.ShouldBeLessThan(half);
-        ball.Y.ShouldBeGreaterThan(-half);
-        ball.Y.ShouldBeLessThan(half);
+        // Perfect elastic collision with equal masses → velocities exchange.
+        entityA.VelocityX.ShouldBe(-100f, tolerance: 0.01f);
+        entityB.VelocityX.ShouldBe(100f, tolerance: 0.01f);
     }
 }

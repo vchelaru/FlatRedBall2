@@ -36,6 +36,15 @@ file sealed class FakeGamepad : IGamepad
 public class KeyboardPressableInputTests
 {
     [Fact]
+    public void WasJustPressed_DelegatesToWasKeyPressed()
+    {
+        var fake = new FakeKeyboard { KeyPressed = true };
+        var input = new KeyboardPressableInput(fake, Keys.Space);
+
+        input.WasJustPressed.ShouldBeTrue();
+    }
+
+    [Fact]
     public void WasJustReleased_DelegatesToWasKeyJustReleased()
     {
         var fake = new FakeKeyboard { KeyReleased = true };
@@ -51,15 +60,6 @@ public class KeyboardPressableInputTests
         var input = new KeyboardPressableInput(fake, Keys.Space);
 
         input.WasJustReleased.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void WasJustPressed_DelegatesToWasKeyPressed()
-    {
-        var fake = new FakeKeyboard { KeyPressed = true };
-        var input = new KeyboardPressableInput(fake, Keys.Space);
-
-        input.WasJustPressed.ShouldBeTrue();
     }
 }
 
@@ -77,21 +77,21 @@ public class GamepadPressableInputTests
     }
 
     [Fact]
-    public void WasJustReleased_DelegatesToWasButtonJustReleased()
-    {
-        var fake = new FakeGamepad { ButtonJustReleased = true };
-        var input = new GamepadPressableInput(fake, Buttons.A);
-
-        input.WasJustReleased.ShouldBeTrue();
-    }
-
-    [Fact]
     public void WasJustPressed_ReturnsFalse_WhenNotPressed()
     {
         var fake = new FakeGamepad { ButtonJustPressed = false };
         var input = new GamepadPressableInput(fake, Buttons.A);
 
         input.WasJustPressed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WasJustReleased_DelegatesToWasButtonJustReleased()
+    {
+        var fake = new FakeGamepad { ButtonJustReleased = true };
+        var input = new GamepadPressableInput(fake, Buttons.A);
+
+        input.WasJustReleased.ShouldBeTrue();
     }
 }
 

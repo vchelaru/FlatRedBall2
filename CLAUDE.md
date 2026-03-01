@@ -34,7 +34,7 @@ For every task, invoke the appropriate agent from `.claude/agents/` before proce
 
 Available agents:
 - **coder** — Writing or modifying code and unit tests for new features or bugs
-- **qa** — Testing, reviewing changes, and verifying correctness
+- **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
 - **refactoring-specialist** — Refactoring and improving code structure
 - **docs-writer** — Writing or updating documentation
 - **product-manager** — Breaking down tasks and tracking progress

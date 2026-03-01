@@ -10,21 +10,16 @@ public class PhysicsTests
         => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
-    public void ConstantVelocity_MovesExpectedDistance()
+    public void ChildEntity_DoesNotRunPhysicsIndependently()
     {
-        float velocityX = 100f;
-        float deltaSeconds = 1f / 60f;
-        float expectedX = velocityX * deltaSeconds * 3f;
+        var parent = new Entity();
+        var child = new Entity();
+        parent.AddChild(child);
+        child.VelocityX = 50f;
 
-        var entity = new Entity();
-        entity.VelocityX = velocityX;
+        parent.PhysicsUpdate(MakeFrame(1f / 60f));
 
-        var frame = MakeFrame(deltaSeconds);
-        entity.PhysicsUpdate(frame);
-        entity.PhysicsUpdate(frame);
-        entity.PhysicsUpdate(frame);
-
-        entity.X.ShouldBe(expectedX, tolerance: 0.0001f);
+        child.X.ShouldBe(0f);
     }
 
     [Fact]
@@ -45,6 +40,24 @@ public class PhysicsTests
     }
 
     [Fact]
+    public void ConstantVelocity_MovesExpectedDistance()
+    {
+        float velocityX = 100f;
+        float deltaSeconds = 1f / 60f;
+        float expectedX = velocityX * deltaSeconds * 3f;
+
+        var entity = new Entity();
+        entity.VelocityX = velocityX;
+
+        var frame = MakeFrame(deltaSeconds);
+        entity.PhysicsUpdate(frame);
+        entity.PhysicsUpdate(frame);
+        entity.PhysicsUpdate(frame);
+
+        entity.X.ShouldBe(expectedX, tolerance: 0.0001f);
+    }
+
+    [Fact]
     public void Drag_ReducesVelocityEachFrame()
     {
         float initialVelocity = 100f;
@@ -59,18 +72,5 @@ public class PhysicsTests
         entity.PhysicsUpdate(MakeFrame(dt));
 
         entity.VelocityX.ShouldBe(expectedVx, tolerance: 0.00001f);
-    }
-
-    [Fact]
-    public void ChildEntity_DoesNotRunPhysicsIndependently()
-    {
-        var parent = new Entity();
-        var child = new Entity();
-        parent.AddChild(child);
-        child.VelocityX = 50f;
-
-        parent.PhysicsUpdate(MakeFrame(1f / 60f));
-
-        child.X.ShouldBe(0f);
     }
 }

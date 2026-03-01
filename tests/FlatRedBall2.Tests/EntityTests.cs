@@ -7,17 +7,6 @@ namespace FlatRedBall2.Tests;
 public class EntityTests
 {
     [Fact]
-    public void AddChild_SetsParentOnChild()
-    {
-        var parent = new Entity();
-        var child = new Entity();
-
-        parent.AddChild(child);
-
-        child.Parent.ShouldBe(parent);
-    }
-
-    [Fact]
     public void AbsolutePosition_IncludesParentOffset()
     {
         float parentX = 100f, parentY = 50f;
@@ -34,15 +23,14 @@ public class EntityTests
     }
 
     [Fact]
-    public void RemoveChild_ClearsParentOnChild()
+    public void AddChild_SetsParentOnChild()
     {
         var parent = new Entity();
         var child = new Entity();
+
         parent.AddChild(child);
 
-        parent.RemoveChild(child);
-
-        child.Parent.ShouldBeNull();
+        child.Parent.ShouldBe(parent);
     }
 
     [Fact]
@@ -65,6 +53,18 @@ public class EntityTests
         child.Destroy();
 
         parent.Children.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RemoveChild_ClearsParentOnChild()
+    {
+        var parent = new Entity();
+        var child = new Entity();
+        parent.AddChild(child);
+
+        parent.RemoveChild(child);
+
+        child.Parent.ShouldBeNull();
     }
 
     private class DestroyTrackingEntity : Entity

@@ -10,19 +10,6 @@ public class ScreenTests
     private class TestScreen : Screen { }
 
     [Fact]
-    public void Register_SetsEngineOnEntity()
-    {
-        var engine = new FlatRedBallService();
-        var screen = new TestScreen();
-        screen.Engine = engine;
-        var entity = new Entity();
-
-        screen.Register(entity);
-
-        entity.Engine.ShouldBe(engine);
-    }
-
-    [Fact]
     public void Register_AddsRenderableChildrenToRenderList()
     {
         var engine = new FlatRedBallService();
@@ -35,6 +22,19 @@ public class ScreenTests
         screen.Register(entity);
 
         screen.RenderList.ShouldContain(rect);
+    }
+
+    [Fact]
+    public void Register_SetsEngineOnEntity()
+    {
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen();
+        screen.Engine = engine;
+        var entity = new Entity();
+
+        screen.Register(entity);
+
+        entity.Engine.ShouldBe(engine);
     }
 
     [Fact]
