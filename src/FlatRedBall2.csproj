@@ -7,4 +7,9 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

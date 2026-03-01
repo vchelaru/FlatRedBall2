@@ -1,0 +1,75 @@
+using System;
+using Xunit;
+
+namespace FlatRedBall2.Tests;
+
+public class PhysicsTests
+{
+    private static FrameTime MakeFrame(float deltaSeconds)
+        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
+
+    [Fact]
+    public void ConstantVelocity_MovesExpectedDistance()
+    {
+        float velocityX = 100f;
+        float deltaSeconds = 1f / 60f;
+        float expectedX = velocityX * deltaSeconds * 3f;
+
+        var entity = new Entity();
+        entity.VelocityX = velocityX;
+
+        var frame = MakeFrame(deltaSeconds);
+        entity.PhysicsUpdate(frame);
+        entity.PhysicsUpdate(frame);
+        entity.PhysicsUpdate(frame);
+
+        Assert.Equal(expectedX, entity.X, 4);
+    }
+
+    [Fact]
+    public void ConstantAcceleration_UsesSecondOrderKinematics()
+    {
+        float accelerationX = 100f;
+        float dt = 1f / 60f;
+        float expectedX = accelerationX * (dt * dt / 2f);
+        float expectedVx = accelerationX * dt;
+
+        var entity = new Entity();
+        entity.AccelerationX = accelerationX;
+
+        entity.PhysicsUpdate(MakeFrame(dt));
+
+        Assert.Equal(expectedX, entity.X, 4);
+        Assert.Equal(expectedVx, entity.VelocityX, 4);
+    }
+
+    [Fact]
+    public void Drag_ReducesVelocityEachFrame()
+    {
+        float initialVelocity = 100f;
+        float drag = 1f;
+        float dt = 1f / 60f;
+        float expectedVx = initialVelocity - initialVelocity * drag * dt;
+
+        var entity = new Entity();
+        entity.VelocityX = initialVelocity;
+        entity.Drag = drag;
+
+        entity.PhysicsUpdate(MakeFrame(dt));
+
+        Assert.Equal(expectedVx, entity.VelocityX, 5);
+    }
+
+    [Fact]
+    public void ChildEntity_DoesNotRunPhysicsIndependently()
+    {
+        var parent = new Entity();
+        var child = new Entity();
+        parent.AddChild(child);
+        child.VelocityX = 50f;
+
+        parent.PhysicsUpdate(MakeFrame(1f / 60f));
+
+        Assert.Equal(0f, child.X);
+    }
+}
