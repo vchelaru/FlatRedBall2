@@ -62,6 +62,14 @@ public class Screen
     public void RemoveGum(GraphicalUiElement visual)
         => RemoveGumVisual(visual);
 
+    internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, float z)
+    {
+        var renderable = new GumRenderable(visual) { Z = z, WorldParent = worldParent };
+        _gumRenderables.Add(renderable);
+        _gumByVisual[visual] = renderable;
+        RenderList.Add(renderable);
+    }
+
     private void AddGumVisual(GraphicalUiElement visual, float z)
     {
         var renderable = new GumRenderable(visual) { Z = z };

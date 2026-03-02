@@ -7,21 +7,22 @@ namespace FlatRedBall2.UI;
 /// <summary>
 /// Wraps a Gum <see cref="GraphicalUiElement"/> as an <see cref="IRenderable"/> so it can be
 /// sorted by Layer and Z alongside sprites and shapes in the Screen's render list.
-/// Renders in screen space by default.
 /// </summary>
 /// <remarks>
-/// This type is an internal implementation detail. Use <c>Screen.AddGum</c> with a
-/// <c>FrameworkElement</c> or <c>GraphicalUiElement</c> directly — the screen handles wrapping internally.
-/// <para>
-/// TODO: World-space attachment — if a future Parent entity is set, project
-/// AbsoluteX/Y through <c>camera.WorldToScreen</c> to offset <see cref="Visual"/>'s
-/// position before drawing.
-/// </para>
+/// This type is an internal implementation detail. Use <c>Screen.AddGum</c> for screen-space
+/// elements or <c>Entity.AddGum</c> for world-space elements — both handle wrapping internally.
 /// </remarks>
 public class GumRenderable : IRenderable
 {
     /// <summary>The root Gum element rendered by this object.</summary>
     public GraphicalUiElement Visual { get; }
+
+    /// <summary>
+    /// When set, the visual is positioned in world space at this entity's location each frame.
+    /// <c>AbsoluteX/Y</c> are converted through the camera to screen pixels before drawing.
+    /// Leave null (default) for screen-space rendering.
+    /// </summary>
+    public Entity? WorldParent { get; set; }
 
     /// <param name="visual">
     /// The Gum visual to render. Pass the <c>.Visual</c> property of a Forms control
@@ -42,6 +43,13 @@ public class GumRenderable : IRenderable
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
+        if (WorldParent != null)
+        {
+            var screenPos = camera.WorldToScreen(
+                new System.Numerics.Vector2(WorldParent.AbsoluteX, WorldParent.AbsoluteY));
+            Visual.X = screenPos.X;
+            Visual.Y = screenPos.Y;
+        }
         GumRenderBatch.Instance.DrawElement(Visual);
     }
 }

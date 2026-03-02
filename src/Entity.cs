@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
+using Gum.Forms.Controls;
+using Gum.Wireframe;
 
 namespace FlatRedBall2;
 
@@ -12,6 +14,7 @@ public class Entity : ICollidable, IAttachable
 {
     private readonly List<IAttachable> _children = new();
     private readonly List<ICollidable> _shapes = new();
+    private readonly List<GraphicalUiElement> _gumChildren = new();
 
     // Position — relative to parent when attached, world when root
     public float X { get; set; }
@@ -108,6 +111,36 @@ public class Entity : ICollidable, IAttachable
             _engine?.CurrentScreen?.RenderList.Remove(renderable);
     }
 
+    /// <summary>
+    /// Adds a Gum visual to this entity in world space. The visual's screen position tracks
+    /// this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
+    /// </summary>
+    /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
+    public void AddGum(GraphicalUiElement visual, float z = 0f)
+    {
+        _gumChildren.Add(visual);
+        Engine.CurrentScreen.AddGumForEntity(visual, this, z);
+    }
+
+    /// <summary>
+    /// Adds a Gum Forms control to this entity in world space. The visual's screen position
+    /// tracks this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
+    /// </summary>
+    /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
+    public void AddGum(FrameworkElement element, float z = 0f)
+        => AddGum(element.Visual, z);
+
+    /// <summary>Removes a Gum visual previously added with <see cref="AddGum(GraphicalUiElement, float)"/>.</summary>
+    public void RemoveGum(GraphicalUiElement visual)
+    {
+        _gumChildren.Remove(visual);
+        _engine?.CurrentScreen?.RemoveGum(visual);
+    }
+
+    /// <summary>Removes a Gum Forms control previously added with <see cref="AddGum(FrameworkElement, float)"/>.</summary>
+    public void RemoveGum(FrameworkElement element)
+        => RemoveGum(element.Visual);
+
     // Called by Screen each frame before CustomActivity
     internal void PhysicsUpdate(FrameTime frameTime)
     {
@@ -133,6 +166,9 @@ public class Entity : ICollidable, IAttachable
     public void Destroy()
     {
         CustomDestroy();
+        foreach (var visual in _gumChildren)
+            _engine?.CurrentScreen?.RemoveGum(visual);
+        _gumChildren.Clear();
         Parent?.RemoveChild(this);
         foreach (var child in new List<IAttachable>(_children))
             child.Destroy();

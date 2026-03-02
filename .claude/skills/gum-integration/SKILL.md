@@ -184,7 +184,9 @@ var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
 AddGum(scoreText);
 ```
 
-**Coordinate gotcha**: Gum X/Y are screen pixels, Y-down from the top-left corner — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
+**Coordinate gotcha (screen-space)**: Gum X/Y are screen pixels, Y-down from the top-left corner — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
+
+**Coordinate gotcha (world-space)**: When using `entity.AddGum`, the entity's `X/Y` are world coordinates (Y-up). The conversion to screen pixels happens automatically. Do not manually set `Visual.X/Y` on a world-space Gum element — it will be overwritten each frame.
 
 ## Input / Interactivity
 
@@ -211,6 +213,62 @@ Gum is fully cleaned up on every screen transition — no manual teardown needed
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize` is called.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `AddGum` instead.
 
-## TODO: World-Space Attachment
+## Screen-Space vs World-Space
 
-Currently all Gum elements render in screen space. Future work: if a Gum element is attached to an `Entity`, project `AbsoluteX/Y` through `camera.WorldToScreen` to follow the entity (e.g., a health bar above a character). See the `TODO` comment in `GumRenderable.Draw`.
+### Screen-Space (default)
+
+`Screen.AddGum` places the element in screen space — Gum's native coordinate system (pixels, Y-down, origin top-left). Use this for HUDs, menus, and any UI that should stay fixed on screen regardless of where the camera is.
+
+```csharp
+// In Screen.CustomInitialize():
+var scoreLabel = new Label { Text = "0" };
+scoreLabel.Anchor(Anchor.TopRight);
+AddGum(scoreLabel);   // screen-space — stays in corner as camera moves
+```
+
+### World-Space (entity-attached)
+
+`Entity.AddGum` places a Gum element at the entity's world position. Each frame, `AbsoluteX/Y` is converted through the camera to screen pixels — so the visual follows the entity as it moves, and shifts when the camera pans.
+
+```csharp
+// In a custom Entity.CustomInitialize():
+var label = new TextRuntime { Text = "Enemy", FontSize = 24 };
+AddGum(label);   // world-space — follows this entity
+```
+
+The visual is automatically removed when the entity is destroyed. `RemoveGum` is available if you need to detach it earlier.
+
+### Pattern: Transient World-Space Text (e.g., Floating Score)
+
+For text that spawns at a world position, animates, and then disappears (like "+100" after hitting an enemy), create a short-lived entity that owns the animation:
+
+```csharp
+// User-defined in game code — not a FlatRedBall2 type:
+class ScoreFloater : Entity
+{
+    private float _lifetime;
+    private TextRuntime _label = new TextRuntime { FontSize = 32 };
+
+    public int Score { set => _label.Text = $"+{value}"; }
+
+    public override void CustomInitialize()
+    {
+        VelocityY = 80f;
+        AddGum(_label);   // world-space — floats up with the entity
+    }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        _lifetime += time.DeltaSeconds;
+        if (_lifetime > 1.2f) Destroy();
+    }
+}
+
+// Spawn at the hit position:
+var floater = Factory<ScoreFloater>.Create();
+floater.X = hitX;
+floater.Y = hitY;
+floater.Score = 100;
+```
+
+Physics (velocity, drag, acceleration) move the entity in world space, and the Gum visual follows automatically. No manual screen-coordinate math is needed.
