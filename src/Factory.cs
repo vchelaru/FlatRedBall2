@@ -22,16 +22,17 @@ public class Factory<T> : IEnumerable<T> where T : Entity, new()
         entity.Engine = _screen.Engine;
         _screen.AddEntity(entity);
         _instances.Add(entity);
+        entity._onDestroy = () =>
+        {
+            _instances.Remove(entity);
+            _screen.RemoveEntity(entity);
+        };
         entity.CustomInitialize();
         return entity;
     }
 
-    public void Destroy(T instance)
-    {
-        _instances.Remove(instance);
-        _screen.RemoveEntity(instance);
-        instance.Destroy();
-    }
+    /// <summary>Destroys the entity. Equivalent to calling <see cref="Entity.Destroy"/> directly.</summary>
+    public void Destroy(T instance) => instance.Destroy();
 
     public void DestroyAll()
     {
@@ -39,6 +40,10 @@ public class Factory<T> : IEnumerable<T> where T : Entity, new()
             Destroy(instance);
     }
 
-    public IEnumerator<T> GetEnumerator() => _instances.GetEnumerator();
+    /// <summary>
+    /// Enumerates a snapshot of current instances. Safe to call <see cref="Destroy"/> on any
+    /// instance during enumeration — the live list can be modified without affecting the iterator.
+    /// </summary>
+    public IEnumerator<T> GetEnumerator() => new List<T>(_instances).GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

@@ -27,6 +27,7 @@ public class Screen
     public void Register(Entity entity)
     {
         entity.Engine = Engine;
+        entity._onDestroy = () => RemoveEntity(entity);
         _entities.Add(entity);
         foreach (var child in entity.Children)
         {

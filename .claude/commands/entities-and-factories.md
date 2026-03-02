@@ -92,6 +92,23 @@ public class GameScreen : Screen
 
 `Factory<T>` implements `IEnumerable<T>`, so you can pass it directly to `AddCollisionRelationship`.
 
+## Inspecting the Factory
+
+`Factory<T>.Instances` exposes the live list as `IReadOnlyList<T>`, available for any read purpose — counting, querying, or iterating to update state:
+
+```csharp
+// Count surviving enemies
+int remaining = _enemyFactory.Instances.Count;
+
+// Iterate to update state
+for (int i = 0; i < _enemyFactory.Instances.Count; i++)
+    _enemyFactory.Instances[i].UpdateHealthBar();
+
+// Detect when a group is fully cleared
+if (_brickFactory.Instances.Count == 0)
+    MoveToScreen<NextLevelScreen>();
+```
+
 ## Configuring Entities After Create()
 
 `Create()` returns the entity instance. You can set position and shape dimensions after creation:
@@ -152,6 +169,90 @@ public override void CustomActivity(FrameTime time)
 ```
 
 `GetFactory<T>()` throws `InvalidOperationException` if no factory for `T` has been created yet — check that the screen calls `new Factory<Ball>(this)` before any entity tries to spawn one.
+
+## Destroying Entities
+
+Call `Destroy()` directly on any entity to remove it from the game. It removes itself from its factory, the screen's update list, and clears all child shapes:
+
+```csharp
+enemy.Destroy();
+bullet.Destroy();
+```
+
+`factory.Destroy(entity)` is equivalent — prefer whichever is more readable at the call site.
+
+## Destroy and Spawn (Death Effects)
+
+When an entity should trigger a visual effect on destruction, destroy it immediately and spawn a separate effect entity at the same position. Do not try to play an effect on the dying entity — once destroyed it is removed from the game.
+
+```csharp
+AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
+    .CollisionOccurred += (bullet, enemy) =>
+    {
+        var explosion = Engine.GetFactory<Explosion>().Create();
+        explosion.X = enemy.X;
+        explosion.Y = enemy.Y;
+        enemy.Destroy();
+        bullet.Destroy();
+    };
+```
+
+The effect entity manages its own lifetime in `CustomActivity`:
+
+```csharp
+public class Explosion : Entity
+{
+    private float _lifetime = 0.5f;
+
+    public override void CustomActivity(FrameTime time)
+    {
+        _lifetime -= time.DeltaSeconds;
+        if (_lifetime <= 0f)
+            Destroy();
+    }
+}
+```
+
+## Particle Effects
+
+> **Future:** A dedicated particle tool is planned. For now, spawn short-lived entities that destroy themselves after a set duration — the same pattern as death effects, applied in quantity.
+
+A particle entity tracks its own remaining lifetime and destroys itself when it expires:
+
+```csharp
+public class Particle : Entity
+{
+    private float _lifetime;
+
+    public void Launch(float lifetimeSeconds)
+    {
+        _lifetime = lifetimeSeconds;
+    }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        _lifetime -= time.DeltaSeconds;
+        if (_lifetime <= 0f)
+            Destroy();
+    }
+}
+```
+
+Spawn a burst from any entity that has access to the factory:
+
+```csharp
+var factory = Engine.GetFactory<Particle>();
+for (int i = 0; i < 12; i++)
+{
+    var p = factory.Create();
+    p.X = X;
+    p.Y = Y;
+    p.Velocity = Engine.Random.RadialVector2(60f, 180f);
+    p.Launch(lifetimeSeconds: Engine.Random.Between(0.3f, 0.8f));
+}
+```
+
+Visual variety comes from randomizing velocity, color, size, and lifetime across the burst. Fading can be approximated by scaling the shape's alpha in `CustomActivity` based on remaining lifetime fraction.
 
 ## Common Pitfalls
 

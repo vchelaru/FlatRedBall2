@@ -36,6 +36,39 @@ public class FactoryTests
     }
 
     [Fact]
+    public void Destroy_CalledDirectlyOnEntity_RemovesFromFactory()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TestEntity>(screen);
+
+        var entity = factory.Create();
+        entity.Destroy(); // no factory reference needed
+
+        factory.Instances.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Destroy_DuringEnumeration_DoesNotThrow()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TestEntity>(screen);
+
+        var e1 = factory.Create();
+        factory.Create();
+
+        // Simulates destroying inside CollisionOccurred while the collision loop iterates the factory
+        Should.NotThrow(() =>
+        {
+            foreach (var _ in factory)
+                factory.Destroy(e1);
+        });
+
+        factory.Instances.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void Destroy_RemovesFromInstances()
     {
         var screen = new TestScreen();

@@ -52,6 +52,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `screens` — Screen lifecycle and transitions
 - `gum-integration` — UI with Gum
 - `content-and-assets` — Asset loading
+- `levels` — Level data layout and progression
 
 ## Key Architecture Decisions
 

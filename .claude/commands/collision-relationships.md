@@ -58,7 +58,15 @@ AddCollisionRelationship(_bulletsA, _bulletsB)
 
 ## Responding to Collision Events
 
-Use the `CollisionOccurred` event for custom logic (damage, scoring, sound, etc.):
+`CollisionOccurred` covers three broad categories of use:
+
+- **Physics customization** — read or override velocity/position after the engine's response has been applied
+- **Entity logic** — deal damage, destroy entities, update state
+- **Triggers** — detect when an entity enters a region, with no physics response at all
+
+The event fires once per overlapping pair per frame, **after** position separation and velocity adjustment have already been applied. Whatever you set on the entities in this handler is what carries into the next frame.
+
+### Entity logic
 
 ```csharp
 AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
@@ -70,7 +78,43 @@ AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
     };
 ```
 
-The event fires once per overlapping pair per frame, after separation has been applied.
+### Physics customization
+
+Because the event fires after the engine's response, you can override velocity to layer custom behavior on top of the built-in bounce:
+
+```csharp
+AddCollisionRelationship(_balls, _paddles)
+    .BounceOnCollision(firstMass: 0f, secondMass: 1f)
+    .CollisionOccurred += (ball, paddle) =>
+    {
+        // BounceOnCollision already reflected the velocity.
+        // Override here to apply custom logic on top.
+        ball.VelocityX = /* custom value */;
+        ball.VelocityY = /* custom value */;
+    };
+```
+
+### Triggers
+
+A trigger is an invisible entity used purely to detect when something enters a region — no physics response needed. Omit the fluent physics modifier entirely and handle everything in `CollisionOccurred`:
+
+```csharp
+// DeathZone entity: AxisAlignedRectangle child, Visible = false
+var zone = _deathZoneFactory.Create();
+zone.X = 0;
+zone.Y = -Camera.TargetHeight / 2f - 40f;  // just below screen bottom
+zone.Rectangle.Width  = Camera.TargetWidth;
+zone.Rectangle.Height = 80f;
+
+AddCollisionRelationship(_balls, _deathZoneFactory)
+    .CollisionOccurred += (ball, _) =>
+    {
+        _ballFactory.Destroy(ball);
+        OnBallLost();
+    };
+```
+
+Other trigger examples: end-of-level zones, score regions, checkpoint areas.
 
 ## How Entity-vs-Entity Collision Works
 

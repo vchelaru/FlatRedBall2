@@ -58,6 +58,10 @@ public class Entity : ICollidable, IAttachable
     // Engine reference — injected by Factory or Screen.Register
     public FlatRedBallService? Engine { get; internal set; }
 
+    // Set by Factory or Screen.Register; called at the end of Destroy() to remove this entity
+    // from its owning container without requiring a back-reference to the factory or screen.
+    internal Action? _onDestroy;
+
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
@@ -118,6 +122,7 @@ public class Entity : ICollidable, IAttachable
             child.Destroy();
         _children.Clear();
         _shapes.Clear();
+        _onDestroy?.Invoke();
     }
 
     // ICollidable — aggregates all attached shapes, recursing through child entities.
