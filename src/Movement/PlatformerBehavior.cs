@@ -33,6 +33,8 @@ public class PlatformerBehavior
     /// </summary>
     public void Update(Entity entity, FrameTime time)
     {
+        if (time.DeltaSeconds == 0f) return;
+
         // A. Determine ground state
         IsOnGround = entity.LastReposition.Y > 0;
 

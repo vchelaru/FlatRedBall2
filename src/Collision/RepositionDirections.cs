@@ -3,21 +3,21 @@ using System;
 namespace FlatRedBall2.Collision;
 
 /// <summary>
-/// Controls which sides of an <see cref="AxisAlignedRectangle"/> act as solid collision surfaces.
+/// Controls which directions an <see cref="AxisAlignedRectangle"/> may reposition overlapping objects.
 /// Used to eliminate "snagging" — the unintended velocity deflection that occurs when a moving
 /// object grazes the shared edge between two adjacent rectangles.
 /// </summary>
 /// <remarks>
-/// <para>Set to <see cref="All"/> by default, meaning every side is solid.</para>
+/// <para>Set to <see cref="All"/> by default, meaning repositioning is allowed in every direction.</para>
 /// <para>
-/// For a horizontal row of tiles, remove <see cref="Left"/> and <see cref="Right"/> from each
-/// interior tile so that only the exposed top and bottom surfaces produce collisions. Objects
-/// then glide smoothly along the surface instead of catching on seam corners.
+/// For a horizontal row of floor tiles, remove <see cref="Left"/> and <see cref="Right"/> from
+/// each interior tile so that only the top and bottom surfaces produce push-back. Objects then
+/// glide smoothly along the surface instead of catching on seam corners.
 /// </para>
 /// <para>
-/// Setting a direction on this object means <em>that side is solid</em>. When a collision would
-/// push a moving object in a direction not present here, the collision is suppressed entirely —
-/// the moving object passes through that side as if it does not exist.
+/// When flags are restricted, the engine picks the smallest valid displacement along the remaining
+/// allowed axes. A collision that would naturally push an object left against a Down-only rect
+/// will instead push it downward — the collision is never silently suppressed.
 /// </para>
 /// </remarks>
 [Flags]

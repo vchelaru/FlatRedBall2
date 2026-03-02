@@ -29,8 +29,10 @@ public class Player : Entity
 
         _platformer.GroundMovement = groundValues;
         _platformer.AirMovement = groundValues;   // reuse, or provide separate air values
-        _platformer.JumpInput = Engine.Input.Keyboard.SpaceKey;
-        _platformer.MovementInput = Engine.Input.Keyboard.HorizontalInput2D;
+
+        var keyboard = Engine.InputManager.Keyboard;
+        _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space);
+        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
     }
 
     public override void CustomActivity(FrameTime time)
@@ -83,15 +85,19 @@ _platformer.DirectionFacing   // HorizontalDirection.Left or .Right
 
 ## Collision Setup
 
-The behavior has no special collision requirements. Set up a standard move relationship
-between the player list and solid tiles:
+Use `BounceOnCollision` with `elasticity: 0f` — **not** `MoveFirstOnCollision`:
 
 ```csharp
 screen.AddCollisionRelationship(playerList, solidTiles)
-      .MoveFirstOnCollision();
+      .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 ```
 
-`LastReposition` is populated automatically by `SeparateFrom` inside the relationship.
+`BounceOnCollision` both separates the player (populating `LastReposition` for ground
+detection) and zeroes the velocity component into the surface. Without it, hitting a
+ceiling leaves the player with upward velocity and they float against it.
+
+`MoveFirstOnCollision` only repositions — it never touches velocity, which is wrong for
+platformer collision.
 
 ## Gotchas
 

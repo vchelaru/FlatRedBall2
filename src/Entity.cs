@@ -18,8 +18,8 @@ public class Entity : ICollidable, IAttachable
 
     // Position — relative to parent when attached, world when root
     public Vector2 Position;
-    public float X { get => Position.X; set => Position.X = value; }
-    public float Y { get => Position.Y; set => Position.Y = value; }
+    public float X { get => Position.X; set { ThrowIfNotFinite(value, nameof(X)); Position.X = value; } }
+    public float Y { get => Position.Y; set { ThrowIfNotFinite(value, nameof(Y)); Position.Y = value; } }
     public float Z { get; set; }
 
     // Absolute world position
@@ -33,11 +33,11 @@ public class Entity : ICollidable, IAttachable
 
     // Physics
     public Vector2 Velocity;
-    public float VelocityX { get => Velocity.X; set => Velocity.X = value; }
-    public float VelocityY { get => Velocity.Y; set => Velocity.Y = value; }
+    public float VelocityX { get => Velocity.X; set { ThrowIfNotFinite(value, nameof(VelocityX)); Velocity.X = value; } }
+    public float VelocityY { get => Velocity.Y; set { ThrowIfNotFinite(value, nameof(VelocityY)); Velocity.Y = value; } }
     public Vector2 Acceleration;
-    public float AccelerationX { get => Acceleration.X; set => Acceleration.X = value; }
-    public float AccelerationY { get => Acceleration.Y; set => Acceleration.Y = value; }
+    public float AccelerationX { get => Acceleration.X; set { ThrowIfNotFinite(value, nameof(AccelerationX)); Acceleration.X = value; } }
+    public float AccelerationY { get => Acceleration.Y; set { ThrowIfNotFinite(value, nameof(AccelerationY)); Acceleration.Y = value; } }
     public float Drag { get; set; }
 
     // Records cumulative separation applied this frame; reset at the start of each PhysicsUpdate.
@@ -242,5 +242,12 @@ public class Entity : ICollidable, IAttachable
         {
             yield return collidable;
         }
+    }
+
+    private static void ThrowIfNotFinite(float value, string propertyName)
+    {
+        if (!float.IsFinite(value))
+            throw new InvalidOperationException(
+                $"Attempted to set {propertyName} to {value}. Only finite values are allowed.");
     }
 }

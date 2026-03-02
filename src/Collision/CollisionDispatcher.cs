@@ -25,8 +25,12 @@ internal static class CollisionDispatcher
     public static bool CollidesWith(ICollidable a, ICollidable b)
         => GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
 
-    // Returns MTV (minimum translation vector) to move 'a' out of 'b'.
-    // Returns Vector2.Zero if no collision, or if b's RepositionDirections blocks the push direction.
+    // Returns the displacement needed to move 'a' out of 'b', respecting b's RepositionDirections.
+    // Returns Vector2.Zero if no collision.
+    // When b has RepositionDirections != All, computes the minimum displacement restricted to
+    // each allowed axis and returns the smallest one — so a left-edge hit against a Down-only
+    // rect pushes the object downward rather than being suppressed. For circles, the exact
+    // circle-arc geometry is used; the object is never treated as a bounding box.
     public static Vector2 GetSeparationVector(ICollidable a, ICollidable b)
     {
         var mtv = (a, b) switch
@@ -45,24 +49,135 @@ internal static class CollisionDispatcher
 
         if (mtv == Vector2.Zero) return Vector2.Zero;
 
-        // Suppress the collision if b's RepositionDirections doesn't allow the push direction.
-        if (b is AxisAlignedRectangle rectB && !IsDirectionAllowed(mtv, rectB.RepositionDirections))
-            return Vector2.Zero;
+        if (b is AxisAlignedRectangle rectB && rectB.RepositionDirections != RepositionDirections.All)
+            mtv = ComputeDirectionalSeparation(a, rectB);
 
         return mtv;
     }
 
-    // Returns true if the MTV direction is permitted by the given RepositionDirections.
-    // For a diagonal MTV (circle-corner case), ALL non-zero components must be allowed.
-    private static bool IsDirectionAllowed(Vector2 mtv, RepositionDirections dirs)
+    // Computes the minimum displacement for 'a' restricted to b's allowed axes.
+    // Tries every allowed direction and returns the one with the smallest magnitude.
+    private static Vector2 ComputeDirectionalSeparation(ICollidable a, AxisAlignedRectangle b)
     {
-        if (dirs == RepositionDirections.All)  return true;
-        if (dirs == RepositionDirections.None) return false;
-        if (mtv.X > 0 && !dirs.HasFlag(RepositionDirections.Right)) return false;
-        if (mtv.X < 0 && !dirs.HasFlag(RepositionDirections.Left))  return false;
-        if (mtv.Y > 0 && !dirs.HasFlag(RepositionDirections.Up))    return false;
-        if (mtv.Y < 0 && !dirs.HasFlag(RepositionDirections.Down))  return false;
-        return true;
+        var dirs = b.RepositionDirections;
+        if (dirs == RepositionDirections.None) return Vector2.Zero;
+
+        Vector2 best = Vector2.Zero;
+        float bestMag = float.MaxValue;
+
+        if (dirs.HasFlag(RepositionDirections.Down))  TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Down),  ref best, ref bestMag);
+        if (dirs.HasFlag(RepositionDirections.Up))    TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Up),    ref best, ref bestMag);
+        if (dirs.HasFlag(RepositionDirections.Left))  TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Left),  ref best, ref bestMag);
+        if (dirs.HasFlag(RepositionDirections.Right)) TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Right), ref best, ref bestMag);
+
+        return best;
+
+        static void TryAxis(Vector2 sep, ref Vector2 best, ref float bestMag)
+        {
+            if (sep == Vector2.Zero) return;
+            float mag = MathF.Abs(sep.X) + MathF.Abs(sep.Y); // one component is always zero
+            if (mag < bestMag) { best = sep; bestMag = mag; }
+        }
+    }
+
+    // Returns the minimum displacement to push 'a' out of 'b' along one specific axis direction.
+    // For circles the exact arc formula is used: targetCenter = face ± √(r²−d²) where d is the
+    // perpendicular distance from the circle center to the face being exited.
+    // For other shape types the AABB bounding-box approximation is used (exact for rects).
+    private static Vector2 ComputeAxisSeparation(ICollidable a, AxisAlignedRectangle b, RepositionDirections dir)
+    {
+        float bLeft   = b.AbsoluteX - b.Width  / 2f;
+        float bRight  = b.AbsoluteX + b.Width  / 2f;
+        float bBottom = b.AbsoluteY - b.Height / 2f;
+        float bTop    = b.AbsoluteY + b.Height / 2f;
+
+        if (a is Circle circle)
+        {
+            float cx = circle.AbsoluteX, cy = circle.AbsoluteY, r = circle.Radius;
+            // Perpendicular distances from circle center to the rect's nearest edges on each axis.
+            float px = System.Math.Clamp(cx, bLeft, bRight);
+            float py = System.Math.Clamp(cy, bBottom, bTop);
+            float dx = MathF.Abs(cx - px); // 0 when center is inside rect's X span
+            float dy = MathF.Abs(cy - py); // 0 when center is inside rect's Y span
+
+            switch (dir)
+            {
+                case RepositionDirections.Down:
+                    // Exit through the bottom face. Circle center lands at rect.bottom − √(r²−dx²).
+                    // If dx ≥ r the circle can't reach the bottom face — no separation possible.
+                    if (dx >= r) return Vector2.Zero;
+                    float targetDown = bBottom - MathF.Sqrt(r * r - dx * dx);
+                    float deltaDown  = targetDown - cy;
+                    return deltaDown < 0f ? new Vector2(0f, deltaDown) : Vector2.Zero;
+
+                case RepositionDirections.Up:
+                    if (dx >= r) return Vector2.Zero;
+                    float targetUp  = bTop + MathF.Sqrt(r * r - dx * dx);
+                    float deltaUp   = targetUp - cy;
+                    return deltaUp > 0f ? new Vector2(0f, deltaUp) : Vector2.Zero;
+
+                case RepositionDirections.Left:
+                    // Exit through the left face. Circle center lands at rect.left − √(r²−dy²).
+                    if (dy >= r) return Vector2.Zero;
+                    float targetLeft  = bLeft - MathF.Sqrt(r * r - dy * dy);
+                    float deltaLeft   = targetLeft - cx;
+                    return deltaLeft < 0f ? new Vector2(deltaLeft, 0f) : Vector2.Zero;
+
+                case RepositionDirections.Right:
+                    if (dy >= r) return Vector2.Zero;
+                    float targetRight = bRight + MathF.Sqrt(r * r - dy * dy);
+                    float deltaRight  = targetRight - cx;
+                    return deltaRight > 0f ? new Vector2(deltaRight, 0f) : Vector2.Zero;
+            }
+        }
+        else
+        {
+            // AABB bounding-box approach — exact for AxisAlignedRectangle, approximate for Polygon.
+            var (aMinX, aMaxX, aMinY, aMaxY) = GetBounds(a);
+            switch (dir)
+            {
+                case RepositionDirections.Down:
+                    float sepD = bBottom - aMaxY;
+                    return sepD < 0f ? new Vector2(0f, sepD) : Vector2.Zero;
+                case RepositionDirections.Up:
+                    float sepU = bTop - aMinY;
+                    return sepU > 0f ? new Vector2(0f, sepU) : Vector2.Zero;
+                case RepositionDirections.Left:
+                    float sepL = bLeft - aMaxX;
+                    return sepL < 0f ? new Vector2(sepL, 0f) : Vector2.Zero;
+                case RepositionDirections.Right:
+                    float sepR = bRight - aMinX;
+                    return sepR > 0f ? new Vector2(sepR, 0f) : Vector2.Zero;
+            }
+        }
+        return Vector2.Zero;
+    }
+
+    // Returns the axis-aligned bounding box of any supported ICollidable.
+    private static (float minX, float maxX, float minY, float maxY) GetBounds(ICollidable c)
+    {
+        switch (c)
+        {
+            case AxisAlignedRectangle r:
+                return (r.AbsoluteX - r.Width / 2f,  r.AbsoluteX + r.Width / 2f,
+                        r.AbsoluteY - r.Height / 2f, r.AbsoluteY + r.Height / 2f);
+            case Polygon poly:
+            {
+                var pts = GetWorldPoints(poly);
+                float minX = float.MaxValue, maxX = float.MinValue;
+                float minY = float.MaxValue, maxY = float.MinValue;
+                foreach (var pt in pts)
+                {
+                    if (pt.X < minX) minX = pt.X;
+                    if (pt.X > maxX) maxX = pt.X;
+                    if (pt.Y < minY) minY = pt.Y;
+                    if (pt.Y > maxY) maxY = pt.Y;
+                }
+                return (minX, maxX, minY, maxY);
+            }
+            default:
+                return (0f, 0f, 0f, 0f);
+        }
     }
 
     private static bool PointsOverlap(ICollidable a, ICollidable b)

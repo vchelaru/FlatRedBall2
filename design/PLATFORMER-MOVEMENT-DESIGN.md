@@ -116,8 +116,10 @@ public class Player : Entity
     public override void CustomInitialize()
     {
         _platformer.GroundMovement = new PlatformerValues { MaxSpeedX = 200, ... };
-        _platformer.JumpInput = Engine.Input.Keyboard.SpaceKey;
-        _platformer.HorizontalInput = Engine.Input.Keyboard.HorizontalInput;
+
+        var keyboard = Engine.InputManager.Keyboard;
+        _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space);
+        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
     }
 
     public override void CustomActivity(FrameTime time)

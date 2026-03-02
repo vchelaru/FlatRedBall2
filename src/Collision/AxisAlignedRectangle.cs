@@ -13,15 +13,23 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     public float Height { get; set; } = 32f;
 
     /// <summary>
-    /// Which sides of this rectangle act as solid collision surfaces.
-    /// Collisions that would push an object in a direction not listed here are suppressed.
-    /// Defaults to <see cref="RepositionDirections.All"/> (all sides solid).
+    /// Controls which directions this rectangle may reposition overlapping objects.
+    /// When a collision occurs, the engine computes the minimum displacement along each allowed
+    /// axis and applies the smallest one — so even a left-edge hit against a Down-only rect
+    /// will push the object downward rather than suppressing the collision.
+    /// Defaults to <see cref="RepositionDirections.All"/>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Use this to prevent "snagging" at the seams of adjacent rectangles. For a horizontal
-    /// strip of tiles, remove <see cref="RepositionDirections.Left"/> and
+    /// strip of floor tiles, clear <see cref="RepositionDirections.Left"/> and
     /// <see cref="RepositionDirections.Right"/> from interior tiles so objects glide across
-    /// the top surface without catching on shared edges.
+    /// the top surface without catching on shared vertical edges.
+    /// </para>
+    /// <para>
+    /// For circles the displacement is geometrically exact: the circle is moved until its arc
+    /// grazes the target face (or corner), never inflated to its bounding box.
+    /// </para>
     /// </remarks>
     public RepositionDirections RepositionDirections { get; set; } = RepositionDirections.All;
 
