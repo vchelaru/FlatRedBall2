@@ -1,21 +1,23 @@
+using System;
+
 namespace FlatRedBall2.Movement;
 
 public class PlatformerValues
 {
     public float MaxSpeedX;
 
-    /// <summary>Seconds to reach <see cref="MaxSpeedX"/> from rest. 0 means instant.</summary>
-    public float AccelerationTimeX;
+    /// <summary>Time to reach <see cref="MaxSpeedX"/> from rest. <see cref="TimeSpan.Zero"/> means instant.</summary>
+    public TimeSpan AccelerationTimeX;
 
-    /// <summary>Seconds to decelerate from <see cref="MaxSpeedX"/> to rest when input is released. 0 means instant.</summary>
-    public float DecelerationTimeX;
+    /// <summary>Time to decelerate from <see cref="MaxSpeedX"/> to rest when input is released. <see cref="TimeSpan.Zero"/> means instant.</summary>
+    public TimeSpan DecelerationTimeX;
 
     public float Gravity;
     public float MaxFallSpeed;
     public float JumpVelocity;
 
-    /// <summary>Time in seconds the jump velocity continues to be applied while the button is held.</summary>
-    public float JumpApplyLength;
+    /// <summary>How long the jump velocity continues to be applied while the button is held.</summary>
+    public TimeSpan JumpApplyLength;
 
     /// <summary>
     /// When true, <see cref="JumpApplyLength"/> is only consumed while the jump button is held;

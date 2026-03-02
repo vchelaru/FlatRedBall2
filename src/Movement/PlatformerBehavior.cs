@@ -22,9 +22,14 @@ public class PlatformerBehavior
 
     public HorizontalDirection DirectionFacing { get; private set; } = HorizontalDirection.Right;
 
-    private double _jumpStartTime;
+    /// <summary>
+    /// True while the jump sustain is active — the jump button is held and
+    /// <see cref="PlatformerValues.JumpApplyLength"/> has not yet elapsed.
+    /// </summary>
+    public bool IsApplyingJump { get; private set; }
+
+    private TimeSpan _jumpStartTime;
     private PlatformerValues? _jumpValues;
-    private bool _isApplyingJump;
 
     /// <summary>
     /// Applies platformer movement to <paramref name="entity"/> for the current frame.
@@ -48,7 +53,7 @@ public class PlatformerBehavior
 
         var current = IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement;
 
-        if (!current.UsesAcceleration || (current.AccelerationTimeX == 0f && current.DecelerationTimeX == 0f))
+        if (!current.UsesAcceleration || (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero))
         {
             entity.VelocityX = inputX * current.MaxSpeedX;
         }
@@ -63,8 +68,8 @@ public class PlatformerBehavior
             bool speedingUp = targetSpeed != 0f && diff != 0f && MathF.Sign(diff) == MathF.Sign(targetSpeed);
 
             float accelMagnitude = speedingUp
-                ? (current.AccelerationTimeX > 0f ? current.MaxSpeedX / current.AccelerationTimeX : float.MaxValue)
-                : (current.DecelerationTimeX > 0f ? current.MaxSpeedX / current.DecelerationTimeX : float.MaxValue);
+                ? (current.AccelerationTimeX > TimeSpan.Zero ? current.MaxSpeedX / (float)current.AccelerationTimeX.TotalSeconds : float.MaxValue)
+                : (current.DecelerationTimeX > TimeSpan.Zero ? current.MaxSpeedX / (float)current.DecelerationTimeX.TotalSeconds : float.MaxValue);
 
             float maxDeltaV = accelMagnitude * time.DeltaSeconds;
             float clampedDiff = MathF.Abs(diff) <= maxDeltaV ? diff : maxDeltaV * MathF.Sign(diff);
@@ -78,20 +83,26 @@ public class PlatformerBehavior
         if (JumpInput?.WasJustPressed == true && IsOnGround)
         {
             entity.VelocityY = current.JumpVelocity;
-            _jumpStartTime = time.SinceGameStart.TotalSeconds;
+            _jumpStartTime = time.SinceGameStart;
             _jumpValues = current;
-            _isApplyingJump = true;
+            IsApplyingJump = true;
         }
 
-        if (_isApplyingJump && _jumpValues != null)
+        if (IsApplyingJump && _jumpValues != null)
         {
-            if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
+            if (entity.LastReposition.Y < 0)
             {
-                _isApplyingJump = false;
+                // Ceiling hit — cancel sustain and kill upward velocity so the entity drops immediately
+                IsApplyingJump = false;
+                entity.VelocityY = 0f;
             }
-            else if (time.SinceGameStart.TotalSeconds - _jumpStartTime >= _jumpValues.JumpApplyLength)
+            else if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
             {
-                _isApplyingJump = false;
+                IsApplyingJump = false;
+            }
+            else if (time.SinceGameStart - _jumpStartTime >= _jumpValues.JumpApplyLength)
+            {
+                IsApplyingJump = false;
             }
             else
             {

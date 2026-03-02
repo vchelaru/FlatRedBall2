@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Input;
@@ -27,12 +28,12 @@ public class Player : Entity
         _platformer.GroundMovement = new PlatformerValues
         {
             MaxSpeedX = 220f,
-            AccelerationTimeX = 0.08f,
-            DecelerationTimeX = 0.06f,
+            AccelerationTimeX = TimeSpan.FromSeconds(0.08),
+            DecelerationTimeX = TimeSpan.FromSeconds(0.06),
             Gravity = 900f,
             MaxFallSpeed = 700f,
             JumpVelocity = 500f,
-            JumpApplyLength = 0.18f,
+            JumpApplyLength = TimeSpan.FromSeconds(0.68),
             JumpApplyByButtonHold = true,
             UsesAcceleration = true,
         };
@@ -40,12 +41,12 @@ public class Player : Entity
         _platformer.AirMovement = new PlatformerValues
         {
             MaxSpeedX = 220f,
-            AccelerationTimeX = 0.15f,
-            DecelerationTimeX = 0.30f,
+            AccelerationTimeX = TimeSpan.FromSeconds(0.15),
+            DecelerationTimeX = TimeSpan.FromSeconds(0.30),
             Gravity = 900f,
             MaxFallSpeed = 700f,
             JumpVelocity = 500f,
-            JumpApplyLength = 0.18f,
+            JumpApplyLength = TimeSpan.FromSeconds(0.18),
             JumpApplyByButtonHold = true,
             UsesAcceleration = true,
         };
@@ -55,8 +56,12 @@ public class Player : Entity
         _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
     }
 
+    private static readonly XnaColor NormalColor = new(100, 180, 255, 255);
+    private static readonly XnaColor JumpingColor = new(255, 255, 100, 255);
+
     public override void CustomActivity(FrameTime time)
     {
         _platformer.Update(this, time);
+        Rectangle.Color = _platformer.IsApplyingJump ? JumpingColor : NormalColor;
     }
 }

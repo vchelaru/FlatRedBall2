@@ -22,7 +22,7 @@ public class Player : Entity
             Gravity = 600f,
             MaxFallSpeed = 800f,
             JumpVelocity = 400f,
-            JumpApplyLength = 0.2f,
+            JumpApplyLength = TimeSpan.FromSeconds(0.2),
             JumpApplyByButtonHold = true,
             UsesAcceleration = false,
         };
@@ -57,12 +57,12 @@ collision results — no special wiring needed.
 | Field | Description |
 |---|---|
 | `MaxSpeedX` | Maximum horizontal speed in world units/sec |
-| `AccelerationTimeX` | Seconds to reach `MaxSpeedX` from rest. 0 = instant |
-| `DecelerationTimeX` | Seconds to stop from `MaxSpeedX`. 0 = instant |
+| `AccelerationTimeX` | Time to reach `MaxSpeedX` from rest. `TimeSpan.Zero` = instant |
+| `DecelerationTimeX` | Time to stop from `MaxSpeedX`. `TimeSpan.Zero` = instant |
 | `Gravity` | Downward acceleration (positive value, Y− direction applied internally) |
 | `MaxFallSpeed` | Maximum downward speed (prevents infinite fall acceleration) |
 | `JumpVelocity` | Upward velocity applied when jump is triggered |
-| `JumpApplyLength` | Seconds to sustain `JumpVelocity` after pressing jump |
+| `JumpApplyLength` | How long to sustain `JumpVelocity` after pressing jump |
 | `JumpApplyByButtonHold` | If true, releasing jump early cuts the jump short |
 | `UsesAcceleration` | If false, `AccelerationTimeX`/`DecelerationTimeX` are ignored and velocity is set directly |
 
@@ -101,6 +101,6 @@ platformer collision.
 
 ## Gotchas
 
-- `JumpApplyLength = 0` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.
+- `JumpApplyLength = TimeSpan.Zero` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.
 - `MaxFallSpeed` must be > 0 or the entity will be clamped to 0 downward velocity. Set it to a large value (e.g. 1000) if you don't want a meaningful cap.
 - Ground detection is `LastReposition.Y > 0` — a purely horizontal collision (wall) does not register as ground.
