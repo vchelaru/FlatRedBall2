@@ -3,6 +3,8 @@
 /tests/FlatRedBall2.Tests/bin
 /tests/FlatRedBall2.Tests/obj
 /src/bin
-/samples/SampleProject1
 /samples/PlatformerSample/bin
 /samples/PlatformerSample/obj
+/samples/SampleProject1/.vs
+/samples/SampleProject1/bin
+/samples/SampleProject1/obj

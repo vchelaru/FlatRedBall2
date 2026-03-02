@@ -9,6 +9,7 @@ public class ShapeCollection : ICollidable
 
     public void Add(AxisAlignedRectangle rect) => _shapes.Add(rect);
     public void Add(Circle circle) => _shapes.Add(circle);
+    public void Add(Line line) => _shapes.Add(line);
     public void Add(Polygon polygon) => _shapes.Add(polygon);
 
     public bool CollidesWith(ICollidable other)
