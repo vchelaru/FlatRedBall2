@@ -126,6 +126,19 @@ public class Screen
         return rel;
     }
 
+    /// <summary>
+    /// Registers a self-collision check: every unordered pair within <paramref name="list"/>
+    /// is tested each frame. Equivalent to passing the same list for both arguments, but
+    /// clearer at the call site.
+    /// </summary>
+    public CollisionRelationship<A, A> AddCollisionRelationship<A>(IEnumerable<A> list)
+        where A : ICollidable
+    {
+        var rel = new CollisionRelationship<A, A>(list, list);
+        _collisionRelationships.Add(rel);
+        return rel;
+    }
+
     public CollisionRelationship<A, ShapeCollection> AddCollisionRelationship<A>(
         IEnumerable<A> entities, ShapeCollection staticGeometry)
         where A : ICollidable

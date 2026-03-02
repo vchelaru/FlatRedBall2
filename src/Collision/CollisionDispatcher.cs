@@ -23,7 +23,12 @@ internal static class CollisionDispatcher
     }
 
     public static bool CollidesWith(ICollidable a, ICollidable b)
-        => GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
+    {
+        // Lines have no separation vector (infinitely thin), so delegate to Line's own intersection test.
+        if (a is Line la) return la.CollidesWith(b);
+        if (b is Line lb) return lb.CollidesWith(a);
+        return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
+    }
 
     // Returns the displacement needed to move 'a' out of 'b', respecting b's RepositionDirections.
     // Returns Vector2.Zero if no collision.

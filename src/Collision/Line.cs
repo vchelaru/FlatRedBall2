@@ -51,11 +51,21 @@ public class Line : IAttachable, IRenderable, ICollidable
         var screen1 = camera.WorldToScreen(AbsolutePoint1);
         var screen2 = camera.WorldToScreen(AbsolutePoint2);
 
+        var radius = LineThickness / 2f;
+
+        // thickness will always take "1" pixel on the edge, so we need to subtract 1 and then split the rest by 2
+        var remainderRadius = (LineThickness - 1) / 2f;
+        remainderRadius = System.Math.Max(0.5f, remainderRadius);
+        
+        var aa = 0.5f;
+
         sb.Shapes.FillLine(
             new XnaVec2(screen1.X, screen1.Y),
             new XnaVec2(screen2.X, screen2.Y),
-            LineThickness,
-            Color);
+            // line radius:
+            remainderRadius,
+            aaSize:aa,
+            c:Color);
     }
 
     public void Destroy()

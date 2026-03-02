@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace FlatRedBall2;
 
-public class Factory<T> : IEnumerable<T> where T : Entity, new()
+public class Factory<T> : IEnumerable<T>, IReadOnlyList<T> where T : Entity, new()
 {
     private readonly Screen _screen;
     private readonly List<T> _instances = new();
@@ -15,6 +15,10 @@ public class Factory<T> : IEnumerable<T> where T : Entity, new()
     }
 
     public IReadOnlyList<T> Instances => _instances;
+
+    // IReadOnlyList<T> — allows SelfCollisionRelationship to iterate by index without GetEnumerator.
+    public int Count => _instances.Count;
+    public T this[int index] => _instances[index];
 
     public T Create()
     {

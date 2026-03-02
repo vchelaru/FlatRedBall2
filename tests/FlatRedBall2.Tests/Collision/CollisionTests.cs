@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FlatRedBall2.Collision;
 using Shouldly;
 using Xunit;
@@ -7,6 +8,41 @@ namespace FlatRedBall2.Tests.Collision;
 
 public class CollisionTests
 {
+    [Fact]
+    public void AllowDuplicatePairs_WhenFalse_EachPairFiresOnce()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var list = new[] { a, b };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list);
+        int fireCount = 0;
+        rel.CollisionOccurred += (_, _) => fireCount++;
+
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void AllowDuplicatePairs_WhenTrue_FiresEventForBothOrderings()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var list = new[] { a, b };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list)
+        {
+            AllowDuplicatePairs = true,
+        };
+        var firedFirstArgs = new List<AxisAlignedRectangle>();
+        rel.CollisionOccurred += (first, _) => firedFirstArgs.Add(first);
+
+        rel.RunCollisions();
+
+        firedFirstArgs.Count.ShouldBe(2);
+        firedFirstArgs[0].ShouldBe(a); // first firing:  (a, b)
+        firedFirstArgs[1].ShouldBe(b); // second firing: (b, a)
+    }
+
     [Fact]
     public void CollidesWith_AARectVsAARect_NotOverlapping_ReturnsFalse()
     {
@@ -190,6 +226,23 @@ public class CollisionTests
 
         a.X.ShouldBe(0f);                     // a is fixed
         a.CollidesWith(b).ShouldBeFalse();    // b resolved the overlap
+    }
+
+    [Fact]
+    public void RunCollisions_SameList_EachPairCheckedExactlyOnce()
+    {
+        // Three overlapping rects — all 3 unordered pairs collide, each should fire exactly once.
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
+        var c = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var list = new[] { a, b, c };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list);
+        int fireCount = 0;
+        rel.CollisionOccurred += (_, _) => fireCount++;
+
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(3); // (a,b), (a,c), (b,c) — never (b,a), (c,a), or (c,b)
     }
 
     [Fact]
