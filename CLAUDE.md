@@ -107,6 +107,13 @@ When you hit friction working on any task, respond at the appropriate scope:
 
 ## Agent Workflow
 
+**Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:
+- **Game creation** → game-designer agent (then product-manager, then coder)
+- **Engine feature or bug** → identify which subsystem (collision, rendering, input, etc.) to know which skill files are relevant
+- **Docs or refactor** → docs-writer or refactoring-specialist agent
+
+This scoping step keeps context lean — only load the skills and files that are actually needed.
+
 For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
 
 Available agents:
