@@ -26,10 +26,10 @@ internal static class CollisionDispatcher
         => GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
 
     // Returns MTV (minimum translation vector) to move 'a' out of 'b'.
-    // Returns Vector2.Zero if no collision.
+    // Returns Vector2.Zero if no collision, or if b's RepositionDirections blocks the push direction.
     public static Vector2 GetSeparationVector(ICollidable a, ICollidable b)
     {
-        return (a, b) switch
+        var mtv = (a, b) switch
         {
             (AxisAlignedRectangle ra, AxisAlignedRectangle rb) => AabbVsAabb(ra, rb),
             (Circle ca, Circle cb)                             => CircleVsCircle(ca, cb),
@@ -42,6 +42,27 @@ internal static class CollisionDispatcher
             (Circle ca, Polygon pb)                            => -PolygonVsCircle(pb, ca),
             _                                                  => Vector2.Zero
         };
+
+        if (mtv == Vector2.Zero) return Vector2.Zero;
+
+        // Suppress the collision if b's RepositionDirections doesn't allow the push direction.
+        if (b is AxisAlignedRectangle rectB && !IsDirectionAllowed(mtv, rectB.RepositionDirections))
+            return Vector2.Zero;
+
+        return mtv;
+    }
+
+    // Returns true if the MTV direction is permitted by the given RepositionDirections.
+    // For a diagonal MTV (circle-corner case), ALL non-zero components must be allowed.
+    private static bool IsDirectionAllowed(Vector2 mtv, RepositionDirections dirs)
+    {
+        if (dirs == RepositionDirections.All)  return true;
+        if (dirs == RepositionDirections.None) return false;
+        if (mtv.X > 0 && !dirs.HasFlag(RepositionDirections.Right)) return false;
+        if (mtv.X < 0 && !dirs.HasFlag(RepositionDirections.Left))  return false;
+        if (mtv.Y > 0 && !dirs.HasFlag(RepositionDirections.Up))    return false;
+        if (mtv.Y < 0 && !dirs.HasFlag(RepositionDirections.Down))  return false;
+        return true;
     }
 
     private static bool PointsOverlap(ICollidable a, ICollidable b)

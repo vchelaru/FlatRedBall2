@@ -12,6 +12,19 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     public float Width { get; set; } = 32f;
     public float Height { get; set; } = 32f;
 
+    /// <summary>
+    /// Which sides of this rectangle act as solid collision surfaces.
+    /// Collisions that would push an object in a direction not listed here are suppressed.
+    /// Defaults to <see cref="RepositionDirections.All"/> (all sides solid).
+    /// </summary>
+    /// <remarks>
+    /// Use this to prevent "snagging" at the seams of adjacent rectangles. For a horizontal
+    /// strip of tiles, remove <see cref="RepositionDirections.Left"/> and
+    /// <see cref="RepositionDirections.Right"/> from interior tiles so objects glide across
+    /// the top surface without catching on shared edges.
+    /// </remarks>
+    public RepositionDirections RepositionDirections { get; set; } = RepositionDirections.All;
+
     // IAttachable
     public Entity? Parent { get; set; }
     public float X { get; set; }
