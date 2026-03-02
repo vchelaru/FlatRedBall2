@@ -74,6 +74,18 @@ public class CollisionTests
     }
 
     [Fact]
+    public void GetSeparationVector_RepositionDirection_ShouldRedirectReposition()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f, RepositionDirections = RepositionDirections.Down };
+        var b = new Circle { Radius = 10, X = -25, Y = -10f };
+
+        var sep = b.GetSeparationVector(a);
+
+        sep.X.ShouldBe(0);
+        sep.Y.ShouldBeLessThan(0, "because a's RepositionDirections should redirect the MTV downwards, even though the raw MTV from circle-vs-rect would be left");
+    }
+
+    [Fact]
     public void MoveBothOnCollision_BothObjectsMove()
     {
         var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };

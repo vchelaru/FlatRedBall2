@@ -36,15 +36,6 @@ This document tracks features and systems intentionally deferred from the initia
 - `SpriteFont` integration for `DrawText`
 - Alternative: use MonoGame's built-in primitive batch via vertex buffers
 
-## Gum Integration
-
-**Status**: `GumBatch` and `GumRenderable` are stubs
-**What's needed**:
-- Add `Gum` NuGet package reference
-- `GumBatch.Begin` delegates to Gum's render setup
-- `GumRenderable.Draw` calls Gum's draw pass
-- Wire `GumBatch.End` to Gum's render teardown
-
 ## Tiled Integration
 
 **Status**: `TiledMapLayerRenderable` and `TiledCollisionGenerator` are stubs
@@ -73,6 +64,21 @@ This document tracks features and systems intentionally deferred from the initia
 **What's needed**:
 - `RotationVelocity` and `RotationAcceleration` properties on `Entity`
 - Updated in the physics pass alongside X/Y kinematics
+
+## FrameTime — convenience accessor for elapsed seconds
+
+**Status**: `SinceGameStart` is a `TimeSpan`; accessing total elapsed seconds requires `time.SinceGameStart.TotalSeconds`
+**What's needed**:
+- A `TotalSecondsElapsed` (or similar) float shorthand on `FrameTime`, analogous to `DeltaSeconds`
+- Reduces verbosity in any code that needs an absolute time value (e.g. `PlatformerBehavior` jump timer)
+
+## Top-Down Movement
+
+**Status**: Not yet implemented — deferred after platformer movement
+**What's needed**:
+- `TopDownValues` data class (max speed, acceleration time, deceleration time, possibly 8-directional vs free angle)
+- `TopDownBehavior` component following the same `Update(entity, time)` pattern as `PlatformerBehavior`
+- Skill file at `.claude/skills/top-down-movement/SKILL.md`
 
 ## GamepadPressableInput WasJustPressed / WasJustReleased
 

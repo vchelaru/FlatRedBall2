@@ -17,14 +17,10 @@ public class Entity : ICollidable, IAttachable
     private readonly List<GraphicalUiElement> _gumChildren = new();
 
     // Position — relative to parent when attached, world when root
-    public float X { get; set; }
-    public float Y { get; set; }
+    public Vector2 Position;
+    public float X { get => Position.X; set => Position.X = value; }
+    public float Y { get => Position.Y; set => Position.Y = value; }
     public float Z { get; set; }
-    public Vector2 Position
-    {
-        get => new Vector2(X, Y);
-        set { X = value.X; Y = value.Y; }
-    }
 
     // Absolute world position
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
@@ -36,21 +32,16 @@ public class Entity : ICollidable, IAttachable
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;
 
     // Physics
-    public float VelocityX { get; set; }
-    public float VelocityY { get; set; }
-    public Vector2 Velocity
-    {
-        get => new Vector2(VelocityX, VelocityY);
-        set { VelocityX = value.X; VelocityY = value.Y; }
-    }
-    public float AccelerationX { get; set; }
-    public float AccelerationY { get; set; }
-    public Vector2 Acceleration
-    {
-        get => new Vector2(AccelerationX, AccelerationY);
-        set { AccelerationX = value.X; AccelerationY = value.Y; }
-    }
+    public Vector2 Velocity;
+    public float VelocityX { get => Velocity.X; set => Velocity.X = value; }
+    public float VelocityY { get => Velocity.Y; set => Velocity.Y = value; }
+    public Vector2 Acceleration;
+    public float AccelerationX { get => Acceleration.X; set => Acceleration.X = value; }
+    public float AccelerationY { get => Acceleration.Y; set => Acceleration.Y = value; }
     public float Drag { get; set; }
+
+    // Records cumulative separation applied this frame; reset at the start of each PhysicsUpdate.
+    public Vector2 LastReposition;
 
     // Hierarchy
     public Entity? Parent { get; set; }
@@ -95,7 +86,7 @@ public class Entity : ICollidable, IAttachable
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
             _engine!.CurrentScreen.RenderList.Add(renderable);
 
-        if (child is Entity childEntity)
+        if (child is Entity childEntity && _engine is not null)
             childEntity.Engine = _engine;
     }
 
@@ -146,15 +137,13 @@ public class Entity : ICollidable, IAttachable
     {
         if (Parent != null) return; // only root entities drive physics; children move with parent
 
+        LastReposition = Vector2.Zero;
         float dt = frameTime.DeltaSeconds;
         float halfDt2 = 0.5f * dt * dt;
 
-        X += VelocityX * dt + AccelerationX * halfDt2;
-        Y += VelocityY * dt + AccelerationY * halfDt2;
-        VelocityX += AccelerationX * dt;
-        VelocityY += AccelerationY * dt;
-        VelocityX -= VelocityX * Drag * dt;
-        VelocityY -= VelocityY * Drag * dt;
+        Position += Velocity * dt + Acceleration * halfDt2;
+        Velocity += Acceleration * dt;
+        Velocity -= Velocity * (Drag * dt);
     }
 
     // Lifecycle
@@ -202,8 +191,8 @@ public class Entity : ICollidable, IAttachable
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
     {
         var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
-        X += offset.X;
-        Y += offset.Y;
+        Position += offset;
+        LastReposition += offset;
     }
 
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
@@ -224,22 +213,16 @@ public class Entity : ICollidable, IAttachable
 
             // Project relative velocity onto the collision normal.
             // Negative means 'this' is moving into 'other'.
-            float relVelAlongNormal = Vector2.Dot(
-                new Vector2(VelocityX - otherEntity.VelocityX, VelocityY - otherEntity.VelocityY),
-                normal);
+            float relVelAlongNormal = Vector2.Dot(Velocity - otherEntity.Velocity, normal);
 
             // Skip if already separating — prevents double-bouncing on the same frame.
             if (relVelAlongNormal >= 0) return;
 
             float impulse = -(1f + elasticity) * relVelAlongNormal;
 
-            VelocityX += impulse * thisRatio * normal.X;
-            VelocityY += impulse * thisRatio * normal.Y;
+            Velocity += impulse * thisRatio * normal;
             if (otherMass != 0)
-            {
-                otherEntity.VelocityX -= impulse * otherRatio * normal.X;
-                otherEntity.VelocityY -= impulse * otherRatio * normal.Y;
-            }
+                otherEntity.Velocity -= impulse * otherRatio * normal;
         }
     }
 
