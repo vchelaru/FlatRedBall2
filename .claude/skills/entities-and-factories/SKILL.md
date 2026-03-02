@@ -158,7 +158,7 @@ Entities can spawn other entities without receiving a factory reference. Call `E
 // Player.cs — spawns a Ball on Space press, no factory field needed
 public override void CustomActivity(FrameTime time)
 {
-    if (Engine!.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+    if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
     {
         var ball = Engine.GetFactory<Ball>().Create();
         ball.X = X;

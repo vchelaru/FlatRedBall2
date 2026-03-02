@@ -57,7 +57,22 @@ public class Entity : ICollidable, IAttachable
     public bool IsVisible { get; set; } = true;
 
     // Engine reference — injected by Factory or Screen.Register
-    public FlatRedBallService? Engine { get; internal set; }
+    private FlatRedBallService? _engine;
+
+    /// <summary>
+    /// The engine instance injected by <see cref="Factory{T}"/> or <c>Screen.Register</c> before
+    /// <see cref="CustomInitialize"/> is called. Never null during normal game-code execution.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if accessed before the entity has been registered with the engine.
+    /// Create entities via <c>Factory&lt;T&gt;.Create()</c> or <c>Screen.Register()</c>.
+    /// </exception>
+    public FlatRedBallService Engine
+    {
+        get => _engine ?? throw new InvalidOperationException(
+            "Entity.Engine is null. Create entities via Factory<T>.Create() or Screen.Register().");
+        internal set => _engine = value;
+    }
 
     // Set by Factory or Screen.Register; called at the end of Destroy() to remove this entity
     // from its owning container without requiring a back-reference to the factory or screen.
@@ -74,11 +89,11 @@ public class Entity : ICollidable, IAttachable
         if (child is ICollidable collidable)
             _shapes.Add(collidable);
 
-        if (child is IRenderable renderable && Engine?.CurrentScreen != null)
-            Engine.CurrentScreen.RenderList.Add(renderable);
+        if (child is IRenderable renderable && _engine?.CurrentScreen != null)
+            _engine!.CurrentScreen.RenderList.Add(renderable);
 
         if (child is Entity childEntity)
-            childEntity.Engine = Engine;
+            childEntity.Engine = _engine;
     }
 
     public void RemoveChild(IAttachable child)
@@ -90,7 +105,7 @@ public class Entity : ICollidable, IAttachable
             _shapes.Remove(collidable);
 
         if (child is IRenderable renderable)
-            Engine?.CurrentScreen?.RenderList.Remove(renderable);
+            _engine?.CurrentScreen?.RenderList.Remove(renderable);
     }
 
     // Called by Screen each frame before CustomActivity
