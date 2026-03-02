@@ -7,7 +7,6 @@ FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top o
 ## Key Files
 
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL 3.8.*)
-- **Engine cheat sheet**: `design/ENGINE-CHEAT-SHEET.md` — read this first; what the engine does vs what game code must do, and what is stubbed
 - Architecture spec: `design/ARCHITECTURE.md`
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
@@ -53,6 +52,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `screens` — Screen lifecycle and transitions
 - `gum-integration` — UI with Gum
 - `content-and-assets` — Asset loading
+- `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `levels` — Level data layout and progression
 
 ## Key Architecture Decisions
