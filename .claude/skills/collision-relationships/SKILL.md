@@ -155,3 +155,17 @@ This means by the time `CustomActivity` executes, the entity is already separate
 - **Both sides move when only one should** — Use `.MoveFirstOnCollision()` (player pushed, walls fixed) rather than `.MoveBothOnCollision()` for solid terrain.
 - **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children. The dispatcher only works with shape children, not the entity's own X/Y directly.
 - **Player tunnels through thin walls at high speed** — FlatRedBall2 uses discrete (not continuous) collision detection. Keep velocities and wall thicknesses reasonable, or split fast movement into sub-steps.
+- **Don't use a `DiedThisFrame` flag on enemies — destroy them directly in `CollisionOccurred`**. The execution order is: collision → entity `CustomActivity` → screen `CustomActivity`. Any flag set by collision is reset at the top of `CustomActivity` before the screen ever sees it. Instead, check health and call `Destroy()` right in the callback:
+
+```csharp
+AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
+    .CollisionOccurred += (bullet, enemy) =>
+    {
+        bullet.Destroy();
+        enemy.TakeHit();          // decrements health
+        if (enemy.Health <= 0)
+            enemy.Destroy();      // destroy here, not via a flag the screen polls
+    };
+```
+
+The screen can then detect the enemy is gone by checking `_enemyFactory.Instances.Count == 0` rather than polling a flag on the entity.

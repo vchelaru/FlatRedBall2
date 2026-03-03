@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Diagnostics;
@@ -15,6 +16,17 @@ public class Screen
     private readonly List<Entity> _entities = new();
     private readonly List<ICollisionRelationship> _collisionRelationships = new();
     private readonly List<GumRenderable> _gumRenderables = new();
+
+    internal readonly CancellationTokenSource _cts = new();
+
+    /// <summary>
+    /// A <see cref="CancellationToken"/> that is cancelled automatically when this screen is destroyed
+    /// (i.e., when <see cref="MoveToScreen{T}"/> is called). Pass this token to
+    /// <see cref="TimeManager.DelaySeconds"/>, <see cref="TimeManager.DelayUntil"/>, or any other
+    /// async API to ensure tasks are silently cancelled on screen transition rather than running
+    /// against the new screen.
+    /// </summary>
+    public CancellationToken Token => _cts.Token;
 
     public Camera Camera { get; } = new Camera();
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
@@ -160,8 +172,6 @@ public class Screen
         // 2. Collision phase
         foreach (var rel in _collisionRelationships)
             rel.RunCollisions();
-
-        // TODO: flush async sync context
 
         // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
         foreach (var entity in new List<Entity>(_entities))

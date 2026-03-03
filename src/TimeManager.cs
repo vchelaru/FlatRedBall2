@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 
 namespace FlatRedBall2;
@@ -8,8 +11,109 @@ public class TimeManager
     private TimeSpan _sinceGameStart;
     private TimeSpan _sinceScreenStart;
 
+    /// <summary>Scaling factor applied to real elapsed time. Values &lt; 1 slow the game; &gt; 1 speed it up.</summary>
     public float TimeScale { get; set; } = 1f;
+
     public FrameTime CurrentFrameTime { get; private set; }
+
+    /// <summary>Elapsed game time since the current screen was activated, in seconds. Respects <see cref="TimeScale"/>.</summary>
+    public double CurrentScreenTimeSeconds => _sinceScreenStart.TotalSeconds;
+
+    /// <summary>Total number of frames that have elapsed since <see cref="FlatRedBallService.Initialize"/> was called.</summary>
+    public long CurrentFrame { get; private set; }
+
+    // -------------------------------------------------------------------------
+    // Delay task lists — kept sorted by completion time / frame so DoTaskLogic
+    // can early-exit as soon as the first unready entry is found.
+    // -------------------------------------------------------------------------
+
+    private readonly List<TimedTask> _timedTasks = new();
+    private readonly List<PredicateTask> _predicateTasks = new();
+    private readonly List<FrameTask> _frameTasks = new();
+
+    private readonly record struct TimedTask(double CompletionTime, TaskCompletionSource Tcs, CancellationToken Token);
+    private readonly record struct PredicateTask(Func<bool> Predicate, TaskCompletionSource Tcs, CancellationToken Token);
+    private readonly record struct FrameTask(long TargetFrame, TaskCompletionSource Tcs);
+
+    // -------------------------------------------------------------------------
+    // Async delay APIs
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns a task that completes after <paramref name="seconds"/> of screen time have elapsed.
+    /// Screen time respects <see cref="TimeScale"/> and resets when the screen changes.
+    /// </summary>
+    /// <param name="seconds">Seconds to wait. Values ≤ 0 complete immediately.</param>
+    /// <param name="cancellationToken">
+    /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
+    /// </param>
+    public Task DelaySeconds(double seconds, CancellationToken cancellationToken = default)
+    {
+        if (seconds <= 0)
+            return Task.CompletedTask;
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completionTime = CurrentScreenTimeSeconds + seconds;
+
+        // Insert sorted by completion time for efficient early-exit in DoTaskLogic.
+        var index = _timedTasks.Count;
+        for (int i = 0; i < _timedTasks.Count; i++)
+        {
+            if (_timedTasks[i].CompletionTime > completionTime)
+            {
+                index = i;
+                break;
+            }
+        }
+        _timedTasks.Insert(index, new TimedTask(completionTime, tcs, cancellationToken));
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// Returns a task that completes once <paramref name="predicate"/> returns <c>true</c>.
+    /// Checked once per frame.
+    /// </summary>
+    /// <param name="cancellationToken">
+    /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
+    /// </param>
+    public Task DelayUntil(Func<bool> predicate, CancellationToken cancellationToken = default)
+    {
+        if (predicate())
+            return Task.CompletedTask;
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _predicateTasks.Add(new PredicateTask(predicate, tcs, cancellationToken));
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// Returns a task that completes after <paramref name="frameCount"/> frames have elapsed.
+    /// </summary>
+    /// <param name="frameCount">Frames to wait. Values ≤ 0 complete immediately.</param>
+    public Task DelayFrames(int frameCount)
+    {
+        if (frameCount <= 0)
+            return Task.CompletedTask;
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var targetFrame = CurrentFrame + frameCount;
+
+        var index = _frameTasks.Count;
+        for (int i = 0; i < _frameTasks.Count; i++)
+        {
+            if (_frameTasks[i].TargetFrame > targetFrame)
+            {
+                index = i;
+                break;
+            }
+        }
+        _frameTasks.Insert(index, new FrameTask(targetFrame, tcs));
+        return tcs.Task;
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal lifecycle
+    // -------------------------------------------------------------------------
 
     public void ResetScreen() => _sinceScreenStart = TimeSpan.Zero;
 
@@ -18,6 +122,83 @@ public class TimeManager
         var scaledDelta = TimeSpan.FromSeconds(gameTime.ElapsedGameTime.TotalSeconds * TimeScale);
         _sinceGameStart += scaledDelta;
         _sinceScreenStart += scaledDelta;
+        CurrentFrame++;
         CurrentFrameTime = new FrameTime(scaledDelta, _sinceScreenStart, _sinceGameStart);
+    }
+
+    /// <summary>
+    /// Completes any delay tasks whose conditions are now met. Called once per frame by
+    /// <see cref="FlatRedBallService"/>, immediately before flushing <see cref="GameSynchronizationContext"/>.
+    /// </summary>
+    internal void DoTaskLogic()
+    {
+        // Timed tasks — sorted, so stop at the first one that's not ready.
+        while (_timedTasks.Count > 0)
+        {
+            var task = _timedTasks[0];
+            if (task.Token.IsCancellationRequested)
+            {
+                _timedTasks.RemoveAt(0);
+                task.Tcs.TrySetCanceled(task.Token);
+            }
+            else if (task.CompletionTime <= CurrentScreenTimeSeconds)
+            {
+                _timedTasks.RemoveAt(0);
+                task.Tcs.TrySetResult();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Predicate tasks — check all (no ordering guarantee).
+        for (int i = _predicateTasks.Count - 1; i >= 0; i--)
+        {
+            var task = _predicateTasks[i];
+            if (task.Token.IsCancellationRequested)
+            {
+                _predicateTasks.RemoveAt(i);
+                task.Tcs.TrySetCanceled(task.Token);
+            }
+            else if (task.Predicate())
+            {
+                _predicateTasks.RemoveAt(i);
+                task.Tcs.TrySetResult();
+            }
+        }
+
+        // Frame tasks — sorted, so stop at the first one that's not ready.
+        while (_frameTasks.Count > 0)
+        {
+            var task = _frameTasks[0];
+            if (task.TargetFrame <= CurrentFrame)
+            {
+                _frameTasks.RemoveAt(0);
+                task.Tcs.TrySetResult();
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cancels and discards all pending delay tasks. Called on screen transition.
+    /// </summary>
+    internal void ClearTasks()
+    {
+        foreach (var task in _timedTasks)
+            task.Tcs.TrySetCanceled();
+        _timedTasks.Clear();
+
+        foreach (var task in _predicateTasks)
+            task.Tcs.TrySetCanceled();
+        _predicateTasks.Clear();
+
+        foreach (var task in _frameTasks)
+            task.Tcs.TrySetResult(); // frame tasks have no cancellation token
+        _frameTasks.Clear();
     }
 }

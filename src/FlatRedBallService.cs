@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Audio;
@@ -24,6 +25,7 @@ public class FlatRedBallService
     private SpriteBatch? _spriteBatch;
     private Action? _pendingScreenChange;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
+    private readonly GameSynchronizationContext _syncContext = new();
 
     public FlatRedBallService() { }
 
@@ -31,6 +33,7 @@ public class FlatRedBallService
     {
         _game = game;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
+        SynchronizationContext.SetSynchronizationContext(_syncContext);
         ContentManager.Initialize(game.Content);
         ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
 
@@ -65,6 +68,14 @@ public class FlatRedBallService
         {
             CurrentScreen.CustomDestroy();
             CurrentScreen.ContentManager.UnloadAll();
+
+            // Cancel all async work that was started on the old screen.
+            // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
+            // in any awaiting code); Clear discards stale continuations from the sync context queue.
+            CurrentScreen._cts.Cancel();
+            TimeManager.ClearTasks();
+            _syncContext.Clear();
+
             var screen = new T();
             configure?.Invoke(screen);
             ActivateScreen(screen);
@@ -150,6 +161,12 @@ public class FlatRedBallService
         foreach (var r in CurrentScreen.GumRenderables)
             _gumUpdateList.Add(r.Visual);
         GumService.Default.Update(gameTime, _gumUpdateList);
+
+        // Complete any delay tasks whose conditions are now met, then flush their
+        // continuations onto the game thread. This runs before CustomActivity so
+        // screen/entity code sees the results of completed tasks in the same frame.
+        TimeManager.DoTaskLogic();
+        _syncContext.Update();
 
         CurrentScreen.Update(TimeManager.CurrentFrameTime);
     }

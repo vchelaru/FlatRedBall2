@@ -80,8 +80,31 @@ Common patterns:
 
 ```csharp
 _platformer.IsOnGround        // true if entity was pushed upward by a collision this frame
+_platformer.IsApplyingJump    // true while jump sustain is active (button held, duration not yet elapsed)
 _platformer.DirectionFacing   // HorizontalDirection.Left or .Right
 ```
+
+## Double Jump (Air Jumps)
+
+`PlatformerBehavior` only jumps from the ground. Implement air jumps manually in the entity:
+
+```csharp
+private int _airJumpsRemaining;
+private const int MaxAirJumps = 1;  // 1 = double jump
+
+// In CustomActivity, after _platformer.Update(this, time):
+if (_platformer.IsOnGround)
+    _airJumpsRemaining = MaxAirJumps;
+
+bool jumpJustPressed = keyboard.WasKeyPressed(Keys.Space);
+if (jumpJustPressed && !_platformer.IsOnGround && !_platformer.IsApplyingJump && _airJumpsRemaining > 0)
+{
+    VelocityY = _platformer.AirMovement.JumpVelocity;
+    _airJumpsRemaining--;
+}
+```
+
+The `!_platformer.IsApplyingJump` guard prevents the air jump from triggering during the sustain phase of the first jump — the player must reach the peak before double-jumping.
 
 ## Collision Setup
 

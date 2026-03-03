@@ -12,3 +12,6 @@
 /samples/SpaceInvadersSample/obj
 /samples/ShmupSample/bin
 /samples/ShmupSample/obj
+samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
+/samples/KoalaPickleSample/bin
+/samples/KoalaPickleSample/obj
