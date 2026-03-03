@@ -6,6 +6,16 @@ For full API details see `ARCHITECTURE.md`. For deferred items see `TODOS.md`.
 
 ---
 
+## Core Concepts
+
+**Screen** — represents one game state (menu, gameplay, game-over). Only one screen is active at a time. It owns factories, collision relationships, and layers. Lifecycle: `CustomInitialize` → repeated `CustomActivity` → `CustomDestroy`. Navigate between screens with `MoveToScreen<T>()`.
+
+**Entity** — the base class for every game object (player, enemy, bullet, wall). Holds position, velocity, and acceleration. Owns child shapes for rendering and collision. Game logic lives in `CustomActivity(FrameTime time)`.
+
+**Factory\<T\>** — creates, tracks, and destroys entity instances. Always create entities through a factory — never `new`. Factories are created in `Screen.CustomInitialize` and destroyed automatically when the screen exits. Pass a factory directly to `AddCollisionRelationship` since `Factory<T>` implements `IEnumerable<T>`.
+
+---
+
 ## What the Engine Does Automatically
 
 You do not need to implement these — the engine handles them every frame.
@@ -43,7 +53,7 @@ These are **not** in the engine. Every game needs to provide them.
 
 - **`CustomInitialize`**: create layers, create factories, spawn starting entities, call `AddCollisionRelationship`.
 - **`CustomActivity`**: game rules (score, win/lose), camera follow, spawner timers, etc.
-- **`CustomDestroy`**: call `factory.DestroyAll()` on every factory to clean up before screen exit.
+- **`CustomDestroy`**: only needed for external resources you manage yourself (file handles, network connections). Factories and entities are destroyed automatically.
 - **Layer setup**: Layers must be created and added to `Layers` explicitly. Common pattern:
   ```csharp
   var gameplay = new Layer("Gameplay");
@@ -129,7 +139,7 @@ These APIs exist but are not functional.
 
 **`PlatformerBehavior.Update()` must be called after collision.** It reads `entity.LastReposition` which is set during the collision phase. Calling it in `CustomActivity` (which runs after collision) is correct. Do not call it in a pre-collision hook.
 
-**`Factory.DestroyAll()` must be called in `Screen.CustomDestroy`.** If you do not clean up factories, entity references linger and the next screen may crash.
+**`CustomDestroy` is for external resources only.** Factories and their entities are destroyed automatically when the screen exits — no `DestroyAll()` call needed.
 
 **`CollisionOccurred` fires once per overlapping pair per frame.** Do not rely on it for continuous effects. Use it to trigger one-time events (damage, destroy, sound).
 
@@ -181,8 +191,8 @@ public class GameScreen : Screen
 
     public override void CustomDestroy()
     {
-        _players.DestroyAll();
-        _enemies.DestroyAll();
+        // Factories and entities are destroyed automatically.
+        // Only needed for external resources (file handles, network, etc.).
     }
 }
 

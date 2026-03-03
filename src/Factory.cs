@@ -3,7 +3,13 @@ using System.Collections.Generic;
 
 namespace FlatRedBall2;
 
-public class Factory<T> : IEnumerable<T>, IReadOnlyList<T> where T : Entity, new()
+/// <summary>Non-generic interface used by <see cref="FlatRedBallService"/> to destroy all factory instances on screen exit.</summary>
+internal interface IFactory
+{
+    void DestroyAll();
+}
+
+public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : Entity, new()
 {
     private readonly Screen _screen;
     private readonly List<T> _instances = new();

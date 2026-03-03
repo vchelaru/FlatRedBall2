@@ -21,9 +21,11 @@ Choose the right level for your use case:
 ## Quick Start
 
 ```csharp
-// In Screen.CustomInitialize():
-using Gum.Forms.Controls;
+// Always import BOTH — Forms controls and Wireframe (Anchor/Dock) live in different namespaces:
+using Gum.Forms.Controls;  // Label, Panel, StackPanel, Button, etc.
+using Gum.Wireframe;        // Anchor, Dock
 
+// In Screen.CustomInitialize():
 var button = new Button();
 button.Text = "Click Me";
 button.Click += (_, _) => Debug.WriteLine("clicked");

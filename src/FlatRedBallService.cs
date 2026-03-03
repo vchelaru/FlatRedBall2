@@ -73,6 +73,8 @@ public class FlatRedBallService
 
     private void ActivateScreen(Screen screen)
     {
+        foreach (var factory in _factories.Values)
+            factory.DestroyAll();
         _factories.Clear();
 
         // Clear any Gum elements left over from the previous screen.
@@ -98,7 +100,7 @@ public class FlatRedBallService
     }
 
     // Factory registry — populated automatically when a Factory<T> is constructed
-    private readonly Dictionary<Type, object> _factories = new();
+    private readonly Dictionary<Type, IFactory> _factories = new();
 
     /// <summary>Registers a factory so entities can retrieve it via <see cref="GetFactory{T}"/>.</summary>
     /// <remarks>Called automatically by <see cref="Factory{T}"/>; you should not need to call this directly.</remarks>

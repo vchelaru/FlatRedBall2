@@ -46,6 +46,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `entities-and-factories` — Entity lifecycle, AddChild, Factory<T>, spawning
 - `collision-relationships` — AddCollisionRelationship, move/bounce semantics
 - `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
+- `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds
 - `shapes` — AxisAlignedRectangle, Circle, Polygon, visual properties
 - `input-system` — Keyboard, gamepad, input binding
 - `camera` — Camera setup and transforms
@@ -54,6 +55,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `content-and-assets` — Asset loading
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `levels` — Level data layout and progression
+- `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
 
 ## Key Architecture Decisions
 
