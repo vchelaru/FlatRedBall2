@@ -125,3 +125,14 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 - **Gum elements are also cleared automatically** — no teardown needed for `AddGum` elements.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
+- **`MoveToScreen` can target the same screen type** — this fully destroys and recreates the screen, making it the correct pattern for restarting a level. Use the configure callback to pass state (e.g., level index):
+
+```csharp
+// Restart current level
+MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex);
+
+// Advance to next level
+MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex + 1);
+```
+
+  Do **not** manually destroy entities or collision relationships before calling this — the engine handles all teardown automatically.

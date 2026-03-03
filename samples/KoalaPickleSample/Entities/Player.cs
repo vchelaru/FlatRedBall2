@@ -23,7 +23,10 @@ public class Player : Entity
 
     // Input — set from either keyboard or gamepad in CustomInitialize
     private float _hitFlashTimer;
-    private int _airJumpsRemaining;
+    private int   _airJumpsRemaining;
+    private float _shootCooldown;
+
+    private const float ShootInterval = 1f / 6f; // 3 shots per second
 
     public AxisAlignedRectangle Rectangle => _rect;
 
@@ -79,14 +82,14 @@ public class Player : Entity
         // Support both gamepad and keyboard so the game is playable either way.
         // GamepadPressableInput.WasJustPressed is stubbed (always false), so we use
         // IGamepad.WasButtonJustPressed directly for jump in CustomActivity.
-        // Movement uses GamepadInput2D which reads axes correctly.
-        var gamepad = Engine.InputManager.GetGamepad(0);
+        var gamepad  = Engine.InputManager.GetGamepad(0);
         var keyboard = Engine.InputManager.Keyboard;
 
-        // Movement: left stick X (gamepad) | left/right keys (keyboard fallback via keyboard 2D)
-        // We use keyboard as the movement input so keyboard works too; gamepad is read directly
-        // in CustomActivity for the axis override.
-        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
+        // Movement: merge keyboard and gamepad — whichever has the larger magnitude wins.
+        // This lets DirectionFacing be driven entirely inside PlatformerBehavior.
+        var keyboardInput2D = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
+        var gamepadInput2D  = new GamepadInput2D(gamepad, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY, deadzone: 0.15f);
+        _platformer.MovementInput = new MaxAbsInput2D(keyboardInput2D, gamepadInput2D);
 
         // Jump: keyboard Space — gamepad A is handled manually in CustomActivity
         _platformer.JumpInput = new KeyboardPressableInput(keyboard, Keys.Space);
@@ -97,30 +100,14 @@ public class Player : Entity
         if (IsDead) return;
         DiedThisFrame = false;
 
-        // --- Gamepad movement override ---
-        // Read left stick directly and override the keyboard-driven MovementInput result
-        // by temporarily adjusting velocity after PlatformerBehavior.Update.
+        // Gamepad A jump is handled manually because GamepadPressableInput.WasJustPressed is stubbed.
         var gamepad = Engine.InputManager.GetGamepad(0);
-        float stickX = gamepad.GetAxis(GamepadAxis.LeftStickX);
-
-        // --- Gamepad jump ---
-        // GamepadPressableInput.WasJustPressed is stubbed. Use WasButtonJustPressed directly.
         bool gamepadJumpPressed = gamepad.WasButtonJustPressed(Buttons.A);
 
-        // Inject a synthetic jump press if gamepad A was pressed and we're on the ground.
-        // We do this by temporarily swapping JumpInput to a pre-pressed state — simpler:
-        // just call the behavior normally (keyboard jump still works) and manually apply
-        // the jump velocity here if gamepad triggered it.
+        // Movement (keyboard + gamepad merged via MovementInput) and DirectionFacing are
+        // handled entirely inside PlatformerBehavior.
         _platformer.Update(this, time);
 
-        // Apply gamepad stick on top of keyboard movement (axis wins if non-trivial)
-        if (MathF.Abs(stickX) > 0.15f)
-        {
-            float groundMax = _platformer.GroundMovement?.MaxSpeedX ?? 220f;
-            VelocityX = stickX * groundMax;
-        }
-
-        // Apply gamepad jump manually (PlatformerBehavior.IsOnGround is set after Update)
         if (gamepadJumpPressed && _platformer.IsOnGround)
         {
             float jumpVel = _platformer.GroundMovement?.JumpVelocity ?? 480f;
@@ -142,16 +129,19 @@ public class Player : Entity
             _airJumpsRemaining--;
         }
 
-        // --- Shooting (no cooldown — one bullet per press) ---
-        bool fireJustPressed = Engine.InputManager.Keyboard.WasKeyPressed(Keys.Z)
-                             || gamepad.WasButtonJustPressed(Buttons.RightTrigger)
-                             || gamepad.WasButtonJustPressed(Buttons.X);
+        // --- Auto-fire (hold to shoot at ShootInterval) ---
+        _shootCooldown -= time.DeltaSeconds;
 
-        if (fireJustPressed)
+        bool fireHeld = Engine.InputManager.Keyboard.IsKeyDown(Keys.Z)
+                     || gamepad.IsButtonDown(Buttons.RightTrigger)
+                     || gamepad.IsButtonDown(Buttons.X);
+
+        if (fireHeld && _shootCooldown <= 0f)
         {
             float dir = _platformer.DirectionFacing == FlatRedBall2.Movement.HorizontalDirection.Right ? 1f : -1f;
             var bullet = Engine.GetFactory<PlayerBullet>().Create();
             bullet.Launch(dir, X, Y);
+            _shootCooldown = ShootInterval;
         }
 
         // --- Hit flash ---

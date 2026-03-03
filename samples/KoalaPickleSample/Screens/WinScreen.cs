@@ -43,8 +43,6 @@ public class WinScreen : Screen
                    || gamepad.WasButtonJustPressed(Buttons.Start);
 
         if (anyKey)
-        {
-            MoveToScreen<GameScreen>();
-        }
+            MoveToScreen<TitleScreen>();
     }
 }

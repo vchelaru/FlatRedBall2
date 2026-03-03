@@ -9,7 +9,8 @@ namespace KoalaPickleSample.Screens;
 
 /// <summary>
 /// The Great Koala vs Pickle Journey — main gameplay screen.
-/// Manages level progression (5 levels), player health, win/lose conditions.
+/// Set <see cref="LevelIndex"/> via the <c>MoveToScreen</c> configure callback before
+/// <see cref="Screen.CustomInitialize"/> runs.
 /// </summary>
 public class GameScreen : Screen
 {
@@ -137,18 +138,24 @@ public class GameScreen : Screen
         ),
     };
 
+    // ------------------------------------------------------------------ Properties
+
+    /// <summary>
+    /// 0-based index of the level to play. Set via the <c>MoveToScreen</c> configure
+    /// callback before <see cref="Screen.CustomInitialize"/> runs.
+    /// </summary>
+    public int LevelIndex { get; set; } = 0;
+
     // ------------------------------------------------------------------ Fields
 
     private Factory<Player>       _playerFactory       = null!;
-    private Factory<Enemy>        _enemyFactory         = null!;
-    private Factory<Platform>     _platformFactory      = null!;
-    private Factory<PlayerBullet> _playerBulletFactory  = null!;
-    private Factory<EnemyBullet>  _enemyBulletFactory   = null!;
+    private Factory<Enemy>        _enemyFactory        = null!;
+    private Factory<Platform>     _platformFactory     = null!;
+    private Factory<PlayerBullet> _playerBulletFactory = null!;
+    private Factory<EnemyBullet>  _enemyBulletFactory  = null!;
 
     private Player _player = null!;
     private Enemy  _enemy  = null!;
-
-    private int _currentLevel = 0;  // 0-indexed
 
     // ------------------------------------------------------------------ Init
 
@@ -156,42 +163,23 @@ public class GameScreen : Screen
     {
         Camera.BackgroundColor = new Color(18, 18, 28);
 
-        _playerFactory      = new Factory<Player>(this);
-        _enemyFactory       = new Factory<Enemy>(this);
-        _platformFactory    = new Factory<Platform>(this);
+        _playerFactory       = new Factory<Player>(this);
+        _enemyFactory        = new Factory<Enemy>(this);
+        _platformFactory     = new Factory<Platform>(this);
         _playerBulletFactory = new Factory<PlayerBullet>(this);
         _enemyBulletFactory  = new Factory<EnemyBullet>(this);
 
-        LoadLevel(_currentLevel);
-    }
-
-    private void LoadLevel(int levelIndex)
-    {
-        // Destroy everything from the previous level (enemy bullets, player bullets, platforms)
-        DestroyAllEntities();
-
-        var data = Levels[levelIndex];
+        var data = Levels[LevelIndex];
 
         SpawnPlatforms(data);
         SpawnPlayer(data);
         SpawnEnemy(data);
         SetupCollision();
-    }
 
-    private void DestroyAllEntities()
-    {
-        // Destroy instances from factories that persist across level reloads.
-        // Factory.Instances is a snapshot-safe IReadOnlyList, so iterate by index.
-        for (int i = _platformFactory.Instances.Count - 1; i >= 0; i--)
-            _platformFactory.Instances[i].Destroy();
-        for (int i = _playerBulletFactory.Instances.Count - 1; i >= 0; i--)
-            _playerBulletFactory.Instances[i].Destroy();
-        for (int i = _enemyBulletFactory.Instances.Count - 1; i >= 0; i--)
-            _enemyBulletFactory.Instances[i].Destroy();
-        for (int i = _enemyFactory.Instances.Count - 1; i >= 0; i--)
-            _enemyFactory.Instances[i].Destroy();
-        for (int i = _playerFactory.Instances.Count - 1; i >= 0; i--)
-            _playerFactory.Instances[i].Destroy();
+        // Snap camera to the player so the lerp follow starts from the correct
+        // position rather than flying in from (0, 0).
+        Camera.X = _player.X;
+        Camera.Y = _player.Y;
     }
 
     private void SpawnPlatforms(LevelData data)
@@ -278,23 +266,17 @@ public class GameScreen : Screen
         // Win condition: enemy dead
         if (_enemy.DiedThisFrame)
         {
-            _currentLevel++;
-            if (_currentLevel >= Levels.Length)
-            {
-                // All levels cleared — show You Win screen
+            int nextLevel = LevelIndex + 1;
+            if (nextLevel >= Levels.Length)
                 MoveToScreen<WinScreen>();
-                return;
-            }
-            LoadLevel(_currentLevel);
+            else
+                MoveToScreen<LevelAnnounceScreen>(s => s.LevelIndex = nextLevel);
             return;
         }
 
-        // Lose condition: player dead (took 3 hits)
+        // Lose condition: player dead — restart the same level
         if (_player.DiedThisFrame)
-        {
-            // Restart current level
-            LoadLevel(_currentLevel);
-        }
+            MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex);
     }
 
     public override void CustomDestroy()

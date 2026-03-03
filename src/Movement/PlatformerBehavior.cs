@@ -20,6 +20,11 @@ public class PlatformerBehavior
     /// <summary>Reflects the ground state determined during the most recent <see cref="Update"/> call.</summary>
     public bool IsOnGround { get; private set; }
 
+    /// <summary>
+    /// The horizontal direction the entity is currently facing.
+    /// Updated each frame from <see cref="MovementInput"/>: non-zero X input sets the direction;
+    /// zero input leaves it unchanged (last direction is remembered).
+    /// </summary>
     public HorizontalDirection DirectionFacing { get; private set; } = HorizontalDirection.Right;
 
     /// <summary>
