@@ -9,10 +9,16 @@ public readonly struct Angle : IEquatable<Angle>
 
     private Angle(float radians) => _radians = radians;
 
+    /// <summary>Creates an angle from a value in degrees.</summary>
     public static Angle FromDegrees(float degrees) => new Angle(degrees * MathF.PI / 180f);
+
+    /// <summary>Creates an angle from a value in radians.</summary>
     public static Angle FromRadians(float radians) => new Angle(radians);
 
+    /// <summary>The angle value in degrees.</summary>
     public float Degrees => _radians * 180f / MathF.PI;
+
+    /// <summary>The angle value in radians.</summary>
     public float Radians => _radians;
 
     public Angle Normalized()
@@ -23,7 +29,13 @@ public readonly struct Angle : IEquatable<Angle>
         return new Angle(r);
     }
 
-    public Vector2 ToVector2() => new Vector2(MathF.Cos(_radians), MathF.Sin(_radians));
+    /// <summary>
+    /// Returns the unit vector pointing in the direction this angle represents.
+    /// <c>Angle.Zero</c> points up (0, 1); <c>FromDegrees(90)</c> points right (1, 0).
+    /// Matches the screen-space convention where sprites face up at <c>Rotation = 0</c>
+    /// and positive rotation is clockwise.
+    /// </summary>
+    public Vector2 ToVector2() => new Vector2(MathF.Sin(_radians), MathF.Cos(_radians));
 
     public static Angle Between(Angle a, Angle b)
     {

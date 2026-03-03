@@ -93,6 +93,32 @@ if (jumpPressed && IsOnGround)
     VelocityY = 350f;   // upward impulse; gravity brings it back down
 ```
 
+### Rotation-based thrust (top-down ship)
+
+`Rotation.ToVector2()` returns the unit vector the entity is facing. Use it directly for thrust.
+Set acceleration in the forward direction each frame and use `Drag` to decelerate naturally when thrust stops:
+
+```csharp
+// CustomInitialize:
+Drag = 3f;
+
+// CustomActivity:
+const float ThrustForce = 400f;
+var forward = Rotation.ToVector2();
+
+if (kb.IsKeyDown(Keys.Up))
+{
+    AccelerationX = forward.X * ThrustForce;
+    AccelerationY = forward.Y * ThrustForce;
+}
+else
+{
+    AccelerationX = 0f;
+    AccelerationY = 0f;
+    // Drag continues to bleed off existing velocity
+}
+```
+
 ### Projectile
 
 ```csharp

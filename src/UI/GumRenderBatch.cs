@@ -27,6 +27,9 @@ public class GumRenderBatch : IRenderBatch
     }
 
     /// <inheritdoc/>
+    public bool FlipsY => false; // Gum renders in screen space; no Y-flip transform applied
+
+    /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
         _inner!.Begin();

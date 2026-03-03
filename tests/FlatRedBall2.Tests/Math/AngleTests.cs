@@ -73,12 +73,24 @@ public class AngleTests
     }
 
     [Fact]
-    public void ToVector2_ZeroAnglePointsRight()
+    public void ToVector2_ZeroAnglePointsUp()
+    {
+        float expectedX = 0f;
+        float expectedY = 1f;
+
+        var vec = Angle.FromRadians(0f).ToVector2();
+
+        vec.X.ShouldBe(expectedX, tolerance: 0.00001f);
+        vec.Y.ShouldBe(expectedY, tolerance: 0.00001f);
+    }
+
+    [Fact]
+    public void ToVector2_90DegreesPointsRight()
     {
         float expectedX = 1f;
         float expectedY = 0f;
 
-        var vec = Angle.FromRadians(0f).ToVector2();
+        var vec = Angle.FromDegrees(90f).ToVector2();
 
         vec.X.ShouldBe(expectedX, tolerance: 0.00001f);
         vec.Y.ShouldBe(expectedY, tolerance: 0.00001f);

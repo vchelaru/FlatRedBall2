@@ -27,6 +27,9 @@ public class ShapesBatch : IRenderBatch
         ?? throw new InvalidOperationException(
             "ShapesBatch.Instance has not been initialized. Call FlatRedBallService.Initialize() first.");
 
+    /// <inheritdoc/>
+    public bool FlipsY => false; // Shapes convert world→screen via camera.WorldToScreen() themselves
+
     // Apos.Shapes manages its own pixel-space projection internally.
     // Shape Draw() methods convert world coordinates to screen pixels via camera.WorldToScreen()
     // before submitting to Apos.Shapes, so no view matrix is needed here.

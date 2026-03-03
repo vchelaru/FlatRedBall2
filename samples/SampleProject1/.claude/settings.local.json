@@ -7,7 +7,9 @@
       "Bash(dotnet test:*)",
       "Bash(start:*)",
       "Bash(grep:*)",
-      "WebFetch(domain:docs.flatredball.com)"
+      "WebFetch(domain:docs.flatredball.com)",
+      "Bash(dotnet tool:*)",
+      "Bash(python3:*)"
     ]
   }
 }
