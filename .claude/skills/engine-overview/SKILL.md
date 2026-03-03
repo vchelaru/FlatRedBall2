@@ -24,7 +24,7 @@ You do not need to implement these — the engine handles them every frame.
 |---|---|
 | **Physics integration** | Position, velocity, acceleration, and drag are integrated each frame using second-order kinematics: `pos += vel*dt + acc*(dt²/2)`, `vel += acc*dt`, `vel -= vel*drag*dt`. Just set the properties; physics runs automatically. |
 | **Collision detection** | `CollisionRelationship` checks all pairs each frame, fires `CollisionOccurred`, and calls the built-in response (move/bounce). You only write the event handler. |
-| **Entity update order** | `PhysicsUpdate` runs before `CustomActivity`. Collision runs between them. You never call these yourself. |
+| **Entity update order** | Physics → Collision → each entity's `CustomActivity` → `Screen.CustomActivity`. Entities run first (context-free); the screen runs after so it can react to updated entity state. You never invoke these yourself. |
 | **Child registration** | `entity.AddChild(sprite)` auto-adds the sprite to the render list and, if it is a shape, to the collision list. No manual manager calls. |
 | **Destroy cascade** | `entity.Destroy()` calls `CustomDestroy()`, removes from factory, recursively destroys all children, and removes them from the render list. |
 | **Render sorting** | Objects are sorted by Layer (index) then Z value each frame. You do not sort manually. |
@@ -140,6 +140,8 @@ These APIs exist but are not functional.
 **`PlatformerBehavior.Update()` must be called after collision.** It reads `entity.LastReposition` which is set during the collision phase. Calling it in `CustomActivity` (which runs after collision) is correct. Do not call it in a pre-collision hook.
 
 **`CustomDestroy` is for external resources only.** Factories and their entities are destroyed automatically when the screen exits — no `DestroyAll()` call needed.
+
+**`Vector2` ambiguity.** `Microsoft.Xna.Framework` and `System.Numerics` both define `Vector2`. Any file that imports both will get a compile error on bare `Vector2`. Resolve with a type alias at the top of the file: `using Vector2 = System.Numerics.Vector2;`
 
 **`CollisionOccurred` fires once per overlapping pair per frame.** Do not rely on it for continuous effects. Use it to trigger one-time events (damage, destroy, sound).
 

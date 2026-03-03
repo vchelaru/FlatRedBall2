@@ -163,10 +163,12 @@ public class Screen
 
         // TODO: flush async sync context
 
-        // 3. CustomActivity
-        CustomActivity(frameTime);
+        // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
         foreach (var entity in new List<Entity>(_entities))
             entity.CustomActivity(frameTime);
+
+        // 4. Screen CustomActivity — runs after entities, so it can react to their updated state
+        CustomActivity(frameTime);
     }
 
     // Internal draw — called by FlatRedBallService

@@ -36,8 +36,10 @@ public class GameScreen : Screen
 
 1. **Physics** — entity positions updated from velocity/acceleration
 2. **Collision** — registered relationships resolved; positions corrected
-3. **`CustomActivity`** — game logic runs with corrected state
-4. **`CustomActivity` per entity** — each entity's own `CustomActivity` runs
+3. **Entity `CustomActivity`** — each entity's own logic runs first (context-free)
+4. **Screen `CustomActivity`** — screen-level logic runs after all entities have updated; can react to the updated entity state
+
+The screen's `CustomActivity` always runs *after* all entity `CustomActivity` calls.
 
 `CustomInitialize` runs once when the screen is activated, before the first frame.
 

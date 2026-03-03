@@ -107,6 +107,22 @@ When you hit friction working on any task, respond at the appropriate scope:
 2. **XML doc comments** — Fix immediately. No need to ask.
 3. **API design issues** — Flag and suggest; don't unilaterally change the API.
 
+### Skill File Quality Bar
+
+Skill files are loaded into a limited context window — every line costs budget. Keep them lean and generalizable.
+
+**Include:**
+- Engine behaviors that are non-obvious or contradict intuition (gotchas, footguns)
+- API patterns that apply across many game types
+- Correct order-of-operations for lifecycle hooks
+
+**Do not include:**
+- Game-specific logic (score systems, enemy AI, wave spawning, upgrade trees) — the agent should implement these without guidance
+- Anything that is obvious from the method name or standard C# patterns
+- Step-by-step walkthroughs for common programming tasks
+
+**Calibration:** A reasonable amount of implementation work is expected from the agent. If the friction was "I had to write a state machine" or "I had to calculate screen bounds arithmetic" — that is normal work, not a gap in documentation. Only document things the engine makes unexpectedly hard or behaves unexpectedly.
+
 ## Agent Workflow
 
 **Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:

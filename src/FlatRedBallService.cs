@@ -126,8 +126,8 @@ public class FlatRedBallService
     public DebugRenderer DebugRenderer { get; } = new DebugRenderer();
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
-    // Convenience: current screen's camera
-    private Camera Camera => CurrentScreen.Camera;
+    /// <summary>The active screen's camera. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Camera"/>.</summary>
+    public Camera Camera => CurrentScreen.Camera;
 
     public void Update(GameTime gameTime)
     {

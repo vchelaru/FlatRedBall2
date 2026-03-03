@@ -256,6 +256,9 @@ Visual variety comes from randomizing velocity, color, size, and lifetime across
 
 ## Common Pitfalls
 
+- **Avoid naming fields/constants the same as `Entity` members.** Names like `Acceleration`, `Velocity`, `Position`, and `Drag` already exist on `Entity`. Declaring a field or constant with the same name in a subclass shadows the inherited member and causes compiler warnings. Prefer names like `AccelForce`, `MoveSpeed`, or `MaxSpeed`.
+
+
 - **`Engine` is null in the entity constructor** — Do not call `AddChild` or access `Engine.InputManager` in the constructor. Use `CustomInitialize` instead.
 - **`Visible` defaults to `false` on shapes** — Always set `Visible = true` or the shape won't render.
 - **`AddChild` only auto-registers to `RenderList` if `Engine` is set** — Factory sets `Engine` before calling `CustomInitialize`, so `AddChild` inside `CustomInitialize` works correctly. If you create entities outside of Factory, call `screen.Register(entity)` first.
