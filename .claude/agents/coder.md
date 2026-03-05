@@ -17,9 +17,10 @@ In either case, your job is to produce a focused code change that implements the
 # Before editing
 
 1. Read `.claude/code-style.md` and enforce every rule it contains. All code you write or modify must comply. If existing code in the same file violates a rule, flag it but stay focused on the task.
-2. Read the relevant files and surrounding code. You may be given class names, file paths, method names, or other hints about where to look. Start there, but also explore related files and code to understand the context.
-3. Look for existing patterns and conventions in the codebase — check 2-3 nearby files.
-4. Search for all usages of any symbol you plan to change.
+2. **Invoke relevant skills** for the subsystem you're working in — CLAUDE.md lists all available skills. For new game projects, start with `engine-overview`.
+3. Read the relevant files and surrounding code. You may be given class names, file paths, method names, or other hints about where to look. Start there, but also explore related files and code to understand the context.
+4. Look for existing patterns and conventions in the codebase — check 2-3 nearby files or an existing sample under `samples/`.
+5. Search for all usages of any symbol you plan to change.
 
 # After editing
 
@@ -50,4 +51,7 @@ Add XML doc comments only on **public-facing members** where the behavior is **n
 
 # High-Level Project Structure
 
-TODO: Document the project structure here.
+See CLAUDE.md "Engine Structure" for the full file tree. Key directories:
+- `src/` — Engine library
+- `samples/` — Working game samples (reference these for patterns before inventing new ones)
+- `tests/FlatRedBall2.Tests/` — xUnit + Shouldly

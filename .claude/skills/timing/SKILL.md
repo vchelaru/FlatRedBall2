@@ -1,3 +1,8 @@
+---
+name: timing
+description: "Timing in FlatRedBall2. Use when working with cooldowns, timers, delays, entity lifetimes, self-destruct, repeating events, or FrameTime.DeltaSeconds. Covers cooldown gates, repeating timers, and entity lifetime patterns."
+---
+
 # Timing in FlatRedBall2
 
 The engine provides `FrameTime` to every `CustomActivity` call. Use `time.DeltaSeconds` (a `float`) to drive all time-based logic — cooldowns, repeating events, and entity lifetimes.

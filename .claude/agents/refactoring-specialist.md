@@ -16,4 +16,9 @@ Incremental refactoring is preferred over large rewrites. If you need to make a 
 
 # Project-Specific Patterns
 
-TODO: Document project-specific patterns and conventions here as they are discovered.
+- **No static state** — only `FlatRedBallService.Default` is static. Everything else flows through `Engine` on entities or directly on screens.
+- **Factory pattern** — all entities are created via `Factory<T>`. Never bypass this with `new MyEntity()`.
+- **`internal` access** — `InternalsVisibleTo` exposes internals to `FlatRedBall2.Tests`. Use `internal` for engine implementation details, `public` for game-code-facing APIs.
+- **Shape types** — `AxisAlignedRectangle`, `Circle`, `Polygon`. All implement both `IRenderable` and `ICollidable`.
+- **Lifecycle hooks** — `CustomInitialize`, `CustomActivity`, `CustomDestroy` on both `Entity` and `Screen`. Don't add new virtual methods without good reason.
+- **Collision dispatch** — `CollisionDispatcher` is `internal static`. Shape-pair resolution uses concrete type matching, not polymorphism.

@@ -1,3 +1,8 @@
+---
+name: camera
+description: "Camera in FlatRedBall2. Use when working with camera setup, background color, world bounds, window resolution, scrolling, screen shake, coordinate conversion between world and screen space, or Camera.TargetWidth/TargetHeight. Trigger on any camera-related question including viewport, following a player, or screen boundaries."
+---
+
 # Camera in FlatRedBall2
 
 Every `Screen` has a `Camera` property. Access it directly — no initialization required.
@@ -24,11 +29,10 @@ World coordinates are **centered at the origin**:
 - X ∈ [−TargetWidth/2, TargetWidth/2]  →  [−640, 640]
 - Y ∈ [−TargetHeight/2, TargetHeight/2]  →  [−360, 360]
 
-Y+ is **up**. The top of the screen is Y = +360, the bottom is Y = −360.
+Y+ is **up** (see `physics-and-movement`). Top = +360, bottom = −360.
 
 ```csharp
-// Place a wall at the bottom of the screen
-wall.Y = -Camera.TargetHeight / 2f;  // -360
+wall.Y = -Camera.TargetHeight / 2f;  // bottom of screen
 ```
 
 ## Window Resolution

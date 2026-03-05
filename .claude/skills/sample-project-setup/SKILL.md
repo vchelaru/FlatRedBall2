@@ -1,3 +1,8 @@
+---
+name: sample-project-setup
+description: "Sample Project Setup for FlatRedBall2. Use when creating a new sample project, setting up a .csproj, configuring MonoGame content pipeline, or troubleshooting 'Cannot find a manifest file' / 'dotnet-mgcb does not exist' build errors. Covers the complete checklist for new sample projects."
+---
+
 # Sample Project Setup
 
 How to create a new sample project (`.csproj`) under `samples/`. Follow this checklist exactly — two of these steps are easy to forget and cause hard-to-diagnose build failures.

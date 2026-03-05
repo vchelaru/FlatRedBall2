@@ -44,12 +44,9 @@ This document tracks features and systems intentionally deferred from the initia
 - `TiledMapLayerRenderable.Draw` renders a tile layer using MonoGame.Extended's tile renderer
 - `TiledCollisionGenerator.Generate` reads tile properties and emits `AxisAlignedRectangle` shapes into a `ShapeCollection`
 
-## Same-List Collision
+## ~~Same-List Collision~~ (COMPLETED)
 
-**Status**: Not implemented — `CollisionRelationship` only handles two different lists
-**What's needed**:
-- `AddCollisionRelationship<T>(IEnumerable<T> list)` overload for self-vs-self collision
-- Pair iteration: `for i in 0..n, for j in i+1..n` to avoid duplicate pairs and self-collision
+**Status**: Implemented — `Screen.AddCollisionRelationship<A>(IEnumerable<A> list)` overload exists in `Screen.cs`.
 
 ## Camera Pixel-Perfect Mode
 
@@ -80,10 +77,6 @@ This document tracks features and systems intentionally deferred from the initia
 - `TopDownBehavior` component following the same `Update(entity, time)` pattern as `PlatformerBehavior`
 - Skill file at `.claude/skills/top-down-movement/SKILL.md`
 
-## GamepadPressableInput WasJustPressed / WasJustReleased
+## ~~GamepadPressableInput WasJustPressed / WasJustReleased~~ (COMPLETED)
 
-**Status**: Returns `false` — previous state tracking not implemented
-**What's needed**:
-- Expose `WasButtonPressed(Buttons)` and `WasButtonReleased(Buttons)` on `IGamepad`
-- Update `Gamepad` implementation to track previous frame state (already done internally, needs interface exposure)
-- Update `GamepadPressableInput` to use these methods
+**Status**: Implemented — `GamepadPressableInput` delegates to `IGamepad.WasButtonJustPressed`/`WasButtonJustReleased`.

@@ -1,3 +1,8 @@
+---
+name: levels
+description: "Level Data in FlatRedBall2. Use when working with level layouts, tile grids, level progression, loading level data, parsing maps, or transitioning between levels. Covers grid-based string layouts, record-based placement, and level advancement patterns."
+---
+
 # Level Data in FlatRedBall2
 
 Level layouts are defined in code, in a dedicated file separate from screen logic. This keeps data easy to scan and edit without touching game logic.

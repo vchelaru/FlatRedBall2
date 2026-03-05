@@ -1,3 +1,8 @@
+---
+name: collision-relationships
+description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, or entity-vs-entity collision. Trigger on any collision-related question."
+---
+
 # Collision Relationships in FlatRedBall2
 
 `Screen.AddCollisionRelationship<A,B>` registers a pair of collidable groups. Each frame, after physics runs, every entity in group A is tested against every entity in group B. If they overlap, the configured response fires.
@@ -7,22 +12,20 @@
 Call `AddCollisionRelationship` inside `Screen.CustomInitialize` after creating your factories:
 
 ```csharp
-public class GameScreen : Screen
-{
-    private Factory<Player> _playerFactory = null!;
-    private Factory<Wall>   _wallFactory   = null!;
-
-    public override void CustomInitialize()
-    {
-        _playerFactory = new Factory<Player>(this);
-        _wallFactory   = new Factory<Wall>(this);
-
-        // Solid collision: player is pushed out, walls stay fixed
-        AddCollisionRelationship<Player, Wall>(_playerFactory, _wallFactory)
-            .MoveFirstOnCollision();
-    }
-}
+AddCollisionRelationship<Player, Wall>(_playerFactory, _wallFactory)
+    .MoveFirstOnCollision();
 ```
+
+## Self-Collision (Same List)
+
+To collide entities within the same list (e.g., enemies pushing each other apart):
+
+```csharp
+AddCollisionRelationship<Enemy>(_enemyFactory)
+    .MoveBothOnCollision(firstMass: 1f, secondMass: 1f);
+```
+
+This single-list overload iterates unique pairs only — no duplicate checks or self-collision.
 
 ## Fluent Modifiers
 
@@ -30,41 +33,12 @@ public class GameScreen : Screen
 |--------|--------|
 | `.MoveFirstOnCollision()` | A gets pushed out, B stays fixed. Use for player vs. solid walls. |
 | `.MoveSecondOnCollision()` | B gets pushed out, A stays fixed. |
-| `.MoveBothOnCollision(firstMass, secondMass)` | Both objects share the separation weighted by mass. Equal masses = 50/50 split. |
-| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B using impulse physics. Separates positions automatically. |
-
-### BounceOnCollision — Mass Semantics
-
-```csharp
-// Signature:
-BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
-```
-
-- **`firstMass = 0f`** — A (the ball) is fully displaced; B (the wall) stays fixed. Use this for a ball bouncing off immovable walls.
-- **`secondMass = 0f`** — B is fully displaced; A stays fixed. Rarely used for bounce.
-- **`elasticity = 1.0f`** — perfectly elastic (no energy loss). `0.9f` = 10% energy loss per bounce, ball slowly settles.
-
-```csharp
-// Ball bounces off immovable walls — ball moves, walls don't
-AddCollisionRelationship(_balls, _walls)
-    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f);
-
-// Two-body elastic bounce (equal masses exchange velocities)
-AddCollisionRelationship(_bulletsA, _bulletsB)
-    .BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 1.0f);
-```
-
-> **Note:** `BounceOnCollision` only adjusts the velocity of A (the first group). B's velocity is unchanged when `firstMass == 0f`. `AdjustVelocityFrom` requires both objects to be `Entity` instances — it has no effect if either is a bare shape.
+| `.MoveBothOnCollision(firstMass, secondMass)` | Both objects share the separation weighted by mass. |
+| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B using impulse physics. `firstMass: 0f` = A moves, B fixed (common for walls). |
 
 ## Responding to Collision Events
 
-`CollisionOccurred` covers three broad categories of use:
-
-- **Physics customization** — read or override velocity/position after the engine's response has been applied
-- **Entity logic** — deal damage, destroy entities, update state
-- **Triggers** — detect when an entity enters a region, with no physics response at all
-
-The event fires once per overlapping pair per frame, **after** position separation and velocity adjustment have already been applied. Whatever you set on the entities in this handler is what carries into the next frame.
+`CollisionOccurred` fires once per overlapping pair per frame, **after** position separation and velocity adjustment have been applied.
 
 ### Entity logic
 
@@ -80,32 +54,23 @@ AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
 
 ### Physics customization
 
-Because the event fires after the engine's response, you can override velocity to layer custom behavior on top of the built-in bounce:
+Override velocity after the engine's response:
 
 ```csharp
 AddCollisionRelationship(_balls, _paddles)
     .BounceOnCollision(firstMass: 0f, secondMass: 1f)
     .CollisionOccurred += (ball, paddle) =>
     {
-        // BounceOnCollision already reflected the velocity.
-        // Override here to apply custom logic on top.
         ball.VelocityX = /* custom value */;
         ball.VelocityY = /* custom value */;
     };
 ```
 
-### Triggers
+### Triggers (no physics response)
 
-A trigger is an invisible entity used purely to detect when something enters a region — no physics response needed. Omit the fluent physics modifier entirely and handle everything in `CollisionOccurred`:
+Omit the fluent modifier entirely:
 
 ```csharp
-// DeathZone entity: AxisAlignedRectangle child, Visible = false
-var zone = _deathZoneFactory.Create();
-zone.X = 0;
-zone.Y = -Camera.TargetHeight / 2f - 40f;  // just below screen bottom
-zone.Rectangle.Width  = Camera.TargetWidth;
-zone.Rectangle.Height = 80f;
-
 AddCollisionRelationship(_balls, _deathZoneFactory)
     .CollisionOccurred += (ball, _) =>
     {
@@ -114,58 +79,37 @@ AddCollisionRelationship(_balls, _deathZoneFactory)
     };
 ```
 
-Other trigger examples: end-of-level zones, score regions, checkpoint areas.
+## Execution Order
 
-## How Entity-vs-Entity Collision Works
-
-`CollisionDispatcher` resolves collisions between concrete shape types (AABB vs AABB, Circle vs Circle, AABB vs Circle). When two entities collide, the dispatcher iterates their shape children and finds matching pairs.
-
-For example, if `Player` has an `AxisAlignedRectangle` child and `Wall` has an `AxisAlignedRectangle` child, the dispatcher runs **AABB vs AABB** overlap and separation between those shapes. The parent entity's position is updated as a result.
-
-Supported pairs:
-- `AxisAlignedRectangle` vs `AxisAlignedRectangle`
-- `Circle` vs `Circle`
-- `AxisAlignedRectangle` vs `Circle` (and the reverse)
-- `Polygon` vs `Polygon`
+Collision runs after physics and before `CustomActivity` — by the time game logic runs, entities are already separated from any overlapping collision partner. See `engine-overview` for the full frame loop.
 
 ## Important: ShapeCollection as B Does Not Work
 
-Passing a `ShapeCollection` as the second argument to `AddCollisionRelationship` hits the wildcard dispatch path and returns zero separation. **Use entity factories instead.** If you need reusable wall geometry, create a `Wall` entity class and a `Factory<Wall>`, then configure dimensions after `Create()`:
-
-```csharp
-// Correct — wall entities
-AddCollisionRelationship<Player, Wall>(_playerFactory, _wallFactory)
-    .MoveFirstOnCollision();
-
-// Wrong — ShapeCollection as B returns zero separation
-// AddCollisionRelationship<Player, ShapeCollection>(...) — do not do this
-```
-
-## Execution Order Each Frame
-
-1. Physics update — `X += VelocityX*dt`, `Y += VelocityY*dt`, etc.
-2. Collision resolution — all registered relationships run; positions are corrected
-3. `CustomActivity(time)` — game logic runs with already-corrected positions
-
-This means by the time `CustomActivity` executes, the entity is already separated from any overlapping collision partner.
+Passing a `ShapeCollection` as the second argument hits the wildcard dispatch path and returns zero separation. **Use entity factories instead.**
 
 ## Common Pitfalls
 
-- **Relationship not registered** — `AddCollisionRelationship` must be called from `CustomInitialize`. Relationships registered after the screen is running are still processed, but is unusual.
-- **Both sides move when only one should** — Use `.MoveFirstOnCollision()` (player pushed, walls fixed) rather than `.MoveBothOnCollision()` for solid terrain.
-- **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children. The dispatcher only works with shape children, not the entity's own X/Y directly.
-- **Player tunnels through thin walls at high speed** — FlatRedBall2 uses discrete (not continuous) collision detection. Keep velocities and wall thicknesses reasonable, or split fast movement into sub-steps.
-- **Don't use a `DiedThisFrame` flag on enemies — destroy them directly in `CollisionOccurred`**. The execution order is: collision → entity `CustomActivity` → screen `CustomActivity`. Any flag set by collision is reset at the top of `CustomActivity` before the screen ever sees it. Instead, check health and call `Destroy()` right in the callback:
+- **Both sides move when only one should** — Use `.MoveFirstOnCollision()` for solid terrain.
+- **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children.
+- **Player tunnels through thin walls** — Discrete collision detection; keep velocities reasonable.
+- **Don't use a `DiedThisFrame` flag** — The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
+
+## BounceOnCollision — Mass Semantics
 
 ```csharp
-AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
-    .CollisionOccurred += (bullet, enemy) =>
-    {
-        bullet.Destroy();
-        enemy.TakeHit();          // decrements health
-        if (enemy.Health <= 0)
-            enemy.Destroy();      // destroy here, not via a flag the screen polls
-    };
+BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
 ```
 
-The screen can then detect the enemy is gone by checking `_enemyFactory.Instances.Count == 0` rather than polling a flag on the entity.
+- **`firstMass = 0f`** — A is fully displaced; B stays fixed. Use for ball vs. immovable walls.
+- **`secondMass = 0f`** — B is fully displaced; A stays fixed. Rarely used.
+- **`elasticity = 1.0f`** — perfectly elastic. `0.9f` = 10% energy loss per bounce.
+
+> **Note:** `BounceOnCollision` only adjusts A's velocity. B is unchanged when `firstMass == 0f`.
+
+## Entity-vs-Entity Dispatch
+
+`CollisionDispatcher` resolves concrete shape pairs. Supported:
+- `AxisAlignedRectangle` vs `AxisAlignedRectangle`
+- `Circle` vs `Circle`
+- `AxisAlignedRectangle` vs `Circle` (and reverse)
+- `Polygon` vs `Polygon`
