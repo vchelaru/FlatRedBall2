@@ -17,6 +17,6 @@ public class Platform : Entity
             Visible = true,
             Color = new XnaColor(120, 160, 80, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
     }
 }

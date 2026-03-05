@@ -47,7 +47,7 @@ public class EnemyBullet : Entity
             Visible = true,
             Color = new XnaColor(80, 220, 80, 255),
         };
-        AddChild(_rect);
+        Add(_rect);
     }
 
     public override void CustomActivity(FrameTime time)

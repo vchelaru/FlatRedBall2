@@ -184,11 +184,11 @@ public class CollisionTests
         // Verifies the parent entity's X changes, not the child shape's local X
         var entityA = new Entity { X = 0f };
         var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        entityA.AddChild(rectA);
+        entityA.Add(rectA);
 
         var entityB = new Entity { X = 20f };
         var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        entityB.AddChild(rectB);
+        entityB.Add(rectB);
 
         var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
         rel.MoveFirstOnCollision();
@@ -261,11 +261,11 @@ public class CollisionTests
     {
         var entityA = new Entity();
         var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        entityA.AddChild(rectA);
+        entityA.Add(rectA);
 
         var entityB = new Entity();
         var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        entityB.AddChild(rectB);
+        entityB.Add(rectB);
 
         entityA.X = 0f;
         entityB.X = 20f;

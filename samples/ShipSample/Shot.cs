@@ -17,7 +17,7 @@ public class Shot : Entity
             Texture = texture,
             IsVisible = true,
         };
-        AddChild(_sprite);
+        Add(_sprite);
     }
 
     public override void CustomActivity(FrameTime time)

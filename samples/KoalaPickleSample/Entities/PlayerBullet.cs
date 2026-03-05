@@ -31,7 +31,7 @@ public class PlayerBullet : Entity
             Visible = true,
             Color = new XnaColor(255, 130, 180, 255),
         };
-        AddChild(_rect);
+        Add(_rect);
     }
 
     public override void CustomActivity(FrameTime time)

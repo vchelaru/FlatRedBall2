@@ -33,9 +33,19 @@ public class Screen
     public FlatRedBallService Engine { get; internal set; } = null!;
 
     public List<Layer> Layers { get; } = new();
-    public List<IRenderable> RenderList { get; } = new();
 
-    // Manual entity registration (for entities not created via Factory)
+    private readonly List<IRenderable> _renderList = new();
+    public IReadOnlyList<IRenderable> RenderList => _renderList;
+
+    public void Add(IRenderable renderable) => _renderList.Add(renderable);
+    public void Remove(IRenderable renderable) => _renderList.Remove(renderable);
+
+    /// <summary>
+    /// Registers a manually-created entity with this screen for physics, activity, and lifecycle management.
+    /// <para><b>Only call this for entities you instantiated with <c>new</c>.</b> Entities created via
+    /// <c>Factory&lt;T&gt;.Create()</c> are registered automatically — calling <c>Register</c> on them
+    /// would add them to the update loop twice.</para>
+    /// </summary>
     public void Register(Entity entity)
     {
         entity.Engine = Engine;
@@ -44,7 +54,7 @@ public class Screen
         foreach (var child in entity.Children)
         {
             if (child is IRenderable renderable)
-                RenderList.Add(renderable);
+                _renderList.Add(renderable);
         }
     }
 
@@ -55,23 +65,23 @@ public class Screen
     /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.
     /// </summary>
     /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
-    public void AddGum(FrameworkElement element, float z = 0f)
+    public void Add(FrameworkElement element, float z = 0f)
         => AddGumVisual(element.Visual, z);
 
     /// <summary>
     /// Adds a Gum visual element to this screen. Registered for rendering and input updates.
-    /// Prefer <see cref="AddGum(FrameworkElement, float)"/> when a Forms control is available.
+    /// Prefer <see cref="Add(FrameworkElement, float)"/> when a Forms control is available.
     /// </summary>
     /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
-    public void AddGum(GraphicalUiElement visual, float z = 0f)
+    public void Add(GraphicalUiElement visual, float z = 0f)
         => AddGumVisual(visual, z);
 
-    /// <summary>Removes a Gum element previously added with <see cref="AddGum(FrameworkElement, float)"/>.</summary>
-    public void RemoveGum(FrameworkElement element)
+    /// <summary>Removes a Gum element previously added with <see cref="Add(FrameworkElement, float)"/>.</summary>
+    public void Remove(FrameworkElement element)
         => RemoveGumVisual(element.Visual);
 
-    /// <summary>Removes a Gum visual previously added with <see cref="AddGum(GraphicalUiElement, float)"/>.</summary>
-    public void RemoveGum(GraphicalUiElement visual)
+    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, float)"/>.</summary>
+    public void Remove(GraphicalUiElement visual)
         => RemoveGumVisual(visual);
 
     internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, float z)
@@ -79,7 +89,7 @@ public class Screen
         var renderable = new GumRenderable(visual) { Z = z, WorldParent = worldParent };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
-        RenderList.Add(renderable);
+        _renderList.Add(renderable);
     }
 
     private void AddGumVisual(GraphicalUiElement visual, float z)
@@ -87,7 +97,7 @@ public class Screen
         var renderable = new GumRenderable(visual) { Z = z };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
-        RenderList.Add(renderable);
+        _renderList.Add(renderable);
     }
 
     private void RemoveGumVisual(GraphicalUiElement visual)
@@ -96,7 +106,7 @@ public class Screen
         {
             _gumRenderables.Remove(renderable);
             _gumByVisual.Remove(visual);
-            RenderList.Remove(renderable);
+            _renderList.Remove(renderable);
         }
     }
 
@@ -151,11 +161,12 @@ public class Screen
         return rel;
     }
 
-    public CollisionRelationship<A, ShapeCollection> AddCollisionRelationship<A>(
-        IEnumerable<A> entities, ShapeCollection staticGeometry)
+    public CollisionRelationship<A, TGeometry> AddCollisionRelationship<A, TGeometry>(
+        IEnumerable<A> entities, TGeometry staticGeometry)
         where A : ICollidable
+        where TGeometry : ICollidable
     {
-        var rel = new CollisionRelationship<A, ShapeCollection>(entities, SingleEnumerable(staticGeometry));
+        var rel = new CollisionRelationship<A, TGeometry>(entities, SingleEnumerable(staticGeometry));
         _collisionRelationships.Add(rel);
         return rel;
     }
@@ -220,16 +231,16 @@ public class Screen
     private void SortRenderList()
     {
         // Insertion sort — O(N) for nearly-sorted data; stable
-        for (int i = 1; i < RenderList.Count; i++)
+        for (int i = 1; i < _renderList.Count; i++)
         {
-            var item = RenderList[i];
+            var item = _renderList[i];
             int j = i - 1;
-            while (j >= 0 && Compare(RenderList[j], item) > 0)
+            while (j >= 0 && Compare(_renderList[j], item) > 0)
             {
-                RenderList[j + 1] = RenderList[j];
+                _renderList[j + 1] = _renderList[j];
                 j--;
             }
-            RenderList[j + 1] = item;
+            _renderList[j + 1] = item;
         }
     }
 

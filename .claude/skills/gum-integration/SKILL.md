@@ -1,6 +1,6 @@
 ---
 name: gum-integration
-description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, menus, buttons, labels, text display, StackPanel, Panel, layout, Gum Forms controls, AddGum, screen-space vs world-space UI, or any Gum-related question. Also trigger when user asks about displaying text on screen."
+description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, menus, buttons, labels, text display, StackPanel, Panel, layout, Gum Forms controls, Add, screen-space vs world-space UI, or any Gum-related question. Also trigger when user asks about displaying text on screen."
 ---
 
 # Gum Integration in FlatRedBall2
@@ -27,20 +27,20 @@ var button = new Button();
 button.Text = "Click Me";
 button.Click += (_, _) => Debug.WriteLine("clicked");
 
-AddGum(button);   // pass FrameworkElement directly
+Add(button);   // pass FrameworkElement directly
 ```
 
-## AddGum / RemoveGum
+## Add / Remove (Gum elements)
 
-`AddGum` registers the element for rendering **and** per-frame input updates (cursor, clicks, hover, keyboard). All Forms controls work out of the box — no additional input wiring needed.
+`Add` registers the element for rendering **and** per-frame input updates (cursor, clicks, hover, keyboard). All Forms controls work out of the box — no additional input wiring needed.
 
-Always use `AddGum` instead of adding directly to `RenderList`:
+Always use `Add` instead of adding directly to `RenderList`:
 
 ```csharp
-AddGum(button);          // FrameworkElement
-AddGum(textRuntime);     // GraphicalUiElement (low-level visual)
-RemoveGum(button);
-RemoveGum(textRuntime);
+Add(button);          // FrameworkElement
+Add(textRuntime);     // GraphicalUiElement (low-level visual)
+Remove(button);
+Remove(textRuntime);
 ```
 
 **Do not call `button.AddToRoot()`** — this bypasses the FRB2 render-order system.
@@ -55,7 +55,7 @@ scoreLabel.Text = "0";
 scoreLabel.Anchor(Anchor.TopRight);
 scoreLabel.X = -20;
 scoreLabel.Y = 20;
-AddGum(scoreLabel);
+Add(scoreLabel);
 
 // Update at runtime:
 scoreLabel.Text = _score.ToString();
@@ -67,7 +67,7 @@ scoreLabel.Text = _score.ToString();
 using MonoGameGum.GueDeriving;   // TextRuntime lives here, NOT Gum.Wireframe
 
 var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
-AddGum(scoreText);
+Add(scoreText);
 ```
 
 ## Render Ordering (Layer / Z)
@@ -78,22 +78,22 @@ AddGum(scoreText);
 | `z: 50f` parameter | Control ordering among multiple Gum elements or between Gum and sprites |
 
 ```csharp
-AddGum(bgPanel, z: 0f);
-AddGum(hudPanel, z: 100f);
+Add(bgPanel, z: 0f);
+Add(hudPanel, z: 100f);
 ```
 
 ## Screen-Space vs World-Space
 
-**Screen-space (default)**: `Screen.AddGum` places elements in Gum's native coordinate system (pixels, Y-down, origin top-left). Use for HUDs, menus.
+**Screen-space (default)**: `screen.Add(element)` places elements in Gum's native coordinate system (pixels, Y-down, origin top-left). Use for HUDs, menus.
 
-**World-space**: `Entity.AddGum` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed.
+**World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed.
 
 ## Gotchas
 
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
-- **`AddToRoot()` is NOT the FRB2 pattern**. Use `AddGum` instead.
+- **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.
 - **No persistence across screen transitions** — Gum elements are fully cleaned up. Add them fresh in each screen's `CustomInitialize`.
 - **World-space Gum**: Do not manually set `Visual.X/Y` on an entity-attached Gum element — it will be overwritten each frame.
 
@@ -112,7 +112,7 @@ class ScoreFloater : Entity
     public override void CustomInitialize()
     {
         VelocityY = 80f;
-        AddGum(_label);   // world-space — floats up with the entity
+        Add(_label);   // world-space — floats up with the entity
     }
 
     public override void CustomActivity(FrameTime time)
@@ -150,7 +150,7 @@ menu.Anchor(Anchor.Center);
 
 menu.AddChild(new Button { Text = "Start" });
 menu.AddChild(new Button { Text = "Quit" });
-AddGum(menu);
+Add(menu);
 ```
 
 For horizontal: `new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 }`.

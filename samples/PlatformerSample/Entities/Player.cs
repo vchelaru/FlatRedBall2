@@ -23,7 +23,7 @@ public class Player : Entity
             Visible = true,
             Color = new XnaColor(100, 180, 255, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         _platformer.GroundMovement = new PlatformerValues
         {
@@ -53,7 +53,8 @@ public class Player : Entity
 
         var keyboard = Engine.InputManager.Keyboard;
         _platformer.JumpInput = new KeyboardPressableInput(keyboard, Keys.Space);
-        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
+        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down).Or(
+            new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }
 
     private static readonly XnaColor NormalColor = new(100, 180, 255, 255);

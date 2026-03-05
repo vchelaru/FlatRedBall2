@@ -30,8 +30,8 @@ public class RenderListTests
         var highZ = new StubRenderable { Z = 10f, Layer = layer };
         var lowZ = new StubRenderable { Z = 1f, Layer = layer };
 
-        screen.RenderList.Add(highZ);
-        screen.RenderList.Add(lowZ);
+        screen.Add(highZ);
+        screen.Add(lowZ);
 
         var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
@@ -51,8 +51,8 @@ public class RenderListTests
         var fgItem = new StubRenderable { Z = 0f, Layer = layer2, Name = "fg" };
         var bgItem = new StubRenderable { Z = 0f, Layer = layer1, Name = "bg" };
 
-        screen.RenderList.Add(fgItem);
-        screen.RenderList.Add(bgItem);
+        screen.Add(fgItem);
+        screen.Add(bgItem);
 
         var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
@@ -73,9 +73,9 @@ public class RenderListTests
         var second = new StubRenderable { Z = 0f, Layer = layer, Name = "second" };
         var third = new StubRenderable { Z = 0f, Layer = layer, Name = "third" };
 
-        screen.RenderList.Add(first);
-        screen.RenderList.Add(second);
-        screen.RenderList.Add(third);
+        screen.Add(first);
+        screen.Add(second);
+        screen.Add(third);
 
         screen.RenderList[0].Name.ShouldBe("first");
         screen.RenderList[1].Name.ShouldBe("second");

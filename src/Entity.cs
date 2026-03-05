@@ -30,6 +30,7 @@ public class Entity : ICollidable, IAttachable
     // Rotation
     public Angle Rotation { get; set; }
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;
+    public Angle RotationVelocity { get; set; }
 
     // Physics
     public Vector2 Velocity;
@@ -75,7 +76,7 @@ public class Entity : ICollidable, IAttachable
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
-    public void AddChild(IAttachable child)
+    public void Add(IAttachable child)
     {
         child.Parent = this;
         _children.Add(child);
@@ -84,13 +85,13 @@ public class Entity : ICollidable, IAttachable
             _shapes.Add(collidable);
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
-            _engine!.CurrentScreen.RenderList.Add(renderable);
+            _engine!.CurrentScreen.Add(renderable);
 
         if (child is Entity childEntity && _engine is not null)
             childEntity.Engine = _engine;
     }
 
-    public void RemoveChild(IAttachable child)
+    public void Remove(IAttachable child)
     {
         _children.Remove(child);
         child.Parent = null;
@@ -99,7 +100,7 @@ public class Entity : ICollidable, IAttachable
             _shapes.Remove(collidable);
 
         if (child is IRenderable renderable)
-            _engine?.CurrentScreen?.RenderList.Remove(renderable);
+            _engine?.CurrentScreen?.Remove(renderable);
     }
 
     /// <summary>
@@ -107,7 +108,7 @@ public class Entity : ICollidable, IAttachable
     /// this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
     /// </summary>
     /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
-    public void AddGum(GraphicalUiElement visual, float z = 0f)
+    public void Add(GraphicalUiElement visual, float z = 0f)
     {
         _gumChildren.Add(visual);
         Engine.CurrentScreen.AddGumForEntity(visual, this, z);
@@ -118,19 +119,19 @@ public class Entity : ICollidable, IAttachable
     /// tracks this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
     /// </summary>
     /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
-    public void AddGum(FrameworkElement element, float z = 0f)
-        => AddGum(element.Visual, z);
+    public void Add(FrameworkElement element, float z = 0f)
+        => Add(element.Visual, z);
 
-    /// <summary>Removes a Gum visual previously added with <see cref="AddGum(GraphicalUiElement, float)"/>.</summary>
-    public void RemoveGum(GraphicalUiElement visual)
+    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, float)"/>.</summary>
+    public void Remove(GraphicalUiElement visual)
     {
         _gumChildren.Remove(visual);
-        _engine?.CurrentScreen?.RemoveGum(visual);
+        _engine?.CurrentScreen?.Remove(visual);
     }
 
-    /// <summary>Removes a Gum Forms control previously added with <see cref="AddGum(FrameworkElement, float)"/>.</summary>
-    public void RemoveGum(FrameworkElement element)
-        => RemoveGum(element.Visual);
+    /// <summary>Removes a Gum Forms control previously added with <see cref="Add(FrameworkElement, float)"/>.</summary>
+    public void Remove(FrameworkElement element)
+        => Remove(element.Visual);
 
     // Called by Screen each frame before CustomActivity
     internal void PhysicsUpdate(FrameTime frameTime)
@@ -144,6 +145,7 @@ public class Entity : ICollidable, IAttachable
         Position += Velocity * dt + Acceleration * halfDt2;
         Velocity += Acceleration * dt;
         Velocity -= Velocity * (Drag * dt);
+        Rotation += RotationVelocity * dt;
     }
 
     // Lifecycle
@@ -156,9 +158,9 @@ public class Entity : ICollidable, IAttachable
     {
         CustomDestroy();
         foreach (var visual in _gumChildren)
-            _engine?.CurrentScreen?.RemoveGum(visual);
+            _engine?.CurrentScreen?.Remove(visual);
         _gumChildren.Clear();
-        Parent?.RemoveChild(this);
+        Parent?.Remove(this);
         foreach (var child in new List<IAttachable>(_children))
             child.Destroy();
         _children.Clear();

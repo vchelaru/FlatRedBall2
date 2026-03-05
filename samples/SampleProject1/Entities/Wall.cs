@@ -21,6 +21,6 @@ public class Wall : Entity
             Color = Color.Transparent,
             Visible = false,
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
     }
 }

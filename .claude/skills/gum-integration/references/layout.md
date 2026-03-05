@@ -61,7 +61,7 @@ menu.AddChild(new Button { Text = "Start" });
 menu.AddChild(new Button { Text = "Options" });
 menu.AddChild(new Button { Text = "Quit" });
 
-AddGum(menu);
+Add(menu);
 ```
 
 For horizontal layout:
@@ -83,5 +83,5 @@ scoreLabel.X = -20;   // 20px from right
 scoreLabel.Y = 20;
 
 hud.AddChild(scoreLabel);
-AddGum(hud);
+Add(hud);
 ```

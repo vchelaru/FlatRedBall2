@@ -34,14 +34,14 @@ Shapes default to `Visible = false`. **Always set `Visible = true`** or the shap
 
 ## Step 3: Add to the Render Pipeline
 
-**Option A — Directly on the Screen**: Add to `RenderList` in `CustomInitialize`:
+**Option A — Directly on the Screen**: Call `Add` in `CustomInitialize`:
 ```csharp
-RenderList.Add(rect);
+Add(rect);
 ```
 
-**Option B — Attached to an Entity**: `entity.AddChild(shape)` auto-adds to `RenderList` (as long as `Engine` is set).
+**Option B — Attached to an Entity**: `entity.Add(shape)` auto-adds to the render pipeline (as long as `Engine` is set).
 
-> **Note:** `AddChild` only auto-registers if the entity already has an `Engine` reference (via `Factory` or `Screen.Register`).
+> **Note:** `entity.Add(child)` only auto-registers if the entity already has an `Engine` reference (via `Factory` or `Screen.Register`).
 
 ## Visual Properties
 
@@ -63,12 +63,12 @@ var rect = new AxisAlignedRectangle
 rect.Destroy();   // removes from parent entity and clears references
 ```
 
-For shapes added directly to `RenderList` (not via `AddChild`), also call `RenderList.Remove(rect)`.
+For shapes added directly to the screen (not via `entity.Add`), also call `Remove(rect)`.
 
 ## Common Pitfalls
 
 - **Shape is invisible** — forgot `Visible = true`. Default is `false`.
-- **Shape is not drawn** — forgot `RenderList.Add(shape)` or `AddChild` before entity was registered.
+- **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
 - **Shape position looks wrong** — Y+ is up (see `physics-and-movement`).
 - **Polygon not rotating** — use `Polygon`, not `AxisAlignedRectangle`.
 

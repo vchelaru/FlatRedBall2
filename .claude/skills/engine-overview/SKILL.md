@@ -11,7 +11,7 @@ FlatRedBall2 is a 2D game engine built on MonoGame. It provides physics, collisi
 
 - **Physics**: `pos += vel*dt + acc*(dt^2/2)`, `vel += acc*dt`, `vel -= vel*drag*dt` — every frame, for every entity
 - **Collision resolution**: All registered `CollisionRelationship` pairs are tested and resolved after physics
-- **Rendering**: Everything in `Screen.RenderList` is drawn, sorted by Layer + Z
+- **Rendering**: Everything added via `screen.Add(renderable)` is drawn, sorted by Layer + Z
 - **Input polling**: `InputManager` updates keyboard, mouse, and gamepad state each frame
 - **Gum UI updates**: Click/hover/focus events routed to all active Gum elements
 - **Screen transitions**: Old screen torn down, new screen initialized — entities, factories, Gum elements all cleaned up automatically
@@ -35,7 +35,7 @@ Each frame runs in this order:
 5. **Collision** — registered relationships resolved; positions corrected
 6. **Entity `CustomActivity`** — each entity's per-frame logic
 7. **Screen `CustomActivity`** — screen-level logic (sees post-collision, post-entity state)
-8. **Draw** — all renderables in `RenderList` drawn
+8. **Draw** — all registered renderables drawn
 
 ## Bootstrapping a Game
 

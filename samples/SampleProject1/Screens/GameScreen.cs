@@ -316,7 +316,7 @@ public class GameScreen : Screen
         _launchHint.Y = 680;
         hud.AddChild(_launchHint);
 
-        AddGum(hud);
+        Add(hud);
         UpdateHud();
     }
 

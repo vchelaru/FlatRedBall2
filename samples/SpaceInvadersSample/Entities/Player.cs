@@ -24,7 +24,7 @@ public class Player : Entity
             Visible = true,
             Color = new XnaColor(80, 220, 80, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         _keyboard = Engine.InputManager.Keyboard;
         _shootInput = new KeyboardPressableInput(_keyboard, Keys.Space);

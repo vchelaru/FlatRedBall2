@@ -19,6 +19,6 @@ public class DeathZone : Entity
             Height = 80f,
             Visible = false,
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
     }
 }

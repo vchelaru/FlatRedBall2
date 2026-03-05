@@ -26,7 +26,7 @@ public class Ship : Entity
             TextureScale = 1.5f,
             IsVisible = true,
         };
-        AddChild(_sprite);
+        Add(_sprite);
 
         Drag = 3f;
     }

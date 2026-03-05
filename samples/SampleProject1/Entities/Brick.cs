@@ -35,7 +35,7 @@ public class Brick : Entity
             Height = BrickHeight,
             Visible = true,
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
         UpdateColor();
     }
 

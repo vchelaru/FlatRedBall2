@@ -21,7 +21,7 @@ dotnet test tests/FlatRedBall2.Tests/
 ## Available Skills
 
 Invoke these with the Skill tool when working on specific topics:
-- `entities-and-factories` — Entity lifecycle, AddChild, Factory<T>, spawning
+- `entities-and-factories` — Entity lifecycle, Add (shapes/Gum), Factory<T>, spawning
 - `collision-relationships` — AddCollisionRelationship, move/bounce semantics
 - `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
 - `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds

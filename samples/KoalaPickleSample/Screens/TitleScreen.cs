@@ -22,7 +22,7 @@ public class TitleScreen : Screen
         var hint = new Label { Text = "Press SPACE to start" };
         panel.AddChild(hint);
 
-        AddGum(panel);
+        Add(panel);
 
         AutoAdvance();
     }

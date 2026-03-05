@@ -14,14 +14,14 @@ public class BounceTests
         public Ball()
         {
             AccelerationY = -200f;
-            AddChild(new Circle { Radius = 8f });
+            Add(new Circle { Radius = 8f });
         }
     }
 
     private static Entity MakeWall(float x, float y, float width, float height)
     {
         var wall = new Entity { X = x, Y = y };
-        wall.AddChild(new AxisAlignedRectangle { Width = width, Height = height });
+        wall.Add(new AxisAlignedRectangle { Width = width, Height = height });
         return wall;
     }
 
@@ -123,12 +123,12 @@ public class BounceTests
         // When grandparent collides with a wall, its velocity should be reversed.
         var grandparent = new Entity { X = 0f, VelocityX = 100f };
         var child = new Entity();
-        grandparent.AddChild(child);
-        child.AddChild(new Circle { Radius = 16f });
+        grandparent.Add(child);
+        child.Add(new Circle { Radius = 16f });
 
         // Wall at X=20, width=16 → left edge at 12; circle right edge at 16 → 4px overlap.
         var wall = new Entity { X = 20f };
-        wall.AddChild(new AxisAlignedRectangle { Width = 16f, Height = 100f });
+        wall.Add(new AxisAlignedRectangle { Width = 16f, Height = 100f });
 
         grandparent.CollidesWith(wall).ShouldBeTrue();
 
@@ -145,10 +145,10 @@ public class BounceTests
     {
         // Both entities moving toward each other — equal mass, perfect elasticity → velocities swap.
         var entityA = new Entity { X = 0f, VelocityX = 100f };
-        entityA.AddChild(new Circle { Radius = 16f });
+        entityA.Add(new Circle { Radius = 16f });
 
         var entityB = new Entity { X = 20f, VelocityX = -100f };
-        entityB.AddChild(new Circle { Radius = 16f });
+        entityB.Add(new Circle { Radius = 16f });
 
         // Distance = 20, combined radii = 32 → 12px overlap; they are colliding.
         entityA.CollidesWith(entityB).ShouldBeTrue();

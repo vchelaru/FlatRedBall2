@@ -59,7 +59,7 @@ public class Enemy : Entity
             Visible = true,
             Color  = NormalColor,
         };
-        AddChild(_rect);
+        Add(_rect);
 
         Health      = MaxHealth;
         _phaseTimer = _paceTime;

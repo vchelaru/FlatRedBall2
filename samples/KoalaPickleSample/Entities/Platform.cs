@@ -17,7 +17,7 @@ public class Platform : Entity
             Visible = true,
             Color = new XnaColor(160, 160, 170, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
     }
 
     public override void CustomDestroy()
