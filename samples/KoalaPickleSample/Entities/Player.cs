@@ -89,7 +89,7 @@ public class Player : Entity
         // This lets DirectionFacing be driven entirely inside PlatformerBehavior.
         var keyboardInput2D = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
         var gamepadInput2D  = new GamepadInput2D(gamepad, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY, deadzone: 0.15f);
-        _platformer.MovementInput = new MaxAbsInput2D(keyboardInput2D, gamepadInput2D);
+        _platformer.MovementInput = keyboardInput2D.Or(gamepadInput2D);
 
         // Jump: keyboard Space — gamepad A is handled manually in CustomActivity
         _platformer.JumpInput = new KeyboardPressableInput(keyboard, Keys.Space);
