@@ -64,11 +64,13 @@ Three layers of AI-usability (in priority order):
 
 ### Post-Task Reflection (Required for Game Dev Tasks)
 
-After completing any game development task, reflect and suggest concrete improvements:
+After completing a task where you are **using the engine as an end user** (building a game, writing a sample, implementing a game mechanic), reflect and suggest concrete improvements:
 - Did completing this task require excessive context or guesswork?
 - Would a cleaner API design have prevented confusion?
 - Are there missing, unclear, or redundant XML doc comments?
 - Should a skill file be created or updated?
+
+**Do not give this reflection when working on the engine itself** (fixing engine bugs, implementing engine features, writing engine tests). Those tasks are about the internals, not about the end-user experience of the API.
 
 Make suggestions even if minor. **High churn on docs and skills is expected and desired — we want it perfect.**
 

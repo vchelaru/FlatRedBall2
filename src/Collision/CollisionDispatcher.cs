@@ -49,6 +49,7 @@ internal static class CollisionDispatcher
             (AxisAlignedRectangle ra, Polygon pb)              => -PolygonVsAabb(pb, ra),
             (Polygon pa, Circle cb)                            => PolygonVsCircle(pa, cb),
             (Circle ca, Polygon pb)                            => -PolygonVsCircle(pb, ca),
+            (_, TileShapeCollection tsc)                       => tsc.GetSeparationFor(a),
             _                                                  => Vector2.Zero
         };
 
@@ -96,6 +97,9 @@ internal static class CollisionDispatcher
         float bBottom = b.AbsoluteY - b.Height / 2f;
         float bTop    = b.AbsoluteY + b.Height / 2f;
 
+        float bCenterX = (bLeft + bRight) / 2f;
+        float bCenterY = (bBottom + bTop) / 2f;
+
         if (a is Circle circle)
         {
             float cx = circle.AbsoluteX, cy = circle.AbsoluteY, r = circle.Radius;
@@ -108,6 +112,9 @@ internal static class CollisionDispatcher
             switch (dir)
             {
                 case RepositionDirections.Down:
+                    // Only push down if the circle center is below the tile's center.
+                    // This prevents corner-clips from above triggering a downward push.
+                    if (cy >= bCenterY) return Vector2.Zero;
                     // Exit through the bottom face. Circle center lands at rect.bottom − √(r²−dx²).
                     // If dx ≥ r the circle can't reach the bottom face — no separation possible.
                     if (dx >= r) return Vector2.Zero;
@@ -116,12 +123,14 @@ internal static class CollisionDispatcher
                     return deltaDown < 0f ? new Vector2(0f, deltaDown) : Vector2.Zero;
 
                 case RepositionDirections.Up:
+                    if (cy <= bCenterY) return Vector2.Zero;
                     if (dx >= r) return Vector2.Zero;
                     float targetUp  = bTop + MathF.Sqrt(r * r - dx * dx);
                     float deltaUp   = targetUp - cy;
                     return deltaUp > 0f ? new Vector2(0f, deltaUp) : Vector2.Zero;
 
                 case RepositionDirections.Left:
+                    if (cx >= bCenterX) return Vector2.Zero;
                     // Exit through the left face. Circle center lands at rect.left − √(r²−dy²).
                     if (dy >= r) return Vector2.Zero;
                     float targetLeft  = bLeft - MathF.Sqrt(r * r - dy * dy);
@@ -129,6 +138,7 @@ internal static class CollisionDispatcher
                     return deltaLeft < 0f ? new Vector2(deltaLeft, 0f) : Vector2.Zero;
 
                 case RepositionDirections.Right:
+                    if (cx <= bCenterX) return Vector2.Zero;
                     if (dy >= r) return Vector2.Zero;
                     float targetRight = bRight + MathF.Sqrt(r * r - dy * dy);
                     float deltaRight  = targetRight - cx;
@@ -139,18 +149,28 @@ internal static class CollisionDispatcher
         {
             // AABB bounding-box approach — exact for AxisAlignedRectangle, approximate for Polygon.
             var (aMinX, aMaxX, aMinY, aMaxY) = GetBounds(a);
+            float aCenterX = (aMinX + aMaxX) / 2f;
+            float aCenterY = (aMinY + aMaxY) / 2f;
+            // Only push in a direction if the moving object's center is on the outward side of the
+            // tile's center. This prevents corner-clips from triggering spurious repositions — e.g.,
+            // a player whose bottom-right corner barely overlaps the top-left of a Right-only tile
+            // should not be pushed rightward.
             switch (dir)
             {
                 case RepositionDirections.Down:
+                    if (aCenterY >= bCenterY) return Vector2.Zero;
                     float sepD = bBottom - aMaxY;
                     return sepD < 0f ? new Vector2(0f, sepD) : Vector2.Zero;
                 case RepositionDirections.Up:
+                    if (aCenterY <= bCenterY) return Vector2.Zero;
                     float sepU = bTop - aMinY;
                     return sepU > 0f ? new Vector2(0f, sepU) : Vector2.Zero;
                 case RepositionDirections.Left:
+                    if (aCenterX >= bCenterX) return Vector2.Zero;
                     float sepL = bLeft - aMaxX;
                     return sepL < 0f ? new Vector2(sepL, 0f) : Vector2.Zero;
                 case RepositionDirections.Right:
+                    if (aCenterX <= bCenterX) return Vector2.Zero;
                     float sepR = bRight - aMinX;
                     return sepR > 0f ? new Vector2(sepR, 0f) : Vector2.Zero;
             }
@@ -159,13 +179,17 @@ internal static class CollisionDispatcher
     }
 
     // Returns the axis-aligned bounding box of any supported ICollidable.
-    private static (float minX, float maxX, float minY, float maxY) GetBounds(ICollidable c)
+    // Internal so TileShapeCollection can use it for spatial partitioning.
+    internal static (float minX, float maxX, float minY, float maxY) GetBounds(ICollidable c)
     {
         switch (c)
         {
             case AxisAlignedRectangle r:
                 return (r.AbsoluteX - r.Width / 2f,  r.AbsoluteX + r.Width / 2f,
                         r.AbsoluteY - r.Height / 2f, r.AbsoluteY + r.Height / 2f);
+            case Circle ci:
+                return (ci.AbsoluteX - ci.Radius, ci.AbsoluteX + ci.Radius,
+                        ci.AbsoluteY - ci.Radius, ci.AbsoluteY + ci.Radius);
             case Polygon poly:
             {
                 var pts = GetWorldPoints(poly);

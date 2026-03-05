@@ -1,6 +1,6 @@
 ---
 name: shapes
-description: "Working with Shapes in FlatRedBall2. Use when working with AxisAlignedRectangle, Circle, Polygon, shape creation, visibility, color, IsFilled, OutlineThickness, or visual properties of shapes. Also covers RepositionDirections for one-way platforms and tile grids. Trigger on any shape-related question."
+description: "Working with Shapes in FlatRedBall2. Use when working with AxisAlignedRectangle, Circle, Polygon, TileShapeCollection, shape creation, visibility, color, IsFilled, OutlineThickness, or visual properties of shapes. Also covers RepositionDirections for one-way platforms and tile grids. Trigger on any shape-related question."
 ---
 
 # Working with Shapes in FlatRedBall2
@@ -71,6 +71,27 @@ For shapes added directly to the screen (not via `entity.Add`), also call `Remov
 - **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
 - **Shape position looks wrong** — Y+ is up (see `physics-and-movement`).
 - **Polygon not rotating** — use `Polygon`, not `AxisAlignedRectangle`.
+
+## TileShapeCollection
+
+`TileShapeCollection` is a grid-based static collision structure for tile maps. Set `X`, `Y`, and `GridSize` before adding tiles — positions are computed at insertion time and not updated if those properties change later.
+
+```csharp
+var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 16f };
+
+// X, Y are the world position of the bottom-left corner of cell (0, 0)
+tiles.AddTileAtCell(int col, int row);      // by grid index
+tiles.AddTileAtWorld(float x, float y);    // snapped to nearest cell
+
+tiles.RemoveTileAtCell(col, row);
+tiles.GetTileAtCell(col, row);             // returns AxisAlignedRectangle? for inspection
+
+tiles.Visible = true;                      // debug visualization
+```
+
+`RepositionDirections` are maintained automatically on every add/remove — interior shared edges between adjacent tiles are cleared to prevent seam snagging. No manual refresh needed.
+
+Integrates with `AddCollisionRelationship` — see `collision-relationships` skill.
 
 ## RepositionDirections (AxisAlignedRectangle only)
 

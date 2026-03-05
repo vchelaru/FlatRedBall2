@@ -83,9 +83,19 @@ AddCollisionRelationship(_balls, _deathZoneFactory)
 
 Collision runs after physics and before `CustomActivity` — by the time game logic runs, entities are already separated from any overlapping collision partner. See `engine-overview` for the full frame loop.
 
-## Important: ShapeCollection as B Does Not Work
+## Tile Collision (TileShapeCollection)
 
-Passing a `ShapeCollection` as the second argument hits the wildcard dispatch path and returns zero separation. **Use entity factories instead.**
+`TileShapeCollection` implements `ICollidable` and works as static geometry with the `entities, staticGeometry` overload:
+
+```csharp
+var tiles = new TileShapeCollection { GridSize = 16f };
+tiles.AddTileAtCell(col, row);   // or AddTileAtWorld(x, y)
+
+AddCollisionRelationship(_playerFactory, tiles)
+    .MoveFirstOnCollision();
+```
+
+`RepositionDirections` on adjacent tiles are maintained automatically — interior shared edges are cleared so entities glide across flat surfaces without snagging on seams.
 
 ## Common Pitfalls
 

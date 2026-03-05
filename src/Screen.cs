@@ -41,6 +41,19 @@ public class Screen
     public void Remove(IRenderable renderable) => _renderList.Remove(renderable);
 
     /// <summary>
+    /// Registers all tiles in <paramref name="tiles"/> for rendering and wires up future
+    /// <see cref="Collision.TileShapeCollection.AddTileAtCell"/> / <see cref="Collision.TileShapeCollection.RemoveTileAtCell"/>
+    /// calls so newly added or removed tiles stay in sync automatically.
+    /// </summary>
+    public void Add(Collision.TileShapeCollection tiles)
+    {
+        foreach (var rect in tiles.AllTiles)
+            _renderList.Add(rect);
+        tiles._onTileAdded += _renderList.Add;
+        tiles._onTileRemoved += r => _renderList.Remove(r);
+    }
+
+    /// <summary>
     /// Registers a manually-created entity with this screen for physics, activity, and lifecycle management.
     /// <para><b>Only call this for entities you instantiated with <c>new</c>.</b> Entities created via
     /// <c>Factory&lt;T&gt;.Create()</c> are registered automatically — calling <c>Register</c> on them

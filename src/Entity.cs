@@ -226,6 +226,20 @@ public class Entity : ICollidable, IAttachable
             if (otherMass != 0)
                 otherEntity.Velocity -= impulse * otherRatio * normal;
         }
+        else
+        {
+            // Static geometry (e.g. TileShapeCollection) — treat other as immovable with zero velocity.
+            float totalMass = thisMass + otherMass;
+            if (totalMass == 0) return;
+
+            float thisRatio = otherMass == 0 ? 1f : otherMass / totalMass;
+            float relVelAlongNormal = Vector2.Dot(Velocity, normal);
+
+            if (relVelAlongNormal >= 0) return;
+
+            float impulse = -(1f + elasticity) * relVelAlongNormal;
+            Velocity += impulse * thisRatio * normal;
+        }
     }
 
     // Recursively yields the primitive shapes (Circle, AxisAlignedRectangle, Polygon) reachable
