@@ -21,7 +21,7 @@ public class TrailParticle : Entity
             Radius = 8f,
             Visible = true,
         };
-        AddChild(_circle);
+        Add(_circle);
     }
 
     public override void CustomActivity(FrameTime time)

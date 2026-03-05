@@ -37,7 +37,7 @@ public class HeavyEnemy : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(CollisionRect);
+        Add(CollisionRect);
 
         _outline = new AxisAlignedRectangle
         {
@@ -48,7 +48,7 @@ public class HeavyEnemy : Entity
             OutlineThickness = 2f,
             Visible = true,
         };
-        AddChild(_outline);
+        Add(_outline);
     }
 
     public override void CustomActivity(FrameTime time)

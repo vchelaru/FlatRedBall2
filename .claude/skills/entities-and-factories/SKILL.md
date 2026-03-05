@@ -1,6 +1,6 @@
 ---
 name: entities-and-factories
-description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, Factory<T>, spawning/creating/destroying entities, entity lifecycle, AddChild, shape children, CustomInitialize/CustomActivity, or Engine.GetFactory<T>(). Trigger on any entity creation, destruction, or factory question."
+description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, Factory<T>, spawning/creating/destroying entities, entity lifecycle, Add, shape children, CustomInitialize/CustomActivity, or Engine.GetFactory<T>(). Trigger on any entity creation, destruction, or factory question."
 ---
 
 # Entities and Factories in FlatRedBall2
@@ -29,7 +29,7 @@ public class Player : Entity
             Color = new Color(80, 140, 255, 220),
             Visible = true,
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         _movement = new KeyboardInput2D(
             Engine.InputManager.Keyboard,
@@ -53,18 +53,18 @@ public class Player : Entity
 
 ## Shape Children
 
-All three shape types can be attached with `AddChild`:
+All three shape types can be attached with `Add`:
 
 ```csharp
 var rect = new AxisAlignedRectangle { Width = 40, Height = 40, Visible = true };
-AddChild(rect);
+Add(rect);
 
 var circle = new Circle { Radius = 20, Visible = true };
-AddChild(circle);
+Add(circle);
 
 var poly = Polygon.CreateRectangle(40, 40);
 poly.Visible = true;
-AddChild(poly);
+Add(poly);
 ```
 
 Shape position is relative to the parent entity's position.
@@ -142,7 +142,7 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 - **Avoid naming fields/constants the same as `Entity` members.** `Acceleration`, `Velocity`, `Drag` already exist on `Entity` — shadowing them causes warnings.
 - **`Engine` is null in the constructor** — see `engine-overview` Key Design Rules. Use `CustomInitialize` instead.
 - **Shapes default `Visible = false`** — see `shapes` skill. Always set `Visible = true`.
-- **`AddChild` only auto-registers to `RenderList` if `Engine` is set** — Factory sets `Engine` before `CustomInitialize`, so `AddChild` works correctly there.
+- **`Add(child)` only auto-registers to the render pipeline if `Engine` is set** — Factory sets `Engine` before `CustomInitialize`, so `Add` works correctly there.
 - **`_movement` must be initialized once, not every frame** — create input objects in `CustomInitialize`.
 - **Always use `Factory<T>`, never `new MyEntity()`** — bypassing Factory breaks `Engine.GetFactory<T>()` and collision relationships.
 

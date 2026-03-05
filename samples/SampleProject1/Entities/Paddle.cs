@@ -28,7 +28,7 @@ public class Paddle : Entity
             Color = new Color(180, 220, 255),
             Visible = true,
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         _keyboard = Engine!.InputManager.Keyboard;
     }

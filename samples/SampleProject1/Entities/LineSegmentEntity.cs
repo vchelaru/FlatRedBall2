@@ -44,7 +44,7 @@ public class LineSegmentEntity : Entity
             Color = DefaultColor,
             LineThickness = 1f,
         };
-        AddChild(_line);
+        Add(_line);
     }
 
     public override void CustomActivity(FrameTime time)

@@ -26,7 +26,7 @@ public class GameScreen : Screen
         _debugLabel.Anchor(Anchor.TopLeft);
         _debugLabel.X = 8;
         _debugLabel.Y = 8;
-        AddGum(_debugLabel);
+        Add(_debugLabel);
     }
 
     public override void CustomActivity(FrameTime time)

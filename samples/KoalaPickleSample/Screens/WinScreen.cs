@@ -28,7 +28,7 @@ public class WinScreen : Screen
         subtitle.Text = "Press any key to play again";
         stack.AddChild(subtitle);
 
-        AddGum(stack);
+        Add(stack);
     }
 
     public override void CustomActivity(FrameTime time)

@@ -43,7 +43,7 @@ public class ShooterEnemy : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(CollisionRect);
+        Add(CollisionRect);
 
         // Inner accent square
         _innerRect = new AxisAlignedRectangle
@@ -54,7 +54,7 @@ public class ShooterEnemy : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(_innerRect);
+        Add(_innerRect);
 
         _shootTimer = ShootInterval * 0.5f;  // first shot sooner
     }

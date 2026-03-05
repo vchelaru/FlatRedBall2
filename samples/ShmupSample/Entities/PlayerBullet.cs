@@ -20,7 +20,7 @@ public class PlayerBullet : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(CollisionRect);
+        Add(CollisionRect);
     }
 
     public override void CustomActivity(FrameTime time)

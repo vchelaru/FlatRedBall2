@@ -27,7 +27,7 @@ public class ScoreFloater : Entity
         Drag = 1.5f;
 
         _label = new TextRuntime { Text = $"+{_points}", FontSize = 18 };
-        AddGum(_label);
+        Add(_label);
     }
 
     public override void CustomActivity(FrameTime time)

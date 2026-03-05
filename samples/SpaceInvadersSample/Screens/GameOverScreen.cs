@@ -31,7 +31,7 @@ public class GameOverScreen : Screen
         hintLabel.Text = "Press SPACE to play again";
         panel.AddChild(hintLabel);
 
-        AddGum(panel);
+        Add(panel);
     }
 
     public override void CustomActivity(FrameTime time)

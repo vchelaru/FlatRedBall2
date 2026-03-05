@@ -23,7 +23,7 @@ public class Player : Entity
             Visible = true,
             Color = new XnaColor(100, 180, 255, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         _platformer.GroundMovement = new PlatformerValues
         {

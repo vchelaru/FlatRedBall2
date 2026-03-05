@@ -74,7 +74,7 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     public void Destroy()
     {
         if (Parent is Entity entity)
-            entity.RemoveChild(this);
+            entity.Remove(this);
         else
             Parent = null;
     }

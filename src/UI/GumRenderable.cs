@@ -9,8 +9,8 @@ namespace FlatRedBall2.UI;
 /// sorted by Layer and Z alongside sprites and shapes in the Screen's render list.
 /// </summary>
 /// <remarks>
-/// This type is an internal implementation detail. Use <c>Screen.AddGum</c> for screen-space
-/// elements or <c>Entity.AddGum</c> for world-space elements — both handle wrapping internally.
+/// This type is an internal implementation detail. Use <c>screen.Add(element)</c> for screen-space
+/// elements or <c>entity.Add(element)</c> for world-space elements — both handle wrapping internally.
 /// </remarks>
 public class GumRenderable : IRenderable
 {

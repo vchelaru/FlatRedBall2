@@ -25,7 +25,7 @@ public class DeathParticle : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(_rect);
+        Add(_rect);
     }
 
     /// <summary>

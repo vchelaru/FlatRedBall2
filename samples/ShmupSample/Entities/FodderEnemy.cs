@@ -36,7 +36,7 @@ public class FodderEnemy : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(CollisionCircle);
+        Add(CollisionCircle);
     }
 
     /// <summary>

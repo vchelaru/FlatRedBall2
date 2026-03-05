@@ -30,7 +30,7 @@ public class GameOverScreen : Screen
         restartLabel.Text = "Press Space or Z to restart";
         panel.AddChild(restartLabel);
 
-        AddGum(panel);
+        Add(panel);
     }
 
     public override void CustomActivity(FrameTime time)

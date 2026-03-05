@@ -51,7 +51,7 @@ See `engine-overview` for the full 8-step frame loop. Key ordering for screens:
 | `Camera` | `Camera` | This screen's camera — set background color, world bounds, position |
 | `Engine` | `FlatRedBallService` | Access to `Random`, `InputManager`, `AudioManager`, etc. |
 | `ContentManager` | `ContentManagerService` | Load textures, fonts, and other content |
-| `RenderList` | `List<IRenderable>` | All renderables sorted and drawn each frame |
+| `RenderList` | `IReadOnlyList<IRenderable>` | All renderables sorted and drawn each frame; use `Add`/`Remove` to modify |
 | `Layers` | `List<Layer>` | Named layers for render ordering |
 
 ## Navigating Between Screens
@@ -89,7 +89,7 @@ public class GameOverScreen : Screen
     {
         var label = new Label();
         label.Text = $"{Winner} wins! Score: {FinalScore}";
-        AddGum(label);
+        Add(label);
     }
 }
 ```
@@ -123,7 +123,7 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 
 - **`MoveToScreen` is deferred** — the transition does not happen immediately. Code after `MoveToScreen<T>()` in the same frame still runs. If you want to stop processing, `return` after the call.
 - **All entities and factories are destroyed automatically** on screen change. You do not need to manually destroy them in `CustomDestroy`.
-- **Gum elements are also cleared automatically** — no teardown needed for `AddGum` elements.
+- **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
 - **`MoveToScreen` can target the same screen type** — this fully destroys and recreates the screen, making it the correct pattern for restarting a level. Use the configure callback to pass state (e.g., level index):

@@ -48,7 +48,7 @@ public class Player : Entity
             Visible = true,
             Color = NormalColor,
         };
-        AddChild(_rect);
+        Add(_rect);
 
         var groundValues = new PlatformerValues
         {

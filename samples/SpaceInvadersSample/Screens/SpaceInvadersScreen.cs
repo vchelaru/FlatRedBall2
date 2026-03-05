@@ -111,7 +111,7 @@ public class SpaceInvadersScreen : Screen
         _scoreLabel.Y = 10;
         hud.AddChild(_scoreLabel);
 
-        AddGum(hud);
+        Add(hud);
     }
 
     private void UpdateHud()

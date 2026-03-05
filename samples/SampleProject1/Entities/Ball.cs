@@ -18,7 +18,7 @@ public class Ball : Entity
             Color = new Color(255, 255, 200),
             Visible = true,
         };
-        AddChild(Circle);
+        Add(Circle);
     }
 
     public override void CustomActivity(FrameTime time)

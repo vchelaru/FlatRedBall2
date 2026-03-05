@@ -48,7 +48,7 @@ public class PlayerShip : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(_body);
+        Add(_body);
 
         // Nose — narrower piece at the top to give arrow shape
         _nose = new AxisAlignedRectangle
@@ -61,7 +61,7 @@ public class PlayerShip : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(_nose);
+        Add(_nose);
 
         // Collision rectangle matches body bounds
         CollisionRect = new AxisAlignedRectangle
@@ -70,7 +70,7 @@ public class PlayerShip : Entity
             Height = 36,
             Visible = false,
         };
-        AddChild(CollisionRect);
+        Add(CollisionRect);
 
         _movement = new KeyboardInput2D(
             Engine.InputManager.Keyboard,

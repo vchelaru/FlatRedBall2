@@ -17,7 +17,7 @@ public class EnemyBullet : Entity
             Visible = true,
             Color = new XnaColor(255, 120, 60, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         VelocityY = -250f;
     }

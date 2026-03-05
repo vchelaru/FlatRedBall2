@@ -1,4 +1,5 @@
 using FlatRedBall2.Collision;
+using FlatRedBall2.Math;
 using Shouldly;
 using Xunit;
 
@@ -16,19 +17,33 @@ public class EntityTests
 
         var parent = new Entity { X = parentX, Y = parentY };
         var child = new Entity { X = childX, Y = childY };
-        parent.AddChild(child);
+        parent.Add(child);
 
         child.AbsoluteX.ShouldBe(expectedAbsoluteX);
         child.AbsoluteY.ShouldBe(expectedAbsoluteY);
     }
 
     [Fact]
-    public void AddChild_SetsParentOnChild()
+    public void AbsoluteRotation_IncludesParentRotation()
+    {
+        var parentRotation = Angle.FromDegrees(45f);
+        var childRotation = Angle.FromDegrees(30f);
+        float expectedDegrees = 75f;
+
+        var parent = new Entity { Rotation = parentRotation };
+        var child = new Entity { Rotation = childRotation };
+        parent.Add(child);
+
+        child.AbsoluteRotation.Degrees.ShouldBe(expectedDegrees, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void Add_SetsParentOnChild()
     {
         var parent = new Entity();
         var child = new Entity();
 
-        parent.AddChild(child);
+        parent.Add(child);
 
         child.Parent.ShouldBe(parent);
     }
@@ -48,7 +63,7 @@ public class EntityTests
     {
         var parent = new Entity();
         var child = new Entity();
-        parent.AddChild(child);
+        parent.Add(child);
 
         child.Destroy();
 
@@ -56,13 +71,13 @@ public class EntityTests
     }
 
     [Fact]
-    public void RemoveChild_ClearsParentOnChild()
+    public void Remove_ClearsParentOnChild()
     {
         var parent = new Entity();
         var child = new Entity();
-        parent.AddChild(child);
+        parent.Add(child);
 
-        parent.RemoveChild(child);
+        parent.Remove(child);
 
         child.Parent.ShouldBeNull();
     }

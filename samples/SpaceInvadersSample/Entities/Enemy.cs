@@ -20,7 +20,7 @@ public class Enemy : Entity
             Visible = true,
             Color = new XnaColor(255, 255, 255, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
     }
 
     public override void CustomDestroy()

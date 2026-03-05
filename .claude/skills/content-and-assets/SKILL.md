@@ -23,7 +23,7 @@ Shapes require no content files and are ready to use immediately.
 
 ```csharp
 var rect = new AxisAlignedRectangle { Width = 20, Height = 120, Color = Color.White, Visible = true };
-AddChild(rect);
+Add(rect);
 ```
 
 See the `shapes` skill for all shape types and visual properties.
@@ -50,7 +50,7 @@ var sprite = new Sprite
     TextureScale = 1.5f,   // 1.5x the texture's pixel size
     IsVisible = true,       // note: IsVisible, not Visible (unlike shapes)
 };
-AddChild(sprite);
+Add(sprite);
 ```
 
 ### TextureScale vs Explicit Sizing

@@ -1,4 +1,5 @@
 using System;
+using FlatRedBall2.Math;
 using Shouldly;
 using Xunit;
 
@@ -14,7 +15,7 @@ public class PhysicsTests
     {
         var parent = new Entity();
         var child = new Entity();
-        parent.AddChild(child);
+        parent.Add(child);
         child.VelocityX = 50f;
 
         parent.PhysicsUpdate(MakeFrame(1f / 60f));
@@ -55,6 +56,34 @@ public class PhysicsTests
         entity.PhysicsUpdate(frame);
 
         entity.X.ShouldBe(expectedX, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void RotationVelocity_ChildDoesNotRotateIndependently()
+    {
+        var parent = new Entity();
+        var child = new Entity();
+        parent.Add(child);
+        child.RotationVelocity = Angle.FromDegrees(90f);
+
+        parent.PhysicsUpdate(MakeFrame(1f));
+
+        child.Rotation.Degrees.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void RotationVelocity_RotatesEntityEachFrame()
+    {
+        float degreesPerSecond = 90f;
+        float dt = 1f / 60f;
+        float expectedDegrees = degreesPerSecond * dt;
+
+        var entity = new Entity();
+        entity.RotationVelocity = Angle.FromDegrees(degreesPerSecond);
+
+        entity.PhysicsUpdate(MakeFrame(dt));
+
+        entity.Rotation.Degrees.ShouldBe(expectedDegrees, tolerance: 0.001f);
     }
 
     [Fact]

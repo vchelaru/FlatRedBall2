@@ -155,7 +155,7 @@ public class GameplayScreen : Screen
         _scoreLabel.Anchor(Anchor.TopRight);
         _scoreLabel.X = -16;
         _scoreLabel.Y = 16;
-        AddGum(_scoreLabel);
+        Add(_scoreLabel);
 
         // Multiplier label — just below score
         _multiplierLabel = new Label();
@@ -163,7 +163,7 @@ public class GameplayScreen : Screen
         _multiplierLabel.Anchor(Anchor.TopRight);
         _multiplierLabel.X = -16;
         _multiplierLabel.Y = 44;
-        AddGum(_multiplierLabel);
+        Add(_multiplierLabel);
 
         // Health label — top left
         _healthLabel = new Label();
@@ -171,7 +171,7 @@ public class GameplayScreen : Screen
         _healthLabel.Anchor(Anchor.TopLeft);
         _healthLabel.X = 16;
         _healthLabel.Y = 16;
-        AddGum(_healthLabel);
+        Add(_healthLabel);
     }
 
     private string BuildHealthText() => $"HP: {_player.Health}/{_player.MaxHealth}";

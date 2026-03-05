@@ -36,13 +36,25 @@ This document tracks features and systems intentionally deferred from the initia
 - `SpriteFont` integration for `DrawText`
 - Alternative: use MonoGame's built-in primitive batch via vertex buffers
 
+## TileShapeCollection
+
+**Status**: Not yet implemented
+**What it is**: A grid-based `ICollidable` for static tile collision. Shapes are positioned on a uniform tile grid, enabling spatial partitioning (only test tiles near the entity rather than all tiles). Usable independently of Tiled.
+**What's needed**:
+- `TileShapeCollection` class implementing `ICollidable` with an internal grid structure
+- API to add tiles by grid position (e.g., `AddTile(int col, int row)`) with configurable tile size
+- Spatial partitioning in `CollidesWith`/`GetSeparationVector` — only check tiles within range of the query shape's bounds
+- `RepositionDirections` support per-tile (for one-way platforms)
+- `Screen.AddCollisionRelationship` already accepts any `ICollidable` as static geometry (generalized from `ShapeCollection`)
+- Skill file at `.claude/skills/shapes/` (or new file) covering `TileShapeCollection` usage
+
 ## Tiled Integration
 
-**Status**: `TiledMapLayerRenderable` and `TiledCollisionGenerator` are stubs
+**Status**: `TiledMapLayerRenderable` and `TiledCollisionGenerator` are stubs; depends on `TileShapeCollection`
 **What's needed**:
 - Add `MonoGame.Extended.Tiled` NuGet package reference
 - `TiledMapLayerRenderable.Draw` renders a tile layer using MonoGame.Extended's tile renderer
-- `TiledCollisionGenerator.Generate` reads tile properties and emits `AxisAlignedRectangle` shapes into a `ShapeCollection`
+- `TiledCollisionGenerator.Generate` reads tile properties and emits tiles into a `TileShapeCollection`
 
 ## ~~Same-List Collision~~ (COMPLETED)
 
@@ -55,19 +67,9 @@ This document tracks features and systems intentionally deferred from the initia
 - A `PixelPerfect` flag on `Camera` that snaps `X`/`Y` to nearest integer before computing the transform matrix
 - Eliminates sub-pixel shimmer for pixel-art games
 
-## Rotation Velocity on Entity
+## ~~Rotation Velocity on Entity~~ (COMPLETED)
 
-**Status**: Omitted from initial implementation
-**What's needed**:
-- `RotationVelocity` and `RotationAcceleration` properties on `Entity`
-- Updated in the physics pass alongside X/Y kinematics
-
-## FrameTime — convenience accessor for elapsed seconds
-
-**Status**: `SinceGameStart` is a `TimeSpan`; accessing total elapsed seconds requires `time.SinceGameStart.TotalSeconds`
-**What's needed**:
-- A `TotalSecondsElapsed` (or similar) float shorthand on `FrameTime`, analogous to `DeltaSeconds`
-- Reduces verbosity in any code that needs an absolute time value (e.g. `PlatformerBehavior` jump timer)
+**Status**: Implemented — `RotationVelocity` (`Angle`) on `Entity`; applied in `PhysicsUpdate` alongside X/Y kinematics. Children skip rotation physics the same as positional physics.
 
 ## Top-Down Movement
 

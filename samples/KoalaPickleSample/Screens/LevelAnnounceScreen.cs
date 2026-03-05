@@ -30,7 +30,7 @@ public class LevelAnnounceScreen : Screen
         var hint = new Label { Text = "Get ready..." };
         panel.AddChild(hint);
 
-        AddGum(panel);
+        Add(panel);
 
         AutoAdvance();
     }

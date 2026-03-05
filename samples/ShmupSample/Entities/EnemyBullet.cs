@@ -17,7 +17,7 @@ public class EnemyBullet : Entity
             IsFilled = true,
             Visible = true,
         };
-        AddChild(CollisionCircle);
+        Add(CollisionCircle);
     }
 
     public override void CustomActivity(FrameTime time)

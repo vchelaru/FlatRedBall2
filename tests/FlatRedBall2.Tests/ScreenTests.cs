@@ -17,7 +17,7 @@ public class ScreenTests
         screen.Engine = engine;
         var entity = new Entity();
         var rect = new AxisAlignedRectangle();
-        entity.AddChild(rect);
+        entity.Add(rect);
 
         screen.Register(entity);
 

@@ -17,7 +17,7 @@ public class PlayerBullet : Entity
             Visible = true,
             Color = new XnaColor(255, 255, 80, 255),
         };
-        AddChild(Rectangle);
+        Add(Rectangle);
 
         VelocityY = 550f;
     }
