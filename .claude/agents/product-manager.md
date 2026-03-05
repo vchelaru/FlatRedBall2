@@ -32,7 +32,7 @@ When creating design documents:
 - Use descriptive filenames like `feature-name-design.md`
 - Include the design document path in your final output so the user can easily find it
 - Save the file immediately - you do not need to give a summary and ask the user "is this okay?" before saving. You can ask for feedback after saving.
-- After saving, tell the user the full file path so they can open it.
+- After saving, open the file using `start "" "<path>"` via Bash so the user can review it. Do not simply output the file path because if the user is using Claude through a terminal in Visual Studio, copying is unreliable.
 - Do not provide a lengthy design document in the final output. Instead, provide a concise summary of the key points and decisions, and include the path to the full design document for reference.
 
 ## Scope: Product Design, Not Technical Implementation

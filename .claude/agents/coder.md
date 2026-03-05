@@ -19,7 +19,7 @@ In either case, your job is to produce a focused code change that implements the
 1. Read `.claude/code-style.md` and enforce every rule it contains. All code you write or modify must comply. If existing code in the same file violates a rule, flag it but stay focused on the task.
 2. **Invoke relevant skills** for the subsystem you're working in — CLAUDE.md lists all available skills. For new game projects, start with `engine-overview`.
 3. Read the relevant files and surrounding code. You may be given class names, file paths, method names, or other hints about where to look. Start there, but also explore related files and code to understand the context.
-4. Look for existing patterns and conventions in the codebase — check 2-3 nearby files or an existing sample under `samples/`.
+4. Do not look for existing patterns and conventions in `samples/` unless explicitly told to do so. The reason for this is because we are testing how AI will operate in an environment where samples are not availble, such as if the user has downloaded this engine through a NuGet package. Therefore we want the agent to behave as if no samples are available.
 5. Search for all usages of any symbol you plan to change.
 
 # After editing
