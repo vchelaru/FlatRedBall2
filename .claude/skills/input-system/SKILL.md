@@ -1,3 +1,8 @@
+---
+name: input-system
+description: "Input System in FlatRedBall2. Use when working with keyboard, mouse, cursor, gamepad, touch input, key bindings, or input handling. Covers IKeyboard, ICursor, IGamepad, KeyboardInput2D, KeyboardPressableInput, GamepadInput2D, GamepadPressableInput, and I2DInput/IPressableInput interfaces."
+---
+
 # Input System in FlatRedBall2
 
 All input is accessed through `Engine.InputManager` from inside an entity. The input manager exposes keyboard, cursor (mouse/touch), and up to four gamepads.
@@ -117,13 +122,11 @@ var jumpButton = new GamepadPressableInput(
 if (jumpButton.WasJustPressed) { /* jump */ }
 ```
 
-> **Note:** `GamepadPressableInput.WasJustPressed` and `WasJustReleased` currently always return `false` (stub implementation). Use `IGamepad.WasButtonJustPressed` directly for reliable pressed/released detection.
-
 ## Best Practices
 
 - **Create input objects once in `CustomInitialize`, not in `CustomActivity`.** Constructing them every frame allocates garbage and is wasteful.
-- **`Engine` is not available in the entity constructor** — always initialize input in `CustomInitialize`.
-- **Y+ is up** — `KeyboardInput2D` already accounts for this. Up key → `Y = +1`. Multiply by positive speed to move upward.
+- **`Engine` is not available in the constructor** — see `engine-overview` Key Design Rules. Always initialize input in `CustomInitialize`.
+- **Y+ is up** — `KeyboardInput2D` already accounts for this. Up key → `Y = +1`.
 - **Check `ICursor.WorldPosition` for click-to-move logic** — it returns coordinates in the same world space as entity positions.
 
 ## Common Pitfalls

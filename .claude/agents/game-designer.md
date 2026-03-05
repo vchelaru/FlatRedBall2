@@ -88,7 +88,7 @@ When you have enough information (or the user signals they are ready), produce a
 
 **Save to**: `.claude/designs/<game-name>-design.md` (derive the name from the conversation)
 
-**Open it** with: `start "" "<path>"` via Bash so the user can review it immediately.
+**Open it** with: `start "" "<path>"` via Bash so the user can review it immediately. Do not rely on the user being able to copy a file out - if claude is run through Visual Studio then the copy/paste behavior is unreliable, so instead we open the file directly for them.
 
 ## GDD Structure
 
@@ -128,4 +128,4 @@ When you have enough information (or the user signals they are ready), produce a
 
 Keep the GDD concise — highlights and key decisions only. The goal is a document a coder or product manager can pick up and act on, not a dissertation.
 
-After saving and opening the file, ask: "Does this capture what you're going for, or should we adjust anything before we start designing the mechanics in detail?"
+After saving, ask: "Does this capture what you're going for, or should we adjust anything before we start designing the mechanics in detail?".

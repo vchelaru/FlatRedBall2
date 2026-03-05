@@ -2,12 +2,11 @@
 
 ## What Is This?
 
-FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top of MonoGame. It integrates Gum (UI) and Tiled (level editing) as dependencies. The project is currently in the architecture/design phase — see `ARCHITECTURE.md` for the full design.
+FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top of MonoGame. It integrates Gum (UI) and Tiled (level editing) as dependencies.
 
 ## Key Files
 
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL 3.8.*)
-- Architecture spec: `design/ARCHITECTURE.md`
 - Code style: `.claude/code-style.md`
 - Deferred items: `design/TODOS.md`
 - Test project: `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`
@@ -17,27 +16,6 @@ FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top o
 ```
 dotnet build src/FlatRedBall2.csproj
 dotnet test tests/FlatRedBall2.Tests/
-```
-
-## Engine Structure
-
-```
-src/
-  Math/Angle.cs
-  FrameTime.cs, IAttachable.cs, Entity.cs, Screen.cs, Factory.cs
-  TimeManager.cs, ContentManagerService.cs, FlatRedBallService.cs
-  Rendering/    IRenderable.cs, IRenderBatch.cs, Layer.cs, Camera.cs, Sprite.cs
-  Rendering/Batches/   WorldSpaceBatch.cs, ScreenSpaceBatch.cs
-  Collision/    ICollidable.cs, AxisAlignedRectangle.cs, Circle.cs, Polygon.cs
-               ShapeCollection.cs, CollisionDispatcher.cs, CollisionRelationship.cs
-  Input/        (15 files: interfaces + implementations)
-  Audio/        AudioManager.cs (stub — throws NotImplementedException)
-  Diagnostics/  BatchBreakInfo.cs, RenderDiagnostics.cs, DebugRenderer.cs (stub)
-  UI/           GumRenderBatch.cs, GumRenderable.cs (implemented)
-  Tiled/        TiledMapLayerRenderable.cs, TiledCollisionGenerator.cs (stubs)
-  Game1.cs      (wired to FlatRedBallService.Default)
-tests/FlatRedBall2.Tests/
-  BounceTests.cs
 ```
 
 ## Available Skills
@@ -62,18 +40,17 @@ Invoke these with the Skill tool when working on specific topics:
 - **Physics**: Second-order kinematic — `pos += vel*dt + acc*(dt²/2)`, `vel += acc*dt`, `vel -= vel*drag*dt`
 - **Y-axis**: World space Y+ up; Camera transform flips Y for screen-space rendering
 - **No static state**: Only `FlatRedBallService.Default` is static
-- **Entity.Engine**: `internal set` — injected by Factory or Screen.Register before `CustomInitialize`; throws `InvalidOperationException` if accessed before injection
+- **Entity.Engine**: `internal set` — injected by Factory before `CustomInitialize`; throws `InvalidOperationException` if accessed before injection
 - **InternalsVisibleTo**: `FlatRedBall2.Tests` accesses internal members (PhysicsUpdate, AddEntity, etc.)
-- **CollisionDispatcher**: `internal static` class in `FlatRedBall2.Collision` namespace
+- **CollisionDispatcher**: `internal static` class — shape-pair resolution uses concrete type matching
 
 ## Known Stubs (Not Yet Implemented)
 
-These APIs exist but are not functional — do not attempt to use them:
+Do not attempt to use these — they exist as API placeholders:
 - Audio: All methods throw `NotImplementedException`
 - ACHX animations: `Sprite.PlayAnimation` is a no-op
 - DebugRenderer: All draw methods are no-ops
 - Tiled integration: `TiledMapLayerRenderable`/`TiledCollisionGenerator` are stubs
-- `GamepadPressableInput.WasJustPressed/Released`: always returns false
 
 ## AI-Usability Goals
 

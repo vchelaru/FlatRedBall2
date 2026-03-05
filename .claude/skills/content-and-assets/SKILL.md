@@ -1,55 +1,158 @@
+---
+name: content-and-assets
+description: "Content and Assets in FlatRedBall2. Use when working with loading textures, fonts, sprites, content pipeline, .mgcb setup, or ContentManagerService. Also trigger when the user asks about displaying text (use Gum Labels) or graphics without custom art (use Shapes)."
+---
+
 # Content and Assets in FlatRedBall2
 
-> **Status: Under Construction.** The content pipeline (`ContentManagerService.Load<T>()`, `.mgcb` setup, custom textures, custom fonts) is not yet documented and the workflow is not finalized. The guidance below covers what works today.
+## Decision: Shapes, Sprites, or Gum?
+
+| Need | Use | Content files required? |
+|------|-----|------------------------|
+| Simple geometry (paddles, walls, bullets) | Shapes (`AxisAlignedRectangle`, `Circle`, `Polygon`) | No |
+| Textured game objects (ships, characters) | `Sprite` with `Texture2D` | Yes (`.mgcb` pipeline) |
+| On-screen text (scores, labels, menus) | Gum `Label` or `TextRuntime` | No (default font auto-loaded) |
 
 ## Text / Fonts — Use Gum Labels
 
-Do not load `SpriteFont` manually. Gum's default font is loaded automatically by `FlatRedBallService.Initialize` — no `.mgcb` setup required.
+Gum's default font is loaded automatically — no `.mgcb` setup required. See the `gum-integration` skill for Label examples and full layout details.
 
-For any on-screen text (scores, labels, menus, game-over messages), use a Gum `Label`:
+## Graphics Without Art — Use Shapes
 
-```csharp
-using Gum.Forms.Controls;
-
-var scoreLabel = new Label();
-scoreLabel.Text = "0";
-scoreLabel.X = 20;   // screen pixels from left
-scoreLabel.Y = 20;   // screen pixels from TOP (Gum is Y-down)
-AddGum(scoreLabel);
-
-// Update each frame in CustomActivity:
-scoreLabel.Text = _score.ToString();
-```
-
-See `gum-integration.md` for full Label and layout details.
-
-## Graphics — Use Shapes Instead of Sprites
-
-For games that don't need photographic art, shapes are the right choice. They require no content files and are ready to use immediately.
+Shapes require no content files and are ready to use immediately.
 
 ```csharp
-// Paddle / wall — axis-aligned rectangle
-var rect = new AxisAlignedRectangle
-{
-    Width = 20,
-    Height = 120,
-    Color = Color.White,
-    Visible = true,
-};
+var rect = new AxisAlignedRectangle { Width = 20, Height = 120, Color = Color.White, Visible = true };
 AddChild(rect);
-
-// Ball — circle
-var circle = new Circle
-{
-    Radius = 10,
-    Color = Color.White,
-    Visible = true,
-};
-AddChild(circle);
 ```
 
-See `shapes.md` for all shape types, visual properties, and gotchas.
+See the `shapes` skill for all shape types and visual properties.
 
-## Custom Textures / Sprites — Not Yet Supported
+## Sprites and Textures
 
-Loading a `Texture2D` via `ContentManager.Load<Texture2D>("path")` and rendering it through `Sprite` is plumbed but not documented or tested end-to-end. Do not rely on it until this skill is updated.
+Load textures via MonoGame's content pipeline and render them with `Sprite`.
+
+### Loading a Texture
+
+```csharp
+// Inside an Entity's CustomInitialize:
+var texture = Engine.ContentManager.Load<Texture2D>("ship_0001");
+```
+
+The string is the asset name (filename without extension) as defined in the `.mgcb` file. The `Content/` prefix is set by `Game1.Content.RootDirectory`.
+
+### Creating a Sprite
+
+```csharp
+var sprite = new Sprite
+{
+    Texture = texture,
+    TextureScale = 1.5f,   // 1.5x the texture's pixel size
+    IsVisible = true,       // note: IsVisible, not Visible (unlike shapes)
+};
+AddChild(sprite);
+```
+
+### TextureScale vs Explicit Sizing
+
+`TextureScale` (default `1f`) controls how sprite dimensions are derived:
+
+- **Non-null (default)** — `Width = textureWidth * TextureScale`, `Height = textureHeight * TextureScale`. Setting `Width`/`Height` directly is a no-op while `TextureScale` is set.
+- **Null** — explicit mode. Set `TextureScale = null` first, then set `Width`/`Height` freely.
+
+```csharp
+// Pixel-art 2x upscale:
+sprite.TextureScale = 2f;
+
+// Explicit size (ignores texture dimensions):
+sprite.TextureScale = null;
+sprite.Width = 100;
+sprite.Height = 50;
+```
+
+### Sprite Sheets (SourceRectangle)
+
+Use `SourceRectangle` to render a sub-region of a texture:
+
+```csharp
+sprite.SourceRectangle = new Rectangle(0, 0, 32, 32);  // top-left 32x32 tile
+```
+
+When `TextureScale` is non-null, dimensions are recalculated from the source rectangle size.
+
+### Sprite Properties
+
+| Property | Default | Notes |
+|----------|---------|-------|
+| `IsVisible` | `true` | Different from shapes which use `Visible` and default to `false` |
+| `Color` | `Color.White` | Tint color — `White` means no tint |
+| `Alpha` | `1f` | Opacity (0 = transparent, 1 = opaque) |
+| `Rotation` | `0` | Uses `Angle` type, same as entities |
+| `FlipHorizontal` | `false` | Mirror horizontally |
+| `FlipVertical` | `false` | Mirror vertically |
+
+### Cleanup
+
+```csharp
+sprite.Destroy();   // removes from parent entity
+```
+
+## Content Pipeline Setup (.mgcb)
+
+To use textures, you need a `Content/Content.mgcb` file in your sample project.
+
+### 1. Create the Content directory and `.mgcb` file
+
+```
+samples/YourSample/Content/Content.mgcb
+```
+
+Minimal `.mgcb` content:
+
+```
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+```
+
+### 2. Add a texture
+
+Place the `.png` file in `Content/`, then add an entry to the `.mgcb`:
+
+```
+#begin mysprite.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:mysprite.png
+```
+
+### 3. Load in code
+
+```csharp
+var tex = Engine.ContentManager.Load<Texture2D>("mysprite");  // no extension
+```
+
+## Gotchas
+
+- **`IsVisible` on Sprite vs `Visible` on shapes** — Sprites use `IsVisible` (default `true`). Shapes use `Visible` (default `false`). Mixing them up is a common source of invisible objects.
+- **`TextureScale` wins over explicit `Width`/`Height`** — If you set `Width` and it doesn't take effect, check that `TextureScale` is `null`.
+- **Content not found at runtime** — Verify the asset name matches the `.mgcb` entry (case-sensitive on Linux), and that `Content.RootDirectory = "Content"` is set in `Game1`.
+- **ACHX animations are stubbed** — `Sprite.PlayAnimation` is a no-op. Animation is not yet implemented.
+- **Each screen gets its own ContentManager** — assets are unloaded when the screen transitions. Re-load textures in each screen's `CustomInitialize` if needed.

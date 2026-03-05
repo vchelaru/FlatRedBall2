@@ -1,3 +1,8 @@
+---
+name: platformer-movement
+description: "Platformer Movement in FlatRedBall2. Use when implementing platformer mechanics including jumping, ground detection, PlatformerBehavior, PlatformerValues, double jump, air control, variable-height jumps, or side-scrolling movement. Trigger on any platformer-related question."
+---
+
 # Platformer Movement
 
 ## Overview

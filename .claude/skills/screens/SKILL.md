@@ -1,3 +1,8 @@
+---
+name: screens
+description: "Screens in FlatRedBall2. Use when working with screen lifecycle, screen transitions, MoveToScreen, passing data between screens, CustomInitialize/CustomActivity/CustomDestroy, or starting the first screen. Trigger on any screen management or game state transition question."
+---
+
 # Screens in FlatRedBall2
 
 A `Screen` is the top-level container for a game state — a level, a menu, a game-over sequence. Each screen owns its entities, collision relationships, Gum UI, and camera. Only one screen is active at a time.
@@ -34,14 +39,10 @@ public class GameScreen : Screen
 
 ## Lifecycle Order Each Frame
 
-1. **Physics** — entity positions updated from velocity/acceleration
-2. **Collision** — registered relationships resolved; positions corrected
-3. **Entity `CustomActivity`** — each entity's own logic runs first (context-free)
-4. **Screen `CustomActivity`** — screen-level logic runs after all entities have updated; can react to the updated entity state
+See `engine-overview` for the full 8-step frame loop. Key ordering for screens:
 
-The screen's `CustomActivity` always runs *after* all entity `CustomActivity` calls.
-
-`CustomInitialize` runs once when the screen is activated, before the first frame.
+- Entity `CustomActivity` runs **before** Screen `CustomActivity` — the screen always sees post-entity, post-collision state.
+- `CustomInitialize` runs once when the screen is activated, before the first frame.
 
 ## What's Available on a Screen
 

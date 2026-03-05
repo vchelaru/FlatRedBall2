@@ -1,3 +1,8 @@
+---
+name: physics-and-movement
+description: "Physics and Movement in FlatRedBall2. Use when working with velocity, acceleration, drag, gravity, kinematic movement, projectiles, rotation-based thrust, or coordinate system (Y+ up). Also covers GameRandom helpers for randomized spawning. Trigger on any physics or movement question."
+---
+
 # Physics and Movement in FlatRedBall2
 
 ## Coordinate System
@@ -69,9 +74,7 @@ Drag does *not* affect acceleration — only velocity. A falling entity with dra
 
 ## Update Order Each Frame
 
-1. **Physics** — position and velocity updated from acceleration/drag
-2. **Collision** — overlapping pairs separated; bounce impulses applied
-3. **CustomActivity** — game logic sees already-corrected positions
+See `engine-overview` for the full 8-step frame loop. The key point: **Physics → Collision → CustomActivity** — game logic sees already-corrected positions.
 
 ## Common Patterns
 
