@@ -90,7 +90,40 @@ public class TopDownDemoScreen : Screen
             }
         }
 
+        AddCornerTriangles();
+
         _tiles.Visible = true;
+    }
+
+    // half-size of one tile in local space
+    private const float H = GridSize / 2f;
+
+    private void AddCornerTriangles()
+    {
+        var cornerColor = new Color(160, 120, 70, 220);
+
+        // Four outer room corners — triangles chamfer the 90° wall corners so the player slides around them.
+        // Each triangle's right-angle vertex sits in the room corner; the hypotenuse faces the open room.
+        AddTriangle(1,  1,  new(-H,-H), new( H,-H), new(-H, H), cornerColor); // bottom-left  room corner
+        AddTriangle(38, 1,  new( H,-H), new(-H,-H), new( H, H), cornerColor); // bottom-right room corner
+        AddTriangle(1,  21, new(-H, H), new( H, H), new(-H,-H), cornerColor); // top-left     room corner
+        AddTriangle(38, 21, new( H, H), new(-H, H), new( H,-H), cornerColor); // top-right    room corner
+
+        // Four outer corners of the central rectangular obstacle (rows 10-12, cols 13-18).
+        // Triangles fill the corner pockets so the player doesn't get snagged on the sharp corners.
+        AddTriangle(12, 9,  new( H, H), new(-H, H), new( H,-H), cornerColor); // below-left  of obstacle
+        AddTriangle(19, 9,  new(-H, H), new( H, H), new(-H,-H), cornerColor); // below-right of obstacle
+        AddTriangle(12, 13, new( H,-H), new(-H,-H), new( H, H), cornerColor); // above-left  of obstacle
+        AddTriangle(19, 13, new(-H,-H), new( H,-H), new(-H, H), cornerColor); // above-right of obstacle
+    }
+
+    private void AddTriangle(int col, int row,
+        System.Numerics.Vector2 a, System.Numerics.Vector2 b, System.Numerics.Vector2 c,
+        Color color)
+    {
+        var prototype = FlatRedBall2.Collision.Polygon.FromPoints(new[] { a, b, c });
+        _tiles.AddPolygonTileAtCell(col, row, prototype);
+        _tiles.GetPolygonTileAtCell(col, row)!.Color = color;
     }
 
     private void SetupCollision()
@@ -104,7 +137,7 @@ public class TopDownDemoScreen : Screen
         var panel = new Panel();
         panel.Dock(Dock.Fill);
 
-        var hint = new Label { Text = "Arrow Keys / WASD to move" };
+        var hint = new Label { Text = "Arrow Keys / WASD to move  |  Mouse: aim sight line" };
         hint.Anchor(Anchor.TopLeft);
         hint.X = 10;
         hint.Y = 10;

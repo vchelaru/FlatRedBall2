@@ -20,6 +20,23 @@ public class RenderListTests
         public void Draw(SpriteBatch spriteBatch, Camera camera) { }
     }
 
+    private class StubAttachable : IRenderable, IAttachable
+    {
+        public float Z { get; set; }
+        public Layer Layer { get; set; } = null!;
+        public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
+        public string? Name { get; set; }
+        public void Draw(SpriteBatch spriteBatch, Camera camera) { }
+
+        public Entity? Parent { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+        public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+        public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+        public void Destroy() { }
+    }
+
     [Fact]
     public void RenderList_ItemsRemainAfterUpdate()
     {
@@ -60,6 +77,46 @@ public class RenderListTests
         screen.RenderList.Count.ShouldBe(2);
         screen.RenderList.ShouldContain(fgItem);
         screen.RenderList.ShouldContain(bgItem);
+    }
+
+    [Fact]
+    public void SortRenderList_ZSecondaryParentY_DifferentZ_SortsByZ()
+    {
+        var screen = new TestScreen();
+        screen.SortMode = FlatRedBall2.Rendering.SortMode.ZSecondaryParentY;
+        var layer = new Layer("Test");
+        screen.Layers.Add(layer);
+
+        // highZ has a lower parent Y, which would win under Y-sort — but Z should take priority
+        var highZ = new StubAttachable { Z = 10f, Y = -100f, Layer = layer, Name = "highZ" };
+        var lowZ  = new StubAttachable { Z =  1f, Y =  100f, Layer = layer, Name = "lowZ"  };
+
+        screen.Add(highZ);
+        screen.Add(lowZ);
+        screen.SortRenderList();
+
+        screen.RenderList[0].Name.ShouldBe("lowZ");
+        screen.RenderList[1].Name.ShouldBe("highZ");
+    }
+
+    [Fact]
+    public void SortRenderList_ZSecondaryParentY_SameZ_LowerParentYDrawnLast()
+    {
+        var screen = new TestScreen();
+        screen.SortMode = FlatRedBall2.Rendering.SortMode.ZSecondaryParentY;
+        var layer = new Layer("Test");
+        screen.Layers.Add(layer);
+
+        // Both at Z=0. Entity at Y=100 is higher on screen (behind); Y=-50 is lower (in front).
+        var high = new StubAttachable { Z = 0f, Y =  100f, Layer = layer, Name = "high" };
+        var low  = new StubAttachable { Z = 0f, Y = -50f,  Layer = layer, Name = "low"  };
+
+        screen.Add(high);
+        screen.Add(low);
+        screen.SortRenderList();
+
+        screen.RenderList[0].Name.ShouldBe("high");
+        screen.RenderList[1].Name.ShouldBe("low");
     }
 
     [Fact]

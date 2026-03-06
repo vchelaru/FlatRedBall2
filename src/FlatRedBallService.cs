@@ -35,7 +35,7 @@ public class FlatRedBallService
         _game = game;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
         SynchronizationContext.SetSynchronizationContext(_syncContext);
-        ContentManager.Initialize(game.Content);
+        ContentManager.Initialize(game.Content, game.GraphicsDevice);
         ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
 
         var viewport = game.GraphicsDevice.Viewport;
@@ -97,7 +97,7 @@ public class FlatRedBallService
         screen.Engine = this;
         // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
         // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
-        screen.ContentManager.Initialize(new ContentManager(_game!.Services, _game!.Content.RootDirectory));
+        screen.ContentManager.Initialize(new ContentManager(_game!.Services, _game!.Content.RootDirectory), _game!.GraphicsDevice);
 
         var viewport = _game!.GraphicsDevice.Viewport;
         screen.Camera.SetViewport(viewport);
@@ -130,6 +130,7 @@ public class FlatRedBallService
     }
 
     // Sub-systems
+    public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
     public GameRandom Random { get; } = new GameRandom();
     public InputManager InputManager { get; } = new InputManager();
     public AudioManager AudioManager { get; } = new AudioManager();

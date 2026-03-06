@@ -208,4 +208,165 @@ public class TileShapeCollectionTests
         // Should push up by exactly 2, not 4 (double-counted from two tiles)
         sep.Y.ShouldBe(expectedSep, tolerance: 0.001f);
     }
+
+    // ── AddPolygonTileAtCell ──────────────────────────────────────────────────
+
+    private static Polygon SquarePrototype(float halfSize = 8f) => Polygon.FromPoints(new[]
+    {
+        new Vector2(-halfSize, -halfSize),
+        new Vector2( halfSize, -halfSize),
+        new Vector2( halfSize,  halfSize),
+        new Vector2(-halfSize,  halfSize),
+    });
+
+    [Fact]
+    public void AddPolygonTileAtCell_GetPolygonTileAtCell_ReturnsTile()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(2, 3, SquarePrototype());
+
+        tiles.GetPolygonTileAtCell(2, 3).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void AddPolygonTileAtCell_TilePositionedAtCellCenter()
+    {
+        // Cell (2,3) center = (2*16+8, 3*16+8) = (40, 56)
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(2, 3, SquarePrototype());
+
+        var poly = tiles.GetPolygonTileAtCell(2, 3)!;
+        poly.X.ShouldBe(40f, tolerance: 0.001f);
+        poly.Y.ShouldBe(56f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void AddPolygonTileAtCell_DoesNotOverwriteExistingRectTile()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype()); // same cell — should be ignored
+
+        tiles.GetPolygonTileAtCell(0, 0).ShouldBeNull();
+        tiles.GetTileAtCell(0, 0).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void RemovePolygonTileAtCell_RemovedTileNoLongerReturned()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(1, 1, SquarePrototype());
+        tiles.RemovePolygonTileAtCell(1, 1);
+
+        tiles.GetPolygonTileAtCell(1, 1).ShouldBeNull();
+    }
+
+    // ── GetSeparationFor (polygon tiles) ─────────────────────────────────────
+
+    [Fact]
+    public void GetSeparationFor_PolygonTile_PushesRectOutFromRight()
+    {
+        // Square polygon tile at cell (0,0): world points form a 16×16 square centered at (8,8).
+        // Rect overlaps from the right: center X=22, left edge at 14 → 2 px overlap on X.
+        // Y overlap is much larger (8 px) so SAT picks X as the minimum axis.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+
+        var rect = new AxisAlignedRectangle { Width = 16f, Height = 8f, X = 22f, Y = 8f };
+
+        var sep = tiles.GetSeparationFor(rect);
+        sep.X.ShouldBeGreaterThan(0f); // pushed rightward out of the polygon
+        sep.Y.ShouldBe(0f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void GetSeparationFor_PolygonTile_NoOverlap_ReturnsZero()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+
+        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 100f, Y = 100f };
+
+        tiles.GetSeparationFor(rect).ShouldBe(Vector2.Zero);
+    }
+
+    [Fact]
+    public void GetSeparationFor_RemovedPolygonTile_ReturnsZero()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+        tiles.RemovePolygonTileAtCell(0, 0);
+
+        var rect = new AxisAlignedRectangle { Width = 16f, Height = 8f, X = 22f, Y = 8f };
+
+        tiles.GetSeparationFor(rect).ShouldBe(Vector2.Zero);
+    }
+
+    [Fact]
+    public void GetSeparationFor_CircleVsPolygonTile_PushesCircleOut()
+    {
+        // Square polygon tile at cell (0,0): covers [0..16] x [0..16].
+        // Circle at X=18, Y=8, radius=6 — left edge at X=12, overlapping by 4px on X axis.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+
+        var circle = new Circle { Radius = 6f, X = 18f, Y = 8f };
+
+        var sep = tiles.GetSeparationFor(circle);
+        sep.X.ShouldBeGreaterThan(0f); // pushed rightward
+        sep.Y.ShouldBe(0f, tolerance: 0.01f);
+    }
+
+    // ── Raycast (polygon tiles) ───────────────────────────────────────────────
+
+    [Fact]
+    public void Raycast_PolygonTile_HitsLeftFace()
+    {
+        // Square polygon tile at cell (2,0): center at (40,8), left edge at X=32.
+        // Ray travels right from X=10 at Y=8 — should hit the polygon's left edge at (32,8).
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(2, 0, SquarePrototype());
+
+        bool hit = tiles.Raycast(new Vector2(10f, 8f), new Vector2(80f, 8f),
+            out Vector2 hitPoint, out Vector2 hitNormal);
+
+        hit.ShouldBeTrue();
+        hitPoint.X.ShouldBe(32f, tolerance: 0.1f);
+        hitPoint.Y.ShouldBe(8f, tolerance: 0.1f);
+        hitNormal.X.ShouldBeLessThan(0f); // normal points back toward start (leftward)
+    }
+
+    [Fact]
+    public void Raycast_PolygonTile_TriangleSlope_HitsHypotenuse()
+    {
+        // Right-triangle tile at cell (1,0): lower-left half of cell.
+        // World points: (16,0), (32,0), (16,16). Hypotenuse from (32,0) to (16,16).
+        // A ray at Y=8 going right enters the cell, the left edge (X=16) is the first hit.
+        var prototype = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f), // world (16,0)
+            new Vector2( 8f, -8f), // world (32,0)
+            new Vector2(-8f,  8f), // world (16,16)
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(1, 0, prototype);
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(40f, 8f), out Vector2 hitPoint, out _);
+
+        hit.ShouldBeTrue();
+        hitPoint.X.ShouldBe(16f, tolerance: 0.1f); // left edge of the triangle at X=16
+        hitPoint.Y.ShouldBe(8f, tolerance: 0.1f);
+    }
+
+    [Fact]
+    public void Raycast_PolygonTile_RayDoesNotReachCell_ReturnsFalse()
+    {
+        // Polygon tile at cell (5,0) — ray stops well before it.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(5, 0, SquarePrototype());
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(40f, 8f), out _, out _);
+
+        hit.ShouldBeFalse();
+    }
 }

@@ -14,23 +14,7 @@ This document tracks features and systems intentionally deferred from the initia
 
 ## TileShapeCollection — Polygon Tile Support
 
-**Status**: Not implemented
-**What's needed**:
-- `TileShapeCollection` currently stores only `AxisAlignedRectangle` tiles. There is no way to place a `Polygon` (e.g., a 45° slope triangle, a ramp, a concave wall section) as a tile.
-- Common use cases: sloped terrain, angled platforms, ramps, non-rectangular collision in tile-based levels.
-- Recommended approach: store a discriminated shape per cell — either a rectangle or a polygon — and dispatch to the correct collision resolver at runtime. The existing `AddTileAtCell` API could gain an overload accepting a `Polygon` (or a predefined `TileShape` enum for common cases like `TopLeftSlope`, `TopRightSlope`).
-- The raycast and broad-phase queries must also handle polygon tiles so that `Raycast` and entity collision work correctly against sloped tiles.
-- Consider whether polygon tiles can share a single prototype shape (translated per cell) to avoid allocating one `Polygon` instance per tile.
-
-## Line vs TileShapeCollection — Closest Intersection
-
-**Status**: Implemented — `TileShapeCollection.Raycast(Vector2 start, Vector2 end, out Vector2 hitPoint, out Vector2 hitNormal)` using DDA traversal.
-**What's needed**:
-- A query method on `TileShapeCollection` (or a static helper) that casts a line segment and returns the closest point of intersection with any tile — e.g., `TileShapeCollection.Raycast(Vector2 start, Vector2 end, out Vector2 hitPoint, out Vector2 hitNormal)`.
-- "Closest" means the intersection nearest to `start`, not just any intersection.
-- Use cases: line-of-sight checks, bullet/laser hit detection, sniper sight lines.
-- Implementation should walk tiles along the line using a grid traversal algorithm (e.g., DDA or Amanatides–Woo) rather than brute-forcing all tiles — otherwise it defeats spatial partitioning.
-- Return value should indicate whether any intersection occurred (bool), with `out` parameters for hit point and surface normal (needed for ricochet or wall-hugging behavior).
+**Status**: Implemented — `AddPolygonTileAtCell(int col, int row, Polygon prototype)` / `RemovePolygonTileAtCell` / `GetPolygonTileAtCell`. Collision (`GetSeparationFor`) and `Raycast` both dispatch to polygon tiles. Screen.Add wires up render callbacks for both tile types.
 
 ## Spatial Partitioning — Design Discussion Needed
 
@@ -69,12 +53,7 @@ This document tracks features and systems intentionally deferred from the initia
 
 ## Y-Sort Rendering (Top-Down Draw Order)
 
-**Status**: Not implemented
-**What's needed**:
-- In top-down games, entities lower on screen must render in front of entities higher on screen — the classic painter's-algorithm Y-sort.
-- A `SortMode` or `DrawOrder` concept on the renderer or per-layer, with at least a `YDescending` option (lower world Y = drawn later = appears in front).
-- Could be a property on `Screen` or `Camera` (e.g., `Camera.SpriteSortMode = SpriteSortMode.YDescending`) that changes the sort key used when flushing the sprite batch each frame.
-- Entities need a way to opt in or override their sort key (e.g., a `DrawY` offset for characters whose feet are not at `Y = 0`).
+**Status**: Done — `Screen.SortMode = SortMode.ZSecondaryParentY`. Items with different Z sort by Z; items with equal Z sort by parent entity's world-space Y descending (higher Y = behind, lower Y = in front). Uses insertion sort (stable, O(N) when nearly sorted). Two unit tests in `RenderListTests`.
 
 ## Moving Entities Between Layers
 

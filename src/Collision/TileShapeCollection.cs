@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Collision;
 
@@ -17,6 +18,7 @@ namespace FlatRedBall2.Collision;
 public class TileShapeCollection : ICollidable
 {
     private readonly Dictionary<(int col, int row), AxisAlignedRectangle> _tiles = new();
+    private readonly Dictionary<(int col, int row), Polygon> _polyTiles = new();
 
     /// <summary>
     /// World X of the left edge of cell (0, 0). Set before adding tiles.
@@ -35,15 +37,22 @@ public class TileShapeCollection : ICollidable
 
     private bool _visible;
 
-    // Invoked when a tile rect is created or destroyed so Screen.Add can keep its render list in sync.
-    internal Action<AxisAlignedRectangle>? _onTileAdded;
-    internal Action<AxisAlignedRectangle>? _onTileRemoved;
+    // Invoked when a tile shape is created or destroyed so Screen.Add can keep its render list in sync.
+    internal Action<IRenderable>? _onTileAdded;
+    internal Action<IRenderable>? _onTileRemoved;
 
     /// <summary>
-    /// Returns all tile rectangles currently in this collection. Used by
+    /// Returns all tile shapes (rectangles and polygons) currently in this collection. Used by
     /// <see cref="Screen.Add(TileShapeCollection)"/> to register tiles for rendering.
     /// </summary>
-    internal IEnumerable<AxisAlignedRectangle> AllTiles => _tiles.Values;
+    internal IEnumerable<IRenderable> AllTiles
+    {
+        get
+        {
+            foreach (var r in _tiles.Values) yield return r;
+            foreach (var p in _polyTiles.Values) yield return p;
+        }
+    }
 
     /// <summary>
     /// Shows or hides all tile rectangles. Defaults to false.
@@ -61,6 +70,8 @@ public class TileShapeCollection : ICollidable
             _visible = value;
             foreach (var tile in _tiles.Values)
                 tile.Visible = value;
+            foreach (var poly in _polyTiles.Values)
+                poly.Visible = value;
         }
     }
 
@@ -136,6 +147,53 @@ public class TileShapeCollection : ICollidable
         return GetTileAtCell(col, row);
     }
 
+    /// <summary>
+    /// Adds a polygon tile at the given grid cell using <paramref name="prototype"/> as the shape template.
+    /// The prototype's local points are copied; the tile is placed at the cell's world center.
+    /// Does nothing if any tile (rectangle or polygon) already exists at that cell.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The prototype's local points define the shape relative to the cell center (0, 0). For a
+    /// 16-unit grid, a right-triangle slope covering the bottom-right half of a cell would use
+    /// points like <c>(-8,-8)</c>, <c>(8,-8)</c>, <c>(8,8)</c>.
+    /// </para>
+    /// <para>
+    /// Unlike rectangle tiles, polygon tiles do not participate in automatic
+    /// <see cref="RepositionDirections"/> management — their collision response is determined
+    /// entirely by the polygon geometry via SAT.
+    /// </para>
+    /// </remarks>
+    public void AddPolygonTileAtCell(int col, int row, Polygon prototype)
+    {
+        if (_tiles.ContainsKey((col, row)) || _polyTiles.ContainsKey((col, row))) return;
+
+        var poly = Polygon.FromPoints(prototype.Points);
+        poly.X = X + col * GridSize + GridSize / 2f;
+        poly.Y = Y + row * GridSize + GridSize / 2f;
+        poly.Visible = _visible;
+
+        _polyTiles[(col, row)] = poly;
+        _onTileAdded?.Invoke(poly);
+    }
+
+    /// <summary>
+    /// Removes the polygon tile at the given grid cell. Does nothing if no polygon tile exists there.
+    /// </summary>
+    public void RemovePolygonTileAtCell(int col, int row)
+    {
+        if (!_polyTiles.TryGetValue((col, row), out var poly)) return;
+        _polyTiles.Remove((col, row));
+        _onTileRemoved?.Invoke(poly);
+    }
+
+    /// <summary>
+    /// Returns the <see cref="Polygon"/> tile at the given grid cell, or <c>null</c> if no polygon
+    /// tile exists there.
+    /// </summary>
+    public Polygon? GetPolygonTileAtCell(int col, int row) =>
+        _polyTiles.TryGetValue((col, row), out var poly) ? poly : null;
+
     private (int col, int row) WorldToCell(float x, float y) =>
         ((int)MathF.Floor((x - X) / GridSize), (int)MathF.Floor((y - Y) / GridSize));
 
@@ -185,9 +243,14 @@ public class TileShapeCollection : ICollidable
         {
             for (int row = rowMin; row <= rowMax; row++)
             {
-                if (!_tiles.TryGetValue((col, row), out var tile)) continue;
+                Vector2 sep;
+                if (_tiles.TryGetValue((col, row), out var tile))
+                    sep = CollisionDispatcher.GetSeparationVector(shape, tile);
+                else if (_polyTiles.TryGetValue((col, row), out var poly))
+                    sep = CollisionDispatcher.GetSeparationVector(shape, poly);
+                else
+                    continue;
 
-                var sep = CollisionDispatcher.GetSeparationVector(shape, tile);
                 if (sep == Vector2.Zero) continue;
 
                 // Take the largest push on each axis independently to avoid double-counting
@@ -273,6 +336,12 @@ public class TileShapeCollection : ICollidable
                 hitPoint = start + dir * t;
                 hitNormal = normal;
                 return true;
+            }
+
+            if (_polyTiles.TryGetValue((col, row), out var polyTile))
+            {
+                if (polyTile.Raycast(start, end, out hitPoint, out hitNormal))
+                    return true;
             }
         }
 

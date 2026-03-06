@@ -34,6 +34,14 @@ public class Screen
 
     public List<Layer> Layers { get; } = new();
 
+    /// <summary>
+    /// Controls how renderables are ordered before drawing each frame.
+    /// Defaults to <see cref="Rendering.SortMode.Z"/>.
+    /// Set to <see cref="Rendering.SortMode.ZSecondaryParentY"/> for top-down games
+    /// where entities at lower world-space Y should appear in front of entities at higher Y.
+    /// </summary>
+    public Rendering.SortMode SortMode { get; set; } = Rendering.SortMode.Z;
+
     private readonly List<IRenderable> _renderList = new();
     public IReadOnlyList<IRenderable> RenderList => _renderList;
 
@@ -42,7 +50,10 @@ public class Screen
 
     /// <summary>
     /// Registers all tiles in <paramref name="tiles"/> for rendering and wires up future
-    /// <see cref="Collision.TileShapeCollection.AddTileAtCell"/> / <see cref="Collision.TileShapeCollection.RemoveTileAtCell"/>
+    /// <see cref="Collision.TileShapeCollection.AddTileAtCell"/> /
+    /// <see cref="Collision.TileShapeCollection.RemoveTileAtCell"/> /
+    /// <see cref="Collision.TileShapeCollection.AddPolygonTileAtCell"/> /
+    /// <see cref="Collision.TileShapeCollection.RemovePolygonTileAtCell"/>
     /// calls so newly added or removed tiles stay in sync automatically.
     /// </summary>
     public void Add(Collision.TileShapeCollection tiles)
@@ -99,7 +110,7 @@ public class Screen
 
     internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, float z)
     {
-        var renderable = new GumRenderable(visual) { Z = z, WorldParent = worldParent };
+        var renderable = new GumRenderable(visual) { Z = z, Parent = worldParent };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
         _renderList.Add(renderable);
@@ -241,7 +252,7 @@ public class Screen
     internal void AddEntity(Entity entity) => _entities.Add(entity);
     internal void RemoveEntity(Entity entity) => _entities.Remove(entity);
 
-    private void SortRenderList()
+    internal void SortRenderList()
     {
         // Insertion sort — O(N) for nearly-sorted data; stable
         for (int i = 1; i < _renderList.Count; i++)
@@ -264,8 +275,24 @@ public class Screen
         if (layerA == -1) layerA = int.MaxValue;
         if (layerB == -1) layerB = int.MaxValue;
         if (layerA != layerB) return layerA.CompareTo(layerB);
-        return a.Z.CompareTo(b.Z);
+
+        int zCmp = a.Z.CompareTo(b.Z);
+        if (zCmp != 0) return zCmp;
+
+        if (SortMode == Rendering.SortMode.ZSecondaryParentY)
+        {
+            // Higher world Y = further away = drawn first (behind).
+            // Lower world Y = closer to viewer = drawn last (in front).
+            float parentYA = GetParentY(a);
+            float parentYB = GetParentY(b);
+            return parentYB.CompareTo(parentYA); // descending
+        }
+
+        return 0;
     }
+
+    private static float GetParentY(IRenderable renderable) =>
+        renderable is IAttachable a ? (a.Parent?.AbsoluteY ?? a.AbsoluteY) : 0f;
 
     private static IEnumerable<T> SingleEnumerable<T>(T item)
     {
