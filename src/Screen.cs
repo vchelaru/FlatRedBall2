@@ -137,6 +137,12 @@ public class Screen
     /// <summary>Gum visuals that need per-frame input updates. Used by FlatRedBallService.</summary>
     internal IReadOnlyList<GumRenderable> GumRenderables => _gumRenderables;
 
+    internal void SetGumRenderableLayer(GraphicalUiElement visual, Layer layer)
+    {
+        if (_gumByVisual.TryGetValue(visual, out var renderable))
+            renderable.Layer = layer;
+    }
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }

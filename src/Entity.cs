@@ -20,6 +20,21 @@ public class Entity : ICollidable, IAttachable
     public Vector2 Position;
     public float X { get => Position.X; set { ThrowIfNotFinite(value, nameof(X)); Position.X = value; } }
     public float Y { get => Position.Y; set { ThrowIfNotFinite(value, nameof(Y)); Position.Y = value; } }
+    /// <summary>
+    /// Contributes to <see cref="AbsoluteZ"/> for position calculations (e.g. attachment to a parent).
+    /// Does <b>not</b> directly control draw order — rendering is sorted by each child renderable's own
+    /// <c>Z</c> value (e.g. <c>myCircle.Z</c>, <c>mySprite.Z</c>), not by this property.
+    /// <para>
+    /// Draw order within a layer: lower Z is drawn first (behind); higher Z is drawn last (in front).
+    /// Two renderables at the same layer and same Z preserve their insertion order (stable sort) —
+    /// whichever was added to the screen first is drawn first. If you need explicit ordering between
+    /// two same-layer renderables, give them distinct Z values.
+    /// </para>
+    /// <para>
+    /// Layer takes priority over Z: a renderable on a lower-indexed layer always draws behind one on a
+    /// higher-indexed layer, regardless of Z. Use <see cref="MoveToLayer"/> to change layers at runtime.
+    /// </para>
+    /// </summary>
     public float Z { get; set; }
 
     // Absolute world position
@@ -144,6 +159,23 @@ public class Entity : ICollidable, IAttachable
         {
             _shapes.Remove(shape);
         }
+    }
+
+    /// <summary>
+    /// Moves this entity's renderable children to <paramref name="layer"/>, changing their draw order.
+    /// Recursively updates child entities. Collision relationships are not affected.
+    /// </summary>
+    public void MoveToLayer(Layer layer)
+    {
+        foreach (var child in _children)
+        {
+            if (child is IRenderable renderable)
+                renderable.Layer = layer;
+            if (child is Entity childEntity)
+                childEntity.MoveToLayer(layer);
+        }
+        foreach (var visual in _gumChildren)
+            _engine?.CurrentScreen?.SetGumRenderableLayer(visual, layer);
     }
 
     public void Remove(IAttachable child)

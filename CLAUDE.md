@@ -34,6 +34,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `levels` — Level data layout and progression
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
+- `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
 - `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
 
 ## Key Architecture Decisions

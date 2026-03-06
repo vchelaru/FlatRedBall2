@@ -38,6 +38,7 @@ screen.AddCollisionRelationship(players, tiles)
     .WithFirstShape(p => p.FeetCollision)
     .MoveFirstOnCollision();
 ```
+Demo in `ShapeSelectDemoScreen` / `ShapeSelectPlayer`: player has a large BodyCircle (visual only, radius 40) and a small CollisionRect (20×20). A narrow 64px passage in the level lets the rect through but not the circle — the cyan circle visibly overlaps the walls while the player passes through.
 
 ## Y-Sort Rendering (Top-Down Draw Order)
 
@@ -45,27 +46,18 @@ screen.AddCollisionRelationship(players, tiles)
 
 ## Moving Entities Between Layers
 
-**Status**: Not implemented
-**What's needed**:
-- No first-class API exists for transferring an entity (and all its children — shapes, sprites, Gum components) from one layer to another at runtime.
-- Common use cases: a pickup moving from the world layer to a foreground layer when collected, a player "entering" a building and switching to an interior layer, toggling an entity onto a debug/overlay layer.
-- Recommended approach: a method on `Entity` or `Screen` such as `entity.MoveToLayer(newLayer)` that atomically removes the entity's renderables from their current layer and adds them to the new one, preserving relative child ordering.
-- Must handle all child types uniformly (shapes, sprites, Gum objects) so game code doesn't have to manually re-parent each child.
-- Collision participation is independent of layer — moving an entity to a different layer must not affect which collision relationships it participates in.
+**Status**: Done — `entity.MoveToLayer(layer)` updates the `Layer` property on all `IRenderable` children (shapes, sprites) and Gum visual children, recursing into child entities. Collision participation is unchanged. `IRenderable.Layer` now has a public setter to support this.
 
 ## Path Object (Movement and Rendering)
 
-**Status**: Not implemented
-**What's needed**:
-- A `Path` type that represents an ordered sequence of points and serves two purposes: (1) guiding entity movement along the path, and (2) rendering the path as a visible line or curve.
-- Movement use cases: patrol routes, cutscene scripted movement, projectile arcs, NPC waypoints.
-- Rendering use cases: displaying a trajectory preview, drawing a rope/cable, showing a debug movement route.
-- Recommended API surface:
-  - `Path` holds a list of `Vector2` waypoints and supports open or closed (looped) configurations.
-  - A `Path.GetPositionAtDistance(float distance)` or `Path.GetPositionAtT(float t)` query for movement interpolation (linear segments to start; bezier curves as a future extension).
-  - A `Path.Renderable` (or `Path` itself implementing `IRenderable`) that draws the polyline each frame, with configurable color and thickness.
-- Movement helpers: a component or utility (e.g., `PathFollower`) that advances an entity along a `Path` at a given speed, fires an event on arrival at each waypoint, and optionally loops.
-- The rendering and movement roles should be independently usable — a `Path` can be drawn without any entity following it, and a `PathFollower` should work without the path being visible.
+**Status**: Done — `Path` (in `FlatRedBall2.Math`) and `PathFollower` (in `FlatRedBall2.Movement`).
+- Builder API: `MoveTo`, `MoveBy`, `LineTo`, `LineBy`, `ArcTo`, `ArcBy` — all fluent (return `this`).
+- Arc angles are signed radians (+ = CCW, − = CW, Y+ up). For a full circle, chain two `ArcTo(π)` calls — a single arc from a point to itself has zero chord length and degenerates.
+- Queries: `PointAtLength`, `PointAtRatio`, `TangentAtLength`, `TangentAtRatio`, `TotalLength`.
+- `IsLooped = true` closes the path back to start and includes the closing segment in `TotalLength`.
+- `Path` implements `IRenderable` — `screen.Add(path)` renders it as a polyline. `Color`, `LineThickness`, `Visible` control appearance.
+- `PathFollower`: `Speed`, `Loops`, `FaceDirection`, `WaypointReached` event, `PathCompleted` event, `Reset()`. Call `Activity(entity, deltaSeconds)` each frame.
+- Demo in `PathDemoScreen`.
 
 ## Audio System
 

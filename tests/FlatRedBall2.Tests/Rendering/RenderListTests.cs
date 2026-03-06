@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Xna.Framework.Graphics;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
 using Shouldly;
@@ -117,6 +118,44 @@ public class RenderListTests
 
         screen.RenderList[0].Name.ShouldBe("high");
         screen.RenderList[1].Name.ShouldBe("low");
+    }
+
+    [Fact]
+    public void MoveToLayer_UpdatesLayerOnRenderableChildren()
+    {
+        var screen = new TestScreen();
+        var layer1 = new Layer("Background");
+        var layer2 = new Layer("Foreground");
+        screen.Layers.Add(layer1);
+        screen.Layers.Add(layer2);
+
+        var entity = new Entity();
+        var rect = new AxisAlignedRectangle { Layer = layer1 };
+        entity.Add(rect);
+
+        entity.MoveToLayer(layer2);
+
+        rect.Layer.ShouldBe(layer2);
+    }
+
+    [Fact]
+    public void MoveToLayer_RecursivelyUpdatesChildEntityRenderables()
+    {
+        var screen = new TestScreen();
+        var layer1 = new Layer("Background");
+        var layer2 = new Layer("Foreground");
+        screen.Layers.Add(layer1);
+        screen.Layers.Add(layer2);
+
+        var parent = new Entity();
+        var child = new Entity();
+        var rect = new AxisAlignedRectangle { Layer = layer1 };
+        child.Add(rect);
+        parent.Add(child);
+
+        parent.MoveToLayer(layer2);
+
+        rect.Layer.ShouldBe(layer2);
     }
 
     [Fact]
