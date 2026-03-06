@@ -76,6 +76,12 @@ public class Entity : ICollidable, IAttachable
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
+    /// <summary>
+    /// Attaches <paramref name="child"/> to this entity and registers it for rendering.
+    /// If <paramref name="child"/> is an <see cref="ICollidable"/> shape, it is included in default collision.
+    /// To attach a collidable shape without including it in default collision, use
+    /// <see cref="Add{T}(T, bool)"/> with <c>isDefaultCollision: false</c>.
+    /// </summary>
     public void Add(IAttachable child)
     {
         child.Parent = this;
@@ -89,6 +95,55 @@ public class Entity : ICollidable, IAttachable
 
         if (child is Entity childEntity && _engine is not null)
             childEntity.Engine = _engine;
+    }
+
+    /// <summary>
+    /// Attaches a collidable shape to this entity and registers it for rendering.
+    /// Pass <c>isDefaultCollision: false</c> to attach the shape for rendering and positioning only —
+    /// it will not participate in <see cref="CollidesWith"/> or <see cref="GetSeparationVector"/> checks.
+    /// Use <see cref="SetDefaultCollision"/> to change participation after the fact.
+    /// </summary>
+    public void Add<T>(T child, bool isDefaultCollision) where T : class, IAttachable, ICollidable
+    {
+        child.Parent = this;
+        _children.Add(child);
+
+        if (isDefaultCollision)
+            _shapes.Add(child);
+
+        if (child is IRenderable renderable && _engine?.CurrentScreen != null)
+            _engine!.CurrentScreen.Add(renderable);
+
+        if (child is Entity childEntity && _engine is not null)
+            childEntity.Engine = _engine;
+    }
+
+    /// <summary>
+    /// Sets whether <paramref name="shape"/> participates in this entity's default collision.
+    /// When excluded, the shape remains attached and rendered but is not included in
+    /// <see cref="CollidesWith"/> or <see cref="GetSeparationVector"/> checks.
+    /// Safe to call multiple times with the same value — idempotent, no error, no duplicate.
+    /// </summary>
+    /// <remarks>
+    /// "Default collision" refers to the set of shapes checked by standard collision relationships.
+    /// A shape excluded from default collision can still be targeted by a per-shape collision
+    /// relationship when that feature is supported.
+    /// </remarks>
+    public void SetDefaultCollision(ICollidable shape, bool isDefaultCollision)
+    {
+        if (shape is IAttachable attachable && !_children.Contains(attachable))
+            throw new InvalidOperationException(
+                "SetDefaultCollision called with a shape that is not a child of this entity. Call Add() first.");
+
+        if (isDefaultCollision)
+        {
+            if (!_shapes.Contains(shape))
+                _shapes.Add(shape);
+        }
+        else
+        {
+            _shapes.Remove(shape);
+        }
     }
 
     public void Remove(IAttachable child)

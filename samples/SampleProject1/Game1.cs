@@ -22,7 +22,7 @@ public class Game1 : Game
         base.Initialize();
 
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-        FlatRedBall2.FlatRedBallService.Default.Start<YSortDemoScreen>();
+        FlatRedBall2.FlatRedBallService.Default.Start<DefaultCollisionDemoScreen>();
     }
 
     protected override void Update(GameTime gameTime)

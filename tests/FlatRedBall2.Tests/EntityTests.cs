@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using Shouldly;
@@ -49,6 +51,18 @@ public class EntityTests
     }
 
     [Fact]
+    public void Add_WithIsDefaultCollisionFalse_ShapeExcludedFromCollision()
+    {
+        var entity = new Entity { X = 0f };
+        var circle = new Circle { Radius = 20f };
+        entity.Add(circle, isDefaultCollision: false);
+
+        var other = new Circle { Radius = 20f, X = 10f };
+
+        entity.CollidesWith(other).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Destroy_CallsCustomDestroy()
     {
         var entity = new DestroyTrackingEntity();
@@ -80,6 +94,55 @@ public class EntityTests
         parent.Remove(child);
 
         child.Parent.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SetDefaultCollision_CalledTwiceWithSameValue_IsIdempotent()
+    {
+        var entity = new Entity();
+        var circle = new Circle { Radius = 20f };
+        entity.Add(circle, isDefaultCollision: false);
+
+        entity.SetDefaultCollision(circle, true);
+        entity.SetDefaultCollision(circle, true); // second call — no duplicate
+
+        entity.Shapes.Count(s => ReferenceEquals(s, circle)).ShouldBe(1);
+    }
+
+    [Fact]
+    public void SetDefaultCollision_ShapeNotAChild_Throws()
+    {
+        var entity = new Entity();
+        var circle = new Circle { Radius = 20f };
+        // circle never Add()-ed to entity
+
+        Should.Throw<InvalidOperationException>(() => entity.SetDefaultCollision(circle, false));
+    }
+
+    [Fact]
+    public void SetDefaultCollision_False_ExcludesShapeFromCollision()
+    {
+        var entity = new Entity { X = 0f };
+        var circle = new Circle { Radius = 20f };
+        entity.Add(circle); // in default collision
+
+        entity.SetDefaultCollision(circle, false);
+
+        var other = new Circle { Radius = 20f, X = 10f };
+        entity.CollidesWith(other).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SetDefaultCollision_True_IncludesShapeInCollision()
+    {
+        var entity = new Entity { X = 0f };
+        var circle = new Circle { Radius = 20f };
+        entity.Add(circle, isDefaultCollision: false);
+
+        entity.SetDefaultCollision(circle, true);
+
+        var other = new Circle { Radius = 20f, X = 10f };
+        entity.CollidesWith(other).ShouldBeTrue();
     }
 
     private class DestroyTrackingEntity : Entity

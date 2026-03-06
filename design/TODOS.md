@@ -4,7 +4,7 @@ This document tracks features and systems intentionally deferred from the initia
 
 ## Polygon — Concave Collision (Convex Decomposition)
 
-**Status**: Not implemented — `Polygon` collision uses SAT, which only works for convex polygons.
+**Status**: Not implemented (deferred — low priority, implement much later) — `Polygon` collision uses SAT, which only works for convex polygons.
 **What's needed**:
 - SAT is fundamentally limited to convex shapes. Concave polygons produce incorrect collision responses: shapes can pass through concave regions or collide with empty concave areas.
 - Rendering already supports concave polygons via ear-clip triangulation; collision does not.

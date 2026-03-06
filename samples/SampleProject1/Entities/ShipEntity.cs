@@ -1,4 +1,5 @@
 using FlatRedBall2;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Input;
 using FlatRedBall2.Movement;
 using FlatRedBall2.Rendering;
@@ -21,6 +22,28 @@ public class ShipEntity : Entity
             Alpha= .5f
         };
         Add(sprite);
+
+        // Solid body circle at the base — participates in default collision
+        var body = new Circle
+        {
+            Radius = 14f,
+            Y = 0f,
+            Color = new Color(80, 160, 230, 180),
+            Visible = true,
+        };
+        Add(body);
+
+        // Outlined circle offset upward — attached for visual purposes only
+        var range = new Circle
+        {
+            Radius = 22f,
+            Y = 18f,
+            IsFilled = false,
+            OutlineThickness = 1.5f,
+            Color = new Color(180, 220, 255, 100),
+            Visible = true,
+        };
+        Add(range, isDefaultCollision: false);
 
         _topDown.MovementValues = new TopDownValues
         {

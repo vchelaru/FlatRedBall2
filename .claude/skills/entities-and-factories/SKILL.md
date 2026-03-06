@@ -69,6 +69,25 @@ Add(poly);
 
 Shape position is relative to the parent entity's position.
 
+## Excluding a Shape from Default Collision
+
+Pass `isDefaultCollision: false` to attach a shape for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship:
+
+```csharp
+// Visual range indicator — renders but never collides by default
+var range = new Circle { Radius = 64f, IsFilled = false, Visible = true };
+Add(range, isDefaultCollision: false);
+```
+
+Use `SetDefaultCollision` to toggle participation at runtime (idempotent — safe to call multiple times):
+
+```csharp
+SetDefaultCollision(range, true);   // include in default collision
+SetDefaultCollision(range, false);  // exclude from default collision
+```
+
+"Default collision" is the set of shapes checked by standard collision relationships. A shape excluded from default collision can still be targeted explicitly when per-shape collision targeting is supported.
+
 ## Using Factory&lt;T&gt; from a Screen
 
 ```csharp
