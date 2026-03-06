@@ -28,28 +28,16 @@ This document tracks features and systems intentionally deferred from the initia
 
 ## Per-Shape Collision Exclusion
 
-**Status**: Not implemented
-**What's needed**:
-- Currently, any shape passed to `Entity.Add` is automatically included in `_shapes` and therefore participates in `ICollidable`. There is no way to add a shape for rendering/attachment only without it being part of collision.
-- Common use case: a visual indicator shape (e.g., a larger "shadow" circle or a range indicator) that should render but never collide.
-- Recommended approach: an overload or flag on `Add` — e.g., `Add(shape, collides: false)` — that adds the shape to `_children` for attachment/rendering but skips adding it to `_shapes`. Alternatively, a separate `AddVisual(shape)` method.
-- The exclusion should be reversible at runtime so shapes can be toggled in/out of collision (e.g., an invincibility window).
+**Status**: Done — `Add<T>(T child, bool isDefaultCollision)` where `T : IAttachable, ICollidable` attaches a shape without adding it to the default collision set. `SetDefaultCollision(ICollidable shape, bool)` toggles participation at runtime (idempotent; throws if shape is not a child of the entity). Demo in `DefaultCollisionDemoScreen`. Also used in `ShipEntity` and `OtherEntity` in the Y-sort demo.
 
 ## Per-Shape Collision Targeting in Collision Relationships
 
-**Status**: Not implemented
-**What's needed**:
-- Currently, `AddCollisionRelationship` uses all shapes in an entity's `ICollidable` (the full `_shapes` list). There is no way to target a specific named shape — e.g., collide only the "feet" rectangle against the ground, or only the "hitbox" circle against enemies.
-- Common use cases: platformer feet vs. terrain (ignoring a body hitbox), top-down melee hitbox vs. hurtbox, JRPG interaction trigger vs. interactables, a "shadow" rectangle that collides with the floor but not walls.
-- Recommended approach: an overload on `AddCollisionRelationship` that accepts a shape selector, e.g.:
-  ```csharp
-  screen.AddCollisionRelationship<Player, TileShapeCollection>(
-      players, tiles,
-      firstShape: p => p.FeetCollision,
-      response: CollisionResponse.MoveFirst);
-  ```
-- The selector could alternatively be a `string` name if shapes get a `Name` property, but a typed lambda is safer and refactor-friendly.
-- The `ICollidable` interface currently returns all shapes; per-shape targeting means the collision relationship must bypass the interface and call the resolver directly with the selected shape.
+**Status**: Done — `WithFirstShape(Func<A, ICollidable>)` and `WithSecondShape(Func<B, ICollidable>)` fluent methods on `CollisionRelationship<A, B>`. Selectors restrict which child shape is used for detection and response while keeping the physics response (separation, bounce) applied to the parent entity. Example:
+```csharp
+screen.AddCollisionRelationship(players, tiles)
+    .WithFirstShape(p => p.FeetCollision)
+    .MoveFirstOnCollision();
+```
 
 ## Y-Sort Rendering (Top-Down Draw Order)
 

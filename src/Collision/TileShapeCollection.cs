@@ -352,5 +352,7 @@ public class TileShapeCollection : ICollidable
     public bool CollidesWith(ICollidable other) => GetSeparationFor(other) != Vector2.Zero;
     public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }
+    public void ApplySeparationOffset(Vector2 offset) { }
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 }

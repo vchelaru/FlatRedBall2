@@ -38,10 +38,14 @@ public class ShapeCollection : ICollidable
                 other.SeparateFrom(shape, otherMass, thisMass);
     }
 
+    public void ApplySeparationOffset(Vector2 offset) { }
+
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
     {
         foreach (var shape in _shapes)
             if (shape.CollidesWith(other))
                 other.AdjustVelocityFrom(shape, otherMass, thisMass, elasticity);
     }
+
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 }

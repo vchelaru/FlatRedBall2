@@ -252,9 +252,17 @@ public class Entity : ICollidable, IAttachable
         LastReposition += offset;
     }
 
-    public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
+    public void ApplySeparationOffset(Vector2 offset)
     {
-        var sep = GetSeparationVector(other);
+        Position += offset;
+        LastReposition += offset;
+    }
+
+    public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
+        => AdjustVelocityFromSeparation(GetSeparationVector(other), other, thisMass, otherMass, elasticity);
+
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
+    {
         if (sep == Vector2.Zero) return;
 
         // Collision normal: the direction to push 'this' out of 'other'.
@@ -301,7 +309,8 @@ public class Entity : ICollidable, IAttachable
     // from this collidable. Child entities are transparent containers — their shapes are yielded
     // in-place rather than the child entity itself, so CollisionDispatcher always receives
     // concrete shape types it can handle.
-    private static IEnumerable<ICollidable> GetLeafShapes(ICollidable collidable)
+    // Internal so CollisionRelationship can iterate leaf shapes for per-shape selector dispatch.
+    internal static IEnumerable<ICollidable> GetLeafShapes(ICollidable collidable)
     {
         if (collidable is Entity entity)
         {

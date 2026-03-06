@@ -110,9 +110,11 @@ public class Line : IAttachable, IRenderable, ICollidable
 
     // Nothing to separate; lines carry no volume.
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }
+    public void ApplySeparationOffset(Vector2 offset) { }
 
     // Velocity bounce is handled by Entity.AdjustVelocityFrom on the owning entity; no-op here.
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 
     // ── Typed collision tests ─────────────────────────────────────────────
 

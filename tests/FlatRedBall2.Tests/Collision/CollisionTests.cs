@@ -288,4 +288,119 @@ public class CollisionTests
 
         a.X.ShouldBe(-12f); // overlap was 12px; all of it assigned to a
     }
+
+    // ── WithFirstShape / WithSecondShape ──────────────────────────────────
+
+    [Fact]
+    public void WithFirstShape_OverlappingShape_DetectsCollision()
+    {
+        var entityA = new Entity { X = 0f };
+        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f }; // at world X=0, overlaps entityB
+        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 100f }; // at world X=100, no overlap
+        entityA.Add(rectA1);
+        entityA.Add(rectA2, isDefaultCollision: false);
+
+        var entityB = new Entity { X = 20f };
+        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        entityB.Add(rectB);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.WithFirstShape(e => rectA1);
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void WithFirstShape_NonOverlappingShape_NoCollision()
+    {
+        var entityA = new Entity { X = 0f };
+        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // overlaps entityB
+        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 100f };  // far away
+        entityA.Add(rectA1, isDefaultCollision: false);
+        entityA.Add(rectA2, isDefaultCollision: false);
+
+        var entityB = new Entity { X = 20f };
+        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        entityB.Add(rectB);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.WithFirstShape(e => rectA2); // select the far shape — should not collide
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void WithFirstShape_MoveFirstOnCollision_MovesEntityNotShapeOffset()
+    {
+        // Entity A's selected child rect overlaps entity B.
+        // After separation, entity A's Position should shift; rectA's local offset should stay 0.
+        var entityA = new Entity { X = 0f };
+        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
+        entityA.Add(rectA);
+
+        var entityB = new Entity { X = 20f };
+        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        entityB.Add(rectB);
+
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.WithFirstShape(e => rectA).MoveFirstOnCollision();
+        rel.RunCollisions();
+
+        entityA.X.ShouldBeLessThan(0f, "entity position should have been pushed left");
+        rectA.X.ShouldBe(0f, "shape's local offset should be unchanged — entity, not shape, was moved");
+        entityA.CollidesWith(entityB).ShouldBeFalse("entities should no longer overlap after separation");
+    }
+
+    [Fact]
+    public void WithSecondShape_OverlappingShape_DetectsCollision()
+    {
+        var entityA = new Entity { X = 0f };
+        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        entityA.Add(rectA);
+
+        var entityB = new Entity { X = 20f };
+        var rectB1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // overlaps entityA
+        var rectB2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f }; // far away
+        entityB.Add(rectB1);
+        entityB.Add(rectB2, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.WithSecondShape(e => rectB1);
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void WithFirstShape_AndWithSecondShape_BothSelectorsApplied()
+    {
+        // Only the pair (rectA2, rectB2) overlaps. Using selectors for both sides should detect it.
+        var entityA = new Entity { X = 0f };
+        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // world X=0
+        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f };  // world X=200
+        entityA.Add(rectA1, isDefaultCollision: false);
+        entityA.Add(rectA2, isDefaultCollision: false);
+
+        var entityB = new Entity { X = 0f };
+        var rectB1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 500f }; // world X=500, no overlap
+        var rectB2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f }; // world X=200, overlaps rectA2
+        entityB.Add(rectB1, isDefaultCollision: false);
+        entityB.Add(rectB2, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
+        rel.WithFirstShape(_ => rectA2).WithSecondShape(_ => rectB2);
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1);
+    }
 }

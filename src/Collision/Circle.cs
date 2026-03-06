@@ -74,7 +74,10 @@ public class Circle : IAttachable, IRenderable, ICollidable
         Y += offset.Y;
     }
 
+    public void ApplySeparationOffset(Vector2 offset) { X += offset.X; Y += offset.Y; }
+
     // Shapes don't carry velocity — only Entity does. AdjustVelocityFrom is intentionally a no-op here.
     // Velocity bounce is handled by Entity.AdjustVelocityFrom, which is called on the owning entity.
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 }

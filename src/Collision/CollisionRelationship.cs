@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace FlatRedBall2.Collision;
 
@@ -23,6 +24,9 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private float _bounceMassA = 1f;
     private float _bounceMassB = 1f;
     private float _bounceElasticity = 1f;
+
+    private Func<A, ICollidable>? _firstShapeSelector;
+    private Func<B, ICollidable>? _secondShapeSelector;
 
     /// <summary>
     /// When <c>true</c> and both lists are the same reference (self-collision), fires
@@ -72,6 +76,26 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _bounce = true; _bounceMassA = firstMass; _bounceMassB = secondMass; _bounceElasticity = elasticity; return this;
     }
 
+    /// <summary>
+    /// Restricts collision detection (and physical response) to a specific shape on each A instance
+    /// instead of testing all of A's shapes. Does not change which entity receives the response —
+    /// separation and velocity adjustments still apply to A, not to the selected child shape.
+    /// </summary>
+    public CollisionRelationship<A, B> WithFirstShape(Func<A, ICollidable> selector)
+    {
+        _firstShapeSelector = selector; return this;
+    }
+
+    /// <summary>
+    /// Restricts collision detection (and physical response) to a specific shape on each B instance
+    /// instead of testing all of B's shapes. Does not change which entity receives the response —
+    /// separation and velocity adjustments still apply to B, not to the selected child shape.
+    /// </summary>
+    public CollisionRelationship<A, B> WithSecondShape(Func<B, ICollidable> selector)
+    {
+        _secondShapeSelector = selector; return this;
+    }
+
     void ICollisionRelationship.RunCollisions() => RunCollisions();
 
     internal void RunCollisions()
@@ -110,9 +134,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             {
                 var a = _selfSnapshot[i];
                 var b = _selfSnapshot[j];
-                if (!a.CollidesWith(b)) continue;
+                var effectiveA = GetEffectiveA(a);
+                var effectiveB = GetEffectiveB((B)(object)b);
+                if (!CheckCollision(effectiveA, effectiveB)) continue;
 
-                ApplyResponse(a, (B)(object)b);
+                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                ApplyResponse(a, (B)(object)b, sep);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
                     CollisionOccurred?.Invoke(b, (B)(object)a);
@@ -122,26 +149,76 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     private void RunPair(A a, B b)
     {
-        if (!a.CollidesWith(b)) return;
-        ApplyResponse(a, b);
+        var effectiveA = GetEffectiveA(a);
+        var effectiveB = GetEffectiveB(b);
+        if (!CheckCollision(effectiveA, effectiveB)) return;
+        var sep = ComputeSeparationVector(effectiveA, effectiveB);
+        ApplyResponse(a, b, sep);
         CollisionOccurred?.Invoke(a, b);
     }
 
-    private void ApplyResponse(A a, B b)
+    private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;
+    private ICollidable GetEffectiveB(B b) => _secondShapeSelector != null ? _secondShapeSelector(b) : b;
+
+    // Checks collision using CollisionDispatcher.CollidesWith so Line intersections are handled.
+    // Iterates leaf shape pairs so any combination of leaf shapes, entities, and
+    // TileShapeCollections is dispatched correctly — including selected-shape vs entity cases.
+    private static bool CheckCollision(ICollidable a, ICollidable b)
+    {
+        if (b is TileShapeCollection tsc)
+        {
+            foreach (var leafA in Entity.GetLeafShapes(a))
+                if (tsc.GetSeparationFor(leafA) != Vector2.Zero)
+                    return true;
+            return false;
+        }
+
+        foreach (var leafA in Entity.GetLeafShapes(a))
+            foreach (var leafB in Entity.GetLeafShapes(b))
+                if (CollisionDispatcher.CollidesWith(leafA, leafB))
+                    return true;
+        return false;
+    }
+
+    // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
+    // physics separation is meaningful (e.g., Lines are infinitely thin).
+    private static Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
+    {
+        if (b is TileShapeCollection tsc)
+        {
+            foreach (var leafA in Entity.GetLeafShapes(a))
+            {
+                var sep = tsc.GetSeparationFor(leafA);
+                if (sep != Vector2.Zero) return sep;
+            }
+            return Vector2.Zero;
+        }
+
+        foreach (var leafA in Entity.GetLeafShapes(a))
+            foreach (var leafB in Entity.GetLeafShapes(b))
+            {
+                var sep = CollisionDispatcher.GetSeparationVector(leafA, leafB);
+                if (sep != Vector2.Zero) return sep;
+            }
+        return Vector2.Zero;
+    }
+
+    private void ApplyResponse(A a, B b, Vector2 sep)
     {
         if (_moveFirst)
-            a.SeparateFrom(b, 0f, 1f);
+            a.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(sep, 0f, 1f));
         if (_moveSecond)
-            b.SeparateFrom(a, 0f, 1f);
+            b.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(-sep, 0f, 1f));
         if (_moveBoth)
         {
-            a.SeparateFrom(b, _bothFirstMass, _bothSecondMass);
-            b.SeparateFrom(a, _bothSecondMass, _bothFirstMass);
+            a.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(sep, _bothFirstMass, _bothSecondMass));
+            b.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(-sep, _bothSecondMass, _bothFirstMass));
         }
         if (_bounce)
         {
-            a.AdjustVelocityFrom(b, _bounceMassA, _bounceMassB, _bounceElasticity);
-            a.SeparateFrom(b, _bounceMassA, _bounceMassB);
+            // Pass entity b so velocity exchange happens between entities, not selected child shapes.
+            a.AdjustVelocityFromSeparation(sep, b, _bounceMassA, _bounceMassB, _bounceElasticity);
+            a.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(sep, _bounceMassA, _bounceMassB));
         }
     }
 }
