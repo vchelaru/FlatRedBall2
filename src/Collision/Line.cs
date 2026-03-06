@@ -97,8 +97,13 @@ public class Line : IAttachable, IRenderable, ICollidable
         Line otherLine                 => CollideAgainst(otherLine),
         Circle circle                  => CollideAgainst(circle),
         AxisAlignedRectangle rect      => CollideAgainst(rect),
+        Polygon polygon                => CollideAgainst(polygon),
         _                              => false
     };
+
+    /// <summary>Returns true if this segment intersects any edge of <paramref name="other"/>.</summary>
+    public bool CollideAgainst(Polygon other)
+        => other.Raycast(AbsolutePoint1, AbsolutePoint2, out _, out _);
 
     // Lines are infinitely thin — no meaningful MTV exists.
     public Vector2 GetSeparationVector(ICollidable other) => Vector2.Zero;

@@ -214,6 +214,65 @@ public class Polygon : IAttachable, IRenderable, ICollidable
             Parent = null;
     }
 
+    /// <summary>
+    /// Tests a line segment against all edges of this polygon and returns the closest intersection.
+    /// </summary>
+    /// <param name="start">World-space start of the segment (typically the ray origin).</param>
+    /// <param name="end">World-space end of the segment.</param>
+    /// <param name="hitPoint">World-space intersection point closest to <paramref name="start"/>, or <see cref="Vector2.Zero"/> when no hit.</param>
+    /// <param name="hitNormal">Surface normal at the hit point, pointing toward <paramref name="start"/>, or <see cref="Vector2.Zero"/> when no hit.</param>
+    /// <returns><c>true</c> if the segment intersects any edge of this polygon.</returns>
+    public bool Raycast(Vec2 start, Vec2 end, out Vec2 hitPoint, out Vec2 hitNormal)
+    {
+        hitPoint = Vec2.Zero;
+        hitNormal = Vec2.Zero;
+
+        float angle = AbsoluteRotation.Radians;
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+
+        // Build world-space points
+        var worldPts = new Vec2[_points.Count];
+        for (int i = 0; i < _points.Count; i++)
+        {
+            float lx = _points[i].X, ly = _points[i].Y;
+            worldPts[i] = new Vec2(AbsoluteX + lx * cos - ly * sin,
+                                   AbsoluteY + lx * sin + ly * cos);
+        }
+
+        var rayDir = end - start;
+        float minT = float.MaxValue;
+        int hitEdge = -1;
+
+        for (int i = 0; i < worldPts.Length; i++)
+        {
+            float t = SegmentT(start, rayDir, worldPts[i], worldPts[(i + 1) % worldPts.Length]);
+            if (t >= 0f && t < minT) { minT = t; hitEdge = i; }
+        }
+
+        if (hitEdge < 0) return false;
+
+        hitPoint = start + rayDir * minT;
+        var edgeDir = worldPts[(hitEdge + 1) % worldPts.Length] - worldPts[hitEdge];
+        hitNormal = Vec2.Normalize(new Vec2(-edgeDir.Y, edgeDir.X));
+        if (Vec2.Dot(hitNormal, start - hitPoint) < 0) hitNormal = -hitNormal;
+        return true;
+    }
+
+    // Returns t in [0,1] along rayDir for the intersection with edge [a,b], or -1 if none.
+    private static float SegmentT(Vec2 start, Vec2 rayDir, Vec2 a, Vec2 b)
+    {
+        var edgeDir = b - a;
+        float denom = RayCross(rayDir, edgeDir);
+        if (MathF.Abs(denom) < 1e-8f) return -1f;
+        var ac = a - start;
+        float t = RayCross(ac, edgeDir) / denom;
+        float s = RayCross(ac, rayDir) / denom;
+        return t >= 0f && t <= 1f && s >= 0f && s <= 1f ? t : -1f;
+    }
+
+    private static float RayCross(Vec2 a, Vec2 b) => a.X * b.Y - a.Y * b.X;
+
     public bool CollidesWith(ICollidable other)
         => CollisionDispatcher.GetSeparationVector(this, other) != Vector2.Zero;
 

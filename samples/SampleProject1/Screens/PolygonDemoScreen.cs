@@ -14,6 +14,7 @@ public class PolygonDemoScreen : Screen
 {
     private Factory<TopDownPlayer> _playerFactory = null!;
     private Factory<PolygonObstacle> _obstacleFactory = null!;
+    private Factory<SightLine> _sightLineFactory = null!;
 
     public override void CustomInitialize()
     {
@@ -21,12 +22,17 @@ public class PolygonDemoScreen : Screen
 
         _playerFactory = new Factory<TopDownPlayer>(this);
         _obstacleFactory = new Factory<PolygonObstacle>(this);
+        _sightLineFactory = new Factory<SightLine>(this);
 
         BuildObstacles();
 
         var player = _playerFactory.Create();
         player.X = 0f;
         player.Y = 0f;
+
+        var sightLine = _sightLineFactory.Create();
+        sightLine.Player = player;
+        sightLine.Obstacles = _obstacleFactory;
 
         AddCollisionRelationship(_playerFactory, _obstacleFactory)
             .MoveFirstOnCollision();
