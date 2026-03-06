@@ -136,7 +136,6 @@ public class FlatRedBallService
     public AudioManager AudioManager { get; } = new AudioManager();
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
     public TimeManager TimeManager { get; } = new TimeManager();
-    public DebugRenderer DebugRenderer { get; } = new DebugRenderer();
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
     /// <summary>
@@ -147,6 +146,9 @@ public class FlatRedBallService
 
     /// <summary>The active screen's camera. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Camera"/>.</summary>
     public Camera Camera => CurrentScreen.Camera;
+
+    /// <summary>The active screen's overlay. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Overlay"/>.</summary>
+    public Overlay Overlay => CurrentScreen.Overlay;
 
     public void Update(GameTime gameTime)
     {
@@ -159,6 +161,7 @@ public class FlatRedBallService
         }
 
         TimeManager.Update(gameTime);
+        CurrentScreen.Overlay.BeginFrame();
         InputManager.Update();
 
         // Route input events (click, hover, etc.) to all active Gum elements.

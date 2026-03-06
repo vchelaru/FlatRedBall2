@@ -85,13 +85,9 @@ Demo in `ShapeSelectDemoScreen` / `ShapeSelectPlayer`: player has a large BodyCi
 - Flushing all pending continuations during the update loop (after collision, before CustomActivity)
 - Allows `await` in entity/screen code to resume on the game thread
 
-## DebugRenderer Drawing
+## DebugRenderer Drawing / Visuals
 
-**Status**: All draw methods are no-ops
-**What's needed**:
-- Primitive line/shape rendering (Apos.Shapes NuGet, or custom triangle-strip renderer)
-- `SpriteFont` integration for `DrawText`
-- Alternative: use MonoGame's built-in primitive batch via vertex buffers
+**Status**: Done — `Overlay` static class in `FlatRedBall2.Diagnostics` provides immediate-mode draw calls: `Circle`, `Rectangle`, `Line`, `Arrow`, `Polygon`, `Sprite`, `Text`, `TextBackground`. Objects are pooled and reused; they appear for one frame and are hidden automatically the next. Pool resets on screen transition. `FlatRedBallService.Update` calls `Overlay.BeginFrame()` each frame so objects disappear even when no draw calls are made.
 
 ## Tiled Integration — TMX → TileShapeCollection
 

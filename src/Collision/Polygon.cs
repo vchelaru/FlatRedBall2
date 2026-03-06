@@ -59,6 +59,15 @@ public class Polygon : IAttachable, IRenderable, ICollidable
         return poly;
     }
 
+    /// <summary>
+    /// Replaces all points with <paramref name="points"/>. Points are relative to the polygon's position.
+    /// </summary>
+    public void SetPoints(IEnumerable<Vector2> points)
+    {
+        _points.Clear();
+        _points.AddRange(points);
+    }
+
     // IAttachable
     public Entity? Parent { get; set; }
     public float X { get; set; }

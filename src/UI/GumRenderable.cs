@@ -50,6 +50,7 @@ public class GumRenderable : IRenderable, IAttachable
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
+        if (!Visual.Visible) return;
         if (Parent != null)
         {
             var screenPos = camera.WorldToScreen(

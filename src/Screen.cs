@@ -32,6 +32,14 @@ public class Screen
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
     public FlatRedBallService Engine { get; internal set; } = null!;
 
+    /// <summary>
+    /// Immediate-mode visual overlay for this screen. Call draw methods each frame — objects
+    /// appear for one frame and are hidden automatically the next. Resets on screen transition.
+    /// </summary>
+    public Overlay Overlay { get; }
+
+    public Screen() => Overlay = new Overlay(this);
+
     public List<Layer> Layers { get; } = new();
 
     /// <summary>
