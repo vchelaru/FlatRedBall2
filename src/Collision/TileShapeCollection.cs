@@ -202,6 +202,83 @@ public class TileShapeCollection : ICollidable
         return total;
     }
 
+    /// <summary>
+    /// Casts a line segment from <paramref name="start"/> to <paramref name="end"/> and returns
+    /// the closest intersection with any tile, using DDA grid traversal.
+    /// </summary>
+    /// <param name="start">Start of the segment in world space.</param>
+    /// <param name="end">End of the segment in world space.</param>
+    /// <param name="hitPoint">World-space position of the first intersection, or <see cref="Vector2.Zero"/> if no hit.</param>
+    /// <param name="hitNormal">Outward surface normal at the hit face — one of (±1,0) or (0,±1) — or <see cref="Vector2.Zero"/> if no hit.</param>
+    /// <returns><c>true</c> if the segment intersects any tile; <c>false</c> otherwise.</returns>
+    /// <remarks>
+    /// Only tiles along the ray path are tested. If <paramref name="start"/> is already inside a tile, returns <c>false</c>.
+    /// </remarks>
+    public bool Raycast(Vector2 start, Vector2 end, out Vector2 hitPoint, out Vector2 hitNormal)
+    {
+        hitPoint = Vector2.Zero;
+        hitNormal = Vector2.Zero;
+
+        Vector2 dir = end - start;
+        if (dir.X == 0f && dir.Y == 0f) return false;
+
+        // Grid-local start position
+        float lx = start.X - X;
+        float ly = start.Y - Y;
+
+        int col = (int)MathF.Floor(lx / GridSize);
+        int row = (int)MathF.Floor(ly / GridSize);
+
+        if (_tiles.ContainsKey((col, row))) return false;
+
+        int stepX = dir.X > 0 ? 1 : dir.X < 0 ? -1 : 0;
+        int stepY = dir.Y > 0 ? 1 : dir.Y < 0 ? -1 : 0;
+
+        // How much t (0..1 along the segment) increases when crossing one full cell on each axis
+        float tDeltaX = stepX != 0 ? MathF.Abs(GridSize / dir.X) : float.MaxValue;
+        float tDeltaY = stepY != 0 ? MathF.Abs(GridSize / dir.Y) : float.MaxValue;
+
+        // t at which we first cross the next boundary on each axis
+        float tMaxX = stepX > 0 ? ((col + 1) * GridSize - lx) / dir.X
+                    : stepX < 0 ? (col * GridSize - lx) / dir.X
+                    : float.MaxValue;
+        float tMaxY = stepY > 0 ? ((row + 1) * GridSize - ly) / dir.Y
+                    : stepY < 0 ? (row * GridSize - ly) / dir.Y
+                    : float.MaxValue;
+
+        while (true)
+        {
+            float t;
+            Vector2 normal;
+
+            if (tMaxX <= tMaxY)
+            {
+                t = tMaxX;
+                col += stepX;
+                normal = new Vector2(-stepX, 0);
+                tMaxX += tDeltaX;
+            }
+            else
+            {
+                t = tMaxY;
+                row += stepY;
+                normal = new Vector2(0, -stepY);
+                tMaxY += tDeltaY;
+            }
+
+            if (t > 1f) break;
+
+            if (_tiles.ContainsKey((col, row)))
+            {
+                hitPoint = start + dir * t;
+                hitNormal = normal;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ICollidable — TileShapeCollection is static geometry; only the querying shape moves.
     public bool CollidesWith(ICollidable other) => GetSeparationFor(other) != Vector2.Zero;
     public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);

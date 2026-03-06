@@ -9,14 +9,19 @@ using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 namespace FlatRedBall2.Collision;
 
 /// <summary>
-/// A line segment. <see cref="IAttachable.X"/>/<see cref="IAttachable.Y"/> is the first endpoint;
-/// <see cref="EndPoint"/> is the offset to the second endpoint relative to the first.
+/// A line segment defined by two world-space endpoints, <see cref="AbsolutePoint1"/> and <see cref="AbsolutePoint2"/>.
 /// </summary>
+/// <remarks>
+/// <see cref="IAttachable.X"/>/<see cref="IAttachable.Y"/> is the parent-relative offset to the first endpoint
+/// (or the world position when unparented). <see cref="EndPoint"/> is added to that to give the second endpoint.
+/// Use <see cref="AbsolutePoint1"/> and <see cref="AbsolutePoint2"/> to read world-space positions,
+/// and <see cref="SetAbsoluteEndpoint"/> to set the second endpoint directly in world space.
+/// </remarks>
 public class Line : IAttachable, IRenderable, ICollidable
 {
     /// <summary>
-    /// Offset from the first endpoint (<see cref="IAttachable.X"/>, <see cref="IAttachable.Y"/>) to the second.
-    /// The second endpoint in world space is <see cref="AbsolutePoint2"/>.
+    /// Offset from the first endpoint to the second, in world units.
+    /// Added to <see cref="AbsolutePoint1"/> to produce <see cref="AbsolutePoint2"/>.
     /// </summary>
     public Vector2 EndPoint { get; set; } = new Vector2(32f, 0f);
 
@@ -43,6 +48,11 @@ public class Line : IAttachable, IRenderable, ICollidable
 
     /// <summary>World-space position of the second endpoint: <c>(AbsoluteX + EndPoint.X, AbsoluteY + EndPoint.Y)</c>.</summary>
     public Vector2 AbsolutePoint2 => new Vector2(AbsoluteX + EndPoint.X, AbsoluteY + EndPoint.Y);
+
+    /// <summary>
+    /// Sets <see cref="EndPoint"/> so that <see cref="AbsolutePoint2"/> lands at <paramref name="absolutePoint"/>.
+    /// </summary>
+    public void SetAbsoluteEndpoint(Vector2 absolutePoint) => EndPoint = absolutePoint - AbsolutePoint1;
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {

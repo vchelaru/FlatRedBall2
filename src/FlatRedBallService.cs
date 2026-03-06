@@ -26,6 +26,7 @@ public class FlatRedBallService
     private Action? _pendingScreenChange;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
     private readonly GameSynchronizationContext _syncContext = new();
+    private readonly GumService _gum = new GumService();
 
     public FlatRedBallService() { }
 
@@ -44,7 +45,7 @@ public class FlatRedBallService
 
         InputManager.SetCamera(Camera);
 
-        GumService.Default.Initialize(game, DefaultVisualsVersion.V2);
+        _gum.Initialize(game, DefaultVisualsVersion.V2);
         GumRenderBatch.Instance.Initialize();
     }
 
@@ -91,7 +92,7 @@ public class FlatRedBallService
         // Clear any Gum elements left over from the previous screen.
         // This covers controls added via AddToRoot() as well as screen-specific GumRenderables,
         // which are abandoned with the old Screen object.
-        GumService.Default.Root.Children.Clear();
+        _gum.Root.Children.Clear();
 
         screen.Engine = this;
         // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
@@ -137,6 +138,12 @@ public class FlatRedBallService
     public DebugRenderer DebugRenderer { get; } = new DebugRenderer();
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
+    /// <summary>
+    /// The Gum UI service owned by this engine instance. Use this to access the root element,
+    /// load Gum projects, or configure themes.
+    /// </summary>
+    public GumService Gum => _gum;
+
     /// <summary>The active screen's camera. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Camera"/>.</summary>
     public Camera Camera => CurrentScreen.Camera;
 
@@ -154,13 +161,13 @@ public class FlatRedBallService
         InputManager.Update();
 
         // Route input events (click, hover, etc.) to all active Gum elements.
-        // GumService.Default.Root covers anything added via AddToRoot();
+        // _gum.Root covers anything added via AddToRoot();
         // screen GumRenderables cover elements added via screen.Add().
         _gumUpdateList.Clear();
-        _gumUpdateList.Add(GumService.Default.Root);
+        _gumUpdateList.Add(_gum.Root);
         foreach (var r in CurrentScreen.GumRenderables)
             _gumUpdateList.Add(r.Visual);
-        GumService.Default.Update(gameTime, _gumUpdateList);
+        _gum.Update(gameTime, _gumUpdateList);
 
         // Complete any delay tasks whose conditions are now met, then flush their
         // continuations onto the game thread. This runs before CustomActivity so

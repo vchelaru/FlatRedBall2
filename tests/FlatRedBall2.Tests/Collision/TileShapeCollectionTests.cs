@@ -1,3 +1,4 @@
+using System.Numerics;
 using FlatRedBall2.Collision;
 using Shouldly;
 using Xunit;
@@ -55,6 +56,51 @@ public class TileShapeCollectionTests
         tiles.AddTileAtWorld(20f, 5f); // falls in cell (1, 0)
 
         tiles.GetTileAtCell(1, 0).ShouldNotBeNull();
+    }
+
+    // ── Raycast ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Raycast_HorizontalRay_HitsLeftFaceOfTile()
+    {
+        // Tile at cell (2, 0): occupies world X=[32,48], left face at X=32
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(2, 0);
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(64f, 8f),
+            out Vector2 hitPoint, out Vector2 hitNormal);
+
+        hit.ShouldBeTrue();
+        hitPoint.X.ShouldBe(32f, tolerance: 0.001f);
+        hitPoint.Y.ShouldBe(8f, tolerance: 0.001f);
+        hitNormal.ShouldBe(new Vector2(-1f, 0f));
+    }
+
+    [Fact]
+    public void Raycast_MultipleHits_ReturnsClosest()
+    {
+        // Two tiles; ray should stop at the nearer one (cell 1, left face at X=16)
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(1, 0);
+        tiles.AddTileAtCell(3, 0);
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(80f, 8f),
+            out Vector2 hitPoint, out _);
+
+        hit.ShouldBeTrue();
+        hitPoint.X.ShouldBe(16f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void Raycast_NoTileOnPath_ReturnsFalse()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 5); // far off the ray path
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(64f, 8f),
+            out _, out _);
+
+        hit.ShouldBeFalse();
     }
 
     // ── RemoveTileAtCell ─────────────────────────────────────────────────────

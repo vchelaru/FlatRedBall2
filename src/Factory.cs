@@ -9,6 +9,29 @@ internal interface IFactory
     void DestroyAll();
 }
 
+/// <summary>
+/// Creates, tracks, and destroys entities of type <typeparamref name="T"/> for a single screen.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <c>Factory&lt;T&gt;</c> is the standard way to create entities — use it even when you only need
+/// one instance. It registers the entity with the engine, wires up the activity loop, and ensures
+/// automatic cleanup when the screen exits.
+/// </para>
+/// <para>
+/// Declare one factory per entity type as a field on your <see cref="Screen"/>, construct it in
+/// <see cref="Screen.CustomInitialize"/>, and call <see cref="Create"/> to spawn instances:
+/// <code>
+/// private Factory&lt;Player&gt; _playerFactory = null!;
+///
+/// public override void CustomInitialize()
+/// {
+///     _playerFactory = new Factory&lt;Player&gt;(this);
+///     var player = _playerFactory.Create();
+/// }
+/// </code>
+/// </para>
+/// </remarks>
 public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : Entity, new()
 {
     private readonly Screen _screen;

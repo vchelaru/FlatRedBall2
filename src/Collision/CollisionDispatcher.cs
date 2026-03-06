@@ -300,7 +300,7 @@ internal static class CollisionDispatcher
             if (overlap < minOverlap)
             {
                 minOverlap = overlap;
-                minMtv = flip ? -axis * overlap : axis * overlap;
+                minMtv = flip ? axis * overlap : -axis * overlap;
             }
         }
         foreach (var axis in axesB)
@@ -310,7 +310,7 @@ internal static class CollisionDispatcher
             if (overlap < minOverlap)
             {
                 minOverlap = overlap;
-                minMtv = flip ? -axis * overlap : axis * overlap;
+                minMtv = flip ? axis * overlap : -axis * overlap;
             }
         }
         return minMtv;
@@ -331,13 +331,13 @@ internal static class CollisionDispatcher
         {
             if (!SatOverlap(polyPoints, rectPoints, axis, out float overlap, out bool flip))
                 return Vector2.Zero;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? -axis * overlap : axis * overlap; }
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         foreach (var axis in axesRect)
         {
             if (!SatOverlap(polyPoints, rectPoints, axis, out float overlap, out bool flip))
                 return Vector2.Zero;
-            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? -axis * overlap : axis * overlap; }
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         return minMtv;
     }
@@ -373,7 +373,7 @@ internal static class CollisionDispatcher
                 // Determine direction: push poly away from circle
                 float polyCenter = (polyMin + polyMax) / 2f;
                 bool flip = polyCenter < circleCenter;
-                minMtv = flip ? axis * overlap : -axis * overlap;
+                minMtv = flip ? -axis * overlap : axis * overlap;
             }
         }
         return minMtv;

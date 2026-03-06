@@ -78,6 +78,84 @@ public class PlatformerBehaviorTests
         entity.VelocityY.ShouldBe(jumpVelocity);
     }
 
+    [Fact]
+    public void Gravity_SetsNegativeAccelerationY()
+    {
+        float gravity = 600f;
+        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f };
+        var behavior = new PlatformerBehavior { AirMovement = values };
+        var entity = new Entity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.AccelerationY.ShouldBe(-gravity);
+    }
+
+    [Fact]
+    public void MaxFallSpeed_ClampsDownwardVelocity()
+    {
+        float maxFallSpeed = 300f;
+        var values = new PlatformerValues { Gravity = 0f, MaxFallSpeed = maxFallSpeed };
+        var behavior = new PlatformerBehavior { AirMovement = values };
+        var entity = new Entity { VelocityY = -999f }; // already falling faster than cap
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityY.ShouldBe(-maxFallSpeed);
+    }
+
+    [Fact]
+    public void Jump_SustainContinuesWhileButtonHeld()
+    {
+        float jumpVelocity = 400f;
+        var values = new PlatformerValues
+        {
+            JumpVelocity = jumpVelocity,
+            JumpApplyLength = TimeSpan.FromSeconds(0.2),
+            JumpApplyByButtonHold = true,
+            MaxFallSpeed = 1000f,
+        };
+        // Button held down across both frames
+        var jumpInput = new MockPressableInput(isDown: true, wasJustPressed: true);
+        var behavior = new PlatformerBehavior { AirMovement = values, JumpInput = jumpInput };
+        var entity = new Entity();
+        entity.LastReposition = new System.Numerics.Vector2(0f, 5f); // on ground
+
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 0f));
+        // Second frame: button still held, within JumpApplyLength — sustain should keep VelocityY = jumpVelocity
+        var heldInput = new MockPressableInput(isDown: true, wasJustPressed: false);
+        behavior.JumpInput = heldInput;
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        entity.VelocityY.ShouldBe(jumpVelocity);
+    }
+
+    [Fact]
+    public void Jump_EarlyRelease_WithButtonHold_CancelsSustain()
+    {
+        float jumpVelocity = 400f;
+        var values = new PlatformerValues
+        {
+            JumpVelocity = jumpVelocity,
+            JumpApplyLength = TimeSpan.FromSeconds(0.2),
+            JumpApplyByButtonHold = true,
+            MaxFallSpeed = 1000f,
+            Gravity = 0f, // disable so gravity doesn't interfere with VelocityY assertion
+        };
+        var jumpInput = new MockPressableInput(isDown: true, wasJustPressed: true);
+        var behavior = new PlatformerBehavior { AirMovement = values, JumpInput = jumpInput };
+        var entity = new Entity();
+        entity.LastReposition = new System.Numerics.Vector2(0f, 5f); // on ground
+
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 0f));
+        // Second frame: button released early — sustain should cancel, VelocityY no longer forced to jumpVelocity
+        var releasedInput = new MockPressableInput(isDown: false, wasJustPressed: false);
+        behavior.JumpInput = releasedInput;
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        behavior.IsApplyingJump.ShouldBeFalse();
+    }
+
     // --- Mock helpers ---
 
     private sealed class MockPressableInput : IPressableInput

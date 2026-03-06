@@ -5,6 +5,8 @@ description: "Working with Shapes in FlatRedBall2. Use when working with AxisAli
 
 # Working with Shapes in FlatRedBall2
 
+All shape types and `TileShapeCollection` are in the `FlatRedBall2.Collision` namespace — add `using FlatRedBall2.Collision;` in any file that uses them.
+
 FlatRedBall2 has three built-in shape types: `AxisAlignedRectangle`, `Circle`, and `Polygon`. All shapes implement both `IRenderable` and `ICollidable`, so they handle both drawing and collision.
 
 ## Shape Types
@@ -55,7 +57,7 @@ var rect = new AxisAlignedRectangle
 };
 ```
 
-> **Polygon note:** `Polygon` always draws as an outline (no fill triangulation yet). `IsFilled = true` doubles `OutlineThickness` to approximate a filled look.
+> **Polygon fill:** `IsFilled = true` ear-clip triangulates and fills the interior (works for concave polygons). `IsFilled = false` renders outline only. Set `OutlineThickness = 0` to suppress the border when filled.
 
 ## Cleanup
 
