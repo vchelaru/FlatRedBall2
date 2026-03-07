@@ -46,7 +46,7 @@ public class FlatRedBallService
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
 
-        _gum.Initialize(game, DefaultVisualsVersion.V2);
+        _gum.Initialize(game, DefaultVisualsVersion.V3);
         GumRenderBatch.Instance.Initialize();
     }
 

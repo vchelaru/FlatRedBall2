@@ -104,22 +104,68 @@ Engine.ApplyWindowSettings(new DisplaySettings
 
 ## Camera Position (Scrolling)
 
-Move the camera by setting `Camera.X` and `Camera.Y`. Entities in world space shift accordingly on screen.
+For fixed-screen games (Pong, etc.), leave `Camera.X = 0` and `Camera.Y = 0` (the defaults).
 
+For manual scrolling, set `Camera.X`/`Camera.Y` each frame from `CustomActivity`:
 ```csharp
-// Follow a player (centered)
 Camera.X = player.X;
 Camera.Y = player.Y;
 ```
 
-For a fixed-screen game like Pong, leave `Camera.X = 0` and `Camera.Y = 0` (the defaults).
+## CameraControllingEntity — Automatic Following
 
-## Screen Shake
+`CameraControllingEntity` (in `FlatRedBall2.Entities`) is an `Entity` subclass that handles following, map clamping, deadzone, pixel-snapping, and screen shake automatically.
 
-Two approaches work for screen shake:
+**Always create it via `Factory<CameraControllingEntity>`** — Factory calls `CustomInitialize`, which wires up the camera. `Screen.Register` does NOT call `CustomInitialize`.
 
-- **Velocity-based**: Set `Camera.VelocityX`/`VelocityY` to a random impulse each frame. Reset to 0 when done, and also explicitly reset `Camera.X/Y = 0` since velocity accumulates position drift.
-- **Direct assignment**: Set `Camera.X`/`Camera.Y` directly each frame to a random offset that decays to zero. No drift; resets cleanly. Preferred for simple timed shakes.
+```csharp
+private Factory<CameraControllingEntity> _cameraFactory = null!;
+
+public override void CustomInitialize()
+{
+    _cameraFactory = new Factory<CameraControllingEntity>(this);
+
+    var mapBounds = new AxisAlignedRectangle { Width = 2560f, Height = 1440f }; // centered at origin
+
+    var cam = _cameraFactory.Create(); // sets cam.Camera = Screen.Camera
+    cam.Target = player;               // or cam.Targets.Add(p1); cam.Targets.Add(p2);
+    cam.Map = mapBounds;               // clamps camera; null = no bounds
+    cam.TargetApproachStyle = TargetApproachStyle.Smooth;
+    cam.TargetApproachCoefficient = 8f; // higher = faster
+}
+```
+
+**Approach styles:**
+- `Immediate` — locks to target each frame (no lag)
+- `Smooth` — exponential ease; speed = coefficient × distance (default 5)
+- `ConstantSpeed` — moves at fixed world-units/sec, snaps when close
+
+**Deadzone** — camera only pans when the target leaves the window:
+```csharp
+cam.ScrollingWindowWidth  = 200f;
+cam.ScrollingWindowHeight = 120f;
+```
+
+**Pixel-perfect snapping** — on by default (`SnapToPixel = true`). Uses `Camera.PixelsPerUnit` for exactness across window resizes.
+
+**Screen shake** (async, pass `Token` to cancel on screen transition):
+```csharp
+_ = cam.ShakeScreen(radius: 8f, durationInSeconds: 0.4f, Token);
+```
+
+**Debug overlay** — shows the deadzone window:
+```csharp
+cam.Visible = true;
+```
+
+**Multi-target auto-zoom** (frames all targets in view):
+```csharp
+cam.EnableAutoZooming(defaultZoom: Camera.Zoom, furthestMultiplier: 3f);
+```
+
+## Screen Shake (manual, no CameraControllingEntity)
+
+Set `Camera.X`/`Camera.Y` directly each frame to a random offset that decays to zero. No drift; resets cleanly.
 
 ## Coordinate Conversion
 

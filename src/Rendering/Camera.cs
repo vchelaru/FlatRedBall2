@@ -27,6 +27,13 @@ public class Camera
     /// </summary>
     public float Zoom { get; set; } = 1f;
 
+    /// <summary>
+    /// Screen pixels per world unit, accounting for both the viewport size and <see cref="Zoom"/>.
+    /// Use this for pixel-perfect calculations such as snapping camera position to the nearest pixel
+    /// (<c>snapInterval = 1f / PixelsPerUnit</c>).
+    /// </summary>
+    public float PixelsPerUnit => _viewport.Height / (float)TargetHeight * Zoom;
+
     private Viewport _viewport;
 
     internal Viewport Viewport => _viewport;

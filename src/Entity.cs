@@ -236,6 +236,17 @@ public class Entity : ICollidable, IAttachable
     }
 
     // Lifecycle
+
+    /// <summary>
+    /// Called by <see cref="Factory{T}.Create"/> immediately after engine injection.
+    /// <see cref="Engine"/> and <see cref="Engine"/>.<see cref="FlatRedBallService.CurrentScreen"/>
+    /// are both available — use this (not the constructor) to access engine services or add child shapes.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Screen.Register"/> does <b>not</b> call this automatically. If you instantiate an
+    /// entity with <c>new</c> and register it manually, call <c>CustomInitialize()</c> yourself after
+    /// registration.
+    /// </remarks>
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }
     public virtual void CustomDestroy() { }
