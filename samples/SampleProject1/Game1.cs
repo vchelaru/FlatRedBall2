@@ -11,8 +11,6 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        _graphics.PreferredBackBufferWidth = 1280;
-        _graphics.PreferredBackBufferHeight = 720;
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
     }
@@ -22,7 +20,7 @@ public class Game1 : Game
         base.Initialize();
 
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-        FlatRedBall2.FlatRedBallService.Default.Start<OverlayDemoScreen>();
+        FlatRedBall2.FlatRedBallService.Default.Start<DisplaySettingsDemoScreenA>();
     }
 
     protected override void Update(GameTime gameTime)

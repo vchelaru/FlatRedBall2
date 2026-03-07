@@ -16,9 +16,14 @@ public class InputManager
             _gamepads[i] = new Gamepad(i);
     }
 
+    /// <summary>Keyboard input. State is captured once per frame before entity and screen logic runs.</summary>
     public IKeyboard Keyboard => _keyboard;
+
+    /// <summary>Mouse/touch cursor. <see cref="ICursor.WorldPosition"/> is in Y+ up world space, matching entity coordinates.</summary>
     public ICursor Cursor => _cursor;
 
+    /// <summary>Returns the gamepad at the given index (0–3). Safe to call when no controller is connected — returns zeroed state.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for index values outside 0–3.</exception>
     public IGamepad GetGamepad(int index)
     {
         if (index < 0 || index > 3)

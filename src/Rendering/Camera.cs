@@ -15,10 +15,21 @@ public class Camera
 
     public Color BackgroundColor { get; set; } = Color.Black;
 
-    public int TargetWidth { get; set; } = 1280;
-    public int TargetHeight { get; set; } = 720;
+    /// <summary>World units visible horizontally. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
+    public int TargetWidth { get; internal set; } = 1280;
+
+    /// <summary>World units visible vertically. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
+    public int TargetHeight { get; internal set; } = 720;
+
+    /// <summary>
+    /// Runtime zoom factor. Values greater than 1 zoom in (fewer world units visible);
+    /// values less than 1 zoom out (more world units visible). Reset to <see cref="DisplaySettings.Zoom"/> on each screen start.
+    /// </summary>
+    public float Zoom { get; set; } = 1f;
 
     private Viewport _viewport;
+
+    internal Viewport Viewport => _viewport;
 
     internal void SetViewport(Viewport viewport) => _viewport = viewport;
 
@@ -35,8 +46,8 @@ public class Camera
     {
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
-        var scaleX = vpW / TargetWidth;
-        var scaleY = vpH / TargetHeight;
+        var scaleX = vpW / TargetWidth * Zoom;
+        var scaleY = vpH / TargetHeight * Zoom;
         return new NumericsVector2(
             (worldPosition.X - X) * scaleX + vpW / 2f,
             -(worldPosition.Y - Y) * scaleY + vpH / 2f);
@@ -46,8 +57,8 @@ public class Camera
     {
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
-        var scaleX = vpW / TargetWidth;
-        var scaleY = vpH / TargetHeight;
+        var scaleX = vpW / TargetWidth * Zoom;
+        var scaleY = vpH / TargetHeight * Zoom;
         return new NumericsVector2(
             (screenPosition.X - vpW / 2f) / scaleX + X,
             -(screenPosition.Y - vpH / 2f) / scaleY + Y);
@@ -58,7 +69,7 @@ public class Camera
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
         return Matrix.CreateTranslation(-X, -Y, 0)
-            * Matrix.CreateScale(vpW / TargetWidth, -(vpH / TargetHeight), 1f)
+            * Matrix.CreateScale(vpW / TargetWidth * Zoom, -(vpH / TargetHeight * Zoom), 1f)
             * Matrix.CreateTranslation(vpW / 2f, vpH / 2f, 0f);
     }
 }

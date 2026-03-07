@@ -151,6 +151,28 @@ public class Screen
             renderable.Layer = layer;
     }
 
+    // Display settings
+
+    /// <summary>
+    /// Override to declare this screen's preferred display configuration.
+    /// <para>
+    /// Camera properties (<see cref="DisplaySettings.Zoom"/>, <see cref="DisplaySettings.ResizeMode"/>,
+    /// <see cref="DisplaySettings.FixedAspectRatio"/>, etc.) are applied every time this screen activates,
+    /// whether via <see cref="FlatRedBallService.Start{T}"/> or <see cref="MoveToScreen{T}"/>.
+    /// </para>
+    /// <para>
+    /// Window properties (<see cref="DisplaySettings.PreferredWindowWidth"/>,
+    /// <see cref="DisplaySettings.PreferredWindowHeight"/>, <see cref="DisplaySettings.AllowUserResizing"/>)
+    /// are only applied when this screen is the <em>starting</em> screen. They are ignored during
+    /// mid-game transitions so the window never pops or resizes while the player is playing.
+    /// </para>
+    /// <para>
+    /// Return <c>null</c> (the default) to inherit the engine's default
+    /// <see cref="FlatRedBallService.DisplaySettings"/> unchanged.
+    /// </para>
+    /// </summary>
+    public virtual DisplaySettings? PreferredDisplaySettings => null;
+
     // Lifecycle
     public virtual void CustomInitialize() { }
     public virtual void CustomActivity(FrameTime time) { }

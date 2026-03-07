@@ -10,7 +10,8 @@
       "WebFetch(domain:docs.flatredball.com)",
       "Bash(dotnet tool:*)",
       "Bash(python3:*)",
-      "Bash(dotnet-ildasm:*)"
+      "Bash(dotnet-ildasm:*)",
+      "Bash(dotnet-reflect:*)"
     ]
   }
 }

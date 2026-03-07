@@ -5,12 +5,12 @@ description: "Input System in FlatRedBall2. Use when working with keyboard, mous
 
 # Input System in FlatRedBall2
 
-All input is accessed through `Engine.InputManager` from inside an entity. The input manager exposes keyboard, cursor (mouse/touch), and up to four gamepads.
+All input is accessed through `Engine.InputManager` from inside any entity or screen. The input manager exposes keyboard, cursor (mouse/touch), and up to four gamepads.
 
 ## Accessing Input Devices
 
 ```csharp
-// From inside an Entity method (CustomInitialize or CustomActivity):
+// Works in Entity.CustomActivity, Screen.CustomActivity, or anywhere Engine is available:
 var keyboard = Engine.InputManager.Keyboard;       // IKeyboard
 var cursor   = Engine.InputManager.Cursor;         // ICursor
 var gamepad0 = Engine.InputManager.GetGamepad(0);  // IGamepad, index 0–3

@@ -99,15 +99,72 @@ Demo in `ShapeSelectDemoScreen` / `ShapeSelectPlayer`: player has a large BodyCi
 
 ## Resolution Control and Camera Display Settings
 
-**Status**: Not implemented
+**Status**: Done — `FlatRedBallService.DisplaySettings` (`DisplaySettings` class, `ResizeMode` enum, `WindowMode` enum) in `src/Rendering/DisplaySettings.cs`.
+- `ResolutionWidth`/`ResolutionHeight`: design resolution (world units visible at Zoom=1). Used as fixed world area for `StretchVisibleArea`. Also the fallback window size when restoring from fullscreen with no explicit size.
+- `Zoom`: initial camera zoom. Copied to `Camera.Zoom` at each screen start; camera is independent after that. At 1.0, one world unit = one pixel.
+- `ResizeMode`: `StretchVisibleArea` (fixed world area, scale fills window) or `IncreaseVisibleArea` (fixed pixels-per-unit, larger window shows more world).
+- `FixedAspectRatio` (`float?`): enforces aspect ratio with letterbox/pillarbox bars. `null` = fill window.
+- `LetterboxColor`: color of bars when `FixedAspectRatio` is set.
+- `WindowMode`: `Windowed` or `FullscreenBorderless`. No hardware/exclusive fullscreen — `HardwareModeSwitch = false` + `IsFullScreen = true` on MonoGame DesktopGL.
+- `PreferredWindowWidth`/`PreferredWindowHeight`: pixel size of the window at startup. `null` = leave unchanged.
+- `AllowUserResizing`: whether the player can drag window borders.
+- `Camera.Zoom`: runtime zoom (modifiable by game code, reset to `DisplaySettings.Zoom` on screen start).
+- `Camera.TargetWidth`/`TargetHeight` have `internal set` — managed by the engine, not set directly by game code.
+- `FlatRedBallService` subscribes to `Window.ClientSizeChanged` and updates the camera viewport and `TargetWidth`/`TargetHeight` (for `IncreaseVisibleArea`) on resize.
+- `FlatRedBallService.PrepareWindow<T>(GraphicsDeviceManager)`: call from `Game1` constructor to apply startup window/fullscreen settings before `Initialize()` (no flicker).
+- `FlatRedBallService.ApplyWindowSettings(DisplaySettings)`: public, safe to call at any time for runtime changes (settings menu, F11 toggle). Updates `DisplaySettings.WindowMode` to reflect current state. When restoring to windowed with no explicit size, falls back to `ResolutionWidth`/`ResolutionHeight`. Re-centers window after exiting fullscreen.
+- Pixel-perfect snapping not yet implemented (see Camera Movement and Control item).
+
+## Gum Project File Loading (.gumx)
+
+**Status**: Not started — high priority
 **What's needed**:
-- No built-in system for controlling how the game view responds to window size, aspect ratio changes, or display scaling. Game code currently has no way to declare a target resolution or constrain how the camera adapts.
-- Required concepts (see FRB1 for prior art on naming and behavior):
-  - **Desired aspect ratio / letterboxing**: define a target aspect ratio; when the window does not match, add letterbox or pillarbox bars rather than stretching the view.
-  - **Zoom**: a scalar applied to the camera's view independent of window size — used for pixel-art scaling (e.g., 2×, 3×) or dynamic zoom-in/out effects.
-  - **Resize mode**: how the visible world area responds when the window is resized. Options typically include: fixed world area (zoom changes), fixed zoom (world area changes), and fixed width or fixed height.
-- Where this lives (on `Camera`, a `DisplaySettings` object, a `ResolutionManager`, etc.) is an open design question — to be decided at implementation time by referencing FRB1's approach.
-- Must integrate with pixel-perfect snapping (see Camera Movement and Control item) so that integer zoom levels produce clean pixel alignment.
+
+FRB2 currently runs Gum in "code-only" mode (`DefaultVisualsVersion.V2`). Full `.gumx` project support lets designers build UI in the Gum tool and have it loaded at runtime, enabling component reuse, screen-level layouts, and animations defined outside of C# code.
+
+**MonoGameGum API entry point**: `GumService.Initialize(Game game, string gumProjectFile)` — already exists in the `Gum.MonoGame` package. The `gumProjectFile` is a path to the `.gumx` file (or the folder containing it). Returns the loaded `GumProjectSave`, or null if no project was loaded.
+
+**What FRB2 must add**:
+
+1. **Initialization path** — `FlatRedBallService.Initialize` currently calls `_gum.Initialize(game, DefaultVisualsVersion.V2)`. Add an overload or property (e.g., `FlatRedBallService.Default.GumProjectFile = "Content/MyProject.gumx"`) that switches to the project-loading `Initialize` overload instead. The two modes (code-only vs. project) are mutually exclusive.
+
+2. **Content/font loading** — Gum loads fonts (`.fnt` + texture atlas) and textures from disk directly, not through the MonoGame content pipeline. Verify the correct `Content.RootDirectory` is set and that `.fnt`/`.png` assets are copied to output (not processed by MGCB). Document which assets go through MGCB vs. which are copied raw.
+
+3. **Animation loading** — `GumService.LoadAnimations()` must be called after project load if the project uses animations. Wrap this or expose it via `FlatRedBallService.Gum`.
+
+4. **Screen-to-GumScreen mapping** — Decide how FRB2 `Screen` types access Gum screens defined in the `.gumx`:
+   - Option A: `Screen.GumScreen` property that game code populates manually by name from the loaded project (`GumService.GetScreen("MainMenu")`).
+   - Option B: A naming convention (`Screen` subclass name matches Gum screen name) with automatic wiring in `ActivateScreen`.
+   - The chosen approach must not break existing code-only Gum usage.
+
+5. **Component instantiation** — Gum components defined in `.gucx` files should be instantiatable in game code by type name (e.g., `GumService.CreateComponent("HealthBar")`), not just built manually in C#.
+
+6. **Screen lifecycle** — On screen transition, the current Gum screen's elements must be cleared/unloaded without disposing shared project assets (fonts, textures shared across screens).
+
+**Related**: The `.gumx` load path may surface AOT issues (Gum uses XML deserialization internally); annotate when/if encountered.
+
+## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
+
+**Status**: Not started — eventual goal
+**What's needed**:
+- FRB2 currently targets MonoGame.Framework.DesktopGL exclusively. The goal is to also support FNA and KNI as drop-in backends.
+- Each backend diverges on: graphics device initialization, fullscreen/borderless APIs, input handling, audio, and content pipeline format. Abstraction points will need to be identified and isolated (likely a thin `IBackend` or conditional compilation layer).
+- Native AOT compatibility is a long-term goal. Blockers to audit:
+  - Reflection-based code (e.g., `Activator.CreateInstance`, `Type.GetType`, `MakeGenericMethod`) must be replaced with source generators or static registration.
+  - MonoGame content pipeline and Gum may have reflection dependencies of their own that need upstream fixes or workarounds.
+  - AOT requires trimming-safe patterns throughout; `[DynamicallyAccessedMembers]` annotations or source-generated alternatives needed.
+- Platform targets that fall out of this work: Windows (x64/ARM64), macOS, Linux, iOS, Android, and console platforms reachable via KNI.
+- No action needed yet — flag any new code that is reflection-heavy or AOT-hostile so it can be cleaned up when this work begins.
+
+## .NET 10 and Latest Language Features
+
+**Status**: Not started
+**What's needed**:
+- FRB2 currently targets `net9.0`. Upgrading to `net10.0` unlocks C# 14 language features (e.g., null-conditional assignment `??=`, field-backed properties, `params` spans) and runtime improvements.
+- Update `<TargetFramework>` in `src/FlatRedBall2.csproj` and `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`.
+- Update `<LangVersion>` (or remove it to default to the latest for the TFM).
+- Verify all NuGet dependencies (MonoGame, Gum, Apos.Shapes) have net10 or `netstandard2.0`/`net6.0`+ compatible builds.
+- Run full test suite and sample builds after the upgrade.
 
 ## Camera Movement and Control
 
