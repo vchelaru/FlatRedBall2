@@ -31,7 +31,7 @@ public class FlatRedBallService
 
     public FlatRedBallService() { }
 
-    public void Initialize(Game game)
+    public void Initialize(Game game, EngineInitSettings? settings = null)
     {
         _game = game;
         _graphicsManager = game.Services.GetService(typeof(IGraphicsDeviceManager)) as GraphicsDeviceManager;
@@ -46,7 +46,15 @@ public class FlatRedBallService
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
 
-        _gum.Initialize(game, DefaultVisualsVersion.V3);
+        if (settings?.GumProjectFile is string gumProjectFile)
+        {
+            _gum.Initialize(game, gumProjectFile);
+            _gum.LoadAnimations();
+        }
+        else
+        {
+            _gum.Initialize(game, DefaultVisualsVersion.V3);
+        }
         GumRenderBatch.Instance.Initialize();
     }
 

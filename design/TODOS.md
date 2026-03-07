@@ -10,12 +10,21 @@ FRB2 runs Gum in code-only mode (`DefaultVisualsVersion.V3`). Full `.gumx` proje
 **MonoGameGum entry point**: `GumService.Initialize(Game game, string gumProjectFile)` — already exists. The `gumProjectFile` is a path to the `.gumx` file. Returns the loaded `GumProjectSave`, or null if no project was loaded.
 
 **What FRB2 must add**:
-1. **Initialization path** — `FlatRedBallService.Initialize` currently calls `_gum.Initialize(game, DefaultVisualsVersion.V3)`. Add an overload or property (e.g., `FlatRedBallService.Default.GumProjectFile = "Content/MyProject.gumx"`) that switches to the project-loading `Initialize` overload instead. The two modes (code-only vs. project) are mutually exclusive.
-2. **Content/font loading** — Gum loads fonts (`.fnt` + texture atlas) and textures from disk directly, not through the MonoGame content pipeline. Verify the correct `Content.RootDirectory` is set and that `.fnt`/`.png` assets are copied to output (not processed by MGCB).
-3. **Animation loading** — `GumService.LoadAnimations()` must be called after project load if the project uses animations.
-4. **Screen-to-GumScreen mapping** — Decide how FRB2 `Screen` types access Gum screens defined in the `.gumx`. Option A: `Screen.GumScreen` property populated manually by name. Option B: naming convention with automatic wiring in `ActivateScreen`. Must not break existing code-only usage.
-5. **Component instantiation** — Gum components defined in `.gucx` files should be instantiatable by type name (e.g., `GumService.CreateComponent("HealthBar")`).
-6. **Screen lifecycle** — On screen transition, clear/unload the current Gum screen's elements without disposing shared project assets.
+1. **Initialization path** — Done. `EngineInitSettings.GumProjectFile` passed to `FlatRedBallService.Initialize`.
+2. **Content/font loading** — Gum loads fonts (`.fnt` + texture atlas) and textures from disk directly, not through the MonoGame content pipeline. Verify the correct `Content.RootDirectory` is set and that `.fnt`/`.png` assets are copied to output (not processed by MGCB). **Blocked** — waiting on Gum command-line / starter project work.
+3. **Animation loading** — Done. `_gum.LoadAnimations()` called automatically when a project file is provided.
+
+## Gum — Default Starter Project
+Provide a minimal empty `.gumx` project checked into the repo (e.g., `tools/Gum/StarterProject/`) that Claude and developers can use as a starting point when a game needs Gum UI. Should include the bare minimum: a valid project file, empty screens folder, and any required default font assets.
+
+## Gum — Tool Location for Claude
+Record the path to the Gum tool `.exe` in a known location (e.g., `tools/Gum/` or a `CLAUDE.md` / skill file entry) so Claude can reference it without searching. Include the version pinned to the repo.
+
+## Gum — Codegen via Gum Tool
+Document and expose how to invoke the Gum tool in codegen mode so Claude can generate C# code from a `.gumx`/`.gucx` file. Record the CLI invocation (flags, input/output paths) in the `gum-integration` skill file so Claude can run it as part of a workflow.
+
+## Gum — Tool Error Reporting
+The Gum tool should have a well-defined error reporting mechanism (e.g., non-zero exit code + structured stderr output) so that Claude can detect failures and surface them clearly. Define what a failed codegen run looks like and how errors are communicated back to the caller.
 
 ## Audio System
 **Priority: Medium** — All `AudioManager` methods throw `NotImplementedException`.
