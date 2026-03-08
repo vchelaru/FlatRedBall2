@@ -2,42 +2,19 @@
 
 See `Done.md` for completed items.
 
-## Gum Project File Loading (.gumx)
-**Priority: High**
+## Gum — Zoom Correctness
+**Priority: Medium**
 
-FRB2 runs Gum in code-only mode (`DefaultVisualsVersion.V3`). Full `.gumx` project support lets designers build UI in the Gum tool and have it loaded at runtime.
+When `Camera.Zoom != 1`, Gum layout and rendering must both scale correctly. The current approach:
+1. Update loop divides `GraphicalUiElement.CanvasWidth/Height` by `Camera.Zoom` — keeps layout units consistent.
+2. `GumRenderBatch.Begin` passes `Matrix.CreateScale(zoom, zoom, 1f)` to `GumBatch.Begin` — scales rendered output.
 
-**MonoGameGum entry point**: `GumService.Initialize(Game game, string gumProjectFile)` — already exists. The `gumProjectFile` is a path to the `.gumx` file. Returns the loaded `GumProjectSave`, or null if no project was loaded.
+This is believed to be correct in principle but has **not been fully verified**. Need to test Gum UI at various zoom values (e.g. 1×, 1.5×, 2×) and window sizes and confirm:
+- Anchored elements (TopLeft, TopRight, Center, etc.) land at the right screen positions.
+- Text and control sizes appear proportionally correct.
+- No offset or clipping artefacts at non-integer zoom levels.
 
-**What FRB2 must add**:
-1. **Initialization path** — Done. `EngineInitSettings.GumProjectFile` passed to `FlatRedBallService.Initialize`.
-2. **Content/font loading** — Gum loads fonts (`.fnt` + texture atlas) and textures from disk directly, not through the MonoGame content pipeline. Verify the correct `Content.RootDirectory` is set and that `.fnt`/`.png` assets are copied to output (not processed by MGCB). **Blocked** — waiting on Gum command-line / starter project work.
-3. **Animation loading** — Done. `_gum.LoadAnimations()` called automatically when a project file is provided.
-
-## Gum — Default Starter Project
-Provide a minimal empty `.gumx` project checked into the repo (e.g., `tools/Gum/StarterProject/`) that Claude and developers can use as a starting point when a game needs Gum UI. Should include the bare minimum: a valid project file, empty screens folder, and any required default font assets.
-
-## Gum — Tool Location for Claude
-Record the path to the Gum tool `.exe` in a known location (e.g., `tools/Gum/` or a `CLAUDE.md` / skill file entry) so Claude can reference it without searching. Include the version pinned to the repo.
-
-## Gum — Codegen via Gum Tool
-Document and expose how to invoke the Gum tool in codegen mode so Claude can generate C# code from a `.gumx`/`.gucx` file. Record the CLI invocation (flags, input/output paths) in the `gum-integration` skill file so Claude can run it as part of a workflow.
-
-## Gum — Tool Error Reporting
-The Gum tool should have a well-defined error reporting mechanism (e.g., non-zero exit code + structured stderr output) so that Claude can detect failures and surface them clearly. Define what a failed codegen run looks like and how errors are communicated back to the caller.
-
-## TopDownMenuSample — Real Pause Implementation
-**Priority: Medium** — `samples/TopDownMenuSample`
-
-Currently, pressing ESC transitions to a `PauseMenuScreen` (destroying `GameScreen`) and "Resume" transitions back (recreating `GameScreen`). This is not true pausing — the game world is not preserved across the transition.
-
-Real pausing requires:
-- Suspending entity physics/activity while the pause overlay is shown
-- Keeping `GameScreen` alive (not destroyed) when ESC is pressed
-- Rendering the pause overlay on top of the existing game world frame
-- Returning to the exact game state when the player resumes
-
-Likely approach: draw a pause overlay within `GameScreen.CustomActivity` (using an in-screen Gum panel toggled on/off) rather than transitioning to a separate screen.
+The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560×1440` with default zoom (1×) for its 2× scale effect — it does not exercise `Camera.Zoom` directly. A dedicated test or demo screen would be the cleanest way to verify.
 
 ## Audio System
 **Priority: Medium** — All `AudioManager` methods throw `NotImplementedException`.
@@ -53,6 +30,9 @@ Likely approach: draw a pause overlay within `GameScreen.CustomActivity` (using 
 - `AnimationChain` and `AnimationFrame` runtime types
 - Per-frame texture region, timing, and relative X/Y offset
 - `Sprite.CurrentAnimation` state machine: playing, looped, completed events
+
+## Pause-Aware Delay
+`TimeManager.DoTaskLogic` runs at the service level, outside `Screen.Update`. This means `await`-based delays in entity/screen code continue ticking while the screen is paused. FRB1 addressed this with a `PauseAdjustedCurrentTime`. We need an equivalent — likely a delay API that uses screen-relative time so timers automatically suspend when `Screen.IsPaused` is true. Details TBD when a real use case arises.
 
 ## Async Synchronization Context
 `// TODO: flush async sync context` comment in update loop.
@@ -87,7 +67,3 @@ Current `AddCollisionRelationship` does O(n×m) broad-phase — fine for small l
 - AOT blockers: reflection-based code (`Activator.CreateInstance`, `MakeGenericMethod`, etc.) must be replaced
 - Flag any new reflection-heavy or AOT-hostile code for future cleanup
 
-## .NET 10 Upgrade
-- Update `<TargetFramework>` in `src/FlatRedBall2.csproj` and `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`
-- Verify NuGet dependencies (MonoGame, Gum, Apos.Shapes) have compatible builds
-- Run full test suite and sample builds after upgrade

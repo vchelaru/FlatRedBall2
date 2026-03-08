@@ -21,7 +21,11 @@
       "Bash(\"$GUMCLI\" codegen-init:*)",
       "Bash(\"$GUMCLI\" check:*)",
       "Bash(find:*)",
-      "Bash(\"$GUMCLI\":*)"
+      "Bash(\"$GUMCLI\":*)",
+      "Bash(\"C:/Users/vchel/Documents/GitHub/FlatRedBall2/../Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe\":*)",
+      "Bash(\"C:/Users/vchel/Documents/GitHub/Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe\" fonts:*)",
+      "Bash(mkdir:*)",
+      "Bash(dotnet list:*)"
     ]
   }
 }

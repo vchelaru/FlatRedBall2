@@ -151,6 +151,11 @@ public class Screen
             renderable.Layer = layer;
     }
 
+    // Pause state
+    public bool IsPaused { get; private set; }
+    public void PauseThisScreen() => IsPaused = true;
+    public void UnpauseThisScreen() => IsPaused = false;
+
     // Display settings
 
     /// <summary>
@@ -249,21 +254,24 @@ public class Screen
     // Internal update — called by FlatRedBallService
     internal void Update(FrameTime frameTime)
     {
-        // 1. Physics pass
-        foreach (var entity in _entities)
-            entity.PhysicsUpdate(frameTime);
+        if (!IsPaused)
+        {
+            // 1. Physics pass
+            foreach (var entity in _entities)
+                entity.PhysicsUpdate(frameTime);
 
-        Camera.PhysicsUpdate(frameTime.DeltaSeconds);
+            Camera.PhysicsUpdate(frameTime.DeltaSeconds);
 
-        // 2. Collision phase
-        foreach (var rel in _collisionRelationships)
-            rel.RunCollisions();
+            // 2. Collision phase
+            foreach (var rel in _collisionRelationships)
+                rel.RunCollisions();
 
-        // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
-        foreach (var entity in new List<Entity>(_entities))
-            entity.CustomActivity(frameTime);
+            // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
+            foreach (var entity in new List<Entity>(_entities))
+                entity.CustomActivity(frameTime);
+        }
 
-        // 4. Screen CustomActivity — runs after entities, so it can react to their updated state
+        // 4. Screen CustomActivity — always runs so pause menu logic can respond to input
         CustomActivity(frameTime);
     }
 

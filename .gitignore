@@ -26,3 +26,5 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 /samples/ZombieSample/obj
 /samples/PongGravity/bin
 /samples/PongGravity/obj
+/samples/BouncingBallsSample/bin
+/samples/BouncingBallsSample/obj

@@ -127,6 +127,21 @@ Exit codes: `0` = success, `1` = elements blocked by errors, `2` = load/config f
 
 ---
 
+## Font Generation
+
+If the project uses custom bitmap fonts (Text elements with a Font variable set), generate the missing `.fnt` and `.png` files with:
+
+```bash
+"$GUMCLI" fonts Content/GumProject/GumProject.gumx
+```
+
+- **Windows-only** — bmfont.exe does not run on Linux/macOS. On non-Windows the command exits with code `2`.
+- Only generates fonts that don't already exist on disk; safe to re-run.
+- Font files land in `FontCache/` next to the `.gumx` file. Add that folder to `.gitignore` or check it in depending on your CI setup.
+- Run this after `gumcli new` if the project template includes screens with font-bearing Text instances, or any time a new font/size combination is added in the Gum editor.
+
+---
+
 ## Known Warnings in Generated Code
 
 After running codegen, the standard controls (`ButtonStandard`, `TextBox`, `CheckBox`, etc.) produce CS0114/CS0108 "hides inherited member" warnings. These come from the Gum-generated `*.Generated.cs` files and are expected — do not try to fix them. They do not affect runtime behavior.

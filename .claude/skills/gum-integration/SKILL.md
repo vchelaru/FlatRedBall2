@@ -161,9 +161,19 @@ mainMenu.QuitButton.Click += (_, _) => Exit();
 - After any edit to the Gum XML, re-run `gumcli codegen` before referencing new/renamed instances in C#.
 - `Add(mainMenu)` works the same as other modes — pass the generated runtime object directly.
 
+## Showing / Hiding a Control
+
+`FrameworkElement` (Label, Button, etc.) exposes `IsVisible` which wraps `Visual.Visible`:
+
+```csharp
+label.IsVisible = false;   // hide
+label.IsVisible = true;    // show
+```
+
 ## Gotchas
 
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
+- **`IsVisible` on `FrameworkElement`** — use `element.IsVisible = true/false` to show/hide. Do not use `element.Visual.Visible` directly.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.

@@ -137,3 +137,31 @@ MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex + 1);
 ```
 
   Do **not** manually destroy entities or collision relationships before calling this — the engine handles all teardown automatically.
+
+## Pausing
+
+`Screen` has built-in pause support:
+
+```csharp
+PauseThisScreen();    // freeze entities
+UnpauseThisScreen();  // resume
+bool paused = IsPaused;
+```
+
+**What pauses:** entity physics, entity `CustomActivity`, collision processing.
+**What keeps running:** `Screen.CustomActivity`, Gum UI, input — so pause-menu logic lives in `CustomActivity` and Gum overlays still update.
+
+Typical pattern:
+
+```csharp
+public override void CustomActivity(FrameTime time)
+{
+    if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Escape))
+    {
+        if (IsPaused) { UnpauseThisScreen(); _pauseOverlay.IsVisible = false; }
+        else          { PauseThisScreen();   _pauseOverlay.IsVisible = true;  }
+    }
+}
+```
+
+> **Note:** `await`-based delays (`TimeManager.DoTaskLogic`) run at the service level and are **not** suspended by pause. Avoid time-sensitive game-logic delays during pause; this will be addressed in a future Pause-Aware Delay API.

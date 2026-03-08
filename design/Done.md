@@ -1,5 +1,8 @@
 # FlatRedBall2 — Completed Items
 
+## Gum Project File Loading (.gumx)
+`EngineInitSettings.GumProjectFile` passed to `FlatRedBallService.Initialize`. Gum loads fonts (`.fnt` + texture atlas) and textures directly from disk. `.fnt`/`.png` assets are copied to output via `<Content Include="Content\GumProject\**" CopyToOutputDirectory="PreserveNewest" />` — not processed by MGCB. `_gum.LoadAnimations()` called automatically when a project file is provided. Demonstrated in PongGravity.
+
 ## TileShapeCollection — Polygon Tile Support
 `AddPolygonTileAtCell(int col, int row, Polygon prototype)` / `RemovePolygonTileAtCell` / `GetPolygonTileAtCell`. Collision (`GetSeparationFor`) and `Raycast` both dispatch to polygon tiles. Screen.Add wires up render callbacks for both tile types.
 
@@ -23,6 +26,9 @@
 
 ## Resolution Control and Camera Display Settings
 `FlatRedBallService.DisplaySettings` (`DisplaySettings` class, `ResizeMode` enum, `WindowMode` enum). Covers `ResolutionWidth/Height`, `Zoom`, `ResizeMode` (`StretchVisibleArea` / `IncreaseVisibleArea`), `FixedAspectRatio` (letterbox/pillarbox), `WindowMode` (`Windowed` / `FullscreenBorderless`), `AllowUserResizing`. `PrepareWindow<T>` for flicker-free startup; `ApplyWindowSettings` for runtime changes.
+
+## Pause System
+`Screen.IsPaused`, `PauseThisScreen()`, `UnpauseThisScreen()`. When paused, entity physics, collision, and entity `CustomActivity` are all skipped. `Screen.CustomActivity` always runs so the screen can respond to input (e.g., showing a pause menu). TopDownMenuSample updated to use an in-screen Gum overlay (`PauseMenuScreen.gusx` loaded at `GameScreen` init, `Visible` toggled) rather than a screen transition, so game world state is preserved across pause/resume.
 
 ## Camera Movement and Control
 `CameraControllingEntity` in `src/Entities/CameraControllingEntity.cs`. `Target`/`Targets`, `TargetApproachStyle` (`Immediate`/`Smooth`/`ConstantSpeed`), `Map` (level bounds clamping), `ScrollingWindowWidth/Height` (deadzone), `SnapToPixel`, `CameraOffset`, `EnableAutoZooming`, `IsKeepingTargetsInView`, `ShakeScreen`/`ShakeScreenUntil` (async, auto-cancels on transition), `ForceToTarget()`.

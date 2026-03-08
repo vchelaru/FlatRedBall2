@@ -51,6 +51,9 @@
     <Variable Type="float" Name="InstructionsLabel.Y" SetsValue="true">
       <Value xsi:type="xsd:float">20</Value>
     </Variable>
+    <Variable IsFont="true" Type="string" Name="P1ScoreLabel.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Impact</Value>
+    </Variable>
     <Variable Type="int" Name="P1ScoreLabel.FontSize" SetsValue="true">
       <Value xsi:type="xsd:int">50</Value>
     </Variable>
@@ -62,6 +65,9 @@
     </Variable>
     <Variable Type="float" Name="P1ScoreLabel.Y" SetsValue="true">
       <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable IsFont="true" Type="string" Name="P2ScoreLabel.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Impact</Value>
     </Variable>
     <Variable Type="int" Name="P2ScoreLabel.FontSize" SetsValue="true">
       <Value xsi:type="xsd:int">50</Value>
