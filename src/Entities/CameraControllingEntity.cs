@@ -145,7 +145,7 @@ public class CameraControllingEntity : Entity
     /// When true, draws the deadzone window as a yellow debug overlay each frame.
     /// Useful for diagnosing camera behavior during development.
     /// </summary>
-    public bool Visible { get; set; }
+    public bool ShowDebugOverlay { get; set; }
 
     // ── Auto-zoom ─────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ public class CameraControllingEntity : Entity
     {
         if (!IsActive || Camera == null) return;
 
-        if (Visible)
+        if (ShowDebugOverlay)
             DrawDeadzoneOverlay();
 
         if (IsKeepingTargetsInView && _hasActivityBeenCalled)

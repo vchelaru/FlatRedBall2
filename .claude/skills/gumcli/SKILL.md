@@ -1,17 +1,22 @@
 ---
 name: gumcli
-description: "Gum CLI tool for FlatRedBall2. Use when creating a game or sample that will use Gum UI (buttons, menus, labels, text boxes, HUD). BEFORE writing any Gum-related code, ask the user whether to use the Gum tool (gumcli.exe) or Gum in code only. Covers locating gumcli.exe, running gumcli new, .csproj content includes, and optional codegen."
+description: "Gum CLI tool for FlatRedBall2. Trigger at game/sample START — before any code is written — to ask the user whether the project will use Gum and which mode (code-only, project+dynamic, or project+codegen). Covers locating gumcli.exe, running gumcli new, .csproj content includes, and codegen."
 ---
 
 # Gum CLI Setup
 
-Use this skill **before writing any Gum UI code**. First ask the user which Gum mode they want:
+**Ask the Gum mode question at game-start time** — before any code is written, not when Gum UI is about to be implemented. This affects project structure and cannot be changed easily mid-build.
 
-> "Should this project use **Gum tool** (gumcli generates a .gumx project file, editable in the Gum editor) or **Gum code-only** (UI defined entirely in C# with no .gumx file)?"
+When starting any new game or sample, ask:
 
-If the user chooses **Gum code-only**, skip this skill and proceed with the `gum-integration` skill.
+> "Before we start: will this project use Gum for UI (menus, HUD, labels)? If so, which mode?
+> 1. **Code-only** — UI defined entirely in C#, no .gumx file, no Gum editor
+> 2. **Project + dynamic access** — .gumx project file (editable in the Gum editor), access elements at runtime via `GetFrameworkElementByName<T>()` (returns a cast, no compile-time safety)
+> 3. **Project + codegen** — .gumx project file + gumcli generates strongly-typed C# classes; access screens/components directly as typed properties with full IntelliSense"
 
-If the user chooses **Gum tool**, follow the steps below.
+If the user chooses **code-only (mode 1)**, skip this skill and proceed with the `gum-integration` skill.
+
+If the user chooses **mode 2 or 3**, follow the steps below to create the project. For mode 3, also run codegen after any edits to the Gum XML files.
 
 ---
 
@@ -26,7 +31,7 @@ Find it via a relative path from the FlatRedBall2 git root:
 GIT_ROOT=$(git rev-parse --show-toplevel)
 
 # gumcli lives in the sibling Gum repo
-GUMCLI="$GIT_ROOT/../Gum/Gum.Cli/bin/Debug/net8.0/gumcli.exe"
+GUMCLI="$GIT_ROOT/../Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe"
 ```
 
 Verify it exists before proceeding:
@@ -61,6 +66,10 @@ Content/GumProject/
 
 Use `GumProject.gumx` as the default name unless the user requests otherwise.
 
+**The generated project includes ready-to-use Forms controls** (Button, TextBox, CheckBox, ListBox, etc.) as component and standard files under `Components/` and `Standards/`. These controls are fully functional out of the box — no extra setup needed.
+
+**Important**: When adding Forms controls to a screen, define them as instances in the Gum screen `.gusx` XML file (or a component `.gucx` file), not just in C# code. Defining them in the XML lets the user open the project in the Gum editor and tweak visuals after the fact. Only fall back to pure-code instantiation for controls that are fully dynamic (e.g., a list whose count is data-driven at runtime).
+
 ---
 
 ## Step 3 — Add Content Includes to .csproj
@@ -75,26 +84,46 @@ Add a wildcard include so all Gum project files are copied to output:
 
 ---
 
-## Step 4 — Ask About Codegen (Optional)
+## Naming Convention (Mode 3 — Codegen)
 
-Ask the user:
+When using codegen, Gum screen/component names collide with FRB2 `Screen` subclass names if both use the same identifier in the same namespace. **Use a `Gum` suffix on all Gum XML elements** to avoid this:
 
-> "Do you want to use **gumcli codegen** to generate C# classes from your Gum elements? This lets you reference Gum screens and components as strongly-typed C# classes. If you're not sure, you can skip this for now."
+- Gum XML screen: `MainMenuScreenGum` → generates class `MainMenuScreenGum : FrameworkElement`
+- FRB2 screen: `MainMenuScreen : Screen` → instantiates `new MainMenuScreenGum()`
 
-If the user says **yes**:
+This convention applies to screens and any components that would otherwise conflict with C# class names in the project. Standard controls (Button, Label, etc.) already have unique names and don't need the suffix.
 
-- `codegen` requires a `ProjectCodeSettings.codsj` file with `CodeProjectRoot` configured — this is set up via the Gum editor, not gumcli. Note this limitation to the user and suggest they configure it in the editor first.
-- Once configured, generate all elements:
-  ```bash
-  "$GUMCLI" codegen Content/GumProject/GumProject.gumx
-  ```
-- Or generate specific elements:
-  ```bash
-  "$GUMCLI" codegen Content/GumProject/GumProject.gumx --element Button
-  ```
-- Exit code `0` = success, `1` = elements blocked by errors, `2` = load/config failure.
+---
 
-If the user says **no**, skip codegen.
+## Step 4 — Codegen (Required for Mode 3, Optional for Mode 2)
+
+**Do not manually create `ProjectCodeSettings.codsj`** — run `codegen-init` once to auto-detect the `.csproj` and generate it:
+
+```bash
+"$GUMCLI" codegen-init Content/GumProject/GumProject.gumx
+```
+
+This sets `CodeProjectRoot`, `RootNamespace`, and `OutputLibrary` automatically. Only needed once per project.
+
+Then run codegen after any edits to Gum XML files:
+
+```bash
+"$GUMCLI" codegen Content/GumProject/GumProject.gumx
+```
+
+Or generate a specific element only:
+
+```bash
+"$GUMCLI" codegen Content/GumProject/GumProject.gumx --element MainMenuScreenGum
+```
+
+Exit codes: `0` = success, `1` = elements blocked by errors, `2` = load/config failure.
+
+**Codegen generates two files per element**: `ElementName.Generated.cs` (never edit) and `ElementName.cs` (partial stub with `CustomInitialize()` for UI-specific setup). The FRB2 `Screen` class is separate — do not confuse the Gum `CustomInitialize` partial with the FRB2 screen's `CustomInitialize`.
+
+**Old generated files are NOT deleted automatically** when you rename a Gum element. Always manually delete stale `.Generated.cs` and `.cs` stub files before re-running codegen after a rename.
+
+**Workflow rule (mode 3)**: After any edit to a `.gusx`, `.gucx`, or `.gutx` file — including adding instances, renaming, or changing types — always run `gumcli check` then `gumcli codegen` before writing C# code that references those elements. The generated classes live in the project as regular `.cs` files — check them in alongside the Gum XML.
 
 ---
 

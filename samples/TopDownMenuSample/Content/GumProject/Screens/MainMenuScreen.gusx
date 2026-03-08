@@ -51,8 +51,52 @@
     <Variable Type="float" Name="TitleText.Y" SetsValue="true">
       <Value xsi:type="xsd:float">80</Value>
     </Variable>
+    <Variable Type="float" Name="StartGameButton.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">40</Value>
+    </Variable>
+    <Variable Type="string" Name="StartGameButton.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Start Game</Value>
+    </Variable>
+    <Variable Type="float" Name="StartGameButton.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">200</Value>
+    </Variable>
+    <Variable Type="float" Name="StartGameButton.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="StartGameButton.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="StartGameButton.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="StartGameButton.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">260</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitButton.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">40</Value>
+    </Variable>
+    <Variable Type="string" Name="ExitButton.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Exit</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitButton.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">200</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitButton.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="ExitButton.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="ExitButton.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitButton.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">320</Value>
+    </Variable>
   </State>
   <Instance Name="Background" BaseType="ColoredRectangle" />
   <Instance Name="TitleText" BaseType="Text" />
+  <Instance Name="StartGameButton" BaseType="Controls/ButtonStandard" />
+  <Instance Name="ExitButton" BaseType="Controls/ButtonStandard" />
   <Behaviors />
 </ScreenSave>

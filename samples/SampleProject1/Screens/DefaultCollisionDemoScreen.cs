@@ -87,7 +87,7 @@ public class DefaultCollisionDemoScreen : Screen
             }
         }
 
-        _tiles.Visible = true;
+        _tiles.IsVisible = true;
     }
 
     private void SetupCollision()

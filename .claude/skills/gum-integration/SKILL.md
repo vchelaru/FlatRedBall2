@@ -7,6 +7,16 @@ description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, me
 
 Gum is FlatRedBall2's UI system, backed by the `Gum.MonoGame` NuGet package. It is **automatically initialized** by `FlatRedBallService.Initialize` — no setup required.
 
+## Three Gum Usage Modes
+
+Choose the mode that matches the project setup (see `gumcli` skill for how to create the project):
+
+| Mode | Description | When to use |
+|------|-------------|-------------|
+| **Code-only** | No `.gumx` file. All controls created in C# with `new Button()` etc. | Prototypes, no Gum editor needed |
+| **Project + dynamic access** | `.gumx` loaded; retrieve named elements at runtime via `GetFrameworkElementByName<T>()` | Editor integration, no codegen |
+| **Project + codegen** | `.gumx` loaded + gumcli generates strongly-typed C# classes; instantiate and use typed properties directly | Best DX; recommended for new projects |
+
 ## Two Levels of Gum API
 
 **FrameworkElement controls (high-level, preferred)**: `Button`, `Label`, `TextBox`, `CheckBox`, `StackPanel`, `Panel`, etc. from `Gum.Forms.Controls`. These have built-in functionality — click events, hover, focus, keyboard navigation, layout.
@@ -93,6 +103,7 @@ Add(hudPanel, z: 100f);
 When a `.gumx` project is loaded (via `EngineInitSettings.GumProjectFile`), you can instantiate a Gum screen defined in the project and add it to the FRB2 screen (e.g., as a background visual):
 
 ```csharp
+using Gum.Forms;     // GetFrameworkElementByName extension method
 using Gum.Managers;  // ObjectFinder
 using MonoGameGum;   // ToGraphicalUiElement — easy to miss, different namespace from Gum.DataTypes
 
@@ -102,12 +113,57 @@ Add(gumScreenSave!.ToGraphicalUiElement());
 ```
 
 - `using MonoGameGum;` is required even though `ScreenSave` lives in `Gum.DataTypes` — the extension method is in `MonoGameGum`.
-- Forms controls (`new Button()`, etc.) created in C# still use built-in default visuals unless the project includes matching component files. Mix freely.
 - **`GumProjectFile` path must NOT include `Content/`** — Gum's `FileManager` is already rooted at the MonoGame `Content/` directory. Use `"GumProject/GumProject.gumx"`, not `"Content/GumProject/GumProject.gumx"`. The double-`Content` causes a runtime load failure.
+
+### If the project was created with gumcli
+
+`gumcli new` scaffolds the project with **all standard Forms controls already included** as component and standard files (Button, TextBox, CheckBox, ListBox, etc.). These are immediately available — no additional setup required.
+
+**Prefer defining Forms control instances in Gum XML files** (screen `.gusx` or component `.gucx`) rather than creating them purely in C# code. XML-defined instances are visible in the Gum editor so designers can adjust layout and visuals without touching code. Only instantiate controls in C# when they are fully dynamic (e.g., a variable-length list driven by runtime data).
+
+### Mode 2 — Dynamic access via Get calls
+
+When the Gum screen XML is loaded with `ToGraphicalUiElement()`, any Forms control instances declared in it are constructed and wired automatically — just hook up events in C#:
+
+```csharp
+// using Gum.Forms;            // GetFrameworkElementByName extension method
+// using Gum.Forms.Controls;   // Button, Label, etc.
+// using MonoGameGum;          // ToGraphicalUiElement
+
+var root = gumScreenSave!.ToGraphicalUiElement();
+Add(root);
+
+// Retrieve a named instance and hook up events:
+var startButton = root.GetFrameworkElementByName<Button>("StartButton");
+startButton.Click += (_, _) => MoveToScreen<GameScreen>();
+```
+
+- `GetFrameworkElementByName<T>` is an extension method in `Gum.Forms` — add `using Gum.Forms;`.
+- `Button` and other Forms types are in `Gum.Forms.Controls` — do **not** use `MonoGameGum.Forms.Controls`; those wrappers are `[Obsolete(error: true)]`.
+- Forms controls (`new Button()`, etc.) created in C# still use built-in default visuals unless the project includes matching component files. Mix freely.
+
+### Mode 3 — Codegen (strongly-typed)
+
+After running `gumcli codegen`, each Gum screen and component gets a generated C# class. Instantiate the class directly — no `ToGraphicalUiElement()` or string-based lookup needed:
+
+```csharp
+// Generated class for "MainMenuScreen" Gum screen:
+var mainMenu = new MainMenuScreenRuntime();
+Add(mainMenu);
+
+// Properties match the instance names defined in the Gum XML:
+mainMenu.StartButton.Click += (_, _) => MoveToScreen<GameScreen>();
+mainMenu.QuitButton.Click += (_, _) => Exit();
+```
+
+- Generated classes are named `<ElementName>Runtime` by convention (e.g., `MainMenuScreenRuntime`, `PauseMenuRuntime`).
+- Accessing a property that doesn't exist is a compile error — much safer than string-based `GetFrameworkElementByName`.
+- After any edit to the Gum XML, re-run `gumcli codegen` before referencing new/renamed instances in C#.
+- `Add(mainMenu)` works the same as other modes — pass the generated runtime object directly.
 
 ## Gotchas
 
-- **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`.
+- **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.

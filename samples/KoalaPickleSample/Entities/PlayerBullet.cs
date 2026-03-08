@@ -28,7 +28,7 @@ public class PlayerBullet : Entity
         {
             Width = 12f,
             Height = 6f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(255, 130, 180, 255),
         };
         Add(_rect);

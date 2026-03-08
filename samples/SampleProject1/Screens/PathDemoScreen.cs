@@ -68,7 +68,7 @@ public class PathDemoScreen : Screen
         var body = new Circle
         {
             Radius = 12f,
-            Visible = true,
+            IsVisible = true,
             IsFilled = true,
             Color = new Color(255, 200, 50),
         };
@@ -79,7 +79,7 @@ public class PathDemoScreen : Screen
         {
             Radius = 5f,
             Y = 16f,
-            Visible = true,
+            IsVisible = true,
             IsFilled = true,
             Color = new Color(255, 100, 50),
         };
@@ -98,7 +98,7 @@ public class PathDemoScreen : Screen
         _follower.Activity(_dot, time.DeltaSeconds);
 
         if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.V))
-            _path.Visible = !_path.Visible;
+            _path.IsVisible = !_path.IsVisible;
 
         _statusLabel.Text =
             $"V = toggle path  |  Waypoints: {_waypointCount}  |  " +

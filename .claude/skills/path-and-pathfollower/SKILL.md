@@ -42,7 +42,7 @@ float   total   = path.TotalLength;               // includes closing segment wh
 ```csharp
 path.Color         = Color.Cyan;
 path.LineThickness = 3f;
-path.Visible       = true;
+path.IsVisible     = true;
 screen.Add(path);  // registers for rendering like any other IRenderable
 ```
 

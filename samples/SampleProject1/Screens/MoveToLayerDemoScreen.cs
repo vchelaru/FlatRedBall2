@@ -45,7 +45,7 @@ public class MoveToLayerDemoScreen : Screen
             Height = 300f,
             Color = new XnaColor(180, 80, 220, 160),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
             Layer = _overlayLayer,
         };
         Add(overlay);

@@ -122,6 +122,34 @@ var jumpButton = new GamepadPressableInput(
 if (jumpButton.WasJustPressed) { /* jump */ }
 ```
 
+## Combining Inputs with Or
+
+Any two `I2DInput` values can be merged with `.Or(other)`. The result reads whichever source has the larger magnitude on each frame — so both inputs work simultaneously without one suppressing the other.
+
+```csharp
+// Keyboard and gamepad both drive the same movement
+_movement = new KeyboardInput2D(kb, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
+    .Or(new GamepadInput2D(pad, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY));
+
+// Two gamepads on the same input (local co-op, shared control)
+_movement = new GamepadInput2D(pad0, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY)
+    .Or(new GamepadInput2D(pad1, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY));
+
+// Analog stick plus d-pad on the same gamepad
+_movement = new GamepadInput2D(pad, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY)
+    .Or(new GamepadInput2D(pad, GamepadAxis.DPadX, GamepadAxis.DPadY));
+```
+
+The same applies to `IPressableInput` via `.Or(other)` — any two pressable inputs merge into one.
+
+```csharp
+// Space bar or gamepad A trigger the same action
+_jump = new KeyboardPressableInput(kb, Keys.Space)
+    .Or(new GamepadPressableInput(pad, Buttons.A));
+```
+
+The concrete types on each side of `.Or` do not matter — anything implementing `I2DInput` or `IPressableInput` can be combined.
+
 ## Best Practices
 
 - **Create input objects once in `CustomInitialize`, not in `CustomActivity`.** Constructing them every frame allocates garbage and is wasteful.

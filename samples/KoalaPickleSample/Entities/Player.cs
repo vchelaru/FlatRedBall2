@@ -45,7 +45,7 @@ public class Player : Entity
         {
             Width = 40f,
             Height = 40f,
-            Visible = true,
+            IsVisible = true,
             Color = NormalColor,
         };
         Add(_rect);

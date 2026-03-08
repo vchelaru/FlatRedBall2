@@ -21,7 +21,7 @@ public class Circle : IAttachable, IRenderable, ICollidable
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
     // IRenderable
-    public bool Visible { get; set; } = false;
+    public bool IsVisible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
     public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     public string? Name { get; set; }
@@ -34,7 +34,7 @@ public class Circle : IAttachable, IRenderable, ICollidable
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        if (!Visible || Batch is not ShapesBatch sb) return;
+        if (!IsVisible || Batch is not ShapesBatch sb) return;
 
         // Convert world-space center to screen pixels (Y-flip handled by WorldToScreen).
         var screenCenter = camera.WorldToScreen(new Vector2(AbsoluteX, AbsoluteY));

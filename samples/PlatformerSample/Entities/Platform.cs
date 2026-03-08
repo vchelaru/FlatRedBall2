@@ -14,7 +14,7 @@ public class Platform : Entity
         {
             Width = 200f,
             Height = 24f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(120, 160, 80, 255),
         };
         Add(Rectangle);

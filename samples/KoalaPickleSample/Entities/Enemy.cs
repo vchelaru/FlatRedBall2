@@ -56,7 +56,7 @@ public class Enemy : Entity
         {
             Width  = 32f,
             Height = 56f,
-            Visible = true,
+            IsVisible = true,
             Color  = NormalColor,
         };
         Add(_rect);

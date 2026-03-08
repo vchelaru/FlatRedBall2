@@ -15,7 +15,7 @@ public class EnemyBullet : Entity
             Radius = 5,
             Color = new Color(255, 80, 80, 230),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionCircle);
     }

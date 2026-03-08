@@ -32,7 +32,7 @@ var custom = Polygon.FromPoints(new[] {
 
 ## Step 2: Make the Shape Visible
 
-Shapes default to `Visible = false`. **Always set `Visible = true`** or the shape won't render.
+Shapes default to `IsVisible = false`. **Always set `IsVisible = true`** or the shape won't render.
 
 ## Step 3: Add to the Render Pipeline
 
@@ -53,7 +53,7 @@ var rect = new AxisAlignedRectangle
     Color = new Color(220, 60, 60, 200),   // RGBA
     IsFilled = false,                       // true = solid fill, false = outline
     OutlineThickness = 3f,                  // line width in pixels
-    Visible = true,
+    IsVisible = true,
 };
 ```
 
@@ -69,7 +69,7 @@ For shapes added directly to the screen (not via `entity.Add`), also call `Remov
 
 ## Common Pitfalls
 
-- **Shape is invisible** — forgot `Visible = true`. Default is `false`.
+- **Shape is invisible** — forgot `IsVisible = true`. Default is `false`.
 - **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
 - **Shape position looks wrong** — Y+ is up (see `physics-and-movement`).
 - **Polygon not rotating** — use `Polygon`, not `AxisAlignedRectangle`.
@@ -88,7 +88,7 @@ tiles.AddTileAtWorld(float x, float y);    // snapped to nearest cell
 tiles.RemoveTileAtCell(col, row);
 tiles.GetTileAtCell(col, row);             // returns AxisAlignedRectangle? for inspection
 
-tiles.Visible = true;                      // debug visualization
+tiles.IsVisible = true;                      // debug visualization
 ```
 
 `RepositionDirections` are maintained automatically on every add/remove — interior shared edges between adjacent tiles are cleared to prevent seam snagging. No manual refresh needed.

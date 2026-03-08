@@ -23,7 +23,7 @@ public class OtherEntity : Entity
             Radius = 18f,
             Y = 0f,
             Color = new Color(220, 130, 60, 180),
-            Visible = true,
+            IsVisible = true,
         };
         Add(body);
 
@@ -35,7 +35,7 @@ public class OtherEntity : Entity
             IsFilled = false,
             OutlineThickness = 1.5f,
             Color = new Color(255, 200, 140, 100),
-            Visible = true,
+            IsVisible = true,
         };
         Add(range, isDefaultCollision: false);
     }

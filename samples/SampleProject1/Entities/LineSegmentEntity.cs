@@ -40,7 +40,7 @@ public class LineSegmentEntity : Entity
     {
         _line = new Line
         {
-            Visible = true,
+            IsVisible = true,
             Color = DefaultColor,
             LineThickness = 1f,
         };

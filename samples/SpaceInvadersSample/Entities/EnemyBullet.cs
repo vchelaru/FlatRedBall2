@@ -14,7 +14,7 @@ public class EnemyBullet : Entity
         {
             Width = 4f,
             Height = 16f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(255, 120, 60, 255),
         };
         Add(Rectangle);

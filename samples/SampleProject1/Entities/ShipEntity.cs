@@ -29,7 +29,7 @@ public class ShipEntity : Entity
             Radius = 14f,
             Y = 0f,
             Color = new Color(80, 160, 230, 180),
-            Visible = true,
+            IsVisible = true,
         };
         Add(body);
 
@@ -41,7 +41,7 @@ public class ShipEntity : Entity
             IsFilled = false,
             OutlineThickness = 1.5f,
             Color = new Color(180, 220, 255, 100),
-            Visible = true,
+            IsVisible = true,
         };
         Add(range, isDefaultCollision: false);
 

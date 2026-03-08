@@ -23,7 +23,7 @@ public class DefaultCollisionPlayer : Entity
             Radius = 14f,
             IsFilled = true,
             Color = new XnaColor(100, 180, 255, 220),
-            Visible = true,
+            IsVisible = true,
         };
         Add(_body); // isDefaultCollision defaults to true
 
@@ -33,7 +33,7 @@ public class DefaultCollisionPlayer : Entity
             IsFilled = false,
             OutlineThickness = 1.5f,
             Color = new XnaColor(255, 255, 255, 80),
-            Visible = true,
+            IsVisible = true,
         };
         Add(_range, isDefaultCollision: false); // visual only — does not participate in default collision
 

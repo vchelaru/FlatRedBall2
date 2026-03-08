@@ -22,7 +22,7 @@ Gum's default font is loaded automatically — no `.mgcb` setup required. See th
 Shapes require no content files and are ready to use immediately.
 
 ```csharp
-var rect = new AxisAlignedRectangle { Width = 20, Height = 120, Color = Color.White, Visible = true };
+var rect = new AxisAlignedRectangle { Width = 20, Height = 120, Color = Color.White, IsVisible = true };
 Add(rect);
 ```
 
@@ -48,7 +48,7 @@ var sprite = new Sprite
 {
     Texture = texture,
     TextureScale = 1.5f,   // 1.5x the texture's pixel size
-    IsVisible = true,       // note: IsVisible, not Visible (unlike shapes)
+    IsVisible = true,
 };
 Add(sprite);
 ```
@@ -84,7 +84,7 @@ When `TextureScale` is non-null, dimensions are recalculated from the source rec
 
 | Property | Default | Notes |
 |----------|---------|-------|
-| `IsVisible` | `true` | Different from shapes which use `Visible` and default to `false` |
+| `IsVisible` | `true` | Shapes default to `false`; Sprite defaults to `true` |
 | `Color` | `Color.White` | Tint color — `White` means no tint |
 | `Alpha` | `1f` | Opacity (0 = transparent, 1 = opaque) |
 | `Rotation` | `0` | Uses `Angle` type, same as entities |
@@ -151,7 +151,7 @@ var tex = Engine.ContentManager.Load<Texture2D>("mysprite");  // no extension
 
 ## Gotchas
 
-- **`IsVisible` on Sprite vs `Visible` on shapes** — Sprites use `IsVisible` (default `true`). Shapes use `Visible` (default `false`). Mixing them up is a common source of invisible objects.
+- **`IsVisible` defaults differ** — Sprite defaults to `true`; shapes default to `false`. Forgetting `IsVisible = true` on a shape is a common source of invisible objects.
 - **`TextureScale` wins over explicit `Width`/`Height`** — If you set `Width` and it doesn't take effect, check that `TextureScale` is `null`.
 - **Content not found at runtime** — Verify the asset name matches the `.mgcb` entry (case-sensitive on Linux), and that `Content.RootDirectory = "Content"` is set in `Game1`.
 - **ACHX animations are stubbed** — `Sprite.PlayAnimation` is a no-op. Animation is not yet implemented.

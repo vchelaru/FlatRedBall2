@@ -155,7 +155,7 @@ _ = cam.ShakeScreen(radius: 8f, durationInSeconds: 0.4f, Token);
 
 **Debug overlay** — shows the deadzone window:
 ```csharp
-cam.Visible = true;
+cam.ShowDebugOverlay = true;
 ```
 
 **Multi-target auto-zoom** (frames all targets in view):

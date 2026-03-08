@@ -19,7 +19,7 @@ public class TopDownPlayer : Entity
         {
             Radius = 14f,
             Color = new XnaColor(100, 220, 130, 255),
-            Visible = true,
+            IsVisible = true,
         };
         Add(Circle);
 

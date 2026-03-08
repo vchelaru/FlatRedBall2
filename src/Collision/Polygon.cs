@@ -78,7 +78,7 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
     // IRenderable
-    public bool Visible { get; set; } = false;
+    public bool IsVisible { get; set; } = false;
     public Layer Layer { get; set; } = null!;
     public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     public string? Name { get; set; }
@@ -91,7 +91,7 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        if (!Visible || Batch is not ShapesBatch sb || _points.Count < 2) return;
+        if (!IsVisible || Batch is not ShapesBatch sb || _points.Count < 2) return;
 
         float angle = AbsoluteRotation.Radians;
         float cos = MathF.Cos(angle);

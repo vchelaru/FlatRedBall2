@@ -17,7 +17,7 @@ public class Enemy : Entity
         {
             Width = 24f,
             Height = 18f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(255, 255, 255, 255),
         };
         Add(Rectangle);

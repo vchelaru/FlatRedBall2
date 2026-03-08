@@ -19,7 +19,7 @@ public class TrailParticle : Entity
         _circle = new Circle
         {
             Radius = 8f,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_circle);
     }

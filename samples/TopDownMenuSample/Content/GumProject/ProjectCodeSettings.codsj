@@ -1,13 +1,13 @@
 {
   "CommonUsingStatements": "using Gum.Converters;\r\nusing Gum.DataTypes;\r\nusing Gum.Managers;\r\nusing Gum.Wireframe;\r\n\r\nusing RenderingLibrary.Graphics;\r\n\r\nusing System.Linq;\r\n",
-  "CodeProjectRoot": "",
-  "RootNamespace": "",
-  "AppendFolderToNamespace": true,
+  "CodeProjectRoot": null,
+  "RootNamespace": null,
+  "AppendFolderToNamespace": false,
   "InheritanceLocation": 1,
   "ObjectInstantiationType": 0,
-  "DefaultScreenBase": "Gum.Wireframe.GraphicalUiElement",
-  "OutputLibrary": 4,
+  "DefaultScreenBase": "Gum.Wireframe.BindableGue",
+  "OutputLibrary": 0,
   "AdjustPixelValuesForDensity": false,
-  "BaseTypesNotCodeGenerated": "",
+  "BaseTypesNotCodeGenerated": null,
   "GenerateGumDataTypes": false
 }

@@ -92,7 +92,7 @@ public class TopDownDemoScreen : Screen
 
         AddCornerTriangles();
 
-        _tiles.Visible = true;
+        _tiles.IsVisible = true;
     }
 
     // half-size of one tile in local space

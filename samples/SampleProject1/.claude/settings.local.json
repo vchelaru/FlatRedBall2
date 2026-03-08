@@ -11,7 +11,17 @@
       "Bash(dotnet tool:*)",
       "Bash(python3:*)",
       "Bash(dotnet-ildasm:*)",
-      "Bash(dotnet-reflect:*)"
+      "Bash(dotnet-reflect:*)",
+      "Bash(\"$GUMCLI\" new:*)",
+      "Bash(GUMCLI=\"/c/Users/vchel/Documents/GitHub/Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe\")",
+      "Read(//c/Users/vchel/Documents/GitHub/FlatRedBall2/samples/SampleProject1/**)",
+      "Bash(\"$GUMCLI\" codegen:*)",
+      "Bash(\"$GUMCLI\" codegen Content/GumProject/GumProject.gumx)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(\"$GUMCLI\" codegen-init:*)",
+      "Bash(\"$GUMCLI\" check:*)",
+      "Bash(find:*)",
+      "Bash(\"$GUMCLI\":*)"
     ]
   }
 }

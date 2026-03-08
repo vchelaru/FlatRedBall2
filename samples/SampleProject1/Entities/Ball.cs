@@ -16,7 +16,7 @@ public class Ball : Entity
         {
             Radius = 9f,
             Color = new Color(255, 255, 200),
-            Visible = true,
+            IsVisible = true,
         };
         Add(Circle);
     }

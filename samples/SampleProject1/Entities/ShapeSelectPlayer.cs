@@ -25,7 +25,7 @@ public class ShapeSelectPlayer : Entity
             IsFilled = false,
             OutlineThickness = 2f,
             Color = new XnaColor(80, 200, 255, 200),
-            Visible = true,
+            IsVisible = true,
         };
         Add(BodyCircle, isDefaultCollision: false);
 
@@ -37,7 +37,7 @@ public class ShapeSelectPlayer : Entity
             Height = 20f,
             IsFilled = true,
             Color = new XnaColor(255, 220, 60, 230),
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionRect, isDefaultCollision: false);
 

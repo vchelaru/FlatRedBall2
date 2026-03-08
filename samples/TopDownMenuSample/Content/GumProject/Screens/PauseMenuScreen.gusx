@@ -3,106 +3,97 @@
   <Name>PauseMenuScreen</Name>
   <State>
     <Name>Default</Name>
-    <Variable>
-      <Type>int</Type>
-      <Name>Overlay.Alpha</Name>
+    <Variable Type="int" Name="Overlay.Alpha" SetsValue="true">
       <Value xsi:type="xsd:int">200</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>int</Type>
-      <Name>Overlay.Blue</Name>
+    <Variable Type="int" Name="Overlay.Blue" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>int</Type>
-      <Name>Overlay.Green</Name>
+    <Variable Type="int" Name="Overlay.Green" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>float</Type>
-      <Name>Overlay.Height</Name>
+    <Variable Type="float" Name="Overlay.Height" SetsValue="true">
       <Value xsi:type="xsd:float">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>DimensionUnitType</Type>
-      <Name>Overlay.HeightUnits</Name>
+    <Variable Type="DimensionUnitType" Name="Overlay.HeightUnits" SetsValue="true">
       <Value xsi:type="xsd:int">2</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>int</Type>
-      <Name>Overlay.Red</Name>
+    <Variable Type="int" Name="Overlay.Red" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>float</Type>
-      <Name>Overlay.Width</Name>
+    <Variable Type="float" Name="Overlay.Width" SetsValue="true">
       <Value xsi:type="xsd:float">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>DimensionUnitType</Type>
-      <Name>Overlay.WidthUnits</Name>
+    <Variable Type="DimensionUnitType" Name="Overlay.WidthUnits" SetsValue="true">
       <Value xsi:type="xsd:int">2</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>string</Type>
-      <Name>TitleText.Text</Name>
-      <Value xsi:type="xsd:string">Paused</Value>
-      <SetsValue>true</SetsValue>
-    </Variable>
-    <Variable>
-      <Type>float</Type>
-      <Name>TitleText.FontScale</Name>
+    <Variable Type="float" Name="TitleText.FontScale" SetsValue="true">
       <Value xsi:type="xsd:float">2</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>HorizontalAlignment</Type>
-      <Name>TitleText.HorizontalAlignment</Name>
+    <Variable Type="HorizontalAlignment" Name="TitleText.HorizontalAlignment" SetsValue="true">
       <Value xsi:type="xsd:int">1</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>float</Type>
-      <Name>TitleText.X</Name>
+    <Variable Type="string" Name="TitleText.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Paused</Value>
+    </Variable>
+    <Variable Type="float" Name="TitleText.X" SetsValue="true">
       <Value xsi:type="xsd:float">0</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>HorizontalAlignment</Type>
-      <Name>TitleText.XOrigin</Name>
+    <Variable Type="HorizontalAlignment" Name="TitleText.XOrigin" SetsValue="true">
       <Value xsi:type="xsd:int">1</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>PositionUnitType</Type>
-      <Name>TitleText.XUnits</Name>
+    <Variable Type="PositionUnitType" Name="TitleText.XUnits" SetsValue="true">
       <Value xsi:type="xsd:int">6</Value>
-      <SetsValue>true</SetsValue>
     </Variable>
-    <Variable>
-      <Type>float</Type>
-      <Name>TitleText.Y</Name>
-      <Value xsi:type="xsd:float">140</Value>
-      <SetsValue>true</SetsValue>
+    <Variable Type="float" Name="TitleText.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">200</Value>
+    </Variable>
+    <Variable Type="float" Name="ResumeButton.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">40</Value>
+    </Variable>
+    <Variable Type="string" Name="ResumeButton.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Resume</Value>
+    </Variable>
+    <Variable Type="float" Name="ResumeButton.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">200</Value>
+    </Variable>
+    <Variable Type="float" Name="ResumeButton.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="ResumeButton.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="ResumeButton.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="ResumeButton.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">300</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitToMenuButton.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">40</Value>
+    </Variable>
+    <Variable Type="string" Name="ExitToMenuButton.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">Exit to Main Menu</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitToMenuButton.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">200</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitToMenuButton.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="ExitToMenuButton.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="ExitToMenuButton.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="ExitToMenuButton.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">360</Value>
     </Variable>
   </State>
-  <Instance>
-    <Name>Overlay</Name>
-    <BaseType>ColoredRectangle</BaseType>
-    <DefinedByBase>false</DefinedByBase>
-  </Instance>
-  <Instance>
-    <Name>TitleText</Name>
-    <BaseType>Text</BaseType>
-    <DefinedByBase>false</DefinedByBase>
-  </Instance>
+  <Instance Name="Overlay" BaseType="ColoredRectangle" />
+  <Instance Name="TitleText" BaseType="Text" />
+  <Instance Name="ResumeButton" BaseType="Controls/ButtonStandard" />
+  <Instance Name="ExitToMenuButton" BaseType="Controls/ButtonStandard" />
   <Behaviors />
 </ScreenSave>

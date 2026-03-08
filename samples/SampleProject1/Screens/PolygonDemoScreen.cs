@@ -110,7 +110,7 @@ public class PolygonDemoScreen : Screen
         poly.Color = color;
         poly.IsFilled = filled;
         poly.OutlineThickness = 3f;
-        poly.Visible = true;
+        poly.IsVisible = true;
         obstacle.SetPolygon(poly);
     }
 

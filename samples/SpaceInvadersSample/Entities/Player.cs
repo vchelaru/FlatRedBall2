@@ -21,7 +21,7 @@ public class Player : Entity
         {
             Width = 32f,
             Height = 20f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(80, 220, 80, 255),
         };
         Add(Rectangle);

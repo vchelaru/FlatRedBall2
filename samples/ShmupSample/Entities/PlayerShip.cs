@@ -46,7 +46,7 @@ public class PlayerShip : Entity
             Height = 36,
             Color = new Color(0, 220, 255, 230),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_body);
 
@@ -59,7 +59,7 @@ public class PlayerShip : Entity
             Y = 16,
             Color = new Color(0, 255, 220, 255),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_nose);
 
@@ -68,7 +68,7 @@ public class PlayerShip : Entity
         {
             Width = 28,
             Height = 36,
-            Visible = false,
+            IsVisible = false,
         };
         Add(CollisionRect);
 

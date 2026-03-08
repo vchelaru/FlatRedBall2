@@ -31,7 +31,7 @@ public class SightLine : Entity
         {
             Color = new XnaColor(255, 220, 60, 200),
             LineThickness = 2f,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_line);
 
@@ -40,7 +40,7 @@ public class SightLine : Entity
             Radius = 6f,
             Color = new XnaColor(255, 80, 80, 220),
             IsFilled = true,
-            Visible = false,
+            IsVisible = false,
         };
         Add(_hitCircle);
     }
@@ -62,12 +62,12 @@ public class SightLine : Entity
             _line.SetAbsoluteEndpoint(hitPoint.Value);
             _hitCircle.X = hitPoint.Value.X;
             _hitCircle.Y = hitPoint.Value.Y;
-            _hitCircle.Visible = true;
+            _hitCircle.IsVisible = true;
         }
         else
         {
             _line.SetAbsoluteEndpoint(mouseWorld);
-            _hitCircle.Visible = false;
+            _hitCircle.IsVisible = false;
         }
     }
 

@@ -34,7 +34,7 @@ public class FodderEnemy : Entity
             Radius = 10,
             Color = _normalColor,
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionCircle);
     }

@@ -27,7 +27,7 @@ public class Player : Entity
         {
             Width = 40, Height = 40,
             Color = new Color(80, 140, 255, 220),
-            Visible = true,
+            IsVisible = true,
         };
         Add(Rectangle);
 
@@ -56,14 +56,14 @@ public class Player : Entity
 All three shape types can be attached with `Add`:
 
 ```csharp
-var rect = new AxisAlignedRectangle { Width = 40, Height = 40, Visible = true };
+var rect = new AxisAlignedRectangle { Width = 40, Height = 40, IsVisible = true };
 Add(rect);
 
-var circle = new Circle { Radius = 20, Visible = true };
+var circle = new Circle { Radius = 20, IsVisible = true };
 Add(circle);
 
 var poly = Polygon.CreateRectangle(40, 40);
-poly.Visible = true;
+poly.IsVisible = true;
 Add(poly);
 ```
 
@@ -75,7 +75,7 @@ Pass `isDefaultCollision: false` to attach a shape for rendering/positioning onl
 
 ```csharp
 // Visual range indicator — renders but never collides by default
-var range = new Circle { Radius = 64f, IsFilled = false, Visible = true };
+var range = new Circle { Radius = 64f, IsFilled = false, IsVisible = true };
 Add(range, isDefaultCollision: false);
 ```
 
@@ -160,7 +160,7 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 
 - **Avoid naming fields/constants the same as `Entity` members.** `Acceleration`, `Velocity`, `Drag` already exist on `Entity` — shadowing them causes warnings.
 - **`Engine` is null in the constructor** — see `engine-overview` Key Design Rules. Use `CustomInitialize` instead.
-- **Shapes default `Visible = false`** — see `shapes` skill. Always set `Visible = true`.
+- **Shapes default `IsVisible = false`** — see `shapes` skill. Always set `IsVisible = true`.
 - **`Add(child)` only auto-registers to the render pipeline if `Engine` is set** — Factory sets `Engine` before `CustomInitialize`, so `Add` works correctly there.
 - **`_movement` must be initialized once, not every frame** — create input objects in `CustomInitialize`.
 - **Always use `Factory<T>`, never `new MyEntity()`** — bypassing Factory breaks `Engine.GetFactory<T>()` and collision relationships.

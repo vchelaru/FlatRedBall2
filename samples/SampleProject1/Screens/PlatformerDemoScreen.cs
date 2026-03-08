@@ -82,7 +82,7 @@ public class PlatformerDemoScreen : Screen
             }
         }
 
-        _tiles.Visible = true;
+        _tiles.IsVisible = true;
     }
 
     private void SetupCollision()

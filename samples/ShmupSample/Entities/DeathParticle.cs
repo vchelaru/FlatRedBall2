@@ -23,7 +23,7 @@ public class DeathParticle : Entity
             Height = 6,
             Color = Color.White,
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_rect);
     }

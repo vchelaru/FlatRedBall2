@@ -41,7 +41,7 @@ public class ShooterEnemy : Entity
             Height = 20,
             Color = _normalColor,
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionRect);
 
@@ -52,7 +52,7 @@ public class ShooterEnemy : Entity
             Height = 10,
             Color = new Color(255, 220, 80, 255),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_innerRect);
 

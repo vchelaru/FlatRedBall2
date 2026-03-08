@@ -231,6 +231,21 @@ public class Screen
         return rel;
     }
 
+    /// <summary>
+    /// Registers a collision relationship between a group of entities and a
+    /// <see cref="Collision.TileShapeCollection"/>. Type argument <typeparamref name="A"/> is
+    /// inferred from <paramref name="entities"/>, so no explicit type arguments are needed:
+    /// <code>AddCollisionRelationship(_playerFactory, _tiles).MoveFirstOnCollision();</code>
+    /// </summary>
+    public CollisionRelationship<A, Collision.TileShapeCollection> AddCollisionRelationship<A>(
+        IEnumerable<A> entities, Collision.TileShapeCollection tiles)
+        where A : ICollidable
+    {
+        var rel = new CollisionRelationship<A, Collision.TileShapeCollection>(entities, SingleEnumerable(tiles));
+        _collisionRelationships.Add(rel);
+        return rel;
+    }
+
     // Internal update — called by FlatRedBallService
     internal void Update(FrameTime frameTime)
     {

@@ -1,7 +1,7 @@
 using FlatRedBall2;
+using Gum.Forms;
 using Gum.Forms.Controls;
 using Gum.Managers;
-using Gum.Wireframe;
 using Microsoft.Xna.Framework;
 using MonoGameGum;
 
@@ -13,27 +13,16 @@ public class MainMenuScreen : Screen
     {
         Camera.BackgroundColor = new Color(10, 15, 40);
 
-        // Load the Gum screen for background and title from the project file.
         var gumScreen = ObjectFinder.Self.GumProjectSave.Screens
             .Find(s => s.Name == "MainMenuScreen");
-        Add(gumScreen!.ToGraphicalUiElement());
+        var root = gumScreen!.ToGraphicalUiElement();
+        Add(root);
 
-        var menu = new StackPanel();
-        menu.Spacing = 12;
-        menu.Anchor(Anchor.Center);
-        menu.Y = 40;
-
-        var startButton = new Button();
-        startButton.Text = "Start Game";
+        var startButton = root.GetFrameworkElementByName<Button>("StartGameButton");
         startButton.Click += (_, _) => MoveToScreen<GameScreen>();
-        menu.AddChild(startButton);
 
-        var exitButton = new Button();
-        exitButton.Text = "Exit";
+        var exitButton = root.GetFrameworkElementByName<Button>("ExitButton");
         exitButton.Click += (_, _) => Engine.Game.Exit();
-        menu.AddChild(exitButton);
-
-        Add(menu);
     }
 
     public override void CustomActivity(FrameTime time) { }

@@ -96,7 +96,7 @@ public class Overlay
             _circles.Add(CreateCircle());
 
         var c = _circles[_nextCircle++];
-        c.Visible = true;
+        c.IsVisible = true;
         c.X = x;
         c.Y = y;
         c.Radius = radius;
@@ -114,7 +114,7 @@ public class Overlay
             _rectangles.Add(CreateRectangle());
 
         var r = _rectangles[_nextRectangle++];
-        r.Visible = true;
+        r.IsVisible = true;
         r.X = x;
         r.Y = y;
         r.Width = width;
@@ -132,7 +132,7 @@ public class Overlay
             _lines.Add(CreateLine());
 
         var l = _lines[_nextLine++];
-        l.Visible = true;
+        l.IsVisible = true;
         l.X = x1;
         l.Y = y1;
         l.EndPoint = new Vector2(x2 - x1, y2 - y1);
@@ -150,7 +150,7 @@ public class Overlay
             _polygons.Add(CreatePolygon());
 
         var p = _polygons[_nextPolygon++];
-        p.Visible = true;
+        p.IsVisible = true;
         p.X = x;
         p.Y = y;
         p.SetPoints(relativePoints);
@@ -177,7 +177,7 @@ public class Overlay
         float dx = x2 - x1, dy = y2 - y1;
         float len = MathF.Sqrt(dx * dx + dy * dy);
 
-        entry.Body.Visible = true;
+        entry.Body.IsVisible = true;
         entry.Body.Color = c;
         entry.Body.LineThickness = BodyThickness;
 
@@ -192,7 +192,7 @@ public class Overlay
             entry.Body.Y = y1;
             entry.Body.EndPoint = new Vector2(bodyEndX - x1, bodyEndY - y1);
 
-            entry.Head.Visible = true;
+            entry.Head.IsVisible = true;
             entry.Head.X = x2;
             entry.Head.Y = y2;
             entry.Head.Color = c;
@@ -210,7 +210,7 @@ public class Overlay
             entry.Body.X = x1;
             entry.Body.Y = y1;
             entry.Body.EndPoint = Vector2.Zero;
-            entry.Head.Visible = false;
+            entry.Head.IsVisible = false;
         }
     }
 
@@ -285,7 +285,7 @@ public class Overlay
         float worldW = MathF.Abs(camera.ScreenToWorld(new Vector2(totalScreenW, 0f)).X - worldOrigin.X);
         float worldH = MathF.Abs(camera.ScreenToWorld(new Vector2(0f, totalScreenH)).Y - worldOrigin.Y);
 
-        bg.Visible = true;
+        bg.IsVisible = true;
         bg.X = worldCenter.X;
         bg.Y = worldCenter.Y;
         bg.Width = worldW;
@@ -302,14 +302,14 @@ public class Overlay
     /// </summary>
     internal void BeginFrame()
     {
-        foreach (var c in _circles) c.Visible = false;
-        foreach (var r in _rectangles) r.Visible = false;
-        foreach (var l in _lines) l.Visible = false;
-        foreach (var p in _polygons) p.Visible = false;
-        foreach (var a in _arrows) { a.Body.Visible = false; a.Head.Visible = false; }
+        foreach (var c in _circles) c.IsVisible = false;
+        foreach (var r in _rectangles) r.IsVisible = false;
+        foreach (var l in _lines) l.IsVisible = false;
+        foreach (var p in _polygons) p.IsVisible = false;
+        foreach (var a in _arrows) { a.Body.IsVisible = false; a.Head.IsVisible = false; }
         foreach (var s in _sprites) s.IsVisible = false;
         foreach (var l in _labels) l.Visual.Visible = false;
-        foreach (var bg in _textBackgrounds) bg.Visible = false;
+        foreach (var bg in _textBackgrounds) bg.IsVisible = false;
 
         _labelScreenPositions.Clear();
 
@@ -327,36 +327,36 @@ public class Overlay
 
     private CircleShape CreateCircle()
     {
-        var c = new CircleShape { IsFilled = false, Visible = false, Z = DefaultZ };
+        var c = new CircleShape { IsFilled = false, IsVisible = false, Z = DefaultZ };
         _screen.Add(c);
         return c;
     }
 
     private RectShape CreateRectangle()
     {
-        var r = new RectShape { IsFilled = false, Visible = false, Z = DefaultZ };
+        var r = new RectShape { IsFilled = false, IsVisible = false, Z = DefaultZ };
         _screen.Add(r);
         return r;
     }
 
     private LineShape CreateLine()
     {
-        var l = new LineShape { Visible = false, Z = DefaultZ };
+        var l = new LineShape { IsVisible = false, Z = DefaultZ };
         _screen.Add(l);
         return l;
     }
 
     private PolyShape CreatePolygon()
     {
-        var p = new PolyShape { IsFilled = false, Visible = false, Z = DefaultZ };
+        var p = new PolyShape { IsFilled = false, IsVisible = false, Z = DefaultZ };
         _screen.Add(p);
         return p;
     }
 
     private ArrowEntry CreateArrow()
     {
-        var body = new LineShape { Visible = false, Z = DefaultZ };
-        var head = new PolyShape { IsFilled = true, Visible = false, Z = DefaultZ };
+        var body = new LineShape { IsVisible = false, Z = DefaultZ };
+        var head = new PolyShape { IsFilled = true, IsVisible = false, Z = DefaultZ };
         _screen.Add(body);
         _screen.Add(head);
         return new ArrowEntry(body, head);
@@ -378,7 +378,7 @@ public class Overlay
 
     private RectShape CreateTextBackground()
     {
-        var r = new RectShape { IsFilled = true, Visible = false, Z = DefaultZ - 1f };
+        var r = new RectShape { IsFilled = true, IsVisible = false, Z = DefaultZ - 1f };
         _screen.Add(r);
         return r;
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using FlatRedBall2.Rendering;
+using XnaColor = Microsoft.Xna.Framework.Color;
 
 namespace FlatRedBall2.Collision;
 
@@ -35,7 +36,10 @@ public class TileShapeCollection : ICollidable
     /// </summary>
     public float GridSize { get; set; } = 16f;
 
-    private bool _visible;
+    private bool _isVisible;
+    private XnaColor _color = new XnaColor(255, 255, 255, 128);
+    private bool _isFilled = false;
+    private float _outlineThickness = 2f;
 
     // Invoked when a tile shape is created or destroyed so Screen.Add can keep its render list in sync.
     internal Action<IRenderable>? _onTileAdded;
@@ -55,23 +59,74 @@ public class TileShapeCollection : ICollidable
     }
 
     /// <summary>
-    /// Shows or hides all tile rectangles. Defaults to false.
+    /// Shows or hides all tiles. Defaults to false.
     /// </summary>
     /// <remarks>
     /// Call <c>Screen.Add(tiles)</c> first so tiles are registered for rendering; then set
-    /// <c>Visible = true</c> to make them appear. Tiles added after <c>Screen.Add</c> inherit
-    /// the current <see cref="Visible"/> value automatically.
+    /// <c>IsVisible = true</c> to make them appear. Tiles added after <c>Screen.Add</c> inherit
+    /// the current <see cref="IsVisible"/> value automatically.
     /// </remarks>
-    public bool Visible
+    public bool IsVisible
     {
-        get => _visible;
+        get => _isVisible;
         set
         {
-            _visible = value;
+            _isVisible = value;
             foreach (var tile in _tiles.Values)
-                tile.Visible = value;
+                tile.IsVisible = value;
             foreach (var poly in _polyTiles.Values)
-                poly.Visible = value;
+                poly.IsVisible = value;
+        }
+    }
+
+    /// <summary>
+    /// Color applied to all tiles. Defaults to semi-transparent white.
+    /// Tiles added after this is set inherit the current value automatically.
+    /// </summary>
+    public XnaColor Color
+    {
+        get => _color;
+        set
+        {
+            _color = value;
+            foreach (var tile in _tiles.Values)
+                tile.Color = value;
+            foreach (var poly in _polyTiles.Values)
+                poly.Color = value;
+        }
+    }
+
+    /// <summary>
+    /// Whether tiles are drawn filled or as outlines. Defaults to false (outline only).
+    /// Tiles added after this is set inherit the current value automatically.
+    /// </summary>
+    public bool IsFilled
+    {
+        get => _isFilled;
+        set
+        {
+            _isFilled = value;
+            foreach (var tile in _tiles.Values)
+                tile.IsFilled = value;
+            foreach (var poly in _polyTiles.Values)
+                poly.IsFilled = value;
+        }
+    }
+
+    /// <summary>
+    /// Outline thickness in pixels when <see cref="IsFilled"/> is false. Defaults to 2.
+    /// Tiles added after this is set inherit the current value automatically.
+    /// </summary>
+    public float OutlineThickness
+    {
+        get => _outlineThickness;
+        set
+        {
+            _outlineThickness = value;
+            foreach (var tile in _tiles.Values)
+                tile.OutlineThickness = value;
+            foreach (var poly in _polyTiles.Values)
+                poly.OutlineThickness = value;
         }
     }
 
@@ -89,8 +144,10 @@ public class TileShapeCollection : ICollidable
             Height = GridSize,
             X = X + col * GridSize + GridSize / 2f,
             Y = Y + row * GridSize + GridSize / 2f,
-            Visible = _visible,
-            IsFilled = false,
+            IsVisible = _isVisible,
+            Color = _color,
+            IsFilled = _isFilled,
+            OutlineThickness = _outlineThickness,
         };
 
         _tiles[(col, row)] = tile;
@@ -171,7 +228,10 @@ public class TileShapeCollection : ICollidable
         var poly = Polygon.FromPoints(prototype.Points);
         poly.X = X + col * GridSize + GridSize / 2f;
         poly.Y = Y + row * GridSize + GridSize / 2f;
-        poly.Visible = _visible;
+        poly.IsVisible = _isVisible;
+        poly.Color = _color;
+        poly.IsFilled = _isFilled;
+        poly.OutlineThickness = _outlineThickness;
 
         _polyTiles[(col, row)] = poly;
         _onTileAdded?.Invoke(poly);

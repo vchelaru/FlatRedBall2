@@ -18,7 +18,7 @@ public class PlayerBullet : Entity
             Height = 16,
             Color = new Color(0, 220, 255, 255),
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionRect);
     }

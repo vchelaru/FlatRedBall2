@@ -77,7 +77,7 @@ public class CameraFollowDemoScreen : Screen
         AddBlock(33, 37,  8,  4, accentColor); // top-center
         AddBlock(62, 33,  5,  5, accentColor); // top-right
 
-        _tiles.Visible = true;
+        _tiles.IsVisible = true;
     }
 
     private void SetWall(int col, int row, Color color)

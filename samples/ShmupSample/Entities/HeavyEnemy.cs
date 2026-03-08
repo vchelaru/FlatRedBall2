@@ -35,7 +35,7 @@ public class HeavyEnemy : Entity
             Height = 36,
             Color = _normalColor,
             IsFilled = true,
-            Visible = true,
+            IsVisible = true,
         };
         Add(CollisionRect);
 
@@ -46,7 +46,7 @@ public class HeavyEnemy : Entity
             Color = new Color(255, 100, 255, 255),
             IsFilled = false,
             OutlineThickness = 2f,
-            Visible = true,
+            IsVisible = true,
         };
         Add(_outline);
     }

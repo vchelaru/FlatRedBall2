@@ -14,7 +14,7 @@ public class PlayerBullet : Entity
         {
             Width = 4f,
             Height = 16f,
-            Visible = true,
+            IsVisible = true,
             Color = new XnaColor(255, 255, 80, 255),
         };
         Add(Rectangle);

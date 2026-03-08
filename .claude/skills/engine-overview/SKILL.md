@@ -67,8 +67,9 @@ protected override void Draw(GameTime gameTime)
 - **Y+ is up** in world space. Camera flips Y for screen rendering.
 - **Always use `Factory<T>`** to create entities — never `new MyEntity()`. Factory sets `Engine`, registers with the screen, and enables `GetFactory<T>()`.
 - **No static state** — only `FlatRedBallService.Default` is static. Everything else is accessed via `Engine` on entities or directly on screens.
-- **Shapes default to `Visible = false`** — always set `Visible = true`.
+- **Shapes default to `IsVisible = false`** — always set `IsVisible = true`.
 - **`Entity.Engine`**: Use `CustomInitialize`, not the constructor — `Engine` is null until Factory injects it.
+- **Use Gum for all UI** — HUD, health bars, menus, win/lose screens, any text display. Shapes are for world-space game objects (collision geometry, projectiles, platforms). If you reach for a shape to build UI, stop and use Gum instead.
 
 ## Complete Screen Example
 

@@ -91,6 +91,7 @@ Collision runs after physics and before `CustomActivity` — by the time game lo
 var tiles = new TileShapeCollection { GridSize = 16f };
 tiles.AddTileAtCell(col, row);   // or AddTileAtWorld(x, y)
 
+// TileShapeCollection has a dedicated overload — no explicit type arguments needed
 AddCollisionRelationship(_playerFactory, tiles)
     .MoveFirstOnCollision();
 ```
@@ -116,10 +117,6 @@ BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity 
 
 > **Note:** `BounceOnCollision` only adjusts A's velocity. B is unchanged when `firstMass == 0f`.
 
-## Entity-vs-Entity Dispatch
+## Shape Dispatch
 
-`CollisionDispatcher` resolves concrete shape pairs. Supported:
-- `AxisAlignedRectangle` vs `AxisAlignedRectangle`
-- `Circle` vs `Circle`
-- `AxisAlignedRectangle` vs `Circle` (and reverse)
-- `Polygon` vs `Polygon`
+Collision between any two entity types just works — the engine inspects the shape children of each entity at runtime and resolves the overlap automatically. What shapes the entities contain doesn't matter; you don't need to know or specify them at the call site.

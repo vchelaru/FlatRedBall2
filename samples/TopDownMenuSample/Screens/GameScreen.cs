@@ -1,5 +1,4 @@
 using FlatRedBall2;
-using FlatRedBall2.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 

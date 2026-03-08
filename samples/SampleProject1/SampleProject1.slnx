@@ -7,5 +7,7 @@
   <Project Path="../ShmupSample/ShmupSample.csproj" />
   <Project Path="../SpaceInvadersSample/SpaceInvadersSample.csproj" />
   <Project Path="../TopDownMenuSample/TopDownMenuSample.csproj" />
+  <Project Path="../TopDownMenuSampleWithCodeGen/TopDownMenuSampleWithCodeGen.csproj" />
+  <Project Path="../ZombieSample/ZombieSample.csproj" />
   <Project Path="SampleProject1.csproj" />
 </Solution>

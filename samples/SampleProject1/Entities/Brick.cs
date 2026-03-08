@@ -33,7 +33,7 @@ public class Brick : Entity
         {
             Width = BrickWidth,
             Height = BrickHeight,
-            Visible = true,
+            IsVisible = true,
         };
         Add(Rectangle);
         UpdateColor();

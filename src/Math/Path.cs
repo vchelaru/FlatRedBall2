@@ -89,7 +89,7 @@ public class Path : IRenderable
     public string? Name { get; set; }
 
     /// <summary>Whether the path polyline is drawn each frame. Default is <c>true</c>.</summary>
-    public bool Visible { get; set; } = true;
+    public bool IsVisible { get; set; } = true;
 
     /// <summary>Color of the rendered polyline.</summary>
     public XnaColor Color { get; set; } = XnaColor.White;
@@ -260,7 +260,7 @@ public class Path : IRenderable
     /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
-        if (!Visible || Batch is not ShapesBatch sb) return;
+        if (!IsVisible || Batch is not ShapesBatch sb) return;
 
         Vector2? lastWorldPt = null;
 

@@ -34,7 +34,7 @@ public class Ball : Entity
 {
     public override void CustomInitialize()
     {
-        var circle = new Circle { Radius = 8f, Visible = true };
+        var circle = new Circle { Radius = 8f, IsVisible = true };
         Add(circle);
 
         AccelerationY = -200f;   // gravity pulls downward (Y- direction)

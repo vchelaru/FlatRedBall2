@@ -19,7 +19,7 @@ public class Wall : Entity
             Width = 80f,
             Height = 1000f,
             Color = Color.Transparent,
-            Visible = false,
+            IsVisible = false,
         };
         Add(Rectangle);
     }

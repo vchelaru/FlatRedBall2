@@ -20,3 +20,7 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 /samples/ShipSample/obj
 /samples/TopDownMenuSample/bin
 /samples/TopDownMenuSample/obj
+/samples/TopDownMenuSampleWithCodeGen/bin
+/samples/TopDownMenuSampleWithCodeGen/obj
+/samples/ZombieSample/bin
+/samples/ZombieSample/obj

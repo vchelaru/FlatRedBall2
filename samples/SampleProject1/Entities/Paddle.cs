@@ -26,7 +26,7 @@ public class Paddle : Entity
             Width = PaddleWidth,
             Height = PaddleHeight,
             Color = new Color(180, 220, 255),
-            Visible = true,
+            IsVisible = true,
         };
         Add(Rectangle);
 

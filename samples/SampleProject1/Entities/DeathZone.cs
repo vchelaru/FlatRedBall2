@@ -17,7 +17,7 @@ public class DeathZone : Entity
         {
             Width = 2000f,
             Height = 80f,
-            Visible = false,
+            IsVisible = false,
         };
         Add(Rectangle);
     }

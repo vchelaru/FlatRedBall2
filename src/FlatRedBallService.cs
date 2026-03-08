@@ -26,6 +26,8 @@ public class FlatRedBallService
     private SpriteBatch? _spriteBatch;
     private Action? _pendingScreenChange;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
+    private float _lastGumCanvasWidth;
+    private float _lastGumCanvasHeight;
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
 
@@ -358,6 +360,14 @@ public class FlatRedBallService
         CurrentScreen.Overlay.BeginFrame();
         InputManager.Update();
 
+        // Keep the Gum canvas in sync with the current viewport so that UI layout
+        // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) resolves to the
+        // correct screen dimensions rather than the stale project defaults.
+        var viewport = CurrentScreen.Camera.Viewport;
+        var zoom = CurrentScreen.Camera.Zoom;
+        _gum.CanvasWidth = viewport.Width / zoom;
+        _gum.CanvasHeight = viewport.Height / zoom;
+
         // Route input events (click, hover, etc.) to all active Gum elements.
         // _gum.Root covers anything added via AddToRoot();
         // screen GumRenderables cover elements added via screen.Add().
@@ -365,6 +375,18 @@ public class FlatRedBallService
         _gumUpdateList.Add(_gum.Root);
         foreach (var r in CurrentScreen.GumRenderables)
             _gumUpdateList.Add(r.Visual);
+
+        // If the canvas size changed, force a layout pass on every top-level element
+        // so that percent-of-parent sizes, anchors, and center-based positions recompute
+        // against the new canvas dimensions.
+        if (_gum.CanvasWidth != _lastGumCanvasWidth || _gum.CanvasHeight != _lastGumCanvasHeight)
+        {
+            _lastGumCanvasWidth = _gum.CanvasWidth;
+            _lastGumCanvasHeight = _gum.CanvasHeight;
+            foreach (var element in _gumUpdateList)
+                element.UpdateLayout();
+        }
+
         _gum.Update(gameTime, _gumUpdateList);
 
         // Complete any delay tasks whose conditions are now met, then flush their

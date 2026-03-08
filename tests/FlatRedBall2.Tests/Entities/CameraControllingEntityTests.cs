@@ -59,7 +59,7 @@ public class CameraControllingEntityTests
     public void GetTarget_TargetOutsideMapEdge_ClampsToMapBoundary()
     {
         // Camera shows 1280×720 (zoom=1, targetWidth=1280). Map is 2560×1440 centered at origin.
-        // Visible half-width = 640. Max camera X = mapRight - visibleW/2 = 1280 - 640 = 640.
+        // IsVisible half-width = 640. Max camera X = mapRight - visibleW/2 = 1280 - 640 = 640.
         var controller = MakeController(entityX: 0f, entityY: 0f);
         controller.Map = new AxisAlignedRectangle { Width = 2560f, Height = 1440f };
 
