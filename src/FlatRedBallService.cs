@@ -31,6 +31,14 @@ public class FlatRedBallService
 
     public FlatRedBallService() { }
 
+    /// <summary>
+    /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize"/>.
+    /// Use this to call <see cref="Microsoft.Xna.Framework.Game.Exit"/> or access window/graphics properties.
+    /// Throws if accessed before <see cref="Initialize"/> is called.
+    /// </summary>
+    public Game Game => _game ?? throw new InvalidOperationException(
+        "FlatRedBallService has not been initialized. Call Initialize() first.");
+
     public void Initialize(Game game, EngineInitSettings? settings = null)
     {
         _game = game;

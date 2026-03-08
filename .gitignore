@@ -18,3 +18,5 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 /samples/ShipSample/bin
 /samples/ShipSample/Content/obj
 /samples/ShipSample/obj
+/samples/TopDownMenuSample/bin
+/samples/TopDownMenuSample/obj

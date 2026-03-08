@@ -6,5 +6,6 @@
   <Project Path="../ShipSample/ShipSample.csproj" />
   <Project Path="../ShmupSample/ShmupSample.csproj" />
   <Project Path="../SpaceInvadersSample/SpaceInvadersSample.csproj" />
+  <Project Path="../TopDownMenuSample/TopDownMenuSample.csproj" />
   <Project Path="SampleProject1.csproj" />
 </Solution>

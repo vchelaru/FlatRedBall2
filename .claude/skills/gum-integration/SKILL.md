@@ -88,6 +88,23 @@ Add(hudPanel, z: 100f);
 
 **World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed.
 
+## Loading Gum Screens from a .gumx Project File
+
+When a `.gumx` project is loaded (via `EngineInitSettings.GumProjectFile`), you can instantiate a Gum screen defined in the project and add it to the FRB2 screen (e.g., as a background visual):
+
+```csharp
+using Gum.Managers;  // ObjectFinder
+using MonoGameGum;   // ToGraphicalUiElement — easy to miss, different namespace from Gum.DataTypes
+
+var gumScreenSave = ObjectFinder.Self.GumProjectSave.Screens
+    .Find(s => s.Name == "MainMenuScreen");
+Add(gumScreenSave!.ToGraphicalUiElement());
+```
+
+- `using MonoGameGum;` is required even though `ScreenSave` lives in `Gum.DataTypes` — the extension method is in `MonoGameGum`.
+- Forms controls (`new Button()`, etc.) created in C# still use built-in default visuals unless the project includes matching component files. Mix freely.
+- **`GumProjectFile` path must NOT include `Content/`** — Gum's `FileManager` is already rooted at the MonoGame `Content/` directory. Use `"GumProject/GumProject.gumx"`, not `"Content/GumProject/GumProject.gumx"`. The double-`Content` causes a runtime load failure.
+
 ## Gotchas
 
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`.

@@ -26,6 +26,19 @@ Document and expose how to invoke the Gum tool in codegen mode so Claude can gen
 ## Gum — Tool Error Reporting
 The Gum tool should have a well-defined error reporting mechanism (e.g., non-zero exit code + structured stderr output) so that Claude can detect failures and surface them clearly. Define what a failed codegen run looks like and how errors are communicated back to the caller.
 
+## TopDownMenuSample — Real Pause Implementation
+**Priority: Medium** — `samples/TopDownMenuSample`
+
+Currently, pressing ESC transitions to a `PauseMenuScreen` (destroying `GameScreen`) and "Resume" transitions back (recreating `GameScreen`). This is not true pausing — the game world is not preserved across the transition.
+
+Real pausing requires:
+- Suspending entity physics/activity while the pause overlay is shown
+- Keeping `GameScreen` alive (not destroyed) when ESC is pressed
+- Rendering the pause overlay on top of the existing game world frame
+- Returning to the exact game state when the player resumes
+
+Likely approach: draw a pause overlay within `GameScreen.CustomActivity` (using an in-screen Gum panel toggled on/off) rather than transitioning to a separate screen.
+
 ## Audio System
 **Priority: Medium** — All `AudioManager` methods throw `NotImplementedException`.
 

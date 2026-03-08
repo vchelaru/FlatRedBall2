@@ -29,7 +29,8 @@ Invoke these with the Skill tool when working on specific topics:
 - `input-system` — Keyboard, gamepad, input binding
 - `camera` — Camera setup and transforms
 - `screens` — Screen lifecycle and transitions
-- `gum-integration` — UI with Gum
+- `gumcli` — **Ask first** before any Gum UI code: use gumcli tool or code-only? Covers gumcli new, .csproj content includes, codegen
+- `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
 - `content-and-assets` — Asset loading
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `levels` — Level data layout and progression
