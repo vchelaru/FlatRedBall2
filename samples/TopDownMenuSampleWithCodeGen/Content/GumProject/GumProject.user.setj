@@ -2,7 +2,8 @@
   "TreeViewState": {
     "ExpandedNodes": [
       "Screens",
-      "Screens/MainMenuScreenGum"
+      "Screens/MainMenuScreenGum",
+      "Screens/PauseMenuScreenGum"
     ]
   }
 }

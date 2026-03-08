@@ -19,7 +19,7 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RollForward>Major</RollForward>
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
@@ -81,7 +81,18 @@ cd samples/YourSample
 dotnet tool restore
 ```
 
-### 3. Add `Program.cs` and `Game1.cs`
+### 3. Ask about Gum mode (REQUIRED — do not skip)
+
+Before writing any game code, ask the user:
+
+> "Will this project use Gum for UI (menus, HUD, score labels, any text)? If so, which mode?
+> 1. **Code-only** — UI defined in C#, no .gumx file
+> 2. **Project + dynamic** — .gumx editable in the Gum editor, runtime string lookup
+> 3. **Project + codegen** — .gumx + generated strongly-typed C# classes"
+
+Then invoke the `gumcli` skill and follow its instructions for the chosen mode before writing any screen or entity code.
+
+### 4. Add `Program.cs` and `Game1.cs`
 
 ```csharp
 // Program.cs
@@ -108,7 +119,7 @@ protected override void Draw(GameTime gt)
 }
 ```
 
-### 4. Build
+### 5. Build
 
 ```
 dotnet build samples/YourSample/YourSample.csproj

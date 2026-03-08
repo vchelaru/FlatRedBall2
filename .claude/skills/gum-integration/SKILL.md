@@ -212,6 +212,9 @@ panel.Dock(Dock.Fill);              // fill parent entirely
 panel.Dock(Dock.SizeToChildren);    // shrink-wrap content (default for Panel)
 ```
 
+Valid `Anchor` values: `TopLeft`, `Top` (centered horizontally), `TopRight`, `BottomLeft`, `BottomRight`, `Center`.
+**`Anchor.TopCenter` does not exist — use `Anchor.Top` for centered-top placement.**
+
 ### StackPanel
 
 Stacks children vertically (default) or horizontally with optional spacing:

@@ -5,7 +5,12 @@
       "Bash(start:*)",
       "Bash(dotnet tool:*)",
       "Bash(dotnet build:*)",
-      "Bash(dotnet:*)"
+      "Bash(dotnet:*)",
+      "Bash(\"$GUMCLI\" new:*)",
+      "Bash(\"$GUMCLI\" check:*)",
+      "Bash(\"$GUMCLI\" codegen-init:*)",
+      "Bash(\"$GUMCLI\" codegen:*)",
+      "Bash(\"$GUMCLI\":*)"
     ]
   }
 }

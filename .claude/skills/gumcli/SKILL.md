@@ -127,6 +127,10 @@ Exit codes: `0` = success, `1` = elements blocked by errors, `2` = load/config f
 
 ---
 
+## Known Warnings in Generated Code
+
+After running codegen, the standard controls (`ButtonStandard`, `TextBox`, `CheckBox`, etc.) produce CS0114/CS0108 "hides inherited member" warnings. These come from the Gum-generated `*.Generated.cs` files and are expected — do not try to fix them. They do not affect runtime behavior.
+
 ## Step 5 — Verify the Project
 
 After creation, check for errors:

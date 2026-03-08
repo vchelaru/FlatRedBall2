@@ -55,7 +55,7 @@
       <Value xsi:type="xsd:string">Start Game</Value>
     </Variable>
     <Variable Type="float" Name="StartGameButton.Width" SetsValue="true">
-      <Value xsi:type="xsd:float">200</Value>
+      <Value xsi:type="xsd:float">554</Value>
     </Variable>
     <Variable Type="float" Name="StartGameButton.X" SetsValue="true">
       <Value xsi:type="xsd:float">0</Value>

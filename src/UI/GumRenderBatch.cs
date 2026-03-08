@@ -1,3 +1,4 @@
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Rendering;
 using Gum.Wireframe;
@@ -32,7 +33,15 @@ public class GumRenderBatch : IRenderBatch
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
-        _inner!.Begin();
+        // When Camera.Zoom != 1, scale the Gum render to match.
+        // The update loop already divides CanvasWidth/Height by zoom so that Gum layout
+        // units stay consistent; the matrix here makes the rendered output fill the screen
+        // at the same scale as the game world.
+        var zoom = camera.Zoom;
+        var matrix = zoom == 1f
+            ? (Matrix?)null
+            : Matrix.CreateScale(zoom, zoom, 1f);
+        _inner!.Begin(matrix);
     }
 
     /// <inheritdoc/>
