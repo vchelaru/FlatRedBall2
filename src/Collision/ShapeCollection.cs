@@ -12,6 +12,11 @@ public class ShapeCollection : ICollidable
     public void Add(Line line) => _shapes.Add(line);
     public void Add(Polygon polygon) => _shapes.Add(polygon);
 
+    // ShapeCollection has no single center; always participate in broad phase.
+    public float AbsoluteX => 0f;
+    public float AbsoluteY => 0f;
+    public float BroadPhaseRadius => float.MaxValue;
+
     public bool CollidesWith(ICollidable other)
     {
         foreach (var shape in _shapes)

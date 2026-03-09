@@ -24,13 +24,6 @@ The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560Ã
 - Per-frame texture region, timing, and relative X/Y offset
 - `Sprite.CurrentAnimation` state machine: playing, looped, completed events
 
-## Async Synchronization Context
-`// TODO: flush async sync context` comment in update loop.
-
-- Custom `SynchronizationContext` that queues continuations
-- Flush pending continuations during update loop (after collision, before CustomActivity)
-- Allows `await` in entity/screen code to resume on the game thread
-
 ## Spatial Partitioning
 **Design decision needed before building any dense entity-vs-entity collision sample.**
 

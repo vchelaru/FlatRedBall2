@@ -77,6 +77,20 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
+    public float BroadPhaseRadius
+    {
+        get
+        {
+            float max = 0f;
+            foreach (var p in _points)
+            {
+                float d = MathF.Sqrt(p.X * p.X + p.Y * p.Y);
+                if (d > max) max = d;
+            }
+            return max;
+        }
+    }
+
     // IRenderable
     public bool IsVisible { get; set; } = false;
     public Layer Layer { get; set; } = null!;

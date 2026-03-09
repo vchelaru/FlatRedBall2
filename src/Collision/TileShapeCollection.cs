@@ -409,6 +409,9 @@ public class TileShapeCollection : ICollidable
     }
 
     // ICollidable — TileShapeCollection is static geometry; only the querying shape moves.
+    public float AbsoluteX => X;
+    public float AbsoluteY => Y;
+    public float BroadPhaseRadius => float.MaxValue;
     public bool CollidesWith(ICollidable other) => GetSeparationFor(other) != Vector2.Zero;
     public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }

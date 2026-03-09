@@ -33,6 +33,7 @@ public class Line : IAttachable, IRenderable, ICollidable
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+    public float BroadPhaseRadius => EndPoint.Length();
 
     // IRenderable
     public bool IsVisible { get; set; } = false;

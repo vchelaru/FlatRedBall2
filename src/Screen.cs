@@ -262,6 +262,9 @@ public class Screen
 
             Camera.PhysicsUpdate(frameTime.DeltaSeconds);
 
+            // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
+            Engine?.SortPartitionedFactories();
+
             // 2. Collision phase
             foreach (var rel in _collisionRelationships)
                 rel.RunCollisions();

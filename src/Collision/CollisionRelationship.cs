@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using FlatRedBall2;
 
 namespace FlatRedBall2.Collision;
 
@@ -35,6 +36,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// still runs only once per pair. Default is <c>false</c>.
     /// </summary>
     public bool AllowDuplicatePairs { get; set; }
+
+    /// <summary>
+    /// Number of deep (narrow-phase) collision checks performed during the last <see cref="RunCollisions"/> call.
+    /// Useful for profiling. When both lists come from a <see cref="Factory{T}"/> with a matching
+    /// <see cref="Factory{T}.PartitionAxis"/>, this will be much lower than the O(n×m) worst case.
+    /// </summary>
+    public int DeepCollisionCount { get; private set; }
 
     /// <summary>
     /// Fired once per colliding pair per frame, after any physics response configured via
@@ -120,15 +128,28 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     internal void RunCollisions()
     {
+        DeepCollisionCount = 0;
+
         if (ReferenceEquals(_listA, _listB))
         {
-            RunSameListCollisions();
+            var axis = (_listA is IFactory fa) ? fa.PartitionAxis : null;
+            if (axis != null)
+                RunSameListCollisionsSweep(axis.Value);
+            else
+                RunSameListCollisions();
             return;
         }
 
-        foreach (var a in _listA)
-            foreach (var b in _listB)
-                RunPair(a, b);
+        Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
+        Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
+        if (axisA != null && axisA == axisB)
+            RunCrossListCollisionsSweep(axisA.Value);
+        else
+        {
+            foreach (var a in _listA)
+                foreach (var b in _listB)
+                    RunPair(a, b);
+        }
     }
 
     // Called when _listA and _listB are the same reference (self/intra-list collision).
@@ -156,6 +177,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var b = _selfSnapshot[j];
                 var effectiveA = GetEffectiveA(a);
                 var effectiveB = GetEffectiveB((B)(object)b);
+                DeepCollisionCount++;
                 if (!CheckCollision(effectiveA, effectiveB)) continue;
 
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
@@ -171,10 +193,86 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     {
         var effectiveA = GetEffectiveA(a);
         var effectiveB = GetEffectiveB(b);
+        DeepCollisionCount++;
         if (!CheckCollision(effectiveA, effectiveB)) return;
         var sep = ComputeSeparationVector(effectiveA, effectiveB);
         ApplyResponse(a, b, sep);
         CollisionOccurred?.Invoke(a, b);
+    }
+
+    // Both lists are already sorted by their respective factories. Uses indexed access where available.
+    private void RunCrossListCollisionsSweep(Axis axis)
+    {
+        var listA = _listA as IReadOnlyList<A> ?? new List<A>(_listA);
+        var listB = _listB as IReadOnlyList<B> ?? new List<B>(_listB);
+
+        int startB = 0;
+
+        for (int i = 0; i < listA.Count; i++)
+        {
+            var a = listA[i];
+            var effectiveA = GetEffectiveA(a);
+            float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
+            float aR = effectiveA.BroadPhaseRadius;
+            float aLeft = aPos - aR;
+            float aRight = aPos + aR;
+
+            // Advance startB past items whose far edge is behind aLeft
+            while (startB < listB.Count)
+            {
+                var testB = GetEffectiveB(listB[startB]);
+                float testPos = axis == Axis.X ? testB.AbsoluteX : testB.AbsoluteY;
+                if (testPos + testB.BroadPhaseRadius >= aLeft) break;
+                startB++;
+            }
+
+            for (int j = startB; j < listB.Count; j++)
+            {
+                var b = listB[j];
+                var effectiveB = GetEffectiveB(b);
+                float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
+                float bLeft = bPos - effectiveB.BroadPhaseRadius;
+                if (bLeft > aRight) break; // too far; all remaining are also too far
+
+                DeepCollisionCount++;
+                if (!CheckCollision(effectiveA, effectiveB)) continue;
+                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                ApplyResponse(a, b, sep);
+                CollisionOccurred?.Invoke(a, b);
+            }
+        }
+    }
+
+    // List is already sorted by factory. Iterates unique unordered pairs (i < j).
+    private void RunSameListCollisionsSweep(Axis axis)
+    {
+        var list = _listA as IReadOnlyList<A> ?? new List<A>(_listA);
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            var a = list[i];
+            var effectiveA = GetEffectiveA(a);
+            float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
+            float aRight = aPos + effectiveA.BroadPhaseRadius;
+
+            for (int j = i + 1; j < list.Count; j++)
+            {
+                var b = list[j];
+                var effectiveB = GetEffectiveB((B)(object)b);
+                float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
+                float bLeft = bPos - effectiveB.BroadPhaseRadius;
+                if (bLeft > aRight) break;
+
+                DeepCollisionCount++;
+                if (!CheckCollision(effectiveA, effectiveB)) continue;
+
+                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                ApplyResponse(a, (B)(object)b, sep);
+                CollisionOccurred?.Invoke(a, (B)(object)b);
+                if (AllowDuplicatePairs)
+                    CollisionOccurred?.Invoke(b, (B)(object)a);
+            }
+        }
     }
 
     private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;

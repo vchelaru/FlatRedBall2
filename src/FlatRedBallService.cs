@@ -232,6 +232,12 @@ public class FlatRedBallService
             $"No factory registered for {typeof(T).Name}. Create a Factory<{typeof(T).Name}> in CustomInitialize before calling GetFactory.");
     }
 
+    internal void SortPartitionedFactories()
+    {
+        foreach (var factory in _factories.Values)
+            factory.SortForPartition();
+    }
+
     /// <summary>
     /// The engine's default display configuration. Applied to every screen that does not declare
     /// its own <see cref="Screen.PreferredDisplaySettings"/>.

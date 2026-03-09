@@ -42,6 +42,23 @@ public class Entity : ICollidable, IAttachable
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
+    public float BroadPhaseRadius
+    {
+        get
+        {
+            float max = 0f;
+            foreach (var shape in _shapes)
+            {
+                float offsetDist = MathF.Sqrt(
+                    (shape.AbsoluteX - AbsoluteX) * (shape.AbsoluteX - AbsoluteX) +
+                    (shape.AbsoluteY - AbsoluteY) * (shape.AbsoluteY - AbsoluteY));
+                float r = offsetDist + shape.BroadPhaseRadius;
+                if (r > max) max = r;
+            }
+            return max;
+        }
+    }
+
     // Rotation
     public Angle Rotation { get; set; }
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;

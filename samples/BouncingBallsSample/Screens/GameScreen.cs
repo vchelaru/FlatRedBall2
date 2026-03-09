@@ -16,13 +16,17 @@ public class GameScreen : Screen
     private TileShapeCollection _tiles = null!;
     private Label _pauseLabel = null!;
     private Label _timeScaleLabel = null!;
+    private Label _collisionLabel = null!;
     private SoundEffect _hitSound = null!;
+    private CollisionRelationship<Ball, TileShapeCollection> _ballVsTiles = null!;
+    private CollisionRelationship<Ball, Ball> _ballVsBall = null!;
 
     public override void CustomInitialize()
     {
         Camera.BackgroundColor = new Color(20, 25, 35);
 
         _ballFactory = new Factory<Ball>(this);
+        _ballFactory.PartitionAxis = Axis.X;
 
         SetupArena();
 
@@ -71,8 +75,8 @@ public class GameScreen : Screen
     private void SetupCollision()
     {
         // Balls bounce off the tile walls — manual physics so we can measure delta-v for volume
-        var ballVsTiles = AddCollisionRelationship(_ballFactory, _tiles);
-        ballVsTiles.CollisionOccurred += (ball, tiles) =>
+        _ballVsTiles = AddCollisionRelationship(_ballFactory, _tiles);
+        _ballVsTiles.CollisionOccurred += (ball, tiles) =>
         {
             var preVelocity = ball.Velocity;
             var sep = ball.GetSeparationVector(tiles);
@@ -84,8 +88,8 @@ public class GameScreen : Screen
         };
 
         // Balls bounce off each other — manual physics so we can measure delta-v for volume
-        var ballVsBall = AddCollisionRelationship<Ball>(_ballFactory);
-        ballVsBall.CollisionOccurred += (a, b) =>
+        _ballVsBall = AddCollisionRelationship<Ball>(_ballFactory);
+        _ballVsBall.CollisionOccurred += (a, b) =>
         {
             var preVelocity = a.Velocity;
             var sep = a.GetSeparationVector(b);
@@ -117,6 +121,12 @@ public class GameScreen : Screen
         _timeScaleLabel.Y = 8;
         UpdateTimeScaleLabel();
         Add(_timeScaleLabel);
+
+        _collisionLabel = new Label();
+        _collisionLabel.Anchor(Anchor.TopRight);
+        _collisionLabel.X = -8;
+        _collisionLabel.Y = 8;
+        Add(_collisionLabel);
     }
 
     private void UpdateTimeScaleLabel() =>
@@ -163,5 +173,7 @@ public class GameScreen : Screen
                 Engine.Random.Next(100, 255),
                 Engine.Random.Next(100, 255));
         }
+
+        _collisionLabel.Text = $"Ball vs Tiles: {_ballVsTiles.DeepCollisionCount}\nBall vs Ball: {_ballVsBall.DeepCollisionCount}";
     }
 }

@@ -7,6 +7,8 @@ namespace FlatRedBall2;
 internal interface IFactory
 {
     void DestroyAll();
+    Axis? PartitionAxis { get; }
+    void SortForPartition();
 }
 
 /// <summary>
@@ -44,6 +46,36 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     }
 
     public IReadOnlyList<T> Instances => _instances;
+
+    /// <summary>
+    /// When set, this factory's entity list is sorted along the chosen axis once per frame before
+    /// collision relationships run. Any <see cref="Collision.CollisionRelationship{A,B}"/> whose both
+    /// lists are factories sharing the same non-null <see cref="PartitionAxis"/> will automatically use
+    /// broad-phase culling — no extra setup needed.
+    /// Set to <c>null</c> (default) to disable sorting and broad-phase for this factory.
+    /// </summary>
+    public Axis? PartitionAxis { get; set; }
+
+    void IFactory.SortForPartition()
+    {
+        if (PartitionAxis == null) return;
+        bool byX = PartitionAxis == Axis.X;
+        // Insertion sort — O(n) on nearly-sorted data (entities move slowly relative to sort order).
+        for (int i = 1; i < _instances.Count; i++)
+        {
+            var key = _instances[i];
+            float keyVal = byX ? key.AbsoluteX : key.AbsoluteY;
+            int j = i - 1;
+            while (j >= 0)
+            {
+                float jVal = byX ? _instances[j].AbsoluteX : _instances[j].AbsoluteY;
+                if (jVal <= keyVal) break;
+                _instances[j + 1] = _instances[j];
+                j--;
+            }
+            _instances[j + 1] = key;
+        }
+    }
 
     // IReadOnlyList<T> — allows SelfCollisionRelationship to iterate by index without GetEnumerator.
     public int Count => _instances.Count;

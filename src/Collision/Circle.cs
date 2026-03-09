@@ -19,6 +19,7 @@ public class Circle : IAttachable, IRenderable, ICollidable
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+    public float BroadPhaseRadius => Radius;
 
     // IRenderable
     public bool IsVisible { get; set; } = false;

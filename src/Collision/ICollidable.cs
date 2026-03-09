@@ -4,6 +4,15 @@ namespace FlatRedBall2.Collision;
 
 public interface ICollidable
 {
+    float AbsoluteX { get; }
+    float AbsoluteY { get; }
+
+    /// <summary>
+    /// Conservative bounding radius used by sweep-and-prune broad phase.
+    /// Returns <see cref="float.MaxValue"/> for shapes with no meaningful single center (e.g. <see cref="TileShapeCollection"/>).
+    /// </summary>
+    float BroadPhaseRadius { get; }
+
     /// <summary>
     /// Tests whether this object overlaps <paramref name="other"/>.
     /// </summary>
