@@ -45,7 +45,7 @@ public class DefaultCollisionPlayer : Entity
             UsesAcceleration = true,
         };
 
-        var keyboard = Engine.InputManager.Keyboard;
+        var keyboard = Engine.Input.Keyboard;
         _topDown.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down).Or(
             new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }
@@ -54,7 +54,7 @@ public class DefaultCollisionPlayer : Entity
     {
         _topDown.Update(this, time);
 
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
         {
             _collisionEnabled = !_collisionEnabled;
             SetDefaultCollision(_body, _collisionEnabled);

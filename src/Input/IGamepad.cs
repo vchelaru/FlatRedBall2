@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Input;
 namespace FlatRedBall2.Input;
 
 /// <summary>
-/// Per-frame state for one gamepad controller. Obtain via <c>Engine.InputManager.GetGamepad(index)</c>.
+/// Per-frame state for one gamepad controller. Obtain via <c>Engine.Input.GetGamepad(index)</c>.
 /// Returns zeroed/unpressed state when no controller is connected at that index — safe to poll without checking connection.
 /// </summary>
 public interface IGamepad

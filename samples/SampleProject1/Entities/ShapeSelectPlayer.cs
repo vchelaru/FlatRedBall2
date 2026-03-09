@@ -49,7 +49,7 @@ public class ShapeSelectPlayer : Entity
             UsesAcceleration = true,
         };
 
-        var keyboard = Engine.InputManager.Keyboard;
+        var keyboard = Engine.Input.Keyboard;
         _topDown.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down).Or(
             new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }

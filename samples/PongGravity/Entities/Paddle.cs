@@ -35,7 +35,7 @@ public class Paddle : Entity
 
     public override void CustomActivity(FrameTime time)
     {
-        var kb = Engine.InputManager.Keyboard;
+        var kb = Engine.Input.Keyboard;
         const float Speed = 350f;
 
         if (kb.IsKeyDown(_upKey))

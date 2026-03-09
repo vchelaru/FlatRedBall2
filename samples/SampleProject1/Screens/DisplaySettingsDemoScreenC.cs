@@ -71,7 +71,7 @@ public class DisplaySettingsDemoScreenC : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.F11))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.F11))
             ToggleFullscreen();
 
         float visibleW = Camera.TargetWidth / Camera.Zoom;

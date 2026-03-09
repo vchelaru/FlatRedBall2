@@ -36,7 +36,7 @@ public class GameOverScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
             MoveToScreen<SpaceInvadersScreen>();
     }
 }

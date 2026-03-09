@@ -32,7 +32,7 @@ public class Player : Entity
         Add(Rectangle);
 
         _movement = new KeyboardInput2D(
-            Engine.InputManager.Keyboard,
+            Engine.Input.Keyboard,
             Keys.Left, Keys.Right, Keys.Up, Keys.Down);
     }
 
@@ -137,7 +137,7 @@ Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>
 // Player.cs — spawns a Ball on Space press
 public override void CustomActivity(FrameTime time)
 {
-    if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+    if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
     {
         var ball = Engine.GetFactory<Ball>().Create();
         ball.X = X; ball.Y = Y;

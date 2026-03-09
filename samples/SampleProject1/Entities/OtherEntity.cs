@@ -11,7 +11,7 @@ public class OtherEntity : Entity
     {
         var sprite = new Sprite
         {
-            Texture = Engine.ContentManager.CreateSolidColor(32, 32, new Color(220, 130, 60)),
+            Texture = Engine.Content.CreateSolidColor(32, 32, new Color(220, 130, 60)),
             TextureScale = 2f,
             Y = 16f,
         };

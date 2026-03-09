@@ -47,12 +47,12 @@ public class FlatRedBallService
         _graphicsManager = game.Services.GetService(typeof(IGraphicsDeviceManager)) as GraphicsDeviceManager;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
         SynchronizationContext.SetSynchronizationContext(_syncContext);
-        ContentManager.Initialize(game.Content, game.GraphicsDevice);
+        Content.Initialize(game.Content, game.GraphicsDevice);
         ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
 
         var bounds = game.Window.ClientBounds;
         ApplyCameraSettings(Camera, bounds.Width, bounds.Height);
-        InputManager.SetCamera(Camera);
+        Input.SetCamera(Camera);
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
 
@@ -93,7 +93,7 @@ public class FlatRedBallService
             // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
             // in any awaiting code); Clear discards stale continuations from the sync context queue.
             CurrentScreen._cts.Cancel();
-            TimeManager.ClearTasks();
+            Time.ClearTasks();
             _syncContext.Clear();
 
             var screen = new T();
@@ -129,8 +129,8 @@ public class FlatRedBallService
 
         var bounds = _game!.Window.ClientBounds;
         ApplyCameraSettings(screen.Camera, bounds.Width, bounds.Height);
-        InputManager.SetCamera(screen.Camera);
-        TimeManager.ResetScreen();
+        Input.SetCamera(screen.Camera);
+        Time.ResetScreen();
 
         CurrentScreen = screen;
         screen.CustomInitialize();
@@ -328,10 +328,10 @@ public class FlatRedBallService
     // Sub-systems
     public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
     public GameRandom Random { get; } = new GameRandom();
-    public InputManager InputManager { get; } = new InputManager();
-    public AudioManager AudioManager { get; } = new AudioManager();
-    public ContentManagerService ContentManager { get; } = new ContentManagerService();
-    public TimeManager TimeManager { get; } = new TimeManager();
+    public InputManager Input { get; } = new InputManager();
+    public AudioManager Audio { get; } = new AudioManager();
+    public ContentManagerService Content { get; } = new ContentManagerService();
+    public TimeManager Time { get; } = new TimeManager();
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
     /// <summary>
@@ -356,9 +356,10 @@ public class FlatRedBallService
             change();
         }
 
-        TimeManager.Update(gameTime);
+        Time.Update(gameTime);
+        Audio.Update();
         CurrentScreen.Overlay.BeginFrame();
-        InputManager.Update();
+        Input.Update();
 
         // Keep the Gum canvas in sync with the current viewport so that UI layout
         // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) resolves to the
@@ -392,10 +393,10 @@ public class FlatRedBallService
         // Complete any delay tasks whose conditions are now met, then flush their
         // continuations onto the game thread. This runs before CustomActivity so
         // screen/entity code sees the results of completed tasks in the same frame.
-        TimeManager.DoTaskLogic();
+        Time.DoTaskLogic();
         _syncContext.Update();
 
-        CurrentScreen.Update(TimeManager.CurrentFrameTime);
+        CurrentScreen.Update(Time.CurrentFrameTime);
     }
 
     public void Draw()

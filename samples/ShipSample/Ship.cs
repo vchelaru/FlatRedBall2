@@ -19,7 +19,7 @@ public class Ship : Entity
 
     public override void CustomInitialize()
     {
-        var texture = Engine.ContentManager.Load<Texture2D>("ship_0001");
+        var texture = Engine.Content.Load<Texture2D>("ship_0001");
         _sprite = new Sprite
         {
             Texture = texture,
@@ -33,7 +33,7 @@ public class Ship : Entity
 
     public override void CustomActivity(FrameTime time)
     {
-        var kb = Engine.InputManager.Keyboard;
+        var kb = Engine.Input.Keyboard;
         float dt = time.DeltaSeconds;
 
         // Rotate — left/right arrow keys (positive = clockwise on screen)

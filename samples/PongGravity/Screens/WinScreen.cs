@@ -19,8 +19,8 @@ public class WinScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space) ||
-            Engine.InputManager.Keyboard.WasKeyPressed(Keys.Enter))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space) ||
+            Engine.Input.Keyboard.WasKeyPressed(Keys.Enter))
         {
             MoveToScreen<GameScreen>();
         }

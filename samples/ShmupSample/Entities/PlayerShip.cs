@@ -73,7 +73,7 @@ public class PlayerShip : Entity
         Add(CollisionRect);
 
         _movement = new KeyboardInput2D(
-            Engine.InputManager.Keyboard,
+            Engine.Input.Keyboard,
             Keys.Left, Keys.Right, Keys.Up, Keys.Down);
 
         // Drag snaps the ship to a stop quickly when keys are released.
@@ -116,7 +116,7 @@ public class PlayerShip : Entity
     {
         _fireCooldown -= time.DeltaSeconds;
 
-        var kb = Engine.InputManager.Keyboard;
+        var kb = Engine.Input.Keyboard;
         bool fireHeld = kb.IsKeyDown(Keys.Z) || kb.IsKeyDown(Keys.Space);
 
         if (fireHeld && _fireCooldown <= 0f)

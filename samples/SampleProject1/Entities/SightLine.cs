@@ -49,7 +49,7 @@ public class SightLine : Entity
     {
         if (Player == null) return;
 
-        var mouseWorld = Engine.InputManager.Cursor.WorldPosition;
+        var mouseWorld = Engine.Input.Cursor.WorldPosition;
         var playerPos = new Vector2(Player.AbsoluteX, Player.AbsoluteY);
 
         _line.X = playerPos.X;

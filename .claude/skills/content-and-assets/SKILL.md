@@ -36,7 +36,7 @@ Load textures via MonoGame's content pipeline and render them with `Sprite`.
 
 ```csharp
 // Inside an Entity's CustomInitialize:
-var texture = Engine.ContentManager.Load<Texture2D>("ship_0001");
+var texture = Engine.Content.Load<Texture2D>("ship_0001");
 ```
 
 The string is the asset name (filename without extension) as defined in the `.mgcb` file. The `Content/` prefix is set by `Game1.Content.RootDirectory`.
@@ -146,7 +146,7 @@ Place the `.png` file in `Content/`, then add an entry to the `.mgcb`:
 ### 3. Load in code
 
 ```csharp
-var tex = Engine.ContentManager.Load<Texture2D>("mysprite");  // no extension
+var tex = Engine.Content.Load<Texture2D>("mysprite");  // no extension
 ```
 
 ## Gotchas

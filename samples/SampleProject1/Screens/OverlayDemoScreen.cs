@@ -41,8 +41,8 @@ public class OverlayDemoScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        var kb     = Engine.InputManager.Keyboard;
-        var cursor = Engine.InputManager.Cursor;
+        var kb     = Engine.Input.Keyboard;
+        var cursor = Engine.Input.Cursor;
 
         if (kb.WasKeyPressed(Keys.Space))
         {

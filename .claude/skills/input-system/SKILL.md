@@ -5,15 +5,15 @@ description: "Input System in FlatRedBall2. Use when working with keyboard, mous
 
 # Input System in FlatRedBall2
 
-All input is accessed through `Engine.InputManager` from inside any entity or screen. The input manager exposes keyboard, cursor (mouse/touch), and up to four gamepads.
+All input is accessed through `Engine.Input` from inside any entity or screen. The input manager exposes keyboard, cursor (mouse/touch), and up to four gamepads.
 
 ## Accessing Input Devices
 
 ```csharp
 // Works in Entity.CustomActivity, Screen.CustomActivity, or anywhere Engine is available:
-var keyboard = Engine.InputManager.Keyboard;       // IKeyboard
-var cursor   = Engine.InputManager.Cursor;         // ICursor
-var gamepad0 = Engine.InputManager.GetGamepad(0);  // IGamepad, index 0–3
+var keyboard = Engine.Input.Keyboard;       // IKeyboard
+var cursor   = Engine.Input.Cursor;         // ICursor
+var gamepad0 = Engine.Input.GetGamepad(0);  // IGamepad, index 0–3
 ```
 
 `GetGamepad(int index)` throws `ArgumentOutOfRangeException` for index values outside 0–3.
@@ -21,7 +21,7 @@ var gamepad0 = Engine.InputManager.GetGamepad(0);  // IGamepad, index 0–3
 ## IKeyboard
 
 ```csharp
-IKeyboard kb = Engine.InputManager.Keyboard;
+IKeyboard kb = Engine.Input.Keyboard;
 
 bool held       = kb.IsKeyDown(Keys.Space);         // true every frame while held
 bool pressed    = kb.WasKeyPressed(Keys.Space);     // true only on first frame down
@@ -31,7 +31,7 @@ bool released   = kb.WasKeyJustReleased(Keys.Space);// true only on first frame 
 ## ICursor (Mouse / Touch)
 
 ```csharp
-ICursor cursor = Engine.InputManager.Cursor;
+ICursor cursor = Engine.Input.Cursor;
 
 bool clicking       = cursor.PrimaryDown;           // left button held
 bool justClicked    = cursor.PrimaryPressed;        // left button just pressed
@@ -42,7 +42,7 @@ Vector2 screenPos   = cursor.ScreenPosition;        // position in screen pixels
 ## IGamepad
 
 ```csharp
-IGamepad pad = Engine.InputManager.GetGamepad(0);
+IGamepad pad = Engine.Input.GetGamepad(0);
 
 bool held       = pad.IsButtonDown(Buttons.A);
 bool justPressed  = pad.WasButtonJustPressed(Buttons.A);
@@ -66,7 +66,7 @@ public class Player : Entity
     public override void CustomInitialize()
     {
         _movement = new KeyboardInput2D(
-            Engine.InputManager.Keyboard,
+            Engine.Input.Keyboard,
             Keys.Left,   // left  → X = -1
             Keys.Right,  // right → X = +1
             Keys.Up,     // up    → Y = +1
@@ -91,7 +91,7 @@ Wraps one key as a standard `IPressableInput` (useful when passing input to a sy
 ```csharp
 using FlatRedBall2.Input;
 
-var jumpKey = new KeyboardPressableInput(Engine.InputManager.Keyboard, Keys.Space);
+var jumpKey = new KeyboardPressableInput(Engine.Input.Keyboard, Keys.Space);
 
 bool held      = jumpKey.IsDown;
 bool pressed   = jumpKey.WasJustPressed;
@@ -104,7 +104,7 @@ Maps two `GamepadAxis` values to `I2DInput`:
 
 ```csharp
 var stick = new GamepadInput2D(
-    Engine.InputManager.GetGamepad(0),
+    Engine.Input.GetGamepad(0),
     GamepadAxis.LeftStickX,
     GamepadAxis.LeftStickY);
 
@@ -116,7 +116,7 @@ VelocityY = stick.Y * Speed;
 
 ```csharp
 var jumpButton = new GamepadPressableInput(
-    Engine.InputManager.GetGamepad(0),
+    Engine.Input.GetGamepad(0),
     Buttons.A);
 
 if (jumpButton.WasJustPressed) { /* jump */ }

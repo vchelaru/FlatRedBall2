@@ -26,7 +26,7 @@ public class Player : Entity
         };
         Add(Rectangle);
 
-        _keyboard = Engine.InputManager.Keyboard;
+        _keyboard = Engine.Input.Keyboard;
         _shootInput = new KeyboardPressableInput(_keyboard, Keys.Space);
     }
 

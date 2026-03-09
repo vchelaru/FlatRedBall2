@@ -35,7 +35,7 @@ public class Player : Entity
         _platformer.GroundMovement = groundValues;
         _platformer.AirMovement = groundValues;   // reuse, or provide separate air values
 
-        var keyboard = Engine.InputManager.Keyboard;
+        var keyboard = Engine.Input.Keyboard;
         _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space);
         _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
     }

@@ -35,7 +35,7 @@ public class GameOverScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        var kb = Engine.InputManager.Keyboard;
+        var kb = Engine.Input.Keyboard;
         if (kb.WasKeyPressed(Microsoft.Xna.Framework.Input.Keys.Space) ||
             kb.WasKeyPressed(Microsoft.Xna.Framework.Input.Keys.Z))
         {

@@ -11,7 +11,7 @@ public class Shot : Entity
 
     public override void CustomInitialize()
     {
-        var texture = Engine.ContentManager.Load<Texture2D>("tile_0003");
+        var texture = Engine.Content.Load<Texture2D>("tile_0003");
         _sprite = new Sprite
         {
             Texture = texture,

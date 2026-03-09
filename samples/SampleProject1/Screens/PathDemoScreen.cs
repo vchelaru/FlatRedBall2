@@ -97,7 +97,7 @@ public class PathDemoScreen : Screen
     {
         _follower.Activity(_dot, time.DeltaSeconds);
 
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.V))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.V))
             _path.IsVisible = !_path.IsVisible;
 
         _statusLabel.Text =

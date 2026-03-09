@@ -62,7 +62,7 @@ public class MoveToLayerDemoScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
         {
             _isInFront = !_isInFront;
             _player.MoveToLayer(_isInFront ? _front : _behind);

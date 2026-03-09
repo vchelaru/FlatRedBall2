@@ -4,7 +4,9 @@ using FlatRedBall2.Collision;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Media;
 
 namespace BouncingBallsSample.Screens;
 
@@ -13,6 +15,7 @@ public class GameScreen : Screen
     private Factory<Ball> _ballFactory = null!;
     private TileShapeCollection _tiles = null!;
     private Label _pauseLabel = null!;
+    private SoundEffect _hitSound = null!;
 
     public override void CustomInitialize()
     {
@@ -21,6 +24,11 @@ public class GameScreen : Screen
         _ballFactory = new Factory<Ball>(this);
 
         SetupArena();
+
+        var song = Engine.Content.Load<Song>("IGB3Song");
+        _hitSound = Engine.Content.Load<SoundEffect>("SoundEffectInstanceFile");
+        Engine.Audio.PlaySong(song);
+
         SetupCollision();
         SetupUI();
     }
@@ -56,15 +64,42 @@ public class GameScreen : Screen
         Add(_tiles);
     }
 
+    const float MinHitSpeed = 100f;
+    const float MaxHitSpeed = 1000f;
+
     private void SetupCollision()
     {
-        // Balls bounce off the tile walls
-        AddCollisionRelationship(_ballFactory, _tiles)
-            .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.8f);
+        // Balls bounce off the tile walls — manual physics so we can measure delta-v for volume
+        var ballVsTiles = AddCollisionRelationship(_ballFactory, _tiles);
+        ballVsTiles.CollisionOccurred += (ball, tiles) =>
+        {
+            var preVelocity = ball.Velocity;
+            var sep = ball.GetSeparationVector(tiles);
+            ball.ApplySeparationOffset(sep);
+            ball.AdjustVelocityFromSeparation(sep, tiles, thisMass: 0f, otherMass: 1f, elasticity: 0.8f);
+            float impact = (ball.Velocity - preVelocity).Length();
+            if (impact >= MinHitSpeed)
+                Engine.Audio.Play(_hitSound, volume: Math.Clamp(impact / MaxHitSpeed, 0f, 1f));
+        };
 
-        // Balls bounce off each other
-        AddCollisionRelationship<Ball>(_ballFactory)
-            .BounceOnCollision(firstMass: 1f, secondMass: 1f, elasticity: 0.9f);
+        // Balls bounce off each other — manual physics so we can measure delta-v for volume
+        var ballVsBall = AddCollisionRelationship<Ball>(_ballFactory);
+        ballVsBall.CollisionOccurred += (a, b) =>
+        {
+            var preVelocity = a.Velocity;
+            var sep = a.GetSeparationVector(b);
+            a.ApplySeparationOffset(sep * 0.5f);
+            b.ApplySeparationOffset(sep * -0.5f);
+            a.AdjustVelocityFromSeparation(sep, b, thisMass: 1f, otherMass: 1f, elasticity: 0.9f);
+            float impact = (a.Velocity - preVelocity).Length();
+            if (impact >= MinHitSpeed)
+                Engine.Audio.Play(_hitSound, volume: Math.Clamp(impact / MaxHitSpeed, 0f, 1f));
+        };
+    }
+
+    public override void CustomDestroy()
+    {
+        Engine.Audio.StopSong();
     }
 
     private void SetupUI()
@@ -78,7 +113,7 @@ public class GameScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Escape))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Escape))
         {
             if (IsPaused)
             {
@@ -92,9 +127,9 @@ public class GameScreen : Screen
             }
         }
 
-        if (!IsPaused && Engine.InputManager.Cursor.PrimaryPressed)
+        if (!IsPaused && Engine.Input.Cursor.PrimaryPressed)
         {
-            var pos = Engine.InputManager.Cursor.WorldPosition;
+            var pos = Engine.Input.Cursor.WorldPosition;
             var ball = _ballFactory.Create();
             ball.X = pos.X;
             ball.Y = pos.Y;

@@ -73,7 +73,7 @@ public class LineTestScreen : Screen
     {
         // Update the mouse line's far endpoint to track the cursor each frame.
         // The entity sits at world origin (0, 0), so EndPoint == world cursor position.
-        _mouseLine.EndPoint = Engine.InputManager.Cursor.WorldPosition;
+        _mouseLine.EndPoint = Engine.Input.Cursor.WorldPosition;
     }
 
     public override void CustomDestroy()

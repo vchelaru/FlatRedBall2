@@ -1,0 +1,24 @@
+
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+
+#begin IGB3Song.mp3
+/importer:Mp3Importer
+/processor:SongProcessor
+/build:IGB3Song.mp3
+
+#begin SoundEffectInstanceFile.wav
+/importer:WavImporter
+/processor:SoundEffectProcessor
+/build:SoundEffectInstanceFile.wav

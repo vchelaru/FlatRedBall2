@@ -12,7 +12,7 @@ FlatRedBall2 is a 2D game engine built on MonoGame. It provides physics, collisi
 - **Physics**: `pos += vel*dt + acc*(dt^2/2)`, `vel += acc*dt`, `vel -= vel*drag*dt` — every frame, for every entity
 - **Collision resolution**: All registered `CollisionRelationship` pairs are tested and resolved after physics
 - **Rendering**: Everything added via `screen.Add(renderable)` is drawn, sorted by Layer + Z
-- **Input polling**: `InputManager` updates keyboard, mouse, and gamepad state each frame
+- **Input polling**: `Input` updates keyboard, mouse, and gamepad state each frame
 - **Gum UI updates**: Click/hover/focus events routed to all active Gum elements
 - **Screen transitions**: Old screen torn down, new screen initialized — entities, factories, Gum elements all cleaned up automatically
 - **Camera**: Initialized from window viewport; transforms world coordinates to screen
@@ -108,11 +108,11 @@ public class GameScreen : Screen
 
 | Property | Type | Purpose |
 |----------|------|---------|
-| `InputManager` | `InputManager` | Keyboard, cursor, gamepads |
-| `ContentManager` | `ContentManagerService` | Load textures, fonts via `.mgcb` pipeline |
+| `Input` | `InputManager` | Keyboard, cursor, gamepads |
+| `Content` | `ContentManagerService` | Load textures, fonts via `.mgcb` pipeline |
 | `Random` | `GameRandom` | Seeded random with helpers (`Between`, `RadialVector2`) |
-| `TimeManager` | `TimeManager` | Frame timing, async delays |
-| `AudioManager` | `AudioManager` | **Stub — throws NotImplementedException** |
+| `Time` | `TimeManager` | Frame timing, async delays |
+| `Audio` | `AudioManager` | **Stub — throws NotImplementedException** |
 | `DebugRenderer` | `DebugRenderer` | **Stub — all draw methods are no-ops** |
 
 ## Which Skill to Read Next

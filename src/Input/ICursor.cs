@@ -3,7 +3,7 @@ using System.Numerics;
 namespace FlatRedBall2.Input;
 
 /// <summary>
-/// Per-frame mouse/touch state. Accessible via <c>Engine.InputManager.Cursor</c>.
+/// Per-frame mouse/touch state. Accessible via <c>Engine.Input.Cursor</c>.
 /// <see cref="WorldPosition"/> is in Y+ up world space and matches entity coordinates directly.
 /// </summary>
 public interface ICursor

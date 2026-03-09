@@ -502,7 +502,7 @@ public class CameraControllingEntity : Entity
             var point = random.PointInCircle(shakeRadius);
             CameraOffset.X = point.X;
             CameraOffset.Y = point.Y;
-            await Engine.TimeManager.DelaySeconds(IndividualShakeDuration, cancellationToken);
+            await Engine.Time.DelaySeconds(IndividualShakeDuration, cancellationToken);
         }
         CameraOffset = Vector2.Zero;
     }
@@ -521,7 +521,7 @@ public class CameraControllingEntity : Entity
             CameraOffset.Y = point.Y;
             try
             {
-                await Engine.TimeManager.DelaySeconds(IndividualShakeDuration);
+                await Engine.Time.DelaySeconds(IndividualShakeDuration);
             }
             catch (TaskCanceledException)
             {

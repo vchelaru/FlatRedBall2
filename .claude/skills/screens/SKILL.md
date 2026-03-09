@@ -49,7 +49,7 @@ See `engine-overview` for the full 8-step frame loop. Key ordering for screens:
 | Property | Type | Notes |
 |----------|------|-------|
 | `Camera` | `Camera` | This screen's camera — set background color, world bounds, position |
-| `Engine` | `FlatRedBallService` | Access to `Random`, `InputManager`, `AudioManager`, etc. |
+| `Engine` | `FlatRedBallService` | Access to `Random`, `Input`, `Audio`, etc. |
 | `ContentManager` | `ContentManagerService` | Load textures, fonts, and other content |
 | `RenderList` | `IReadOnlyList<IRenderable>` | All renderables sorted and drawn each frame; use `Add`/`Remove` to modify |
 | `Layers` | `List<Layer>` | Named layers for render ordering |
@@ -156,7 +156,7 @@ Typical pattern:
 ```csharp
 public override void CustomActivity(FrameTime time)
 {
-    if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Escape))
+    if (Engine.Input.Keyboard.WasKeyPressed(Keys.Escape))
     {
         if (IsPaused) { UnpauseThisScreen(); _pauseOverlay.IsVisible = false; }
         else          { PauseThisScreen();   _pauseOverlay.IsVisible = true;  }
@@ -164,4 +164,4 @@ public override void CustomActivity(FrameTime time)
 }
 ```
 
-> **Note:** `await`-based delays (`TimeManager.DoTaskLogic`) run at the service level and are **not** suspended by pause. Avoid time-sensitive game-logic delays during pause; this will be addressed in a future Pause-Aware Delay API.
+> **Note:** `await`-based delays (`Time.DoTaskLogic`) run at the service level and are **not** suspended by pause. Avoid time-sensitive game-logic delays during pause; this will be addressed in a future Pause-Aware Delay API.

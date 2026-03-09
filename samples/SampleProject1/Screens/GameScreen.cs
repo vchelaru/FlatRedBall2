@@ -341,7 +341,7 @@ public class GameScreen : Screen
             _ball.VelocityX = 0f;
             _ball.VelocityY = 0f;
 
-            if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space))
+            if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
             {
                 _ballAttached = false;
                 _ball.VelocityY = _ballSpeed;

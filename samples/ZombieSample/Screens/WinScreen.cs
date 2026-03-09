@@ -32,7 +32,7 @@ public class WinScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        var kb = Engine.InputManager.Keyboard;
+        var kb = Engine.Input.Keyboard;
         if (kb.WasKeyPressed(Keys.Enter) ||
             kb.WasKeyPressed(Keys.Space)  ||
             kb.WasKeyPressed(Keys.R))

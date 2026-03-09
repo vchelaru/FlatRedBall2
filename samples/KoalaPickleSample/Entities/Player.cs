@@ -82,8 +82,8 @@ public class Player : Entity
         // Support both gamepad and keyboard so the game is playable either way.
         // GamepadPressableInput.WasJustPressed is stubbed (always false), so we use
         // IGamepad.WasButtonJustPressed directly for jump in CustomActivity.
-        var gamepad  = Engine.InputManager.GetGamepad(0);
-        var keyboard = Engine.InputManager.Keyboard;
+        var gamepad  = Engine.Input.GetGamepad(0);
+        var keyboard = Engine.Input.Keyboard;
 
         // Movement: merge keyboard and gamepad — whichever has the larger magnitude wins.
         // This lets DirectionFacing be driven entirely inside PlatformerBehavior.
@@ -101,7 +101,7 @@ public class Player : Entity
         DiedThisFrame = false;
 
         // Gamepad A jump is handled manually because GamepadPressableInput.WasJustPressed is stubbed.
-        var gamepad = Engine.InputManager.GetGamepad(0);
+        var gamepad = Engine.Input.GetGamepad(0);
         bool gamepadJumpPressed = gamepad.WasButtonJustPressed(Buttons.A);
 
         // Movement (keyboard + gamepad merged via MovementInput) and DirectionFacing are
@@ -120,7 +120,7 @@ public class Player : Entity
             _airJumpsRemaining = MaxAirJumps;
 
         // Allow an extra jump while airborne (gamepad or keyboard), consuming one air jump.
-        bool jumpJustPressed = Engine.InputManager.Keyboard.WasKeyPressed(Keys.Space)
+        bool jumpJustPressed = Engine.Input.Keyboard.WasKeyPressed(Keys.Space)
                              || gamepadJumpPressed;
         if (jumpJustPressed && !_platformer.IsOnGround && !_platformer.IsApplyingJump && _airJumpsRemaining > 0)
         {
@@ -132,7 +132,7 @@ public class Player : Entity
         // --- Auto-fire (hold to shoot at ShootInterval) ---
         _shootCooldown -= time.DeltaSeconds;
 
-        bool fireHeld = Engine.InputManager.Keyboard.IsKeyDown(Keys.Z)
+        bool fireHeld = Engine.Input.Keyboard.IsKeyDown(Keys.Z)
                      || gamepad.IsButtonDown(Buttons.RightTrigger)
                      || gamepad.IsButtonDown(Buttons.X);
 

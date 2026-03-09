@@ -32,7 +32,7 @@ public class GameScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        if (Engine.InputManager.Keyboard.WasKeyPressed(Keys.Escape))
+        if (Engine.Input.Keyboard.WasKeyPressed(Keys.Escape))
         {
             if (IsPaused)
                 Resume();

@@ -30,7 +30,7 @@ public class Paddle : Entity
         };
         Add(Rectangle);
 
-        _keyboard = Engine!.InputManager.Keyboard;
+        _keyboard = Engine!.Input.Keyboard;
     }
 
     public override void CustomActivity(FrameTime time)

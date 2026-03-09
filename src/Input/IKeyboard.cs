@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Input;
 namespace FlatRedBall2.Input;
 
 /// <summary>
-/// Per-frame keyboard state. Accessible from any entity or screen via <c>Engine.InputManager.Keyboard</c>.
+/// Per-frame keyboard state. Accessible from any entity or screen via <c>Engine.Input.Keyboard</c>.
 /// Prefer <see cref="WasKeyPressed"/> for one-shot actions (jump, menu confirm) and <see cref="IsKeyDown"/>
 /// for continuous input (movement). State is captured once per frame before entity logic runs.
 /// </summary>

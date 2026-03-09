@@ -16,7 +16,7 @@ public class ShipEntity : Entity
     {
         var sprite = new Sprite
         {
-            Texture = Engine.ContentManager.CreateSolidColor(16, 16, new Color(80, 160, 230)),
+            Texture = Engine.Content.CreateSolidColor(16, 16, new Color(80, 160, 230)),
             TextureScale = 3f,
             Y = 8f,
             Alpha= .5f
@@ -53,7 +53,7 @@ public class ShipEntity : Entity
             DecelerationTime = 0.08f,
         };
 
-        var keyboard = Engine.InputManager.Keyboard;
+        var keyboard = Engine.Input.Keyboard;
         _topDown.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
             .Or(new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }

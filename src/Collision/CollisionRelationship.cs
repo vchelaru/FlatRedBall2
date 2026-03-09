@@ -36,6 +36,26 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// </summary>
     public bool AllowDuplicatePairs { get; set; }
 
+    /// <summary>
+    /// Fired once per colliding pair per frame, after any physics response configured via
+    /// <see cref="BounceOnCollision"/>, <see cref="MoveFirstOnCollision"/>, etc.
+    /// </summary>
+    /// <remarks>
+    /// If you need to inspect velocity <em>before</em> and <em>after</em> the bounce (e.g. to scale
+    /// a sound effect by impact force), skip the fluent physics methods and apply physics manually
+    /// inside this handler instead:
+    /// <code>
+    /// var rel = AddCollisionRelationship(_balls, _walls); // no BounceOnCollision
+    /// rel.CollisionOccurred += (ball, wall) =>
+    /// {
+    ///     var preVelocity = ball.Velocity;
+    ///     var sep = ball.GetSeparationVector(wall);
+    ///     ball.ApplySeparationOffset(sep);
+    ///     ball.AdjustVelocityFromSeparation(sep, wall, thisMass: 0f, otherMass: 1f, elasticity: 0.8f);
+    ///     float impact = (ball.Velocity - preVelocity).Length();
+    /// };
+    /// </code>
+    /// </remarks>
     public event Action<A, B>? CollisionOccurred;
 
     internal CollisionRelationship(IEnumerable<A> listA, IEnumerable<B> listB)

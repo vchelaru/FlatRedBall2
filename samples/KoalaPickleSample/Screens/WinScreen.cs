@@ -33,8 +33,8 @@ public class WinScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-        var keyboard = Engine.InputManager.Keyboard;
-        var gamepad  = Engine.InputManager.GetGamepad(0);
+        var keyboard = Engine.Input.Keyboard;
+        var gamepad  = Engine.Input.GetGamepad(0);
 
         bool anyKey = keyboard.WasKeyPressed(Keys.Space)
                    || keyboard.WasKeyPressed(Keys.Enter)
