@@ -15,4 +15,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Raw files copied as-is; loaded at runtime via Texture2D.FromFile / XML deserialize -->
+    <Content Include="Content\FRBeefcakeSpritesheet.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content\PlatformerAnimations.achx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

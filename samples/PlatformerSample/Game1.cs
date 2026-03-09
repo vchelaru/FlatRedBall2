@@ -11,8 +11,8 @@ public class Game1 : Game
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
-        _graphics.PreferredBackBufferWidth = 1280;
-        _graphics.PreferredBackBufferHeight = 720;
+        _graphics.PreferredBackBufferWidth = 800;
+        _graphics.PreferredBackBufferHeight = 480;
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
     }
@@ -20,7 +20,10 @@ public class Game1 : Game
     protected override void Initialize()
     {
         base.Initialize();
+
+
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.Zoom = 2f;
         FlatRedBall2.FlatRedBallService.Default.Start<PlatformerScreen>();
     }
 

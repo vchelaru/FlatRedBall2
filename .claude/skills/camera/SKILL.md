@@ -181,6 +181,13 @@ Useful when placing Gum HUD elements relative to world objects, or for click-to-
 
 ## Gotchas
 
+- **Set zoom via `DisplaySettings.Zoom`, not `Camera.Zoom` directly.** `TargetWidth`/`TargetHeight` (the world coordinate extents) are calculated by the engine at screen-start time using `DisplaySettings.Zoom`. If you only set `Camera.Zoom` directly (e.g. in a screen's `CustomInitialize`), `TargetWidth`/`TargetHeight` were already sized for Zoom=1 — the rendered image is zoomed but the coordinate space is not, so objects placed at the edges of the intended world fall off-screen. Always set `DisplaySettings.Zoom` before calling `Start<T>()`:
+  ```csharp
+  FlatRedBallService.Default.DisplaySettings.Zoom = 2f;
+  FlatRedBallService.Default.Start<MyScreen>();
+  ```
+  `Camera.Zoom` is fine for transient runtime effects (e.g. a zoom-in cutscene) where the world layout is not affected.
+- **`Camera.Zoom` is reset on every screen transition.** The engine calls `ApplyCameraSettings` when a new screen starts, which sets `Camera.Zoom = DisplaySettings.Zoom`. Any direct assignment to `Camera.Zoom` is lost on screen change. Use `DisplaySettings.Zoom` (or a per-screen `PreferredDisplaySettings` override) if the zoom should persist.
 - **Gum coordinates are independent of Camera.** Gum X/Y are screen pixels, Y-down from the top-left — they do not shift when the camera moves. Only world-space objects (entities, shapes) are affected by camera position.
 - **TargetWidth/Height ≠ window pixel size.** The camera scales world units to fill whatever window resolution MonoGame uses. A 1280×720 world still renders correctly in an 800×480 window — it just appears smaller.
 - **Do not set `TargetWidth`/`TargetHeight` directly.** They have `internal set` and are managed by the engine from `DisplaySettings`. Use `Camera.Zoom` for runtime zoom effects.

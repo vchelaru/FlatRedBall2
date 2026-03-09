@@ -8,16 +8,16 @@ namespace PlatformerSample.Screens;
 
 public class PlatformerScreen : Screen
 {
-    private Factory<Player> _playerFactory = null!;
+    private Factory<AnimatedPlayer> _playerFactory = null!;
     private Factory<Platform> _platformFactory = null!;
 
-    private Player _player = null!;
+    private AnimatedPlayer _player = null!;
 
     public override void CustomInitialize()
     {
         Camera.BackgroundColor = new Color(20, 20, 40);
 
-        _playerFactory = new Factory<Player>(this);
+        _playerFactory = new Factory<AnimatedPlayer>(this);
         _platformFactory = new Factory<Platform>(this);
 
         SpawnWorld();
@@ -81,7 +81,7 @@ public class PlatformerScreen : Screen
         // BounceOnCollision with elasticity 0 separates the player (populating LastReposition
         // for ground detection) and zeroes the velocity component into the surface, so ceiling
         // hits kill upward velocity and wall hits kill horizontal velocity.
-        AddCollisionRelationship<Player, Platform>(_playerFactory, _platformFactory)
+        AddCollisionRelationship<AnimatedPlayer, Platform>(_playerFactory, _platformFactory)
             .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
     }
 

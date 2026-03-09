@@ -1,29 +1,51 @@
 using System;
 using FlatRedBall2;
+using FlatRedBall2.Animation.Content;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Input;
 using FlatRedBall2.Movement;
+using FlatRedBall2.Rendering;
 using Microsoft.Xna.Framework.Input;
-using XnaColor = Microsoft.Xna.Framework.Color;
 
 namespace PlatformerSample.Entities;
 
-public class Player : Entity
+/// <summary>
+/// A platformer player character that plays animations from PlatformerAnimations.achx.
+/// Animations switch automatically each frame based on movement state (idle, walk, jump, fall)
+/// and facing direction.
+/// </summary>
+public class AnimatedPlayer : Entity
 {
     private readonly PlatformerBehavior _platformer = new();
+    private Sprite _sprite = null!;
 
     public AxisAlignedRectangle Rectangle { get; private set; } = null!;
 
     public override void CustomInitialize()
     {
+        // Collision rectangle — kept invisible since the sprite is the visual
         Rectangle = new AxisAlignedRectangle
         {
-            Width = 32f,
-            Height = 48f,
-            IsVisible = true,
-            Color = new XnaColor(100, 180, 255, 255),
+            Width = 14,
+            Height = 28,
+            Y = 14,
+            IsVisible = false,
         };
         Add(Rectangle);
+
+        _sprite = new Sprite
+        {
+            TextureScale = 1f,
+        };
+        Add(_sprite);
+
+        var animations = AnimationChainListSave
+            .FromFile("Content/PlatformerAnimations.achx")
+            .ToAnimationChainList(Engine.GraphicsDevice);
+
+        _sprite.AnimationChains = animations;
+        _sprite.IsLooping = true;
+        _sprite.PlayAnimation("CharacterIdleRight");
 
         _platformer.GroundMovement = new PlatformerValues
         {
@@ -57,14 +79,34 @@ public class Player : Entity
             new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }
 
-    private static readonly XnaColor NormalColor = new(100, 180, 255, 255);
-    private static readonly XnaColor JumpingColor = new(255, 255, 100, 255);
-
     public override void CustomActivity(FrameTime time)
     {
         _platformer.Update(this, time);
-        Rectangle.Color = _platformer.IsApplyingJump ? JumpingColor : NormalColor;
+        UpdateAnimation();
 
+        Engine.Overlay.Line(X - 10, Y, X + 10, Y);
 
+        this.Rectangle.IsVisible = true;
+        this.Rectangle.IsFilled = false;
+    }
+
+    private void UpdateAnimation()
+    {
+        string animName = ChooseAnimationName();
+        if (_sprite.CurrentAnimation?.Name != animName)
+            _sprite.PlayAnimation(animName);
+    }
+
+    private string ChooseAnimationName()
+    {
+        string dir = _platformer.DirectionFacing == HorizontalDirection.Right ? "Right" : "Left";
+
+        if (!_platformer.IsOnGround)
+            return VelocityY > 0f ? $"CharacterJump{dir}" : $"CharacterFall{dir}";
+
+        if (MathF.Abs(VelocityX) > 10f)
+            return $"CharacterWalk{dir}";
+
+        return $"CharacterIdle{dir}";
     }
 }

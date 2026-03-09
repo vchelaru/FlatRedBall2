@@ -1,15 +1,11 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering.Batches;
 
 namespace FlatRedBall2.Rendering;
-
-// Stub AnimationChain type referenced by Sprite
-public class AnimationChain
-{
-    public string Name { get; set; } = string.Empty;
-}
 
 public class Sprite : IRenderable, IAttachable
 {
@@ -21,6 +17,12 @@ public class Sprite : IRenderable, IAttachable
     private float _width = FallbackSize;
     private float _height = FallbackSize;
     private float? _textureScale = 1f;
+
+    // Animation state
+    private AnimationChainList? _animationChains;
+    private int _currentChainIndex = -1;
+    private int _currentFrameIndex;
+    private double _timeIntoAnimation;
 
     // IAttachable
     public Entity? Parent { get; set; }
@@ -141,17 +143,156 @@ public class Sprite : IRenderable, IAttachable
     public bool FlipVertical { get; set; }
 
     // Animation
-    public AnimationChain? CurrentAnimation { get; private set; }
 
-    public void PlayAnimation(string name)
+    /// <summary>
+    /// The collection of named animation chains available to this sprite.
+    /// Assign before calling <see cref="PlayAnimation(string)"/>.
+    /// </summary>
+    public AnimationChainList? AnimationChains
     {
-        // TODO: Implement ACHX animation format parsing and playback. See design/TODOS.md
+        get => _animationChains;
+        set
+        {
+            _animationChains = value;
+            _currentChainIndex = -1;
+        }
     }
 
+    /// <summary>Whether the sprite is currently advancing through an animation each frame.</summary>
+    public bool Animate { get; set; }
+
+    /// <summary>
+    /// Whether the current animation loops. Defaults to <c>true</c>.
+    /// When <c>false</c>, the animation stops on its last frame and fires <see cref="AnimationFinished"/>.
+    /// </summary>
+    public bool IsLooping { get; set; } = true;
+
+    /// <summary>Multiplier applied to animation playback speed. Default is <c>1f</c> (normal speed).</summary>
+    public float AnimationSpeed { get; set; } = 1f;
+
+    /// <summary>The currently playing <see cref="AnimationChain"/>, or null if no animation is active.</summary>
+    public AnimationChain? CurrentAnimation =>
+        _animationChains != null && _currentChainIndex >= 0 && _currentChainIndex < _animationChains.Count
+            ? _animationChains[_currentChainIndex]
+            : null;
+
+    /// <summary>Fired when a non-looping animation reaches its last frame.</summary>
+    public event Action? AnimationFinished;
+
+    /// <summary>
+    /// Starts playing the named animation from the beginning.
+    /// The name must match a chain in <see cref="AnimationChains"/>.
+    /// </summary>
+    public void PlayAnimation(string name)
+    {
+        if (_animationChains == null) return;
+
+        for (int i = 0; i < _animationChains.Count; i++)
+        {
+            if (_animationChains[i].Name == name)
+            {
+                _currentChainIndex = i;
+                _currentFrameIndex = 0;
+                _timeIntoAnimation = 0;
+                Animate = true;
+                ApplyCurrentFrame();
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Starts playing the specified animation chain from the beginning.
+    /// If the chain exists in <see cref="AnimationChains"/> it is used directly;
+    /// otherwise a temporary single-chain list is created.
+    /// </summary>
     public void PlayAnimation(AnimationChain chain)
     {
-        // TODO: Implement ACHX animation format parsing and playback. See design/TODOS.md
-        CurrentAnimation = chain;
+        // Try to find the chain in the existing list
+        if (_animationChains != null)
+        {
+            for (int i = 0; i < _animationChains.Count; i++)
+            {
+                if (ReferenceEquals(_animationChains[i], chain))
+                {
+                    _currentChainIndex = i;
+                    _currentFrameIndex = 0;
+                    _timeIntoAnimation = 0;
+                    Animate = true;
+                    ApplyCurrentFrame();
+                    return;
+                }
+            }
+        }
+
+        // Chain not in list — create a temporary single-chain list
+        var tempList = new AnimationChainList();
+        tempList.Add(chain);
+        _animationChains = tempList;
+        _currentChainIndex = 0;
+        _currentFrameIndex = 0;
+        _timeIntoAnimation = 0;
+        Animate = true;
+        ApplyCurrentFrame();
+    }
+
+    internal void AnimateSelf(double deltaSeconds)
+    {
+        if (!Animate || _currentChainIndex < 0 || _animationChains == null) return;
+
+        var chain = _animationChains[_currentChainIndex];
+        if (chain.Count == 0) return;
+
+        _timeIntoAnimation += deltaSeconds * AnimationSpeed;
+
+        float totalLength = chain.TotalLength;
+        if (totalLength <= 0f) return;
+
+        if (IsLooping)
+        {
+            while (_timeIntoAnimation >= totalLength)
+                _timeIntoAnimation -= totalLength;
+        }
+        else
+        {
+            if (_timeIntoAnimation >= totalLength)
+            {
+                _timeIntoAnimation = totalLength;
+                Animate = false;
+                AnimationFinished?.Invoke();
+            }
+        }
+
+        // Find frame index from accumulated time
+        double t = _timeIntoAnimation;
+        _currentFrameIndex = chain.Count - 1; // default to last frame
+        for (int i = 0; i < chain.Count; i++)
+        {
+            t -= chain[i].FrameLength;
+            if (t <= 0)
+            {
+                _currentFrameIndex = i;
+                break;
+            }
+        }
+
+        ApplyCurrentFrame();
+    }
+
+    private void ApplyCurrentFrame()
+    {
+        if (_animationChains == null || _currentChainIndex < 0) return;
+        var chain = _animationChains[_currentChainIndex];
+        if (chain.Count == 0) return;
+
+        var frame = chain[System.Math.Clamp(_currentFrameIndex, 0, chain.Count - 1)];
+        _texture = frame.Texture;
+        _sourceRectangle = frame.SourceRectangle;
+        FlipHorizontal = frame.FlipHorizontal;
+        FlipVertical = frame.FlipVertical;
+        X = frame.RelativeX;
+        Y = frame.RelativeY;
+        RecalculateDimensions();
     }
 
     public void Draw(SpriteBatch spriteBatch, Camera camera)

@@ -1,5 +1,8 @@
 # FlatRedBall2 — Completed Items
 
+## ACHX Animation Format
+`AnimationFrame`, `AnimationChain` (extends `List<AnimationFrame>`), and `AnimationChainList` (extends `List<AnimationChain>`, string indexer by name) are the runtime types in `FlatRedBall2.Animation`. `AnimationChainListSave` / `AnimationChainSave` / `AnimationFrameSave` in `FlatRedBall2.Animation.Content` handle XML deserialization of `.achx` files via `AnimationChainListSave.FromFile(path)` and conversion to runtime via `ToAnimationChainList(ContentManagerService)`. Supports `TimeMeasurementUnit` (Second/Millisecond), `TextureCoordinateType` (UV/Pixel), and `FileRelativeTextures`. `Sprite.AnimationChains`, `PlayAnimation(string)`, `PlayAnimation(AnimationChain)`, `Animate`, `IsLooping`, `AnimationSpeed`, `CurrentAnimation`, and `AnimationFinished` event are the playback API. `Screen.Update` calls `Sprite.AnimateSelf` on all sprites each frame inside the `!IsPaused` block.
+
 ## Polygon — Concave Collision
 `Polygon.ConvexParts` (`IReadOnlyList<IReadOnlyList<Vector2>>`) exposes the convex decomposition in local space. `FromPoints`, `SetPoints`, and `CreateRectangle` automatically decompose: convex polygons get a single part (the original points); concave polygons are ear-clip triangulated then Hertel-Mehlhorn merged into the minimum set of convex sub-polygons. `CollisionDispatcher` iterates `ConvexParts` in `PolygonVsPolygon`, `PolygonVsAabb`, and `PolygonVsCircle`, running SAT per part-pair and returning the minimum-magnitude MTV from any overlapping pairs. Shapes placed in concave pockets no longer produce false collisions.
 

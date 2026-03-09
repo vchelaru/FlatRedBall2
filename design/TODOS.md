@@ -16,14 +16,6 @@ This is believed to be correct in principle but has **not been fully verified**.
 
 The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560×1440` with default zoom (1×) for its 2× scale effect — it does not exercise `Camera.Zoom` directly. A dedicated test or demo screen would be the cleanest way to verify.
 
-## ACHX Animation Format
-**Priority: Medium** — `Sprite.PlayAnimation` is a no-op.
-
-- Parser for `.achx` XML format (from FRB1)
-- `AnimationChain` and `AnimationFrame` runtime types
-- Per-frame texture region, timing, and relative X/Y offset
-- `Sprite.CurrentAnimation` state machine: playing, looped, completed events
-
 ## Tiled Integration — TMX → TileShapeCollection
 **Blocked** — waiting on MonoGame.Extended supporting the target MonoGame version.
 
@@ -38,3 +30,6 @@ The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560�
 - AOT blockers: reflection-based code (`Activator.CreateInstance`, `MakeGenericMethod`, etc.) must be replaced
 - Flag any new reflection-heavy or AOT-hostile code for future cleanup
 
+## Node Network (pathfinding)
+
+- Add a NodeNetwork, or more idiomatic class name, matching FRB1's functionality

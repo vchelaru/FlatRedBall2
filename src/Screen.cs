@@ -272,9 +272,15 @@ public class Screen
             // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
             foreach (var entity in new List<Entity>(_entities))
                 entity.CustomActivity(frameTime);
+
+            // 4. Animate sprites
+            double animDt = frameTime.DeltaSeconds;
+            foreach (var renderable in _renderList)
+                if (renderable is Sprite sprite)
+                    sprite.AnimateSelf(animDt);
         }
 
-        // 4. Screen CustomActivity — always runs so pause menu logic can respond to input
+        // 5. Screen CustomActivity — always runs so pause menu logic can respond to input
         CustomActivity(frameTime);
     }
 
