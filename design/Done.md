@@ -1,5 +1,8 @@
 # FlatRedBall2 — Completed Items
 
+## Audio System
+`AudioManager` (at `Engine.Audio`) wraps MonoGame `SoundEffect` and `Song`. `Play(SoundEffect)` supports volume/pitch/pan, per-frame dedup (same sound plays at most once per frame), and a concurrent-instance cap (`MaxConcurrentSounds = 32`). Music via `PlaySong(Song, loop)` and `PlayPlaylist(params Song[])` with automatic playlist advancement. `SoundVolume`/`MusicVolume`/`SoundEnabled`/`MusicEnabled` for master control. Assets loaded via `Content.Load<SoundEffect>()` / `Content.Load<Song>()`.
+
 ## Gum Project File Loading (.gumx)
 `EngineInitSettings.GumProjectFile` passed to `FlatRedBallService.Initialize`. Gum loads fonts (`.fnt` + texture atlas) and textures directly from disk. `.fnt`/`.png` assets are copied to output via `<Content Include="Content\GumProject\**" CopyToOutputDirectory="PreserveNewest" />` — not processed by MGCB. `_gum.LoadAnimations()` called automatically when a project file is provided. Demonstrated in PongGravity.
 
@@ -26,6 +29,9 @@
 
 ## Resolution Control and Camera Display Settings
 `FlatRedBallService.DisplaySettings` (`DisplaySettings` class, `ResizeMode` enum, `WindowMode` enum). Covers `ResolutionWidth/Height`, `Zoom`, `ResizeMode` (`StretchVisibleArea` / `IncreaseVisibleArea`), `FixedAspectRatio` (letterbox/pillarbox), `WindowMode` (`Windowed` / `FullscreenBorderless`), `AllowUserResizing`. `PrepareWindow<T>` for flicker-free startup; `ApplyWindowSettings` for runtime changes.
+
+## Pause-Aware Delay
+`TimeManager._sinceScreenStart` (exposed as `CurrentScreenTimeSeconds`) does not advance while `Screen.IsPaused`. `DelaySeconds` and `DelayUntil` compare against this value, so they automatically suspend during pause. `DelayFrames` is not pause-aware by design — frame counting continues regardless. `TimeScale` still applies to screen time. `DeltaSeconds` in `FrameTime` reflects real elapsed time (not zeroed when paused). `ResetScreen()` resets screen time on screen transition.
 
 ## Pause System
 `Screen.IsPaused`, `PauseThisScreen()`, `UnpauseThisScreen()`. When paused, entity physics, collision, and entity `CustomActivity` are all skipped. `Screen.CustomActivity` always runs so the screen can respond to input (e.g., showing a pause menu). TopDownMenuSample updated to use an in-screen Gum overlay rather than a screen transition, so game world state is preserved across pause/resume. `BouncingBallsSample` added as a demo: click to spawn balls with gravity that bounce off a `TileShapeCollection` arena and self-collide; ESC toggles pause with a code-only Gum label.

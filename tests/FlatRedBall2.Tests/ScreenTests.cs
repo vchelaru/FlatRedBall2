@@ -100,6 +100,67 @@ public class ScreenTests
         entity.ActivityCount.ShouldBe(expectedActivityCount);
     }
 
+    [Fact]
+    public void ScreenTransition_CancelsTimedDelayTask()
+    {
+        var engine = new FlatRedBallService();
+        var task = engine.Time.DelaySeconds(10.0);
+
+        engine.RequestScreenChange<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        task.IsCanceled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ScreenTransition_CancelsPredicateDelayTask()
+    {
+        var engine = new FlatRedBallService();
+        var task = engine.Time.DelayUntil(() => false);
+
+        engine.RequestScreenChange<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        task.IsCanceled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ScreenTransition_CancelsFrameDelayTask()
+    {
+        var engine = new FlatRedBallService();
+        var task = engine.Time.DelayFrames(100);
+
+        engine.RequestScreenChange<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        task.IsCanceled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ScreenTransition_CancelsTasksRegisteredWithScreenToken()
+    {
+        var engine = new FlatRedBallService();
+        var task = engine.Time.DelaySeconds(10.0, engine.CurrentScreen.Token);
+
+        engine.RequestScreenChange<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        task.IsCanceled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ScreenTransition_ResetsScreenTime()
+    {
+        var engine = new FlatRedBallService();
+        engine.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1.0)));
+        engine.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1.0)));
+
+        engine.RequestScreenChange<TestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.Time.CurrentScreenTimeSeconds.ShouldBe(0.0, tolerance: 0.0001);
+    }
+
     private class ActivityTrackingEntity : Entity
     {
         public int ActivityCount { get; private set; }

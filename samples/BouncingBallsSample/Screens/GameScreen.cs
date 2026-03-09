@@ -15,6 +15,7 @@ public class GameScreen : Screen
     private Factory<Ball> _ballFactory = null!;
     private TileShapeCollection _tiles = null!;
     private Label _pauseLabel = null!;
+    private Label _timeScaleLabel = null!;
     private SoundEffect _hitSound = null!;
 
     public override void CustomInitialize()
@@ -109,7 +110,17 @@ public class GameScreen : Screen
         _pauseLabel.Anchor(Anchor.Center);
         _pauseLabel.IsVisible = false;
         Add(_pauseLabel);
+
+        _timeScaleLabel = new Label();
+        _timeScaleLabel.Anchor(Anchor.TopLeft);
+        _timeScaleLabel.X = 8;
+        _timeScaleLabel.Y = 8;
+        UpdateTimeScaleLabel();
+        Add(_timeScaleLabel);
     }
+
+    private void UpdateTimeScaleLabel() =>
+        _timeScaleLabel.Text = $"Time Scale: {Engine.Time.TimeScale:F1}  (↑/↓ to adjust)";
 
     public override void CustomActivity(FrameTime time)
     {
@@ -125,6 +136,18 @@ public class GameScreen : Screen
                 PauseThisScreen();
                 _pauseLabel.IsVisible = true;
             }
+        }
+
+        var keyboard = Engine.Input.Keyboard;
+        if (keyboard.WasKeyPressed(Keys.Up))
+        {
+            Engine.Time.TimeScale = MathF.Round(Engine.Time.TimeScale + 0.1f, 1);
+            UpdateTimeScaleLabel();
+        }
+        else if (keyboard.WasKeyPressed(Keys.Down))
+        {
+            Engine.Time.TimeScale = MathF.Max(0f, MathF.Round(Engine.Time.TimeScale - 0.1f, 1));
+            UpdateTimeScaleLabel();
         }
 
         if (!IsPaused && Engine.Input.Cursor.PrimaryPressed)

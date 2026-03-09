@@ -41,7 +41,7 @@ public class TimeManager
 
     /// <summary>
     /// Returns a task that completes after <paramref name="seconds"/> of screen time have elapsed.
-    /// Screen time respects <see cref="TimeScale"/> and resets when the screen changes.
+    /// Screen time respects <see cref="TimeScale"/>, pauses when the screen is paused, and resets when the screen changes.
     /// </summary>
     /// <param name="seconds">Seconds to wait. Values ≤ 0 complete immediately.</param>
     /// <param name="cancellationToken">
@@ -117,11 +117,12 @@ public class TimeManager
 
     public void ResetScreen() => _sinceScreenStart = TimeSpan.Zero;
 
-    internal void Update(GameTime gameTime)
+    internal void Update(GameTime gameTime, bool screenIsPaused)
     {
         var scaledDelta = TimeSpan.FromSeconds(gameTime.ElapsedGameTime.TotalSeconds * TimeScale);
         _sinceGameStart += scaledDelta;
-        _sinceScreenStart += scaledDelta;
+        if (!screenIsPaused)
+            _sinceScreenStart += scaledDelta;
         CurrentFrame++;
         CurrentFrameTime = new FrameTime(scaledDelta, _sinceScreenStart, _sinceGameStart);
     }
@@ -198,7 +199,7 @@ public class TimeManager
         _predicateTasks.Clear();
 
         foreach (var task in _frameTasks)
-            task.Tcs.TrySetResult(); // frame tasks have no cancellation token
+            task.Tcs.TrySetCanceled();
         _frameTasks.Clear();
     }
 }

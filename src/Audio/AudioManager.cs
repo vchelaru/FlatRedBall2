@@ -5,8 +5,6 @@ using Microsoft.Xna.Framework.Media;
 
 namespace FlatRedBall2.Audio;
 
-internal interface IAudioBackend { }
-
 /// <summary>
 /// Manages sound effect playback and background music. Updated each frame by the engine.
 /// </summary>

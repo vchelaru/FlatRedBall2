@@ -164,4 +164,4 @@ public override void CustomActivity(FrameTime time)
 }
 ```
 
-> **Note:** `await`-based delays (`Time.DoTaskLogic`) run at the service level and are **not** suspended by pause. Avoid time-sensitive game-logic delays during pause; this will be addressed in a future Pause-Aware Delay API.
+`await`-based delays from `Engine.Time.DelaySeconds` and `DelayUntil` **are** suspended while the screen is paused — screen time freezes, so timed tasks don't fire. `DelayFrames` is not pause-aware; frames always advance. See the `timing` skill for full async delay details.

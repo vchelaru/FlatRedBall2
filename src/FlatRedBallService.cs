@@ -123,12 +123,15 @@ public class FlatRedBallService
             ApplyWindowSettings(pref ?? DisplaySettings);
 
         screen.Engine = this;
-        // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
-        // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
-        screen.ContentManager.Initialize(new ContentManager(_game!.Services, _game!.Content.RootDirectory), _game!.GraphicsDevice);
+        if (_game != null)
+        {
+            // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
+            // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
+            screen.ContentManager.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
 
-        var bounds = _game!.Window.ClientBounds;
-        ApplyCameraSettings(screen.Camera, bounds.Width, bounds.Height);
+            var bounds = _game.Window.ClientBounds;
+            ApplyCameraSettings(screen.Camera, bounds.Width, bounds.Height);
+        }
         Input.SetCamera(screen.Camera);
         Time.ResetScreen();
 
@@ -356,39 +359,43 @@ public class FlatRedBallService
             change();
         }
 
-        Time.Update(gameTime);
-        Audio.Update();
-        CurrentScreen.Overlay.BeginFrame();
+        Time.Update(gameTime, CurrentScreen.IsPaused);
         Input.Update();
 
-        // Keep the Gum canvas in sync with the current viewport so that UI layout
-        // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) resolves to the
-        // correct screen dimensions rather than the stale project defaults.
-        var viewport = CurrentScreen.Camera.Viewport;
-        var zoom = CurrentScreen.Camera.Zoom;
-        _gum.CanvasWidth = viewport.Width / zoom;
-        _gum.CanvasHeight = viewport.Height / zoom;
-
-        // Route input events (click, hover, etc.) to all active Gum elements.
-        // _gum.Root covers anything added via AddToRoot();
-        // screen GumRenderables cover elements added via screen.Add().
-        _gumUpdateList.Clear();
-        _gumUpdateList.Add(_gum.Root);
-        foreach (var r in CurrentScreen.GumRenderables)
-            _gumUpdateList.Add(r.Visual);
-
-        // If the canvas size changed, force a layout pass on every top-level element
-        // so that percent-of-parent sizes, anchors, and center-based positions recompute
-        // against the new canvas dimensions.
-        if (_gum.CanvasWidth != _lastGumCanvasWidth || _gum.CanvasHeight != _lastGumCanvasHeight)
+        if (_spriteBatch != null)
         {
-            _lastGumCanvasWidth = _gum.CanvasWidth;
-            _lastGumCanvasHeight = _gum.CanvasHeight;
-            foreach (var element in _gumUpdateList)
-                element.UpdateLayout();
-        }
+            Audio.Update();
+            CurrentScreen.Overlay.BeginFrame();
 
-        _gum.Update(gameTime, _gumUpdateList);
+            // Keep the Gum canvas in sync with the current viewport so that UI layout
+            // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) resolves to the
+            // correct screen dimensions rather than the stale project defaults.
+            var viewport = CurrentScreen.Camera.Viewport;
+            var zoom = CurrentScreen.Camera.Zoom;
+            _gum.CanvasWidth = viewport.Width / zoom;
+            _gum.CanvasHeight = viewport.Height / zoom;
+
+            // Route input events (click, hover, etc.) to all active Gum elements.
+            // _gum.Root covers anything added via AddToRoot();
+            // screen GumRenderables cover elements added via screen.Add().
+            _gumUpdateList.Clear();
+            _gumUpdateList.Add(_gum.Root);
+            foreach (var r in CurrentScreen.GumRenderables)
+                _gumUpdateList.Add(r.Visual);
+
+            // If the canvas size changed, force a layout pass on every top-level element
+            // so that percent-of-parent sizes, anchors, and center-based positions recompute
+            // against the new canvas dimensions.
+            if (_gum.CanvasWidth != _lastGumCanvasWidth || _gum.CanvasHeight != _lastGumCanvasHeight)
+            {
+                _lastGumCanvasWidth = _gum.CanvasWidth;
+                _lastGumCanvasHeight = _gum.CanvasHeight;
+                foreach (var element in _gumUpdateList)
+                    element.UpdateLayout();
+            }
+
+            _gum.Update(gameTime, _gumUpdateList);
+        }
 
         // Complete any delay tasks whose conditions are now met, then flush their
         // continuations onto the game thread. This runs before CustomActivity so
