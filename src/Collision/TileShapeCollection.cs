@@ -32,7 +32,8 @@ public class TileShapeCollection : ICollidable
     public float Y { get; set; }
 
     /// <summary>
-    /// Width and height of each tile in world units. Defaults to 16. Set before adding tiles.
+    /// Width and height of each tile in world units. Defaults to 16, which is the standard tile size
+    /// for FlatRedBall2 games. Set before adding tiles.
     /// </summary>
     public float GridSize { get; set; } = 16f;
 

@@ -38,6 +38,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `levels` — Level data layout and progression
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
 - `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
+- `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapeCollection`, enemy navigation pattern
 - `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
 - `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
