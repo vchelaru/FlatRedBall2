@@ -24,11 +24,6 @@ The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560�
 - Per-frame texture region, timing, and relative X/Y offset
 - `Sprite.CurrentAnimation` state machine: playing, looped, completed events
 
-## Spatial Partitioning
-**Design decision needed before building any dense entity-vs-entity collision sample.**
-
-Current `AddCollisionRelationship` does O(n×m) broad-phase — fine for small lists, bottleneck in shmups or crowd games. Candidates: uniform grid, quadtree, or Apos.Shapes partitioning. Decision should be transparent to game code (no API change to `AddCollisionRelationship`).
-
 ## Polygon — Concave Collision
 **Priority: Low / Deferred** — SAT only works for convex polygons. Concave polygons produce incorrect results.
 

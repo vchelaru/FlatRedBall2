@@ -1,5 +1,8 @@
 # FlatRedBall2 — Completed Items
 
+## Spatial Partitioning (Sweep-and-Prune)
+`Factory<T>.PartitionAxis` (type `Axis` — `X` or `Y`) opts a factory into broad-phase culling. The engine sorts each factory's list in-place once per frame (insertion sort — O(n) on nearly-sorted data) before collision relationships run. Any `CollisionRelationship` whose both lists are factories with matching non-null `PartitionAxis` automatically sweeps instead of doing O(n×m) checks — pairs separated by more than their combined `BroadPhaseRadius` are skipped. Mismatched or null axes silently fall back to full O(n×m). `CollisionRelationship.DeepCollisionCount` reports narrow-phase checks performed last frame for profiling. `TileShapeCollection` is already internally partitioned by grid lookup and does not need this.
+
 ## Audio System
 `AudioManager` (at `Engine.Audio`) wraps MonoGame `SoundEffect` and `Song`. `Play(SoundEffect)` supports volume/pitch/pan, per-frame dedup (same sound plays at most once per frame), and a concurrent-instance cap (`MaxConcurrentSounds = 32`). Music via `PlaySong(Song, loop)` and `PlayPlaylist(params Song[])` with automatic playlist advancement. `SoundVolume`/`MusicVolume`/`SoundEnabled`/`MusicEnabled` for master control. Assets loaded via `Content.Load<SoundEffect>()` / `Content.Load<Song>()`.
 
