@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Math;
@@ -15,8 +16,17 @@ namespace FlatRedBall2.Collision;
 public class Polygon : IAttachable, IRenderable, ICollidable
 {
     private readonly List<Vector2> _points = new();
+    private List<IReadOnlyList<Vector2>> _convexParts = new();
 
     public IReadOnlyList<Vector2> Points => _points;
+
+    /// <summary>
+    /// The convex sub-polygons that tile this polygon's area, in local (unrotated, unpositioned) space.
+    /// For convex polygons this contains a single entry equal to <see cref="Points"/>.
+    /// For concave polygons this is the Hertel-Mehlhorn convex decomposition produced from ear-clip triangulation.
+    /// Collision detection uses these parts so that concave shapes behave correctly.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<Vector2>> ConvexParts => _convexParts;
 
     // Own rotation (not inherited from IAttachable rotation — per the architecture, Polygon has its own)
     public Angle Rotation { get; set; }
@@ -34,28 +44,24 @@ public class Polygon : IAttachable, IRenderable, ICollidable
             new Vector2( hw,  hh),
             new Vector2(-hw,  hh)
         });
+        poly.BuildConvexParts();
         return poly;
     }
 
     /// <summary>
-    /// Creates a polygon from an arbitrary list of points.
+    /// Creates a polygon from an arbitrary list of points. Both convex and concave (non-convex)
+    /// polygons are supported for rendering and collision.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Collision detection uses the Separating Axis Theorem (SAT), which only works correctly
-    /// for <b>convex</b> polygons. Passing concave (non-convex) points will produce incorrect
-    /// collision responses — shapes may pass through concave regions or report false collisions.
-    /// </para>
-    /// <para>
-    /// Rendering via <see cref="Draw"/> supports concave polygons (ear-clip triangulation).
-    /// If you need both rendering and collision for a concave shape, decompose it into
-    /// convex pieces manually and add each as a separate <see cref="Polygon"/>.
-    /// </para>
+    /// Concave polygons are automatically decomposed into convex parts via ear-clip triangulation
+    /// followed by Hertel-Mehlhorn merging. Collision detection operates on those convex parts,
+    /// so concave shapes respond correctly without any manual decomposition.
     /// </remarks>
     public static Polygon FromPoints(IEnumerable<Vector2> points)
     {
         var poly = new Polygon();
         poly._points.AddRange(points);
+        poly.BuildConvexParts();
         return poly;
     }
 
@@ -66,6 +72,7 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     {
         _points.Clear();
         _points.AddRange(points);
+        BuildConvexParts();
     }
 
     // IAttachable
@@ -228,6 +235,137 @@ public class Polygon : IAttachable, IRenderable, ICollidable
         float d3 = Cross(a - c, p - c);
         return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
     }
+
+    // ── Convex decomposition ──────────────────────────────────────────────────
+
+    private void BuildConvexParts()
+    {
+        _convexParts = new List<IReadOnlyList<Vector2>>();
+        if (_points.Count < 3)
+        {
+            if (_points.Count > 0) _convexParts.Add(_points.AsReadOnly());
+            return;
+        }
+
+        if (IsConvexList(_points))
+        {
+            _convexParts.Add(_points.AsReadOnly());
+            return;
+        }
+
+        var triangles = EarClipToLocalTriangles();
+        _convexParts.AddRange(HertelMehlhorn(triangles));
+    }
+
+    // Returns whether a polygon (given as a list of local-space vertices, CCW winding) is convex.
+    private static bool IsConvexList(IReadOnlyList<Vector2> pts)
+    {
+        if (pts.Count < 3) return true;
+        bool hasPos = false, hasNeg = false;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            var a = pts[i];
+            var b = pts[(i + 1) % pts.Count];
+            var c = pts[(i + 2) % pts.Count];
+            float cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+            if (cross > 1e-6f) hasPos = true;
+            else if (cross < -1e-6f) hasNeg = true;
+            if (hasPos && hasNeg) return false;
+        }
+        return true;
+    }
+
+    // Ear-clip the local-space _points into triangles. Returns triangle vertex triples.
+    private List<Vector2[]> EarClipToLocalTriangles()
+    {
+        var pts = _points.ToArray();
+        var result = new List<Vector2[]>();
+        if (pts.Length < 3) return result;
+
+        var idx = new List<int>(pts.Length);
+        for (int i = 0; i < pts.Length; i++) idx.Add(i);
+
+        // Ensure CCW winding (positive signed area in Y-up space).
+        if (SignedArea(pts) < 0) idx.Reverse();
+
+        int guard = idx.Count * idx.Count;
+        while (idx.Count > 3 && guard-- > 0)
+        {
+            bool found = false;
+            for (int i = 0; i < idx.Count; i++)
+            {
+                int n = idx.Count;
+                int prev = idx[(i - 1 + n) % n];
+                int curr = idx[i];
+                int next = idx[(i + 1) % n];
+                if (IsEar(pts, idx, prev, curr, next))
+                {
+                    result.Add(new[] { pts[prev], pts[curr], pts[next] });
+                    idx.RemoveAt(i);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) break; // degenerate polygon — bail out
+        }
+        if (idx.Count == 3)
+            result.Add(new[] { pts[idx[0]], pts[idx[1]], pts[idx[2]] });
+
+        return result;
+    }
+
+    // Hertel-Mehlhorn: greedily merge adjacent convex polygons while the result stays convex.
+    // Input: triangles from ear-clip (local space). Output: minimum convex polygon set.
+    private static List<IReadOnlyList<Vector2>> HertelMehlhorn(List<Vector2[]> triangles)
+    {
+        var polys = new List<List<Vector2>>(triangles.Select(t => new List<Vector2>(t)));
+
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            for (int i = 0; i < polys.Count && !changed; i++)
+            for (int j = i + 1; j < polys.Count && !changed; j++)
+            {
+                if (TryMerge(polys[i], polys[j], out var merged))
+                {
+                    polys.RemoveAt(j);
+                    polys.RemoveAt(i);
+                    polys.Add(merged!);
+                    changed = true;
+                }
+            }
+        }
+
+        return polys.Select(p => (IReadOnlyList<Vector2>)p.AsReadOnly()).ToList();
+    }
+
+    // Tries to merge two convex polygons that share exactly one edge.
+    // The shared edge is found when a[i] == b[(j+1)%m] and a[(i+1)%n] == b[j].
+    // Returns true and sets merged if the resulting polygon is convex.
+    private static bool TryMerge(List<Vector2> a, List<Vector2> b, out List<Vector2>? merged)
+    {
+        merged = null;
+        int n = a.Count, m = b.Count;
+
+        for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++)
+        {
+            if (!AreClose(a[i], b[(j + 1) % m]) || !AreClose(a[(i + 1) % n], b[j]))
+                continue;
+
+            // Build merged polygon: n-1 vertices from a (skip a[i]), m-1 vertices from b (skip b[j]).
+            var candidate = new List<Vector2>(n + m - 2);
+            for (int k = 1; k < n; k++) candidate.Add(a[(i + k) % n]);
+            for (int k = 1; k < m; k++) candidate.Add(b[(j + k) % m]);
+
+            if (IsConvexList(candidate)) { merged = candidate; return true; }
+            return false; // shared edge found but merge would be non-convex
+        }
+        return false;
+    }
+
+    private static bool AreClose(Vector2 a, Vector2 b) => (a - b).LengthSquared() < 1e-10f;
 
     public void Destroy()
     {

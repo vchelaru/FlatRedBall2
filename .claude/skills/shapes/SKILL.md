@@ -28,6 +28,9 @@ var poly = Polygon.CreateRectangle(64, 64);         // rotatable rectangle
 var custom = Polygon.FromPoints(new[] {
     new Vector2(0, 0), new Vector2(50, 0), new Vector2(25, 40),
 });
+// Concave polygons are fully supported for both rendering and collision.
+// FromPoints automatically decomposes concave shapes into convex parts (Hertel-Mehlhorn)
+// for correct collision — no manual decomposition needed.
 ```
 
 ## Step 2: Make the Shape Visible

@@ -282,75 +282,125 @@ internal static class CollisionDispatcher
         return new Vector2(dx / dist * overlap, dy / dist * overlap);
     }
 
-    // Polygon vs Polygon (SAT)
+    // Polygon vs Polygon — iterate convex parts of each, return minimum-magnitude MTV.
     private static Vector2 PolygonVsPolygon(Polygon a, Polygon b)
     {
-        var axesA = GetAxes(a);
-        var axesB = GetAxes(b);
-        var worldPointsA = GetWorldPoints(a);
-        var worldPointsB = GetWorldPoints(b);
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
 
+        foreach (var partA in GetConvexPartsWorldPoints(a))
+        foreach (var partB in GetConvexPartsWorldPoints(b))
+        {
+            var mtv = ConvexVsConvex(partA, partB);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    // Polygon vs AABB — iterate convex parts, AABB is always convex.
+    private static Vector2 PolygonVsAabb(Polygon poly, AxisAlignedRectangle rect)
+    {
+        var rectPoints = GetAabbPoints(rect);
+        Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
+
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
+
+        foreach (var part in GetConvexPartsWorldPoints(poly))
+        {
+            var mtv = ConvexVsAabbPoints(part, rectPoints, axesRect);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    // Polygon vs Circle — iterate convex parts, circle is always convex.
+    private static Vector2 PolygonVsCircle(Polygon poly, Circle circle)
+    {
+        var circleCenter = new Vector2(circle.AbsoluteX, circle.AbsoluteY);
+
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
+
+        foreach (var part in GetConvexPartsWorldPoints(poly))
+        {
+            var mtv = ConvexPartVsCircle(part, circle, circleCenter);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    // Transforms each convex part of a polygon from local to world space.
+    private static IEnumerable<Vector2[]> GetConvexPartsWorldPoints(Polygon poly)
+    {
+        float cos = MathF.Cos(poly.AbsoluteRotation.Radians);
+        float sin = MathF.Sin(poly.AbsoluteRotation.Radians);
+        float ax = poly.AbsoluteX, ay = poly.AbsoluteY;
+
+        foreach (var part in poly.ConvexParts)
+        {
+            var worldPts = new Vector2[part.Count];
+            for (int i = 0; i < part.Count; i++)
+            {
+                float lx = part[i].X, ly = part[i].Y;
+                worldPts[i] = new Vector2(ax + lx * cos - ly * sin, ay + lx * sin + ly * cos);
+            }
+            yield return worldPts;
+        }
+    }
+
+    // SAT for two convex polygons given as world-space point arrays.
+    private static Vector2 ConvexVsConvex(Vector2[] a, Vector2[] b)
+    {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in axesA)
+        foreach (var axis in GetAxesFromPoints(a))
         {
-            if (!SatOverlap(worldPointsA, worldPointsB, axis, out float overlap, out bool flip))
-                return Vector2.Zero;
-            if (overlap < minOverlap)
-            {
-                minOverlap = overlap;
-                minMtv = flip ? axis * overlap : -axis * overlap;
-            }
+            if (!SatOverlap(a, b, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
-        foreach (var axis in axesB)
+        foreach (var axis in GetAxesFromPoints(b))
         {
-            if (!SatOverlap(worldPointsA, worldPointsB, axis, out float overlap, out bool flip))
-                return Vector2.Zero;
-            if (overlap < minOverlap)
-            {
-                minOverlap = overlap;
-                minMtv = flip ? axis * overlap : -axis * overlap;
-            }
+            if (!SatOverlap(a, b, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         return minMtv;
     }
 
-    // Polygon vs AABB — convert AABB to polygon axes and use SAT
-    private static Vector2 PolygonVsAabb(Polygon poly, AxisAlignedRectangle rect)
+    // SAT for a convex polygon part vs a set of AABB points with known axes.
+    private static Vector2 ConvexVsAabbPoints(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect)
     {
-        var polyPoints = GetWorldPoints(poly);
-        var rectPoints = GetAabbPoints(rect);
-        var axesPoly = GetAxes(poly);
-        Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
-
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
 
-        foreach (var axis in axesPoly)
+        foreach (var axis in GetAxesFromPoints(part))
         {
-            if (!SatOverlap(polyPoints, rectPoints, axis, out float overlap, out bool flip))
-                return Vector2.Zero;
+            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
             if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         foreach (var axis in axesRect)
         {
-            if (!SatOverlap(polyPoints, rectPoints, axis, out float overlap, out bool flip))
-                return Vector2.Zero;
+            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
             if (overlap < minOverlap) { minOverlap = overlap; minMtv = flip ? axis * overlap : -axis * overlap; }
         }
         return minMtv;
     }
 
-    // Polygon vs Circle (SAT + circle-center axis)
-    private static Vector2 PolygonVsCircle(Polygon poly, Circle circle)
+    // SAT for a convex polygon part vs a circle (SAT + closest-point axis).
+    private static Vector2 ConvexPartVsCircle(Vector2[] partPoints, Circle circle, Vector2 circleCenter)
     {
-        var polyPoints = GetWorldPoints(poly);
-        var axes = new List<Vector2>(GetAxes(poly));
+        var axes = new List<Vector2>(GetAxesFromPoints(partPoints));
 
-        // Add axis from poly to circle center
-        var closest = ClosestPointOnPoly(polyPoints, new Vector2(circle.AbsoluteX, circle.AbsoluteY));
-        var toCircle = new Vector2(circle.AbsoluteX - closest.X, circle.AbsoluteY - closest.Y);
+        // Add axis from the closest point on the part to the circle center.
+        var closest = ClosestPointOnPoly(partPoints, circleCenter);
+        var toCircle = circleCenter - closest;
         float len = toCircle.Length();
         if (len > 1e-6f) axes.Add(toCircle / len);
 
@@ -359,10 +409,10 @@ internal static class CollisionDispatcher
 
         foreach (var axis in axes)
         {
-            ProjectPoly(polyPoints, axis, out float polyMin, out float polyMax);
-            float circleCenter = Vector2.Dot(new Vector2(circle.AbsoluteX, circle.AbsoluteY), axis);
-            float circMin = circleCenter - circle.Radius;
-            float circMax = circleCenter + circle.Radius;
+            ProjectPoly(partPoints, axis, out float polyMin, out float polyMax);
+            float circC = Vector2.Dot(circleCenter, axis);
+            float circMin = circC - circle.Radius;
+            float circMax = circC + circle.Radius;
 
             float overlap = MathF.Min(polyMax, circMax) - MathF.Max(polyMin, circMin);
             if (overlap <= 0) return Vector2.Zero;
@@ -370,18 +420,17 @@ internal static class CollisionDispatcher
             if (overlap < minOverlap)
             {
                 minOverlap = overlap;
-                // Determine direction: push poly away from circle
                 float polyCenter = (polyMin + polyMax) / 2f;
-                bool flip = polyCenter < circleCenter;
+                bool flip = polyCenter < circC;
                 minMtv = flip ? -axis * overlap : axis * overlap;
             }
         }
         return minMtv;
     }
 
-    private static IEnumerable<Vector2> GetAxes(Polygon poly)
+    // Returns outward-facing edge normals for a convex polygon (world-space points).
+    private static IEnumerable<Vector2> GetAxesFromPoints(Vector2[] pts)
     {
-        var pts = GetWorldPoints(poly);
         for (int i = 0; i < pts.Length; i++)
         {
             var edge = pts[(i + 1) % pts.Length] - pts[i];

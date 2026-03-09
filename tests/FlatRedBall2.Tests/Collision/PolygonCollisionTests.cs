@@ -160,4 +160,104 @@ public class PolygonCollisionTests
 
         sep.X.ShouldBeGreaterThan(0f, "rect should be pushed right (away from polygon)");
     }
+
+    // ── Concave polygon collision ───────────────────────────────────────────────
+    //
+    // L-shape (local coords, Y+ up, CCW winding):
+    //   (-50,50)───(50,50)
+    //      │           │
+    //   (-50, 0)  (0,0)──(50,0)
+    //      │       │
+    //   (-50,-50)─(0,-50)
+    //
+    // Concave pocket = region x=[0,50], y=[-50,0] (the "missing" bottom-right quadrant).
+
+    private static Polygon LShape(float cx, float cy)
+    {
+        var poly = Polygon.FromPoints(new[]
+        {
+            new Vector2(-50f, -50f),
+            new Vector2(  0f, -50f),
+            new Vector2(  0f,   0f),
+            new Vector2( 50f,   0f),
+            new Vector2( 50f,  50f),
+            new Vector2(-50f,  50f),
+        });
+        poly.X = cx;
+        poly.Y = cy;
+        return poly;
+    }
+
+    [Fact]
+    public void ConcavePolygon_HasTwoConvexParts()
+    {
+        var poly = LShape(0f, 0f);
+        poly.ConvexParts.Count.ShouldBe(2, "L-shape decomposes into exactly 2 convex parts");
+    }
+
+    [Fact]
+    public void ConcavePolygon_CircleInConcavePocket_NoCollision()
+    {
+        var poly = LShape(0f, 0f);
+        // Circle entirely within the concave "missing" pocket at (25, -25).
+        var circle = new Circle { X = 25f, Y = -25f, Radius = 10f };
+
+        circle.GetSeparationVector(poly).ShouldBe(Vector2.Zero,
+            "circle in concave pocket should not collide with L-shape");
+    }
+
+    [Fact]
+    public void ConcavePolygon_CircleOverlapsArm_Collides()
+    {
+        var poly = LShape(0f, 0f);
+        // Circle centered below the left arm, overlapping its bottom edge by 5 units.
+        var circle = new Circle { X = -25f, Y = -60f, Radius = 15f };
+
+        var sep = circle.GetSeparationVector(poly);
+        sep.ShouldNotBe(Vector2.Zero, "circle overlapping L-arm should collide");
+        sep.Y.ShouldBeLessThan(0f, "circle should be pushed down, away from the arm's bottom edge");
+    }
+
+    [Fact]
+    public void ConcavePolygon_CircleSeparationResolvesCollision()
+    {
+        var poly = LShape(0f, 0f);
+        var circle = new Circle { X = -25f, Y = -60f, Radius = 15f };
+
+        var sep = circle.GetSeparationVector(poly);
+        var moved = new Circle { X = circle.X + sep.X, Y = circle.Y + sep.Y, Radius = circle.Radius };
+
+        moved.GetSeparationVector(poly).ShouldBe(Vector2.Zero,
+            "applying separation should resolve the concave polygon collision");
+    }
+
+    [Fact]
+    public void ConcavePolygon_RectInConcavePocket_NoCollision()
+    {
+        var poly = LShape(0f, 0f);
+        // Rect entirely within the concave pocket.
+        var rect = new AxisAlignedRectangle { X = 25f, Y = -25f, Width = 10f, Height = 10f };
+
+        rect.GetSeparationVector(poly).ShouldBe(Vector2.Zero,
+            "rect in concave pocket should not collide with L-shape");
+    }
+
+    [Fact]
+    public void ConcavePolygon_ConvexPolygonInConcavePocket_NoCollision()
+    {
+        var lPoly = LShape(0f, 0f);
+        // Small 10×10 convex polygon entirely within the concave pocket (x=[0,50], y=[-50,0]).
+        var pocket = Polygon.FromPoints(new[]
+        {
+            new Vector2(-5f, -5f),
+            new Vector2( 5f, -5f),
+            new Vector2( 5f,  5f),
+            new Vector2(-5f,  5f),
+        });
+        pocket.X = 25f;
+        pocket.Y = -25f;
+
+        pocket.GetSeparationVector(lPoly).ShouldBe(Vector2.Zero,
+            "convex polygon in concave pocket should not collide with L-shape");
+    }
 }

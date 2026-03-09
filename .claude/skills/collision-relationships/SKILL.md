@@ -120,3 +120,5 @@ BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity 
 ## Shape Dispatch
 
 Collision between any two entity types just works — the engine inspects the shape children of each entity at runtime and resolves the overlap automatically. What shapes the entities contain doesn't matter; you don't need to know or specify them at the call site.
+
+Concave `Polygon` shapes are fully supported: the engine automatically decomposes them into convex parts internally. No manual decomposition is needed and reading `CollisionDispatcher.cs` is never necessary.

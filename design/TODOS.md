@@ -24,13 +24,6 @@ The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560�
 - Per-frame texture region, timing, and relative X/Y offset
 - `Sprite.CurrentAnimation` state machine: playing, looped, completed events
 
-## Polygon — Concave Collision
-**Priority: Low / Deferred** — SAT only works for convex polygons. Concave polygons produce incorrect results.
-
-- At `FromPoints`/`AddPoint` time, decompose into convex sub-polygons (e.g., Hertel-Mehlhorn on top of existing ear-clip triangulation)
-- `CollisionDispatcher` would need a `PolygonVsX` path that iterates sub-polygons
-- Consider exposing `Polygon.ConvexParts` for debugging
-
 ## Tiled Integration — TMX → TileShapeCollection
 **Blocked** — waiting on MonoGame.Extended supporting the target MonoGame version.
 

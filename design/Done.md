@@ -1,5 +1,8 @@
 # FlatRedBall2 — Completed Items
 
+## Polygon — Concave Collision
+`Polygon.ConvexParts` (`IReadOnlyList<IReadOnlyList<Vector2>>`) exposes the convex decomposition in local space. `FromPoints`, `SetPoints`, and `CreateRectangle` automatically decompose: convex polygons get a single part (the original points); concave polygons are ear-clip triangulated then Hertel-Mehlhorn merged into the minimum set of convex sub-polygons. `CollisionDispatcher` iterates `ConvexParts` in `PolygonVsPolygon`, `PolygonVsAabb`, and `PolygonVsCircle`, running SAT per part-pair and returning the minimum-magnitude MTV from any overlapping pairs. Shapes placed in concave pockets no longer produce false collisions.
+
 ## Spatial Partitioning (Sweep-and-Prune)
 `Factory<T>.PartitionAxis` (type `Axis` — `X` or `Y`) opts a factory into broad-phase culling. The engine sorts each factory's list in-place once per frame (insertion sort — O(n) on nearly-sorted data) before collision relationships run. Any `CollisionRelationship` whose both lists are factories with matching non-null `PartitionAxis` automatically sweeps instead of doing O(n×m) checks — pairs separated by more than their combined `BroadPhaseRadius` are skipped. Mismatched or null axes silently fall back to full O(n×m). `CollisionRelationship.DeepCollisionCount` reports narrow-phase checks performed last frame for profiling. `TileShapeCollection` is already internally partitioned by grid lookup and does not need this.
 

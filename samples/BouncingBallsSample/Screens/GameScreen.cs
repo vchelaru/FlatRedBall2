@@ -1,6 +1,7 @@
 using BouncingBallsSample.Entities;
 using FlatRedBall2;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Math;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
 using Microsoft.Xna.Framework;
@@ -13,6 +14,7 @@ namespace BouncingBallsSample.Screens;
 public class GameScreen : Screen
 {
     private Factory<Ball> _ballFactory = null!;
+    private Factory<CrescentMoon> _crescentFactory = null!;
     private TileShapeCollection _tiles = null!;
     private Label _pauseLabel = null!;
     private Label _timeScaleLabel = null!;
@@ -20,6 +22,7 @@ public class GameScreen : Screen
     private SoundEffect _hitSound = null!;
     private CollisionRelationship<Ball, TileShapeCollection> _ballVsTiles = null!;
     private CollisionRelationship<Ball, Ball> _ballVsBall = null!;
+    private CollisionRelationship<Ball, CrescentMoon> _ballVsCrescent = null!;
 
     public override void CustomInitialize()
     {
@@ -29,6 +32,7 @@ public class GameScreen : Screen
         _ballFactory.PartitionAxis = Axis.X;
 
         SetupArena();
+        SetupCrescent();
 
         var song = Engine.Content.Load<Song>("IGB3Song");
         _hitSound = Engine.Content.Load<SoundEffect>("SoundEffectInstanceFile");
@@ -69,6 +73,15 @@ public class GameScreen : Screen
         Add(_tiles);
     }
 
+    private void SetupCrescent()
+    {
+        _crescentFactory = new Factory<CrescentMoon>(this);
+        var crescent = _crescentFactory.Create();
+        crescent.X = 0f;
+        crescent.Y = -50f;
+        crescent.RotationVelocity = Angle.FromDegrees(-20);
+    }
+
     const float MinHitSpeed = 100f;
     const float MaxHitSpeed = 1000f;
 
@@ -82,6 +95,19 @@ public class GameScreen : Screen
             var sep = ball.GetSeparationVector(tiles);
             ball.ApplySeparationOffset(sep);
             ball.AdjustVelocityFromSeparation(sep, tiles, thisMass: 0f, otherMass: 1f, elasticity: 0.8f);
+            float impact = (ball.Velocity - preVelocity).Length();
+            if (impact >= MinHitSpeed)
+                Engine.Audio.Play(_hitSound, volume: Math.Clamp(impact / MaxHitSpeed, 0f, 1f));
+        };
+
+        // Balls bounce off the crescent moon (concave polygon) — same pattern as tiles
+        _ballVsCrescent = AddCollisionRelationship(_ballFactory, _crescentFactory);
+        _ballVsCrescent.CollisionOccurred += (ball, moon) =>
+        {
+            var preVelocity = ball.Velocity;
+            var sep = ball.GetSeparationVector(moon);
+            ball.ApplySeparationOffset(sep);
+            ball.AdjustVelocityFromSeparation(sep, moon, thisMass: 0f, otherMass: 1f, elasticity: 0.8f);
             float impact = (ball.Velocity - preVelocity).Length();
             if (impact >= MinHitSpeed)
                 Engine.Audio.Play(_hitSound, volume: Math.Clamp(impact / MaxHitSpeed, 0f, 1f));
@@ -174,6 +200,6 @@ public class GameScreen : Screen
                 Engine.Random.Next(100, 255));
         }
 
-        _collisionLabel.Text = $"Ball vs Tiles: {_ballVsTiles.DeepCollisionCount}\nBall vs Ball: {_ballVsBall.DeepCollisionCount}";
+        _collisionLabel.Text = $"Ball vs Tiles: {_ballVsTiles.DeepCollisionCount}\nBall vs Ball: {_ballVsBall.DeepCollisionCount}\nBall vs Crescent: {_ballVsCrescent.DeepCollisionCount}";
     }
 }

@@ -116,6 +116,8 @@ Skill files are loaded into a limited context window — every line costs budget
 
 This scoping step keeps context lean — only load the skills and files that are actually needed.
 
+**Step 0b — Load all relevant skills before touching any source files.** Decompose the task into every concern it touches, and load a skill for each one. A task that involves creating an entity, giving it a shape, and setting up collision requires `entities-and-factories` + `shapes` + `collision-relationships` — all three, up front. Skills are cheap to load and save enormous amounts of time; reading source to compensate for a missing skill is always the wrong trade. If in doubt, load the skill.
+
 For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
 
 Available agents:
