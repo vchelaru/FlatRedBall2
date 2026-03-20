@@ -25,7 +25,7 @@ public class TiledDemoScreen : Screen
         {
             if (layer is TilemapTileLayer tileLayer)
             {
-                var renderable = new TilemapLayerRenderable(tilemap, tileLayer)
+                var renderable = new TileMapLayerRenderable(tilemap, tileLayer)
                 {
                     X = mapX,
                     Y = mapY,

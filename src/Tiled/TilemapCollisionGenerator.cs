@@ -7,7 +7,7 @@ namespace FlatRedBall2.Tiled;
 /// Generates a <see cref="TileShapeCollection"/> from a <see cref="TilemapTileLayer"/>
 /// by inspecting per-tile custom properties in the tileset.
 /// </summary>
-public static class TilemapCollisionGenerator
+public static class TileMapCollisionGenerator
 {
     /// <summary>
     /// Scans every tile in <paramref name="layer"/> and adds a collision cell for each tile

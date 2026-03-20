@@ -10,19 +10,23 @@ namespace FlatRedBall2.Tiled;
 /// Renders a single <see cref="TilemapTileLayer"/> from a <see cref="Tilemap"/>,
 /// integrating with FlatRedBall2's Z-ordered rendering pipeline.
 /// </summary>
-public class TilemapLayerRenderable : IRenderable, IAttachable
+public class TileMapLayerRenderable : IRenderable, IAttachable
 {
     private readonly Tilemap _tilemap;
     private readonly TilemapTileLayer _layer;
 
-    public TilemapLayerRenderable(Tilemap tilemap, TilemapTileLayer layer)
+    public TileMapLayerRenderable(Tilemap tilemap, TilemapTileLayer layer)
     {
         _tilemap = tilemap;
         _layer = layer;
     }
 
-    public bool IsVisible { get; set; } = true;
-    public Color Color { get; set; } = Color.White;
+    /// <summary>Delegates to the underlying <see cref="TilemapTileLayer.IsVisible"/>.</summary>
+    public bool IsVisible
+    {
+        get => _layer.IsVisible;
+        set => _layer.IsVisible = value;
+    }
 
     // IAttachable
     public Entity? Parent { get; set; }
@@ -75,7 +79,7 @@ public class TilemapLayerRenderable : IRenderable, IAttachable
                 if ((tile.FlipFlags & TilemapTileFlipFlags.FlipDiagonally) != 0)
                     rotation = MathHelper.PiOver2;
 
-                spriteBatch.Draw(tileset.Texture, position, sourceRect, Color, rotation, origin, 1f, effects, 0f);
+                spriteBatch.Draw(tileset.Texture, position, sourceRect, Color.White * _layer.Opacity, rotation, origin, 1f, effects, 0f);
             }
         }
     }

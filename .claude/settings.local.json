@@ -12,7 +12,14 @@
       "Bash(\"$GUMCLI\" codegen:*)",
       "Bash(\"$GUMCLI\":*)",
       "Bash(xargs grep:*)",
-      "WebFetch(domain:www.monogameextended.net)"
+      "WebFetch(domain:www.monogameextended.net)",
+      "Read(//c/Users/vchel/.nuget/packages/monogame.extended/**)",
+      "Read(//c/Users/vchel/.nuget/packages/**)",
+      "Bash(find ~/.nuget/packages -path */monogame.extended* -name *.dll)",
+      "Bash(find ~/.nuget/packages/monogame.extended -type f -name *.dll)",
+      "Bash(find ~/.nuget/packages/monogame.extended* -type f -name *.dll)",
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \":*)"
     ]
   }
 }
