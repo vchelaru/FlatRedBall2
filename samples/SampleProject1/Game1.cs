@@ -19,8 +19,13 @@ public class Game1 : Game
     {
         base.Initialize();
 
+
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.Zoom = 1;
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionWidth = 360*3;
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionHeight = 240*3;
+
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-        FlatRedBall2.FlatRedBallService.Default.Start<CameraFollowDemoScreen>();
+        FlatRedBall2.FlatRedBallService.Default.Start<PlatformerBallScreen>();
     }
 
     protected override void Update(GameTime gameTime)

@@ -2,26 +2,13 @@
 
 See `Done.md` for completed items.
 
-## Gum — Zoom Correctness
-**Priority: Medium**
+## Tiled Integration — Remaining Work
 
-When `Camera.Zoom != 1`, Gum layout and rendering must both scale correctly. The current approach:
-1. Update loop divides `GraphicalUiElement.CanvasWidth/Height` by `Camera.Zoom` — keeps layout units consistent.
-2. `GumRenderBatch.Begin` passes `Matrix.CreateScale(zoom, zoom, 1f)` to `GumBatch.Begin` — scales rendered output.
+`TiledMapLayerRenderable` and `TiledCollisionGenerator` are implemented (MonoGame.Extended 5.* / MonoGame 5.4.*).
 
-This is believed to be correct in principle but has **not been fully verified**. Need to test Gum UI at various zoom values (e.g. 1×, 1.5×, 2×) and window sizes and confirm:
-- Anchored elements (TopLeft, TopRight, Center, etc.) land at the right screen positions.
-- Text and control sizes appear proportionally correct.
-- No offset or clipping artefacts at non-integer zoom levels.
-
-The PongGravity sample uses `DisplaySettings.PreferredWindowWidth/Height = 2560×1440` with default zoom (1×) for its 2× scale effect — it does not exercise `Camera.Zoom` directly. A dedicated test or demo screen would be the cleanest way to verify.
-
-## Tiled Integration — TMX → TileShapeCollection
-**Blocked** — waiting on MonoGame.Extended supporting the target MonoGame version.
-
-- `TiledMapLayerRenderable.Draw` renders a tile layer
-- `TiledCollisionGenerator.Generate` reads tile properties and calls `TileShapeCollection.AddTileAtCell`
-- When this lands, `CameraControllingEntity.Map` should become a `MapBounds` struct/interface instead of `AxisAlignedRectangle`
+Remaining:
+- `IsFlippedDiagonally` (anti-diagonal flip / 90° rotation) is not yet rendered correctly — tiles are drawn unrotated. Requires passing a rotation angle to `SpriteBatch.Draw`.
+- `CameraControllingEntity.Map` should become a `MapBounds` struct/interface instead of `AxisAlignedRectangle` now that Tiled integration is live.
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.

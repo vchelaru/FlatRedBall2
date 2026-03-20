@@ -25,7 +25,10 @@
       "Bash(\"C:/Users/vchel/Documents/GitHub/FlatRedBall2/../Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe\":*)",
       "Bash(\"C:/Users/vchel/Documents/GitHub/Gum/Tools/Gum.Cli/bin/Debug/net8.0/gumcli.exe\" fonts:*)",
       "Bash(mkdir:*)",
-      "Bash(dotnet list:*)"
+      "Bash(dotnet list:*)",
+      "WebSearch",
+      "WebFetch(domain:www.monogameextended.net)",
+      "Bash(dotnet mgcb:*)"
     ]
   }
 }

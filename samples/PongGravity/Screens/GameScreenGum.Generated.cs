@@ -41,6 +41,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
     public Label P1ScoreLabel { get; protected set; }
     public Label P2ScoreLabel { get; protected set; }
     public Label InstructionsLabel { get; protected set; }
+    public TextRuntime TextInstance { get; protected set; }
 
     public GameScreenGum(InteractiveGue visual) : base(visual)
     {
@@ -58,6 +59,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
         P1ScoreLabel = global::Gum.Forms.GraphicalUiElementFormsExtensions.TryGetFrameworkElementByName<Label>(this.Visual,"P1ScoreLabel");
         P2ScoreLabel = global::Gum.Forms.GraphicalUiElementFormsExtensions.TryGetFrameworkElementByName<Label>(this.Visual,"P2ScoreLabel");
         InstructionsLabel = global::Gum.Forms.GraphicalUiElementFormsExtensions.TryGetFrameworkElementByName<Label>(this.Visual,"InstructionsLabel");
+        TextInstance = this.Visual?.GetGraphicalUiElementByName("TextInstance") as global::MonoGameGum.GueDeriving.TextRuntime;
         CustomInitialize();
     }
     //Not assigning variables because Object Instantiation Type is set to By Name rather than Fully In Code

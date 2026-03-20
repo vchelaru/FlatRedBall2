@@ -87,10 +87,23 @@
     <Variable Type="float" Name="P2ScoreLabel.Y" SetsValue="true">
       <Value xsi:type="xsd:float">20</Value>
     </Variable>
+    <Variable IsFont="true" Type="string" Name="TextInstance.Font" SetsValue="true">
+      <Value xsi:type="xsd:string">Arial</Value>
+    </Variable>
+    <Variable Type="int" Name="TextInstance.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">44</Value>
+    </Variable>
+    <Variable Type="float" Name="TextInstance.X" SetsValue="true">
+      <Value xsi:type="xsd:float">127</Value>
+    </Variable>
+    <Variable Type="float" Name="TextInstance.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">217</Value>
+    </Variable>
   </State>
   <Instance Name="ColoredRectangleInstance" BaseType="ColoredRectangle" />
   <Instance Name="P1ScoreLabel" BaseType="Controls/Label" />
   <Instance Name="P2ScoreLabel" BaseType="Controls/Label" />
   <Instance Name="InstructionsLabel" BaseType="Controls/Label" />
+  <Instance Name="TextInstance" BaseType="Text" />
   <Behaviors />
 </ScreenSave>
