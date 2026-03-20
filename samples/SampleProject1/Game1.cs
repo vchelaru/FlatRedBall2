@@ -25,7 +25,7 @@ public class Game1 : Game
         FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionHeight = 240*3;
 
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-        FlatRedBall2.FlatRedBallService.Default.Start<PlatformerBallScreen>();
+        FlatRedBall2.FlatRedBallService.Default.Start<TiledDemoScreen>();
     }
 
     protected override void Update(GameTime gameTime)

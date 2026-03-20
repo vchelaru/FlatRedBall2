@@ -56,7 +56,7 @@ Invoke these with the Skill tool when working on specific topics:
 
 Do not attempt to use these — they exist as API placeholders:
 - DebugRenderer: All draw methods are no-ops
-- Tiled integration: `TiledMapLayerRenderable`/`TiledCollisionGenerator` are stubs
+- Tiled integration: `TilemapLayerRenderable`/`TilemapCollisionGenerator` use MonoGame.Extended 6.0 preview
 
 ## AI-Usability Goals
 

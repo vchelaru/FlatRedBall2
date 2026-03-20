@@ -3,7 +3,8 @@ using FlatRedBall2.Tiled;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
 using Microsoft.Xna.Framework;
-using MonoGame.Extended.Tiled;
+using MonoGame.Extended.Tilemaps;
+using MonoGame.Extended.Tilemaps.Tiled;
 
 namespace SampleProject1.Screens;
 
@@ -13,20 +14,24 @@ public class TiledDemoScreen : Screen
     {
         Camera.BackgroundColor = new Color(20, 30, 20);
 
-        var tiledMap = ContentManager.Load<TiledMap>("Tiled/OverworldTopDownA");
+        var parser = new TiledTmxParser();
+        var tilemap = parser.ParseFromFile("Content/Tiled/OverworldTopDownA.tmx", Engine.GraphicsDevice);
 
         // Place map so its center aligns with the world origin.
-        float mapX = -tiledMap.WidthInPixels / 2f;
-        float mapY = tiledMap.HeightInPixels / 2f;
+        float mapX = -(float)tilemap.WorldBounds.Width / 2f;
+        float mapY = (float)tilemap.WorldBounds.Height / 2f;
 
-        foreach (var layer in tiledMap.TileLayers)
+        foreach (var layer in tilemap.Layers)
         {
-            var renderable = new TiledMapLayerRenderable(tiledMap, layer)
+            if (layer is TilemapTileLayer tileLayer)
             {
-                X = mapX,
-                Y = mapY,
-            };
-            Add(renderable);
+                var renderable = new TilemapLayerRenderable(tilemap, tileLayer)
+                {
+                    X = mapX,
+                    Y = mapY,
+                };
+                Add(renderable);
+            }
         }
 
         var panel = new Panel();

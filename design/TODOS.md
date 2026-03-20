@@ -4,11 +4,12 @@ See `Done.md` for completed items.
 
 ## Tiled Integration — Remaining Work
 
-`TiledMapLayerRenderable` and `TiledCollisionGenerator` are implemented (MonoGame.Extended 5.* / MonoGame 5.4.*).
+Using MonoGame.Extended 6.0 (preview) for Tiled support. The `TilemapLayerRenderable` handles per-layer rendering with manual tile drawing for Z-order integration.
 
 Remaining:
-- `IsFlippedDiagonally` (anti-diagonal flip / 90° rotation) is not yet rendered correctly — tiles are drawn unrotated. Requires passing a rotation angle to `SpriteBatch.Draw`.
-- `CameraControllingEntity.Map` should become a `MapBounds` struct/interface instead of `AxisAlignedRectangle` now that Tiled integration is live.
+- Verify `TilemapTileFlipFlags.FlipDiagonally` rotation renders correctly (now attempted via 90° rotation in `TilemapLayerRenderable`).
+- `CameraControllingEntity.Map` should become a `MapBounds` struct/interface instead of `AxisAlignedRectangle`.
+- Consider migrating to `TilemapSpriteBatchRenderer` for maps that don't need per-layer Z control (better performance via frustum culling).
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.

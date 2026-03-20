@@ -13,18 +13,3 @@
 
 #---------------------------------- Content ---------------------------------#
 
-#begin Tiled/StandardTileset.tsx
-/importer:TiledMapTilesetImporter
-/processor:TiledMapTilesetProcessor
-/build:Tiled/StandardTileset.tsx
-
-#begin Tiled/ZoriaOverworld.tsx
-/importer:TiledMapTilesetImporter
-/processor:TiledMapTilesetProcessor
-/build:Tiled/ZoriaOverworld.tsx
-
-#begin Tiled/OverworldTopDownA.tmx
-/importer:TiledMapImporter
-/processor:TiledMapProcessor
-/build:Tiled/OverworldTopDownA.tmx
-
