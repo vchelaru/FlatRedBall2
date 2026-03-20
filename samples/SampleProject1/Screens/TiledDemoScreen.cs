@@ -4,6 +4,7 @@ using Gum.Forms.Controls;
 using Gum.Wireframe;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.Tilemaps;
+using MonoGame.Extended.Tilemaps.Rendering;
 using MonoGame.Extended.Tilemaps.Tiled;
 
 namespace SampleProject1.Screens;
@@ -17,6 +18,9 @@ public class TiledDemoScreen : Screen
         var parser = new TiledTmxParser();
         var tilemap = parser.ParseFromFile("Content/Tiled/OverworldTopDownA.tmx", Engine.GraphicsDevice);
 
+        var renderer = new TilemapSpriteBatchRenderer();
+        renderer.LoadTilemap(tilemap);
+
         // Place map so its center aligns with the world origin.
         float mapX = -(float)tilemap.WorldBounds.Width / 2f;
         float mapY = (float)tilemap.WorldBounds.Height / 2f;
@@ -25,7 +29,7 @@ public class TiledDemoScreen : Screen
         {
             if (layer is TilemapTileLayer tileLayer)
             {
-                var renderable = new TileMapLayerRenderable(tilemap, tileLayer)
+                var renderable = new TileMapLayerRenderable(renderer, tileLayer)
                 {
                     X = mapX,
                     Y = mapY,

@@ -48,5 +48,8 @@
 ## Pause System
 `Screen.IsPaused`, `PauseThisScreen()`, `UnpauseThisScreen()`. When paused, entity physics, collision, and entity `CustomActivity` are all skipped. `Screen.CustomActivity` always runs so the screen can respond to input (e.g., showing a pause menu). TopDownMenuSample updated to use an in-screen Gum overlay rather than a screen transition, so game world state is preserved across pause/resume. `BouncingBallsSample` added as a demo: click to spawn balls with gravity that bounce off a `TileShapeCollection` arena and self-collide; ESC toggles pause with a code-only Gum label.
 
+## Tiled Tile Rendering via TilemapSpriteBatchRenderer
+`TileMapLayerRenderable` delegates to MonoGame.Extended's `TilemapSpriteBatchRenderer.DrawLayer()` for per-layer rendering. This provides frustum culling (only visible tiles drawn) and automatic handling of all 8 tile flip/rotation combinations. A `TiledRenderBatch` (no-op `IRenderBatch`) ensures the `SpriteBatch` is not in an active state when the MGEx renderer manages its own Begin/End. FRB's Y-up camera is mapped to an `OrthographicCamera` in Tiled's Y-down space per draw call.
+
 ## Camera Movement and Control
 `CameraControllingEntity` in `src/Entities/CameraControllingEntity.cs`. `Target`/`Targets`, `TargetApproachStyle` (`Immediate`/`Smooth`/`ConstantSpeed`), `Map` (level bounds clamping), `ScrollingWindowWidth/Height` (deadzone), `SnapToPixel`, `CameraOffset`, `EnableAutoZooming`, `IsKeepingTargetsInView`, `ShakeScreen`/`ShakeScreenUntil` (async, auto-cancels on transition), `ForceToTarget()`.

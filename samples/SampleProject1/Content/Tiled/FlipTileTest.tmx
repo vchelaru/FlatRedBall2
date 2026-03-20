@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="50" height="25" tilewidth="16" tileheight="16" infinite="0" nextlayerid="12" nextobjectid="1">
+ <tileset firstgid="1" source="StandardTileset.tsx"/>
+ <tileset firstgid="1025" source="ZoriaOverworld.tsx"/>
+ <layer id="7" name="Ground" width="50" height="25">
+  <data encoding="base64" compression="gzip">
+   H4sIAAAAAAAACvvEwsDwiY5YnJWBQZKVND3hQPVKLPixCSt9McwfpOi5QMAPIPyFlb4Y5g9i1X8n0h9mbPTFMH8QUmcKxA0gf7MR548NdMYwfxBStxGIhdmI9we98QZWCCak7tKoP0b9MYT84QrBC4D4ABAnDGF/NADxAyB2AGKFIewPsPth/hnC/gCnJ1j6ItXd6Hig/EFp+FPij48slLcjqeUPUvUh+8OYCu3IgfbHXKDez3gwse3IgfSHCbS9CGsznseC6ZV/yPVHOVJbEtZmHIr+wJbG6OkPdDeTUkbhMi+EBYFp6Q9cZSs5GJvZ01gQeKD9QWm6Qs7zyNhiCOUP5DyPDVcM4npwsGF6+QMAJP+ty4gTAAA=
+  </data>
+ </layer>
+</map>
