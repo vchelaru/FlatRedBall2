@@ -31,6 +31,15 @@ public class TiledDemoScreen : Screen
                     Y = mapY,
                 };
                 Add(renderable);
+
+                // Generate visible collision overlay from tiles with class "SolidCollision".
+                if (tileLayer.Name == "GameplayLayer")
+                {
+                    var solidCollision = TileMapCollisionGenerator.GenerateFromClass(
+                        tilemap, tileLayer, "SolidCollision", mapX, mapY);
+                    solidCollision.IsVisible = true;
+                    Add(solidCollision);
+                }
             }
         }
 

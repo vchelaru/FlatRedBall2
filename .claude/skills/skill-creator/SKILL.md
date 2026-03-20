@@ -63,8 +63,8 @@ Check available MCPs - if useful for research (searching docs, finding similar s
 
 Based on the user interview, fill in these components:
 
-- **name**: Skill identifier
-- **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Note: currently Claude has a tendency to "undertrigger" skills -- to not use them when they'd be useful. To combat this, please make the skill descriptions a little bit "pushy". So for instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
+- **name**: Skill identifier. Use lowercase letters, numbers, and hyphens only (max 64 characters). Cannot contain "anthropic" or "claude". Prefer gerund form (`processing-pdfs`, `managing-databases`) as it clearly describes the activity. Acceptable alternatives: noun phrases (`pdf-processing`) or action-oriented (`process-pdfs`). Avoid vague names like `helper`, `utils`, `tools`.
+- **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Write descriptions in **third person** — the description is injected into the system prompt, and inconsistent point-of-view causes discovery problems. Good: "Processes Excel files and generates reports." Bad: "I can help you process Excel files" or "You can use this to process Excel files." Note: currently Claude has a tendency to "undertrigger" skills — to not use them when they'd be useful. To combat this, make the skill descriptions specific but slightly "pushy". For instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
 - **the rest of the skill :)**
 
@@ -95,7 +95,8 @@ These word counts are approximate and you can feel free to go longer if needed.
 **Key patterns:**
 - Keep SKILL.md under 500 lines; if you're approaching this limit, add an additional layer of hierarchy along with clear pointers about where the model using the skill should go next to follow up.
 - Reference files clearly from SKILL.md with guidance on when to read them
-- For large reference files (>300 lines), include a table of contents
+- **Keep references one level deep from SKILL.md.** All reference files should link directly from SKILL.md — not from other reference files. Claude may only partially read files that are referenced from referenced files (e.g., using `head -100` to preview), resulting in incomplete information. Bad: `SKILL.md → advanced.md → details.md`. Good: `SKILL.md → advanced.md` and `SKILL.md → details.md`.
+- For large reference files (>300 lines), include a table of contents at the top so Claude can see the full scope of available information even when previewing
 
 **Domain organization**: When a skill supports multiple domains/frameworks, organize by variant:
 ```
@@ -136,7 +137,19 @@ Output: feat(auth): implement JWT-based authentication
 
 ### Writing Style
 
-Try to explain to the model why things are important in lieu of heavy-handed musty MUSTs. Use theory of mind and try to make the skill general and not super-narrow to specific examples. Start by writing a draft and then look at it with fresh eyes and improve it.
+Lead with the **why** behind each instruction. LLMs are smart — when they understand the reasoning, they can generalize to edge cases instead of blindly following rigid rules. Start by writing a draft and then look at it with fresh eyes and improve it.
+
+**When to be strict vs. flexible:** Not all instructions deserve the same weight. For opinionated frameworks and engines (like FlatRedBall2), the engine has built-in patterns and conventions that exist for good reasons — following them consistently pays off long-term. Use explicit, firm language (ALWAYS, MUST, exact templates) when:
+- A specific sequence must be followed or things break (lifecycle hooks, initialization order)
+- The engine/framework has an opinionated pattern and deviating causes subtle bugs
+- Consistency across the codebase matters more than local creativity
+
+Use flexible language ("consider", "typically", "adapt as needed") when:
+- Multiple approaches are genuinely valid
+- The decision depends on context the skill can't predict
+- You're describing general best practices, not framework requirements
+
+The key distinction: firm language backed by a clear reason ("ALWAYS call `CustomInitialize` before accessing `Engine` — the engine reference isn't injected until factory creation") is effective. Firm language without a reason ("ALWAYS do X") feels arbitrary and the model may ignore it when it seems irrelevant. When in doubt, explain the consequence of getting it wrong — that's more compelling than capitalization.
 
 ### Test Cases
 

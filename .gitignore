@@ -29,6 +29,6 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 /samples/BouncingBallsSample/bin
 /samples/BouncingBallsSample/obj
 /samples/BouncingBallsSample/Content/obj
-samples/SampleProject1/.claude/settings.local.json
+**/settings.local.json
 /samples/SampleProject1/Content/bin
 /samples/SampleProject1/Content/obj
