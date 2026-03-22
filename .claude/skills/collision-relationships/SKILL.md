@@ -98,6 +98,8 @@ AddCollisionRelationship(_playerFactory, tiles)
 
 `RepositionDirections` on adjacent tiles are maintained automatically — interior shared edges are cleared so entities glide across flat surfaces without snagging on seams.
 
+**Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
+
 ## Common Pitfalls
 
 - **Both sides move when only one should** — Use `.MoveFirstOnCollision()` for solid terrain.

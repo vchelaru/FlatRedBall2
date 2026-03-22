@@ -113,10 +113,15 @@ The `!_platformer.IsApplyingJump` guard prevents the air jump from triggering du
 
 ## Collision Setup
 
-Use `BounceOnCollision` with `elasticity: 0f` — **not** `MoveFirstOnCollision`:
+Use `BounceOnCollision` with `elasticity: 0f` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapeCollection` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):
 
 ```csharp
-screen.AddCollisionRelationship(playerList, solidTiles)
+// Against static tile geometry (preferred for level walls/floors)
+screen.AddCollisionRelationship(playerFactory, tileShapeCollection)
+      .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+
+// Against entity-based solids (moving platforms, breakable walls, etc.)
+screen.AddCollisionRelationship<Player, MovingPlatform>(playerFactory, platformFactory)
       .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 ```
 
