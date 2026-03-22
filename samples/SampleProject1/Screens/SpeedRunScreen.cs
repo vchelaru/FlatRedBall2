@@ -1,3 +1,4 @@
+using System.Linq;
 using FlatRedBall2;
 using FlatRedBall2.Collision;
 using Gum.Forms.Controls;
@@ -46,7 +47,7 @@ public class SpeedRunScreen : Screen
         };
         Add(_tiles);
 
-        var layout = SpeedRunLevelData.Layout;
+        var layout = SpeedRunLevelData.Layout.Reverse().ToArray();
 
         for (int row = 0; row < layout.Length; row++)
         {

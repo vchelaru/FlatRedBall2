@@ -12,4 +12,5 @@
   <Project Path="../TopDownMenuSampleWithCodeGen/TopDownMenuSampleWithCodeGen.csproj" />
   <Project Path="../ZombieSample/ZombieSample.csproj" />
   <Project Path="SampleProject1.csproj" />
+  <Project Path="../ZeldaRoomsSample/ZeldaRoomsSample.csproj" />
 </Solution>

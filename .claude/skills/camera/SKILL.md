@@ -112,6 +112,36 @@ Camera.X = player.X;
 Camera.Y = player.Y;
 ```
 
+## Camera Physics — Smooth Movement and Transitions
+
+`Camera` has the same velocity and acceleration properties as `Entity`:
+
+```csharp
+Camera.VelocityX    // world units/sec — applied each frame by the engine physics loop
+Camera.VelocityY
+Camera.AccelerationX
+Camera.AccelerationY
+```
+
+The camera is updated by the same physics loop as entities — set velocity or acceleration and it moves automatically each frame. **Do not lerp `Camera.X`/`Camera.Y` manually** — use velocity instead.
+
+```csharp
+// Slide camera right one screen width
+Camera.VelocityX = Camera.TargetWidth;  // moves one screen-width per second
+```
+
+For a timed one-shot slide, use an async delay to stop it:
+
+```csharp
+float targetX = Camera.X + Camera.TargetWidth;
+Camera.VelocityX = Camera.TargetWidth;
+await Engine.Time.DelaySeconds(1.0, Token);
+Camera.VelocityX = 0f;
+Camera.X = targetX;   // snap to exact position to eliminate drift
+```
+
+> **Note:** Camera has no `Drag` property — velocity must be zeroed explicitly.
+
 ## CameraControllingEntity — Automatic Following
 
 `CameraControllingEntity` (in `FlatRedBall2.Entities`) is an `Entity` subclass that handles following, map clamping, deadzone, pixel-snapping, and screen shake automatically.

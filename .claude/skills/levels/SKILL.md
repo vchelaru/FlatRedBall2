@@ -91,6 +91,16 @@ public class GameScreen : Screen
 
 Row 0 is the top of the grid. Each successive row subtracts `cellSize` from Y (world space is Y+ up).
 
+## Rooms as Separate Screens
+
+Each distinct room or area is its own `Screen` subclass. There is no built-in "room manager" — `MoveToScreen<T>` is the room transition mechanism. Room state (which enemies are alive, whether the exit is unlocked) is passed via the configure callback:
+
+```csharp
+MoveToScreen<Room2Screen>(s => s.RoomState = _sharedState);
+```
+
+This is simpler than managing multiple rooms within a single screen and composes naturally with the screen lifecycle (automatic entity/factory cleanup, `CustomInitialize` for fresh setup).
+
 ## Level Advancement
 
 Pass the next level index when transitioning screens:

@@ -32,3 +32,5 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 **/settings.local.json
 /samples/SampleProject1/Content/bin
 /samples/SampleProject1/Content/obj
+/samples/ZeldaRoomsSample/bin
+/samples/ZeldaRoomsSample/obj

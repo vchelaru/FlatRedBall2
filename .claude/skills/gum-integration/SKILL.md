@@ -19,11 +19,45 @@ Choose the mode that matches the project setup (see `gumcli` skill for how to cr
 
 ## Two Levels of Gum API
 
-**FrameworkElement controls (high-level, preferred)**: `Button`, `Label`, `TextBox`, `CheckBox`, `StackPanel`, `Panel`, etc. from `Gum.Forms.Controls`. These have built-in functionality — click events, hover, focus, keyboard navigation, layout.
+### Forms Controls — interactive UI (`Gum.Forms.Controls`)
 
-**GraphicalUiElement visuals (low-level)**: The raw visual tree. Use only when Forms controls do not expose what you need — for example, `TextRuntime` for a custom `FontSize` that `Label` does not surface.
+High-level controls with built-in click, hover, focus, and keyboard navigation:
 
-**Rule: prefer FrameworkElement. Drop to visuals only when necessary.**
+| Control | Use for |
+|---------|---------|
+| `Button` | Clickable buttons |
+| `Label` | Display-only text |
+| `TextBox` | Text input |
+| `CheckBox` | Toggle on/off |
+| `StackPanel` | Vertical/horizontal layout container |
+| `Panel` | Free-layout container |
+
+Use Forms controls for menus, buttons, and any interactive element. `Label` is also the right choice for simple score/status text.
+
+### Visual Types — non-interactive rendering (`MonoGameGum.GueDeriving`)
+
+Raw visual objects with no built-in input handling. Use these for non-interactive HUD elements — health bars, icons, solid-color shapes — when no Forms control fits:
+
+| Type | Use for |
+|------|---------|
+| `TextRuntime` | Text with custom `FontSize`/`FontScale` not exposed by `Label` |
+| `ColoredRectangleRuntime` | Solid-color rectangle (health bars, UI frames, heart indicators) |
+| `SpriteRuntime` | Textured image |
+
+```csharp
+using MonoGameGum.GueDeriving;
+
+// Health bar fill
+var fill = new ColoredRectangleRuntime { Width = 100, Height = 12, Color = Color.Red };
+fill.Anchor(Anchor.TopLeft);
+fill.X = 20; fill.Y = 20;
+Add(fill);
+
+// Shrink it as health decreases:
+fill.Width = _health / _maxHealth * 100f;
+```
+
+**Rule: use Forms controls for interactive elements. Use visual types directly for non-interactive HUD (health indicators, icons, status bars).**
 
 ## Quick Start
 
@@ -163,17 +197,23 @@ mainMenu.QuitButton.Click += (_, _) => Exit();
 
 ## Showing / Hiding a Control
 
-`FrameworkElement` (Label, Button, etc.) exposes `IsVisible` which wraps `Visual.Visible`:
+The API differs by type:
 
-```csharp
-label.IsVisible = false;   // hide
-label.IsVisible = true;    // show
-```
+- **`FrameworkElement`** (Label, Button, etc.) — use `IsVisible`:
+  ```csharp
+  label.IsVisible = false;
+  label.IsVisible = true;
+  ```
+- **Visual types** (`ColoredRectangleRuntime`, `TextRuntime`, `SpriteRuntime`) — use `Visible`:
+  ```csharp
+  rect.Visible = false;
+  rect.Visible = true;
+  ```
 
 ## Gotchas
 
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
-- **`IsVisible` on `FrameworkElement`** — use `element.IsVisible = true/false` to show/hide. Do not use `element.Visual.Visible` directly.
+- **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.

@@ -79,6 +79,27 @@ TopDownDirection dir = _topDown.DirectionFacing;
 // e.g. TopDownDirection.Up, .DownLeft, etc.
 ```
 
+## Direction to Vector2
+
+`TopDownDirectionExtensions.ToVector2()` converts a `TopDownDirection` to a normalized world-space `Vector2` (Y+ up):
+
+```csharp
+using FlatRedBall2.Movement;
+
+Vector2 offset = _topDown.DirectionFacing.ToVector2();
+```
+
+Useful for positioning a hitbox or spawning a projectile in front of the entity:
+
+```csharp
+// Place a sword hitbox 32 units in front of the player
+var dir = _topDown.DirectionFacing.ToVector2();
+_swordHitbox.X = X + dir.X * 32f;
+_swordHitbox.Y = Y + dir.Y * 32f;
+```
+
+Diagonal directions return a normalized vector (magnitude 1.0), not `(1, 1)`.
+
 ## Speed Multiplier
 
 ```csharp
