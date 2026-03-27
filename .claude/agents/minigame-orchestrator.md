@@ -63,7 +63,7 @@ Now implement the game as a new sample project under `samples/auto/`. Follow the
 3. **Load skills for every subsystem you'll use** — entities, collision, shapes, input, physics, screens, timing, etc. Decompose the task and load ALL relevant skills before writing code.
 4. **Read `.claude/code-style.md`** before writing any code.
 5. **Do NOT read existing samples, unit tests, or any code outside `src/` and your own project.** The goal is to simulate an end user working with the engine as if installed via NuGet — your only resources are the engine source, XML docs, and skill files.
-6. **For the Gum question in sample-project-setup step 3**: default to "no Gum" unless the design requires UI (score display, health bar). If UI is needed, use code-only Gum mode.
+6. **For the Gum question in sample-project-setup step 3**: Use Gum (code-only mode) for any UI — score, health bar, lives display, etc. — to keep text rendering on-screen rather than in the window title.
 7. Name the sample project `AutoEval<GameName>Sample` (e.g., `AutoEvalFroggerSample`).
 8. The `.csproj` must reference the engine directly via `ProjectReference`:
    ```xml
