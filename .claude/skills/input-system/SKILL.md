@@ -33,8 +33,8 @@ bool released   = kb.WasKeyJustReleased(Keys.Space);// true only on first frame 
 ```csharp
 ICursor cursor = Engine.Input.Cursor;
 
-bool clicking       = cursor.PrimaryDown;           // left button held
-bool justClicked    = cursor.PrimaryPressed;        // left button just pressed
+bool clicking       = cursor.PrimaryDown;           // left mouse button or touch held
+bool justClicked    = cursor.PrimaryPressed;        // left mouse button or touch just started
 Vector2 worldPos    = cursor.WorldPosition;         // position in world space (Y+ up)
 Vector2 screenPos   = cursor.ScreenPosition;        // position in screen pixels
 ```
