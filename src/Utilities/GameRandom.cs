@@ -19,7 +19,7 @@ public class GameRandom : Random
     /// <summary>
     /// Returns a random element from a list. The list must have at least one item.
     /// </summary>
-    public T In<T>(IList<T> list)
+    public T In<T>(IReadOnlyList<T> list)
     {
 #if DEBUG
         if (list == null) throw new ArgumentNullException(nameof(list));
@@ -31,7 +31,7 @@ public class GameRandom : Random
     /// <summary>
     /// Returns <paramref name="numberToReturn"/> unique elements chosen at random from <paramref name="list"/>.
     /// </summary>
-    public IList<T> MultipleIn<T>(IList<T> list, int numberToReturn)
+    public IList<T> MultipleIn<T>(IReadOnlyList<T> list, int numberToReturn)
     {
 #if DEBUG
         if (numberToReturn > list.Count)
