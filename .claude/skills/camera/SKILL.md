@@ -35,6 +35,8 @@ Y+ is **up** (see `physics-and-movement`). Top = +360, bottom = −360.
 wall.Y = -Camera.TargetHeight / 2f;  // bottom of screen
 ```
 
+> **Screen-edge boundaries** (keeping entities in bounds) are a collision concern, not a camera concern — use wall entities or `TileShapeCollection`. See the `collision-relationships` and `shapes` skills.
+
 ## DisplaySettings — Resolution, Zoom, and Letterboxing
 
 `FlatRedBallService.Default.DisplaySettings` controls how the camera is configured at each screen start. Set these before calling `Start<T>()` or between screens.

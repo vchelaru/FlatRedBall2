@@ -34,7 +34,7 @@ This single-list overload iterates unique pairs only — no duplicate checks or 
 | `.MoveFirstOnCollision()` | A gets pushed out, B stays fixed. Use for player vs. solid walls. |
 | `.MoveSecondOnCollision()` | B gets pushed out, A stays fixed. |
 | `.MoveBothOnCollision(firstMass, secondMass)` | Both objects share the separation weighted by mass. |
-| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B using impulse physics. `firstMass: 0f` = A moves, B fixed (common for walls). |
+| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B's surface normal using impulse physics. `firstMass: 0f` = A moves, B fixed (common for walls). |
 
 ## Responding to Collision Events
 

@@ -113,6 +113,22 @@ Claude reads only the relevant reference file.
 
 This goes without saying, but skills must not contain malware, exploit code, or any content that could compromise system security. A skill's contents should not surprise the user in their intent if described. Don't go along with requests to create misleading skills or skills designed to facilitate unauthorized access, data exfiltration, or other malicious activities. Things like a "roleplay as an XYZ" are OK though.
 
+#### Code Blocks: Less Is More
+
+Code blocks are expensive — they consume context tokens every time the skill loads. Only include a code block if an agent would produce **wrong code** without it. If the code is standard usage that's clear from the API signatures and names, describe it in a sentence instead.
+
+**Worth the tokens:**
+- "Wrong vs right" contrasts that prevent a recurring mistake (e.g., showing a broken pattern alongside the correct one)
+- Patterns where the API is non-obvious, has a surprising order of operations, or contradicts common conventions
+- Wiring/setup sequences where getting one step wrong silently breaks things
+
+**Not worth the tokens:**
+- Standard language patterns any competent developer would write (subclassing, property declarations, loops)
+- "Here's how to use this API" examples when the method name and parameters are self-explanatory
+- The same pattern repeated across multiple skills — put it in one skill and reference it
+
+**Rule of thumb:** If the example is showing "how to write C#" rather than "how this engine behaves unexpectedly," cut it.
+
 #### Writing Patterns
 
 Prefer using the imperative form in instructions.

@@ -19,13 +19,12 @@ public class Game1 : Game
     {
         base.Initialize();
 
-
         FlatRedBall2.FlatRedBallService.Default.DisplaySettings.Zoom = 1;
-        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionWidth = 360*3;
-        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionHeight = 240*3;
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionWidth = 1280;
+        FlatRedBall2.FlatRedBallService.Default.DisplaySettings.ResolutionHeight = 720;
 
         FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-        FlatRedBall2.FlatRedBallService.Default.Start<SpeedRunScreen>();
+        FlatRedBall2.FlatRedBallService.Default.Start<CoinCollectorScreen>();
     }
 
     protected override void Update(GameTime gameTime)

@@ -36,6 +36,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `content-and-assets` — Asset loading
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `levels` — Level data layout and progression
+- `tmx` — TMX map file creation/editing: base template, StandardTileset tile IDs, layer conventions, CSV data
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
 - `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
 - `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapeCollection`, enemy navigation pattern

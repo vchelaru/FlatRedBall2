@@ -127,6 +127,52 @@ wall.Rectangle.Width = w;
 wall.Rectangle.Height = h;
 ```
 
+## Entity Properties Must Be Reactive (Not Config)
+
+Entity properties that affect shapes or visuals must apply their changes immediately in the setter — not store a value for some future initialization step to read. Since properties are reactive, they can be set at any time: after `CustomInitialize`, after `Factory.Create()`, or mid-game. Timing does not matter.
+
+**Wrong — "configure-then-initialize" pattern:**
+```csharp
+public class Asteroid : Entity
+{
+    public AsteroidSize Size { get; set; }  // does nothing on its own
+
+    public override void CustomInitialize()
+    {
+        // Reads Size to decide radius — but Size wasn't set yet!
+        float radius = Size == AsteroidSize.Small ? 10f : 30f;
+        Add(new Circle { Radius = radius, IsVisible = true });
+    }
+}
+```
+
+**Right — reactive property, works at any time:**
+```csharp
+public class Asteroid : Entity
+{
+    private Circle _shape = null!;
+    private AsteroidSize _size = AsteroidSize.Large;
+
+    public AsteroidSize Size
+    {
+        get => _size;
+        set { _size = value; _shape.Radius = value == AsteroidSize.Small ? 10f : 30f; }
+    }
+
+    public override void CustomInitialize()
+    {
+        _shape = new Circle { Radius = 30f, IsVisible = true };
+        Add(_shape);
+    }
+}
+
+// Caller — timing doesn't matter:
+var asteroid = _asteroidFactory.Create();  // defaults to Large
+asteroid.Size = AsteroidSize.Small;        // immediately resizes the shape
+```
+
+This eliminates any dependency on Factory/CustomInitialize timing. There is no need for a separate `Setup()` method or a `Create(Action<T>)` overload.
+
 ## Always Use Factory — Even for Single Instances
 
 Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>`. This keeps lifecycle, collision (`IEnumerable<T>`), and `Engine.GetFactory<T>()` all working consistently.
