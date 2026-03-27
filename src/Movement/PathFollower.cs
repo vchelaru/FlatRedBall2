@@ -100,9 +100,8 @@ public class PathFollower
         if (FaceDirection)
         {
             var tangent = Path.TangentAtLength(_distanceTraveled);
-            // Angle convention: 0 = up (0, 1), positive = CW.
-            // atan2(tangent.X, tangent.Y) maps the movement direction to this convention.
-            entity.Rotation = Angle.FromRadians(MathF.Atan2(tangent.X, tangent.Y));
+            // Standard math convention: 0 = right (1, 0), positive = CCW.
+            entity.Rotation = Angle.FromRadians(MathF.Atan2(tangent.Y, tangent.X));
         }
     }
 

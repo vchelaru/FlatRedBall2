@@ -73,10 +73,10 @@ public class AngleTests
     }
 
     [Fact]
-    public void ToVector2_ZeroAnglePointsUp()
+    public void ToVector2_ZeroAnglePointsRight()
     {
-        float expectedX = 0f;
-        float expectedY = 1f;
+        float expectedX = 1f;
+        float expectedY = 0f;
 
         var vec = Angle.FromRadians(0f).ToVector2();
 
@@ -85,10 +85,10 @@ public class AngleTests
     }
 
     [Fact]
-    public void ToVector2_90DegreesPointsRight()
+    public void ToVector2_90DegreesPointsUp()
     {
-        float expectedX = 1f;
-        float expectedY = 0f;
+        float expectedX = 0f;
+        float expectedY = 1f;
 
         var vec = Angle.FromDegrees(90f).ToVector2();
 

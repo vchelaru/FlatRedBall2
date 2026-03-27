@@ -71,4 +71,4 @@ _follower.Activity(this, time.DeltaSeconds);
 
 ## FaceDirection Rotation Convention
 
-`FaceDirection = true` sets `entity.Rotation = Angle.FromRadians(atan2(tangent.X, tangent.Y))`, which maps the movement tangent to FlatRedBall2's angle convention (0 = facing up, positive = CW).
+`FaceDirection = true` sets `entity.Rotation = Angle.FromRadians(atan2(tangent.Y, tangent.X))`, which maps the movement tangent to FlatRedBall2's standard math convention (0 = facing right, positive = CCW).

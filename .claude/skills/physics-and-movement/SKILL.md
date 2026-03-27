@@ -98,7 +98,7 @@ if (jumpPressed && IsOnGround)
 
 ### Rotation-based thrust (top-down ship)
 
-`Rotation.ToVector2()` returns the unit vector the entity is facing. Use it directly for thrust.
+**Angle convention:** Standard math — 0 = right (1, 0), 90° = up (0, 1), positive = counter-clockwise. `Rotation.ToVector2()` returns the unit vector the entity is facing. Use it directly for thrust.
 Set acceleration in the forward direction each frame and use `Drag` to decelerate naturally when thrust stops:
 
 ```csharp

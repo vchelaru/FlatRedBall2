@@ -83,7 +83,32 @@ cd samples/YourSample
 dotnet tool restore
 ```
 
-### 3. Ask about Gum mode (REQUIRED — do not skip)
+### 3. Add `Content/Content.mgcb` (REQUIRED — easy to forget)
+
+Without this file, `MonoGame.Content.Builder.Task` has nothing to drive the content pipeline. The build will succeed with zero errors, but `Apos.Shapes`' `buildTransitive` content (the `apos-shapes.fx` shader) won't be compiled, and the game will crash at startup with a `FileNotFoundException` for `apos-shapes.xnb`.
+
+Create `Content/Content.mgcb` in the project directory with this minimal content:
+
+```
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:bin/$(Platform)
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+
+#---------------------------------- Content ---------------------------------#
+
+```
+
+Even if the project has no custom content (no textures, fonts, or audio), this file is still required for the `buildTransitive` shader from `Apos.Shapes` to be built.
+
+### 4. Ask about Gum mode (REQUIRED — do not skip)
 
 Before writing any game code, ask the user:
 
@@ -94,14 +119,21 @@ Before writing any game code, ask the user:
 
 Then invoke the `gumcli` skill and follow its instructions for the chosen mode before writing any screen or entity code.
 
-### 4. Add `Program.cs` and `Game1.cs`
+### 5. Add `Program.cs` and `Game1.cs`
 
 ```csharp
 // Program.cs
 using var game = new YourSample.Game1();
 game.Run();
 
-// Game1.cs
+// Game1.cs — constructor must set Content.RootDirectory
+public Game1()
+{
+    _graphics = new GraphicsDeviceManager(this);
+    Content.RootDirectory = "Content";  // REQUIRED — Apos.Shapes loads its shader from here
+    FlatRedBall2.FlatRedBallService.Default.PrepareWindow<YourScreen>(_graphics);
+}
+
 protected override void Initialize()
 {
     base.Initialize();
@@ -121,7 +153,7 @@ protected override void Draw(GameTime gt)
 }
 ```
 
-### 5. Build
+### 6. Build
 
 ```
 dotnet build samples/YourSample/YourSample.csproj

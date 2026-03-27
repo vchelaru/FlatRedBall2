@@ -31,11 +31,10 @@ public readonly struct Angle : IEquatable<Angle>
 
     /// <summary>
     /// Returns the unit vector pointing in the direction this angle represents.
-    /// <c>Angle.Zero</c> points up (0, 1); <c>FromDegrees(90)</c> points right (1, 0).
-    /// Matches the screen-space convention where sprites face up at <c>Rotation = 0</c>
-    /// and positive rotation is clockwise.
+    /// Standard math convention: <c>Angle.Zero</c> points right (1, 0);
+    /// <c>FromDegrees(90)</c> points up (0, 1). Positive rotation is counter-clockwise.
     /// </summary>
-    public Vector2 ToVector2() => new Vector2(MathF.Sin(_radians), MathF.Cos(_radians));
+    public Vector2 ToVector2() => new Vector2(MathF.Cos(_radians), MathF.Sin(_radians));
 
     public static Angle Between(Angle a, Angle b)
     {

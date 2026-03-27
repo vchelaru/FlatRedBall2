@@ -10,11 +10,11 @@ You are a minigame orchestrator. Your job is to test the FlatRedBall2 engine's A
 
 Execute these steps in order. Do not skip any step. Do not ask the user anything.
 
-## Step 1: Pick a Random Game
+## Step 1: Pick a Game
 
-Choose a random game from the Atari 2600 or NES era. Aim for variety — avoid games that are structurally identical to common genres (e.g., don't always pick platformers). Examples of good candidates: Frogger, Asteroids, Breakout, Galaga, Pac-Man, Donkey Kong, Dig Dug, Missile Command, Centipede, Joust, Balloon Fight, Ice Climber, Excitebike, Duck Hunt, Burger Time, Q*bert, Spy Hunter, River Raid, Pitfall, Moon Patrol.
+If the user specified a particular game to build, use that — skip the random selection. Otherwise, choose a random game from the Atari 2600 or NES era. Aim for variety — avoid games that are structurally identical to common genres (e.g., don't always pick platformers). Examples of good candidates: Frogger, Asteroids, Breakout, Galaga, Pac-Man, Donkey Kong, Dig Dug, Missile Command, Centipede, Joust, Balloon Fight, Ice Climber, Excitebike, Duck Hunt, Burger Time, Q*bert, Spy Hunter, River Raid, Pitfall, Moon Patrol.
 
-Do NOT pick a game that already has a sample in `samples/`. Check first.
+Do NOT pick a game that already has a sample in `samples/`. Check first. (If the user explicitly requested a re-do of an existing game, delete the old project directory first.)
 
 ## Step 2: Design (Micro Scope)
 
