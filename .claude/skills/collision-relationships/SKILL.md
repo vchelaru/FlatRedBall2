@@ -1,6 +1,6 @@
 ---
 name: collision-relationships
-description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, or entity-vs-entity collision. Trigger on any collision-related question."
+description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, or wall constraints. Trigger on any collision-related question."
 ---
 
 # Collision Relationships in FlatRedBall2

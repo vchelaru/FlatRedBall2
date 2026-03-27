@@ -112,7 +112,8 @@ Skill files are loaded into a limited context window — every line costs budget
 ## Agent Workflow
 
 **Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:
-- **Game creation** → game-designer agent (then product-manager, then coder)
+- **Random / autonomous game creation** (e.g., "make a random game", "use the orchestrator") → `minigame-orchestrator` agent. It picks a game, presents a short pitch for approval, then designs and implements autonomously.
+- **User has a specific game vision** (e.g., "I want to make a game like X", "let's build a platformer") → `game-designer` agent (then product-manager, then coder)
 - **Engine feature or bug** → identify which subsystem (collision, rendering, input, etc.) to know which skill files are relevant
 - **Docs or refactor** → docs-writer or refactoring-specialist agent
 
@@ -123,7 +124,8 @@ This scoping step keeps context lean — only load the skills and files that are
 For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
 
 Available agents:
-- **game-designer** — **Invoke first** whenever the user wants to make a game (e.g., "I want to make a game like X", "let's build a platformer"). Leads a feel-first design conversation and produces a Game Design Document before any code is written.
+- **minigame-orchestrator** — Autonomous random game creation. Picks a game, presents a short pitch for user approval, then designs and implements it without further interaction. Use when the user says "make a random game", "use the orchestrator", or similar.
+- **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.
 - **coder** — Writing or modifying code and unit tests for new features or bugs
 - **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
 - **refactoring-specialist** — Refactoring and improving code structure
@@ -133,7 +135,7 @@ Available agents:
 
 Select the agent that best matches the task at hand. For tasks that span multiple concerns (e.g., implement a feature and write tests), invoke the relevant agents in sequence.
 
-**Game creation rule**: If the user says they want to make a game — even if they give a reference title or genre — always invoke the **game-designer** agent before the product-manager or coder. Do not skip straight to technical planning.
+**Game creation rule**: If the user has a specific game vision — even if they give a reference title or genre — invoke the **game-designer** agent before the product-manager or coder. If the user wants a random/autonomous game, invoke the **minigame-orchestrator** instead.
 
 ## Code Style
 
