@@ -210,6 +210,7 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 - **`Add(child)` only auto-registers to the render pipeline if `Engine` is set** — Factory sets `Engine` before `CustomInitialize`, so `Add` works correctly there.
 - **`_movement` must be initialized once, not every frame** — create input objects in `CustomInitialize`.
 - **Always use `Factory<T>`, never `new MyEntity()`** — bypassing Factory breaks `Engine.GetFactory<T>()` and collision relationships.
+- **Don't create entities for static walls/floors/ceilings** — use `TileShapeCollection` instead (see `collision-relationships` skill).
 
 ## Reference Files
 
