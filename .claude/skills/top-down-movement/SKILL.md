@@ -126,6 +126,22 @@ screen.AddCollisionRelationship(playerList, solidTiles)
       .MoveFirstOnCollision();
 ```
 
+## AI Movement (enemies, NPCs)
+
+Create a class in the project that is a settable `I2DInput` — so AI entities share the same acceleration, deceleration, and `DirectionFacing` logic as players. Set `X`/`Y` each frame before calling `Update`. Magnitudes > 1 are normalized automatically.
+
+```csharp
+private readonly DirectionalInput _aiInput = new();
+
+// in CustomInitialize:
+_topDown.MovementInput = _aiInput;
+
+// in CustomActivity, before _topDown.Update:
+var dir = Vector2.Normalize(new Vector2(_target.X - X, _target.Y - Y));
+_aiInput.X = dir.X;
+_aiInput.Y = dir.Y;
+```
+
 ## Gotchas
 
 - Diagonal input magnitudes > 1 are clamped to the unit circle — full speed in 8 directions.

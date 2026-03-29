@@ -90,6 +90,20 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// <summary>
     /// Reflects A's velocity off B using impulse physics and separates their positions.
     /// </summary>
+    /// <remarks>
+    /// Separation applied to A is scaled by mass ratio:
+    /// <code>A separation = sep * (secondMass / (firstMass + secondMass))</code>
+    ///
+    /// Common outcomes:
+    /// <list type="bullet">
+    /// <item><description><c>firstMass = 0f, secondMass = 1f</c>: A takes full separation, B stays fixed.</description></item>
+    /// <item><description><c>firstMass = 1f, secondMass = 1f</c>: separation is shared equally.</description></item>
+    /// <item><description><c>firstMass = 1f, secondMass = 0f</c>: A takes zero separation (usually not desired for wall/floor collisions).</description></item>
+    /// </list>
+    ///
+    /// Elasticity controls post-collision speed along the collision normal:
+    /// <c>1.0f</c> = perfectly elastic, <c>0f</c> = no bounce, values between 0 and 1 lose energy.
+    /// </remarks>
     /// <param name="firstMass">
     /// Mass of A. Pass <c>0f</c> when A should absorb the full separation (e.g., a ball bouncing
     /// off an immovable wall). Higher values relative to <paramref name="secondMass"/> mean A moves less.

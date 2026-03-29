@@ -132,6 +132,8 @@ bullet.VelocityX = facingDirection * 600f;
 // No AccelerationY — bullet travels in a straight line
 ```
 
+**Aiming at the cursor:** `cursor.WorldPosition` is already in world space (Y+ up) — no coordinate conversion needed. Guard `Vector2.Normalize` against a zero-length vector when the cursor is exactly on the entity.
+
 ## GameRandom — Randomized Spawning
 
 `FlatRedBallService.Random` (type `GameRandom`, a subclass of `System.Random`) provides game-friendly helpers:
