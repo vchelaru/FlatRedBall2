@@ -84,6 +84,18 @@ Run `dotnet build` on the new sample project. If it fails, fix the errors and re
 Record the path to the resulting `.exe` file. It will be at:
 `samples/auto/<ProjectName>/bin/Debug/net10.0/<ProjectName>.exe`
 
+## Step 5b: Self-Audit — Delegation Check
+
+Before writing the result file, honestly answer these questions:
+
+1. **Did you spawn a `coder` agent in Step 4?** (Yes/No)
+2. **Did the `coder` agent write all the game code?** (Yes/No)
+3. **Did you write or edit any game source files yourself** (outside of build fixes in Step 5)? (Yes/No — if Yes, list which files)
+
+If the answer to #1 or #2 is No, or #3 is Yes, you violated the pipeline. This is a **critical process failure** — the entire point of the orchestrator is to test how the *coder agent* performs with the engine's skills and docs. If you implemented the game yourself, the friction feedback is about *your* experience, not the coder's, which defeats the purpose of the evaluation.
+
+Record your answers — they go in the result file.
+
 ## Step 6: Write Result File
 
 Create a result file at `samples/auto/eval-results/<game-name>.md` with this exact structure:
@@ -99,6 +111,12 @@ Create a result file at `samples/auto/eval-results/<game-name>.md` with this exa
 
 ## How to Play
 <1-2 sentences: what keys to press, what the goal is>
+
+## Delegation Audit
+- Spawned coder agent: <Yes/No>
+- Coder agent wrote all game code: <Yes/No>
+- Orchestrator edited game source files (outside build fixes): <Yes/No — list files if Yes>
+- **Verdict:** <PASS or FAIL — FAIL if coder was not used or orchestrator wrote game code>
 
 ## Feedback
 <Friction points from implementation — things that were confusing, required excessive context, had unclear APIs, missing/misleading docs, or missing skill coverage. If everything went smoothly, just write "No concerns.">
