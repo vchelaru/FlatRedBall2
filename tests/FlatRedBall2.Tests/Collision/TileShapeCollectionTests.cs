@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using FlatRedBall2.Collision;
 using Shouldly;
@@ -117,6 +118,25 @@ public class TileShapeCollectionTests
         tiles.GetTileAtCell(0, 0)!.RepositionDirections.ShouldBe(RepositionDirections.All);
     }
 
+    // ── Clear ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Clear_RemovesAllTiles_AllowsGridPropertyChanges()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddPolygonTileAtCell(1, 0, SquarePrototype());
+
+        tiles.Clear();
+
+        tiles.GetTileAtCell(0, 0).ShouldBeNull();
+        tiles.GetPolygonTileAtCell(1, 0).ShouldBeNull();
+        // Should not throw after Clear
+        tiles.GridSize = 32f;
+        tiles.X = 10f;
+        tiles.Y = 20f;
+    }
+
     // ── CollidesWith ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -207,6 +227,53 @@ public class TileShapeCollectionTests
         var sep = tiles.GetSeparationFor(rect);
         // Should push up by exactly 2, not 4 (double-counted from two tiles)
         sep.Y.ShouldBe(expectedSep, tolerance: 0.001f);
+    }
+
+    // ── GridSize — throws after tiles added ─────────────────────────────────────
+
+    [Fact]
+    public void GridSize_SetAfterTilesAdded_Throws()
+    {
+        var tiles = new TileShapeCollection();
+        tiles.AddTileAtCell(0, 0);
+
+        Should.Throw<InvalidOperationException>(() => tiles.GridSize = 32f);
+    }
+
+    // ── X / Y — shifts existing tiles ────────────────────────────────────────────
+
+    [Fact]
+    public void X_SetAfterTilesAdded_ShiftsTiles()
+    {
+        // Cell (0,0) with GridSize=16: tile center starts at (8, 8)
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        tiles.X = 100f;
+
+        tiles.GetTileAtCell(0, 0)!.X.ShouldBe(108f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void Y_SetAfterTilesAdded_ShiftsTiles()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        tiles.Y = 50f;
+
+        tiles.GetTileAtCell(0, 0)!.Y.ShouldBe(58f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void X_SetAfterTilesAdded_ShiftsPolygonTiles()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
+
+        tiles.X = 100f;
+
+        tiles.GetPolygonTileAtCell(0, 0)!.X.ShouldBe(108f, tolerance: 0.001f);
     }
 
     // ── AddPolygonTileAtCell ──────────────────────────────────────────────────

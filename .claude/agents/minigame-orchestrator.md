@@ -100,10 +100,58 @@ Create a result file at `samples/auto/eval-results/<game-name>.md` with this exa
 
 # Feedback Guidelines
 
-The feedback section is the most important output. Be honest and specific:
+The feedback section is the most important output. Be honest and specific.
 
-- **Report friction, not success.** Don't list things that went well.
-- **Be specific.** "The collision API was confusing" is useless. "I expected `AddCollisionRelationship` to return the relationship object for chaining, but it returns void — I had to call it separately then configure via the entity" is useful.
-- **Distinguish categories:** prefix each item with `[API]`, `[Docs]`, or `[Skill]` so the reader knows where to act.
-- **If no friction:** just write "No concerns." Don't pad with praise.
+## Validation — Apply Before Reporting Each Item
+
+Before writing any feedback item, run this checklist. If an item fails validation, **drop it**.
+
+1. **Did you actually get stuck?** If you found the answer (via XML docs, source, or skill) and used it correctly, the system worked. "I wish it was more prominent" is not friction — discovering an API by reading the class you were already using is the intended workflow.
+2. **Re-read the XML docs.** Open the source file for the type in question and check whether the XML doc comments already explain the thing you're about to report. If they do, drop the item.
+3. **Is the method/property name self-explanatory?** If you found `Color` on a shape type and it does what `Color` obviously means, that's not a gap — that's discoverability working as intended.
+4. **Is this about a single member on a class you were already reading?** XML docs handle individual property/method documentation. Skills handle cross-cutting workflows and routing. Don't report "skill doesn't mention property X" when X is documented on the class you were already working with.
+
+## What IS Worth Reporting
+
+- **Couldn't find the right class at all** — no skill routed you there, name wasn't guessable → `[Skill]` gap (routing)
+- **Multi-class workflow was unclear** — needed to coordinate 3+ types and the sequence wasn't documented anywhere → `[Skill]` gap (workflow)
+- **Silent failure / wrong behavior** — API accepted bad input without error, produced wrong results → `[API]` issue
+- **XML docs were wrong or misleading** — doc said X, actual behavior was Y → `[Docs]` issue
+- **Skill was inaccurate or contradicted another skill** — inconsistent guidance → `[Skill]` issue
+- **Guardrail missing** — you went down a completely wrong path that a "use X, not Y" note would have prevented → `[Skill]` gap (guardrail)
+- **Non-obvious member that you couldn't guess existed** — something like `RepositionDirections` or `Raycast` on a tile collection, where the name or concept isn't predictable from the class → `[Skill]` gap (worth a brief mention in the skill to save future agents from reading the file)
+
+## What Belongs Where (Do Not Suggest the Wrong Fix)
+
+| Content type | Where it belongs | Why |
+|---|---|---|
+| Routing — "for task X, use class Y" | Skill | Prevents searching the codebase |
+| Cross-cutting workflows (3+ classes) | Skill | Prevents reading multiple files to piece together a sequence |
+| Guardrails — "use X, not Y" | Skill | Prevents going down wrong paths entirely |
+| Non-obvious members the agent wouldn't guess exist | Skill (brief mention) | Saves a file read when the agent only needs that one thing |
+| What a single property/method does | XML docs only | Agent sees it when reading the class — zero additional cost |
+| Parameters, defaults, return values | XML docs only | Same reason |
+| Obvious members on a class the agent is already reading | Neither — already discoverable | `Color` on a shape class needs no extra documentation |
+
+## Missing XML Docs
+
+If you encounter a public member with **no XML doc comment at all** (or one that is misleading/incomplete), report it as `[Docs]` with high confidence. This is distinct from "the skill doesn't mention it" — missing XML docs means the primary documentation layer has a gap. Include the type name, member name, and what the doc should say.
+
+## Confidence Level
+
+Every feedback item must include a confidence rating from 1 to 3:
+
+- **1** — Low. Might be friction, might be normal work. Worth reviewing but could be noise.
+- **2** — Medium. Genuinely slowed me down, but reasonable people could disagree on the fix.
+- **3** — High. Clear gap — wrong docs, silent failure, or completely missing guidance that caused a wrong path.
+
+## Format
+
+Each feedback item should be formatted as: `- [Category] (Confidence N) Description`
+
+Example: `- [API] (Confidence 3) TileShapeCollection silently accepts tiles before GridSize is set — positions are wrong with no error.`
+
+- **Be specific.** "The collision API was confusing" is useless. "I expected `AddCollisionRelationship` to return the relationship object for chaining, but it returns void" is useful.
+- **Prefix each item** with `[API]`, `[Docs]`, or `[Skill]` so the reader knows where to act.
 - **Normal work is not friction.** Writing a state machine, calculating positions, implementing game logic — that's expected. Only report things the engine made unexpectedly hard or where guidance was wrong/missing.
+- **If no friction after validation:** just write "No concerns." Don't pad with praise.
