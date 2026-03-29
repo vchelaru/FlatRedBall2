@@ -41,6 +41,13 @@ Each frame runs in this order:
 
 ```csharp
 // Game1.cs
+public Game1()
+{
+    _graphics = new GraphicsDeviceManager(this);
+    Content.RootDirectory = "Content";
+    FlatRedBallService.Default.PrepareWindow<GameplayScreen>(_graphics);
+}
+
 protected override void Initialize()
 {
     base.Initialize();

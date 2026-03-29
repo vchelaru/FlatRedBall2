@@ -12,9 +12,9 @@ namespace FlatRedBall2.Collision;
 /// the cells overlapping the querying shape rather than all tiles.
 /// </summary>
 /// <remarks>
-/// Set <see cref="X"/>, <see cref="Y"/>, and <see cref="GridSize"/> before adding tiles —
-/// tile positions are computed from these values at insertion time and are not updated if
-/// the properties change afterwards.
+/// <see cref="X"/> and <see cref="Y"/> can be changed at any time — existing tiles shift
+/// automatically. <see cref="GridSize"/> must be set before adding tiles; call
+/// <see cref="Clear"/> first if you need to change it after tiles have been added.
 /// </remarks>
 public class TileShapeCollection : ICollidable
 {
@@ -22,20 +22,55 @@ public class TileShapeCollection : ICollidable
     private readonly Dictionary<(int col, int row), Polygon> _polyTiles = new();
 
     /// <summary>
-    /// World X of the left edge of cell (0, 0). Set before adding tiles.
+    /// World X of the left edge of cell (0, 0). Can be changed at any time —
+    /// existing tiles shift automatically to match the new origin.
     /// </summary>
-    public float X { get; set; }
+    public float X
+    {
+        get => _x;
+        set
+        {
+            float delta = value - _x;
+            _x = value;
+            if (delta != 0f)
+                ShiftAllTiles(delta, 0f);
+        }
+    }
 
     /// <summary>
-    /// World Y of the bottom edge of cell (0, 0). Set before adding tiles.
+    /// World Y of the bottom edge of cell (0, 0). Can be changed at any time —
+    /// existing tiles shift automatically to match the new origin.
     /// </summary>
-    public float Y { get; set; }
+    public float Y
+    {
+        get => _y;
+        set
+        {
+            float delta = value - _y;
+            _y = value;
+            if (delta != 0f)
+                ShiftAllTiles(0f, delta);
+        }
+    }
 
     /// <summary>
     /// Width and height of each tile in world units. Defaults to 16, which is the standard tile size
-    /// for FlatRedBall2 games. Set before adding tiles.
+    /// for FlatRedBall2 games. Must be set before adding tiles.
     /// </summary>
-    public float GridSize { get; set; } = 16f;
+    /// <exception cref="InvalidOperationException">Thrown if tiles have already been added. Call <see cref="Clear"/> first, change the value, then re-add tiles.</exception>
+    public float GridSize
+    {
+        get => _gridSize;
+        set
+        {
+            ThrowIfTilesExist();
+            _gridSize = value;
+        }
+    }
+
+    private float _x;
+    private float _y;
+    private float _gridSize = 16f;
 
     private bool _isVisible;
     private XnaColor _color = new XnaColor(255, 255, 255, 128);
@@ -129,6 +164,20 @@ public class TileShapeCollection : ICollidable
             foreach (var poly in _polyTiles.Values)
                 poly.OutlineThickness = value;
         }
+    }
+
+    /// <summary>
+    /// Removes all tiles (rectangles and polygons) from this collection.
+    /// After clearing, <see cref="X"/>, <see cref="Y"/>, and <see cref="GridSize"/> can be changed again.
+    /// </summary>
+    public void Clear()
+    {
+        foreach (var tile in _tiles.Values)
+            _onTileRemoved?.Invoke(tile);
+        foreach (var poly in _polyTiles.Values)
+            _onTileRemoved?.Invoke(poly);
+        _tiles.Clear();
+        _polyTiles.Clear();
     }
 
     /// <summary>
@@ -419,4 +468,25 @@ public class TileShapeCollection : ICollidable
     public void ApplySeparationOffset(Vector2 offset) { }
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+
+    private void ShiftAllTiles(float dx, float dy)
+    {
+        foreach (var tile in _tiles.Values)
+        {
+            tile.X += dx;
+            tile.Y += dy;
+        }
+        foreach (var poly in _polyTiles.Values)
+        {
+            poly.X += dx;
+            poly.Y += dy;
+        }
+    }
+
+    private void ThrowIfTilesExist()
+    {
+        if (_tiles.Count > 0 || _polyTiles.Count > 0)
+            throw new InvalidOperationException(
+                "Cannot change GridSize after tiles have been added. Call Clear() first, change the value, then re-add tiles.");
+    }
 }
