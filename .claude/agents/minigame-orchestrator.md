@@ -25,7 +25,7 @@ Write a brief design — this is a micro-scope evaluation, not a full game:
 
 Micro scope means: pick only 1-2 core mechanics. For Frogger, that might be "grid-based movement across lanes of hazards." For Asteroids, "thrust-based ship movement and shooting rocks that split." Strip away everything that isn't the core loop.
 
-No art, no music, no sound. Shapes only. Polish the mechanics, not the presentation.
+No music, no sound. Polish the mechanics, not the presentation.
 
 **Present the brief design to the user and wait for approval before proceeding.** If the user wants changes, revise and re-present. Only continue to Step 3 after the user confirms.
 
@@ -54,22 +54,28 @@ The GDD should follow this structure (keep it concise — this is micro scope):
 <what is explicitly OUT of scope for this micro evaluation>
 ```
 
-## Step 4: Implement
+## Step 4: Delegate to Coder Agent
 
-Now implement the game as a new sample project under `samples/auto/`. Follow these rules strictly:
+**Do not implement the game yourself.** Use the Agent tool to spawn a `coder` agent with the following prompt (fill in the blanks from your design):
 
-1. **Load the `engine-overview` skill first** — read it before writing any code.
-2. **Load the `sample-project-setup` skill** — follow its checklist exactly.
-3. **Load skills for every subsystem you'll use** — entities, collision, shapes, input, physics, screens, timing, etc. Decompose the task and load ALL relevant skills before writing code.
-4. **Read `.claude/code-style.md`** before writing any code.
-5. **Do NOT read existing samples, unit tests, or any code outside `src/` and your own project.** The goal is to simulate an end user working with the engine as if installed via NuGet — your only resources are the engine source, XML docs, and skill files.
-6. **For the Gum question in sample-project-setup step 3**: Use Gum (code-only mode) for any UI — score, health bar, lives display, etc. — to keep text rendering on-screen rather than in the window title.
-7. Name the sample project `AutoEval<GameName>Sample` (e.g., `AutoEvalFroggerSample`).
-8. The `.csproj` must reference the engine directly via `ProjectReference`:
-   ```xml
-   <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
-   ```
-   Note the extra `..` — projects live one level deeper at `samples/auto/<ProjectName>/`.
+```
+Implement the game described in samples/auto/<ProjectName>/design.md as a new FlatRedBall2 sample project.
+
+Project setup:
+- Project directory: samples/auto/<ProjectName>/
+- Project name: AutoEval<GameName>Sample
+- The .csproj must reference the engine via ProjectReference:
+  <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
+- Create a .slnx solution file that includes both the sample and engine projects.
+- Do NOT read existing samples, unit tests, or any code outside src/ and your own project. Simulate an end user with only the engine source, XML docs, and skill files.
+
+Content mode decisions (do not ask — use these):
+- Gum: Code-only mode for any UI (score, health bar, lives display, etc.)
+- Tiled: Use .tmx files — copy the template from .claude/templates/Tiled/
+- Animations: Use .achx files — copy the template from .claude/templates/AnimationChains/. Use template animations where an appropriate chain exists (e.g., character walk/jump, coin, enemy). For entities with no matching animation in the template, shapes are fine.
+```
+
+Wait for the coder agent to complete before proceeding.
 
 ## Step 5: Build
 

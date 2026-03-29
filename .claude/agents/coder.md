@@ -22,6 +22,20 @@ In either case, your job is to produce a focused code change that implements the
 4. Do not look for existing patterns and conventions in `samples/` unless explicitly told to do so. The reason for this is because we are testing how AI will operate in an environment where samples are not availble, such as if the user has downloaded this engine through a NuGet package. Therefore we want the agent to behave as if no samples are available.
 5. Search for all usages of any symbol you plan to change.
 
+## Content Mode Decision (New Game Projects Only)
+
+When starting a new game project, decide the **content mode** for each of these systems before writing any code:
+
+| System | Code-Only | File-Based |
+|---|---|---|
+| **UI (Gum)** | Build layouts in C# with Gum Forms | Use `.gumx` project with screen/component XML files |
+| **Levels (Tiled)** | Build collision and layout in C# with shapes | Use `.tmx` files from the template in `.claude/templates/Tiled/` |
+| **Animations** | Build `AnimationChain`/`AnimationChainList` in C# | Use `.achx` files from the template in `.claude/templates/AnimationChains/` |
+
+**If the caller (e.g., orchestrator, product-manager, or user) specifies a content mode, use it.** If not specified, ask the user before proceeding — don't guess. The choice affects project setup (`.csproj` content includes, file copies) and how skills are loaded.
+
+For shapes-only games (no sprite art), animations are not needed at all — neither code-only nor file-based.
+
 # After editing
 
 Write unit tests for new features and bug fixes unless the change is trivial or untestable. Follow the test guidelines in `.claude/code-style.md`. The user will build and run tests themselves — do not run them via Bash.

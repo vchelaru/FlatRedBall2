@@ -154,5 +154,5 @@ var tex = Engine.Content.Load<Texture2D>("mysprite");  // no extension
 - **`IsVisible` defaults differ** — Sprite defaults to `true`; shapes default to `false`. Forgetting `IsVisible = true` on a shape is a common source of invisible objects.
 - **`TextureScale` wins over explicit `Width`/`Height`** — If you set `Width` and it doesn't take effect, check that `TextureScale` is `null`.
 - **Content not found at runtime** — Verify the asset name matches the `.mgcb` entry (case-sensitive on Linux), and that `Content.RootDirectory = "Content"` is set in `Game1`.
-- **ACHX animations are stubbed** — `Sprite.PlayAnimation` is a no-op. Animation is not yet implemented.
+- **For sprite animation**, see the `animation` skill — `Sprite.PlayAnimation`, `AnimationChainListSave`, and `.achx` loading are fully implemented.
 - **Each screen gets its own ContentManager** — assets are unloaded when the screen transitions. Re-load textures in each screen's `CustomInitialize` if needed.
