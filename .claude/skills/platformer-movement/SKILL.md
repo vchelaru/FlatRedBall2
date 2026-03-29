@@ -111,6 +111,25 @@ if (jumpJustPressed && !_platformer.IsOnGround && !_platformer.IsApplyingJump &&
 
 The `!_platformer.IsApplyingJump` guard prevents the air jump from triggering during the sustain phase of the first jump — the player must reach the peak before double-jumping.
 
+## Entity Origin and Shape Offset
+
+In platformers, an entity's Y position represents **the feet** (the bottom of the character). This means collision shapes and sprites must be offset upward so their bottom edge aligns with Y=0 on the entity:
+
+```csharp
+// For a 12×28 collision box, offset Y by half the height so the bottom sits at the entity's feet
+var collisionBox = new AxisAlignedRectangle
+{
+    Width = 12,
+    Height = 28,
+    Y = 14,  // Height / 2 — centers the box above the entity origin
+};
+Add(collisionBox);
+```
+
+The same applies to sprites — the `.achx` template uses `<RelativeY>16</RelativeY>` on a 32-pixel-tall character for exactly this reason (16 = half of 32).
+
+**If you skip this offset**, the character's feet will not align with the ground.
+
 ## Collision Setup
 
 Use `BounceOnCollision` with `elasticity: 0f` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapeCollection` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):

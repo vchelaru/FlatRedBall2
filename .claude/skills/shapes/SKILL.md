@@ -74,7 +74,7 @@ For shapes added directly to the screen (not via `entity.Add`), also call `Remov
 
 - **Shape is invisible** — forgot `IsVisible = true`. Default is `false`.
 - **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
-- **Shape position looks wrong** — Y+ is up (see `physics-and-movement`).
+- **Shape position looks wrong** — Y+ is up (see `physics-and-movement`). In platformers, entity origin = feet, so offset shapes upward by `Height/2` (see `platformer-movement` skill).
 - **Polygon not rotating** — use `Polygon`, not `AxisAlignedRectangle`.
 
 ## TileShapeCollection
