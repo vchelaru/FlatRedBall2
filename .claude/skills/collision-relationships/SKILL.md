@@ -1,6 +1,6 @@
 ---
 name: collision-relationships
-description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, or static geometry. Trigger on any collision-related question."
+description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, static geometry, sensor shapes, awareness radius, or trigger zones. Trigger on any collision-related question."
 ---
 
 # Collision Relationships in FlatRedBall2
@@ -100,23 +100,43 @@ AddCollisionRelationship(_playerFactory, tiles)
 
 **Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
 
+## Sensor Shapes (Awareness, Trigger Zones)
+
+For non-physical overlap detection — e.g., enemy awareness radius, pickup range, trigger zones — add an extra shape child and target it with `WithFirstShape`.
+
+Assume the entity already exposes `Body` (physical collider) and `Sensor` (larger trigger collider).
+
+```csharp
+AddCollisionRelationship(_enemies, solidTiles)
+    .WithFirstShape(e => e.Body)
+    .MoveFirstOnCollision();
+
+AddCollisionRelationship<Enemy, Player>(_enemies, _playerFactory)
+    .WithFirstShape(e => e.Sensor)
+    .CollisionOccurred += (enemy, player) => enemy.Alert(player);
+```
+
+Direct `Vector2.Distance` checks are fine for simple one-off tests, but prefer sensor shapes when you want `CollisionOccurred` events, debug-shape visibility, or consistent integration with the collision pass.
+
 ## Common Pitfalls
 
 - **Both sides move when only one should** — Use `.MoveFirstOnCollision()` for solid terrain.
 - **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children.
+- **Type argument mismatch on overloads** — `AddCollisionRelationship<Enemy>(_enemies, _players)` is not the 2-list overload. Use two type args for entity-vs-entity (`<Enemy, Player>`), one type arg only for self-collision, and no explicit type args for `TileShapeCollection`.
 - **Player tunnels through thin walls** — Discrete collision detection; keep velocities reasonable.
 - **Don't use a `DiedThisFrame` flag** — The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
+- **Platformer gotcha**: swapping masses on BounceOnCollision can make the player phase through the floor.
 
-## BounceOnCollision — Mass Semantics
+## BounceOnCollision — Practical Defaults
 
 ```csharp
-BounceOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
+BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f)
 ```
-
 - **`firstMass = 0f`** — A is fully displaced; B stays fixed. Use for ball vs. immovable walls.
 - **`secondMass = 0f`** — B is fully displaced; A stays fixed. Rarely used.
-- **`elasticity = 1.0f`** — perfectly elastic. `0.9f` = 10% energy loss per bounce.
+- **`elasticity = 1.0f`** — perfectly elastic. `0.9f` = 10% energy loss per bounce. `0f` = no bounce
 
+>  **Wall/floor collisions**: keep `firstMass: 0f, secondMass: 1f` so the moving entity is separated from static geometry.
 > **Note:** `BounceOnCollision` only adjusts A's velocity. B is unchanged when `firstMass == 0f`.
 
 ## Shape Dispatch

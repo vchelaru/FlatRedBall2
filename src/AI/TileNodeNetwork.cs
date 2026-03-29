@@ -142,6 +142,10 @@ public class TileNodeNetwork
     /// Removes all nodes whose tile cell overlaps the rectangle. The check is cell-based, so a node
     /// may be removed even if its center is not strictly inside the rectangle.
     /// </summary>
+    /// <remarks>
+    /// Uses <see cref="AxisAlignedRectangle.AbsoluteX"/> and <see cref="AxisAlignedRectangle.AbsoluteY"/>,
+    /// so the rectangle's world position is resolved correctly even when it is offset from its parent entity's origin.
+    /// </remarks>
     public void RemoveNodesOverlapping(AxisAlignedRectangle rectangle)
     {
         float left   = rectangle.AbsoluteX - rectangle.Width  / 2f;

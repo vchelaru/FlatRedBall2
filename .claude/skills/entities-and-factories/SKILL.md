@@ -211,6 +211,7 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 - **`_movement` must be initialized once, not every frame** — create input objects in `CustomInitialize`.
 - **Always use `Factory<T>`, never `new MyEntity()`** — bypassing Factory breaks `Engine.GetFactory<T>()` and collision relationships.
 - **Don't create entities for static walls/floors/ceilings** — use `TileShapeCollection` instead (see `collision-relationships` skill).
+- **Fields are invalid after `Destroy()`** — `Destroy()` removes the entity immediately. Don't read health or other fields on an entity you just destroyed; use `factory.Instances.Count == 0` to detect when all enemies are gone.
 
 ## Reference Files
 

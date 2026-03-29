@@ -193,6 +193,19 @@ public class Screen
         => Engine.RequestScreenChange(configure);
 
     // Collision relationship overloads
+    /// <summary>
+    /// Registers a collision relationship between two different collidable groups.
+    /// Each entity in <paramref name="listA"/> is tested against each entity in <paramref name="listB"/> each frame.
+    /// </summary>
+    /// <remarks>
+    /// Quick overload guide:
+    /// <para>- Two groups: <c>AddCollisionRelationship&lt;A, B&gt;(listA, listB)</c></para>
+    /// <para>- Self-collision: <c>AddCollisionRelationship&lt;A&gt;(list)</c></para>
+    /// <para>- Tiles: <c>AddCollisionRelationship(entities, tiles)</c> (no explicit type args)</para>
+    /// Common mistake: <c>AddCollisionRelationship&lt;Enemy&gt;(_enemies, _players)</c>.
+    /// With one type argument, the compiler chooses the self-collision overload,
+    /// so the second argument is invalid for that method.
+    /// </remarks>
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
         IEnumerable<A> listA, IEnumerable<B> listB)
         where A : ICollidable

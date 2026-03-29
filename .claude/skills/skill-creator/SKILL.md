@@ -117,6 +117,8 @@ This goes without saying, but skills must not contain malware, exploit code, or 
 
 Code blocks are expensive — they consume context tokens every time the skill loads. Only include a code block if an agent would produce **wrong code** without it. If the code is standard usage that's clear from the API signatures and names, describe it in a sentence instead.
 
+Before adding any code block, write one sentence (in your own working notes or draft) answering: **"What recurring mistake does this snippet prevent?"** If you can't answer that clearly, remove the block.
+
 **Worth the tokens:**
 - "Wrong vs right" contrasts that prevent a recurring mistake (e.g., showing a broken pattern alongside the correct one)
 - Patterns where the API is non-obvious, has a surprising order of operations, or contradicts common conventions
@@ -128,6 +130,18 @@ Code blocks are expensive — they consume context tokens every time the skill l
 - The same pattern repeated across multiple skills — put it in one skill and reference it
 
 **Rule of thumb:** If the example is showing "how to write C#" rather than "how this engine behaves unexpectedly," cut it.
+
+**Hard limits for C# snippets (default):**
+- Keep each `csharp` code block to **8 lines max**.
+- If a snippet must be longer, include this marker on the line immediately before the block:
+  `<!-- skill-creator: allow-long-csharp reason="non-obvious engine behavior" -->`
+- Long snippets without that marker are considered validation failures.
+
+**Pre-save snippet checklist (run every time):**
+- Does this snippet teach engine behavior or just language syntax?
+- Can 30-70% of lines be deleted without losing the key idea?
+- Are we repeating a pattern already documented in another skill?
+- If >8 lines, is there an explicit exception marker with a reason?
 
 #### Writing Patterns
 
