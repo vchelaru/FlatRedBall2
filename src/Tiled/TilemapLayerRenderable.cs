@@ -48,7 +48,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
 
     // IRenderable
     public float Z { get; set; }
-    public Layer Layer { get; set; } = null!;
+    public Layer? Layer { get; set; }
     public IRenderBatch Batch { get; set; } = TiledRenderBatch.Instance;
     public string? Name { get; set; }
 

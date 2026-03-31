@@ -50,10 +50,38 @@ public class Screen
     /// </summary>
     public Rendering.SortMode SortMode { get; set; } = Rendering.SortMode.Z;
 
+    private Layer? _layer;
+
+    /// <summary>
+    /// Default rendering layer for this screen. Setting this propagates to all existing
+    /// entities, renderables, and Gum elements. New objects added after this is set
+    /// inherit the layer automatically.
+    /// </summary>
+    public Layer? Layer
+    {
+        get => _layer;
+        set
+        {
+            _layer = value;
+            foreach (var entity in _entities)
+                entity.Layer = value;
+            foreach (var renderable in _renderList)
+                renderable.Layer = value;
+            foreach (var gum in _gumRenderables)
+                gum.Layer = value;
+        }
+    }
+
     private readonly List<IRenderable> _renderList = new();
     public IReadOnlyList<IRenderable> RenderList => _renderList;
 
-    public void Add(IRenderable renderable) => _renderList.Add(renderable);
+    public void Add(IRenderable renderable, Layer? layer = null)
+    {
+        if (layer != null || Layer != null)
+            renderable.Layer = layer ?? Layer;
+        _renderList.Add(renderable);
+    }
+
     public void Remove(IRenderable renderable) => _renderList.Remove(renderable);
 
     /// <summary>
@@ -64,8 +92,10 @@ public class Screen
     /// <see cref="Collision.TileShapeCollection.RemovePolygonTileAtCell"/>
     /// calls so newly added or removed tiles stay in sync automatically.
     /// </summary>
-    public void Add(Collision.TileShapeCollection tiles)
+    public void Add(Collision.TileShapeCollection tiles, Layer? layer = null)
     {
+        if (layer != null || Layer != null)
+            tiles.Layer = layer ?? Layer;
         foreach (var rect in tiles.AllTiles)
             _renderList.Add(rect);
         tiles._onTileAdded += _renderList.Add;
@@ -96,37 +126,35 @@ public class Screen
     /// <summary>
     /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.
     /// </summary>
-    /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
-    public void Add(FrameworkElement element, float z = 0f)
-        => AddGumVisual(element.Visual, z);
+    public void Add(FrameworkElement element, Layer? layer = null)
+        => AddGumVisual(element.Visual, layer ?? Layer);
 
     /// <summary>
     /// Adds a Gum visual element to this screen. Registered for rendering and input updates.
-    /// Prefer <see cref="Add(FrameworkElement, float)"/> when a Forms control is available.
+    /// Prefer <see cref="Add(FrameworkElement, Layer?)"/> when a Forms control is available.
     /// </summary>
-    /// <param name="z">Draw order relative to other Gum elements and world objects on the same Layer.</param>
-    public void Add(GraphicalUiElement visual, float z = 0f)
-        => AddGumVisual(visual, z);
+    public void Add(GraphicalUiElement visual, Layer? layer = null)
+        => AddGumVisual(visual, layer ?? Layer);
 
-    /// <summary>Removes a Gum element previously added with <see cref="Add(FrameworkElement, float)"/>.</summary>
+    /// <summary>Removes a Gum element previously added with <see cref="Add(FrameworkElement, Layer?)"/>.</summary>
     public void Remove(FrameworkElement element)
         => RemoveGumVisual(element.Visual);
 
-    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, float)"/>.</summary>
+    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
     public void Remove(GraphicalUiElement visual)
         => RemoveGumVisual(visual);
 
-    internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, float z)
+    internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, Layer? layer)
     {
-        var renderable = new GumRenderable(visual) { Z = z, Parent = worldParent };
+        var renderable = new GumRenderable(visual) { Parent = worldParent, Layer = layer };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
         _renderList.Add(renderable);
     }
 
-    private void AddGumVisual(GraphicalUiElement visual, float z)
+    private void AddGumVisual(GraphicalUiElement visual, Layer? layer)
     {
-        var renderable = new GumRenderable(visual) { Z = z };
+        var renderable = new GumRenderable(visual) { Layer = layer };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
         _renderList.Add(renderable);
@@ -145,7 +173,7 @@ public class Screen
     /// <summary>Gum visuals that need per-frame input updates. Used by FlatRedBallService.</summary>
     internal IReadOnlyList<GumRenderable> GumRenderables => _gumRenderables;
 
-    internal void SetGumRenderableLayer(GraphicalUiElement visual, Layer layer)
+    internal void SetGumRenderableLayer(GraphicalUiElement visual, Layer? layer)
     {
         if (_gumByVisual.TryGetValue(visual, out var renderable))
             renderable.Layer = layer;
@@ -353,8 +381,6 @@ public class Screen
     {
         int layerA = a.Layer != null ? Layers.IndexOf(a.Layer) : -1;
         int layerB = b.Layer != null ? Layers.IndexOf(b.Layer) : -1;
-        if (layerA == -1) layerA = int.MaxValue;
-        if (layerB == -1) layerB = int.MaxValue;
         if (layerA != layerB) return layerA.CompareTo(layerB);
 
         int zCmp = a.Z.CompareTo(b.Z);

@@ -92,6 +92,8 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
             _instances.Remove(entity);
             _screen.RemoveEntity(entity);
         };
+        if (_screen.Layer != null)
+            entity.Layer = _screen.Layer;
         entity.CustomInitialize();
         return entity;
     }

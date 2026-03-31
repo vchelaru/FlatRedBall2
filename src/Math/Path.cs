@@ -82,7 +82,7 @@ public class Path : IRenderable
     /// <inheritdoc/>
     public float Z { get; set; }
     /// <inheritdoc/>
-    public Layer Layer { get; set; } = null!;
+    public Layer? Layer { get; set; }
     /// <inheritdoc/>
     public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     /// <inheritdoc/>

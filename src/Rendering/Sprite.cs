@@ -38,7 +38,7 @@ public class Sprite : IRenderable, IAttachable
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;
 
     // IRenderable
-    public Layer Layer { get; set; } = null!;
+    public Layer? Layer { get; set; }
     public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
     public string? Name { get; set; }
 

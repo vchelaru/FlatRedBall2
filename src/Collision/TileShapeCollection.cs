@@ -72,6 +72,7 @@ public class TileShapeCollection : ICollidable
     private float _y;
     private float _gridSize = 16f;
 
+    private Layer? _layer;
     private bool _isVisible;
     private XnaColor _color = new XnaColor(255, 255, 255, 128);
     private bool _isFilled = false;
@@ -91,6 +92,23 @@ public class TileShapeCollection : ICollidable
         {
             foreach (var r in _tiles.Values) yield return r;
             foreach (var p in _polyTiles.Values) yield return p;
+        }
+    }
+
+    /// <summary>
+    /// Rendering layer for all tiles. Setting this propagates to all existing tiles.
+    /// Tiles added after this is set inherit the current layer automatically.
+    /// </summary>
+    public Layer? Layer
+    {
+        get => _layer;
+        set
+        {
+            _layer = value;
+            foreach (var tile in _tiles.Values)
+                tile.Layer = value;
+            foreach (var poly in _polyTiles.Values)
+                poly.Layer = value;
         }
     }
 
@@ -194,6 +212,7 @@ public class TileShapeCollection : ICollidable
             Height = GridSize,
             X = X + col * GridSize + GridSize / 2f,
             Y = Y + row * GridSize + GridSize / 2f,
+            Layer = _layer,
             IsVisible = _isVisible,
             Color = _color,
             IsFilled = _isFilled,
@@ -278,6 +297,7 @@ public class TileShapeCollection : ICollidable
         var poly = Polygon.FromPoints(prototype.Points);
         poly.X = X + col * GridSize + GridSize / 2f;
         poly.Y = Y + row * GridSize + GridSize / 2f;
+        poly.Layer = _layer;
         poly.IsVisible = _isVisible;
         poly.Color = _color;
         poly.IsFilled = _isFilled;

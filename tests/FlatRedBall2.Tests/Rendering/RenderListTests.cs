@@ -15,7 +15,7 @@ public class RenderListTests
     private class StubRenderable : IRenderable
     {
         public float Z { get; set; }
-        public Layer Layer { get; set; } = null!;
+        public Layer? Layer { get; set; }
         public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
         public string? Name { get; set; }
         public void Draw(SpriteBatch spriteBatch, Camera camera) { }
@@ -24,7 +24,7 @@ public class RenderListTests
     private class StubAttachable : IRenderable, IAttachable
     {
         public float Z { get; set; }
-        public Layer Layer { get; set; } = null!;
+        public Layer? Layer { get; set; }
         public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
         public string? Name { get; set; }
         public void Draw(SpriteBatch spriteBatch, Camera camera) { }
@@ -121,7 +121,7 @@ public class RenderListTests
     }
 
     [Fact]
-    public void MoveToLayer_UpdatesLayerOnRenderableChildren()
+    public void Layer_UpdatesLayerOnRenderableChildren()
     {
         var screen = new TestScreen();
         var layer1 = new Layer("Background");
@@ -133,13 +133,13 @@ public class RenderListTests
         var rect = new AxisAlignedRectangle { Layer = layer1 };
         entity.Add(rect);
 
-        entity.MoveToLayer(layer2);
+        entity.Layer = layer2;
 
         rect.Layer.ShouldBe(layer2);
     }
 
     [Fact]
-    public void MoveToLayer_RecursivelyUpdatesChildEntityRenderables()
+    public void Layer_RecursivelyUpdatesChildEntityRenderables()
     {
         var screen = new TestScreen();
         var layer1 = new Layer("Background");
@@ -153,7 +153,7 @@ public class RenderListTests
         child.Add(rect);
         parent.Add(child);
 
-        parent.MoveToLayer(layer2);
+        parent.Layer = layer2;
 
         rect.Layer.ShouldBe(layer2);
     }
@@ -176,5 +176,48 @@ public class RenderListTests
         screen.RenderList[0].Name.ShouldBe("first");
         screen.RenderList[1].Name.ShouldBe("second");
         screen.RenderList[2].Name.ShouldBe("third");
+    }
+
+    [Fact]
+    public void SortRenderList_LayeredItems_DrawOnTopOfUnlayered()
+    {
+        var screen = new TestScreen();
+        var layer = new Layer("HUD");
+        screen.Layers.Add(layer);
+
+        var unlayered = new StubRenderable { Z = 0f, Name = "unlayered" };
+        var layered = new StubRenderable { Z = 0f, Layer = layer, Name = "layered" };
+
+        // Add layered first — it should still sort on top regardless of insertion order
+        screen.Add(layered);
+        screen.Add(unlayered);
+        screen.SortRenderList();
+
+        screen.RenderList[0].Name.ShouldBe("unlayered");
+        screen.RenderList[1].Name.ShouldBe("layered");
+    }
+
+    [Fact]
+    public void SortRenderList_UnlayeredItems_DrawBehindAllLayers()
+    {
+        var screen = new TestScreen();
+        var bg = new Layer("Background");
+        var fg = new Layer("Foreground");
+        screen.Layers.Add(bg);
+        screen.Layers.Add(fg);
+
+        var unlayered = new StubRenderable { Z = 0f, Name = "unlayered" };
+        var bgItem = new StubRenderable { Z = 0f, Layer = bg, Name = "bg" };
+        var fgItem = new StubRenderable { Z = 0f, Layer = fg, Name = "fg" };
+
+        // Add in reverse order to prove sort wins over insertion order
+        screen.Add(fgItem);
+        screen.Add(unlayered);
+        screen.Add(bgItem);
+        screen.SortRenderList();
+
+        screen.RenderList[0].Name.ShouldBe("unlayered");
+        screen.RenderList[1].Name.ShouldBe("bg");
+        screen.RenderList[2].Name.ShouldBe("fg");
     }
 }

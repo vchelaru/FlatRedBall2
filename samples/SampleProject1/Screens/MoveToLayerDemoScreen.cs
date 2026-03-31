@@ -55,7 +55,7 @@ public class MoveToLayerDemoScreen : Screen
         _player = playerFactory.Create();
         _player.X = -80f;
         _player.Y = 0f;
-        _player.MoveToLayer(_behind);
+        _player.Layer = _behind;
 
         SetupHud();
     }
@@ -65,7 +65,7 @@ public class MoveToLayerDemoScreen : Screen
         if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
         {
             _isInFront = !_isInFront;
-            _player.MoveToLayer(_isInFront ? _front : _behind);
+            _player.Layer = _isInFront ? _front : _behind;
             UpdateStatusLabel();
         }
     }

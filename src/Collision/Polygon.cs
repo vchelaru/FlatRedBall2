@@ -100,7 +100,7 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 
     // IRenderable
     public bool IsVisible { get; set; } = false;
-    public Layer Layer { get; set; } = null!;
+    public Layer? Layer { get; set; }
     public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
     public string? Name { get; set; }
 

@@ -32,10 +32,35 @@ public class Entity : ICollidable, IAttachable
     /// </para>
     /// <para>
     /// Layer takes priority over Z: a renderable on a lower-indexed layer always draws behind one on a
-    /// higher-indexed layer, regardless of Z. Use <see cref="MoveToLayer"/> to change layers at runtime.
+    /// higher-indexed layer, regardless of Z. Set <see cref="Layer"/> to change layers at runtime.
     /// </para>
     /// </summary>
     public float Z { get; set; }
+
+    private Layer? _layer;
+
+    /// <summary>
+    /// The rendering layer for this entity's children. Setting this propagates to all
+    /// renderable children (shapes, sprites, Gum visuals) and child entities recursively.
+    /// New children added after this is set inherit the current layer automatically.
+    /// </summary>
+    public Layer? Layer
+    {
+        get => _layer;
+        set
+        {
+            _layer = value;
+            foreach (var child in _children)
+            {
+                if (child is IRenderable renderable)
+                    renderable.Layer = value;
+                if (child is Entity childEntity)
+                    childEntity.Layer = value;
+            }
+            foreach (var visual in _gumChildren)
+                _engine?.CurrentScreen?.SetGumRenderableLayer(visual, value);
+        }
+    }
 
     // Absolute world position
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
@@ -112,9 +137,9 @@ public class Entity : ICollidable, IAttachable
     /// Attaches <paramref name="child"/> to this entity and registers it for rendering.
     /// If <paramref name="child"/> is an <see cref="ICollidable"/> shape, it is included in default collision.
     /// To attach a collidable shape without including it in default collision, use
-    /// <see cref="Add{T}(T, bool)"/> with <c>isDefaultCollision: false</c>.
+    /// <see cref="Add{T}(T, bool, Layer?)"/> with <c>isDefaultCollision: false</c>.
     /// </summary>
-    public void Add(IAttachable child)
+    public void Add(IAttachable child, Layer? layer = null)
     {
         child.Parent = this;
         _children.Add(child);
@@ -123,10 +148,15 @@ public class Entity : ICollidable, IAttachable
             _shapes.Add(collidable);
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
-            _engine!.CurrentScreen.Add(renderable);
+            _engine!.CurrentScreen.Add(renderable, layer ?? Layer);
 
-        if (child is Entity childEntity && _engine is not null)
-            childEntity.Engine = _engine;
+        if (child is Entity childEntity)
+        {
+            if (_engine is not null)
+                childEntity.Engine = _engine;
+            if (layer != null || Layer != null)
+                childEntity.Layer = layer ?? Layer;
+        }
     }
 
     /// <summary>
@@ -135,7 +165,7 @@ public class Entity : ICollidable, IAttachable
     /// it will not participate in <see cref="CollidesWith"/> or <see cref="GetSeparationVector"/> checks.
     /// Use <see cref="SetDefaultCollision"/> to change participation after the fact.
     /// </summary>
-    public void Add<T>(T child, bool isDefaultCollision) where T : class, IAttachable, ICollidable
+    public void Add<T>(T child, bool isDefaultCollision, Layer? layer = null) where T : class, IAttachable, ICollidable
     {
         child.Parent = this;
         _children.Add(child);
@@ -144,10 +174,15 @@ public class Entity : ICollidable, IAttachable
             _shapes.Add(child);
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
-            _engine!.CurrentScreen.Add(renderable);
+            _engine!.CurrentScreen.Add(renderable, layer ?? Layer);
 
-        if (child is Entity childEntity && _engine is not null)
-            childEntity.Engine = _engine;
+        if (child is Entity childEntity)
+        {
+            if (_engine is not null)
+                childEntity.Engine = _engine;
+            if (layer != null || Layer != null)
+                childEntity.Layer = layer ?? Layer;
+        }
     }
 
     /// <summary>
@@ -178,23 +213,6 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
-    /// <summary>
-    /// Moves this entity's renderable children to <paramref name="layer"/>, changing their draw order.
-    /// Recursively updates child entities. Collision relationships are not affected.
-    /// </summary>
-    public void MoveToLayer(Layer layer)
-    {
-        foreach (var child in _children)
-        {
-            if (child is IRenderable renderable)
-                renderable.Layer = layer;
-            if (child is Entity childEntity)
-                childEntity.MoveToLayer(layer);
-        }
-        foreach (var visual in _gumChildren)
-            _engine?.CurrentScreen?.SetGumRenderableLayer(visual, layer);
-    }
-
     public void Remove(IAttachable child)
     {
         _children.Remove(child);
@@ -212,10 +230,10 @@ public class Entity : ICollidable, IAttachable
     /// this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
     /// </summary>
     /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
-    public void Add(GraphicalUiElement visual, float z = 0f)
+    public void Add(GraphicalUiElement visual, Layer? layer = null)
     {
         _gumChildren.Add(visual);
-        Engine.CurrentScreen.AddGumForEntity(visual, this, z);
+        Engine.CurrentScreen.AddGumForEntity(visual, this, layer ?? Layer);
     }
 
     /// <summary>
@@ -223,17 +241,17 @@ public class Entity : ICollidable, IAttachable
     /// tracks this entity's <c>AbsoluteX/Y</c> each frame. Automatically removed when the entity is destroyed.
     /// </summary>
     /// <remarks>Call from <see cref="CustomInitialize"/> or later — requires the entity to be registered with the engine.</remarks>
-    public void Add(FrameworkElement element, float z = 0f)
-        => Add(element.Visual, z);
+    public void Add(FrameworkElement element, Layer? layer = null)
+        => Add(element.Visual, layer);
 
-    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, float)"/>.</summary>
+    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
     public void Remove(GraphicalUiElement visual)
     {
         _gumChildren.Remove(visual);
         _engine?.CurrentScreen?.Remove(visual);
     }
 
-    /// <summary>Removes a Gum Forms control previously added with <see cref="Add(FrameworkElement, float)"/>.</summary>
+    /// <summary>Removes a Gum Forms control previously added with <see cref="Add(FrameworkElement, Layer?)"/>.</summary>
     public void Remove(FrameworkElement element)
         => Remove(element.Visual);
 

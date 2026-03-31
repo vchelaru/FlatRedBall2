@@ -36,5 +36,20 @@ public class ShapesBatch : IRenderBatch
     public void Begin(SpriteBatch spriteBatch, Camera camera)
         => _shapeBatch!.Begin();
 
-    public void End(SpriteBatch spriteBatch) => _shapeBatch!.End();
+    public void End(SpriteBatch spriteBatch)
+    {
+        try
+        {
+            _shapeBatch!.End();
+        }
+        catch (NotSupportedException ex) when (ex.Message.Contains("ThirtyTwoBits"))
+        {
+            throw new NotSupportedException(
+                "Too many shapes for GraphicsProfile.Reach (16-bit index buffer limit exceeded). " +
+                "Either reduce the number of visible shapes (e.g. clean up off-screen tiles) or " +
+                "switch to HiDef: set graphics.GraphicsProfile = GraphicsProfile.HiDef " +
+                "in your Game1 constructor before Initialize().",
+                ex);
+        }
+    }
 }

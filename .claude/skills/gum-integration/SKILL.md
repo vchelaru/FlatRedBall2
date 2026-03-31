@@ -114,17 +114,42 @@ var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
 Add(scoreText);
 ```
 
-## Render Ordering (Layer / Z)
+## Render Ordering (Layers / Z)
 
-| Setting | Effect |
-|---|---|
-| `Layer = null` (default) | Drawn last — on top of all world objects. Right for HUDs and menus. |
-| `z: 50f` parameter | Control ordering among multiple Gum elements or between Gum and sprites |
+**Unlayered renderables draw behind layered ones.** Gum elements added without a layer will be hidden behind any layered game objects. Always assign Gum UI to an explicit layer.
+
+Within the same layer, items sort by Z. Within the same layer and Z, insertion order is preserved (stable sort).
+
+## UI Layers
+
+Most games need one or more UI layers. Create them in `CustomInitialize` and add them to `Layers` in back-to-front order. Gum elements on a layer draw on top of all unlayered world objects and on top of lower-indexed layers.
+
+**Three common UI layers** (create only what the game needs):
+
+| Layer | Purpose | Examples |
+|-------|---------|----------|
+| **InGameUI** | Transient visuals attached to world position or floating near entities | Floating damage/heal numbers, "+100" score popups, level-up announcements, entity health bars |
+| **HUD** | Persistent screen-anchored status display | Score, health bar, fuel gauge, minimap, timer |
+| **TopUI** | Modal overlays that block gameplay | Pause menu, "Exit game?" confirmation, options screen, critical messages |
 
 ```csharp
-Add(bgPanel, z: 0f);
-Add(hudPanel, z: 100f);
+// In CustomInitialize — order matters: later = drawn on top
+var hudLayer = new Layer("HUD");
+Layers.Add(hudLayer);
+
+// Add Gum elements with the layer: parameter
+var scoreLabel = new Label();
+scoreLabel.Text = "Score: 0";
+scoreLabel.Anchor(Anchor.TopLeft);
+scoreLabel.X = 10; scoreLabel.Y = 10;
+Add(scoreLabel, layer: hudLayer);
 ```
+
+**When to create which layers:**
+- **HUD only** — most games (score, health, fuel, timer)
+- **HUD + TopUI** — games with a pause menu or confirmation dialogs
+- **InGameUI + HUD** — games with floating combat text, score popups near enemies, or entity health bars
+- **All three** — RPGs, complex action games with both world-space feedback and modal menus
 
 ## Screen-Space vs World-Space
 

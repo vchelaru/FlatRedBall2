@@ -43,7 +43,7 @@ public class GumRenderable : IRenderable, IAttachable
 
     // IRenderable
     public float Z { get; set; }
-    public Layer Layer { get; set; } = null!;
+    public Layer? Layer { get; set; }
     public IRenderBatch Batch { get; set; } = GumRenderBatch.Instance;
     public string? Name { get; set; }
 

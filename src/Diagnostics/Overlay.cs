@@ -372,7 +372,7 @@ public class Overlay
     private Label CreateLabel()
     {
         var label = new Label { Text = "" };
-        _screen.Add(label, DefaultZ);
+        _screen.Add(label);
         return label;
     }
 
