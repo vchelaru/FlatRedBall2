@@ -124,7 +124,8 @@ Direct `Vector2.Distance` checks are fine for simple one-off tests, but prefer s
 - **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children.
 - **Type argument mismatch on overloads** — `AddCollisionRelationship<Enemy>(_enemies, _players)` is not the 2-list overload. Use two type args for entity-vs-entity (`<Enemy, Player>`), one type arg only for self-collision, and no explicit type args for `TileShapeCollection`.
 - **Player tunnels through thin walls** — Discrete collision detection; keep velocities reasonable.
-- **Don't use a `DiedThisFrame` flag** — The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
+- **Stale trigger sets** — `CollisionOccurred` fires once per overlapping pair per frame while the overlap persists. If you accumulate targets into a collection (e.g., `_targetsInRange.Add(...)`), clear the collection each frame before the collision pass runs, or you will accumulate stale entries from previous frames.
+- **Don't use a `DiedThisFrame` flag**— The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
 - **Platformer gotcha**: swapping masses on BounceOnCollision can make the player phase through the floor.
 
 ## BounceOnCollision — Practical Defaults

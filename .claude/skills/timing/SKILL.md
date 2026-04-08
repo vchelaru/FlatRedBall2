@@ -45,6 +45,27 @@ if (_shootTimer <= 0f)
 }
 ```
 
+## Rate Accumulator (High-Frequency Events)
+
+For events that fire multiple times per second (typewriter text, particle bursts, rapid-fire), use a `while` loop and subtract — not `if` and reset:
+
+```csharp
+// Field:
+private float _charTimer = 0f;
+private const float CharsPerSecond = 30f;
+
+// In CustomActivity:
+_charTimer += time.DeltaSeconds;
+while (_charTimer >= 1f / CharsPerSecond && _charIndex < _fullText.Length)
+{
+    _charIndex++;
+    _charTimer -= 1f / CharsPerSecond;  // carry remainder — don't reset to 0
+}
+```
+
+- **`while` not `if`** — prevents dropped events when `DeltaSeconds` spikes (first frame, tab-back, debugger pause).
+- **Subtract, don't reset** — preserves fractional remainder so rate stays accurate across frame boundaries.
+
 ## Entity Lifetime (Self-Destruct)
 
 Entities that should expire after a fixed duration track their own remaining time and destroy themselves:

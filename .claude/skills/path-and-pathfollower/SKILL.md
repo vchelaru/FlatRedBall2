@@ -67,7 +67,17 @@ Call in `CustomActivity`:
 _follower.Activity(this, time.DeltaSeconds);
 ```
 
-`PathFollower` only sets `entity.X`, `entity.Y`, and optionally `entity.Rotation`. It does not affect velocity or physics. Call `follower.Reset()` to restart from the beginning.
+`PathFollower` bypasses velocity entirely — it sets `entity.X` and `entity.Y` directly each frame. Zero out `VelocityX` and `VelocityY` in `CustomActivity` after calling `Activity(...)`, or the physics system will fight the follower and cause jitter. Call `follower.Reset()` to restart from the beginning.
+
+## Gotchas
+
+**`DirectionFacing` does not update from PathFollower.** `TopDownBehavior.DirectionFacing` only updates from input. If you need the entity to face its movement direction while following a path, read the tangent from the follower and set rotation explicitly:
+
+```csharp
+// FaceDirection = true on the PathFollower sets entity.Rotation automatically,
+// but TopDownBehavior.DirectionFacing will not reflect it.
+// If you need a TopDownDirection enum value, derive it from the tangent manually.
+```
 
 ## FaceDirection Rotation Convention
 
