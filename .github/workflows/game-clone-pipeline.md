@@ -25,6 +25,8 @@ safe-outputs:
     labels: [edc-review]
     preserve-branch-name: true
     max: 1
+    allowed-files:
+      - .github/game-designs/**
   add-labels:
     max: 2
 timeout-minutes: 30
