@@ -26,6 +26,7 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Apos.Shapes" Version="0.6.8" />

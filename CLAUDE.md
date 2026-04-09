@@ -124,7 +124,7 @@ This scoping step keeps context lean — only load the skills and files that are
 For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
 
 Available agents:
-- **minigame-orchestrator** — Autonomous random game creation. Picks a game, presents a short pitch for user approval, then designs and implements it without further interaction. Use when the user says "make a random game", "use the orchestrator", or similar.
+- **minigame-orchestrator** — Autonomous random game creation. Picks a game, presents a short pitch for user approval, then designs and implements it without further interaction. Use when the user says "make a random game", "use the orchestrator", or similar. **Must be spawned with `subagent_type: "general-purpose"`** so it has access to the Agent tool for delegating implementation to a coder sub-agent. Pass the contents of `.claude/agents/minigame-orchestrator.md` as the prompt.
 - **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.
 - **coder** — Writing or modifying code and unit tests for new features or bugs
 - **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
