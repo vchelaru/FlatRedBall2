@@ -27,7 +27,6 @@ Invoke these with the Skill tool when working on specific topics:
 - `collision-relationships` — AddCollisionRelationship, move/bounce semantics
 - `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
 - `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds
-- `isometric-rendering` — Isometric/trimetric projection strategy, depth sorting, input picking boundaries
 - `shapes` — AxisAlignedRectangle, Circle, Polygon, visual properties
 - `input-system` — Keyboard, gamepad, input binding
 - `camera` — Camera setup and transforms
@@ -133,13 +132,10 @@ Available agents:
 - **docs-writer** — Writing or updating documentation
 - **product-manager** — Breaking down tasks and tracking progress
 - **security-auditor** — Security reviews and vulnerability assessments
-- **edc** — Engine Debate Committee. Facilitates a structured three-agent debate on where a proposed documentation or API change belongs (skill, XML doc, API change, or project skill), then calls a vote. Invoke when the user types `/edc` followed by a proposed change, or when asked "where should this live?" or "should this be a skill or XML docs?". Sub-agents: `edc-engine-expert`, `edc-skill-defender`, `edc-reality-tester`.
 
 Select the agent that best matches the task at hand. For tasks that span multiple concerns (e.g., implement a feature and write tests), invoke the relevant agents in sequence.
 
 **Game creation rule**: If the user has a specific game vision — even if they give a reference title or genre — invoke the **game-designer** agent before the product-manager or coder. If the user wants a random/autonomous game, invoke the **minigame-orchestrator** instead.
-
-**EDC rule**: When the user types `edc` (as plain text — `/edc` is intercepted by the CLI as an unknown slash command), or asks "where should [X] live?", invoke the **edc** agent. Do not decide the question yourself — let the committee debate it. To run EDC on unstaged changes, type: `edc the current unstaged changes`.
 
 ## Code Style
 

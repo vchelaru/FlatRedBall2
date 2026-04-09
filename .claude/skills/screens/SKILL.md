@@ -151,8 +151,6 @@ bool paused = IsPaused;
 **What pauses:** entity physics, entity `CustomActivity`, collision processing.
 **What keeps running:** `Screen.CustomActivity`, Gum UI, input — so pause-menu logic lives in `CustomActivity` and Gum overlays still update.
 
-> **Dialogue gotcha:** When the screen is paused, entity `CustomActivity` stops — so "press A to advance" input cannot live on an NPC entity. Handle it in `Screen.CustomActivity` instead.
-
 Typical pattern:
 
 ```csharp
