@@ -217,21 +217,6 @@ public class Screen
     /// Optional callback invoked on the new screen instance before <see cref="CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
     /// </param>
-    /// <remarks>
-    /// <para>
-    /// To carry long-lived session state (e.g. player stats, inventory, discovered locations)
-    /// across multiple screen transitions, declare the state as a plain C# class and forward
-    /// a reference through the configure callback each time:
-    /// </para>
-    /// <code>
-    /// MoveToScreen&lt;NextScreen&gt;(s =&gt; s.GameState = GameState);
-    /// </code>
-    /// <para>
-    /// Each destination screen declares <c>public GameState GameState { get; set; }</c> and
-    /// receives the same instance. Avoid static fields — they break the engine's single-screen
-    /// lifecycle and make state hard to reset between runs.
-    /// </para>
-    /// </remarks>
     public void MoveToScreen<T>(Action<T>? configure = null) where T : Screen, new()
         => Engine.RequestScreenChange(configure);
 
