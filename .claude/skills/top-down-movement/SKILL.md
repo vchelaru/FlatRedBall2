@@ -142,6 +142,31 @@ _aiInput.X = dir.X;
 _aiInput.Y = dir.Y;
 ```
 
+## Grid-Based (Tile-Snap) Movement — Pokémon / Classic Zelda Style
+
+**Do not use `TopDownBehavior` for grid movement.** `TopDownBehavior` controls velocity, not position — the entity will stop at sub-tile coordinates. Grid-style movement requires a state machine that commits to a target tile center, locks input mid-step, and snaps on arrival.
+
+**Do not use `CollisionRelationship` for solid tile collision in grid movement.** The standard collision system is move-then-correct (post-physics). Grid movement requires check-before-commit: query the target cell first, and only move if it's clear. Using both will produce confusing double-correction.
+
+Key implementation points:
+- Use `IsKeyDown` (not `WasKeyPressed`) — holding walks continuously, one tile at a time.
+- Declare a public property on the entity and inject `_solidTiles` from the screen after `Factory.Create()`:
+
+```csharp
+// In the entity:
+public TileShapeCollection? SolidTiles { get; set; }
+
+// In the screen, after Factory.Create():
+var player = _playerFactory.Create();
+player.SolidTiles = _solidCollision;
+```
+
+- Use `SolidTiles?.GetTileAtWorld(nx, ny) == null` to check the target cell before committing the move.
+- Snap to exact position on arrival (`X = _targetX`) — never accumulate sub-pixel drift.
+- Don't use `CollisionRelationship` for NPC/entity collision during grid movement — check target coordinates directly before committing the step.
+
+<!-- If this grid-movement section exceeds ~25 lines, move it to a dedicated grid-movement/SKILL.md skill. -->
+
 ## Gotchas
 
 - Diagonal input magnitudes > 1 are clamped to the unit circle — full speed in 8 directions.

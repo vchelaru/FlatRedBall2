@@ -213,6 +213,13 @@ Useful when placing Gum HUD elements relative to world objects, or for click-to-
 
 ## Gotchas
 
+- **Manual map-clamping: guard against small maps.** `Math.Clamp(x, min, max)` throws `ArgumentException` if `min > max`. This happens when the map is smaller than the viewport — `mapHalfW - halfW` goes negative. Always guard:
+  ```csharp
+  Camera.X = mapHalfW > halfW
+      ? Math.Clamp(_player.X, -mapHalfW + halfW, mapHalfW - halfW)
+      : 0f;  // map fits in viewport — center it
+  ```
+  This applies to both X and Y axes. **Use `CameraControllingEntity` (with `Map` set) to avoid writing this yourself.**
 - **Use `DisplaySettings.Zoom` for setup; use `Camera.Zoom` for dynamic zoom effects.** `TargetWidth`/`TargetHeight` (the world coordinate extents) are calculated by the engine at screen-start time using `DisplaySettings.Zoom`. If you only set `Camera.Zoom` directly at setup time (e.g. in `CustomInitialize`), `TargetWidth`/`TargetHeight` were already sized for Zoom=1 — the rendered image is zoomed but the coordinate space is not, so objects placed at the edges of the intended world fall off-screen. Set the baseline zoom in `DisplaySettings` before `Start<T>()`:
   ```csharp
   FlatRedBallService.Default.DisplaySettings.Zoom = 2f;

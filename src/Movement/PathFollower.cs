@@ -61,6 +61,13 @@ public class PathFollower
     /// Advances the follower and updates the entity's position (and optionally rotation).
     /// Call every frame from <c>CustomActivity</c>.
     /// </summary>
+    /// <remarks>
+    /// Sets <c>entity.X</c> and <c>entity.Y</c> directly — bypassing velocity entirely.
+    /// If the entity has a non-zero velocity while the follower is active, the physics update
+    /// will shift the position each frame and fight the follower, causing jitter or the entity
+    /// sliding off the path. Zero out <c>VelocityX</c> and <c>VelocityY</c> in
+    /// <c>CustomActivity</c> after calling this method to prevent it.
+    /// </remarks>
     public void Activity(Entity entity, float deltaSeconds)
     {
         if (_completed && !Loops && !Path.IsLooped) return;

@@ -267,6 +267,13 @@ public class TileShapeCollection : ICollidable
     /// Returns the <see cref="AxisAlignedRectangle"/> at the grid cell containing
     /// <paramref name="x"/>, <paramref name="y"/>, or <c>null</c> if the cell is empty.
     /// </summary>
+    /// <remarks>
+    /// Lookup is O(1) — backed by a <c>Dictionary&lt;(col, row), rect&gt;</c>, not a linear scan.
+    /// Use to detect which tile type an entity is standing on:
+    /// <code>
+    /// bool onGrass = _grassTiles.GetTileAtWorld(player.X, player.Y) != null;
+    /// </code>
+    /// </remarks>
     public AxisAlignedRectangle? GetTileAtWorld(float x, float y)
     {
         var (col, row) = WorldToCell(x, y);

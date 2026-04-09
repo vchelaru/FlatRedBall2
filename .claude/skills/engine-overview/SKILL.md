@@ -23,6 +23,7 @@ FlatRedBall2 is a 2D game engine built on MonoGame. It provides physics, collisi
 - **Screen subclasses** — override `CustomInitialize` (create factories, entities, collision relationships, UI)
 - **Collision relationships** — call `AddCollisionRelationship` in screen's `CustomInitialize`
 - **Game1.cs** — initialize `FlatRedBallService.Default`, call `Update`/`Draw` each frame
+- **Save/Load** — no engine support; serialize game state manually (`System.Text.Json` recommended)
 
 ## Frame Loop Order
 

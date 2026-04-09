@@ -89,6 +89,20 @@ MoveToScreen<Room2Screen>(s => s.RoomState = _sharedState);
 
 This is simpler than managing multiple rooms within a single screen and composes naturally with the screen lifecycle (automatic entity/factory cleanup, `CustomInitialize` for fresh setup).
 
+## Mutable Tile Visuals
+
+`TileMapLayerRenderable` has **no per-tile mutation API** — it is a baked renderer. Once loaded, you cannot change individual tile visuals at runtime (e.g., replacing a grass tile with tilled soil).
+
+**Gotcha:** `TileShapeCollection` and `TileMapLayerRenderable` are **completely independent systems**. `AddTileAtCell`/`RemoveTileAtCell` changes collision only — the visual layer is unaffected. Removing a wall from `TileShapeCollection` does not remove its sprite from the rendered layer.
+
+For games that need tile visuals to change at runtime (farming tiles, destructible blocks, Bomberman-style terrain), **do not use `TileMapLayerRenderable` for those layers**. Instead:
+
+- **Option A — Sprite grid**: Create a 2D array of `Sprite` entities. Swap the `SourceRectangle` or `Texture` when the tile state changes. Use `TileShapeCollection` separately for collision.
+- **Option B — Multiple layers + visibility**: Pre-load one TMX layer per visual state (e.g., `GrassLayer`, `TilledLayer`, `PlantedLayer`). Toggle `TileMapLayerRenderable.IsVisible` per layer, per row/column. Only practical for small maps or few states.
+- **Option C — Custom renderer**: Maintain your own tile-data array and render it with a `SpriteBatch` pass.
+
+Use `TileMapLayerRenderable` only for **static background layers** (sky, background terrain, decorations) that never change.
+
 ## Level Advancement
 
 Pass the next level index when transitioning screens:
