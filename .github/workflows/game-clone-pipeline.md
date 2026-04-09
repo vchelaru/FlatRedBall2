@@ -97,9 +97,9 @@ Keep a running list of every change you make — you will need it for Phase 3.
 
 ## Phase 3 — Pull Request
 
-**CRITICAL: Call `create_pull_request` directly yourself — do NOT delegate this to a sub-agent or task tool. Sub-agents do not have access to the `create_pull_request` tool.**
+You have a tool called `create_pull_request`. Call it now, directly, in this message. Do not use the `task` tool. Do not spawn a sub-agent. The `create_pull_request` tool is only available to you — not to any sub-agent you might create.
 
-Create a pull request with the following:
+Call `create_pull_request` with:
 
 **Branch name**: `skill-sync/${{ inputs.game_name }}`
 
