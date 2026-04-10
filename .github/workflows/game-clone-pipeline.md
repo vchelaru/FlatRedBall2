@@ -30,6 +30,9 @@ safe-outputs:
     allowed-files:
       - .github/game-designs/**
       - .claude/skills/**
+  dispatch-workflow:
+    workflows: [edc-skill-review]
+    max: 1
   add-labels:
     max: 2
 timeout-minutes: 30
@@ -125,6 +128,8 @@ Call `create_pull_request` with:
 EDC review is pending. Once the committee approves placement, label this PR `edc-approved` to merge.
 ```
 
-Label the PR with `edc-review` once created.
+After the PR is created, immediately call `dispatch_workflow` with:
+- **workflow**: `edc-skill-review`
+- **inputs**: `{ "pr_number": "<the PR number returned by create_pull_request>" }`
 
 If for any reason you cannot create the pull request, call `noop` with a clear message explaining why.

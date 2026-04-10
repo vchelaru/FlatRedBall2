@@ -7,7 +7,13 @@ description: >
 on:
   pull_request:
     types: [labeled]
-if: github.event.label.name == 'edc-review'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: string
+if: github.event.label.name == 'edc-review' || github.event_name == 'workflow_dispatch'
 permissions:
   contents: read
   pull-requests: read
@@ -25,7 +31,7 @@ safe-outputs:
 timeout-minutes: 20
 ---
 
-# EDC Skill Review — PR #${{ github.event.pull_request.number }}
+# EDC Skill Review — PR #${{ github.event.pull_request.number || inputs.pr_number }}
 
 You are the Engine Debate Committee (EDC) Orchestrator for FlatRedBall2. Your job is to review every skill file change in this PR and render a verdict on whether each change is in the right location.
 
@@ -35,7 +41,7 @@ You are the Engine Debate Committee (EDC) Orchestrator for FlatRedBall2. Your jo
 
 ## Step 1 — Read the PR Diff
 
-Fetch the diff for PR #${{ github.event.pull_request.number }}. Focus only on changes to files matching:
+Fetch the diff for PR #${{ github.event.pull_request.number || inputs.pr_number }}. Focus only on changes to files matching:
 - `.claude/skills/**/*.md`
 - `src/**/*.cs` (XML doc changes only)
 - `CLAUDE.md`
