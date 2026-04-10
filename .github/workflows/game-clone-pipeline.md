@@ -25,8 +25,11 @@ safe-outputs:
     labels: [edc-review]
     preserve-branch-name: true
     max: 1
+    protected-files: allowed
+    draft: false
     allowed-files:
       - .github/game-designs/**
+      - .claude/skills/**
   add-labels:
     max: 2
 timeout-minutes: 30
@@ -123,3 +126,5 @@ EDC review is pending. Once the committee approves placement, label this PR `edc
 ```
 
 Label the PR with `edc-review` once created.
+
+If for any reason you cannot create the pull request, call `noop` with a clear message explaining why.
