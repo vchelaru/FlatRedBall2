@@ -1,5 +1,5 @@
-using FlatRedBall2.Collision;
 using FlatRedBall2.Entities;
+using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
 using Microsoft.Xna.Framework.Graphics;
 using Shouldly;
@@ -61,7 +61,7 @@ public class CameraControllingEntityTests
         // Camera shows 1280×720 (zoom=1, targetWidth=1280). Map is 2560×1440 centered at origin.
         // IsVisible half-width = 640. Max camera X = mapRight - visibleW/2 = 1280 - 640 = 640.
         var controller = MakeController(entityX: 0f, entityY: 0f);
-        controller.Map = new AxisAlignedRectangle { Width = 2560f, Height = 1440f };
+        controller.Map = new BoundsRectangle(2560f, 1440f);
 
         var target = new Entity { X = 1500f, Y = 0f }; // beyond right map edge
         controller.Targets.Add(target);
@@ -78,7 +78,7 @@ public class CameraControllingEntityTests
         // Zoom out so camera shows far more world than the map — should center on map.
         var controller = MakeController(entityX: 999f, entityY: 999f, zoom: 0.1f);
         // Map is 100×100 centered at origin. Camera at zoom=0.1 shows 12800×7200 world units.
-        controller.Map = new AxisAlignedRectangle { Width = 100f, Height = 100f };
+        controller.Map = new BoundsRectangle(100f, 100f);
 
         var target = new Entity { X = 0f, Y = 0f };
         controller.Targets.Add(target);

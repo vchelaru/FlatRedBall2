@@ -1,6 +1,7 @@
 using FlatRedBall2;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Entities;
+using FlatRedBall2.Math;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
 using Microsoft.Xna.Framework;
@@ -101,12 +102,8 @@ public class CameraFollowDemoScreen : Screen
 
     private void SetupCamera(TopDownPlayer player)
     {
-        // Map bounds rect centered at world origin — same center as the tile collection
-        var mapBounds = new AxisAlignedRectangle
-        {
-            Width  = Cols * GridSize,
-            Height = Rows * GridSize,
-        };
+        // Map bounds centered at world origin — same center as the tile collection
+        var mapBounds = new BoundsRectangle(Cols * GridSize, Rows * GridSize);
 
         var cam = _cameraFactory.Create();
         cam.Target = player;
