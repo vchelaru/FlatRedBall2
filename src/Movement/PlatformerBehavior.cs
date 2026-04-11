@@ -111,6 +111,7 @@ public class PlatformerBehavior
             }
             else
             {
+                entity.AccelerationY = 0f;
                 entity.VelocityY = _jumpValues.JumpVelocity;
             }
         }

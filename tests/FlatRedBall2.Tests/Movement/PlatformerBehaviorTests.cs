@@ -156,6 +156,100 @@ public class PlatformerBehaviorTests
         behavior.IsApplyingJump.ShouldBeFalse();
     }
 
+    [Fact]
+    public void Jump_FixedJump_ReachesMinHeight()
+    {
+        // Fixed jump (no push-to-hold): pure ballistic arc.
+        // v = sqrt(2*g*h), peak after n = v/(g*dt) frames.
+        // Discrete peak: Y(n) = n*dt*(v - g*n*dt/2).
+        // With g=600, h=48, dt=1/60: v=240, n=24, Y(24)=48.0 exactly.
+        float gravity = 600f;
+        float minHeight = 48f;
+        float dt = 1f / 60f;
+        float v = MathF.Sqrt(2f * gravity * minHeight);           // 240
+        float peakFrame = v / (gravity * dt);                      // 24
+        int n = (int)MathF.Round(peakFrame);
+        float expectedPeak = n * dt * (v - gravity * n * dt / 2f); // 48.0
+
+        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f, UsesAcceleration = false };
+        values.SetJumpHeights(minHeight); // no maxHeight → fixed jump, no sustain
+
+        float maxY = SimulateJump(values, held: false);
+
+        maxY.ShouldBe(expectedPeak, tolerance: expectedPeak * 0.01);
+    }
+
+    [Fact]
+    public void Jump_HeldJump_ReachesMaxHeight()
+    {
+        // Variable jump (push-to-hold): sustain cancels gravity (AccY=0),
+        // so each sustain frame adds exactly v*dt of height.
+        // sustainTime = (maxHeight - minHeight) / v.
+        // Sustain frames with AccY=0: frames 1..N where N*dt = sustainTime (frame 0 also
+        // gets AccY=0 via the sustain else-branch, but its PhysicsUpdate saw the entity at
+        // rest so it contributes 0 height).
+        // After sustain, coast is pure ballistic from v: peak = v²/(2g) = minHeight.
+        // Total = sustainFrames * v * dt + ballisticPeak.
+        float gravity = 600f;
+        float minHeight = 48f;
+        float maxHeight = 96f;
+        float dt = 1f / 60f;
+        float v = MathF.Sqrt(2f * gravity * minHeight);                // 240
+        float sustainTime = (maxHeight - minHeight) / v;                // 0.2s
+        int sustainFrames = (int)MathF.Round(sustainTime / dt);         // 12
+        float sustainHeight = sustainFrames * v * dt;                   // 48.0
+        float coastPeakFrame = v / (gravity * dt);                      // 24
+        int cn = (int)MathF.Round(coastPeakFrame);
+        float coastHeight = cn * dt * (v - gravity * cn * dt / 2f);     // 48.0
+        float expectedPeak = sustainHeight + coastHeight;               // 96.0
+
+        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f, UsesAcceleration = false };
+        values.SetJumpHeights(minHeight, maxHeight);
+
+        float maxY = SimulateJump(values, held: true);
+
+        maxY.ShouldBe(expectedPeak, tolerance: expectedPeak * 0.01);
+    }
+
+    /// <summary>
+    /// Simulates a full jump arc matching the real game loop order
+    /// (PhysicsUpdate → Collision → behavior.Update) and returns the peak Y.
+    /// </summary>
+    private static float SimulateJump(PlatformerValues values, bool held)
+    {
+        float dt = 1f / 60f;
+        var behavior = new PlatformerBehavior { AirMovement = values };
+        var entity = new Entity();
+
+        var jumpPressed = new MockPressableInput(isDown: true, wasJustPressed: true);
+        var jumpHeld = new MockPressableInput(isDown: held, wasJustPressed: false);
+        behavior.JumpInput = jumpPressed;
+
+        float maxY = 0f;
+        float totalTime = 0f;
+
+        for (int frame = 0; frame < 600; frame++)
+        {
+            totalTime += dt;
+
+            entity.PhysicsUpdate(MakeFrame(dt));
+
+            // Simulate ground contact on frame 0
+            if (frame == 0)
+                entity.LastReposition = new System.Numerics.Vector2(0f, 1f);
+
+            behavior.Update(entity, MakeFrame(dt, totalSeconds: totalTime));
+
+            if (frame == 0)
+                behavior.JumpInput = jumpHeld;
+
+            if (entity.Y > maxY) maxY = entity.Y;
+            if (frame > 2 && entity.Y <= 0f && entity.VelocityY < 0f) break;
+        }
+
+        return maxY;
+    }
+
     // --- Mock helpers ---
 
     private sealed class MockPressableInput : IPressableInput
