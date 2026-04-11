@@ -26,11 +26,9 @@ public class Player : Entity
             MaxSpeedX = 200f,
             Gravity = 600f,
             MaxFallSpeed = 800f,
-            JumpVelocity = 400f,
-            JumpApplyLength = TimeSpan.FromSeconds(0.2),
-            JumpApplyByButtonHold = true,
             UsesAcceleration = false,
         };
+        groundValues.SetJumpHeights(minHeight: 16f, maxHeight: 48f); // must be after Gravity
 
         _platformer.GroundMovement = groundValues;
         _platformer.AirMovement = groundValues;   // reuse, or provide separate air values
@@ -69,6 +67,7 @@ collision results — no special wiring needed.
 | `JumpVelocity` | Upward velocity applied when jump is triggered |
 | `JumpApplyLength` | How long to sustain `JumpVelocity` after pressing jump |
 | `JumpApplyByButtonHold` | If true, releasing jump early cuts the jump short |
+| `SetJumpHeights(min, max?)` | Computes `JumpVelocity`, `JumpApplyLength`, and `JumpApplyByButtonHold` from desired min/max jump heights in world units. `Gravity` must be set first. Prefer this over setting jump fields manually. |
 | `UsesAcceleration` | If false, `AccelerationTimeX`/`DecelerationTimeX` are ignored and velocity is set directly |
 
 ## Ground vs Air values

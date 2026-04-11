@@ -157,7 +157,7 @@ public override void CustomInitialize()
 {
     _cameraFactory = new Factory<CameraControllingEntity>(this);
 
-    var mapBounds = new BoundsRectangle(2560f, 1440f); // centered at origin
+    var mapBounds = new BoundsRectangle(2560f, 1440f); // centered at origin; use BoundsRectangle(x, y, w, h) for maps not centered at origin
 
     var cam = _cameraFactory.Create(); // sets cam.Camera = Screen.Camera
     cam.Target = player;               // or cam.Targets.Add(p1); cam.Targets.Add(p2);

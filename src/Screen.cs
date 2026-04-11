@@ -4,6 +4,7 @@ using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Diagnostics;
+using FlatRedBall2.Tiled;
 using FlatRedBall2.UI;
 using FlatRedBall2.Rendering;
 using Gum.Forms.Controls;
@@ -122,6 +123,27 @@ public class Screen
 
     // Gum integration
     private readonly Dictionary<GraphicalUiElement, GumRenderable> _gumByVisual = new();
+
+    /// <summary>
+    /// Adds all visual layers of a <see cref="TileMap"/> to this screen's render list.
+    /// Individual layer Z values and visibility are respected.
+    /// </summary>
+    public void Add(TileMap map, Layer? layer = null)
+    {
+        foreach (var mapLayer in map.Layers)
+            Add(mapLayer, layer);
+    }
+
+    /// <summary>
+    /// Adds a single <see cref="TileMapLayer"/> to this screen's render list.
+    /// Use this instead of <see cref="Add(TileMap, Layer?)"/> when you need per-layer control
+    /// (e.g., assigning different layers to different FRB rendering layers).
+    /// </summary>
+    public void Add(TileMapLayer mapLayer, Layer? layer = null)
+    {
+        mapLayer.Renderable.Layer = layer ?? Layer;
+        _renderList.Add(mapLayer.Renderable);
+    }
 
     /// <summary>
     /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.

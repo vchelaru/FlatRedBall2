@@ -9,85 +9,85 @@ Levels are defined as TMX files using the Tiled map format. Use the `tmx` skill 
 
 ## Level Setup in a Screen
 
-Parse the TMX file, set up rendering for visual layers, and generate collision from the GameplayLayer:
+Load a TMX file with `TileMap`, add it to the screen, and generate collision:
 
 ```csharp
+using FlatRedBall2.Tiled;
+
 public class GameScreen : Screen
 {
-    private TileShapeCollection _solidCollision;
+    private TileShapeCollection _solidCollision = null!;
 
     public override void CustomInitialize()
     {
-        var parser = new TiledTmxParser();
-        var tilemap = parser.ParseFromFile("Content/Tiled/Level1.tmx", Engine.GraphicsDevice);
+        var map = new TileMap("Content/Tiled/Level1.tmx", Engine.GraphicsDevice);
+        map.CenterOn(0, 0); // center map on world origin
+        Add(map);
 
-        var renderer = new TilemapSpriteBatchRenderer();
-        renderer.LoadTilemap(tilemap);
-
-        // Place map so its center aligns with the world origin.
-        float mapX = -(float)tilemap.WorldBounds.Width / 2f;
-        float mapY = (float)tilemap.WorldBounds.Height / 2f;
-
-        foreach (var layer in tilemap.Layers)
-        {
-            if (layer is TilemapTileLayer tileLayer)
-            {
-                // Render all visual layers.
-                var renderable = new TileMapLayerRenderable(renderer, tileLayer)
-                {
-                    X = mapX,
-                    Y = mapY,
-                };
-                Add(renderable);
-
-                // Generate collision from the GameplayLayer.
-                if (tileLayer.Name == "GameplayLayer")
-                {
-                    _solidCollision = TileMapCollisionGenerator.GenerateFromClass(
-                        tilemap, tileLayer, "SolidCollision", mapX, mapY);
-                    Add(_solidCollision);
-                }
-            }
-        }
+        _solidCollision = map.GenerateCollisionFromClass("SolidCollision");
+        Add(_solidCollision);
     }
 }
 ```
 
-Key types and their namespaces:
-- `TiledTmxParser` — `MonoGame.Extended.Tilemaps.Tiled`
-- `TilemapSpriteBatchRenderer` — `MonoGame.Extended.Tilemaps.Rendering`
-- `TilemapTileLayer`, `Tilemap` — `MonoGame.Extended.Tilemaps`
-- `TileMapLayerRenderable`, `TileMapCollisionGenerator` — `FlatRedBall2.Tiled`
+**Key types** (all in `FlatRedBall2.Tiled`):
+- `TileMap` — loads a TMX file, wraps layers, generates collision
+- `TileMapLayer` — per-layer Z, visibility, and render layer control
+- `TileShapeCollection` — collision grid (`FlatRedBall2.Collision`)
 
-`GenerateFromClass` matches tiles whose `type` attribute equals the class name (case-insensitive). Use `GenerateFromProperty` to match on a custom property instead.
+## TileMap Position
+
+`TileMap.X` and `TileMap.Y` define the **top-left corner** of the map (Tiled convention). Default (0, 0) places the top-left at the world origin; the map extends right (+X) and down (−Y).
+
+`CenterOn(worldX, worldY)` repositions the map so its center is at the given point.
+
+## Layer Z-Order
+
+Layers are assigned Z values automatically: 1 apart in TMX order, with `GameplayLayer` at Z = 0 if it exists. Entities at Z = 0 naturally interleave at the gameplay layer. Override per-layer Z only when needed:
+
+```csharp
+map.GetLayer("Foreground").Z = 100f;
+```
 
 ## Multiple Collision Types
 
-Generate a separate `TileShapeCollection` for each type inside the GameplayLayer loop:
-
 ```csharp
-if (tileLayer.Name == "GameplayLayer")
-{
-    _solidCollision = TileMapCollisionGenerator.GenerateFromClass(
-        tilemap, tileLayer, "SolidCollision", mapX, mapY);
-    _cloudCollision = TileMapCollisionGenerator.GenerateFromClass(
-        tilemap, tileLayer, "CloudCollision", mapX, mapY);
-    Add(_solidCollision);
-    Add(_cloudCollision);
-}
+var solid = map.GenerateCollisionFromClass("SolidCollision");
+var cloud = map.GenerateCollisionFromClass("CloudCollision");
+Add(solid);
+Add(cloud);
 ```
 
-Each collection can then have its own collision relationship with the player (e.g., solid blocks movement, cloud allows jump-through).
+Each collection can have its own collision relationship (solid blocks movement, cloud allows jump-through). By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
+
+```csharp
+var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
+```
+
+## Camera Bounds
+
+`TileMap.Bounds` returns a `BoundsRectangle` for `CameraControllingEntity.Map`:
+
+```csharp
+cam.Map = map.Bounds;
+```
+
+## Map Dimensions
+
+```csharp
+map.Width       // total width in world units
+map.Height      // total height in world units
+map.TileWidth   // single tile width
+map.TileHeight  // single tile height
+```
 
 ## Rooms as Separate Screens
 
-Each distinct room or area is its own `Screen` subclass. There is no built-in "room manager" — `MoveToScreen<T>` is the room transition mechanism. Room state (which enemies are alive, whether the exit is unlocked) is passed via the configure callback:
+Each distinct room or area is its own `Screen` subclass. There is no built-in "room manager" — `MoveToScreen<T>` is the room transition mechanism. Room state is passed via the configure callback:
 
 ```csharp
 MoveToScreen<Room2Screen>(s => s.RoomState = _sharedState);
 ```
-
-This is simpler than managing multiple rooms within a single screen and composes naturally with the screen lifecycle (automatic entity/factory cleanup, `CustomInitialize` for fresh setup).
 
 ## Level Advancement
 
