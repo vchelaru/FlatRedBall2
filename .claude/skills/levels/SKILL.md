@@ -64,6 +64,18 @@ Each collection can have its own collision relationship (solid blocks movement, 
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
 ```
 
+## Slope Tiles
+
+Tiles in the tileset that declare collision via `<objectgroup><polygon>...</polygon></objectgroup>` are automatically emitted as polygon tiles (not rects) by `GenerateCollisionFromClass`. For platformer floors, set the collection's slope mode so vertical separation uses a heightmap instead of SAT:
+
+```csharp
+var solid = map.GenerateCollisionFromClass("SolidCollision");
+solid.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+Add(solid);
+```
+
+See the `tmx` skill for how to author the polygon on the tileset tile.
+
 ## Camera Bounds
 
 `TileMap.Bounds` returns a `BoundsRectangle` for `CameraControllingEntity.Map`:

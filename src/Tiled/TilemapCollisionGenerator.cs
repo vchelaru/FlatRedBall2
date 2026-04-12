@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Numerics;
 using MonoGame.Extended.Tilemaps;
 using FlatRedBall2.Collision;
+using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Tiled;
 
@@ -202,8 +205,68 @@ public static class TileMapCollisionGenerator
 
                 // Tiled is Y-down; TileShapeCollection is Y-up. Flip the row.
                 int flippedRow = layer.Height - 1 - row;
-                collection.AddTileAtCell(col, flippedRow);
+
+                if (TryBuildPolygonPrototypes(tileData, collection.GridSize, tile.FlipFlags, out var prototypes))
+                {
+                    foreach (var proto in prototypes)
+                        collection.AddPolygonTileAtCell(col, flippedRow, proto);
+                }
+                else
+                {
+                    collection.AddTileAtCell(col, flippedRow);
+                }
             }
         }
+    }
+
+    // Converts any TilemapPolygonObject collision shapes on the tile into local-space Polygon
+    // prototypes centered on (0, 0) with Y-up. Applies Tiled flip flags (diagonal, then
+    // horizontal, then vertical) per Tiled's rendering semantics. Returns false (and null
+    // prototypes) if the tile has no polygon collision objects. Non-polygon collision objects
+    // (rectangles, ellipses, polylines) are currently ignored — see TODOS.md.
+    private static bool TryBuildPolygonPrototypes(
+        TilemapTileData tileData,
+        float gridSize,
+        TilemapTileFlipFlags flipFlags,
+        out List<Polygon> prototypes)
+    {
+        prototypes = null!;
+        if (tileData.CollisionObjects == null || tileData.CollisionObjects.Count == 0)
+            return false;
+
+        float half = gridSize / 2f;
+        bool flipD = (flipFlags & TilemapTileFlipFlags.FlipDiagonally) != 0;
+        bool flipH = (flipFlags & TilemapTileFlipFlags.FlipHorizontally) != 0;
+        bool flipV = (flipFlags & TilemapTileFlipFlags.FlipVertically) != 0;
+
+        foreach (var obj in tileData.CollisionObjects)
+        {
+            if (obj is not TilemapPolygonObject polyObj || polyObj.Points == null || polyObj.Points.Length < 3)
+                continue;
+
+            var localPoints = new List<Vector2>(polyObj.Points.Length);
+            foreach (var p in polyObj.Points)
+            {
+                // Tiled pixel (Y-down, origin at tile top-left) → FRB2 local (Y-up, centered).
+                XnaVec2 tiled = polyObj.Position + p;
+                float x = tiled.X - half;
+                float y = half - tiled.Y;
+
+                // Apply flips in Tiled's declared order: diagonal, then horizontal, then vertical.
+                // In centered-Y-up space this becomes: D: (x,y) → (-y,-x); H: x → -x; V: y → -y.
+                // Winding may reverse under odd flip counts, but Polygon.FromPoints / SAT
+                // normalize winding internally, so we preserve the original point order.
+                if (flipD) (x, y) = (-y, -x);
+                if (flipH) x = -x;
+                if (flipV) y = -y;
+
+                localPoints.Add(new Vector2(x, y));
+            }
+
+            prototypes ??= new List<Polygon>();
+            prototypes.Add(Polygon.FromPoints(localPoints));
+        }
+
+        return prototypes != null;
     }
 }

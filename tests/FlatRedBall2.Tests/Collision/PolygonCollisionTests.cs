@@ -260,4 +260,5 @@ public class PolygonCollisionTests
         pocket.GetSeparationVector(lPoly).ShouldBe(Vector2.Zero,
             "convex polygon in concave pocket should not collide with L-shape");
     }
+
 }

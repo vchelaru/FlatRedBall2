@@ -1,5 +1,11 @@
 # FlatRedBall2 — Completed Items
 
+## Slope Polygons in Tiled Maps — Phase 2 (partial)
+`TileMapCollisionGenerator.TryBuildPolygonPrototypes` now honors `TilemapTile.FlipFlags`. Flips are applied in Tiled's declared order (diagonal → horizontal → vertical) in centered-Y-up space: D swaps to `(-y, -x)`, H negates x, V negates y. Point order is preserved — `Polygon.FromPoints` normalizes winding internally so the odd-flip-reverses-winding concern doesn't reach SAT. `TileShapeCollection.AddPolygonTileAtCell` now throws `InvalidOperationException` on a duplicate `(col, row)` instead of silently dropping the second polygon; multi-polygon-per-cell is unsupported and authors should merge shapes in Tiled.
+
+## Slope Polygons in Tiled Maps — Phase 1
+`TileMapCollisionGenerator` now inspects `TilemapTileData.CollisionObjects` when building collision from a tile layer. For each matched tile with one or more `TilemapPolygonObject`s (authored as `<polygon>` in a tileset tile's `<objectgroup>`), the generator converts points from Tiled pixel space (Y-down, origin top-left of tile) to local Polygon space (Y-up, centered on the cell: `localX = tiledX - G/2`, `localY = G/2 - tiledY`) and calls `TileShapeCollection.AddPolygonTileAtCell` with a prototype built from `Polygon.FromPoints`. Tiles without polygon objects still emit a rect via `AddTileAtCell`. Flip flags, rectangle/ellipse collision objects, and multiple polygons per cell are deferred to Phase 2 (see TODOS.md).
+
 ## TileNodeNetwork (A* Pathfinding)
 `TileNodeNetwork` in `FlatRedBall2.AI` is a grid-based node network for A* pathfinding. Construct with `xOrigin`, `yOrigin`, `gridSpacing`, `xCount`, `yCount`, and `DirectionalType` (Four or Eight). Populate via `FillCompletely()` or `AddAndLinkNode(x, y)` (by tile index) / `AddAndLinkNodeAtWorld(wx, wy)`. Remove nodes via `RemoveAt(x, y)`, `RemoveAtWorld`, or `RemoveNodesOverlapping(AxisAlignedRectangle)`. For 8-way networks, call `EliminateCutCorners()` after carving walls to prevent diagonal movement through corners of missing tiles. Query with `NodeAt(x,y)`, `NodeAtWorld`, and `GetClosestNode`. Find paths with `GetPath(start, end)` (allocates) or `GetPath(start, end, List<Vector2>)` (reuse to avoid GC). Result contains world positions from start (exclusive) to end (inclusive). `TileNode.Tag` holds optional game data per node.
 

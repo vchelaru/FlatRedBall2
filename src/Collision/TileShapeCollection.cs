@@ -7,6 +7,17 @@ using XnaColor = Microsoft.Xna.Framework.Color;
 namespace FlatRedBall2.Collision;
 
 /// <summary>
+/// Controls how polygon tiles in a <see cref="TileShapeCollection"/> resolve overlap.
+/// </summary>
+public enum SlopeCollisionMode
+{
+    /// <summary>Standard SAT collision for polygon tiles. Correct for top-down games.</summary>
+    Standard,
+    /// <summary>Vertical-only heightmap separation for polygon tiles. Correct for platformer slopes.</summary>
+    PlatformerFloor,
+}
+
+/// <summary>
 /// A grid-based static collision structure for tile maps. Each filled cell holds one
 /// <see cref="AxisAlignedRectangle"/>; spatial partitioning limits collision checks to
 /// the cells overlapping the querying shape rather than all tiles.
@@ -67,6 +78,13 @@ public class TileShapeCollection : ICollidable
             _gridSize = value;
         }
     }
+
+    /// <summary>
+    /// Controls how polygon tiles resolve overlap. <see cref="SlopeCollisionMode.Standard"/>
+    /// uses SAT (correct for top-down). <see cref="SlopeCollisionMode.PlatformerFloor"/>
+    /// uses vertical-only heightmap separation (correct for platformer slopes).
+    /// </summary>
+    public SlopeCollisionMode SlopeMode { get; set; } = SlopeCollisionMode.Standard;
 
     private float _x;
     private float _y;
@@ -276,7 +294,9 @@ public class TileShapeCollection : ICollidable
     /// <summary>
     /// Adds a polygon tile at the given grid cell using <paramref name="prototype"/> as the shape template.
     /// The prototype's local points are copied; the tile is placed at the cell's world center.
-    /// Does nothing if any tile (rectangle or polygon) already exists at that cell.
+    /// Does nothing if a rectangle tile already exists at that cell. Throws
+    /// <see cref="InvalidOperationException"/> if a polygon tile already exists there —
+    /// multi-polygon-per-cell is not supported; merge the polygons in Tiled instead.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -290,9 +310,13 @@ public class TileShapeCollection : ICollidable
     /// entirely by the polygon geometry via SAT.
     /// </para>
     /// </remarks>
+    /// <exception cref="InvalidOperationException">A polygon tile already exists at (<paramref name="col"/>, <paramref name="row"/>).</exception>
     public void AddPolygonTileAtCell(int col, int row, Polygon prototype)
     {
-        if (_tiles.ContainsKey((col, row)) || _polyTiles.ContainsKey((col, row))) return;
+        if (_tiles.ContainsKey((col, row))) return;
+        if (_polyTiles.ContainsKey((col, row)))
+            throw new InvalidOperationException(
+                $"A polygon tile already exists at cell ({col}, {row}). Multi-polygon-per-cell is not supported — merge the polygons in Tiled.");
 
         var poly = Polygon.FromPoints(prototype.Points);
         poly.X = X + col * GridSize + GridSize / 2f;
@@ -304,6 +328,7 @@ public class TileShapeCollection : ICollidable
         poly.OutlineThickness = _outlineThickness;
 
         _polyTiles[(col, row)] = poly;
+        UpdateDirectionsAround(col, row);
         _onTileAdded?.Invoke(poly);
     }
 
@@ -314,6 +339,7 @@ public class TileShapeCollection : ICollidable
     {
         if (!_polyTiles.TryGetValue((col, row), out var poly)) return;
         _polyTiles.Remove((col, row));
+        UpdateNeighborDirections(col, row);
         _onTileRemoved?.Invoke(poly);
     }
 
@@ -334,6 +360,11 @@ public class TileShapeCollection : ICollidable
         UpdateCellDirections(col + 1, row);
         UpdateCellDirections(col, row - 1);
         UpdateCellDirections(col, row + 1);
+        UpdatePolygonEdges(col, row);
+        UpdatePolygonEdges(col - 1, row);
+        UpdatePolygonEdges(col + 1, row);
+        UpdatePolygonEdges(col, row - 1);
+        UpdatePolygonEdges(col, row + 1);
     }
 
     private void UpdateNeighborDirections(int col, int row)
@@ -342,6 +373,10 @@ public class TileShapeCollection : ICollidable
         UpdateCellDirections(col + 1, row);
         UpdateCellDirections(col, row - 1);
         UpdateCellDirections(col, row + 1);
+        UpdatePolygonEdges(col - 1, row);
+        UpdatePolygonEdges(col + 1, row);
+        UpdatePolygonEdges(col, row - 1);
+        UpdatePolygonEdges(col, row + 1);
     }
 
     private void UpdateCellDirections(int col, int row)
@@ -349,12 +384,55 @@ public class TileShapeCollection : ICollidable
         if (!_tiles.TryGetValue((col, row), out var tile)) return;
 
         var dirs = RepositionDirections.All;
-        if (_tiles.ContainsKey((col - 1, row))) dirs &= ~RepositionDirections.Left;
-        if (_tiles.ContainsKey((col + 1, row))) dirs &= ~RepositionDirections.Right;
-        if (_tiles.ContainsKey((col, row - 1))) dirs &= ~RepositionDirections.Down;
-        if (_tiles.ContainsKey((col, row + 1))) dirs &= ~RepositionDirections.Up;
+        bool hasLeft  = _tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row));
+        bool hasRight = _tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row));
+        bool hasDown  = _tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1));
+        bool hasUp    = _tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1));
+        if (hasLeft)  dirs &= ~RepositionDirections.Left;
+        if (hasRight) dirs &= ~RepositionDirections.Right;
+        if (hasDown)  dirs &= ~RepositionDirections.Down;
+        if (hasUp)    dirs &= ~RepositionDirections.Up;
 
         tile.RepositionDirections = dirs;
+    }
+
+    // Computes SuppressedEdges for the polygon tile at (col, row).
+    // An edge is suppressed if both its vertices lie along a cell boundary
+    // that borders an occupied cell (rect or polygon).
+    private void UpdatePolygonEdges(int col, int row)
+    {
+        if (!_polyTiles.TryGetValue((col, row), out var poly)) return;
+
+        float cellLeft   = X + col * GridSize;
+        float cellRight  = X + (col + 1) * GridSize;
+        float cellBottom = Y + row * GridSize;
+        float cellTop    = Y + (row + 1) * GridSize;
+
+        bool hasLeft  = _tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row));
+        bool hasRight = _tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row));
+        bool hasDown  = _tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1));
+        bool hasUp    = _tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1));
+
+        int suppressed = 0;
+        const float eps = 1e-3f;
+
+        for (int i = 0; i < poly.Points.Count; i++)
+        {
+            // World-space vertex positions (polygon has no rotation in tile grids)
+            float ax = poly.X + poly.Points[i].X;
+            float ay = poly.Y + poly.Points[i].Y;
+            int next = (i + 1) % poly.Points.Count;
+            float bx = poly.X + poly.Points[next].X;
+            float by = poly.Y + poly.Points[next].Y;
+
+            // Check if both vertices lie along a cell boundary
+            if (hasLeft  && MathF.Abs(ax - cellLeft)   < eps && MathF.Abs(bx - cellLeft)   < eps) suppressed |= 1 << i;
+            if (hasRight && MathF.Abs(ax - cellRight)  < eps && MathF.Abs(bx - cellRight)  < eps) suppressed |= 1 << i;
+            if (hasDown  && MathF.Abs(ay - cellBottom) < eps && MathF.Abs(by - cellBottom) < eps) suppressed |= 1 << i;
+            if (hasUp    && MathF.Abs(ay - cellTop)    < eps && MathF.Abs(by - cellTop)    < eps) suppressed |= 1 << i;
+        }
+
+        poly.SuppressedEdges = suppressed;
     }
 
     // Returns the total separation vector needed to move 'shape' out of all overlapping tiles.
@@ -362,6 +440,7 @@ public class TileShapeCollection : ICollidable
     internal Vector2 GetSeparationFor(ICollidable shape)
     {
         var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(shape);
+        float centerX = (minX + maxX) / 2f;
 
         int colMin = (int)MathF.Floor((minX - X) / GridSize);
         int colMax = (int)MathF.Floor((maxX - X) / GridSize);
@@ -375,9 +454,53 @@ public class TileShapeCollection : ICollidable
             {
                 Vector2 sep;
                 if (_tiles.TryGetValue((col, row), out var tile))
+                {
                     sep = CollisionDispatcher.GetSeparationVector(shape, tile);
+                    if (SlopeMode == SlopeCollisionMode.PlatformerFloor)
+                    {
+                        float rectLeft  = tile.AbsoluteX - tile.Width / 2f;
+                        float rectRight = tile.AbsoluteX + tile.Width / 2f;
+                        bool centerInside = centerX >= rectLeft && centerX <= rectRight;
+
+                        float rectTop = tile.AbsoluteY + tile.Height / 2f;
+                        bool hasEntityParent = shape is IAttachable att && att.Parent is Entity;
+                        Entity? ent = hasEntityParent ? (Entity)((IAttachable)shape).Parent! : null;
+
+                        // Prefer landing: if standard collision pushes horizontally
+                        // but the shape was above the rect last frame, override to land
+                        // on top. Reconstructs last-frame bottom from velocity:
+                        //   lastBottom ≈ currentBottom - velocityY / 60
+                        // Only fires when the tile's Up direction is active — otherwise
+                        // the top face is covered by another tile and isn't a landing
+                        // surface.
+                        if (sep.X != 0f && sep.Y == 0f && ent != null && ent.VelocityY < 0f
+                            && tile.RepositionDirections.HasFlag(RepositionDirections.Up))
+                        {
+                            float lastBottom = minY - ent.VelocityY / 60f;
+                            if (lastBottom > rectTop)
+                            {
+                                float pushUp = rectTop - minY;
+                                if (pushUp > 0f)
+                                    sep = new Vector2(0f, pushUp);
+                            }
+                        }
+                        // Suppress vertical push at slope-to-rect seams (center X outside
+                        // rect AND a polygon tile is adjacent on that side).
+                        else if (sep.Y != 0f && !centerInside)
+                        {
+                            int adjCol = centerX < rectLeft ? col - 1 : col + 1;
+                            if (_polyTiles.ContainsKey((adjCol, row)))
+                                sep = new Vector2(sep.X, 0f);
+                        }
+                    }
+                }
                 else if (_polyTiles.TryGetValue((col, row), out var poly))
-                    sep = CollisionDispatcher.GetSeparationVector(shape, poly);
+                {
+                    if (SlopeMode == SlopeCollisionMode.PlatformerFloor)
+                        sep = GetHeightmapSeparation(poly, minX, maxX, minY, maxY);
+                    else
+                        sep = CollisionDispatcher.GetSeparationVector(shape, poly);
+                }
                 else
                     continue;
 
@@ -393,6 +516,50 @@ public class TileShapeCollection : ICollidable
         }
 
         return total;
+    }
+
+    // Heightmap-based vertical separation for platformer slopes.
+    // Computes the polygon's surface height at the shape's center X and pushes up if needed.
+    private static Vector2 GetHeightmapSeparation(Polygon poly, float shapeMinX, float shapeMaxX, float shapeMinY, float shapeMaxY)
+    {
+        float centerX = (shapeMinX + shapeMaxX) / 2f;
+        float bottomY = shapeMinY;
+
+        // Find the polygon's surface Y at centerX by checking each edge.
+        // The surface is the highest Y where an edge spans centerX.
+        float surfaceY = float.MinValue;
+        var pts = poly.Points;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            // World-space vertices (polygon tiles have no rotation)
+            float ax = poly.X + pts[i].X;
+            float ay = poly.Y + pts[i].Y;
+            int next = (i + 1) % pts.Count;
+            float bx = poly.X + pts[next].X;
+            float by = poly.Y + pts[next].Y;
+
+            // Does this edge span centerX?
+            if ((ax <= centerX && bx >= centerX) || (bx <= centerX && ax >= centerX))
+            {
+                float range = bx - ax;
+                if (MathF.Abs(range) < 1e-6f)
+                {
+                    // Vertical edge — take the higher Y
+                    surfaceY = MathF.Max(surfaceY, MathF.Max(ay, by));
+                }
+                else
+                {
+                    float t = (centerX - ax) / range;
+                    float y = ay + t * (by - ay);
+                    if (y > surfaceY) surfaceY = y;
+                }
+            }
+        }
+
+        if (surfaceY == float.MinValue) return Vector2.Zero; // centerX outside polygon edges
+        if (bottomY >= surfaceY) return Vector2.Zero; // shape is above the surface
+
+        return new Vector2(0f, surfaceY - bottomY);
     }
 
     /// <summary>

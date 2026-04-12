@@ -62,7 +62,7 @@ public class PlatformerValues
 
     /// <summary>
     /// When false, <see cref="AccelerationTimeX"/> and <see cref="DecelerationTimeX"/> are ignored
-    /// and velocity is set directly to the input-scaled <see cref="MaxSpeedX"/>.
+    /// and x velocity is set directly to the input-scaled <see cref="MaxSpeedX"/>.
     /// </summary>
     public bool UsesAcceleration;
 }

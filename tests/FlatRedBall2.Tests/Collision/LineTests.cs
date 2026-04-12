@@ -333,6 +333,99 @@ public class LineTests
         normal.Y.ShouldBe(0f, 0.01f);
     }
 
+    // ── GetSeparationVector (Line vs AxisAlignedRectangle) ─────────────
+
+    [Fact]
+    public void GetSeparationVector_LineVsAARect_NotOverlapping_ReturnsZero()
+    {
+        // Vertical line well above the rect — no collision.
+        var line = new Line { X = 0f, Y = 100f, EndPoint = new Vector2(0f, 20f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        line.GetSeparationVector(rect).ShouldBe(Vector2.Zero);
+    }
+
+    [Fact]
+    public void GetSeparationVector_LineVsAARect_VerticalLineFeetInRect_PushesUp()
+    {
+        // Vertical line: bottom (Point1) at (0, 10), top (Point2) at (0, 34).
+        // Rect centered at (0, 0), 32×32 → top edge at y=16.
+        // Bottom of line is at y=10, which is 6 units below the top edge.
+        // Should push up so feet sit on the top edge: sep.Y = 6.
+        var line = new Line { X = 0f, Y = 10f, EndPoint = new Vector2(0f, 24f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        var sep = line.GetSeparationVector(rect);
+
+        sep.Y.ShouldBe(6f, tolerance: 0.01f);
+        sep.X.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void GetSeparationVector_LineVsAARect_VerticalLineTopInRect_PushesDown()
+    {
+        // Vertical line: Point1 at (0, -39), Point2 at (0, -15).
+        // Rect centered at (0, 0), 32×32 → bottom edge at y=-16.
+        // Top of line (y=-15) is 1 unit inside the rect bottom. Should push down.
+        var line = new Line { X = 0f, Y = -39f, EndPoint = new Vector2(0f, 24f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        var sep = line.GetSeparationVector(rect);
+
+        sep.Y.ShouldBe(-1f, tolerance: 0.01f);
+        sep.X.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void GetSeparationVector_LineVsAARect_HorizontalLinePushesOnShortestAxis()
+    {
+        // Horizontal line from (14, 0) to (20, 0).
+        // Rect centered at (0, 0), 32×32 → right edge at x=16.
+        // Line left endpoint at x=14 is 2 units inside the right edge.
+        // Y: line is at y=0, rect spans [-16,16] — line center is at rect center so Y push = 16.
+        // Shortest push is X=2 (push right to clear the right edge).
+        var line = new Line { X = 14f, Y = 0f, EndPoint = new Vector2(6f, 0f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        var sep = line.GetSeparationVector(rect);
+
+        sep.X.ShouldBeGreaterThan(0f); // pushed right
+        sep.Y.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void GetSeparationVector_LineVsAARect_BothEndpointsInside_PushesShortestAxis()
+    {
+        // Short line near the top of the rect, both endpoints inside.
+        // Line from (0, 14) to (2, 14). Rect 32×32 at origin → top at 16.
+        // Y push up = 16 - 14 = 2. X push (nearest edge) would be much larger.
+        // Shortest is Y push up = 2.
+        var line = new Line { X = 0f, Y = 14f, EndPoint = new Vector2(2f, 0f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        var sep = line.GetSeparationVector(rect);
+
+        sep.Y.ShouldBe(2f, tolerance: 0.01f);
+        sep.X.ShouldBe(0f);
+    }
+
+    // ── SeparateFrom (Line vs AxisAlignedRectangle) ──────────────────────
+
+    [Fact]
+    public void SeparateFrom_LineVsAARect_MovesLineOutOfRect()
+    {
+        // Vertical line with feet 4 units inside rect top.
+        // Rect centered at (0, 0), 32×32 → top at y=16.
+        // Line Point1 at (0, 12), Point2 at (0, 36). Penetration = 16 - 12 = 4.
+        var line = new Line { X = 0f, Y = 12f, EndPoint = new Vector2(0f, 24f) };
+        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+
+        line.SeparateFrom(rect, thisMass: 0f, otherMass: 1f);
+
+        // After separation, line Point1 should be at rect top (y=16).
+        line.Y.ShouldBe(16f, tolerance: 0.01f);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     // Square polygon of side 100 centered at (cx, cy).

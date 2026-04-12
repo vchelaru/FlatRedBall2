@@ -150,8 +150,34 @@ ceiling leaves the player with upward velocity and they float against it.
 `MoveFirstOnCollision` only repositions — it never touches velocity, which is wrong for
 platformer collision.
 
+## Slopes and Ramps
+
+Set `tileShapeCollection.SlopeMode = SlopeCollisionMode.PlatformerFloor` to enable slope collision for polygon tiles. In this mode:
+
+- **Polygon tiles push vertically only** (heightmap-based). The polygon's surface Y at the player's center X determines the push. No horizontal component means no snagging at slope seams.
+- **Rect tiles next to polygon tiles** get their shared face suppressed automatically (like adjacent rects already do).
+- **Preferential landing**: if the player is falling and standard collision would push them sideways off a ledge edge, they land on top instead. Only fires when the tile's Up face is active (nothing above it).
+
+Create slope tiles with `AddPolygonTileAtCell`:
+
+```csharp
+// Right-triangle slope going up-right (bottom edge flat, hypotenuse top-right to bottom-left)
+var upRampSlope = Polygon.FromPoints(new[]
+{
+    new Vector2(-8f, -8f), // bottom-left
+    new Vector2( 8f, -8f), // bottom-right
+    new Vector2( 8f,  8f), // top-right
+});
+
+tileShapeCollection.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+tileShapeCollection.AddPolygonTileAtCell(col, row, upRampSlope);
+```
+
+Default is `SlopeCollisionMode.Standard` (SAT collision for polygon tiles), which is correct for top-down games but causes snagging in platformers.
+
 ## Gotchas
 
 - `JumpApplyLength = TimeSpan.Zero` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.
 - `MaxFallSpeed` must be > 0 or the entity will be clamped to 0 downward velocity. Set it to a large value (e.g. 1000) if you don't want a meaningful cap.
 - Ground detection is `LastReposition.Y > 0` — a purely horizontal collision (wall) does not register as ground.
+- Slopes require `SlopeMode = SlopeCollisionMode.PlatformerFloor`. The default `Standard` mode will cause the player to snag at polygon/rect seams.

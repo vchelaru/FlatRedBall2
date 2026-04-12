@@ -9,11 +9,69 @@
  <tile id="5" type="CloudCollision"/>
  <tile id="6" type="OneWayCollision"/>
  <tile id="9" type="MovingPlatform"/>
+ <tile id="11" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="4" x="0" y="0">
+    <polygon points="0,0 16,16 0,16"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="12" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="0">
+    <polygon points="0,0 16,8 16,16 0,16"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="13" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="8">
+    <polygon points="0,0 16,8 0,8"/>
+   </object>
+  </objectgroup>
+ </tile>
  <tile id="32" type="Water"/>
  <tile id="33" type="BreakableCollision"/>
  <tile id="34" type="IceCollision"/>
  <tile id="64" type="Door"/>
+ <tile id="73" type="SolidCollision"/>
+ <tile id="74" type="SolidCollision"/>
+ <tile id="75" type="SolidCollision"/>
+ <tile id="76" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="8">
+    <polygon points="0,0 16,0 16,8 0,8"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="77" type="SolidCollision"/>
  <tile id="96" type="Ladder"/>
+ <tile id="105" type="SolidCollision"/>
+ <tile id="106" type="SolidCollision"/>
+ <tile id="107" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="8" y="0">
+    <polygon points="0,0 8,0 8,16 0,16"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="108" type="SolidCollision"/>
+ <tile id="109" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="0">
+    <polygon points="0,0 8,0 8,16 0,16"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="139" type="SolidCollision"/>
+ <tile id="140" type="SolidCollision">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="0">
+    <polyline points="0,0 16,0 16,8 0,8 0,0"/>
+   </object>
+  </objectgroup>
+ </tile>
+ <tile id="141" type="SolidCollision"/>
  <tile id="256">
   <properties>
    <property name="MatchType" value="Empty"/>

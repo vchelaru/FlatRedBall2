@@ -1,0 +1,272 @@
+using System.Numerics;
+using FlatRedBall2.Collision;
+using FlatRedBall2.Tiled;
+using MonoGame.Extended.Tilemaps;
+using Shouldly;
+using Xunit;
+using XnaVec2 = Microsoft.Xna.Framework.Vector2;
+
+namespace FlatRedBall2.Tests.Tiled;
+
+public class TileMapCollisionGeneratorTests
+{
+    // Builds a minimal MonoGame.Extended Tilemap with a single tileset whose tiles have the
+    // given TilemapTileData entries. The texture is null — safe because TileMapCollisionGenerator
+    // only reads Class, Properties, and CollisionObjects.
+    private static MonoGame.Extended.Tilemaps.Tilemap BuildTilemap(
+        int widthTiles, int heightTiles, int tileSize,
+        TilemapTileData[] tileDataEntries,
+        (int col, int row, int localId)[] placements)
+    {
+        var tilemap = new MonoGame.Extended.Tilemaps.Tilemap(
+            name: "test",
+            width: widthTiles,
+            height: heightTiles,
+            tileWidth: tileSize,
+            tileHeight: tileSize,
+            orientation: TilemapOrientation.Orthogonal);
+
+        int tileCount = 0;
+        foreach (var td in tileDataEntries)
+            if (td.LocalId + 1 > tileCount) tileCount = td.LocalId + 1;
+
+        var tileset = new TilemapTileset(
+            name: "ts",
+            texture: null!,
+            tileWidth: tileSize,
+            tileHeight: tileSize,
+            tileCount: tileCount,
+            columns: tileCount);
+        tileset.FirstGlobalId = 1;
+
+        foreach (var td in tileDataEntries)
+            tileset.AddTileData(td);
+
+        tilemap.Tilesets.Add(tileset);
+
+        var layer = new TilemapTileLayer("Main", widthTiles, heightTiles, tileSize, tileSize);
+        foreach (var (col, row, localId) in placements)
+            layer.SetTile(col, row, new TilemapTile(globalId: 1 + localId));
+        tilemap.Layers.Add(layer);
+
+        return tilemap;
+    }
+
+    // Variant that allows per-placement flip flags.
+    private static MonoGame.Extended.Tilemaps.Tilemap BuildTilemapWithFlips(
+        int widthTiles, int heightTiles, int tileSize,
+        TilemapTileData[] tileDataEntries,
+        (int col, int row, int localId, TilemapTileFlipFlags flip)[] placements)
+    {
+        var tilemap = new MonoGame.Extended.Tilemaps.Tilemap(
+            name: "test", width: widthTiles, height: heightTiles,
+            tileWidth: tileSize, tileHeight: tileSize,
+            orientation: TilemapOrientation.Orthogonal);
+
+        int tileCount = 0;
+        foreach (var td in tileDataEntries)
+            if (td.LocalId + 1 > tileCount) tileCount = td.LocalId + 1;
+
+        var tileset = new TilemapTileset(
+            name: "ts", texture: null!, tileWidth: tileSize, tileHeight: tileSize,
+            tileCount: tileCount, columns: tileCount);
+        tileset.FirstGlobalId = 1;
+        foreach (var td in tileDataEntries) tileset.AddTileData(td);
+        tilemap.Tilesets.Add(tileset);
+
+        var layer = new TilemapTileLayer("Main", widthTiles, heightTiles, tileSize, tileSize);
+        foreach (var (col, row, localId, flip) in placements)
+            layer.SetTile(col, row, new TilemapTile(1 + localId, flip));
+        tilemap.Layers.Add(layer);
+
+        return tilemap;
+    }
+
+    private static TilemapTileData MakeRectTile(int localId, string className)
+    {
+        var td = new TilemapTileData(localId) { Class = className };
+        return td;
+    }
+
+    private static TilemapTileData MakePolygonTile(int localId, string className,
+        XnaVec2 position, XnaVec2[] points)
+    {
+        var td = new TilemapTileData(localId) { Class = className };
+        td.CollisionObjects.Add(new TilemapPolygonObject(id: 1, position: position, points: points));
+        return td;
+    }
+
+    [Fact]
+    public void GenerateFromClass_MatchedTileWithNoPolygon_EmitsRectOnly()
+    {
+        // 1x1 map, single rect-class tile at (0,0). Expect 1 rect, 0 polygons.
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [MakeRectTile(0, "Solid")],
+            placements: [(0, 0, 0)]);
+
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        coll.GetTileAtCell(0, 0).ShouldNotBeNull();
+        coll.GetPolygonTileAtCell(0, 0).ShouldBeNull();
+    }
+
+    [Fact]
+    public void GenerateFromClass_MatchedTileWithOnePolygon_EmitsPolygonOnly_WithConvertedPoints()
+    {
+        // Tile polygon in Tiled space (Y-down, origin top-left of tile):
+        //   position (0, 0), points (0,0), (16,16), (0,16) — lower-left triangle.
+        // Expected local (Y-up, centered) for G=16: (-8, 8), (8, -8), (-8, -8).
+        var poly = new XnaVec2[]
+        {
+            new(0, 0),
+            new(16, 16),
+            new(0, 16),
+        };
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [MakePolygonTile(0, "Solid", new XnaVec2(0, 0), poly)],
+            placements: [(0, 0, 0)]);
+
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        coll.GetTileAtCell(0, 0).ShouldBeNull();
+        var emitted = coll.GetPolygonTileAtCell(0, 0);
+        emitted.ShouldNotBeNull();
+        emitted!.Points.Count.ShouldBe(3);
+        emitted.Points[0].ShouldBe(new Vector2(-8f, 8f));
+        emitted.Points[1].ShouldBe(new Vector2(8f, -8f));
+        emitted.Points[2].ShouldBe(new Vector2(-8f, -8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_MatchedTileWithTwoPolygons_Throws()
+    {
+        // Multi-polygon-per-cell is not supported — the second AddPolygonTileAtCell call
+        // throws loudly so the authoring mistake is caught at load time instead of silently
+        // dropping a collision shape.
+        var pA = new XnaVec2[] { new(0, 0), new(16, 0), new(0, 16) };
+        var pB = new XnaVec2[] { new(16, 16), new(16, 0), new(0, 16) };
+        var td = new TilemapTileData(0) { Class = "Solid" };
+        td.CollisionObjects.Add(new TilemapPolygonObject(1, new XnaVec2(0, 0), pA));
+        td.CollisionObjects.Add(new TilemapPolygonObject(2, new XnaVec2(0, 0), pB));
+
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [td],
+            placements: [(0, 0, 0)]);
+
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        Should.Throw<System.InvalidOperationException>(
+            () => TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid"));
+    }
+
+    [Fact]
+    public void GenerateFromClass_MixedRectAndPolygonTiles_BothShapesEmittedAtCorrectCells()
+    {
+        // Map layout (Tiled Y-down rows):
+        //   row 0: rect at col 0
+        //   row 1: polygon at col 0
+        // After Y-flip for FRB2 (height=2): Tiled row 0 -> FRB2 row 1, Tiled row 1 -> FRB2 row 0.
+        var tri = new XnaVec2[] { new(0, 0), new(16, 16), new(0, 16) };
+        var tilemap = BuildTilemap(1, 2, 16,
+            tileDataEntries:
+            [
+                MakeRectTile(0, "Solid"),
+                MakePolygonTile(1, "Solid", new XnaVec2(0, 0), tri),
+            ],
+            placements:
+            [
+                (0, 0, 0), // rect at Tiled (0,0) → FRB2 row 1
+                (0, 1, 1), // polygon at Tiled (0,1) → FRB2 row 0
+            ]);
+
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        coll.GetTileAtCell(0, 1).ShouldNotBeNull();
+        coll.GetPolygonTileAtCell(0, 1).ShouldBeNull();
+        coll.GetTileAtCell(0, 0).ShouldBeNull();
+        coll.GetPolygonTileAtCell(0, 0).ShouldNotBeNull();
+    }
+
+    // ── Flip flags ───────────────────────────────────────────────────────────
+    //
+    // Base polygon in Tiled pixel space: (0,0), (16,16), (0,16).
+    // Centered-Y-up (no flip):           (-8,8), (8,-8), (-8,-8).
+    //
+    // Transforms (applied D → H → V):
+    //   D: (x,y) → (-y,-x)
+    //   H: (x,y) → (-x, y)
+    //   V: (x,y) → ( x,-y)
+    //
+    // Expected outputs per flag combo (applied to the base):
+    //   H only:  (8,8),  (-8,-8), (8,-8)
+    //   V only:  (-8,-8),(8,8),   (-8,8)
+    //   D only:  (-8,8), (8,-8),  (8,8)
+    //   H+V:     (8,-8), (-8,8),  (8,8)
+    //   H+V+D:   (8,-8), (-8,8),  (-8,-8)
+
+    private static readonly XnaVec2[] BaseTriangle =
+    {
+        new(0, 0), new(16, 16), new(0, 16),
+    };
+
+    private static Polygon GenerateWithFlip(TilemapTileFlipFlags flip)
+    {
+        var tilemap = BuildTilemapWithFlips(1, 1, 16,
+            tileDataEntries: [MakePolygonTile(0, "Solid", new XnaVec2(0, 0), BaseTriangle)],
+            placements: [(0, 0, 0, flip)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        return coll.GetPolygonTileAtCell(0, 0)!;
+    }
+
+    [Fact]
+    public void GenerateFromClass_PolygonTileFlippedHorizontally_PointsMirroredOnX()
+    {
+        var poly = GenerateWithFlip(TilemapTileFlipFlags.FlipHorizontally);
+        poly.Points[0].ShouldBe(new Vector2(8f, 8f));
+        poly.Points[1].ShouldBe(new Vector2(-8f, -8f));
+        poly.Points[2].ShouldBe(new Vector2(8f, -8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_PolygonTileFlippedVertically_PointsMirroredOnY()
+    {
+        var poly = GenerateWithFlip(TilemapTileFlipFlags.FlipVertically);
+        poly.Points[0].ShouldBe(new Vector2(-8f, -8f));
+        poly.Points[1].ShouldBe(new Vector2(8f, 8f));
+        poly.Points[2].ShouldBe(new Vector2(-8f, 8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_PolygonTileFlippedDiagonally_PointsReflectedAcrossDiagonal()
+    {
+        var poly = GenerateWithFlip(TilemapTileFlipFlags.FlipDiagonally);
+        poly.Points[0].ShouldBe(new Vector2(-8f, 8f));
+        poly.Points[1].ShouldBe(new Vector2(8f, -8f));
+        poly.Points[2].ShouldBe(new Vector2(8f, 8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_PolygonTileFlippedHorizontallyAndVertically_PointsRotated180()
+    {
+        var poly = GenerateWithFlip(TilemapTileFlipFlags.FlipHorizontally | TilemapTileFlipFlags.FlipVertically);
+        poly.Points[0].ShouldBe(new Vector2(8f, -8f));
+        poly.Points[1].ShouldBe(new Vector2(-8f, 8f));
+        poly.Points[2].ShouldBe(new Vector2(8f, 8f));
+    }
+
+    [Fact]
+    public void GenerateFromClass_PolygonTileAllThreeFlipFlags_PointsTransformedInDHVOrder()
+    {
+        var poly = GenerateWithFlip(
+            TilemapTileFlipFlags.FlipHorizontally |
+            TilemapTileFlipFlags.FlipVertically |
+            TilemapTileFlipFlags.FlipDiagonally);
+        poly.Points[0].ShouldBe(new Vector2(8f, -8f));
+        poly.Points[1].ShouldBe(new Vector2(-8f, 8f));
+        poly.Points[2].ShouldBe(new Vector2(-8f, -8f));
+    }
+}
