@@ -1,4 +1,6 @@
 using System;
+using System.Numerics;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Input;
 using FlatRedBall2.Movement;
 using Shouldly;
@@ -248,6 +250,383 @@ public class PlatformerBehaviorTests
         }
 
         return maxY;
+    }
+
+    // --- Ground snap (slope adherence) ---
+    //
+    // Ground snap is driven implicitly by any CollisionRelationship with
+    // SlopeMode = PlatformerFloor — the relationship calls ConsiderSnappingTo on the
+    // IPlatformerEntity side during collision dispatch. Tests below build a minimal
+    // PlayerEntity implementing IPlatformerEntity and drive the relationship's
+    // RunCollisions() to emulate the engine's collision pass, then call Update() to
+    // close out the frame (updating _wasOnGroundLastFrame).
+
+    private sealed class PlayerEntity : Entity, IPlatformerEntity
+    {
+        public PlatformerBehavior Behavior { get; } = new();
+        public PlatformerBehavior Platformer => Behavior;
+    }
+
+    private static PlatformerValues MakeSnapValues(float snapDistance = 16f, float maxAngleDegrees = 60f)
+        => new()
+        {
+            Gravity = 0f,
+            MaxFallSpeed = 1000f,
+            SlopeSnapDistance = snapDistance,
+            SlopeSnapMaxAngleDegrees = maxAngleDegrees,
+        };
+
+    private static TileShapeCollection MakeTiles(int gridSize = 16)
+        => new() { GridSize = gridSize };
+
+    // Creates a collision shape attached to the entity such that the shape's bottom edge
+    // (feet) is at entity.Y. Shape height is 2 with a +1 Y offset, so AbsoluteY = entity.Y + 1,
+    // and feet = AbsoluteY - Height/2 = entity.Y.
+    private static AxisAlignedRectangle AttachFeetShape(Entity entity)
+    {
+        var shape = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = 1f };
+        entity.Add(shape);
+        return shape;
+    }
+
+    // Builds a relationship with SlopeMode = PlatformerFloor so RunCollisions invokes
+    // ConsiderSnappingTo on player.Platformer.
+    private static CollisionRelationship<PlayerEntity, TileShapeCollection> MakePlatformerRelationship(
+        PlayerEntity player, TileShapeCollection tiles)
+    {
+        var rel = new CollisionRelationship<PlayerEntity, TileShapeCollection>(
+            new[] { player }, new[] { tiles })
+        {
+            SlopeMode = SlopeCollisionMode.PlatformerFloor,
+        };
+        return rel;
+    }
+
+    [Fact]
+    public void GroundSnap_CollisionShapeNullWithDistance_Throws()
+    {
+        // Active values have SlopeSnapDistance > 0 but the user forgot CollisionShape.
+        // This is a wiring bug we surface loudly rather than silently skip.
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        // Deliberately no CollisionShape set.
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        // Frame 1: pretend grounded last frame so the snap gate opens on frame 2.
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+
+        var ex = Should.Throw<InvalidOperationException>(() => rel.RunCollisions());
+        ex.Message.ShouldContain("CollisionShape is null");
+    }
+
+    [Fact]
+    public void GroundSnap_DisabledByZeroDistance_DoesNotSnap()
+    {
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 0f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void GroundSnap_DownslopeToFlat_StaysGrounded()
+    {
+        // "Ran off a downslope onto lower flat ground" — the right cell (1,0) is a polygon
+        // filling the bottom half (flat top at y=8). Player just crossed the seam at x=16
+        // with feet at y=16 — an 8 unit gap to the flat ground below.
+        var tiles = MakeTiles();
+        var lowerFlat = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  0f),
+            new Vector2(-8f,  0f),
+        });
+        tiles.AddPolygonTileAtCell(1, 0, lowerFlat);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 20f, Y = 16f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeTrue();
+        player.Y.ShouldBe(8f);
+    }
+
+    [Fact]
+    public void GroundSnap_GapExceedsDistance_DoesNotSnap()
+    {
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 100f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void GroundSnap_MultipleRelationships_SnapsOnceToSurfaceInRange()
+    {
+        // Two PlatformerFloor relationships. Only _tilesB has a surface within range.
+        // Snap must fire exactly once (no double-snap) and land the player on _tilesB's surface.
+        var tilesA = MakeTiles();
+        // tilesA has no surface within range — tile at col 0 is offscreen from player at x=100.
+        var tilesB = MakeTiles();
+        tilesB.AddTileAtCell(6, 0); // cell (6,0): spans x∈[96,112], top y=16
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 104f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+
+        var relA = MakePlatformerRelationship(player, tilesA);
+        var relB = MakePlatformerRelationship(player, tilesB);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        relA.RunCollisions();
+        relB.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeTrue();
+        player.Y.ShouldBe(16f);
+        // Exactly one "snap:" message — the second relationship must no-op after the first success.
+        int snapCount = 0;
+        foreach (var m in messages)
+            if (m.Contains("snap:") && !m.Contains("skip:")) snapCount++;
+        snapCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void GroundSnap_MultipleRelationshipsAfterFirstSnap_EmitsAlreadySnappedDiagnostic()
+    {
+        // Two PlatformerFloor relationships, both with a valid surface within snap range.
+        // First RunCollisions snaps. Second RunCollisions (no Update between) must hit the
+        // _snappedThisFrame guard and emit "skip: already snapped this frame" so logs are
+        // unambiguous about double-snap situations.
+        var tilesA = MakeTiles();
+        tilesA.AddTileAtCell(0, 0);
+        var tilesB = MakeTiles();
+        tilesB.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+        var relA = MakePlatformerRelationship(player, tilesA);
+        var relB = MakePlatformerRelationship(player, tilesB);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        relA.RunCollisions();
+        relB.RunCollisions();
+
+        messages.Count.ShouldBe(2);
+        messages[0].ShouldContain("snap: entityY=");
+        messages[1].ShouldContain("skip: already snapped this frame");
+    }
+
+    [Fact]
+    public void GroundSnap_NonPlatformerEntity_DoesNotCrashOrSnap()
+    {
+        // Plain Entity (not IPlatformerEntity) on a PlatformerFloor relationship.
+        // The relationship must silently skip the snap offer.
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var entity = new Entity { X = 8f, Y = 20f };
+        AttachFeetShape(entity); // so collision has something to compare
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles })
+        {
+            SlopeMode = SlopeCollisionMode.PlatformerFloor,
+        };
+
+        Should.NotThrow(() => rel.RunCollisions());
+    }
+
+    [Fact]
+    public void GroundSnap_NotGroundedLastFrame_DoesNotSnap()
+    {
+        // Simulates a jump: player is airborne and rising, with a surface below within range.
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f, VelocityY = 100f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        // Never grounded — rel.RunCollisions should skip snap.
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeFalse();
+        player.Y.ShouldBe(20f);
+    }
+
+    [Fact]
+    public void GroundSnap_OnSnapDiagnostic_OnRaycastMiss_InvokedOnceWithSkipReason()
+    {
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 100f }; // far above — ray misses
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+
+        messages.Count.ShouldBe(1);
+        messages[0].ShouldContain("skip: raycast missed");
+    }
+
+    [Fact]
+    public void GroundSnap_OnSnapDiagnostic_OnSuccessfulSnap_InvokedOnceWithSnapMessage()
+    {
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+
+        messages.Count.ShouldBe(1);
+        messages[0].ShouldContain("snap: entityY=");
+        messages[0].ShouldContain("shape=AxisAlignedRectangle");
+        messages[0].ShouldContain("cell=(col=0,row=0)");
+        messages[0].ShouldContain("probe=(");
+    }
+
+    [Fact]
+    public void GroundSnap_OnSnapDiagnostic_PolygonHit_ReportsShapePolygon()
+    {
+        var tiles = MakeTiles();
+        var lowerFlat = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  0f),
+            new Vector2(-8f,  0f),
+        });
+        tiles.AddPolygonTileAtCell(0, 0, lowerFlat);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 4f, Y = 16f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+
+        messages.Count.ShouldBe(1);
+        messages[0].ShouldContain("shape=Polygon");
+    }
+
+    [Fact]
+    public void GroundSnap_SurfaceTooSteep_DoesNotSnap()
+    {
+        var tiles = MakeTiles();
+        var slope = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+        });
+        tiles.AddPolygonTileAtCell(0, 0, slope);
+        var values = MakeSnapValues(snapDistance: 16f, maxAngleDegrees: 30f);
+        var player = new PlayerEntity { X = 4f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeFalse();
+        player.Y.ShouldBe(20f);
+    }
+
+    [Fact]
+    public void GroundSnap_SurfaceWithinDistance_SnapsAndGrounds()
+    {
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeTrue();
+        player.Y.ShouldBe(16f);
+        player.VelocityY.ShouldBe(0f);
     }
 
     // --- Mock helpers ---

@@ -2,12 +2,15 @@
 
 See `Done.md` for completed items.
 
-## Slope Polygons in Tiled Maps — Phase 2
-**Priority: Next** — Phase 1 (emit polygon tiles from tileset `<polygon>` collision objects) is complete. Remaining work:
+## Tiled Collision Objects — Remaining
 
-- Support `TilemapRectangleObject` (and maybe `TilemapEllipseObject`) collision objects as sub-cell rects — currently ignored
-- Add TMX-based slope examples to sample levels
-- Update `levels` skill once Phase 2 lands
+Phases 1 (polygon tiles) and 2 (sub-cell `<object>` rectangles) are complete. Remaining items:
+
+- Add TMX-based slope/sub-cell examples to sample levels
+- `TilemapEllipseObject` stays out of scope: FRB2 has `Circle` with uniform radius only, and Tiled ellipses allow `rx != ry`; no realistic tile-collision use case justifies the approximation work
+
+## Slope Speed Adjustment (Platformer)
+**Priority: Eventual** — Port the slope-speed multiplier pattern from FRB1. When a platformer entity walks on a slope, its horizontal speed should adjust based on slope steepness (usually faster downhill, slower uphill). Config lives on `PlatformerValues` (something like `UphillStopAngle`, `UphillSlowDownSlope`, `DownhillSpeedBoost`, matching the FRB1 naming). Applied in `PlatformerBehavior` after determining current-surface normal (re-use the snap probe's normal, or query it separately).
 
 ## Polygon Snagging in Top-Down (Standard mode)
 **Priority: Eventual** — `TileShapeCollection` in `SlopeCollisionMode.Standard` can still snag at seams between adjacent polygon tiles when used for top-down angled walls.

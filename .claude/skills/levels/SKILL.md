@@ -64,15 +64,20 @@ Each collection can have its own collision relationship (solid blocks movement, 
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
 ```
 
-## Slope Tiles
+## Slope Tiles and Sub-Cell Shapes
 
-Tiles in the tileset that declare collision via `<objectgroup><polygon>...</polygon></objectgroup>` are automatically emitted as polygon tiles (not rects) by `GenerateCollisionFromClass`. For platformer floors, set the collection's slope mode so vertical separation uses a heightmap instead of SAT:
+Tiles in the tileset can declare custom collision via an `<objectgroup>` containing polygons and/or plain `<object>` rectangles. `GenerateCollisionFromClass` emits polygons as `Polygon` tiles and rectangles as sub-cell `AxisAlignedRectangle`s, instead of the default full-cell rect. Polygons and rects can coexist on the same tile. For platformer floors, set `SlopeMode = PlatformerFloor` on the **collision relationship** (not on the collection) so vertical separation uses a heightmap instead of SAT:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision");
-solid.SlopeMode = SlopeCollisionMode.PlatformerFloor;
 Add(solid);
+
+var playerVsSolid = AddCollisionRelationship(_playerFactory, solid);
+playerVsSolid.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+playerVsSolid.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 ```
+
+`SlopeMode` is a per-relationship concern: the same `solid` collection can simultaneously back a player relationship (`PlatformerFloor`) and a ball relationship (default `Standard` SAT) without conflict.
 
 See the `tmx` skill for how to author the polygon on the tileset tile.
 

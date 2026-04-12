@@ -39,9 +39,7 @@
  <tile id="75" type="SolidCollision"/>
  <tile id="76" type="SolidCollision">
   <objectgroup draworder="index" id="2">
-   <object id="1" x="0" y="8">
-    <polygon points="0,0 16,0 16,8 0,8"/>
-   </object>
+   <object id="1" x="0" y="8" width="16" height="8"/>
   </objectgroup>
  </tile>
  <tile id="77" type="SolidCollision"/>
@@ -50,25 +48,19 @@
  <tile id="106" type="SolidCollision"/>
  <tile id="107" type="SolidCollision">
   <objectgroup draworder="index" id="2">
-   <object id="1" x="8" y="0">
-    <polygon points="0,0 8,0 8,16 0,16"/>
-   </object>
+   <object id="2" x="8" y="0" width="8" height="16"/>
   </objectgroup>
  </tile>
  <tile id="108" type="SolidCollision"/>
  <tile id="109" type="SolidCollision">
   <objectgroup draworder="index" id="2">
-   <object id="1" x="0" y="0">
-    <polygon points="0,0 8,0 8,16 0,16"/>
-   </object>
+   <object id="1" x="0" y="0" width="8" height="16"/>
   </objectgroup>
  </tile>
  <tile id="139" type="SolidCollision"/>
  <tile id="140" type="SolidCollision">
   <objectgroup draworder="index" id="2">
-   <object id="1" x="0" y="0">
-    <polyline points="0,0 16,0 16,8 0,8 0,0"/>
-   </object>
+   <object id="1" x="0" y="0" width="16" height="8"/>
   </objectgroup>
  </tile>
  <tile id="141" type="SolidCollision"/>

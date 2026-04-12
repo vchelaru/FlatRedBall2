@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using FlatRedBall2;
+using FlatRedBall2.Movement;
 
 namespace FlatRedBall2.Collision;
 
@@ -28,6 +29,20 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     private Func<A, ICollidable>? _firstShapeSelector;
     private Func<B, ICollidable>? _secondShapeSelector;
+
+    /// <summary>
+    /// Controls how this relationship resolves overlap with polygon tiles when one side is a
+    /// <see cref="TileShapeCollection"/>. Default <see cref="SlopeCollisionMode.Standard"/> uses
+    /// SAT (correct for top-down and non-player-vs-level pairs like a ball vs. tiles). Set to
+    /// <see cref="SlopeCollisionMode.PlatformerFloor"/> for platformer player-vs-level to get
+    /// heightmap-based vertical separation on floor slopes. Ignored when neither side is a
+    /// <see cref="TileShapeCollection"/>.
+    /// </summary>
+    /// <remarks>
+    /// Lives on the relationship — not the collection — so the same tile collection can be used
+    /// with different semantics per relationship (e.g., player = PlatformerFloor, ball = Standard).
+    /// </remarks>
+    public SlopeCollisionMode SlopeMode { get; set; } = SlopeCollisionMode.Standard;
 
     /// <summary>
     /// When <c>true</c> and both lists are the same reference (self-collision), fires
@@ -208,10 +223,15 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var effectiveA = GetEffectiveA(a);
         var effectiveB = GetEffectiveB(b);
         DeepCollisionCount++;
-        if (!CheckCollision(effectiveA, effectiveB)) return;
+        if (!CheckCollision(effectiveA, effectiveB))
+        {
+            TryOfferGroundSnap(a, b);
+            return;
+        }
         var sep = ComputeSeparationVector(effectiveA, effectiveB);
         ApplyResponse(a, b, sep);
         CollisionOccurred?.Invoke(a, b);
+        TryOfferGroundSnap(a, b);
     }
 
     // Both lists are already sorted by their respective factories. Uses indexed access where available.
@@ -249,10 +269,15 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (bLeft > aRight) break; // too far; all remaining are also too far
 
                 DeepCollisionCount++;
-                if (!CheckCollision(effectiveA, effectiveB)) continue;
+                if (!CheckCollision(effectiveA, effectiveB))
+                {
+                    TryOfferGroundSnap(a, b);
+                    continue;
+                }
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
                 ApplyResponse(a, b, sep);
                 CollisionOccurred?.Invoke(a, b);
+                TryOfferGroundSnap(a, b);
             }
         }
     }
@@ -289,18 +314,30 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
     }
 
+    // Offers this relationship's TileShapeCollection to any IPlatformerEntity side as a
+    // ground-snap candidate. Only fires when SlopeMode == PlatformerFloor. No-op otherwise.
+    private void TryOfferGroundSnap(A a, B b)
+    {
+        if (SlopeMode != SlopeCollisionMode.PlatformerFloor) return;
+
+        if (a is IPlatformerEntity pa && pa is Entity ea && b is TileShapeCollection tscB)
+            pa.Platformer.ConsiderSnappingTo(ea, tscB);
+        else if (b is IPlatformerEntity pb && pb is Entity eb && a is TileShapeCollection tscA)
+            pb.Platformer.ConsiderSnappingTo(eb, tscA);
+    }
+
     private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;
     private ICollidable GetEffectiveB(B b) => _secondShapeSelector != null ? _secondShapeSelector(b) : b;
 
     // Checks collision using CollisionDispatcher.CollidesWith so Line intersections are handled.
     // Iterates leaf shape pairs so any combination of leaf shapes, entities, and
     // TileShapeCollections is dispatched correctly — including selected-shape vs entity cases.
-    private static bool CheckCollision(ICollidable a, ICollidable b)
+    private bool CheckCollision(ICollidable a, ICollidable b)
     {
         if (b is TileShapeCollection tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
-                if (tsc.GetSeparationFor(leafA) != Vector2.Zero)
+                if (tsc.GetSeparationFor(leafA, SlopeMode) != Vector2.Zero)
                     return true;
             return false;
         }
@@ -314,13 +351,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
     // physics separation is meaningful (e.g., Lines are infinitely thin).
-    private static Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
+    private Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
     {
         if (b is TileShapeCollection tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
             {
-                var sep = tsc.GetSeparationFor(leafA);
+                var sep = tsc.GetSeparationFor(leafA, SlopeMode);
                 if (sep != Vector2.Zero) return sep;
             }
             return Vector2.Zero;

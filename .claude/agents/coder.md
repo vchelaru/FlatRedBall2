@@ -44,7 +44,7 @@ For shapes-only games (no sprite art), animations are not needed at all — neit
 
 Exceptions are rare: genuinely untestable changes (e.g., purely cosmetic renames, doc-only edits) or trivial one-liners where a test would cost more than it's worth. When in doubt, write the test.
 
-Follow the test guidelines in `.claude/code-style.md`. The user will build and run tests themselves — do not run them via Bash.
+Follow the test guidelines in `.claude/code-style.md`. **Run tests via Bash yourself** — especially when TDDing. Write the failing test, run it to confirm it actually fails (and fails for the right reason), implement, re-run, confirm green. Don't wait for the user; reasoning about expected failures is not a substitute for actually seeing the failure message.
 
 # After editing
 

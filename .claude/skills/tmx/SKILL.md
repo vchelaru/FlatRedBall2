@@ -103,7 +103,7 @@ Add a new `<layer>` element. Increment the `id` and update `nextlayerid` on `<ma
 
 ### Author a slope tile (polygon collision)
 
-Slope collision is defined on a tileset tile via an `<objectgroup>` containing one `<polygon>`. `TileMapCollisionGenerator` converts any such polygon to a local-space `Polygon` prototype (centered on the cell, Y-up) and emits it via `TileShapeCollection.AddPolygonTileAtCell` instead of a rect. Pair with `TileShapeCollection.SlopeMode = PlatformerFloor` for platformer floor slopes.
+Slope collision is defined on a tileset tile via an `<objectgroup>` containing one `<polygon>`. `TileMapCollisionGenerator` converts any such polygon to a local-space `Polygon` prototype (centered on the cell, Y-up) and emits it via `TileShapeCollection.AddPolygonTileAtCell` instead of a rect. For platformer floor slopes, set `SlopeMode = PlatformerFloor` on the **player's collision relationship** (not on the collection) — see the `collision-relationships` and `platformer-movement` skills.
 
 ```xml
 <tile id="11" type="SolidCollision">
@@ -131,9 +131,25 @@ Tile flip flags (H, V, diagonal — the flip buttons in Tiled's editor, also app
 
 OR the appropriate mask(s) with the base GID. Example: tile ID 11 (GID 12) flipped horizontally → `12 + 2147483648 = 2147483660`. If you author TMX through the Tiled editor, this encoding is automatic. If you hand-edit CSV data, you must OR the bits yourself.
 
+### Sub-cell rectangles
+
+A tileset tile can also carry one or more `<object>` elements with no child shape — plain Tiled rectangles. These emit as `AxisAlignedRectangle`s placed inside the cell (not the default full-cell rect). Use them for spikes, half-height platforms, or any box that doesn't fill the whole tile.
+
+```xml
+<tile id="20" type="SolidCollision">
+ <objectgroup draworder="index" id="2">
+  <object id="1" x="0" y="8" width="16" height="8"/>  <!-- bottom half of the tile -->
+ </objectgroup>
+</tile>
+```
+
+Multiple rects per tile are fine (e.g., two separate spike-rects). Rects and polygons can coexist on the same tile — both emit. Tile flip flags (H, V, diagonal) are honored for rects the same way they are for polygons.
+
+Adjacent sub-cell rects participate in `RepositionDirections` seam suppression: if two sub-cell rects share an aligned, overlapping face (e.g., two bottom-half curbs in neighbor cells), or if a sub-cell rect's face aligns with a full-cell neighbor tile's face, the sub-cell rect's face is suppressed. When a sub-cell rect fully covers the adjacent full-cell tile's face (endpoints coincide), the matching face on the full-cell tile is suppressed as well, so a mover crossing the seam sees one clean surface. Partial coverage (e.g., a short spike next to a tall wall) leaves the full-cell face live so the exposed portion still repositions correctly. A sub-cell rect face that is fully covered by an axis-aligned polygon edge along the shared cell boundary (e.g., a slope polygon's vertical back-edge meeting a half-height rect) is also suppressed on the rect side so the mover doesn't snag at the seam; the polygon side is not modified.
+
 **Current limitations:**
-- `<object>` rectangles (no child element) and polylines are ignored — only `<polygon>` is honored.
-- Only one `<polygon>` per tile is supported. Authoring a second polygon on the same tile throws `InvalidOperationException` at load time — merge the shapes into a single polygon in Tiled instead.
+- `<ellipse>` and polyline collision objects are ignored — only `<polygon>` and plain `<object>` rectangles are honored.
+- Only one `<polygon>` per tile is supported. Authoring a second polygon on the same tile throws `InvalidOperationException` at load time — merge the shapes into a single polygon in Tiled instead. (Rectangles have no such limit.)
 
 ### Add a tileset
 

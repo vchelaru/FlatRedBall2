@@ -537,6 +537,33 @@ public class TileShapeCollectionTests
     }
 
     [Fact]
+    public void Raycast_HitShapeOverload_FullCellTile_ReturnsThatRect()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(2, 0);
+        var expected = tiles.GetTileAtCell(2, 0);
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(64f, 8f),
+            out _, out _, out ICollidable? hitShape);
+
+        hit.ShouldBeTrue();
+        hitShape.ShouldBeSameAs(expected);
+    }
+
+    [Fact]
+    public void Raycast_HitShapeOverload_PolygonTile_ReturnsPolygonInstance()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(2, 0, SquarePrototype());
+
+        bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(80f, 8f),
+            out _, out _, out ICollidable? hitShape);
+
+        hit.ShouldBeTrue();
+        hitShape.ShouldBeOfType<Polygon>();
+    }
+
+    [Fact]
     public void Raycast_PolygonTile_RayDoesNotReachCell_ReturnsFalse()
     {
         // Polygon tile at cell (5,0) — ray stops well before it.
@@ -544,6 +571,130 @@ public class TileShapeCollectionTests
         tiles.AddPolygonTileAtCell(5, 0, SquarePrototype());
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(40f, 8f), out _, out _);
+
+        hit.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Raycast_PolygonTile_StartsInsideCellAbovePolygon_HitsPolygonTopSurface()
+    {
+        // 45° slope polygon filling bottom-right triangle of cell (0,0):
+        // world verts (0,0), (16,0), (16,16). Slope surface y = x along the hypotenuse.
+        // Ray starts inside cell at (12, 15) — above the surface (surface at x=12 is y=12).
+        // Probes straight down to y=-1. Expected: hits slope surface at y=12.
+        var slope = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f), // world (0,0)
+            new Vector2( 8f, -8f), // world (16,0)
+            new Vector2( 8f,  8f), // world (16,16)
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, slope);
+
+        bool hit = tiles.Raycast(new Vector2(12f, 15f), new Vector2(12f, -1f),
+            out Vector2 hitPoint, out _, out ICollidable? hitShape);
+
+        hit.ShouldBeTrue();
+        hitPoint.Y.ShouldBe(12f, tolerance: 0.1f);
+        hitShape.ShouldBeOfType<Polygon>();
+    }
+
+    [Fact]
+    public void Raycast_PolygonTile_StartsEmbeddedSlightlyBelowSurface_HitsPolygonNotCellBelow()
+    {
+        // 45° slope polygon filling bottom-right triangle of cell (0,1) at y ∈ [16,32]:
+        // world verts (0,16), (16,16), (16,32). Surface y = x + 16 along hypotenuse.
+        // Below (cell (0,0), y∈[0,16]) is a full-cell rect — a "floor below the slope".
+        // Ray feet at x=12 — surface there is y=28. Start ray slightly EMBEDDED at y=27.9,
+        // probe down to y=12. Without fix: start cell's polygon is skipped, ray continues
+        // down and hits the full-cell tile's top at y=16. With fix: returns a polygon hit
+        // at (or near) the start position — NOT the cell below.
+        var slope = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f), // world (0,16)
+            new Vector2( 8f, -8f), // world (16,16)
+            new Vector2( 8f,  8f), // world (16,32)
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 1, slope);
+        tiles.AddTileAtCell(0, 0); // full-cell rect at y∈[0,16] — the "wrong" thing to hit
+
+        bool hit = tiles.Raycast(new Vector2(12f, 27.9f), new Vector2(12f, 12f),
+            out Vector2 hitPoint, out _, out ICollidable? hitShape);
+
+        hit.ShouldBeTrue();
+        hitShape.ShouldBeOfType<Polygon>();       // must be the slope, not the rect below
+        hitPoint.Y.ShouldBeGreaterThan(16f);      // above the cell-below boundary
+    }
+
+    // ── Raycast (sub-cell rects) ─────────────────────────────────────────────
+
+    [Fact]
+    public void Raycast_DownwardRay_HitsSubCellRect()
+    {
+        // Cell (0,0) contains a 16x8 bottom-half rect — top face at y=8.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
+
+        bool hit = tiles.Raycast(new Vector2(8f, 20f), new Vector2(8f, -4f),
+            out Vector2 hitPoint, out Vector2 hitNormal);
+
+        hit.ShouldBeTrue();
+        hitPoint.Y.ShouldBe(8f, tolerance: 0.001f);
+        hitNormal.ShouldBe(new Vector2(0f, 1f));
+    }
+
+    [Fact]
+    public void Raycast_SubCellRectCloserThanPolygon_ReturnsSubCellHit()
+    {
+        // Cell (0,0): polygon bottom half (top y=8) AND sub-cell rect filling top quarter
+        // (y=[12,16], top face at y=16). A downward ray from above hits the rect (y=16) first.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        var bottomHalf = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  0f),
+            new Vector2(-8f,  0f),
+        });
+        tiles.AddPolygonTileAtCell(0, 0, bottomHalf);
+        tiles.AddRectangleTileAtCell(0, 0, 0f, 6f, 16f, 4f); // center y=14, height 4 → top y=16
+
+        bool hit = tiles.Raycast(new Vector2(8f, 30f), new Vector2(8f, -4f),
+            out Vector2 hitPoint, out _);
+
+        hit.ShouldBeTrue();
+        hitPoint.Y.ShouldBe(16f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void Raycast_MultipleSubCellRectsInCell_ReturnsEarliestHit()
+    {
+        // Two rects in cell (0,0): lower (top y=4) and upper (top y=12).
+        // Downward ray hits the upper one first.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -6f, 16f, 4f); // top y=4
+        tiles.AddRectangleTileAtCell(0, 0, 0f,  2f, 16f, 4f); // top y=12
+
+        bool hit = tiles.Raycast(new Vector2(8f, 30f), new Vector2(8f, -4f),
+            out Vector2 hitPoint, out _);
+
+        hit.ShouldBeTrue();
+        hitPoint.Y.ShouldBe(12f, tolerance: 0.001f);
+    }
+
+    [Fact]
+    public void Raycast_SubCellRectOffAxis_RayContinuesToNextCell()
+    {
+        // Cell (0,0) has a sub-cell rect only in its left half (x=[0,8]).
+        // Cell (1,0) has a full tile. A downward ray at x=12 should skip the rect and
+        // continue — ultimately not hitting anything directly below in its column.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, -4f, 0f, 8f, 16f); // left half of cell (0,0)
+        tiles.AddTileAtCell(2, 0); // a separate tile, not under the ray
+
+        bool hit = tiles.Raycast(new Vector2(12f, 20f), new Vector2(12f, -4f),
+            out _, out _);
 
         hit.ShouldBeFalse();
     }
@@ -569,12 +720,12 @@ public class TileShapeCollectionTests
         // Surface height at X=12: lerp from 0 to 16 over [0..16] → 12.
         // Rect bottom is 6 < 12 → push up by 6.
         float expectedSepY = 6f;
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 12f, Y = 10f };
 
-        var sep = tiles.GetSeparationFor(rect);
+        var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBe(0f, tolerance: 0.01f, customMessage: "platformer slope should not push horizontally");
         sep.Y.ShouldBe(expectedSepY, tolerance: 0.1f);
@@ -609,14 +760,14 @@ public class TileShapeCollectionTests
         // Player at X=20 (inside slope cell), bottom at Y=2 (center Y=6, height=8).
         // Slope at cell (1,0): surface at X=20 → lerp (20-16)/(32-16) * 16 = 4.
         // Player bottom=2 < 4 → push up by 2. No X push. No snagging.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddPolygonTileAtCell(1, 0, UpRightSlope());
 
         // Player overlapping the slope tile near the seam with the rect tile.
         var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 20f, Y = 6f };
 
-        var sep = tiles.GetSeparationFor(rect);
+        var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBe(0f, tolerance: 0.01f, customMessage: "slope should not push horizontally at seam");
         sep.Y.ShouldBeGreaterThan(0f, "slope should push player up to surface");
@@ -626,13 +777,13 @@ public class TileShapeCollectionTests
     public void GetSeparationFor_PlatformerFloor_NoOverlap_ReturnsZero()
     {
         // Rect above the slope surface — no separation needed.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         // Slope at cell (0,0): surface at X=8 → 8. Rect bottom at Y=20 → well above.
         var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 8f, Y = 24f };
 
-        tiles.GetSeparationFor(rect).ShouldBe(Vector2.Zero);
+        tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor).ShouldBe(Vector2.Zero);
     }
 
     [Fact]
@@ -673,7 +824,7 @@ public class TileShapeCollectionTests
         // would strip vertical. With velocity check, lastBottom = 13 - (-500/60) =
         // 13 + 8.33 = 21.33 > rectTop(16) → was above → landing fires.
         // Platform at cell (5, 0): spans [80..96] x [0..16].
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(5, 0);
 
         // Player center X=78, bottom at Y=13. Spans [72..84] x [13..37].
@@ -681,7 +832,7 @@ public class TileShapeCollectionTests
         // Center X=78 < rectLeft=80 → outside → suppressed. Landing must restore it.
         var box = MakePlayerBox(78f, 25f, 12f, 24f, velocityY: -500f);
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.Y.ShouldBeGreaterThan(0f, "falling player should land on top");
         sep.X.ShouldBe(0f, tolerance: 0.01f, customMessage: "should not push horizontally when landing");
@@ -692,12 +843,12 @@ public class TileShapeCollectionTests
     {
         // Player walks into wall (VelocityY = 0). Same geometry as landing test but
         // not falling → should push horizontally, not snap up.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         var box = MakePlayerBox(19f, 22f, 12f, 24f, velocityY: 0f);
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBeGreaterThan(0f, "should push right away from wall");
         sep.Y.ShouldBe(0f, tolerance: 0.01f, customMessage: "should not push up when hitting wall from side");
@@ -718,13 +869,13 @@ public class TileShapeCollectionTests
         // Standard: X(4) < Y(14 or 10) → push left. Correct without PlatformerFloor.
         // With VelocityY=-15, lastBottom ≈ 6+0.25 = 6.25 < wall top (32) → not above.
         // So PlatformerFloor landing should NOT fire → horizontal push preserved.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(3, 0);
         tiles.AddTileAtCell(3, 1);
 
         var box = MakePlayerBox(46f, 18f, 12f, 24f, velocityY: -15f);
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBeLessThan(0f, "should push left out of wall, not pop up onto it");
     }
@@ -740,7 +891,7 @@ public class TileShapeCollectionTests
         // Setup: single column of 2 stacked tiles (neighbor on right to suppress Right
         // of the lower tile). Lower tile (0, 0) has Up suppressed by (0, 1).
         // Player barely overlaps (0, 0) from the right, slightly below its top.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(0, 1);
 
@@ -756,7 +907,7 @@ public class TileShapeCollectionTests
         // We DON'T want it to fire because (0, 0) has Up suppressed.
         var box = MakePlayerBox(10f + 6.1f, 15.9f + 12f, 12f, 24f, velocityY: -15f);
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         // Should push LEFT (horizontal), not UP. Only (0, 0) is being checked here
         // (single-column setup). If landing fires, sep.Y > 0. If not, sep.X < 0.
@@ -777,7 +928,7 @@ public class TileShapeCollectionTests
         // Ground at row 2, cols 0-5. Player at col 2-3 area.
         // Tile (2,2): [32..48] x [32..48]. Player at X=42, box [36..48].
         // Player sunk slightly: box Y [32..56] (row 2 bottom to above).
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         for (int c = 0; c < 6; c++)
         {
             tiles.AddTileAtCell(c, 0);
@@ -789,7 +940,7 @@ public class TileShapeCollectionTests
         var box = MakePlayerBox(42f, 32f + 12f, 12f, 24f, velocityY: -15f);
         ((Entity)((IAttachable)box).Parent!).VelocityX = -0.14f; // tiny negative X velocity
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.Y.ShouldBeGreaterThan(10f, "player sunk into ground should be pushed up strongly");
     }
@@ -801,7 +952,7 @@ public class TileShapeCollectionTests
         // VelocityX > 0 (holding right), VelocityY < 0 (gravity while in gap).
         // Ground: cols 0-4 row 0. Gap: cols 5-6. Wall: col 7 rows 0-2.
         // Player fell slightly below ground level, right edge clips wall.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         for (int c = 0; c < 5; c++) tiles.AddTileAtCell(c, 0);
         tiles.AddTileAtCell(7, 0);
         tiles.AddTileAtCell(7, 1);
@@ -814,7 +965,7 @@ public class TileShapeCollectionTests
         // Also set VelocityX on the parent entity
         ((Entity)((IAttachable)box).Parent!).VelocityX = 150f;
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBeLessThan(0f, "walking right into wall should push left");
     }
@@ -830,7 +981,7 @@ public class TileShapeCollectionTests
         // Pit wall at col 5, rows 0-2. Player to the left, falling along the face.
         // Player center X=78, spans [72..84]. Wall [80..96].
         // Player was to the LEFT of the wall last frame AND this frame.
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(5, 0);
         tiles.AddTileAtCell(5, 1);
         tiles.AddTileAtCell(5, 2);
@@ -844,7 +995,7 @@ public class TileShapeCollectionTests
         // last frame, not beside it. lastCenterX should be within rect's X span.
         var box = MakePlayerBox(78f, 46f, 12f, 24f, velocityY: -500f);
 
-        var sep = tiles.GetSeparationFor(box);
+        var sep = tiles.GetSeparationFor(box, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBeLessThan(0f, "falling along pit wall should push left, not snap onto tiles");
     }
@@ -861,12 +1012,12 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  0f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, shallow);
 
         var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 8f, Y = 4f };
 
-        var sep = tiles.GetSeparationFor(rect);
+        var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
         sep.Y.ShouldBe(4f, tolerance: 0.1f, customMessage: "shallow slope at center should push up to half-tile height");
     }
@@ -882,17 +1033,49 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
         tiles.AddPolygonTileAtCell(1, 1, slope);
 
         // Rect near seam (X=15, just inside cell 0's top-right). Surface should be ~15.
         var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 15f, Y = 12f };
 
-        var sep = tiles.GetSeparationFor(rect);
+        var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
         sep.X.ShouldBe(0f, tolerance: 0.01f, customMessage: "slopes should not push horizontally");
         sep.Y.ShouldBeGreaterThan(0f, "should push up onto seam between adjacent slopes");
+    }
+
+    // V-flipped up-right slope: a "ceiling" polygon whose solid mass sits in the upper
+    // half of the cell. Hypotenuse runs from top-left to bottom-right, open space below.
+    private static Polygon CeilingSlope(float halfSize = 8f) => Polygon.FromPoints(new[]
+    {
+        new Vector2(-halfSize,  halfSize), // top-left
+        new Vector2( halfSize,  halfSize), // top-right
+        new Vector2( halfSize, -halfSize), // bottom-right
+    });
+
+    [Fact]
+    public void GetSeparationFor_PlatformerFloor_CeilingPolygonFromBelow_DoesNotPushUp()
+    {
+        // Player jumping up into a V-flipped slope ceiling. The polygon's mass is in the
+        // upper half of the cell; open space is below. Heightmap separation (which assumes
+        // a floor surface) would push the player UP into/through the ceiling — wrong.
+        // Fix: ceiling-like polygons should fall back to SAT, which pushes down/horizontal.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, CeilingSlope());
+
+        // Cell (0,0) spans [0..16] x [0..16]. Ceiling polygon occupies upper region —
+        // hypotenuse runs (0,16)→(16,0) with mass above the line.
+        // Player jumping up: center X=8, Y=2, W=H=8 → bounds [4..12] x [-2..6].
+        // Top of player (Y=6) pokes into the ceiling's lower tip. A floor-style heightmap
+        // push would shove the player up to surfaceY=16 (teleport). SAT pushes along the
+        // hypotenuse's outward normal, away from the ceiling (down/left).
+        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 8f, Y = 2f };
+
+        var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
+
+        sep.Y.ShouldBeLessThanOrEqualTo(0f, "ceiling polygon must not push the player upward");
     }
 
     [Fact]
@@ -900,13 +1083,279 @@ public class TileShapeCollectionTests
     {
         // Player standing at the right edge of a platform, center X slightly past rect edge.
         // No adjacent slope tile. Should still push up (not suppressed).
-        var tiles = new TileShapeCollection { GridSize = 16f, SlopeMode = SlopeCollisionMode.PlatformerFloor };
+        var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         var player = new AxisAlignedRectangle { Width = 12f, Height = 24f, X = 17f, Y = 27f };
 
-        var sep = tiles.GetSeparationFor(player);
+        var sep = tiles.GetSeparationFor(player, SlopeCollisionMode.PlatformerFloor);
 
         sep.Y.ShouldBeGreaterThan(0f, "standing on edge should push up even when center is past edge");
     }
+
+    // ── Relationship-level SlopeMode (per-relationship resolution) ───────────
+
+    [Fact]
+    public void RunCollisions_RelationshipSlopeModePlatformerFloor_PushesPlayerUpSlope()
+    {
+        // Player entity vs. a TileShapeCollection containing one floor slope polygon.
+        // Relationship.SlopeMode = PlatformerFloor → heightmap path → vertical push only.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
+
+        var player = new Entity();
+        var box = new AxisAlignedRectangle { Width = 8f, Height = 8f };
+        player.Add(box);
+        player.X = 12f; player.Y = 10f; // matches SlopeRamp_PushesUpVertically geometry
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { player }, new[] { tiles });
+        rel.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        player.X.ShouldBe(12f, tolerance: 0.01f, customMessage: "PlatformerFloor must not push horizontally on slope");
+        player.Y.ShouldBeGreaterThan(10f, "PlatformerFloor should push player up onto slope surface");
+    }
+
+    [Fact]
+    public void RunCollisions_RelationshipSlopeModeStandard_UsesSatOnSameSlopeTiles()
+    {
+        // Same TileShapeCollection as above but relationship has default Standard mode →
+        // SAT separation with a non-zero X component (proves the collection isn't globally biased).
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
+
+        var ball = new Entity();
+        var circle = new Circle { Radius = 4f };
+        ball.Add(circle);
+        ball.X = 12f; ball.Y = 10f;
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { ball }, new[] { tiles });
+        // No SlopeMode set → defaults to Standard.
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        // SAT pushes along the hypotenuse normal (up-left), so both axes move — unlike
+        // PlatformerFloor which would only move Y.
+        MathF.Abs(ball.X - 12f).ShouldBeGreaterThan(0.1f, "Standard SAT should produce horizontal component");
+    }
+
+    [Fact]
+    public void GetSeparationVector_PublicEntryPoint_DefaultsToStandardMode()
+    {
+        // Calling the ICollidable-level GetSeparationVector on the collection (no relationship)
+        // must use Standard mode — the safe symmetric default.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
+
+        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 12f, Y = 10f };
+
+        var sep = tiles.GetSeparationVector(rect);
+
+        // Standard mode on this slope produces an SAT MTV with a horizontal component;
+        // PlatformerFloor would zero out X.
+        MathF.Abs(sep.X).ShouldBeGreaterThan(0.01f, "public entry point should default to Standard SAT");
+    }
+
+    // ── AddRectangleTileAtCell — sub-cell rect adjacency ────────────────────
+
+    [Fact]
+    public void AddRectangleTileAtCell_AdjacentBottomHalfRects_SuppressSharedInnerFaces()
+    {
+        // Two 16x8 bottom-half sub-cell rects in cells (0,0) and (1,0) form a continuous curb.
+        // Cell (0,0) center is (8, 8); bottom-half rect center is (8, 4). Cell (1,0) bottom-half center (24, 4).
+        // Shared face: x=16, y in [0,8]. Left rect's Right face and right rect's Left face should be cleared.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
+        tiles.AddRectangleTileAtCell(1, 0, 0f, -4f, 16f, 8f);
+
+        var leftRect  = tiles.GetRectangleTilesAtCell(0, 0)[0];
+        var rightRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
+
+        leftRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        rightRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_AdjacentFullCellTile_SuppressesSharedFace()
+    {
+        // Sub-cell bottom-half rect at (0,0): faces left=0, right=16, bottom=0, top=8.
+        // Full-cell tile at (1,0): faces left=16, right=32, bottom=0, top=16.
+        // Shared face: x=16, y in [0,8] ⊂ [0,16]. Sub-cell rect's Right should be cleared.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
+        tiles.AddTileAtCell(1, 0);
+
+        var subRect = tiles.GetRectangleTilesAtCell(0, 0)[0];
+
+        subRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_NonAlignedNeighborRects_NoSuppression()
+    {
+        // Bottom-half in (0,0): y ∈ [0,8], right face at x=16. Top-half in (1,0): y ∈ [8,16],
+        // left face at x=16. Opposite faces are aligned on x but their y-ranges touch only at a
+        // single point (y=8), which is zero overlap — must NOT suppress.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f); // bottom-half in (0,0)
+        tiles.AddRectangleTileAtCell(1, 0, 0f,  4f, 16f, 8f); // top-half in (1,0)
+
+        var leftRect  = tiles.GetRectangleTilesAtCell(0, 0)[0];
+        var rightRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
+
+        leftRect.RepositionDirections.ShouldBe(RepositionDirections.All);
+        rightRect.RepositionDirections.ShouldBe(RepositionDirections.All);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_FlatRectOnTopOfFullCell_SuppressesFullCellUpFace()
+    {
+        // Full-cell tile at (0,0): top face y=16, x in [0,16].
+        // Bottom-half sub-cell rect at (0,1) center=(8,20), so bottom=16, x in [0,16].
+        // Rect's bottom face fully covers the full-cell's top face → both must be suppressed
+        // at the seam so a mover crossing from off-the-square onto the flat rect sees a clean surface.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f);
+
+        var square  = tiles.GetTileAtCell(0, 0)!;
+        var subRect = tiles.GetRectangleTilesAtCell(0, 1)[0];
+
+        square.RepositionDirections.ShouldBe(
+            RepositionDirections.Left | RepositionDirections.Right | RepositionDirections.Down);
+        subRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_PartialCoverageAgainstFullCell_LeavesFullCellFaceLive()
+    {
+        // Full-cell wall at (1,0): left face x=16, y in [0,16].
+        // Sub-cell bottom-half rect at (0,0) center=(8,4), right face x=16, y in [0,8].
+        // Rect only covers bottom half of the wall's left face — wall's Left must stay live
+        // (regression guard: a tall wall next to a short spike should still repo movers off the wall).
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(1, 0);
+        tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
+
+        var wall    = tiles.GetTileAtCell(1, 0)!;
+        var subRect = tiles.GetRectangleTilesAtCell(0, 0)[0];
+
+        wall.RepositionDirections.ShouldBe(RepositionDirections.All);
+        subRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_FlatRectBesideFullCell_SuppressesFullCellRightFace()
+    {
+        // Full-cell tile at (0,0): right face x=16, y in [0,16].
+        // Left-half sub-cell rect at (1,0) center=(20,8), left face x=16, y in [0,16] → full coverage.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddRectangleTileAtCell(1, 0, -4f, 0f, 8f, 16f);
+
+        var square  = tiles.GetTileAtCell(0, 0)!;
+        var subRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
+
+        square.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        subRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_AdjacentPolygonWithFullEdgeCoverage_SuppressesRectFace()
+    {
+        // Slope polygon at cell (0,0) whose right edge runs the full cell height along x=16
+        // (points: (-8,-8),(8,-8),(8,8) → right edge from (8,-8) to (8,8) in local → world x=16, y∈[0,16]).
+        // Bottom-half sub-cell rect at cell (1,0): left face at x=16, y ∈ [0,8] — fully covered.
+        // Rect's Left bit must be suppressed.
+        var slope = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, slope);
+        tiles.AddRectangleTileAtCell(1, 0, 0f, -4f, 16f, 8f);
+
+        var rect = tiles.GetRectangleTilesAtCell(1, 0)[0];
+        rect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_AdjacentPolygonPartialEdgeCoverage_LeavesRectFaceLive()
+    {
+        // Polygon at cell (0,0) whose right edge only covers the BOTTOM half of the shared boundary:
+        // points (-8,-8),(8,-8),(8,0),(-8,0) — right edge from (8,-8)→(8,0) → world x=16, y∈[0,8].
+        // Sub-cell rect at (1,0) is TOP half: center (20, 12), y∈[8,16]. No overlap with edge's y∈[0,8].
+        // Rect's Left must remain live.
+        var poly = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  0f),
+            new Vector2(-8f,  0f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, poly);
+        tiles.AddRectangleTileAtCell(1, 0, 0f, 4f, 16f, 8f); // top-half rect in cell (1,0)
+
+        var rect = tiles.GetRectangleTilesAtCell(1, 0)[0];
+        rect.RepositionDirections.ShouldBe(RepositionDirections.All);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_PolygonBelowRect_SuppressesRectDownFace()
+    {
+        // Polygon at cell (0,0) with a horizontal top edge along y=16 spanning the full cell width.
+        // points (-8,-8),(8,-8),(8,8),(-8,8) — top edge (8,8)→(-8,8) → world y=16, x∈[0,16].
+        // Top-half sub-cell rect at (0,1): center (8,20), bottom face y=16, x∈[0,16]. Fully covered.
+        // Rect's Down must be suppressed.
+        var poly = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+            new Vector2(-8f,  8f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, poly);
+        tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f); // bottom-half rect in cell (0,1)
+
+        var rect = tiles.GetRectangleTilesAtCell(0, 1)[0];
+        rect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void AddRectangleTileAtCell_FullCoverageAddOrderReversed_SuppressesFullCellUpFace()
+    {
+        // Same geometry as FlatRectOnTopOfFullCell but sub-cell rect added first.
+        // When the full-cell tile is added, adjacency pass must see the pre-existing sub-cell rect
+        // and clear the full-cell's Up bit.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f);
+        tiles.AddTileAtCell(0, 0);
+
+        var square  = tiles.GetTileAtCell(0, 0)!;
+        var subRect = tiles.GetRectangleTilesAtCell(0, 1)[0];
+
+        square.RepositionDirections.ShouldBe(
+            RepositionDirections.Left | RepositionDirections.Right | RepositionDirections.Down);
+        subRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+    }
+
 }

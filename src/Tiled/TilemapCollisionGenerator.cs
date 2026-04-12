@@ -206,33 +206,42 @@ public static class TileMapCollisionGenerator
                 // Tiled is Y-down; TileShapeCollection is Y-up. Flip the row.
                 int flippedRow = layer.Height - 1 - row;
 
-                if (TryBuildPolygonPrototypes(tileData, collection.GridSize, tile.FlipFlags, out var prototypes))
-                {
-                    foreach (var proto in prototypes)
-                        collection.AddPolygonTileAtCell(col, flippedRow, proto);
-                }
-                else
+                BuildCollisionShapes(tileData, collection.GridSize, tile.FlipFlags,
+                    out var polygons, out var rects);
+
+                if (polygons == null && rects == null)
                 {
                     collection.AddTileAtCell(col, flippedRow);
+                    continue;
                 }
+
+                if (polygons != null)
+                    foreach (var proto in polygons)
+                        collection.AddPolygonTileAtCell(col, flippedRow, proto);
+
+                if (rects != null)
+                    foreach (var r in rects)
+                        collection.AddRectangleTileAtCell(col, flippedRow, r.cx, r.cy, r.w, r.h);
             }
         }
     }
 
-    // Converts any TilemapPolygonObject collision shapes on the tile into local-space Polygon
-    // prototypes centered on (0, 0) with Y-up. Applies Tiled flip flags (diagonal, then
-    // horizontal, then vertical) per Tiled's rendering semantics. Returns false (and null
-    // prototypes) if the tile has no polygon collision objects. Non-polygon collision objects
-    // (rectangles, ellipses, polylines) are currently ignored — see TODOS.md.
-    private static bool TryBuildPolygonPrototypes(
+    // Converts polygon and rectangle collision objects on the tile into local-space shapes
+    // centered on (0, 0) with Y-up. Applies Tiled flip flags (diagonal, then horizontal, then
+    // vertical) per Tiled's rendering semantics. A tile with any collision object emits those
+    // custom shapes instead of the default full-cell rect. Ellipse and polyline collision
+    // objects are ignored — see TODOS.md.
+    private static void BuildCollisionShapes(
         TilemapTileData tileData,
         float gridSize,
         TilemapTileFlipFlags flipFlags,
-        out List<Polygon> prototypes)
+        out List<Polygon>? polygons,
+        out List<(float cx, float cy, float w, float h)>? rects)
     {
-        prototypes = null!;
+        polygons = null;
+        rects = null;
         if (tileData.CollisionObjects == null || tileData.CollisionObjects.Count == 0)
-            return false;
+            return;
 
         float half = gridSize / 2f;
         bool flipD = (flipFlags & TilemapTileFlipFlags.FlipDiagonally) != 0;
@@ -241,32 +250,53 @@ public static class TileMapCollisionGenerator
 
         foreach (var obj in tileData.CollisionObjects)
         {
-            if (obj is not TilemapPolygonObject polyObj || polyObj.Points == null || polyObj.Points.Length < 3)
-                continue;
-
-            var localPoints = new List<Vector2>(polyObj.Points.Length);
-            foreach (var p in polyObj.Points)
+            if (obj is TilemapPolygonObject polyObj && polyObj.Points != null && polyObj.Points.Length >= 3)
             {
-                // Tiled pixel (Y-down, origin at tile top-left) → FRB2 local (Y-up, centered).
-                XnaVec2 tiled = polyObj.Position + p;
-                float x = tiled.X - half;
-                float y = half - tiled.Y;
+                var localPoints = new List<Vector2>(polyObj.Points.Length);
+                foreach (var p in polyObj.Points)
+                {
+                    // Tiled pixel (Y-down, origin at tile top-left) → FRB2 local (Y-up, centered).
+                    XnaVec2 tiled = polyObj.Position + p;
+                    float x = tiled.X - half;
+                    float y = half - tiled.Y;
+                    ApplyFlips(ref x, ref y, flipD, flipH, flipV);
+                    localPoints.Add(new Vector2(x, y));
+                }
 
-                // Apply flips in Tiled's declared order: diagonal, then horizontal, then vertical.
-                // In centered-Y-up space this becomes: D: (x,y) → (-y,-x); H: x → -x; V: y → -y.
-                // Winding may reverse under odd flip counts, but Polygon.FromPoints / SAT
-                // normalize winding internally, so we preserve the original point order.
-                if (flipD) (x, y) = (-y, -x);
-                if (flipH) x = -x;
-                if (flipV) y = -y;
-
-                localPoints.Add(new Vector2(x, y));
+                polygons ??= new List<Polygon>();
+                polygons.Add(Polygon.FromPoints(localPoints));
             }
+            else if (obj is TilemapRectangleObject rectObj)
+            {
+                // Tiled rect: top-left (Position.X, Position.Y), size (Size.X, Size.Y), Y-down.
+                // Convert center to FRB2 local (Y-up, centered on cell).
+                float w = rectObj.Size.X;
+                float h = rectObj.Size.Y;
+                float cx = rectObj.Position.X + w / 2f - half;
+                float cy = half - (rectObj.Position.Y + h / 2f);
 
-            prototypes ??= new List<Polygon>();
-            prototypes.Add(Polygon.FromPoints(localPoints));
+                // Diagonal flip transposes across the tile's main diagonal — swap center and size.
+                if (flipD)
+                {
+                    (cx, cy) = (-cy, -cx);
+                    (w, h) = (h, w);
+                }
+                if (flipH) cx = -cx;
+                if (flipV) cy = -cy;
+
+                rects ??= new List<(float, float, float, float)>();
+                rects.Add((cx, cy, w, h));
+            }
         }
+    }
 
-        return prototypes != null;
+    // Applies Tiled flip flags in declared D → H → V order in centered-Y-up local space.
+    // Winding may reverse under odd flip counts; callers that produce polygons rely on
+    // Polygon.FromPoints / SAT to normalize winding internally.
+    private static void ApplyFlips(ref float x, ref float y, bool flipD, bool flipH, bool flipV)
+    {
+        if (flipD) (x, y) = (-y, -x);
+        if (flipH) x = -x;
+        if (flipV) y = -y;
     }
 }

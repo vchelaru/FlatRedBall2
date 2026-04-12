@@ -65,4 +65,25 @@ public class PlatformerValues
     /// and x velocity is set directly to the input-scaled <see cref="MaxSpeedX"/>.
     /// </summary>
     public bool UsesAcceleration;
+
+    /// <summary>
+    /// Maximum downward distance the entity will "snap" onto a lower surface after losing ground
+    /// contact while it was grounded the previous frame. Enables the standard platformer feel of
+    /// hugging a downslope or stepping off an up-ramp onto flat ground without floating for a
+    /// frame. Set to <c>0</c> to disable snapping entirely (e.g., a ball/wheel movement mode that
+    /// wants Sonic-style launch physics). Default <c>16</c> matches a typical one-tile step;
+    /// significantly larger values feel teleport-y. Requires
+    /// <see cref="PlatformerBehavior.CollisionShape"/> to be set and at least one collision
+    /// relationship in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/> mode —
+    /// each such relationship contributes its <see cref="TileShapeCollection"/> as a snap probe target.
+    /// </summary>
+    public float SlopeSnapDistance { get; set; } = 16f;
+
+    /// <summary>
+    /// Surfaces whose upward normal is within this many degrees of straight up are considered
+    /// walkable for ground-snap. Surfaces beyond this angle (walls and near-walls) will not
+    /// trigger a snap — the entity falls normally. Default 60° accepts steep slopes but rejects
+    /// walls.
+    /// </summary>
+    public float SlopeSnapMaxAngleDegrees { get; set; } = 60f;
 }

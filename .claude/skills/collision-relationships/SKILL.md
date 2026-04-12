@@ -98,6 +98,27 @@ AddCollisionRelationship(_playerFactory, tiles)
 
 `RepositionDirections` on adjacent tiles are maintained automatically — interior shared edges are cleared so entities glide across flat surfaces without snagging on seams.
 
+### SlopeMode (per-relationship)
+
+When one side is a `TileShapeCollection` containing polygon (slope) tiles, `relationship.SlopeMode` controls how overlap is resolved:
+
+- `SlopeCollisionMode.Standard` (default) — SAT. Correct for top-down games and for non-player pairs (e.g., a ball bouncing off the same level tiles).
+- `SlopeCollisionMode.PlatformerFloor` — vertical-only heightmap separation on floor slopes, with preferential landing. Use on the platformer player's relationship.
+
+`SlopeMode` lives on the relationship — not the collection — specifically so the same level geometry can be used with different semantics per relationship (e.g., player = `PlatformerFloor`, kicked ball = `Standard`).
+
+`PlatformerFloor` mode also **automatically contributes this collection as a ground-snap target** for any entity in the relationship that implements `IPlatformerEntity` — no separate "SnapTarget" wiring required. See the `platformer-movement` skill for how to configure `CollisionShape` / `SlopeSnapDistance` on the behavior.
+
+```csharp
+var playerVsTiles = AddCollisionRelationship(_playerFactory, solidTiles);
+playerVsTiles.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+playerVsTiles.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+
+// Same solidTiles, different relationship, Standard SAT — no conflict.
+AddCollisionRelationship(_ballFactory, solidTiles)
+    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.7f);
+```
+
 **Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
 
 ## Sensor Shapes (Awareness, Trigger Zones)

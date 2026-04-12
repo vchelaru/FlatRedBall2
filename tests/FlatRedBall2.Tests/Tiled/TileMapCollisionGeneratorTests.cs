@@ -96,6 +96,20 @@ public class TileMapCollisionGeneratorTests
         return td;
     }
 
+    // Tiled rectangle object: top-left corner (x, y), size (w, h), Y-down.
+    private static TilemapTileData MakeRectObjectTile(int localId, string className,
+        params (float x, float y, float w, float h)[] rects)
+    {
+        var td = new TilemapTileData(localId) { Class = className };
+        int id = 1;
+        foreach (var r in rects)
+            td.CollisionObjects.Add(new TilemapRectangleObject(
+                id: id++,
+                position: new XnaVec2(r.x, r.y),
+                size: new XnaVec2(r.w, r.h)));
+        return td;
+    }
+
     [Fact]
     public void GenerateFromClass_MatchedTileWithNoPolygon_EmitsRectOnly()
     {
@@ -268,5 +282,176 @@ public class TileMapCollisionGeneratorTests
         poly.Points[0].ShouldBe(new Vector2(8f, -8f));
         poly.Points[1].ShouldBe(new Vector2(-8f, 8f));
         poly.Points[2].ShouldBe(new Vector2(-8f, -8f));
+    }
+
+    // ── Rectangle collision objects ──────────────────────────────────────────
+    // Tiled <object x y width height/> with no child shape element is a rectangle.
+    // Conversion (Tiled Y-down top-left → FRB2 Y-up centered, G = GridSize):
+    //   center X local = x + w/2 - G/2
+    //   center Y local = G/2 - (y + h/2)
+
+    [Fact]
+    public void GenerateFromClass_FullCellRectObject_EmitsSubCellRect_NoFullCellRect()
+    {
+        // A rect collision object covering the whole tile (0,0,16,16) still counts as
+        // "author opted into custom shapes" → the default full-cell rect must NOT be added
+        // via AddTileAtCell. The rect goes into the sub-cell rect list at cell center.
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [MakeRectObjectTile(0, "Solid", (0f, 0f, 16f, 16f))],
+            placements: [(0, 0, 0)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        coll.GetTileAtCell(0, 0).ShouldBeNull();
+        coll.GetPolygonTileAtCell(0, 0).ShouldBeNull();
+        var rects = coll.GetRectangleTilesAtCell(0, 0);
+        rects.Count.ShouldBe(1);
+        rects[0].Width.ShouldBe(16f);
+        rects[0].Height.ShouldBe(16f);
+        rects[0].X.ShouldBe(8f);   // collection X=0; cell (0,0) center X = 0 + 8 = 8
+        rects[0].Y.ShouldBe(-8f);  // collection Y = mapY - H*G = -16; cell (0,0) center Y = -16 + 8 = -8
+    }
+
+    [Fact]
+    public void GenerateFromClass_MixedRectObjectAndPolygon_BothEmitted_NoFullCellRect()
+    {
+        // One tile has both a polygon and a rect — both should emit, neither suppresses the other,
+        // and no default full-cell rect is added.
+        var tri = new XnaVec2[] { new(0, 0), new(16, 16), new(0, 16) };
+        var td = new TilemapTileData(0) { Class = "Solid" };
+        td.CollisionObjects.Add(new TilemapPolygonObject(1, new XnaVec2(0, 0), tri));
+        td.CollisionObjects.Add(new TilemapRectangleObject(2, new XnaVec2(0f, 8f), new XnaVec2(16f, 8f)));
+
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [td],
+            placements: [(0, 0, 0)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        coll.GetTileAtCell(0, 0).ShouldBeNull();
+        coll.GetPolygonTileAtCell(0, 0).ShouldNotBeNull();
+        var rects = coll.GetRectangleTilesAtCell(0, 0);
+        rects.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void GenerateFromClass_MultipleRectObjectsOnTile_BothEmittedAtCorrectCenters()
+    {
+        // Two rects: left half (0,0,8,16) and right half (8,0,8,16).
+        // Expected local centers: (-4, 0) and (+4, 0). Cell (0,0) world center is (8, -8).
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [MakeRectObjectTile(0, "Solid",
+                (0f, 0f, 8f, 16f),
+                (8f, 0f, 8f, 16f))],
+            placements: [(0, 0, 0)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        var rects = coll.GetRectangleTilesAtCell(0, 0);
+        rects.Count.ShouldBe(2);
+        // Order follows the order of collision objects on the tile.
+        rects[0].X.ShouldBe(8f + -4f); // cell center + local offset
+        rects[0].Y.ShouldBe(-8f + 0f);
+        rects[0].Width.ShouldBe(8f);
+        rects[0].Height.ShouldBe(16f);
+        rects[1].X.ShouldBe(8f + 4f);
+        rects[1].Y.ShouldBe(-8f + 0f);
+        rects[1].Width.ShouldBe(8f);
+        rects[1].Height.ShouldBe(16f);
+    }
+
+    [Fact]
+    public void GenerateFromClass_RectObjectFlippedHorizontally_MirroredAcrossCellCenter()
+    {
+        // Left-half rect (0,0,8,16): local center (-4, 0). H-flip negates X → (+4, 0).
+        var tilemap = BuildTilemapWithFlips(1, 1, 16,
+            tileDataEntries: [MakeRectObjectTile(0, "Solid", (0f, 0f, 8f, 16f))],
+            placements: [(0, 0, 0, TilemapTileFlipFlags.FlipHorizontally)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        var rects = coll.GetRectangleTilesAtCell(0, 0);
+        rects.Count.ShouldBe(1);
+        rects[0].X.ShouldBe(8f + 4f);  // right half of cell
+        rects[0].Y.ShouldBe(-8f + 0f);
+        rects[0].Width.ShouldBe(8f);
+        rects[0].Height.ShouldBe(16f);
+    }
+
+    [Fact]
+    public void GenerateFromClass_SubCellRectObject_EmitsHalfHeightRectInLowerHalf()
+    {
+        // Bottom half of the tile in Tiled Y-down: (0, 8, 16, 8).
+        // Local center: X = 0 + 8 - 8 = 0; Y = 8 - (8 + 4) = -4. Width 16, Height 8.
+        var tilemap = BuildTilemap(1, 1, 16,
+            tileDataEntries: [MakeRectObjectTile(0, "Solid", (0f, 8f, 16f, 8f))],
+            placements: [(0, 0, 0)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        var rects = coll.GetRectangleTilesAtCell(0, 0);
+        rects.Count.ShouldBe(1);
+        rects[0].Width.ShouldBe(16f);
+        rects[0].Height.ShouldBe(8f);
+        rects[0].X.ShouldBe(8f);          // cell center X
+        rects[0].Y.ShouldBe(-8f + -4f);   // cell center Y + local -4 → lower half
+    }
+
+    [Fact]
+    public void GenerateFromClass_AdjacentBottomHalfRectTiles_SuppressSharedInnerFaces()
+    {
+        // Author-side bottom-half rects (0,8,16,8) on the same tile; place two side-by-side.
+        // After generation the two sub-cell rects form a continuous curb — their shared inner
+        // faces must be suppressed via RepositionDirections so a mover sliding along the top
+        // doesn't snag at x=16.
+        var tilemap = BuildTilemap(2, 1, 16,
+            tileDataEntries: [MakeRectObjectTile(0, "Solid", (0f, 8f, 16f, 8f))],
+            placements: [(0, 0, 0), (1, 0, 0)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        var leftRect  = coll.GetRectangleTilesAtCell(0, 0)[0];
+        var rightRect = coll.GetRectangleTilesAtCell(1, 0)[0];
+
+        leftRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        rightRect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+    }
+
+    [Fact]
+    public void GenerateFromClass_SubCellRectAdjacentToPolygonTile_SuppressesRectFaceAtShared()
+    {
+        // Tile 0 (polygon): right-triangle slope whose right edge runs the full cell height
+        // along the shared boundary. Tiled Y-down points:
+        //   (0, 16), (16, 0), (16, 16) → local (Y-up, centered): (-8,-8),(8,8),(8,-8).
+        // Right edge world x at cell (0,0) = 16, spans full y ∈ [0,16].
+        // Tile 1 (sub-cell rect): bottom half (0, 8, 16, 8). Placed at cell (1,0) — left face at
+        // x=16, y∈[0,8], fully covered by the polygon's right edge.
+        // After generation, the sub-cell rect's Left bit must be cleared.
+        var slopeTile = MakePolygonTile(0, "Solid", new XnaVec2(0, 0), new XnaVec2[]
+        {
+            new(0, 16),
+            new(16, 0),
+            new(16, 16),
+        });
+        var subCellRectTile = MakeRectObjectTile(1, "Solid", (0f, 8f, 16f, 8f));
+
+        var tilemap = BuildTilemap(2, 1, 16,
+            tileDataEntries: [slopeTile, subCellRectTile],
+            placements: [(0, 0, 0), (1, 0, 1)]);
+        var layer = (TilemapTileLayer)tilemap.Layers[0];
+
+        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+
+        var rect = coll.GetRectangleTilesAtCell(1, 0)[0];
+        rect.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
     }
 }
