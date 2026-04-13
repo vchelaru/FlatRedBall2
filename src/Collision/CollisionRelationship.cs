@@ -321,9 +321,15 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         if (SlopeMode != SlopeCollisionMode.PlatformerFloor) return;
 
         if (a is IPlatformerEntity pa && pa is Entity ea && b is TileShapeCollection tscB)
+        {
             pa.Platformer.ConsiderSnappingTo(ea, tscB);
+            pa.Platformer.ContributeSlopeProbe(ea, tscB);
+        }
         else if (b is IPlatformerEntity pb && pb is Entity eb && a is TileShapeCollection tscA)
+        {
             pb.Platformer.ConsiderSnappingTo(eb, tscA);
+            pb.Platformer.ContributeSlopeProbe(eb, tscA);
+        }
     }
 
     private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;

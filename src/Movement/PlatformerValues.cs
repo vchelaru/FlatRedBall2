@@ -86,4 +86,42 @@ public class PlatformerValues
     /// walls.
     /// </summary>
     public float SlopeSnapMaxAngleDegrees { get; set; } = 60f;
+
+    /// <summary>
+    /// Slope angle (degrees, 0-90) at or below which walking uphill still uses full
+    /// <see cref="MaxSpeedX"/>. Default <c>0</c> — falloff begins as soon as the surface tilts.
+    /// Set equal to <see cref="UphillStopSpeedSlope"/> to disable uphill slowdown.
+    /// </summary>
+    public float UphillFullSpeedSlope { get; set; } = 0f;
+
+    /// <summary>
+    /// Slope angle (degrees, 0-90) at or above which walking uphill produces zero speed.
+    /// Between <see cref="UphillFullSpeedSlope"/> and this value the speed is linearly
+    /// interpolated. Default <c>60</c> (matches FRB1's predefined platformer profile).
+    /// Set equal to <see cref="UphillFullSpeedSlope"/> to disable uphill slowdown.
+    /// </summary>
+    public float UphillStopSpeedSlope { get; set; } = 60f;
+
+    /// <summary>
+    /// Slope angle (degrees, 0-90) at or below which walking downhill uses unmodified
+    /// <see cref="MaxSpeedX"/>. Above this, speed is scaled toward
+    /// <see cref="DownhillMaxSpeedMultiplier"/>, reaching it at <see cref="DownhillMaxSpeedSlope"/>.
+    /// Default <c>0</c>.
+    /// </summary>
+    public float DownhillFullSpeedSlope { get; set; } = 0f;
+
+    /// <summary>
+    /// Slope angle (degrees, 0-90) at which the full <see cref="DownhillMaxSpeedMultiplier"/>
+    /// is applied while walking downhill. Between <see cref="DownhillFullSpeedSlope"/> and this
+    /// value the multiplier is linearly interpolated from <c>1</c>. Default <c>60</c>.
+    /// </summary>
+    public float DownhillMaxSpeedSlope { get; set; } = 60f;
+
+    /// <summary>
+    /// Multiplier applied to <see cref="MaxSpeedX"/> when walking downhill at or beyond
+    /// <see cref="DownhillMaxSpeedSlope"/>. Default <c>1.5</c> (matches FRB1's predefined
+    /// platformer profile — a 50% speed boost at max slope). Set to <c>1</c> to disable
+    /// downhill acceleration; values below <c>1</c> would slow the entity on descents.
+    /// </summary>
+    public float DownhillMaxSpeedMultiplier { get; set; } = 1.5f;
 }

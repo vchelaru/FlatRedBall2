@@ -62,6 +62,16 @@ public class PlatformerBehavior
     public bool IsOnGround { get; private set; }
 
     /// <summary>
+    /// Signed slope angle (degrees, -90 to 90) of the surface the entity is currently standing
+    /// on. Positive values indicate a surface that rises in the +X direction, negative values
+    /// indicate a surface that rises in the -X direction. <c>0</c> when on flat ground or
+    /// airborne. Refreshed each frame by a short downward probe from any
+    /// <see cref="SlopeCollisionMode.PlatformerFloor"/> relationship; consumed by the uphill/
+    /// downhill speed multiplier in <see cref="Update"/>.
+    /// </summary>
+    public float CurrentSlope { get; internal set; }
+
+    /// <summary>
     /// The horizontal direction the entity is currently facing.
     /// Updated each frame from <see cref="MovementInput"/>: non-zero X input sets the direction;
     /// zero input leaves it unchanged (last direction is remembered).
@@ -78,6 +88,7 @@ public class PlatformerBehavior
     private PlatformerValues? _jumpValues;
     private bool _wasOnGroundLastFrame;
     private bool _snappedThisFrame;
+    private bool _slopeSampledThisFrame;
     // Monotonically increments each Update. Prefixed onto every diagnostic message so two
     // messages in the same frame are visually distinguishable from two messages in adjacent
     // frames — otherwise log output leaves ambiguous "was this one frame or two?" questions.
@@ -118,13 +129,16 @@ public class PlatformerBehavior
 
         var current = IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement;
 
+        if (!IsOnGround) CurrentSlope = 0f;
+        float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
+
         if (!current.UsesAcceleration || (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero))
         {
-            entity.VelocityX = inputX * current.MaxSpeedX;
+            entity.VelocityX = inputX * effectiveMaxSpeedX;
         }
         else
         {
-            float targetSpeed = inputX * current.MaxSpeedX;
+            float targetSpeed = inputX * effectiveMaxSpeedX;
             float velocityX = entity.VelocityX;
             float diff = targetSpeed - velocityX;
 
@@ -133,7 +147,7 @@ public class PlatformerBehavior
             bool speedingUp = targetSpeed != 0f && diff != 0f && MathF.Sign(diff) == MathF.Sign(targetSpeed);
 
             float accelMagnitude = speedingUp
-                ? (current.AccelerationTimeX > TimeSpan.Zero ? current.MaxSpeedX / (float)current.AccelerationTimeX.TotalSeconds : float.MaxValue)
+                ? (current.AccelerationTimeX > TimeSpan.Zero ? effectiveMaxSpeedX / (float)current.AccelerationTimeX.TotalSeconds : float.MaxValue)
                 : (current.DecelerationTimeX > TimeSpan.Zero ? current.MaxSpeedX / (float)current.DecelerationTimeX.TotalSeconds : float.MaxValue);
 
             float maxDeltaV = accelMagnitude * time.DeltaSeconds;
@@ -179,9 +193,43 @@ public class PlatformerBehavior
         // D. Clamp fall speed (after jump sustain)
         entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
 
-        // F. Record ground state for next frame's snap gate, and reset the per-frame snap flag.
+        // F. Record ground state for next frame's snap gate, and reset per-frame flags.
         _wasOnGroundLastFrame = IsOnGround;
         _snappedThisFrame = false;
+        _slopeSampledThisFrame = false;
+    }
+
+    private float ComputeSlopeAdjustedMaxSpeed(PlatformerValues values, float inputX)
+    {
+        float maxSpeed = values.MaxSpeedX;
+        if (!IsOnGround || inputX == 0f || CurrentSlope == 0f) return maxSpeed;
+
+        float absSlope = MathF.Abs(CurrentSlope);
+        bool walkingUphill = MathF.Sign(inputX) == MathF.Sign(CurrentSlope);
+
+        if (walkingUphill)
+        {
+            if (values.UphillStopSpeedSlope > values.UphillFullSpeedSlope &&
+                absSlope >= values.UphillFullSpeedSlope)
+            {
+                if (absSlope >= values.UphillStopSpeedSlope) return 0f;
+                float t = 1f - (absSlope - values.UphillFullSpeedSlope) /
+                    (values.UphillStopSpeedSlope - values.UphillFullSpeedSlope);
+                return maxSpeed * t;
+            }
+        }
+        else
+        {
+            if (values.DownhillMaxSpeedMultiplier != 1f &&
+                values.DownhillMaxSpeedSlope > values.DownhillFullSpeedSlope &&
+                absSlope >= values.DownhillFullSpeedSlope)
+            {
+                float t = MathF.Min(1f, (absSlope - values.DownhillFullSpeedSlope) /
+                    (values.DownhillMaxSpeedSlope - values.DownhillFullSpeedSlope));
+                return maxSpeed * (1f + (values.DownhillMaxSpeedMultiplier - 1f) * t);
+            }
+        }
+        return maxSpeed;
     }
 
     /// <summary>
@@ -241,6 +289,32 @@ public class PlatformerBehavior
         IsOnGround = true;
         _snappedThisFrame = true;
         DiagSnapped(entityYBefore, entity.Y, start, end, hit, normal, target, hitShape);
+    }
+
+    /// <summary>
+    /// Called by <see cref="FlatRedBall2.Collision.CollisionRelationship{A,B}"/> with
+    /// <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/> to sample the
+    /// slope of the surface beneath the entity's feet. Updates <see cref="CurrentSlope"/>.
+    /// No-ops when airborne, after the first successful sample within a frame, or when
+    /// <see cref="CollisionShape"/> is null.
+    /// </summary>
+    internal void ContributeSlopeProbe(Entity entity, TileShapeCollection target)
+    {
+        if (_slopeSampledThisFrame) return;
+        if (CollisionShape == null) return;
+        if (!_snappedThisFrame && entity.LastReposition.Y <= 0f) return;
+
+        float feetY = CollisionShape.AbsoluteY - CollisionShape.Height / 2f;
+        const float probeUp = 0.5f;
+        const float probeDown = 2f;
+        var start = new Vector2(entity.X, feetY + probeUp);
+        var end = new Vector2(entity.X, feetY - probeDown);
+
+        if (!target.Raycast(start, end, out _, out var normal, out _)) return;
+        if (normal.Y <= 0f) return; // ignore ceilings / walls
+
+        CurrentSlope = MathF.Atan2(-normal.X, normal.Y) * (180f / MathF.PI);
+        _slopeSampledThisFrame = true;
     }
 
     // Best-effort ground determination for selecting the active values during a snap probe.

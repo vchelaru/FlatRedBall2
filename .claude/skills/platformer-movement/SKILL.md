@@ -239,6 +239,24 @@ The mechanism:
 
 **The "was grounded last frame" gate is what makes jumps work.** Without it, snap would yank the player back to the floor on the first frame of every jump. Don't attempt to bypass it.
 
+## Slope Speed Adjustment
+
+`PlatformerBehavior.CurrentSlope` (signed degrees, +X-rise positive, `0` when airborne/flat) is refreshed each frame by a short downward raycast contributed by every `PlatformerFloor` relationship. **Defaults are active, not opt-in** — any platformer with slope tiles immediately gets the classic "slow going up, faster going down" feel without additional configuration.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `UphillFullSpeedSlope` | `0` | Below this, full `MaxSpeedX` going uphill. |
+| `UphillStopSpeedSlope` | `60` | At/above this, uphill speed = 0. Linearly interpolated between. Set equal to `UphillFullSpeedSlope` to disable slowdown. |
+| `DownhillFullSpeedSlope` | `0` | Below this, downhill uses unmodified `MaxSpeedX`. |
+| `DownhillMaxSpeedSlope` | `60` | At/above this, downhill speed is multiplied by `DownhillMaxSpeedMultiplier`. Linearly interpolated between. |
+| `DownhillMaxSpeedMultiplier` | `1.5` | Peak multiplier. Set to `1` to disable downhill boost. |
+
+Under defaults, a 30° slope cuts uphill speed to 50% and boosts downhill speed to 125%; a 45° slope is 25% / 137.5%. Uphill vs downhill is determined by `sign(inputX) == sign(CurrentSlope)`.
+
+**Requires `SlopeMode = SlopeCollisionMode.PlatformerFloor`** on the player's collision relationship — without it, `CurrentSlope` stays 0 and the multipliers collapse to 1.
+
+When using acceleration, the adjusted max speed drives `AccelerationTimeX` magnitude (speeding up); `DecelerationTimeX` still uses the raw `MaxSpeedX` so braking isn't slowed on an uphill.
+
 ## Gotchas
 
 - `JumpApplyLength = TimeSpan.Zero` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.

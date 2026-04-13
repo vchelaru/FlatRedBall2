@@ -656,4 +656,231 @@ public class PlatformerBehaviorTests
             Y = y;
         }
     }
+
+    // ── Slope speed adjustment ────────────────────────────────────────────────
+
+    private static PlatformerBehavior MakeSlopeBehavior(PlatformerValues values, float inputX, float currentSlope)
+    {
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            MovementInput = new MockAxisInput(x: inputX),
+        };
+        behavior.CurrentSlope = currentSlope;
+        return behavior;
+    }
+
+    private static Entity MakeGroundedEntity()
+    {
+        var e = new Entity();
+        e.LastReposition = new Vector2(0f, 1f);
+        return e;
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingUphill_AtStopSlope_VelocityIsZero()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
+        };
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 45f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingUphill_BelowFullSpeedSlope_UsesFullSpeed()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
+        };
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 5f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(200f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingUphill_Midway_LinearlyInterpolates()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 50f,
+        };
+        // slope=30 halfway between 10 and 50 → multiplier 0.5
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 30f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(100f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingDownhill_OnUphillConfig_IsUnaffected()
+    {
+        // slope is positive (rises to +X), input is -X → walking downhill. Uphill config must not apply.
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
+            DownhillMaxSpeedMultiplier = 1f, // disable downhill for this assertion
+        };
+        var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: 30f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(-200f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingDownhill_AtMaxSlope_AppliesFullMultiplier()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            DownhillFullSpeedSlope = 10f, DownhillMaxSpeedSlope = 45f,
+            DownhillMaxSpeedMultiplier = 1.5f,
+        };
+        // slope positive, input negative → downhill
+        var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: 45f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(-300f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WalkingDownhill_Midway_LinearlyInterpolatesMultiplier()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            DownhillFullSpeedSlope = 10f, DownhillMaxSpeedSlope = 50f,
+            DownhillMaxSpeedMultiplier = 2f,
+        };
+        // slope=30 halfway → multiplier 1.5
+        var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: 30f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(-300f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_WhenAirborne_SlopeIgnored()
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
+        };
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 45f);
+        var entity = new Entity(); // not grounded
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(200f);
+        behavior.CurrentSlope.ShouldBe(0f); // reset when airborne
+    }
+
+    [Fact]
+    public void SlopeSpeed_NegativeSlope_MovingLeft_IsUphill()
+    {
+        // slope negative (rises to -X), input -X → walking uphill
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
+        };
+        var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: -45f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void ContributeSlopeProbe_On45DegSlope_PopulatesCurrentSlope()
+    {
+        var tiles = new FlatRedBall2.Collision.TileShapeCollection { GridSize = 16f };
+        var slope = FlatRedBall2.Collision.Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+        });
+        tiles.AddPolygonTileAtCell(0, 0, slope);
+
+        // Cell (0,0) spans world X [0..16], Y [0..16]. Surface at X=12 is Y=12.
+        var collisionShape = new FlatRedBall2.Collision.AxisAlignedRectangle
+        { Width = 8f, Height = 8f, X = 12f, Y = 12f + 4f };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues(),
+            CollisionShape = collisionShape,
+        };
+        var entity = new Entity { X = 12f };
+        entity.LastReposition = new Vector2(0f, 1f); // grounded gate
+
+        // Invoke probe via the same entry point the relationship uses
+        typeof(PlatformerBehavior)
+            .GetMethod("ContributeSlopeProbe", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(behavior, new object[] { entity, tiles });
+
+        behavior.CurrentSlope.ShouldBe(45f, tolerance: 1f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_DefaultValues_Uphill30Deg_HalvesSpeed()
+    {
+        // Defaults: UphillFullSpeedSlope=0, UphillStopSpeedSlope=60 → at 30° multiplier=0.5.
+        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 30f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(100f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_DefaultValues_Downhill60Deg_AppliesFullBoost()
+    {
+        // Defaults: DownhillFullSpeedSlope=0, DownhillMaxSpeedSlope=60, Multiplier=1.5.
+        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: 60f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(-300f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void SlopeSpeed_DefaultValues_FlatGround_NoEffect()
+    {
+        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 0f);
+        var entity = MakeGroundedEntity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(200f);
+    }
 }
