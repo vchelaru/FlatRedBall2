@@ -26,7 +26,6 @@ public class Player : Entity
             MaxSpeedX = 200f,
             Gravity = 600f,
             MaxFallSpeed = 800f,
-            UsesAcceleration = false,
         };
         groundValues.SetJumpHeights(minHeight: 16f, maxHeight: 48f); // must be after Gravity
 
@@ -68,7 +67,6 @@ collision results — no special wiring needed.
 | `JumpApplyLength` | How long to sustain `JumpVelocity` after pressing jump |
 | `JumpApplyByButtonHold` | If true, releasing jump early cuts the jump short |
 | `SetJumpHeights(min, max?)` | Computes `JumpVelocity`, `JumpApplyLength`, and `JumpApplyByButtonHold` from desired min/max jump heights in world units. `Gravity` must be set first. Prefer this over setting jump fields manually. |
-| `UsesAcceleration` | If false, `AccelerationTimeX`/`DecelerationTimeX` are ignored and velocity is set directly |
 
 ## Ground vs Air values
 

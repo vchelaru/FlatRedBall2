@@ -17,7 +17,7 @@ public class PlatformerBehaviorTests
     public void HorizontalInput_WithNoAcceleration_SetsVelocityDirectly()
     {
         float maxSpeedX = 200f;
-        var values = new PlatformerValues { MaxSpeedX = maxSpeedX, UsesAcceleration = false };
+        var values = new PlatformerValues { MaxSpeedX = maxSpeedX };
         var behavior = new PlatformerBehavior { AirMovement = values, MovementInput = new MockAxisInput(x: 1f) };
         var entity = new Entity();
 
@@ -173,7 +173,7 @@ public class PlatformerBehaviorTests
         int n = (int)MathF.Round(peakFrame);
         float expectedPeak = n * dt * (v - gravity * n * dt / 2f); // 48.0
 
-        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f, UsesAcceleration = false };
+        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f };
         values.SetJumpHeights(minHeight); // no maxHeight → fixed jump, no sustain
 
         float maxY = SimulateJump(values, held: false);
@@ -205,7 +205,7 @@ public class PlatformerBehaviorTests
         float coastHeight = cn * dt * (v - gravity * cn * dt / 2f);     // 48.0
         float expectedPeak = sustainHeight + coastHeight;               // 96.0
 
-        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f, UsesAcceleration = false };
+        var values = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f };
         values.SetJumpHeights(minHeight, maxHeight);
 
         float maxY = SimulateJump(values, held: true);
@@ -657,6 +657,163 @@ public class PlatformerBehaviorTests
         }
     }
 
+    // ── Acceleration / Deceleration ───────────────────────────────────────────
+
+    private static PlatformerBehavior MakeAccelBehavior(float accelTime, float decelTime, float inputX, float startVelX, out Entity entity)
+    {
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f,
+            MaxFallSpeed = 1000f,
+            AccelerationTimeX = TimeSpan.FromSeconds(accelTime),
+            DecelerationTimeX = TimeSpan.FromSeconds(decelTime),
+            // Neutralize slope defaults — these tests target the accel/decel math only
+            UphillFullSpeedSlope = 0f, UphillStopSpeedSlope = 0f,
+            DownhillMaxSpeedMultiplier = 1f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            MovementInput = new MockAxisInput(x: inputX),
+        };
+        entity = new Entity { VelocityX = startVelX };
+        entity.LastReposition = new Vector2(0f, 1f); // grounded
+        return behavior;
+    }
+
+    [Fact]
+    public void Accel_SettingAccelerationTimeX_IsEnoughToEnableRamp()
+    {
+        // Regression: previously a `UsesAcceleration` bool gated the accel path, so setting
+        // AccelerationTimeX without also flipping the bool silently did nothing and velocity
+        // jumped instantly. Setting AccelerationTimeX alone must produce a ramp.
+        var values = new PlatformerValues
+        {
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
+            AccelerationTimeX = TimeSpan.FromSeconds(1f),
+            DecelerationTimeX = TimeSpan.FromSeconds(1f),
+            UphillFullSpeedSlope = 0f, UphillStopSpeedSlope = 0f,
+            DownhillMaxSpeedMultiplier = 1f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values, GroundMovement = values,
+            MovementInput = new MockAxisInput(x: 1f),
+        };
+        var entity = new Entity();
+        entity.LastReposition = new Vector2(0f, 1f);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(0f); // velocity unchanged this frame
+        entity.AccelerationX.ShouldBe(200f, tolerance: 0.5f); // accel queued for next PhysicsUpdate
+    }
+
+    [Fact]
+    public void Accel_FromRest_AppliesAccelerationTimeXRate()
+    {
+        // AccelTime=0.5s, MaxSpeed=200 → accel magnitude = 400/s.
+        // dt=1/60 → per-frame delta = 6.667. AccelerationX = 6.667/dt = 400.
+        var behavior = MakeAccelBehavior(accelTime: 0.5f, decelTime: 0.5f, inputX: 1f, startVelX: 0f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.AccelerationX.ShouldBe(400f, tolerance: 0.5f);
+    }
+
+    [Fact]
+    public void Accel_WhenAtMaxSpeed_NoAccelerationApplied()
+    {
+        var behavior = MakeAccelBehavior(accelTime: 0.5f, decelTime: 0.5f, inputX: 1f, startVelX: 200f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.AccelerationX.ShouldBe(0f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void Accel_WhenReleasingInput_UsesDecelerationTimeX()
+    {
+        // VelX=200, input=0 → target=0, diff=-200. Should use DecelerationTimeX.
+        // DecelTime=0.25s, MaxSpeed=200 → decel magnitude = 800/s.
+        var behavior = MakeAccelBehavior(accelTime: 0.5f, decelTime: 0.25f, inputX: 0f, startVelX: 200f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // AccelerationX should be negative (braking) at decel rate
+        entity.AccelerationX.ShouldBe(-800f, tolerance: 0.5f);
+    }
+
+    [Fact]
+    public void Accel_WhenOvershooting_ClampsToTarget()
+    {
+        // VelX=5, input=1, target=200, diff=195. Very short dt, very fast accel → would overshoot.
+        // But with small diff and big accelMagnitude, the clamp should limit delta to exactly diff.
+        // Using tiny accel time (0.001s) so accelMagnitude=200000, dt=1/60 → maxDelta=3333, diff=195 → clamp to 195.
+        var behavior = MakeAccelBehavior(accelTime: 0.001f, decelTime: 0.5f, inputX: 1f, startVelX: 5f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // clampedDiff = 195, AccelerationX = 195 / (1/60) = 11700
+        entity.AccelerationX.ShouldBe(11700f, tolerance: 1f);
+    }
+
+    [Fact]
+    public void Accel_WhenReversingDirection_UsesDecelerationTimeX()
+    {
+        // VelX=+200 (moving right at full speed), input=-1 (target=-200).
+        // This is a REVERSAL — the entity is moving opposite to target.
+        // Correct behavior (matches FRB1): brake at DecelerationTimeX rate, not AccelerationTimeX.
+        // Otherwise, a long accel time (e.g. slippery ice) would make reversing feel instant
+        // instead of requiring a slow skid-to-a-stop.
+        var behavior = MakeAccelBehavior(accelTime: 1.0f, decelTime: 0.25f, inputX: -1f, startVelX: 200f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // Expected: decel magnitude = 200/0.25 = 800/s. AccelerationX should be -800.
+        // Buggy: accel magnitude = 200/1.0 = 200/s. AccelerationX would be -200.
+        entity.AccelerationX.ShouldBe(-800f, tolerance: 0.5f);
+    }
+
+    [Fact]
+    public void Accel_WhenOppositeVelocity_UsesDecelerationUntilZero()
+    {
+        // VelX=-50 (drifting left), input=+1 (target=+200).
+        // Still a reversal — must brake (decel) before accelerating in the new direction.
+        var behavior = MakeAccelBehavior(accelTime: 1.0f, decelTime: 0.25f, inputX: 1f, startVelX: -50f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // Expected: decel magnitude 800/s → AccelerationX = +800.
+        entity.AccelerationX.ShouldBe(800f, tolerance: 0.5f);
+    }
+
+    [Fact]
+    public void Accel_SameDirectionBelowMax_UsesAccelerationTimeX()
+    {
+        // VelX=+100 (moving right at half speed), input=+1 (target=+200). Proper "speeding up".
+        var behavior = MakeAccelBehavior(accelTime: 0.5f, decelTime: 0.25f, inputX: 1f, startVelX: 100f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // Accel magnitude = 200/0.5 = 400/s.
+        entity.AccelerationX.ShouldBe(400f, tolerance: 0.5f);
+    }
+
+    [Fact]
+    public void Accel_SameDirectionAboveMax_UsesDeceleration()
+    {
+        // VelX=+300 (moving right FASTER than max, e.g. just landed after a downhill boost).
+        // input=+1 (target=+200). Should brake back down to cap at decel rate.
+        var behavior = MakeAccelBehavior(accelTime: 1.0f, decelTime: 0.25f, inputX: 1f, startVelX: 300f, out var entity);
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        // Expected decel: AccelerationX = -800.
+        entity.AccelerationX.ShouldBe(-800f, tolerance: 0.5f);
+    }
+
     // ── Slope speed adjustment ────────────────────────────────────────────────
 
     private static PlatformerBehavior MakeSlopeBehavior(PlatformerValues values, float inputX, float currentSlope)
@@ -683,7 +840,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
         };
         var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 45f);
@@ -699,7 +856,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
         };
         var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 5f);
@@ -715,7 +872,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 50f,
         };
         // slope=30 halfway between 10 and 50 → multiplier 0.5
@@ -733,7 +890,7 @@ public class PlatformerBehaviorTests
         // slope is positive (rises to +X), input is -X → walking downhill. Uphill config must not apply.
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
             DownhillMaxSpeedMultiplier = 1f, // disable downhill for this assertion
         };
@@ -750,7 +907,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             DownhillFullSpeedSlope = 10f, DownhillMaxSpeedSlope = 45f,
             DownhillMaxSpeedMultiplier = 1.5f,
         };
@@ -768,7 +925,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             DownhillFullSpeedSlope = 10f, DownhillMaxSpeedSlope = 50f,
             DownhillMaxSpeedMultiplier = 2f,
         };
@@ -786,7 +943,7 @@ public class PlatformerBehaviorTests
     {
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
         };
         var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 45f);
@@ -804,7 +961,7 @@ public class PlatformerBehaviorTests
         // slope negative (rises to -X), input -X → walking uphill
         var values = new PlatformerValues
         {
-            MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f,
+            MaxSpeedX = 200f, MaxFallSpeed = 1000f,
             UphillFullSpeedSlope = 10f, UphillStopSpeedSlope = 45f,
         };
         var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: -45f);
@@ -850,7 +1007,7 @@ public class PlatformerBehaviorTests
     public void SlopeSpeed_DefaultValues_Uphill30Deg_HalvesSpeed()
     {
         // Defaults: UphillFullSpeedSlope=0, UphillStopSpeedSlope=60 → at 30° multiplier=0.5.
-        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var values = new PlatformerValues { MaxSpeedX = 200f, MaxFallSpeed = 1000f };
         var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 30f);
         var entity = MakeGroundedEntity();
 
@@ -863,7 +1020,7 @@ public class PlatformerBehaviorTests
     public void SlopeSpeed_DefaultValues_Downhill60Deg_AppliesFullBoost()
     {
         // Defaults: DownhillFullSpeedSlope=0, DownhillMaxSpeedSlope=60, Multiplier=1.5.
-        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var values = new PlatformerValues { MaxSpeedX = 200f, MaxFallSpeed = 1000f };
         var behavior = MakeSlopeBehavior(values, inputX: -1f, currentSlope: 60f);
         var entity = MakeGroundedEntity();
 
@@ -875,7 +1032,7 @@ public class PlatformerBehaviorTests
     [Fact]
     public void SlopeSpeed_DefaultValues_FlatGround_NoEffect()
     {
-        var values = new PlatformerValues { MaxSpeedX = 200f, UsesAcceleration = false, MaxFallSpeed = 1000f };
+        var values = new PlatformerValues { MaxSpeedX = 200f, MaxFallSpeed = 1000f };
         var behavior = MakeSlopeBehavior(values, inputX: 1f, currentSlope: 0f);
         var entity = MakeGroundedEntity();
 

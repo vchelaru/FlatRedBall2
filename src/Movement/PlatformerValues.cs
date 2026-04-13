@@ -41,10 +41,10 @@ public class PlatformerValues
 
     public float MaxSpeedX;
 
-    /// <summary>Time to reach <see cref="MaxSpeedX"/> from rest. <see cref="TimeSpan.Zero"/> means instant.</summary>
+    /// <summary>Time to reach <see cref="MaxSpeedX"/> from rest. <see cref="TimeSpan.Zero"/> (the default) means instant.</summary>
     public TimeSpan AccelerationTimeX;
 
-    /// <summary>Time to decelerate from <see cref="MaxSpeedX"/> to rest when input is released. <see cref="TimeSpan.Zero"/> means instant.</summary>
+    /// <summary>Time to decelerate from <see cref="MaxSpeedX"/> to rest when input is released. <see cref="TimeSpan.Zero"/> (the default) means instant.</summary>
     public TimeSpan DecelerationTimeX;
 
     public float Gravity;
@@ -59,12 +59,6 @@ public class PlatformerValues
     /// releasing early cuts the jump short.
     /// </summary>
     public bool JumpApplyByButtonHold;
-
-    /// <summary>
-    /// When false, <see cref="AccelerationTimeX"/> and <see cref="DecelerationTimeX"/> are ignored
-    /// and x velocity is set directly to the input-scaled <see cref="MaxSpeedX"/>.
-    /// </summary>
-    public bool UsesAcceleration;
 
     /// <summary>
     /// Maximum downward distance the entity will "snap" onto a lower surface after losing ground

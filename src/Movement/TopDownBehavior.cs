@@ -81,7 +81,7 @@ public class TopDownBehavior
 
             float secondsToTake = Lerp(MovementValues.DecelerationTime, MovementValues.AccelerationTime, accelerationRatio);
 
-            if (!MovementValues.UsesAcceleration || secondsToTake == 0f)
+            if (secondsToTake == 0f)
             {
                 entity.VelocityX = desiredVelocity.X;
                 entity.VelocityY = desiredVelocity.Y;

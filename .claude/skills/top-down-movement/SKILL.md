@@ -24,7 +24,6 @@ public class Player : Entity
         var values = new TopDownValues
         {
             MaxSpeed = 200f,
-            UsesAcceleration = false,
         };
 
         _topDown.MovementValues = values;
@@ -46,8 +45,7 @@ public class Player : Entity
 |---|---|
 | `MaxSpeed` | Maximum speed in world units/sec |
 | `AccelerationTime` | Seconds to reach `MaxSpeed` from rest. 0 = instant |
-| `DecelerationTime` | Seconds to stop from `MaxSpeed`. 0 = instant |
-| `UsesAcceleration` | If false, velocity is set directly each frame (instant response) |
+| `DecelerationTime` | Seconds to stop from `MaxSpeed`. 0 = instant. Setting either accel or decel time to a non-zero value enables the ramp — no separate flag. |
 | `UpdateDirectionFromInput` | If true (default), `DirectionFacing` follows input direction |
 | `UpdateDirectionFromVelocity` | If true and `UpdateDirectionFromInput` is false, `DirectionFacing` follows actual velocity |
 | `IsUsingCustomDeceleration` | If true, uses `CustomDecelerationValue` when entity exceeds `MaxSpeed` (e.g. after a knockback) |
@@ -59,15 +57,15 @@ public class Player : Entity
 var values = new TopDownValues
 {
     MaxSpeed = 200f,
-    UsesAcceleration = true,
     AccelerationTime = 0.2f,   // 200ms to reach full speed
     DecelerationTime = 0.1f,   // 100ms to stop
 };
 ```
 
-When `UsesAcceleration` is true, the behavior blends between `AccelerationTime` and `DecelerationTime`
+When either time is non-zero, the behavior blends between `AccelerationTime` and `DecelerationTime`
 based on the angle between the current velocity and the desired direction. Perfectly reversing direction
-uses `DecelerationTime`; pressing directly forward uses `AccelerationTime`.
+uses `DecelerationTime`; pressing directly forward uses `AccelerationTime`. Both times zero = instant
+(velocity set directly each frame).
 
 ## Direction Facing
 

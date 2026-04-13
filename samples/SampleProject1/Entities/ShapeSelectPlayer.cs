@@ -46,7 +46,6 @@ public class ShapeSelectPlayer : Entity
             MaxSpeed = 180f,
             AccelerationTime = 0.08f,
             DecelerationTime = 0.06f,
-            UsesAcceleration = true,
         };
 
         var keyboard = Engine.Input.Keyboard;

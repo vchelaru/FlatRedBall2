@@ -31,7 +31,6 @@ public class PlatformerPlayer : Entity
             JumpVelocity = 420f,
             JumpApplyLength = TimeSpan.FromSeconds(0.18),
             JumpApplyByButtonHold = true,
-            UsesAcceleration = false,
         };
 
         _platformer.GroundMovement = groundValues;

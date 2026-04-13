@@ -28,7 +28,6 @@ public class TopDownPlayer : Entity
             MaxSpeed = 200f,
             AccelerationTime = 0.08f,
             DecelerationTime = 0.06f,
-            UsesAcceleration = true,
             UpdateDirectionFromInput = true,
         };
 

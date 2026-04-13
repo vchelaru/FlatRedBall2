@@ -60,7 +60,6 @@ public class Player : Entity
             JumpVelocity       = 480f,
             JumpApplyLength    = TimeSpan.FromSeconds(0.18),
             JumpApplyByButtonHold = true,
-            UsesAcceleration   = true,
         };
 
         var airValues = new PlatformerValues
@@ -73,7 +72,6 @@ public class Player : Entity
             JumpVelocity       = 480f,
             JumpApplyLength    = TimeSpan.FromSeconds(0.18),
             JumpApplyByButtonHold = true,
-            UsesAcceleration   = true,
         };
 
         _platformer.GroundMovement = groundValues;

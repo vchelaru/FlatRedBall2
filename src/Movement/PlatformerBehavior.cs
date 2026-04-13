@@ -132,7 +132,7 @@ public class PlatformerBehavior
         if (!IsOnGround) CurrentSlope = 0f;
         float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
 
-        if (!current.UsesAcceleration || (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero))
+        if (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero)
         {
             entity.VelocityX = inputX * effectiveMaxSpeedX;
         }
@@ -142,9 +142,14 @@ public class PlatformerBehavior
             float velocityX = entity.VelocityX;
             float diff = targetSpeed - velocityX;
 
-            // Use AccelerationTimeX when pressing toward target; DecelerationTimeX when releasing or braking.
-            // "Speeding up" = diff and target are in the same direction (both nonzero and same sign).
-            bool speedingUp = targetSpeed != 0f && diff != 0f && MathF.Sign(diff) == MathF.Sign(targetSpeed);
+            // Use AccelerationTimeX when actively speeding up in the target's direction.
+            // Use DecelerationTimeX for: releasing input (target=0), reversing direction
+            // (velocity sign != target sign), and braking from over-max (|velocity| > |target|).
+            // Without the magnitude guard, a reversal (e.g. running right, pressing left) would
+            // use AccelerationTimeX and feel instant on slippery/ice configs — FRB1 matches.
+            bool speedingUp = targetSpeed != 0f
+                && MathF.Sign(velocityX) == MathF.Sign(targetSpeed)
+                && MathF.Abs(velocityX) < MathF.Abs(targetSpeed);
 
             float accelMagnitude = speedingUp
                 ? (current.AccelerationTimeX > TimeSpan.Zero ? effectiveMaxSpeedX / (float)current.AccelerationTimeX.TotalSeconds : float.MaxValue)
