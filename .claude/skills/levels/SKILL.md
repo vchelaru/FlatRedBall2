@@ -58,7 +58,7 @@ Add(solid);
 Add(cloud);
 ```
 
-Each collection can have its own collision relationship (solid blocks movement, cloud allows jump-through). By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
+Each collection can have its own collision relationship. **Cloud / jump-through collision is not yet implemented** — `CloudCollision` currently behaves identically to `SolidCollision`. Planned; see `design/TODOS.md`. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
