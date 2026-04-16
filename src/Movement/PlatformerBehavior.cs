@@ -84,6 +84,21 @@ public class PlatformerBehavior
     /// </summary>
     public bool IsApplyingJump { get; private set; }
 
+    /// <summary>
+    /// True while this frame's <see cref="Update"/> determined the entity should pass through
+    /// one-way (jump-through / cloud) collision relationships — either because a Down+Jump
+    /// drop-through was just triggered (suppresses for one frame so the entity clears the
+    /// surface) or because the entity is airborne with Down held. After one suppressed frame,
+    /// the entity's <c>LastPosition</c> is below the surface, so the one-way gate's positional
+    /// check naturally prevents re-landing without further suppression. Consumed by
+    /// <see cref="FlatRedBall2.Collision.CollisionRelationship{A,B}"/> when its
+    /// <see cref="FlatRedBall2.Collision.CollisionRelationship{A,B}.OneWayDirection"/> is set.
+    /// </summary>
+    public bool IsSuppressingOneWayCollision => _suppressOneWay;
+
+    private bool _dropThroughFrame;
+    private bool _suppressOneWay;
+
     private TimeSpan _jumpStartTime;
     private PlatformerValues? _jumpValues;
     private bool _wasOnGroundLastFrame;
@@ -163,8 +178,23 @@ public class PlatformerBehavior
         // C. Apply gravity
         entity.AccelerationY = -current.Gravity;
 
-        // E. Handle jump (before fall-speed clamp so jump velocity is applied first)
-        if (JumpInput?.WasJustPressed == true && IsOnGround)
+        // E. Handle jump (before fall-speed clamp so jump velocity is applied first).
+        // Down+Jump while grounded triggers drop-through instead of a regular jump, so the
+        // entity falls through any jump-through platform it is standing on. Suppression lasts
+        // one frame — after that, LastPosition is below the surface and the one-way gate's
+        // positional check naturally prevents re-landing.
+        float inputY = MovementInput?.Y ?? 0f;
+        bool dropThroughTriggered =
+            IsOnGround
+            && JumpInput?.WasJustPressed == true
+            && inputY < -0.5f
+            && current.CanFallThroughOneWayCollision;
+
+        if (dropThroughTriggered)
+        {
+            _dropThroughFrame = true;
+        }
+        else if (JumpInput?.WasJustPressed == true && IsOnGround)
         {
             entity.VelocityY = current.JumpVelocity;
             _jumpStartTime = time.SinceGameStart;
@@ -198,7 +228,13 @@ public class PlatformerBehavior
         // D. Clamp fall speed (after jump sustain)
         entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
 
-        // F. Record ground state for next frame's snap gate, and reset per-frame flags.
+        // F. Drop-through state: the flag lasts exactly one frame (set above, consumed here).
+        _suppressOneWay =
+            _dropThroughFrame
+            || (!IsOnGround && inputY < -0.5f && current.CanFallThroughOneWayCollision);
+        _dropThroughFrame = false;
+
+        // G. Record ground state for next frame's snap gate, and reset per-frame flags.
         _wasOnGroundLastFrame = IsOnGround;
         _snappedThisFrame = false;
         _slopeSampledThisFrame = false;

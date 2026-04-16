@@ -53,12 +53,12 @@ map.GetLayer("Foreground").Z = 100f;
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision");
-var cloud = map.GenerateCollisionFromClass("CloudCollision");
+var jumpThrough = map.GenerateCollisionFromClass("JumpThroughCollision");
 Add(solid);
-Add(cloud);
+Add(jumpThrough);
 ```
 
-Each collection can have its own collision relationship. **Cloud / jump-through collision is not yet implemented** — `CloudCollision` currently behaves identically to `SolidCollision`. Planned; see `design/TODOS.md`. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
+Each collection can have its own collision relationship. For jump-through platforms, set `OneWayDirection = OneWayDirection.Up` and `AllowDropThrough = true` on the relationship — the player passes through from below, lands from above, and can drop down with Down+Jump. For hard one-way barriers (`OneWayCollision` tile class — Yoshi-style ratchet doors), set `OneWayDirection = OneWayDirection.Up` and leave `AllowDropThrough = false`. See the `collision-relationships` skill for details. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");

@@ -255,6 +255,18 @@ Under defaults, a 30° slope cuts uphill speed to 50% and boosts downhill speed 
 
 When using acceleration, the adjusted max speed drives `AccelerationTimeX` magnitude (speeding up); `DecelerationTimeX` still uses the raw `MaxSpeedX` so braking isn't slowed on an uphill.
 
+## One-Way Platforms and Drop-Through
+
+Jump-through (cloud) platforms are configured on the **collision relationship**, not the behavior — set `relationship.OneWayDirection = OneWayDirection.Up` and `relationship.AllowDropThrough = true`. The second flag is required for drop-through to bypass the relationship; leaving it `false` makes the barrier hard (e.g. Yoshi's Island ratchet doors — always blocks, Down+Jump has no effect on it). See the `collision-relationships` skill for the relationship-level semantics.
+
+Drop-through is handled by the behavior. Set `PlatformerValues.CanFallThroughOneWayCollision = true` (default) to enable; `false` makes Down+Jump perform a normal jump and airborne Down has no effect.
+
+Triggers:
+- **Grounded Down+Jump** — suppresses one-way collision for one frame and skips the regular jump. After that frame, the entity's `LastPosition` is below the surface, so the one-way gate's positional check naturally prevents re-landing.
+- **Airborne Down held** (`MovementInput.Y < -0.5`) — continuous suppression while falling, so the player can ride a downward arc through stacked clouds.
+
+`PlatformerBehavior.IsSuppressingOneWayCollision` reflects the combined state; the one-way gate on each relationship reads it via the player's `IPlatformerEntity.Platformer`, **but only when the relationship has `AllowDropThrough = true`**. Relationships with `AllowDropThrough = false` (the default) ignore the suppression flag so hard one-way barriers remain impassable.
+
 ## Gotchas
 
 - `JumpApplyLength = TimeSpan.Zero` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.

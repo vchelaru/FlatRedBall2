@@ -881,28 +881,33 @@ public class TileShapeCollection : ICollidable
         float centerX = (shapeMinX + shapeMaxX) / 2f;
         float bottomY = shapeMinY;
 
-        // Find the polygon's surface Y at centerX by checking each edge.
-        // The surface is the highest Y where an edge spans centerX.
+        float? surfaceY = GetPolygonSurfaceYAt(poly, centerX);
+        if (surfaceY == null) return Vector2.Zero; // centerX outside polygon edges
+        if (bottomY >= surfaceY.Value) return Vector2.Zero; // shape is above the surface
+
+        return new Vector2(0f, surfaceY.Value - bottomY);
+    }
+
+    // Finds the polygon's top-surface Y at the given world X by scanning edges.
+    // The surface is the highest Y of any edge spanning centerX. Returns null when centerX
+    // is outside the polygon's X range.
+    private static float? GetPolygonSurfaceYAt(Polygon poly, float centerX)
+    {
         float surfaceY = float.MinValue;
         var pts = poly.Points;
         for (int i = 0; i < pts.Count; i++)
         {
-            // World-space vertices (polygon tiles have no rotation)
             float ax = poly.X + pts[i].X;
             float ay = poly.Y + pts[i].Y;
             int next = (i + 1) % pts.Count;
             float bx = poly.X + pts[next].X;
             float by = poly.Y + pts[next].Y;
 
-            // Does this edge span centerX?
             if ((ax <= centerX && bx >= centerX) || (bx <= centerX && ax >= centerX))
             {
                 float range = bx - ax;
                 if (MathF.Abs(range) < 1e-6f)
-                {
-                    // Vertical edge — take the higher Y
                     surfaceY = MathF.Max(surfaceY, MathF.Max(ay, by));
-                }
                 else
                 {
                     float t = (centerX - ax) / range;
@@ -911,11 +916,29 @@ public class TileShapeCollection : ICollidable
                 }
             }
         }
+        return surfaceY == float.MinValue ? null : surfaceY;
+    }
 
-        if (surfaceY == float.MinValue) return Vector2.Zero; // centerX outside polygon edges
-        if (bottomY >= surfaceY) return Vector2.Zero; // shape is above the surface
-
-        return new Vector2(0f, surfaceY - bottomY);
+    /// <summary>
+    /// Returns the top-surface world-Y of a floor-like polygon tile occupying the cell at
+    /// <paramref name="worldX"/>, or <c>null</c> when no polygon tile is present. Used by the
+    /// one-way-collision gate to make the LastPosition check slope-aware: on an uphill cloud
+    /// slope, the surface Y at the player's last-frame X is lower than at the current X, and
+    /// that difference must be folded into the gate. Only polygon tiles are queried — rect
+    /// tiles are excluded so the delta adjustment doesn't fire at slope-to-flat transitions
+    /// (where it would incorrectly loosen the gate and allow large upward separations).
+    /// </summary>
+    internal float? GetHeightmapSurfaceYAt(float worldX)
+    {
+        int col = (int)MathF.Floor((worldX - X) / GridSize);
+        foreach (var kv in _polyTiles)
+        {
+            if (kv.Key.col != col) continue;
+            if (!IsFloorLikePolygon(kv.Value)) continue;
+            var y = GetPolygonSurfaceYAt(kv.Value, worldX);
+            if (y.HasValue) return y;
+        }
+        return null;
     }
 
     /// <summary>

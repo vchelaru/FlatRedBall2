@@ -4,9 +4,9 @@
  <tile id="0" class="SolidCollision"/>
  <tile id="1" class="SolidCollision"/>
  <tile id="2" class="SolidCollision"/>
- <tile id="3" class="CloudCollision"/>
- <tile id="4" class="CloudCollision"/>
- <tile id="5" class="CloudCollision"/>
+ <tile id="3" class="JumpThroughCollision"/>
+ <tile id="4" class="JumpThroughCollision"/>
+ <tile id="5" class="JumpThroughCollision"/>
  <tile id="6" class="OneWayCollision"/>
  <tile id="32" class="Water"/>
  <tile id="33" class="BreakableCollision"/>

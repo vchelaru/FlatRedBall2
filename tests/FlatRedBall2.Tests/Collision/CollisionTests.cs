@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Input;
+using FlatRedBall2.Movement;
 using Shouldly;
 using Xunit;
 
@@ -226,6 +228,420 @@ public class CollisionTests
 
         a.X.ShouldBe(0f);                     // a is fixed
         a.CollidesWith(b).ShouldBeFalse();    // b resolved the overlap
+    }
+
+    [Fact]
+    public void OneWayDirection_Default_IsNone()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+
+        rel.OneWayDirection.ShouldBe(OneWayDirection.None);
+    }
+
+    [Fact]
+    public void OneWayDown_WhenRun_ThrowsNotImplemented()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 10f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Down,
+        };
+        rel.MoveFirstOnCollision();
+
+        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+    }
+
+    [Fact]
+    public void OneWayLeft_WhenRun_ThrowsNotImplemented()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Left,
+        };
+        rel.MoveFirstOnCollision();
+
+        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+    }
+
+    [Fact]
+    public void OneWayRight_WhenRun_ThrowsNotImplemented()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Right,
+        };
+        rel.MoveFirstOnCollision();
+
+        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+    }
+
+    [Fact]
+    public void OneWayUp_AOverlapsBFromAbove_Separates()
+    {
+        // A sits just above B with a small vertical overlap. AabbVsAabb will produce sep.Y > 0
+        // (push A upward), so the one-way Up gate fires.
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 25f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        a.Y.ShouldBeGreaterThan(25f); // pushed up
+        a.CollidesWith(b).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_AOverlapsBFromBelow_DoesNotSeparate()
+    {
+        // A sits below B with vertical overlap — sep.Y would be negative (push A down).
+        // Gate rejects this: no separation, no event.
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = -25f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.Y.ShouldBe(-25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_AOverlapsBFromSide_DoesNotSeparate()
+    {
+        // Horizontal-dominant overlap: AabbVsAabb returns a pure-X separation (sep.Y == 0).
+        // Gate rejects: sep.Y <= 0 means "not pushed upward".
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 25f, Y = 0f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(25f);
+        a.Y.ShouldBe(0f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_SeparationHasYComponent_NoXDisplacementApplied()
+    {
+        // A above B with vertical-dominant overlap — SAT returns a pure-Y sep, so X doesn't move.
+        // This also pins the "sep.X zeroed before ApplyResponse" contract: any X in the sep would
+        // translate into X motion here, and we'd see it.
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 5f, Y = 20f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(5f);
+        a.Y.ShouldBeGreaterThan(20f);
+    }
+
+    [Fact]
+    public void AllowDropThrough_DefaultsToFalse()
+    {
+        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+
+        rel.AllowDropThrough.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_AllowDropThroughFalse_PlayerSuppressing_StillSeparates()
+    {
+        // Hard one-way barrier (e.g. Yoshi's Island ratchet door): AllowDropThrough = false.
+        // Even with the player's drop-through flag active, separation must still fire.
+        var player = MakeSuppressingPlayer(y: 25f);
+        // Simulate "was on top of barrier last frame" so the positional gate accepts.
+        player.LastPosition = new System.Numerics.Vector2(0f, 33f);
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            // AllowDropThrough = false (default)
+        };
+        rel.MoveFirstOnCollision();
+
+        player.Platformer.IsSuppressingOneWayCollision.ShouldBeTrue();
+        rel.RunCollisions();
+
+        player.Y.ShouldBeGreaterThan(25f, "hard one-way barrier must push the player out regardless of drop-through state");
+        player.CollidesWith(b).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_AllowDropThroughTrue_PlayerSuppressing_SkipsSeparation()
+    {
+        // Cloud platform: AllowDropThrough = true. Player's drop-through flag bypasses the pair entirely.
+        var player = MakeSuppressingPlayer(y: 25f);
+        float startY = player.Y;
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            AllowDropThrough = true,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        player.Platformer.IsSuppressingOneWayCollision.ShouldBeTrue();
+        rel.RunCollisions();
+
+        player.Y.ShouldBe(startY, "drop-through active + AllowDropThrough=true → relationship bypassed");
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Solid_TwoWay_DropThroughSuppression_DoesNotBypass()
+    {
+        // Drop-through is *direction-gated* inside TryApplyOneWayGate — it only has an effect
+        // when OneWayDirection != None. A solid (two-way) relationship with
+        // OneWayDirection = None must never be bypassed by the player's suppression flag, even
+        // if AllowDropThrough is (deliberately / accidentally) set to true. Regression against
+        // a hypothetical bug where AllowDropThrough became a global "skip collision" kill switch.
+        var player = MakeSuppressingPlayer(y: 25f);
+        float startY = player.Y;
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.None, // solid, two-way
+            AllowDropThrough = true,                // intentionally misconfigured
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        player.Platformer.IsSuppressingOneWayCollision.ShouldBeTrue();
+        rel.RunCollisions();
+
+        player.Y.ShouldBeGreaterThan(startY, "solid floor must still push the player out");
+        player.CollidesWith(b).ShouldBeFalse();
+        fired.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void OneWayUp_NeverAboveTile_StartsFallingFromInside_DoesNotSeparate()
+    {
+        // Player jumped up into a tile from below, never cleared the top, and is now starting to
+        // fall (VY < 0). The velocity gate alone allows this — but the player should still NOT
+        // be popped onto the top. Requires a positional gate: lastPosition must have been at or
+        // above the post-separation Y. Without LastPosition tracking, sep.Y > 0 + VY <= 0 isn't
+        // enough.
+        var player = new OneWayTestPlayer { Y = 12f, VelocityY = -50f };
+        player.LastPosition = new System.Numerics.Vector2(0f, 14f); // last frame: also inside tile from below
+        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        player.Y.ShouldBe(12f, "player never reached the top of the tile, must not be popped onto it");
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_AOverlapsBFromAbove_MovingUpward_DoesNotSeparate()
+    {
+        // Player jumping up through a jump-through platform must not get popped onto its top.
+        // Even when sep.Y > 0 (deep enough overlap that SAT picks the upward exit), an upward-
+        // moving entity should pass through. Gate requires VelocityY <= 0 for OneWayDirection.Up.
+        var player = new OneWayTestPlayer { Y = 25f, VelocityY = 200f };
+        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        player.Y.ShouldBe(25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayUp_PolygonSlope_UphillWalk_Separates()
+    {
+        // Regression: on a sloped one-way (cloud) tile, the surface Y at the player's current X
+        // is higher than at LastPosition.X when walking uphill. The original flat gate would
+        // reject every frame ("LastPos.Y < Position.Y + sep.Y") and the player would tunnel.
+        // The slope-aware gate folds in the (lastSurface - thisSurface) delta so the check passes.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        // Right-ascending triangle in cell (0,0): world (0,0)→(16,0)→(16,16).
+        tiles.AddPolygonTileAtCell(0, 0, Polygon.FromPoints(new[]
+        {
+            new System.Numerics.Vector2(-8f, -8f),
+            new System.Numerics.Vector2( 8f, -8f),
+            new System.Numerics.Vector2( 8f,  8f),
+        }));
+
+        var player = new OneWayTestPlayer
+        {
+            X = 8f, Y = 23f, VelocityY = 0f,
+            LastPosition = new System.Numerics.Vector2(4f, 20f),
+        };
+        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+            new[] { player }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            SlopeMode = SlopeCollisionMode.PlatformerFloor,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        player.Y.ShouldBeGreaterThan(23f, "uphill cloud slope must push the player up to the slope surface");
+    }
+
+    [Fact]
+    public void OneWayUp_PolygonSlope_MovingUpward_DoesNotSeparate()
+    {
+        // Player rising into a sloped cloud from below — velocity gate still rejects regardless
+        // of surface-Y delta. Ensures the slope-aware path didn't accidentally bypass the
+        // VelocityY > 0 gate.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, Polygon.FromPoints(new[]
+        {
+            new System.Numerics.Vector2(-8f, -8f),
+            new System.Numerics.Vector2( 8f, -8f),
+            new System.Numerics.Vector2( 8f,  8f),
+        }));
+
+        var player = new OneWayTestPlayer { X = 8f, Y = 15f, VelocityY = 200f };
+        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+            new[] { player }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            SlopeMode = SlopeCollisionMode.PlatformerFloor,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        player.Y.ShouldBe(15f);
+    }
+
+    [Fact]
+    public void OneWayUp_SlopeToAdjacentFlatTile_DoesNotSnapUp()
+    {
+        // Regression: player walks downhill off a slope onto an adjacent flat tile whose top
+        // is higher than the slope surface at the transition point. Without the fix, the
+        // surfaceDelta (lastSurface on slope − thisSurface on rect) massively loosens the
+        // positional gate, allowing an 8px upward sep through the one-way gate.
+        // Fix: surfaceDelta only uses polygon surfaces — rect tiles return null, delta = 0,
+        // and the original flat gate correctly rejects.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // flat rect: center (8,8), spans [0,16]×[0,16], top = 16
+        tiles.AddPolygonTileAtCell(1, 0, Polygon.FromPoints(new[]
+        {
+            new System.Numerics.Vector2(-8f, -8f),
+            new System.Numerics.Vector2( 8f, -8f),
+            new System.Numerics.Vector2( 8f,  8f),
+        })); // slope: center (24,8), surface from (16,0) to (32,16)
+
+        // Player center above rect center so SAT pushes UP (sep.Y > 0).
+        // Shape 12×20: at (10, 18) spans X [4,16], Y [8,28]. Rect [0,16]×[0,16].
+        // Y overlap = [8,16] = 8, X overlap = [4,16] = 12. Min = Y → sep = (0, 8).
+        // LastPosition on the slope (X=20). Slope surface at X=20 = 4.
+        // With rect fallback (bugged): thisSurface = rect top = 16, delta = 4−16 = −12.
+        //   Gate: 16 >= 18+8+(−12)−ε = 13.999 → TRUE (bug: snaps up).
+        // Without rect fallback (fixed): thisSurface = null, delta = 0.
+        //   Gate: 16 >= 18+8+0−ε = 25.999 → FALSE (correctly rejects).
+        var player = new OneWayTestPlayer
+        {
+            X = 10f, Y = 18f, VelocityY = -5f,
+            LastPosition = new System.Numerics.Vector2(20f, 16f),
+        };
+        player.Add(new AxisAlignedRectangle { Width = 12f, Height = 20f });
+
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+            new[] { player }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            SlopeMode = SlopeCollisionMode.PlatformerFloor,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        fired.ShouldBeFalse("slope-to-flat transition must not produce a large upward separation");
+        player.Y.ShouldBe(18f);
+    }
+
+    // Minimal IPlatformerEntity used to exercise the drop-through gate from collision tests.
+    // Collision shape attached so the rectangle side sees a real overlap.
+    private sealed class OneWayTestPlayer : Entity, IPlatformerEntity
+    {
+        public PlatformerBehavior Behavior { get; } = new();
+        public PlatformerBehavior Platformer => Behavior;
+    }
+
+    private sealed class DownHeldAxisInput : I2DInput
+    {
+        public float X => 0f;
+        public float Y => -1f;
+    }
+
+    // Builds a player whose PlatformerBehavior is in the "airborne + Down held" state so
+    // IsSuppressingOneWayCollision is true. Uses the real Update path — no reflection or
+    // internal hooks — matching how the flag gets set at runtime.
+    private static OneWayTestPlayer MakeSuppressingPlayer(float y)
+    {
+        var player = new OneWayTestPlayer { Y = y };
+        var shape = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        player.Add(shape);
+
+        player.Behavior.AirMovement = new PlatformerValues();
+        player.Behavior.MovementInput = new DownHeldAxisInput();
+        player.LastReposition = System.Numerics.Vector2.Zero; // airborne
+
+        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
+        player.Behavior.Update(player, frame);
+        return player;
     }
 
     [Fact]

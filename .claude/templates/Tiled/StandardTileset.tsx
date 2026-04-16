@@ -4,9 +4,9 @@
  <tile id="0" type="SolidCollision"/>
  <tile id="1" type="SolidCollision"/>
  <tile id="2" type="SolidCollision"/>
- <tile id="3" type="CloudCollision"/>
- <tile id="4" type="CloudCollision"/>
- <tile id="5" type="CloudCollision"/>
+ <tile id="3" type="JumpThroughCollision"/>
+ <tile id="4" type="JumpThroughCollision"/>
+ <tile id="5" type="JumpThroughCollision"/>
  <tile id="6" type="OneWayCollision"/>
  <tile id="9" type="MovingPlatform"/>
  <tile id="11" type="SolidCollision">

@@ -50,8 +50,8 @@ The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. Use these GIDs i
 | 1 | SolidCollision | Primary solid wall/floor tile |
 | 2 | SolidCollision | Visual variant |
 | 3 | SolidCollision | Visual variant |
-| 4 | CloudCollision | |
-| 7 | OneWayCollision | |
+| 4 | JumpThroughCollision | Cloud-style: solid from above, drop-through with Down+Jump |
+| 7 | OneWayCollision | Hard one-way barrier: pass once, never return (e.g., Yoshi door) |
 | 10 | MovingPlatform | |
 | 33 | Water | |
 | 34 | BreakableCollision | |

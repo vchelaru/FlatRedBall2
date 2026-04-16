@@ -118,4 +118,13 @@ public class PlatformerValues
     /// downhill acceleration; values below <c>1</c> would slow the entity on descents.
     /// </summary>
     public float DownhillMaxSpeedMultiplier { get; set; } = 1.5f;
+
+    /// <summary>
+    /// Gates the behavior's drop-through and airborne-Down suppression of one-way collision
+    /// relationships. When true (default): pressing Down+Jump while grounded triggers drop-through,
+    /// and holding Down while airborne suppresses one-way collisions so the entity falls through
+    /// jump-through platforms. When false, both triggers are inert — Down+Jump performs a normal
+    /// jump, and airborne Down has no effect on one-way relationships.
+    /// </summary>
+    public bool CanFallThroughOneWayCollision { get; set; } = true;
 }

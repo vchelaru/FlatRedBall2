@@ -81,6 +81,156 @@ public class PlatformerBehaviorTests
     }
 
     [Fact]
+    public void DropThrough_AirborneDown_RequiresCanFallThroughTrue_ReturnsFalse()
+    {
+        var values = new PlatformerValues { CanFallThroughOneWayCollision = false };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity();
+        entity.LastReposition = Vector2.Zero; // airborne
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DropThrough_AirborneDownHeld_SetsSuppressionFlag()
+    {
+        var values = new PlatformerValues();
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity();
+        entity.LastReposition = Vector2.Zero; // airborne
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DropThrough_AirborneNoDown_SuppressionIsFalse()
+    {
+        var behavior = new PlatformerBehavior { AirMovement = new PlatformerValues() };
+        var entity = new Entity();
+        entity.LastReposition = Vector2.Zero; // airborne, no input
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DropThrough_DisabledByCanFallThroughFalse_JumpsNormally()
+    {
+        float jumpVelocity = 300f;
+        var values = new PlatformerValues
+        {
+            CanFallThroughOneWayCollision = false,
+            JumpVelocity = jumpVelocity,
+            MaxFallSpeed = 1000f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            JumpInput = new MockPressableInput(isDown: true, wasJustPressed: true),
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity();
+        entity.LastReposition = new Vector2(0f, 1f); // grounded
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeFalse();
+        entity.VelocityY.ShouldBe(jumpVelocity);
+    }
+
+    [Fact]
+    public void DropThrough_GroundedDownAndJump_DoesNotApplyJumpVelocity()
+    {
+        var values = new PlatformerValues
+        {
+            JumpVelocity = 300f,
+            MaxFallSpeed = 1000f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            JumpInput = new MockPressableInput(isDown: true, wasJustPressed: true),
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity();
+        entity.LastReposition = new Vector2(0f, 1f); // grounded
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityY.ShouldBe(0f);
+        behavior.IsApplyingJump.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DropThrough_GroundedDownAndJump_SetsSuppressionFlag()
+    {
+        var values = new PlatformerValues
+        {
+            JumpVelocity = 300f,
+            MaxFallSpeed = 1000f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            JumpInput = new MockPressableInput(isDown: true, wasJustPressed: true),
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity { Y = 100f };
+        entity.LastReposition = new Vector2(0f, 1f); // grounded
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DropThrough_SuppressionClearsNextFrame_WhenDownReleased()
+    {
+        var values = new PlatformerValues
+        {
+            JumpVelocity = 300f,
+            MaxFallSpeed = 1000f,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            JumpInput = new MockPressableInput(isDown: true, wasJustPressed: true),
+            MovementInput = new MockAxisInput(y: -1f),
+        };
+        var entity = new Entity { Y = 100f };
+        entity.LastReposition = new Vector2(0f, 1f); // grounded — triggers drop-through
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+        behavior.IsSuppressingOneWayCollision.ShouldBeTrue();
+
+        // Next frame: release all input. Suppression should clear (one-frame flag expired,
+        // and airborne-Down path is inactive).
+        entity.LastReposition = Vector2.Zero; // airborne
+        behavior.JumpInput = new MockPressableInput();
+        behavior.MovementInput = new MockAxisInput();
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        behavior.IsSuppressingOneWayCollision.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Gravity_SetsNegativeAccelerationY()
     {
         float gravity = 600f;
@@ -627,6 +777,100 @@ public class PlatformerBehaviorTests
         player.Behavior.IsOnGround.ShouldBeTrue();
         player.Y.ShouldBe(16f);
         player.VelocityY.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void DropThrough_FullCycle_PlayerPassesBelowTileWithoutBeingPoppedBack()
+    {
+        // End-to-end regression for the drop-through cycle. Catches a subtle bug class: if
+        // drop-through suppression lasts one frame. After that frame the entity's
+        // LastPosition is below the surface, so the one-way gate's positional check
+        // naturally prevents re-landing. This test releases all input after the Down+Jump
+        // to verify the one-frame flag is sufficient — no held-Down path involved.
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0); // tile spans Y in [0, 16], top at Y=16
+
+        var values = new PlatformerValues
+        {
+            Gravity = 600f,
+            MaxFallSpeed = 1000f,
+            JumpVelocity = 400f,
+            MaxSpeedX = 0f,
+            SlopeSnapDistance = 0f,
+        };
+
+        // Player at Y=16 so feet shape (bottom at entity.Y - 1, top at entity.Y + 1) overlaps
+        // the tile's top edge by 1 unit — enough for the one-way-up relationship to separate
+        // upward while the player is "standing on" the tile.
+        var player = new PlayerEntity { X = 8f, Y = 16f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.GroundMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+
+        var rel = new CollisionRelationship<PlayerEntity, TileShapeCollection>(
+            new[] { player }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+            AllowDropThrough = true,
+        };
+        rel.MoveFirstOnCollision();
+
+        float dt = 1f / 60f;
+        float totalTime = 0f;
+
+        var noInput = new MockPressableInput();
+        var noAxis = new MockAxisInput();
+        var downJumpPress = new MockPressableInput(isDown: true, wasJustPressed: true);
+        var downHeldAxis = new MockAxisInput(y: -1f);
+
+        player.Behavior.JumpInput = noInput;
+        player.Behavior.MovementInput = noAxis;
+
+        // Step 1: run a few grounded frames to establish IsOnGround = true.
+        for (int i = 0; i < 4; i++)
+        {
+            totalTime += dt;
+            player.PhysicsUpdate(MakeFrame(dt));
+            rel.RunCollisions();
+            player.Behavior.Update(player, MakeFrame(dt, totalSeconds: totalTime));
+        }
+
+        player.Behavior.IsOnGround.ShouldBeTrue("player should be grounded on the tile before drop-through");
+        float groundedY = player.Y;
+
+        // Step 2: press Down + Jump to trigger drop-through.
+        player.Behavior.JumpInput = downJumpPress;
+        player.Behavior.MovementInput = downHeldAxis;
+
+        totalTime += dt;
+        player.PhysicsUpdate(MakeFrame(dt));
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(dt, totalSeconds: totalTime));
+
+        player.Behavior.IsSuppressingOneWayCollision.ShouldBeTrue(
+            "drop-through should activate suppression on the Down+Jump frame");
+
+        // Step 3: release all input and let gravity carry the player down. Track the maximum
+        // Y observed during descent — it must never exceed the initial grounded Y (which would
+        // indicate a pop-back to the tile top).
+        player.Behavior.JumpInput = noInput;
+        player.Behavior.MovementInput = noAxis;
+
+        float maxYDuringDescent = player.Y;
+        for (int i = 0; i < 60; i++)
+        {
+            totalTime += dt;
+            player.PhysicsUpdate(MakeFrame(dt));
+            rel.RunCollisions();
+            player.Behavior.Update(player, MakeFrame(dt, totalSeconds: totalTime));
+
+            if (player.Y > maxYDuringDescent) maxYDuringDescent = player.Y;
+            if (player.Y < -16f) break; // cleared the tile
+        }
+
+        player.Y.ShouldBeLessThan(-16f, "player should have fallen well below the tile");
+        maxYDuringDescent.ShouldBeLessThanOrEqualTo(groundedY + 0.001f,
+            "player must never be popped back above the tile's top during descent");
     }
 
     // --- Mock helpers ---

@@ -121,6 +121,52 @@ AddCollisionRelationship(_ballFactory, solidTiles)
 
 **Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
 
+### OneWayDirection (jump-through / cloud platforms)
+
+`relationship.OneWayDirection` restricts a relationship so separation only fires when the entity is being pushed in the configured direction. MVP implements `None` (default) and `Up`; `Down`/`Left`/`Right` throw `NotImplementedException` on the next collision pass.
+
+```csharp
+var cloudTiles = new TileShapeCollection { GridSize = 16f };
+cloudTiles.AddTileAtCell(3, 5);
+
+var playerVsClouds = AddCollisionRelationship(_playerFactory, cloudTiles);
+playerVsClouds.OneWayDirection = OneWayDirection.Up;
+playerVsClouds.AllowDropThrough = true; // opt in to Down+Jump drop-through for clouds
+playerVsClouds.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+```
+
+Semantics for `Up` — three gates, all must pass:
+- `sep.Y > 0` (separation pushes upward — skip otherwise, no `CollisionOccurred`).
+- `VelocityY <= 0` (entity is falling or stationary — an upward-moving entity passes through even when SAT would push it onto the top).
+- `LastPosition.Y` was at or above the post-separation Y (entity was cleanly on top last frame, not peaking inside the tile from below). On sloped tiles this is slope-aware: the surface-Y delta between `LastPosition.X` and current `X` is folded in, so uphill walking passes.
+
+The X component of the separation is zeroed before applying — an entity clipping a cloud's side edge is lifted straight up, never shoved sideways. This matches FRB1 cloud behavior.
+
+### Sloped cloud platforms (polygon jump-through tiles)
+
+For sloped one-way tiles (polygon cells in the `TileShapeCollection`) you must also set `SlopeMode = PlatformerFloor`. Without it the collection falls back to SAT, the slope-aware LastPosition gate doesn't run, and the player falls through while walking uphill.
+
+```csharp
+var cloudTiles = new TileShapeCollection { GridSize = 16f };
+cloudTiles.AddPolygonTileAtCell(3, 5, rightAscendingSlopePrototype);
+
+var playerVsClouds = AddCollisionRelationship(_playerFactory, cloudTiles);
+playerVsClouds.OneWayDirection = OneWayDirection.Up;
+playerVsClouds.AllowDropThrough = true;
+playerVsClouds.SlopeMode = SlopeCollisionMode.PlatformerFloor; // required for sloped clouds
+playerVsClouds.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+```
+
+### `AllowDropThrough` — cloud platforms vs. hard one-way barriers
+
+`OneWayDirection` and player drop-through are intentionally separate concerns:
+
+- `AllowDropThrough = true` — this relationship honors
+  `IPlatformerEntity.Platformer.IsSuppressingOneWayCollision`; when the player drop-through flag is active (Down+Jump, or airborne with Down held), the pair is skipped entirely. **Use for cloud platforms / jump-through floors.**
+- `AllowDropThrough = false` (default) — player drop-through input is ignored; the relationship always blocks in the configured direction. **Use for hard one-way barriers** (e.g. Yoshi's Island ratchet doors) that should never be passable the wrong way.
+
+Both forms are driven by the same `OneWayDirection` gate — the only difference is whether drop-through can bypass them. See the `platformer-movement` skill for drop-through wiring on the behavior.
+
 ## Sensor Shapes (Awareness, Trigger Zones)
 
 For non-physical overlap detection — e.g., enemy awareness radius, pickup range, trigger zones — add an extra shape child and target it with `WithFirstShape`.
