@@ -14,6 +14,8 @@ Platformer movement is provided by two classes in `FlatRedBall2.Movement`:
 
 ## Minimal Setup
 
+Movement coefficients **must** live in a JSON file, not hardcoded in C#. Copy the template from `.claude/templates/PlatformerConfig/player.platformer.json` into the project's `Content/` folder, adjust values, and add `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj`.
+
 ```csharp
 public class Player : Entity
 {
@@ -21,16 +23,7 @@ public class Player : Entity
 
     public override void CustomInitialize()
     {
-        var groundValues = new PlatformerValues
-        {
-            MaxSpeedX = 200f,
-            Gravity = 600f,
-            MaxFallSpeed = 800f,
-        };
-        groundValues.SetJumpHeights(minHeight: 16f, maxHeight: 48f); // must be after Gravity
-
-        _platformer.GroundMovement = groundValues;
-        _platformer.AirMovement = groundValues;   // reuse, or provide separate air values
+        PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
 
         var keyboard = Engine.Input.Keyboard;
         _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space);
@@ -43,6 +36,21 @@ public class Player : Entity
     }
 }
 ```
+
+## PlatformerConfig JSON
+
+`PlatformerConfig.FromJson(path)` deserializes a JSON file into a pure data model; the `ApplyTo` extension method pushes it onto a `PlatformerBehavior`. The config is a model — it does not reference the behavior; `ApplyTo` lives in `PlatformerConfigExtensions`.
+
+Template: `.claude/templates/PlatformerConfig/player.platformer.json`
+
+**Movement slots** are fixed names mapping to behavior fields: `ground` → `GroundMovement`, `air` → `AirMovement`, `afterDoubleJump` → reserved (parsed but not applied until the behavior wires a double-jump slot). All fields in a slot are nullable; omitted fields fall back to `new PlatformerValues()` defaults.
+
+**Jump configuration** supports two mutually-exclusive modes per slot:
+- **Derived (preferred):** `minJumpHeight` + optional `maxJumpHeight` → calls `SetJumpHeights`. `Gravity` must be in the same slot (it's applied first internally).
+- **Raw (escape hatch):** `JumpVelocity` + `JumpApplyLength` + `JumpApplyByButtonHold` set directly.
+- Specifying fields from both modes in the same slot throws `InvalidOperationException`.
+
+**TimeSpan fields** (`AccelerationTimeX`, `DecelerationTimeX`, `JumpApplyLength`) are represented as seconds (float) in JSON.
 
 ## Critical Call-Order Rule
 

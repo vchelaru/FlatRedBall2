@@ -128,8 +128,8 @@ public static class BuiltInPriorities
 
 ## Implementation order (once open questions resolve)
 
-1. DTO + nullable-field coefficient types
-2. `PlatformerValues` JSON loader + resolver (derived-vs-raw jump modes)
+1. ~~DTO + nullable-field coefficient types~~ — **Done.** `MovementSlot` in `src/Movement/PlatformerConfig.cs`.
+2. ~~`PlatformerValues` JSON loader + resolver (derived-vs-raw jump modes)~~ — **Done.** `PlatformerConfig.FromJson` / `FromJsonString` + `PlatformerConfigExtensions.ApplyTo`. SlopesSample and AutoEvalCoinHopperSample converted. Template at `.claude/templates/PlatformerConfig/player.platformer.json`.
 3. Animation section loader
 4. `PlatformerAnimationController` (built-in states + registration API + priority evaluation)
 5. Graduate `AddLeftFacingVariants` helper out of `SlopesSample` (generalize to mirror any direction)
@@ -142,7 +142,10 @@ Active tasks (7-14) in the task list map to the sections above. Task #7 (conditi
 
 ## Key source references
 
+- `src/Movement/PlatformerConfig.cs` — DTOs (`PlatformerConfig`, `MovementConfig`, `MovementSlot`) and `FromJson`/`FromJsonString` loader
+- `src/Movement/PlatformerConfigExtensions.cs` — `ApplyTo` extension method (config → behavior wiring)
 - `src/Movement/PlatformerValues.cs:18` — existing `SetJumpHeights(minHeight, maxHeight?)` function
 - `src/Movement/PlatformerBehavior.cs:14` — `GroundMovement` / `AirMovement` fixed slots
-- `samples/SlopesSample/Player.cs:94-129` — current hand-rolled facing convention (Left-suffix only) and `AddLeftFacingVariants` helper to graduate
+- `.claude/templates/PlatformerConfig/player.platformer.json` — commented template for new platformer entities
+- `samples/SlopesSample/Player.cs` — converted to JSON; still has hand-rolled `UpdateFacingChain` and `AddLeftFacingVariants` (step 5-6)
 - `.claude/skills/content-boundary/SKILL.md` — the philosophy this feature embodies

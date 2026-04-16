@@ -35,13 +35,15 @@ This is the lens behind decisions like JSON-driven platformer coefficients, TMX-
 
 When a game task adds a new piece of content, AI **must create a placeholder file** rather than hardcoding the content in C#. After scaffolding, tell the user which file to open in which tool.
 
-| Adding... | Scaffold | Human opens in... |
-|-----------|----------|-------------------|
-| A new level | Minimal TMX with collision layer, one spawn marker (see `tmx` skill) | Tiled |
-| A new UI screen | Gum screen with named controls in a flat list (see `gum-integration` / `gumcli` skills) | Gum Tool |
-| A new platformer entity | Coefficients JSON with default `PlatformerValues` | Text editor (JSON) |
-| A new animated entity | `.achx` referencing a placeholder spritesheet path | Aseprite / FRB animation editor |
-| A new sprite-bearing entity | Code expects `EntityName.png` at a documented size/path | Any image editor |
+| Adding... | Scaffold | Template source | Human opens in... |
+|-----------|----------|-----------------|--------------------|
+| A new level | Minimal TMX with collision layer, one spawn marker (see `tmx` skill) | `.claude/templates/Tiled/base.tmx` | Tiled |
+| A new UI screen | Gum screen with named controls in a flat list (see `gum-integration` / `gumcli` skills) | — | Gum Tool |
+| A new platformer entity | `player.platformer.json` with movement coefficients (see `platformer-movement` skill) | `.claude/templates/PlatformerConfig/player.platformer.json` | Text editor (JSON) |
+| A new animated entity | `.achx` referencing a placeholder spritesheet path | `.claude/templates/AnimationChains/` | Aseprite / FRB animation editor |
+| A new sprite-bearing entity | Code expects `EntityName.png` at a documented size/path | — | Any image editor |
+
+Templates live in `.claude/templates/` — copy from there into the project's `Content/` folder, then adjust values. Add the appropriate `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj` for JSON-based content.
 
 The scaffold must be *valid and runnable* — the game should build and play immediately, using shape-based stand-ins for missing art. The human then iterates on content without the AI being in the loop.
 
@@ -56,7 +58,7 @@ Do not bury this in a summary. The user needs to know exactly which files to ope
 ## Anti-Patterns
 
 - **Hardcoding level geometry in C#** instead of a TMX — the human now has to edit code to move a platform.
-- **Hardcoding jump height / run speed** instead of a coefficients file — every tuning pass is a recompile.
+- **Hardcoding `PlatformerValues` in C#** (`new PlatformerValues { MaxSpeedX = 150f, ... }`) instead of a `player.platformer.json` — every tuning pass is a recompile. Use `PlatformerConfig.FromJson(...).ApplyTo(behavior)` instead.
 - **Generating sprites procedurally "to avoid needing art"** — it is almost always better to use a shape placeholder and have the human drop real art in later.
 - **Silently skipping the handoff** — finishing a task without telling the user which files they need to touch.
 
