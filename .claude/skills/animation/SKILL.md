@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite Animation in FlatRedBall2. Use when working with AnimationChain, AnimationChainList, .achx files, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, or AnimationFinished events."
+description: "Sprite Animation in FlatRedBall2. Use when working with AnimationChain, AnimationChainList, .achx files, Aseprite .ase/.aseprite files, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, or AnimationFinished events."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -17,27 +17,35 @@ Sprites support frame-based animation via `AnimationChain` / `AnimationChainList
 
 ---
 
-## Loading from a .achx File
+## Loading Animations
 
-`.achx` is an XML format. Load with `AnimationChainListSave` from `FlatRedBall2.Animation.Content`:
+Two source formats are supported. Both produce an `AnimationChainList` ready to assign to `sprite.AnimationChains`.
+
+### From Aseprite (.ase / .aseprite) — preferred for new art
+
+Load directly at runtime — no intermediate conversion step. Each Aseprite **tag** becomes one `AnimationChain`. See `references/aseprite.md` for details, gotchas, and the full API.
+
+```csharp
+using FlatRedBall2.Content.Aseprite;
+var animations = AsepriteFileLoader
+    .Load("Content/Characters/player.aseprite")
+    .ToAnimationChainList(GraphicsDevice);
+```
+
+### From .achx (XML)
+
+Load with `AnimationChainListSave` from `FlatRedBall2.Animation.Content`. See `references/achx-authoring.md` for the XML schema and coordinate format.
 
 ```csharp
 using FlatRedBall2.Animation.Content;
-
 var animations = AnimationChainListSave
     .FromFile("Content/Characters/player.achx")
-    .ToAnimationChainList(ContentManager);
-
-sprite.AnimationChains = animations;
-sprite.PlayAnimation("Walk");
+    .ToAnimationChainList(GraphicsDevice);
 ```
 
-`ToAnimationChainList` has two overloads:
+`ToAnimationChainList` has two overloads: one takes `ContentManagerService` (content pipeline / `.xnb`), the other takes `GraphicsDevice` (raw `.png` files).
 
-- **`ToAnimationChainList(ContentManager)`** — loads textures via the content pipeline (`.xnb` files). Strip the extension from texture paths in the `.achx`.
-- **`ToAnimationChainList(GraphicsDevice)`** — loads textures as raw image files (`.png`). Use this with the animation template, which references `.png` directly.
-
-**Gotcha — FileRelativeTextures**: when `true` (the default), texture names in the .achx are relative to the .achx file itself. The loader prepends the .achx directory. If your paths are off, check that the .achx and textures share the expected relative layout.
+**Gotcha — FileRelativeTextures**: when `true` (the default), texture names in the .achx are relative to the .achx file itself. If your paths are off, check that the .achx and textures share the expected relative layout.
 
 ---
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Gum.Forms.Controls;
+using MonoGameGum.GueDeriving;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Rendering;
@@ -234,8 +235,11 @@ public class Overlay
 
     /// <summary>
     /// Draws a text label at world position (<paramref name="worldX"/>, <paramref name="worldY"/>)
-    /// for this frame. The label is positioned in screen space; it does not scale or move
-    /// with the camera.
+    /// for this frame. The label follows the world position — if the camera pans, the label
+    /// moves with the world. Use this for annotations attached to game objects (entity names,
+    /// health values above enemies, debug coordinates).
+    /// For fixed screen-position text (HUD, diagnostics), use
+    /// <see cref="TextScreen(string, float, float)"/> instead.
     /// </summary>
     /// <returns>
     /// The underlying Gum <see cref="Label"/> for optional same-frame configuration.
@@ -243,16 +247,39 @@ public class Overlay
     /// </returns>
     public Label Text(string text, float worldX, float worldY)
     {
+        var screenPos = _screen.Camera.WorldToScreen(new Vector2(worldX, worldY));
+        float zoom = _screen.Camera.Zoom;
+        return PlaceLabel(text, screenPos.X / zoom, screenPos.Y / zoom);
+    }
+
+    /// <summary>
+    /// Draws a text label at a fixed screen position for this frame. The label stays
+    /// put regardless of camera movement. Use this for HUD text, diagnostics, or any overlay
+    /// that should not move with the world.
+    /// Coordinates are in Gum canvas space (origin top-left, Y increases downward).
+    /// Canvas size = <c>Camera.TargetWidth</c> x <c>Camera.TargetHeight</c>.
+    /// For text anchored to a world position, use <see cref="Text(string, float, float)"/> instead.
+    /// </summary>
+    /// <returns>
+    /// The underlying Gum <see cref="Label"/> for optional same-frame configuration.
+    /// Pass this to <see cref="TextBackground"/> to draw a colored backing rectangle.
+    /// </returns>
+    public Label TextScreen(string text, float screenX, float screenY)
+    {
+        return PlaceLabel(text, screenX, screenY);
+    }
+
+    private Label PlaceLabel(string text, float screenX, float screenY)
+    {
         while (_nextLabel >= _labels.Count)
             _labels.Add(CreateLabel());
 
         var label = _labels[_nextLabel++];
-        var screenPos = _screen.Camera.WorldToScreen(new Vector2(worldX, worldY));
         label.Visual.Visible = true;
-        label.X = screenPos.X;
-        label.Y = screenPos.Y;
+        label.X = screenX;
+        label.Y = screenY;
         label.Text = text;
-        _labelScreenPositions[label] = (screenPos.X, screenPos.Y);
+        _labelScreenPositions[label] = (screenX, screenY);
         return label;
     }
 
@@ -277,13 +304,15 @@ public class Overlay
         float totalScreenH = label.ActualHeight + Padding * 2f;
 
         var camera = _screen.Camera;
-        float centerScreenX = sp.screenX + label.ActualWidth  / 2f;
-        float centerScreenY = sp.screenY + label.ActualHeight / 2f;
-        var worldCenter = camera.ScreenToWorld(new Vector2(centerScreenX, centerScreenY));
+        float zoom = camera.Zoom;
+        // Stored positions are in Gum canvas space; ScreenToWorld expects viewport pixels.
+        float centerVpX = (sp.screenX + label.ActualWidth  / 2f) * zoom;
+        float centerVpY = (sp.screenY + label.ActualHeight / 2f) * zoom;
+        var worldCenter = camera.ScreenToWorld(new Vector2(centerVpX, centerVpY));
 
         var worldOrigin = camera.ScreenToWorld(Vector2.Zero);
-        float worldW = MathF.Abs(camera.ScreenToWorld(new Vector2(totalScreenW, 0f)).X - worldOrigin.X);
-        float worldH = MathF.Abs(camera.ScreenToWorld(new Vector2(0f, totalScreenH)).Y - worldOrigin.Y);
+        float worldW = MathF.Abs(camera.ScreenToWorld(new Vector2(totalScreenW * zoom, 0f)).X - worldOrigin.X);
+        float worldH = MathF.Abs(camera.ScreenToWorld(new Vector2(0f, totalScreenH * zoom)).Y - worldOrigin.Y);
 
         bg.IsVisible = true;
         bg.X = worldCenter.X;
@@ -372,7 +401,21 @@ public class Overlay
     private Label CreateLabel()
     {
         var label = new Label { Text = "" };
+        // Label's visual is a TextRuntime; default it to white so it reads against the
+        // default dark TextBackground. Callers can recolor the returned Label as needed.
+        if (label.Visual is TextRuntime text)
+            text.Color = XnaColor.White;
         _screen.Add(label);
+        // Raise the Gum renderable Z above the text background (DefaultZ - 1) so labels
+        // draw on top of their backgrounds, not underneath.
+        foreach (var r in _screen.GumRenderables)
+        {
+            if (r.Visual == label.Visual)
+            {
+                r.Z = DefaultZ;
+                break;
+            }
+        }
         return label;
     }
 

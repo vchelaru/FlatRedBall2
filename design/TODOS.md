@@ -8,6 +8,14 @@ Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and su
 
 - `TilemapEllipseObject` stays out of scope: FRB2 has `Circle` with uniform radius only, and Tiled ellipses allow `rx != ry`; no realistic tile-collision use case justifies the approximation work.
 
+## Platformer Animation Support (FRB1 → FRB2)
+**Priority: Soon** — Port FRB1's platformer animation layer so platformer entities can automatically switch animations based on behavior state (idle/walk/run/jump/fall/land/duck/climb/etc.) and facing direction. FRB1 has this wired through the "AnimationController" plugin / `PlatformerAnimationController` with per-state animation names and left/right variants. Key concerns:
+
+- Map `PlatformerBehavior` states to animation chain names (e.g., `IsOnGround`, `VelocityX != 0`, `JumpTimeElapsed`, etc.)
+- Left/right facing: either two chain variants per state (e.g., `WalkLeft`/`WalkRight`) using FlipHorizontal, or a single chain + flip the sprite based on direction
+- Support for user-defined states beyond the standard set (double-jump, wall-slide, etc.)
+- Hook into PlayAnimation so transitions don't restart a chain that's already playing
+
 ## Platformer Docs Audit (FRB1 → FRB2)
 **Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, animation controller hooks, CSV-driven values.
 
@@ -28,15 +36,6 @@ Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and su
 - Add a loader (e.g. `PlatformerValues.FromJson(string path)` or via `ContentManagerService`) that deserializes into the existing struct
 - Hot-reload support (watch file, re-deserialize on change) would be a nice-to-have for tuning without recompiling
 - Consider whether profiles should live one-per-file or as a named dictionary in a single file
-
-## Aseprite → .achx Conversion Tool
-**Priority: Eventual** — Build a CLI tool (or post-build step) that converts Aseprite `.ase`/`.aseprite` files into FRB2's `.achx` animation chain format. FRB1 has prior art here worth borrowing from. Key concerns:
-
-- Parse Aseprite frame tags → `AnimationChain` entries (name, frame list, loop flag)
-- Map Aseprite frame durations → per-frame `FrameLength` values
-- Export the sprite sheet (or reference existing exported PNG) and wire up UV rects per frame
-- Preserve layer/slice metadata if useful for hitbox or attachment-point data
-- Decide: standalone CLI tool vs. content pipeline extension vs. both
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.
