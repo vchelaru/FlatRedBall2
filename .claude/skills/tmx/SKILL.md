@@ -5,6 +5,8 @@ description: "TMX map file creation and editing for FlatRedBall2. Use when creat
 
 # TMX Map Files in FlatRedBall2
 
+> **See `content-boundary` skill first.** TMX files are a human-edited content format — AI should scaffold a minimal valid TMX and tell the user to open it in Tiled for real level design. Do not try to author detailed levels in XML.
+
 TMX files are the standard level format. A base template and standard tileset live in `.claude/templates/Tiled/`.
 
 ## Communication convention — reference tiles by numeric ID

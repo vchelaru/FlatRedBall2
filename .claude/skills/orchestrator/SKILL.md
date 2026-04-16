@@ -5,6 +5,8 @@ description: "Minigame orchestrator for FlatRedBall2. Designs a small retro game
 
 # Minigame Orchestrator
 
+> **See `content-boundary` skill first.** Orchestrated games must scaffold placeholder content files (TMX, Gum screens, coefficients JSON) and close with an explicit handoff telling the user which files to open in which tools. Do not hardcode levels, UI composition, or tunable values in C#.
+
 Test the FlatRedBall2 engine's AI-usability by designing and implementing a small retro game, then reporting friction.
 
 **Critical constraint:** Do NOT read existing samples (`samples/`), unit tests (`tests/`), or any game code outside `src/` and the current project being built. The only resources available are: engine source code (`src/`), XML docs, skill files (`.claude/skills/`), and templates (`.claude/templates/`). This applies to you AND to the coder agent you delegate to. The whole point of this evaluation is to test whether the engine's docs and skills are sufficient — looking at other samples defeats the purpose.
