@@ -30,6 +30,8 @@
    </object>
   </objectgroup>
  </tile>
+ <tile id="28" type="Coin"/>
+ <tile id="29" type="PlayerSpawn"/>
  <tile id="32" type="Water"/>
  <tile id="33" type="BreakableCollision"/>
  <tile id="34" type="IceCollision"/>

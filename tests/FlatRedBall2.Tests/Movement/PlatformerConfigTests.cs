@@ -159,8 +159,8 @@ public class PlatformerConfigTests
     [Fact]
     public void FromJsonString_UnknownTopLevelKeys_LoadsWithoutError()
     {
-        // leftSuffix/rightSuffix/animations belong to phase 2+ animation layer.
-        // Phase 1 files and phase 2 files share a single loader, so unknown keys must be tolerated.
+        // leftSuffix/rightSuffix/animations are not consumed by the loader but may appear in
+        // user-authored files (leftover from earlier designs, or user extensions). Unknown keys must be tolerated.
         var json = """
         {
           "leftSuffix": "Left",

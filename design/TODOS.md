@@ -8,35 +8,15 @@ Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and su
 
 - `TilemapEllipseObject` stays out of scope: FRB2 has `Circle` with uniform radius only, and Tiled ellipses allow `rx != ry`; no realistic tile-collision use case justifies the approximation work.
 
-## Platformer Config JSON (Animations + Coefficients, Bundled)
-**Priority: Soon** — Port FRB1's platformer animation layer AND externalize `PlatformerValues` in the same unified JSON file per entity. These were two separate TODOs; they're now bundled because they share a file, a loader, and the content-boundary motivation.
+## PlatformerConfig JSON — Coefficients (Landed)
 
-> **In-flight design notes:** `design/platformer-config-design.md` — settled decisions, open questions, and implementation order. Read before picking this up.
+> **Status: Complete.** `PlatformerConfig.FromJson` / `ApplyTo` extension landed. SlopesSample and AutoEvalCoinHopperSample converted. Template at `.claude/templates/PlatformerConfig/`. Skills and content-boundary updated. Hot-reload is a separate TODO below.
 
-### Animation layer
-Port FRB1's platformer animation layer so platformer entities can automatically switch animations based on behavior state (idle/walk/run/jump/fall/land/duck/climb/etc.) and facing direction. FRB1 has this wired through the "AnimationController" plugin / `PlatformerAnimationController` with per-state animation names and left/right variants.
+Externalizes `PlatformerValues` into a JSON file per entity. Canonical application of the `content-boundary` philosophy. Fills the fixed slots FRB2 already has: `movement.ground` → `PlatformerBehavior.GroundMovement`, `movement.air` → `AirMovement`, future `movement.afterDoubleJump` → the not-yet-wired double-jump slot.
 
-- Map `PlatformerBehavior` states to animation chain names via conditions (e.g., `IsOnGround && VelocityX != 0`)
-- Facing: append `leftSuffix`/`rightSuffix` (default `"Left"`/`"Right"` to match FRB1 editor output) to chain names; animation frames carry `FlipHorizontal`
-- Support for user-defined states beyond the standard set (double-jump, wall-slide, etc.)
-- Hook into `PlayAnimation` so transitions don't restart a chain that's already playing
+### Animation — intentionally not engine-managed
 
-### Coefficients layer (was "JSON-Driven PlatformerValues") — **Phase 1 landed**
-Externalize `PlatformerValues` into the config file. Canonical application of the `content-boundary` philosophy.
-
-> **Status:** `PlatformerConfig.FromJson` / `ApplyTo` extension landed. SlopesSample and AutoEvalCoinHopperSample converted. Template at `.claude/templates/PlatformerConfig/`. Skills and content-boundary updated. Hot-reload is a separate TODO below.
-
-- Fills the fixed slots FRB2 already has: `movement.ground` → `PlatformerBehavior.GroundMovement`, `movement.air` → `AirMovement`, future `movement.afterDoubleJump` → the not-yet-wired double-jump slot. **Not arbitrary user-named profiles** — slot names are fixed and known to the behavior.
-- Each movement slot is a nullable-field `PlatformerValues` DTO; omitted fields fall back to struct defaults.
-- **Jump config in each slot supports two mutually-exclusive input modes:**
-  - Derived: `minJumpHeight` + optional `maxJumpHeight` → calls `PlatformerValues.SetJumpHeights(...)`. Preferred mode.
-  - Raw: `JumpVelocity` + `JumpApplyLength` + `JumpApplyByButtonHold` (direct-set escape hatch).
-  - Loader errors if both modes are specified for the same slot.
-- If a game needs "ice physics" or other movement variations, that's game-code swapping the whole `PlatformerValues` assignment — not an engine-level profile concept.
-- ~~Hot-reload support~~ — promoted to its own TODO below.
-
-### Shared schema
-All three top-level sections (`suffixes`, `movement`, `animations`) are **optional** — a file can provide any subset. Single loader entry point (e.g., `PlatformerConfig.FromJson(path)`). Cross-reference `content-boundary` skill.
+FRB1 had an `AnimationController` / `PlatformerAnimationController` that mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this.** The controller was primarily useful for FRB1's code-generation model (Glue editor emitted animation layers that coexisted with hand-written code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable. See the `platformer-movement` skill for the recommended animation pattern.
 
 ## PlatformerConfig Hot-Reload (File Watch)
 **Priority: Soon** — Watch `player.platformer.json` (and any config JSON loaded via `PlatformerConfig.FromJson`) for changes and re-apply values at runtime without recompiling. This is the payoff of the content-boundary split: a designer edits JSON, saves, and sees the result in the running game immediately.
@@ -48,29 +28,47 @@ All three top-level sections (`suffixes`, `movement`, `animations`) are **option
 - Consider generalizing beyond `PlatformerConfig` — any JSON config file could benefit from watch+reload. A generic `ConfigWatcher<T>` might be the right abstraction, with `PlatformerConfig` as the first consumer.
 - Thread safety: `FileSystemWatcher` fires on a threadpool thread; values must be applied on the game thread. Queue the reload and process it during the next `Update` tick.
 
-## Designer-Placed Spawn Markers — API Decision Needed
-**Priority: Soon** — **Discussion item, not yet a settled implementation.** Recurring friction across orchestrator samples: when a game needs designer-placed positions for non-tile things (player spawn, coin/pickup positions, enemy spawn points, trigger zones), the engine offers no path that satisfies the `content-boundary` philosophy. Coders fall back to hardcoded `Vector2[]` arrays in C#, which is the exact anti-pattern that doc warns against — the human now edits code to move a coin.
+## Designer-Placed Spawn Markers
+**Priority: Soon** — Initial implementation landed. `TileMap.CreateEntities<T>` with `Origin` enum and reflection-based property mapping. AutoEvalCoinHopperSample converted. Needs runtime testing to verify coordinate conversion.
 
-### What the coder typically wants
-A way for the human to place markers in a tool, and for game code to read them at load time as `(name, type, worldX, worldY)` tuples — without recompiling.
+### Decision: Tiled Object Layers Behind a Stable Wrapper
 
-### Candidate approaches to discuss
-1. **Tiled object layers** (`<objectgroup>`). Tiled already supports `<object>` elements with `name`, `type`/`class`, `x`, `y` inside an `<objectgroup>`. The TMX format is parsed today (we already pull collision objects), so the marshalling work is small. Pro: zero new tooling, designers already have Tiled open. Con: object Y is in tile-pixel space and needs the same world-coord conversion as the rest of TMX; couples spawn data to the level file (may or may not be desired).
-2. **Separate JSON sidecar per level** (e.g., `Level1.spawns.json`). Pro: decouples spawn data from level geometry; same loader pattern as the planned platformer config JSON. Con: humans must edit JSON by hand, no visual placement.
-3. **Gum-based level editor** for non-tile placement. Almost certainly out of scope but worth naming so we don't quietly drift toward it.
-4. **Tiled object layers + a thin wrapper** that exposes them under a stable API (`map.GetSpawns(layerName)`) so we can later swap the underlying source if needed. Best of (1) and (2).
+Use Tiled object layers with **visual tiles** (designers place tiles from the art tileset onto object layers) and **Tiled Classes** on tile definitions for type identification. The engine surfaces these through a wrapper API so the underlying source (Tiled today, possibly LDTK later) can change without breaking game code.
 
-### Open questions
-- Should spawn markers live in the same TMX as collision/visuals, or in a sibling file?
-- Do we want typed markers (e.g., `class="PlayerSpawn"`) and surface them as a discriminated set, or stay stringly-typed?
-- Tiled object Y is top-down pixel-space; the API should hand back world-space `Vector2` already converted (Y+ up, centered on whatever `CenterOn` was called with) — do we want a flag to opt out?
-- Tiled `Class` (formerly `Type`) supports custom property schemas — worth supporting for "coin worth 50 pts" / "enemy patrol radius 100" out of the box, or punt to v2?
+### Design Decisions
 
-### Related friction (also worth discussing alongside)
-- `TileMap.GetCellWorldPosition(int col, int row)` helper — independent of the spawn-markers question, but the same coder hit both. Currently humans redo `+H/2 - 16*r + 8` on paper to place anything by row/col.
+- **Visual tiles with classes.** Designers place tiles from the visual tileset onto object layers. Each tile definition in the tileset has a Class (e.g., `"Coin"`, `"Player"`, `"CeilingTurret"`). This differs from collision layers, which use the StandardTileset on dedicated tile layers — the difference is justified because spawn markers are concrete visible things, not abstract geometry.
+- **Any number of object layers.** The engine scans all object layers for matching classes. Designers organize layers however they want — one big "Entities" layer or separate layers per category. The engine doesn't care.
+- **Class name as discriminator.** `CreateEntities` filters by tile Class, not by layer name or object name. Stringly-typed at the engine level; game code switches on the class string.
+- **Spawn data lives in the TMX.** Spawn positions are inherently coupled to level geometry — if you move a platform, you want to see the coin sitting on it. Separate files create sync bugs.
+- **World-space positions, always.** The engine converts Tiled's top-down pixel coordinates to world space (Y+ up). No opt-out flag; raw pixel coords are available by reading TMX directly.
+- **Origin is a code-level concern, not a Tiled property.** The designer shouldn't see confusing alignment settings in Tiled that do nothing visually but break things in-game. Origin is an optional parameter on `CreateEntities`, defaulting to `Center`.
+- **Custom properties auto-applied via reflection.** Tiled custom properties (e.g., `worth=50`, `patrolRadius=100`) are automatically mapped to matching entity properties by the engine using reflection. Zero boilerplate for game code — if the entity has `public int Worth { get; set; }` and the Tiled object has `worth=50`, it just works.
+
+### Core API Shape
+
+```csharp
+// Spawn all Coin entities from any object layer
+map.CreateEntities("Coin", coinFactory);
+
+// Player spawns with feet-at-bottom origin
+map.CreateEntities("Player", playerFactory, Origin.BottomCenter);
+
+// Ceiling turret with top origin
+map.CreateEntities("CeilingTurret", turretFactory, Origin.TopCenter);
+```
+
+`Origin` enum: `Center` (default), `BottomCenter`, `TopCenter`, `BottomLeft`, `TopLeft`, etc.
+
+### AOT Consideration
+
+Reflection-based property mapping conflicts with the Native AOT goal (see Multi-Backend TODO). When AOT becomes a priority, this will need a source-generator or explicit-mapping alternative. Acceptable for now — AOT is `Priority: Eventual`.
+
+### Related friction (still open)
+- `TileMap.GetCellWorldPosition(int col, int row)` helper — independent of spawn markers, but addresses similar "where in world space is this tile?" friction.
 
 ## Platformer Docs Audit (FRB1 → FRB2)
-**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, animation controller hooks, CSV-driven values.
+**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. (Note: AnimationController is intentionally not ported — see the "Animation — intentionally not engine-managed" note above.)
 
 ## Implement `OneWayDirection` Down / Left / Right
 **Priority: Eventual** — Currently only `None` and `Up` are implemented; the other three throw `NotImplementedException`. `Down` supports ceiling-only / uppercut-style barriers; `Left`/`Right` support Yoshi's-Island-style one-way doors.

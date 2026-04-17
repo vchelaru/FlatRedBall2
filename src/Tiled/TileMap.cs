@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.Tilemaps;
 using MonoGame.Extended.Tilemaps.Rendering;
@@ -214,6 +215,132 @@ public class TileMap
     {
         X = worldX - Width / 2f;
         Y = worldY + Height / 2f;
+    }
+
+    /// <summary>
+    /// Creates entities from tile objects placed on Tiled object layers whose tile class
+    /// matches <paramref name="className"/>. Scans all object layers in the map.
+    /// </summary>
+    /// <remarks>
+    /// Tiled custom properties on each object are automatically applied to matching public
+    /// instance properties on the entity via reflection (case-insensitive name match).
+    /// Supported property types: <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>.
+    /// </remarks>
+    /// <param name="className">
+    /// The tile class to match (case-insensitive). Checked on the object first, then on the
+    /// tile definition in the tileset.
+    /// </param>
+    /// <param name="factory">The factory to create entities with.</param>
+    /// <param name="origin">
+    /// Which point on the tile becomes the entity's position. Default is <see cref="Origin.Center"/>.
+    /// </param>
+    /// <returns>The created entities.</returns>
+    public IReadOnlyList<T> CreateEntities<T>(string className, Factory<T> factory, Origin origin = Origin.Center)
+        where T : Entity, new()
+    {
+        if (_tilemap == null)
+            throw new InvalidOperationException("CreateEntities requires a loaded TMX file.");
+
+        var created = new List<T>();
+        var entityProps = BuildPropertyMap<T>();
+
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is not TilemapObjectLayer objectLayer)
+                continue;
+
+            foreach (var obj in objectLayer.Objects)
+            {
+                if (obj is not TilemapTileObject tileObj)
+                    continue;
+
+                if (!MatchesClass(tileObj, className))
+                    continue;
+
+                var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
+                var entity = factory.Create();
+                entity.X = worldX;
+                entity.Y = worldY;
+
+                ApplyCustomProperties(entity, tileObj.Properties, entityProps);
+                created.Add(entity);
+            }
+        }
+
+        return created;
+    }
+
+    private bool MatchesClass(TilemapTileObject tileObj, string className)
+    {
+        // Check the object's own Class first (inherits from tile class in Tiled).
+        if (!string.IsNullOrEmpty(tileObj.Class))
+            return string.Equals(tileObj.Class, className, StringComparison.OrdinalIgnoreCase);
+
+        // Fall back to the tile definition's Class in the tileset.
+        var tileData = tileObj.Tile.GetTileData(_tilemap!.Tilesets);
+        return tileData != null &&
+               string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private (float x, float y) ConvertToWorldSpace(TilemapTileObject tileObj, Origin origin)
+    {
+        // Tiled tile objects have position at the bottom-left corner, Y-down from map top-left.
+        float bottomLeftX = _x + tileObj.Position.X;
+        float bottomLeftY = _y - tileObj.Position.Y;
+
+        float w = tileObj.Size.X;
+        float h = tileObj.Size.Y;
+
+        return origin switch
+        {
+            Origin.Center => (bottomLeftX + w / 2f, bottomLeftY + h / 2f),
+            Origin.BottomCenter => (bottomLeftX + w / 2f, bottomLeftY),
+            Origin.TopCenter => (bottomLeftX + w / 2f, bottomLeftY + h),
+            Origin.BottomLeft => (bottomLeftX, bottomLeftY),
+            Origin.TopLeft => (bottomLeftX, bottomLeftY + h),
+            Origin.BottomRight => (bottomLeftX + w, bottomLeftY),
+            Origin.TopRight => (bottomLeftX + w, bottomLeftY + h),
+            _ => (bottomLeftX + w / 2f, bottomLeftY + h / 2f),
+        };
+    }
+
+    private static Dictionary<string, PropertyInfo> BuildPropertyMap<T>()
+    {
+        var map = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+        foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.CanWrite)
+                map[prop.Name] = prop;
+        }
+        return map;
+    }
+
+    private static void ApplyCustomProperties<T>(
+        T entity,
+        TilemapProperties? tiledProps,
+        Dictionary<string, PropertyInfo> entityProps)
+        where T : Entity
+    {
+        if (tiledProps == null || tiledProps.Count == 0)
+            return;
+
+        foreach (var (name, propInfo) in entityProps)
+        {
+            if (!tiledProps.TryGetValue(name, out var tiledValue))
+                continue;
+
+            object? converted = propInfo.PropertyType switch
+            {
+                Type t when t == typeof(string) => tiledValue.AsString(),
+                Type t when t == typeof(int) => tiledValue.AsInt(),
+                Type t when t == typeof(float) => tiledValue.AsFloat(),
+                Type t when t == typeof(bool) => tiledValue.AsBool(),
+                _ => null,
+            };
+
+            if (converted != null)
+                propInfo.SetValue(entity, converted);
+        }
     }
 
     private TilemapTileLayer GetInternalLayer(string name)

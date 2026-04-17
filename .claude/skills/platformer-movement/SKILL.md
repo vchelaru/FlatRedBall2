@@ -275,6 +275,31 @@ Triggers:
 
 `PlatformerBehavior.IsSuppressingOneWayCollision` reflects the combined state; the one-way gate on each relationship reads it via the player's `IPlatformerEntity.Platformer`, **but only when the relationship has `AllowDropThrough = true`**. Relationships with `AllowDropThrough = false` (the default) ignore the suppression flag so hard one-way barriers remain impassable.
 
+## Platformer Animations (User Code, Not Engine-Managed)
+
+FRB2 does not provide an animation controller. Animation state selection is straightforward game code — a pattern match on `PlatformerBehavior` state, plus a facing suffix:
+
+```csharp
+private void UpdateAnimation()
+{
+    string chain = (_platformer.IsOnGround, VelocityX != 0) switch
+    {
+        (true, false) => "Idle",
+        (true, true)  => "Walk",
+        _ => VelocityY > 0 ? "Jump" : "Fall"
+    };
+
+    chain += _platformer.DirectionFacing == HorizontalDirection.Left ? "Left" : "Right";
+    _sprite.PlayAnimation(chain);
+}
+```
+
+Call `UpdateAnimation()` at the end of `CustomActivity`, after `_platformer.Update`. `PlayAnimation` is idempotent — calling with the same chain name each frame does not restart the animation.
+
+For additional states (run, land, wall-slide, double-jump), add cases to the pattern match. Priority is explicit in the code order — no registration API or priority constants needed.
+
+For non-looping animations (attack, land), set `_sprite.IsLooping = false` and use the `AnimationFinished` event to transition back to the default state.
+
 ## Gotchas
 
 - `JumpApplyLength = TimeSpan.Zero` means no jump sustain — velocity is set once on press and immediately stops being held. This gives a fixed-height jump regardless of `JumpApplyByButtonHold`.

@@ -59,9 +59,13 @@ The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. Use these GIDs i
 | 34 | BreakableCollision | |
 | 35 | IceCollision | |
 | 65 | Door | |
+| 29 | Coin | Entity marker — place on object layers, not tile layers |
+| 30 | PlayerSpawn | Entity marker — place on object layers, not tile layers |
 | 97 | Ladder | |
 
 Use **GID 1** for standard solid collision. Use **GID 0** for empty space.
+
+**Entity marker tiles** (GIDs 29, 30) are for object layers only — they have a Class but no collision. Place them as tile objects on an `<objectgroup>` layer. Game code reads them via `map.CreateEntities()`. See the `levels` skill for the API.
 
 ## Layer Conventions
 
@@ -152,6 +156,19 @@ Adjacent sub-cell rects participate in `RepositionDirections` seam suppression: 
 **Current limitations:**
 - `<ellipse>` and polyline collision objects are ignored — only `<polygon>` and plain `<object>` rectangles are honored.
 - Only one `<polygon>` per tile is supported. Authoring a second polygon on the same tile throws `InvalidOperationException` at load time — merge the shapes into a single polygon in Tiled instead. (Rectangles have no such limit.)
+
+### Add an object layer for entity spawns
+
+Object layers hold tile objects that represent entity spawn positions. Each tile object references a tile from the tileset via its GID. The tile's Class determines the entity type. Add an `<objectgroup>` after the tile layers:
+
+```xml
+<objectgroup id="2" name="Entities">
+ <object id="1" gid="29" x="160" y="128" width="16" height="16"/>
+ <object id="2" gid="30" x="32" y="320" width="16" height="16"/>
+</objectgroup>
+```
+
+**Tile object positioning:** For tile objects, Tiled uses the **bottom-left** corner as the anchor, with Y-down from the map's top-left. The engine converts this to world space automatically. `width` and `height` should match the tile size (typically 16×16). Update `nextlayerid` and `nextobjectid` on `<map>` accordingly.
 
 ### Add a tileset
 

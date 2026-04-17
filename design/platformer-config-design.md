@@ -1,44 +1,41 @@
-# Platformer Config JSON — In-Flight Design Notes
+# Platformer Config JSON — Design Notes
 
-This file captures the in-progress design of the unified platformer config JSON (animations + coefficients, bundled). Delete when the feature lands.
+Design record for the platformer config JSON (coefficients). Coefficients are landed; this file preserves the rationale and settled decisions.
 
-See also: `TODOS.md` section "Platformer Config JSON (Animations + Coefficients, Bundled)".
+See also: `TODOS.md` section "PlatformerConfig JSON — Coefficients (Landed)".
 
 ---
 
 ## Motivation
 
-- Externalize both platformer animation state→chain mappings AND `PlatformerValues` coefficients into one JSON file per platformer entity.
-- Canonical application of the `content-boundary` skill: coefficients and mappings are human-tunable; they don't belong in C#.
-- Replaces two previously-separate TODOs ("Platformer Animation Support" and "JSON-Driven PlatformerValues") with a single bundled work item.
+- Externalize `PlatformerValues` coefficients into a JSON file per platformer entity.
+- Canonical application of the `content-boundary` skill: coefficients are human-tunable; they don't belong in C#.
 
 ## Settled decisions
+
+### Animation — not engine-managed
+
+FRB1's `AnimationController` / `PlatformerAnimationController` mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this.** The controller was primarily solving an FRB1/Glue problem (generated code coexisting with custom code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable.
+
+The engine focuses on excellent primitives instead:
+- `PlayAnimation` is idempotent (calling with the same chain doesn't restart)
+- `PlatformerBehavior.DirectionFacing` exposes facing for suffix logic
+- `AnimationFinished` event handles non-looping transitions
+
+See the `platformer-movement` skill for the recommended animation pattern.
 
 ### Schema shape (one file per platformer entity)
 
 ```json
 {
-  "leftSuffix": "Left",
-  "rightSuffix": "Right",
-
   "movement": {
     "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 48 },
     "air":    { "MaxSpeedX": 100, "Gravity": 1500 }
-  },
-
-  "animations": {
-    "states": {
-      "Idle": "Idle",
-      "Walk": "Walk",
-      "Jump": "Jump",
-      "Fall": "Fall"
-    }
   }
 }
 ```
 
-- All three top-level sections (`suffixes`, `movement`, `animations`) are **optional** — a file can provide any subset.
-- Single loader entry point, provisionally `PlatformerConfig.FromJson(path)`.
+- Single loader entry point: `PlatformerConfig.FromJson(path)`.
 
 ### Movement slots are fixed, not user-named profiles
 
@@ -65,80 +62,16 @@ Per movement slot:
 
 See `src/Movement/PlatformerValues.cs:18` for the existing `SetJumpHeights` function.
 
-### Facing suffix convention
+## Resolved questions
 
-- Defaults: `leftSuffix: "Left"`, `rightSuffix: "Right"` — matches FRB1 editor output.
-- Rationale: users won't be migrating FRB1 projects, but they likely will use FRB1's editor, which emits Left/Right-suffixed chains.
-- Either suffix can be set to `""` if the user authored a different convention.
-- `SlopesSample` currently uses `"Left"`-only with base-name-is-right. Will need to update when feature lands — either rename chains or set `rightSuffix: ""`.
+- ~~**Hot-reload support**~~ — promoted to its own TODO in `TODOS.md` ("PlatformerConfig Hot-Reload (File Watch)", Priority: Soon).
 
-### Animation selection approach: Option 3 (hybrid)
-
-Three options were weighed:
-
-1. String expressions in JSON (parser required, ~150 lines)
-2. Enum-only predefined states (no parser, but custom states require engine change)
-3. **Built-in enum + user-registered C# predicates** — chosen
-
-In option 3:
-- Engine ships predicates for a small set of built-in states; user's JSON maps them to chain names.
-- Custom states (`WallSlide`, `DoubleJump`, etc.) are added via `controller.RegisterState(name, priority, predicate)` in game code, then mapped in JSON.
-- Rationale for option 3 over option 1: most custom states coincide with new mechanics that need C# anyway, so forcing a predicate into C# isn't a content-boundary violation. Dodges the parser.
-
-### Built-in animation states (minimum)
-
-Ship predicates for these four only:
-
-| State | Predicate (tentative) |
-|-------|-----------------------|
-| `Idle` | `IsOnGround && VelocityX == 0` |
-| `Walk` | `IsOnGround && VelocityX != 0` |
-| `Jump` | `!IsOnGround && VelocityY > 0` |
-| `Fall` | `!IsOnGround && VelocityY <= 0` |
-
-`Run`, `Land`, `Duck` are **not** built-in — documented as registration recipes in the skill file so users can copy-paste. Keeps the controller lean and avoids coupling it to input systems, thresholds, or frame counters.
-
-### Priority system: flat int priorities with named constants
-
-Not layered (FRB1 had "AnimationLayers" but — pending confirmation from user — they appeared to be a Glue editor grouping, not a runtime semantic difference).
-
-```csharp
-public static class BuiltInPriorities
-{
-    public const int Idle = 100;
-    public const int Walk = 200;
-    public const int Jump = 300;  // Jump and Fall share; predicates are mutually exclusive
-    public const int Fall = 300;
-}
-```
-
-- Gaps of 100 leave room to inject: `WallSlide` at `Fall + 10`, `Sprint` at `Walk + 10`, etc.
-- Per frame: evaluate all registered predicates, pick highest-priority match whose mapping exists in the JSON.
-- Tiebreaker: registration order (stable sort).
-
-## Open questions / not yet decided
-
-1. **FRB1 AnimationLayers semantics** — did layers do anything at runtime beyond priority ordering? Specifically, could layers run *in parallel* (e.g., body layer + weapon layer both playing on different sprites)? If yes, that's a separate parallel-blending feature — probably out of scope for this pass, but worth confirming. **Waiting on user.**
-
-2. **Can `RegisterState` override built-in predicates?** E.g., user calls `RegisterState("Walk", ...)` with their own predicate. Tentatively yes (last registration wins), but not explicitly decided.
-
-3. **Hot-reload support** for the JSON — nice-to-have, not in scope for v1.
-
-4. **Where the skill file lives** — new skill (`platformer-config`?) or a section added to existing `platformer-movement` / `animation` skills. Deferred until closer to landing.
-
-## Implementation order (once open questions resolve)
+## Implementation status
 
 1. ~~DTO + nullable-field coefficient types~~ — **Done.** `MovementSlot` in `src/Movement/PlatformerConfig.cs`.
 2. ~~`PlatformerValues` JSON loader + resolver (derived-vs-raw jump modes)~~ — **Done.** `PlatformerConfig.FromJson` / `FromJsonString` + `PlatformerConfigExtensions.ApplyTo`. SlopesSample and AutoEvalCoinHopperSample converted. Template at `.claude/templates/PlatformerConfig/player.platformer.json`.
-3. Animation section loader
-4. `PlatformerAnimationController` (built-in states + registration API + priority evaluation)
-5. Graduate `AddLeftFacingVariants` helper out of `SlopesSample` (generalize to mirror any direction)
-6. SlopesSample integration — retire hand-rolled `UpdateFacingChain`; this is the end-to-end validation
-7. Skill file
 
-## Tasks
-
-Active tasks (7-14) in the task list map to the sections above. Task #7 (condition strategy) is resolved — option 3 chosen.
+Animation controller, animation JSON section, and RegisterState API were **intentionally dropped** — see "Animation — not engine-managed" above.
 
 ## Key source references
 
@@ -147,5 +80,5 @@ Active tasks (7-14) in the task list map to the sections above. Task #7 (conditi
 - `src/Movement/PlatformerValues.cs:18` — existing `SetJumpHeights(minHeight, maxHeight?)` function
 - `src/Movement/PlatformerBehavior.cs:14` — `GroundMovement` / `AirMovement` fixed slots
 - `.claude/templates/PlatformerConfig/player.platformer.json` — commented template for new platformer entities
-- `samples/SlopesSample/Player.cs` — converted to JSON; still has hand-rolled `UpdateFacingChain` and `AddLeftFacingVariants` (step 5-6)
+- `samples/SlopesSample/Player.cs` — converted to JSON; has hand-rolled `UpdateFacingChain` and `AddLeftFacingVariants` (this is the expected user-code animation pattern)
 - `.claude/skills/content-boundary/SKILL.md` — the philosophy this feature embodies
