@@ -211,7 +211,7 @@ public class ScreenTests
     }
 
     [Fact]
-    public void RestartScreen_AdditionalConfigure_RunsAfterOriginal()
+    public void RestartScreen_WithNewConfigure_AppliesIt()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>(s => s.X = 3);
@@ -223,7 +223,7 @@ public class ScreenTests
     }
 
     [Fact]
-    public void RestartScreen_AdditionalConfigure_NotRetainedForFutureRestarts()
+    public void RestartScreen_WithNewConfigure_ReplacesRetainedConfigureForFutureRestarts()
     {
         var engine = new FlatRedBallService();
         engine.Start<ConfigurableTestScreen>(s => s.X = 3);
@@ -231,10 +231,11 @@ public class ScreenTests
         ((ConfigurableTestScreen)engine.CurrentScreen).RestartScreen(s => s.X = 7);
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
+        // Plain RestartScreen() now replays the most recent configure, not the original.
         engine.CurrentScreen.RestartScreen();
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
-        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(3);
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(7);
     }
 
     [Fact]
@@ -324,6 +325,124 @@ public class ScreenTests
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
         ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(99);
+    }
+
+    // ---------- Increment 2: Hot-reload restart ----------
+
+    private class HotReloadTrackingScreen : Screen
+    {
+        public int Score { get; set; }
+        public List<string> Lifecycle { get; } = new();
+
+        public override void CustomInitialize() => Lifecycle.Add("init");
+        public override void CustomDestroy() => Lifecycle.Add("destroy");
+
+        public override void SaveHotReloadState(HotReloadState state)
+        {
+            Lifecycle.Add("save");
+            state.Set("score", Score);
+        }
+
+        public override void RestoreHotReloadState(HotReloadState state)
+        {
+            Lifecycle.Add("restore");
+            Score = state.Get<int>("score");
+        }
+    }
+
+    [Fact]
+    public void HotReloadState_RoundTripsTypedValues()
+    {
+        var state = new HotReloadState();
+        state.Set("score", 42);
+        state.Set("name", "alice");
+
+        state.Get<int>("score").ShouldBe(42);
+        state.Get<string>("name").ShouldBe("alice");
+    }
+
+    [Fact]
+    public void HotReloadState_TryGet_ReturnsFalseWhenMissing()
+    {
+        var state = new HotReloadState();
+        state.TryGet<int>("missing", out var value).ShouldBeFalse();
+        value.ShouldBe(0);
+    }
+
+    [Fact]
+    public void HotReloadState_Get_ThrowsWhenMissing()
+    {
+        var state = new HotReloadState();
+        Should.Throw<KeyNotFoundException>(() => state.Get<int>("missing"));
+    }
+
+    [Fact]
+    public void RestartScreen_DeathRetry_DoesNotCallSaveOrRestore()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<HotReloadTrackingScreen>();
+        var original = (HotReloadTrackingScreen)engine.CurrentScreen;
+        original.Lifecycle.Clear();
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        original.Lifecycle.ShouldNotContain("save");
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Lifecycle.ShouldNotContain("restore");
+    }
+
+    [Fact]
+    public void RestartScreen_HotReload_CallsSaveOnOldInstanceBeforeDestroy()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<HotReloadTrackingScreen>();
+        var original = (HotReloadTrackingScreen)engine.CurrentScreen;
+        original.Lifecycle.Clear();
+
+        engine.CurrentScreen.RestartScreen(RestartMode.HotReload);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        original.Lifecycle.ShouldBe(new[] { "save", "destroy" });
+    }
+
+    [Fact]
+    public void RestartScreen_HotReload_CallsRestoreOnNewInstanceAfterCustomInitialize()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<HotReloadTrackingScreen>();
+
+        engine.CurrentScreen.RestartScreen(RestartMode.HotReload);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Lifecycle.ShouldBe(new[] { "init", "restore" });
+    }
+
+    [Fact]
+    public void RestartScreen_HotReload_RoundTripsCustomState()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<HotReloadTrackingScreen>();
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Score = 47;
+
+        engine.CurrentScreen.RestartScreen(RestartMode.HotReload);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Score.ShouldBe(47);
+    }
+
+    [Fact]
+    public void RestartScreen_HotReload_StillReplaysRetainedConfigure()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<HotReloadTrackingScreen>(s => s.Score = 3);
+        // Mid-game, score gets bumped:
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Score = 99;
+
+        engine.CurrentScreen.RestartScreen(RestartMode.HotReload);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        // Configure runs (Score=3), then CustomInitialize, then Restore overwrites with saved 99.
+        ((HotReloadTrackingScreen)engine.CurrentScreen).Score.ShouldBe(99);
     }
 
     private class ActivityTrackingEntity : Entity

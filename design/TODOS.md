@@ -41,33 +41,13 @@ The watcher should prefer in-place when possible and fall back to screen restart
 
 #### 1. `RestartScreen()` — prerequisite, independently valuable
 
-> **Status: Increment 1 (death/retry) landed.** See Done.md ("Screen Restart"). Hot-reload variant (`RestartScreen(hotReload: true)`, `SaveHotReloadState`/`RestoreHotReloadState`) and engine-managed camera + tracked-entity restore are still open — covered by the points below.
+> **Status: Increments 1 & 2 landed.** See Done.md ("Screen Restart" + "Hot-Reload Restart Hooks"). Death/retry, hot-reload mode, and the user-defined `SaveHotReloadState`/`RestoreHotReloadState` hooks are all in. Engine-managed automatic preservation (camera position, tracked entity kinematics) is still open — covered below.
 
-Two modes:
-- `RestartScreen()` — death/retry restart. Fresh state, replay the configure callback values. **Done.**
-- `RestartScreen(hotReload: true)` — hot-reload restart. Fresh state, but persist key variables to avoid jarring camera pops and player teleportation. **Open.**
-
-**Mechanism (as landed):** The engine retains the configure callback passed to `Start<T>` / `MoveToScreen<T>` (as `Action<Screen>?` + `Type`) and replays it on a fresh instance. No property snapshot — that approach was rejected because it silently captures mid-game mutations. `RestartScreen<T>(extraConfigure)` extension allows one-shot per-restart overrides applied *after* the original configure (and, once implemented, after hot-reload restored state).
-
-**Hot-reload variable persistence:** A hot-reload restart should feel as close to in-place as possible. The engine automatically persists a small set of critical variables across the restart:
+**Engine-managed defaults still open.** The user's Save/Restore hooks cover game-specific state (score, timer, collected items). The engine should also automatically preserve a small set of generic critical variables so most games don't need to write any hooks at all to get a non-jarring hot-reload:
 - Camera position (from `CameraControllingEntity` or direct camera state)
 - The tracked entity's position, velocity, and acceleration
 
-This covers the common case — the camera doesn't pop and the player doesn't teleport back to spawn. For additional state (score, timer, collected items), games override:
-
-```csharp
-protected override void SaveHotReloadState(HotReloadState state)
-{
-    state.Set("score", _score);
-    state.Set("timeRemaining", _timeRemaining);
-}
-
-protected override void RestoreHotReloadState(HotReloadState state)
-{
-    _score = state.Get<int>("score");
-    _timeRemaining = state.Get<float>("timeRemaining");
-}
-```
+This is the next increment. Apply BEFORE the user's `RestoreHotReloadState` so user code can override the engine's automatic preservation if it wants.
 
 **Edge case:** Restoring player position after a TMX structural change could place the player inside new geometry. This is acceptable — collision pushes them out on the next frame, which is better than teleporting to spawn.
 

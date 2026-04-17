@@ -126,22 +126,56 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 - **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
-- **Restarting the current screen:** call `RestartScreen()`. The engine recreates a fresh instance of the same type and replays the original configure callback passed to `Start<T>` / `MoveToScreen<T>`. Use this for death/retry. Like `MoveToScreen`, the transition is deferred to the next frame.
+- **Restarting the current screen:** call `RestartScreen()`. The engine recreates a fresh instance of the same type and replays the most recently retained configure callback. Use this for death/retry. Like `MoveToScreen`, the transition is deferred to the next frame.
 
 ```csharp
-// Death/retry — replays the original configure
+// Death/retry — replays the retained configure
 RestartScreen();
+
+// Restart with a tweak — replaces the retained configure for this and future restarts
+this.RestartScreen(s => s.LevelIndex++);
 ```
 
-  For "advance to next level" or any case where configure params should change, use `MoveToScreen` against the same type:
-
-```csharp
-MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex + 1);
-```
+  For "advance to next level" you can use either `MoveToScreen<SameType>` or the typed `RestartScreen` overload — both fully tear down and recreate. Use whichever reads more clearly at the call site.
 
   Do **not** manually destroy entities or collision relationships before calling either — the engine handles all teardown automatically.
 
-- **Configure callbacks are retained and replayed.** The engine stores the configure callback you pass to `Start<T>` / `MoveToScreen<T>` so `RestartScreen()` can replay it. C# closures capture variables by reference, so if your callback closes over a mutable local and that local later changes, restart will see the new value. Prefer literals or stable values in configure (`s => s.LevelIndex = 3`), not captured locals that may be mutated later.
+- **One configure slot, last-writer-wins.** The engine retains a single configure callback per session. `Start<T>(d)` and `MoveToScreen<T>(d)` set it. `RestartScreen(d)` (typed extension) replaces it. Plain `RestartScreen()` replays whatever is currently in the slot.
+
+- **Closure gotcha — prefer literals to captured locals.** Because the retained callback is replayed against its current closure environment (not a snapshot), any mutable local the callback closed over will be re-read at restart time. Write `s => s.LevelIndex = 3` rather than `s => s.LevelIndex = level` if `level` may have changed by restart time.
+
+## Hot-Reload Restart
+
+When a content file changes on disk and you want to restart the screen *without* losing session state (player position, score, timer), use the hot-reload restart mode:
+
+```csharp
+RestartScreen(RestartMode.HotReload);
+```
+
+This is identical to a death/retry restart with two extra calls bracketing the teardown:
+
+1. `SaveHotReloadState(state)` runs on the OLD instance, before teardown — live game state is still intact, so you can read your fields and stuff them into the typed bag.
+2. `RestoreHotReloadState(state)` runs on the NEW instance, after `CustomInitialize` — the level has been freshly built, then your restore patches saved values on top.
+
+```csharp
+public override void SaveHotReloadState(HotReloadState state)
+{
+    state.Set("score", _score);
+    state.Set("timeRemaining", _timeRemaining);
+}
+
+public override void RestoreHotReloadState(HotReloadState state)
+{
+    _score = state.Get<int>("score");
+    _timeRemaining = state.Get<float>("timeRemaining");
+}
+```
+
+`HotReloadState` is a typed key/value bag: `Set<T>(key, value)`, `Get<T>(key)` (throws if missing), `TryGet<T>(key, out value)`.
+
+**Plain `RestartScreen()` is `RestartMode.DeathRetry` and never calls these hooks** — by design, so death/retry can't accidentally preserve stale state across a death.
+
+**Restore runs after `CustomInitialize` intentionally.** `CustomInitialize` builds the level from scratch, then restore patches saved values on top. The reverse order would let `CustomInitialize` clobber whatever restore set.
 
 ## Pausing
 

@@ -251,20 +251,55 @@ public class Screen
     /// <summary>
     /// Requests a restart of the current screen at the start of the next frame. The screen is
     /// fully torn down (entities, factories, content, Gum, async tasks) and recreated as a fresh
-    /// instance of the same type, replaying the original configure callback passed to
-    /// <see cref="FlatRedBallService.Start{T}"/> or <see cref="MoveToScreen{T}"/>.
+    /// instance of the same type, replaying the most recently retained configure callback.
+    /// <para>
+    /// The engine retains a single configure slot per session. <see cref="FlatRedBallService.Start{T}"/>
+    /// and <see cref="MoveToScreen{T}"/> set it; the typed extension overload of this method
+    /// (<c>screen.RestartScreen(s =&gt; s.X = 7)</c>) replaces it.
+    /// </para>
     /// <para>
     /// Use this for death/retry flows. Like <see cref="MoveToScreen{T}"/>, the transition is
     /// deferred — code after <c>RestartScreen()</c> in the same frame still runs.
     /// </para>
     /// <para>
-    /// <b>Closure gotcha:</b> the original configure callback is replayed against its current
-    /// closure environment, not a snapshot. If the configure captured a mutable local that has
-    /// since changed, restart will see the new value. Avoid this by passing literals to configure
-    /// (e.g. <c>s =&gt; s.LevelIndex = 3</c>), not captured locals.
+    /// <b>Closure gotcha:</b> the retained callback is replayed against its current closure
+    /// environment, not a snapshot. If the callback captured a mutable local that has since
+    /// changed, restart will see the new value. Prefer literals to captured locals.
     /// </para>
     /// </summary>
-    public void RestartScreen() => Engine.RequestScreenRestart(null);
+    public void RestartScreen() => Engine.RequestScreenRestart(null, RestartMode.DeathRetry);
+
+    /// <summary>
+    /// Restarts the current screen using the specified <paramref name="mode"/>. Pass
+    /// <see cref="RestartMode.HotReload"/> to opt into the Save/Restore hook pipeline that
+    /// preserves session state (score, position, etc.) across a content-change-driven restart.
+    /// </summary>
+    public void RestartScreen(RestartMode mode) => Engine.RequestScreenRestart(null, mode);
+
+    /// <summary>
+    /// Hot-reload restart hook. Called on the OLD screen instance before teardown, while live
+    /// game state is still intact. Stuff anything you want preserved (score, timer, collected
+    /// items) into <paramref name="state"/>. The matching <see cref="RestoreHotReloadState"/>
+    /// runs on the NEW instance after <c>CustomInitialize</c>.
+    /// <para>
+    /// Only invoked when restart was requested with <see cref="RestartMode.HotReload"/>. Plain
+    /// death/retry restarts never call this — by design, so retry can't accidentally preserve
+    /// stale state across a death.
+    /// </para>
+    /// </summary>
+    public virtual void SaveHotReloadState(HotReloadState state) { }
+
+    /// <summary>
+    /// Hot-reload restart hook. Called on the NEW screen instance after <c>CustomInitialize</c>
+    /// has built the fresh world. Read values back out of <paramref name="state"/> and apply
+    /// them — these overwrite whatever the configure callback / <c>CustomInitialize</c> set.
+    /// <para>
+    /// Restore runs after <c>CustomInitialize</c> intentionally: <c>CustomInitialize</c> spawns
+    /// the level from scratch, then restore patches saved values on top. The reverse order
+    /// would let <c>CustomInitialize</c> clobber whatever restore set.
+    /// </para>
+    /// </summary>
+    public virtual void RestoreHotReloadState(HotReloadState state) { }
 
     // Collision relationship overloads
     /// <summary>

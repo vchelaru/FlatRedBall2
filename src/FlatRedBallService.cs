@@ -105,16 +105,31 @@ public class FlatRedBallService
         };
     }
 
-    internal void RequestScreenRestart(Action<Screen>? extraConfigure)
+    internal void RequestScreenRestart(Action<Screen>? newConfigure, RestartMode mode)
     {
         _pendingScreenChange = () =>
         {
+            HotReloadState? state = null;
+            if (mode == RestartMode.HotReload)
+            {
+                state = new HotReloadState();
+                CurrentScreen.SaveHotReloadState(state);
+            }
+
             TeardownCurrentScreen();
+
+            // If a new configure was supplied, it REPLACES the retained one — both for this
+            // restart and for any future restart that doesn't supply its own. There is one
+            // configure slot on the engine; whoever set it last wins.
+            if (newConfigure != null)
+                _lastScreenConfigure = newConfigure;
 
             var screen = (Screen)Activator.CreateInstance(_lastScreenType!)!;
             _lastScreenConfigure?.Invoke(screen);
-            extraConfigure?.Invoke(screen);
             ActivateScreen(screen, applyWindowSettings: false);
+
+            if (state != null)
+                screen.RestoreHotReloadState(state);
         };
     }
 
