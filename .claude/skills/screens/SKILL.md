@@ -177,6 +177,30 @@ public override void RestoreHotReloadState(HotReloadState state)
 
 **Restore runs after `CustomInitialize` intentionally.** `CustomInitialize` builds the level from scratch, then restore patches saved values on top. The reverse order would let `CustomInitialize` clobber whatever restore set.
 
+**The engine does not auto-preserve anything.** Hot-reload preservation is entirely user-driven via `Save`/`RestoreHotReloadState`. In particular, **preserve player position to avoid a jarring camera pop**: if the player is restored to their pre-reload position, any `CameraControllingEntity` will follow them on the first frame and the camera lands correctly automatically. If you don't restore the player, the player respawns at the spawn marker and the camera snaps to the spawn point, even if you tried to preserve `Camera.X/Y` directly (the controller overwrites it on frame 1).
+
+Canonical recipe:
+
+```csharp
+public override void SaveHotReloadState(HotReloadState state)
+{
+    state.Set("playerX", _player.X);
+    state.Set("playerY", _player.Y);
+    state.Set("playerVx", _player.VelocityX);
+    state.Set("playerVy", _player.VelocityY);
+    state.Set("score", _score);
+}
+
+public override void RestoreHotReloadState(HotReloadState state)
+{
+    _player.X = state.Get<float>("playerX");
+    _player.Y = state.Get<float>("playerY");
+    _player.VelocityX = state.Get<float>("playerVx");
+    _player.VelocityY = state.Get<float>("playerVy");
+    _score = state.Get<int>("score");
+}
+```
+
 ## Pausing
 
 `Screen` has built-in pause support:

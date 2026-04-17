@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Content;
 using Shouldly;
 using Xunit;
 
@@ -443,6 +444,71 @@ public class ScreenTests
 
         // Configure runs (Score=3), then CustomInitialize, then Restore overwrites with saved 99.
         ((HotReloadTrackingScreen)engine.CurrentScreen).Score.ShouldBe(99);
+    }
+
+    // ---------- ContentWatcher integration with Screen ----------
+
+    private class FakeFileWatcher : IFileWatcher
+    {
+        public event Action? Changed;
+        public bool Disposed { get; private set; }
+        public void Fire() => Changed?.Invoke();
+        public void Dispose() => Disposed = true;
+    }
+
+    [Fact]
+    public void Screen_WatchContent_RegistersWatcherOnScreen()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+
+        var fake = new FakeFileWatcher();
+        var watcher = engine.CurrentScreen.WatchContent(fake, () => { });
+
+        engine.CurrentScreen.ContentWatchers.ShouldContain(watcher);
+    }
+
+    [Fact]
+    public void Screen_WatchContent_TickedEachFrameByEngineUpdate()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var fake = new FakeFileWatcher();
+        int calls = 0;
+        engine.CurrentScreen.WatchContent(fake, () => calls++).Debounce = TimeSpan.Zero;
+
+        fake.Fire();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Screen_WatchContent_DisposedOnScreenChange()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var fake = new FakeFileWatcher();
+        engine.CurrentScreen.WatchContent(fake, () => { });
+
+        engine.CurrentScreen.MoveToScreen<ConfigurableTestScreen>();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        fake.Disposed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Screen_WatchContent_DisposedOnRestartScreen()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var fake = new FakeFileWatcher();
+        engine.CurrentScreen.WatchContent(fake, () => { });
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        fake.Disposed.ShouldBeTrue();
     }
 
     private class ActivityTrackingEntity : Entity

@@ -253,6 +253,14 @@ public class Overlay
     }
 
     /// <summary>
+    /// Draws a text label at the camera's world-space center for this frame. Convenience overload
+    /// for quick "where am I, is this code running" debug labels — the label appears in the middle
+    /// of the visible area regardless of where the camera currently is.
+    /// </summary>
+    public Label Text(string text)
+        => Text(text, _screen.Camera.X, _screen.Camera.Y);
+
+    /// <summary>
     /// Draws a text label at a fixed screen position for this frame. The label stays
     /// put regardless of camera movement. Use this for HUD text, diagnostics, or any overlay
     /// that should not move with the world.

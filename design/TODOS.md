@@ -41,24 +41,30 @@ The watcher should prefer in-place when possible and fall back to screen restart
 
 #### 1. `RestartScreen()` — prerequisite, independently valuable
 
-> **Status: Increments 1 & 2 landed.** See Done.md ("Screen Restart" + "Hot-Reload Restart Hooks"). Death/retry, hot-reload mode, and the user-defined `SaveHotReloadState`/`RestoreHotReloadState` hooks are all in. Engine-managed automatic preservation (camera position, tracked entity kinematics) is still open — covered below.
+> **Status: Increments 1 & 2 landed.** See Done.md ("Screen Restart", "Hot-Reload Restart Hooks"). Death/retry, hot-reload mode, and user `Save`/`RestoreHotReloadState` hooks are in. Engine-managed automatic preservation is open — see below.
 
-**Engine-managed defaults still open.** The user's Save/Restore hooks cover game-specific state (score, timer, collected items). The engine should also automatically preserve a small set of generic critical variables so most games don't need to write any hooks at all to get a non-jarring hot-reload:
-- Camera position (from `CameraControllingEntity` or direct camera state)
-- The tracked entity's position, velocity, and acceleration
+**Engine-managed automatic preservation — open, deferred indefinitely until a real pattern emerges.** The original TODO described automatic preservation of camera position and tracked-entity kinematics so most games would get non-jarring hot-reload "for free." A naive `Camera.X/Y/Zoom` preservation was tried and reverted: in any game using `CameraControllingEntity` (the common case), that entity slams `Camera.X/Y` to the player position on the first frame after restart, clobbering any preserved value. The actually-useful preservation is **player position** — once the player is back where they were, `CameraControllingEntity` follows on frame 1 and the camera lands correctly automatically. But the engine doesn't know which entity is "the player." Future ideas worth exploring if friction warrants:
+- **Tagged entities for preservation.** Entities (or entity types) opt in via attribute or interface (e.g. `IHotReloadPreserved`); engine auto-saves their `X/Y/VelocityX/VelocityY/AccelerationX/AccelerationY`. Solves the identification problem with a small annotation cost.
+- **`Player` / `CameraControllingEntity`-specific opt-in.** Same idea but only for these two well-known concepts.
 
-This is the next increment. Apply BEFORE the user's `RestoreHotReloadState` so user code can override the engine's automatic preservation if it wants.
+Until then, the user `Save`/`RestoreHotReloadState` hooks handle this cleanly: write `state.Set("playerX", _player.X)` and the matching restore. CameraControllingEntity follows on frame 1 → camera lands at the right place. Documenting this manual pattern as the canonical hot-reload recipe in the `screens` skill is the current state of the art.
 
 **Edge case:** Restoring player position after a TMX structural change could place the player inside new geometry. This is acceptable — collision pushes them out on the next frame, which is better than teleporting to spawn.
 
 #### 2. `ContentWatcher` — generic file watch infrastructure
 
-Handles the boring parts that are common across all content types:
-- `FileSystemWatcher` (or equivalent) to detect writes
-- Debounce: editors fire multiple events per save; collapse into a single reload after ~100-200ms
-- Thread safety: `FileSystemWatcher` fires on a threadpool thread; queue the reload and process it during the next `Update` tick on the game thread
-- Graceful error handling: retry on `IOException` (file mid-write), log parse errors rather than crashing
-- Returns a disposable handle for cleanup
+> **Status: Landed.** See Done.md ("ContentWatcher Infrastructure" + "ContentWatcher: Source/Output Mapping + Directory Watch"). `Screen.WatchContent(sourcePath, onChanged, destinationPath?)` and `Screen.WatchContentDirectory(sourceDir, onChanged, destinationDir?)` both in. Auto source-root detection via csproj walk-up, copy-on-change, global debouncing, shipping-build no-op. `content-hot-reload` skill rewritten around directory watching.
+
+#### 2b. Allowlist for newly-added content files
+**Priority: Eventual** — Today the hot-reload watcher only fires for files that already exist in the build output (filters editor temp files). Side effect: brand-new content files require one rebuild before they're picked up. That's fine for one-off additions, but workflows like "add PNGs to a Gum project," "drop a new font file in," or "add an animation chain frame" suffer — the user wants the new file to flow into the running game without rebuilding.
+
+Possible direction: extension-based allowlist. If a watched directory is registered with an allowlist (e.g. `[".png", ".ttf", ".gumx"]`), the engine treats matching new files as additions to track — copies to dest and invokes the callback even when dest doesn't exist yet. Other extensions still require the dest-exists check.
+
+```csharp
+WatchContentDirectory("Content", relPath => ..., newFileExtensions: [".png", ".ttf"]);
+```
+
+Open questions when we get there: should the engine update the .csproj `<Content Include>` list too, or assume the user's MSBuild rules already include the new file by glob? How does this interact with Gum's own hot-reload pipeline (Gum already supports hot-reload natively — may not need engine help inside `.gumx` projects)?
 
 #### 3. JSON hot-reload — first consumer
 

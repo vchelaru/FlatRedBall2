@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Content;
 using FlatRedBall2.Diagnostics;
 using FlatRedBall2.Tiled;
 using FlatRedBall2.UI;
@@ -300,6 +302,138 @@ public class Screen
     /// </para>
     /// </summary>
     public virtual void RestoreHotReloadState(HotReloadState state) { }
+
+    // Content watching
+
+    private readonly List<ContentWatcher> _contentWatchers = new();
+    private readonly List<ContentDirectoryWatcher> _contentDirectoryWatchers = new();
+
+    /// <summary>All <see cref="ContentWatcher"/>s registered against this screen.</summary>
+    public IReadOnlyList<ContentWatcher> ContentWatchers => _contentWatchers;
+
+    /// <summary>All <see cref="ContentDirectoryWatcher"/>s registered against this screen.</summary>
+    public IReadOnlyList<ContentDirectoryWatcher> ContentDirectoryWatchers => _contentDirectoryWatchers;
+
+    /// <summary>
+    /// Watches a single content file for changes. Resolves <paramref name="sourcePath"/> against
+    /// <see cref="FlatRedBallService.SourceContentRoot"/> (so the user-edited source file is the
+    /// one being watched, not the build-output copy), copies the changed source to the build
+    /// output before invoking <paramref name="onChanged"/>, and invokes the callback on the game
+    /// thread once writes settle.
+    /// <para>
+    /// If <see cref="FlatRedBallService.SourceContentRoot"/> is <c>null</c> (typically a shipping
+    /// build with no <c>.csproj</c> next to the executable), this method returns <c>null</c> and
+    /// no watcher is registered — hot-reload is a dev-only convenience.
+    /// </para>
+    /// <para>
+    /// <paramref name="destinationPath"/> defaults to <paramref name="sourcePath"/>. Override when
+    /// your build pipeline maps the source to a different runtime path
+    /// (e.g. <c>WatchContent("Assets/player.json", ..., "Content/player.json")</c>).
+    /// </para>
+    /// </summary>
+    public ContentWatcher? WatchContent(string sourcePath, Action onChanged, string? destinationPath = null)
+    {
+        if (Engine.SourceContentRoot == null) return null;
+
+        var srcAbs = Path.Combine(Engine.SourceContentRoot, sourcePath);
+        var destAbs = Path.Combine(Engine.OutputContentRoot, destinationPath ?? sourcePath);
+        return WatchContent(new FileSystemFileWatcher(srcAbs), onChanged,
+            sourceAbsolutePath: srcAbs, destinationAbsolutePath: destAbs);
+    }
+
+    /// <summary>
+    /// Watches an injected <see cref="IFileWatcher"/> source. Lower-level overload primarily for
+    /// tests and custom file event sources. <paramref name="sourceAbsolutePath"/> /
+    /// <paramref name="destinationAbsolutePath"/> are optional; when both are supplied, the
+    /// engine copies source → destination before invoking the callback.
+    /// </summary>
+    public ContentWatcher WatchContent(IFileWatcher source, Action onChanged,
+        string? sourceAbsolutePath = null, string? destinationAbsolutePath = null)
+    {
+        Func<bool>? copy = null;
+        if (sourceAbsolutePath != null && destinationAbsolutePath != null)
+            copy = () => CopyFileIfNeeded(sourceAbsolutePath, destinationAbsolutePath);
+        var watcher = new ContentWatcher(source, onChanged, copy);
+        _contentWatchers.Add(watcher);
+        return watcher;
+    }
+
+    /// <summary>
+    /// Watches a directory tree for changes. The callback fires once per changed file (after a
+    /// global debounce — wait until all writes settle), with the file's path relative to
+    /// <paramref name="sourceDirectory"/>. The engine copies each changed file to the matching
+    /// path under the build output before invoking the callback.
+    /// <para>
+    /// Returns <c>null</c> when <see cref="FlatRedBallService.SourceContentRoot"/> is unset
+    /// (shipping build).
+    /// </para>
+    /// </summary>
+    public ContentDirectoryWatcher? WatchContentDirectory(string sourceDirectory, Action<string> onChanged,
+        string? destinationDirectory = null)
+    {
+        if (Engine.SourceContentRoot == null) return null;
+
+        var srcAbs = Path.Combine(Engine.SourceContentRoot, sourceDirectory);
+        var destAbs = Path.Combine(Engine.OutputContentRoot, destinationDirectory ?? sourceDirectory);
+        return WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
+            sourceAbsoluteRoot: srcAbs, destinationAbsoluteRoot: destAbs);
+    }
+
+    /// <summary>
+    /// Watches an injected <see cref="IDirectoryWatcher"/> source. Lower-level overload for tests
+    /// and custom directory event sources. When <paramref name="sourceAbsoluteRoot"/> /
+    /// <paramref name="destinationAbsoluteRoot"/> are both supplied, the engine copies each
+    /// changed file before invoking the callback.
+    /// </summary>
+    public ContentDirectoryWatcher WatchContentDirectory(IDirectoryWatcher source, Action<string> onChanged,
+        string? sourceAbsoluteRoot = null, string? destinationAbsoluteRoot = null)
+    {
+        Func<string, bool> copy;
+        if (sourceAbsoluteRoot != null && destinationAbsoluteRoot != null)
+            copy = relPath => CopyFileIfNeeded(
+                Path.Combine(sourceAbsoluteRoot, relPath),
+                Path.Combine(destinationAbsoluteRoot, relPath));
+        else
+            copy = _ => true;
+        var watcher = new ContentDirectoryWatcher(source, onChanged, copy);
+        _contentDirectoryWatchers.Add(watcher);
+        return watcher;
+    }
+
+    /// <returns>
+    /// <c>false</c> when the source is missing (deletion) OR the destination doesn't exist yet
+    /// — engine tracks only files that are already part of the build output. This filters out
+    /// editor temp files (Photoshop scratch files, IDE autosaves, lock files) that appear in the
+    /// source folder but were never copied to the build output. New content files require a
+    /// rebuild before hot-reload picks them up.
+    /// </returns>
+    private static bool CopyFileIfNeeded(string src, string dest)
+    {
+        // Same path → nothing to copy. Avoids the IOException File.Copy throws on self-copy.
+        if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
+            return File.Exists(dest);
+        if (!File.Exists(src)) return false;
+        if (!File.Exists(dest)) return false;
+        File.Copy(src, dest, overwrite: true);
+        return true;
+    }
+
+    internal void TickContentWatchers(DateTime now)
+    {
+        // Foreach over count: callbacks may dispose / register watchers.
+        for (int i = 0; i < _contentWatchers.Count; i++)
+            _contentWatchers[i].Tick(now);
+        for (int i = 0; i < _contentDirectoryWatchers.Count; i++)
+            _contentDirectoryWatchers[i].Tick(now);
+    }
+
+    internal void DisposeContentWatchers()
+    {
+        foreach (var w in _contentWatchers) w.Dispose();
+        _contentWatchers.Clear();
+        foreach (var w in _contentDirectoryWatchers) w.Dispose();
+        _contentDirectoryWatchers.Clear();
+    }
 
     // Collision relationship overloads
     /// <summary>

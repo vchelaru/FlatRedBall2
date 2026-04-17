@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -33,7 +34,48 @@ public class FlatRedBallService
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
 
-    public FlatRedBallService() { }
+    public FlatRedBallService()
+    {
+        SourceContentRoot = DetectSourceContentRoot(AppContext.BaseDirectory);
+        OutputContentRoot = AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// Absolute path to the project's source content folder, used by <see cref="Screen.WatchContent(string, Action, string?)"/>
+    /// and <see cref="Screen.WatchContentDirectory(string, Action{string}, string?)"/> to locate
+    /// the file the user actually edits (vs the copy MSBuild dropped into the build output).
+    /// <para>
+    /// Auto-detected at construction by walking up from <see cref="AppContext.BaseDirectory"/>
+    /// looking for a <c>.csproj</c>; in a shipping build this returns <c>null</c> and the
+    /// <c>WatchContent</c>* overloads silently no-op. Override this if auto-detection picks the
+    /// wrong root (e.g. unusual project layouts, multi-project repos).
+    /// </para>
+    /// </summary>
+    public string? SourceContentRoot { get; set; }
+
+    /// <summary>
+    /// Absolute path to the build-output folder where copied content lives at runtime. Defaults
+    /// to <see cref="AppContext.BaseDirectory"/>. Override only if your build pipeline writes
+    /// content to a directory other than the executable's folder.
+    /// </summary>
+    public string OutputContentRoot { get; set; } = AppContext.BaseDirectory;
+
+    /// <summary>
+    /// Walks up from <paramref name="startDirectory"/> looking for a <c>.csproj</c>. Returns the
+    /// directory containing the first match, or <c>null</c> if none found within ~10 levels.
+    /// Public for testing.
+    /// </summary>
+    public static string? DetectSourceContentRoot(string startDirectory)
+    {
+        var dir = new DirectoryInfo(startDirectory);
+        for (int i = 0; i < 10 && dir != null; i++)
+        {
+            if (dir.GetFiles("*.csproj").Length > 0)
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return null;
+    }
 
     /// <summary>
     /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize"/>.
@@ -135,6 +177,7 @@ public class FlatRedBallService
 
     private void TeardownCurrentScreen()
     {
+        CurrentScreen.DisposeContentWatchers();
         CurrentScreen.CustomDestroy();
         CurrentScreen.ContentManager.UnloadAll();
 
@@ -408,6 +451,10 @@ public class FlatRedBallService
             _pendingScreenChange = null;
             change();
         }
+
+        // Drain any pending content reloads BEFORE entity / collision / activity passes so the
+        // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
+        CurrentScreen.TickContentWatchers(DateTime.UtcNow);
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
         Input.Update();

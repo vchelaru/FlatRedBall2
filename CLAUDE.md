@@ -34,6 +34,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `gumcli` — **Ask first** before any Gum UI code: use gumcli tool or code-only? Covers gumcli new, .csproj content includes, codegen
 - `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
 - `content-and-assets` — Asset loading
+- `content-hot-reload` — `Screen.WatchContent`, `ContentWatcher`, debouncing, in-place vs screen-restart decision
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
 - `levels` — Level data layout and progression
