@@ -8,6 +8,7 @@
  <tile id="4" type="JumpThroughCollision"/>
  <tile id="5" type="JumpThroughCollision"/>
  <tile id="6" type="OneWayCollision"/>
+ <tile id="8" type="ConveyorBelt"/>
  <tile id="9" type="MovingPlatform"/>
  <tile id="11" type="SolidCollision">
   <objectgroup draworder="index" id="2">
@@ -35,7 +36,22 @@
  <tile id="32" type="Water"/>
  <tile id="33" type="BreakableCollision"/>
  <tile id="34" type="IceCollision"/>
+ <tile id="35" type="Wind"/>
+ <tile id="36" type="Lava"/>
+ <tile id="38" type="Life"/>
+ <tile id="39" type="Heal"/>
+ <tile id="40" type="FallingPlatform"/>
+ <tile id="42" type="Fence"/>
+ <tile id="43" type="Navigation"/>
  <tile id="64" type="Door"/>
+ <tile id="65" type="PlayerFlag"/>
+ <tile id="66" type="EnemyFlag"/>
+ <tile id="67" type="Boss"/>
+ <tile id="68" type="Goal"/>
+ <tile id="69" type="Death"/>
+ <tile id="70" type="SpikeBlock"/>
+ <tile id="71" type="SpikeGround"/>
+ <tile id="72" type="Slime"/>
  <tile id="73" type="SolidCollision"/>
  <tile id="74" type="SolidCollision"/>
  <tile id="75" type="SolidCollision"/>
@@ -46,6 +62,10 @@
  </tile>
  <tile id="77" type="SolidCollision"/>
  <tile id="96" type="Ladder"/>
+ <tile id="97" type="Coin"/>
+ <tile id="98" type="Key"/>
+ <tile id="99" type="LightBulb"/>
+ <tile id="100" type="Switch"/>
  <tile id="105" type="SolidCollision"/>
  <tile id="106" type="SolidCollision"/>
  <tile id="107" type="SolidCollision">
