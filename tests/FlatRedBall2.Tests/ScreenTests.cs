@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FlatRedBall2.Collision;
 using Shouldly;
 using Xunit;
@@ -159,6 +160,170 @@ public class ScreenTests
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
         engine.Time.CurrentScreenTimeSeconds.ShouldBe(0.0, tolerance: 0.0001);
+    }
+
+    private class ConfigurableTestScreen : Screen
+    {
+        public int X { get; set; }
+        public List<string> Lifecycle { get; } = new();
+        public override void CustomInitialize() => Lifecycle.Add("init");
+        public override void CustomDestroy() => Lifecycle.Add("destroy");
+    }
+
+    [Fact]
+    public void RestartScreen_RecreatesSameScreenType()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var original = engine.CurrentScreen;
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.CurrentScreen.ShouldBeOfType<ConfigurableTestScreen>();
+        engine.CurrentScreen.ShouldNotBeSameAs(original);
+    }
+
+    [Fact]
+    public void RestartScreen_ReplaysOriginalConfigureCallback_IgnoresMidGameMutation()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>(s => s.X = 3);
+        ((ConfigurableTestScreen)engine.CurrentScreen).X = 99;
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(3);
+    }
+
+    [Fact]
+    public void RestartScreen_NoConfigure_PropertiesReturnToTypeDefaults()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        ((ConfigurableTestScreen)engine.CurrentScreen).X = 99;
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(0);
+    }
+
+    [Fact]
+    public void RestartScreen_AdditionalConfigure_RunsAfterOriginal()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>(s => s.X = 3);
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).RestartScreen(s => s.X = 7);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(7);
+    }
+
+    [Fact]
+    public void RestartScreen_AdditionalConfigure_NotRetainedForFutureRestarts()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>(s => s.X = 3);
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).RestartScreen(s => s.X = 7);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(3);
+    }
+
+    [Fact]
+    public void RestartScreen_RunsCustomDestroyOnOldThenCustomInitializeOnNew()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var original = (ConfigurableTestScreen)engine.CurrentScreen;
+        original.Lifecycle.Clear();
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        original.Lifecycle.ShouldBe(new[] { "destroy" });
+        ((ConfigurableTestScreen)engine.CurrentScreen).Lifecycle.ShouldBe(new[] { "init" });
+    }
+
+    [Fact]
+    public void RestartScreen_DeferredUntilNextFrame()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>();
+        var original = engine.CurrentScreen;
+
+        engine.CurrentScreen.RestartScreen();
+
+        engine.CurrentScreen.ShouldBeSameAs(original);
+    }
+
+    [Fact]
+    public void RestartScreen_PreservesCallbackAcrossMultipleRestarts()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>(s => s.X = 3);
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+        ((ConfigurableTestScreen)engine.CurrentScreen).X = 99;
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(3);
+    }
+
+    [Fact]
+    public void RestartScreen_AfterMoveToScreen_ReplaysMostRecentConfigure()
+    {
+        var engine = new FlatRedBallService();
+        engine.Start<ConfigurableTestScreen>(s => s.X = 1);
+        engine.CurrentScreen.MoveToScreen<ConfigurableTestScreen>(s => s.X = 5);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(5);
+    }
+
+    // Closure-staleness probes: these PIN current behavior so we notice if it changes.
+    // A configure callback is an Action<T> that closes over its enclosing scope.
+    // C# closures capture variables by reference, so values read inside the callback
+    // reflect the variable's value AT INVOCATION TIME, not at definition time.
+
+    [Fact]
+    public void RestartScreen_ClosureCapturedLocal_RestartReadsCurrentValueNotOriginal()
+    {
+        var engine = new FlatRedBallService();
+        int captured = 5;
+        engine.Start<ConfigurableTestScreen>(s => s.X = captured);
+        captured = 99;
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(99);
+    }
+
+    [Fact]
+    public void RestartScreen_ClosureCapturedMutableReference_RestartReadsMutatedState()
+    {
+        var engine = new FlatRedBallService();
+        var box = new[] { 5 };
+        engine.Start<ConfigurableTestScreen>(s => s.X = box[0]);
+        box[0] = 99;
+
+        engine.CurrentScreen.RestartScreen();
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        ((ConfigurableTestScreen)engine.CurrentScreen).X.ShouldBe(99);
     }
 
     private class ActivityTrackingEntity : Entity

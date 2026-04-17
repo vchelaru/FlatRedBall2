@@ -126,17 +126,22 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 - **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
-- **`MoveToScreen` can target the same screen type** — this fully destroys and recreates the screen, making it the correct pattern for restarting a level. Use the configure callback to pass state (e.g., level index):
+- **Restarting the current screen:** call `RestartScreen()`. The engine recreates a fresh instance of the same type and replays the original configure callback passed to `Start<T>` / `MoveToScreen<T>`. Use this for death/retry. Like `MoveToScreen`, the transition is deferred to the next frame.
 
 ```csharp
-// Restart current level
-MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex);
+// Death/retry — replays the original configure
+RestartScreen();
+```
 
-// Advance to next level
+  For "advance to next level" or any case where configure params should change, use `MoveToScreen` against the same type:
+
+```csharp
 MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex + 1);
 ```
 
-  Do **not** manually destroy entities or collision relationships before calling this — the engine handles all teardown automatically.
+  Do **not** manually destroy entities or collision relationships before calling either — the engine handles all teardown automatically.
+
+- **Configure callbacks are retained and replayed.** The engine stores the configure callback you pass to `Start<T>` / `MoveToScreen<T>` so `RestartScreen()` can replay it. C# closures capture variables by reference, so if your callback closes over a mutable local and that local later changes, restart will see the new value. Prefer literals or stable values in configure (`s => s.LevelIndex = 3`), not captured locals that may be mutated later.
 
 ## Pausing
 

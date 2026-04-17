@@ -238,9 +238,33 @@ public class Screen
     /// <param name="configure">
     /// Optional callback invoked on the new screen instance before <see cref="CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// <para>
+    /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
+    /// on <see cref="RestartScreen"/>; because C# closures capture variables by reference, mutating
+    /// a captured local after this call will change what restart sees. Pass values directly
+    /// (<c>s =&gt; s.LevelIndex = 3</c>) rather than via captured locals.
+    /// </para>
     /// </param>
     public void MoveToScreen<T>(Action<T>? configure = null) where T : Screen, new()
         => Engine.RequestScreenChange(configure);
+
+    /// <summary>
+    /// Requests a restart of the current screen at the start of the next frame. The screen is
+    /// fully torn down (entities, factories, content, Gum, async tasks) and recreated as a fresh
+    /// instance of the same type, replaying the original configure callback passed to
+    /// <see cref="FlatRedBallService.Start{T}"/> or <see cref="MoveToScreen{T}"/>.
+    /// <para>
+    /// Use this for death/retry flows. Like <see cref="MoveToScreen{T}"/>, the transition is
+    /// deferred — code after <c>RestartScreen()</c> in the same frame still runs.
+    /// </para>
+    /// <para>
+    /// <b>Closure gotcha:</b> the original configure callback is replayed against its current
+    /// closure environment, not a snapshot. If the configure captured a mutable local that has
+    /// since changed, restart will see the new value. Avoid this by passing literals to configure
+    /// (e.g. <c>s =&gt; s.LevelIndex = 3</c>), not captured locals.
+    /// </para>
+    /// </summary>
+    public void RestartScreen() => Engine.RequestScreenRestart(null);
 
     // Collision relationship overloads
     /// <summary>

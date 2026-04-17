@@ -25,6 +25,8 @@ public class FlatRedBallService
     private GraphicsDeviceManager? _graphicsManager;
     private SpriteBatch? _spriteBatch;
     private Action? _pendingScreenChange;
+    private Type? _lastScreenType;
+    private Action<Screen>? _lastScreenConfigure;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
     private float _lastGumCanvasWidth;
     private float _lastGumCanvasHeight;
@@ -74,11 +76,18 @@ public class FlatRedBallService
     /// <param name="configure">
     /// Optional callback invoked on the new screen instance before <see cref="Screen.CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// <para>
+    /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
+    /// on <see cref="Screen.RestartScreen"/>; mutating a captured local after this call changes what
+    /// restart sees. Pass values directly rather than via captured locals.
+    /// </para>
     /// </param>
     public void Start<T>(Action<T>? configure = null) where T : Screen, new()
     {
         var screen = new T();
-        configure?.Invoke(screen);
+        _lastScreenType = typeof(T);
+        _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+        _lastScreenConfigure?.Invoke(screen);
         ActivateScreen(screen, applyWindowSettings: true);
     }
 
@@ -86,20 +95,40 @@ public class FlatRedBallService
     {
         _pendingScreenChange = () =>
         {
-            CurrentScreen.CustomDestroy();
-            CurrentScreen.ContentManager.UnloadAll();
-
-            // Cancel all async work that was started on the old screen.
-            // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
-            // in any awaiting code); Clear discards stale continuations from the sync context queue.
-            CurrentScreen._cts.Cancel();
-            Time.ClearTasks();
-            _syncContext.Clear();
+            TeardownCurrentScreen();
 
             var screen = new T();
-            configure?.Invoke(screen);
+            _lastScreenType = typeof(T);
+            _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+            _lastScreenConfigure?.Invoke(screen);
             ActivateScreen(screen, applyWindowSettings: false);
         };
+    }
+
+    internal void RequestScreenRestart(Action<Screen>? extraConfigure)
+    {
+        _pendingScreenChange = () =>
+        {
+            TeardownCurrentScreen();
+
+            var screen = (Screen)Activator.CreateInstance(_lastScreenType!)!;
+            _lastScreenConfigure?.Invoke(screen);
+            extraConfigure?.Invoke(screen);
+            ActivateScreen(screen, applyWindowSettings: false);
+        };
+    }
+
+    private void TeardownCurrentScreen()
+    {
+        CurrentScreen.CustomDestroy();
+        CurrentScreen.ContentManager.UnloadAll();
+
+        // Cancel all async work that was started on the old screen.
+        // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
+        // in any awaiting code); Clear discards stale continuations from the sync context queue.
+        CurrentScreen._cts.Cancel();
+        Time.ClearTasks();
+        _syncContext.Clear();
     }
 
     private void ActivateScreen(Screen screen, bool applyWindowSettings)

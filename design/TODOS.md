@@ -41,11 +41,13 @@ The watcher should prefer in-place when possible and fall back to screen restart
 
 #### 1. `RestartScreen()` — prerequisite, independently valuable
 
-Two modes:
-- `RestartScreen()` — death/retry restart. Fresh state, replay the configure callback values.
-- `RestartScreen(hotReload: true)` — hot-reload restart. Fresh state, but persist key variables to avoid jarring camera pops and player teleportation.
+> **Status: Increment 1 (death/retry) landed.** See Done.md ("Screen Restart"). Hot-reload variant (`RestartScreen(hotReload: true)`, `SaveHotReloadState`/`RestoreHotReloadState`) and engine-managed camera + tracked-entity restore are still open — covered by the points below.
 
-**Mechanism:** The engine snapshots public settable property values on the screen (the ones set by the `MoveToScreen` configure callback) right before `CustomInitialize`. `RestartScreen()` creates a new instance of the same screen type and copies those values over. No need to remember the callback itself — just the resulting property values.
+Two modes:
+- `RestartScreen()` — death/retry restart. Fresh state, replay the configure callback values. **Done.**
+- `RestartScreen(hotReload: true)` — hot-reload restart. Fresh state, but persist key variables to avoid jarring camera pops and player teleportation. **Open.**
+
+**Mechanism (as landed):** The engine retains the configure callback passed to `Start<T>` / `MoveToScreen<T>` (as `Action<Screen>?` + `Type`) and replays it on a fresh instance. No property snapshot — that approach was rejected because it silently captures mid-game mutations. `RestartScreen<T>(extraConfigure)` extension allows one-shot per-restart overrides applied *after* the original configure (and, once implemented, after hot-reload restored state).
 
 **Hot-reload variable persistence:** A hot-reload restart should feel as close to in-place as possible. The engine automatically persists a small set of critical variables across the restart:
 - Camera position (from `CameraControllingEntity` or direct camera state)
@@ -153,6 +155,13 @@ Reflection-based property mapping conflicts with the Native AOT goal (see Multi-
 - `Polygon.SuppressedEdges` bitfield exists but isn't wired into SAT correctly (opposite edges share the same axis, so edge-level suppression during SAT doesn't eliminate the axis)
 - Consider a post-process MTV filter analogous to rectangles' `ComputeDirectionalSeparation`, or a different approach entirely
 - Tests removed when we deferred this; re-add when addressed
+
+## CI: GitHub Action to Run Unit Tests as a Required Status Check on PRs to `main`
+**Priority: Eventual** — Two pieces:
+1. Add a `.github/workflows/` YAML action that runs `dotnet test tests/FlatRedBall2.Tests/` on every pull request targeting `main` (and ideally on direct pushes to `main` too). Should fail the check on any test failure or build error.
+2. Configure the branch protection rule on `main` to mark this check as a **required status check** so PRs cannot be merged unless it passes.
+
+Catches regressions before merge instead of after. No need immediately, but worth setting up before the contributor base expands.
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.
