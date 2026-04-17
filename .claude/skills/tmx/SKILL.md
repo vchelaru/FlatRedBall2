@@ -5,6 +5,8 @@ description: "TMX map file creation and editing for FlatRedBall2. Use when creat
 
 # TMX Map Files in FlatRedBall2
 
+> **See `content-boundary` skill first.** TMX files are a human-edited content format — AI should scaffold a minimal valid TMX and tell the user to open it in Tiled for real level design. Do not try to author detailed levels in XML.
+
 TMX files are the standard level format. A base template and standard tileset live in `.claude/templates/Tiled/`.
 
 ## Communication convention — reference tiles by numeric ID
@@ -42,24 +44,11 @@ This covers `.tmx`, `.tsx`, and `.png` files in the `Content/Tiled/` directory.
 
 ## StandardTileset Tile IDs
 
-The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. Use these GIDs in the CSV data:
+Read `.claude/templates/Tiled/StandardTileset.tsx` for the full list of tile IDs and their Classes. The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. GID 0 means empty (no tile). GID 1 is `SolidCollision` — used in virtually every game as the primary wall/floor/ceiling tile.
 
-| GID | Tile Type | Notes |
-|-----|-----------|-------|
-| 0 | Empty | No tile |
-| 1 | SolidCollision | Primary solid wall/floor tile |
-| 2 | SolidCollision | Visual variant |
-| 3 | SolidCollision | Visual variant |
-| 4 | JumpThroughCollision | Cloud-style: solid from above, drop-through with Down+Jump |
-| 7 | OneWayCollision | Hard one-way barrier: pass once, never return (e.g., Yoshi door) |
-| 10 | MovingPlatform | |
-| 33 | Water | |
-| 34 | BreakableCollision | |
-| 35 | IceCollision | |
-| 65 | Door | |
-| 97 | Ladder | |
-
-Use **GID 1** for standard solid collision. Use **GID 0** for empty space.
+Tiles fall into two categories:
+- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`.
+- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`) — place on object layers only. Game code reads them via `map.CreateEntities()`. See the `levels` skill for the API.
 
 ## Layer Conventions
 
@@ -150,6 +139,19 @@ Adjacent sub-cell rects participate in `RepositionDirections` seam suppression: 
 **Current limitations:**
 - `<ellipse>` and polyline collision objects are ignored — only `<polygon>` and plain `<object>` rectangles are honored.
 - Only one `<polygon>` per tile is supported. Authoring a second polygon on the same tile throws `InvalidOperationException` at load time — merge the shapes into a single polygon in Tiled instead. (Rectangles have no such limit.)
+
+### Add an object layer for entity spawns
+
+Object layers hold tile objects that represent entity spawn positions. Each tile object references a tile from the tileset via its GID. The tile's Class determines the entity type. Add an `<objectgroup>` after the tile layers:
+
+```xml
+<objectgroup id="2" name="Entities">
+ <object id="1" gid="29" x="160" y="128" width="16" height="16"/>
+ <object id="2" gid="30" x="32" y="320" width="16" height="16"/>
+</objectgroup>
+```
+
+**Tile object positioning:** For tile objects, Tiled uses the **bottom-left** corner as the anchor, with Y-down from the map's top-left. The engine converts this to world space automatically. `width` and `height` should match the tile size (typically 16×16). Update `nextlayerid` and `nextobjectid` on `<map>` accordingly.
 
 ### Add a tileset
 

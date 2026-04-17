@@ -81,6 +81,25 @@ playerVsSolid.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 
 See the `tmx` skill for how to author the polygon on the tileset tile.
 
+## Spawning Entities from Object Layers
+
+Place tile objects on Tiled object layers (using tiles with a Class set in the tileset). Game code spawns entities from them with `CreateEntities`:
+
+```csharp
+// Coins — center origin (default)
+map.CreateEntities("Coin", _coinFactory);
+
+// Player — feet at bottom of tile
+var player = map.CreateEntities("PlayerSpawn", _playerFactory, Origin.BottomCenter)[0];
+
+// Ceiling turret — top of tile
+map.CreateEntities("CeilingTurret", _turretFactory, Origin.TopCenter);
+```
+
+**Custom properties** set on tile objects in Tiled are automatically applied to matching entity properties via reflection. If a Coin entity has `public int Worth { get; set; }` and the Tiled object has a custom property `Worth=50`, it's set automatically. Supported types: `string`, `int`, `float`, `bool`.
+
+**Class matching** checks the object's Class first, then falls back to the tile definition's Class in the tileset. Case-insensitive.
+
 ## Camera Bounds
 
 `TileMap.Bounds` returns a `BoundsRectangle` for `CameraControllingEntity.Map`:

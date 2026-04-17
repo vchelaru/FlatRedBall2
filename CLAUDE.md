@@ -35,6 +35,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
 - `content-and-assets` — Asset loading
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
+- `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
 - `levels` — Level data layout and progression
 - `tmx` — TMX map file creation/editing: base template, StandardTileset tile IDs, layer conventions, CSV data
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier

@@ -5,6 +5,8 @@ description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, me
 
 # Gum Integration in FlatRedBall2
 
+> **See `content-boundary` skill first.** UI composition is a human task — AI should scaffold named controls in a flat list and let the human compose the layout in the Gum Tool. Do not try to hand-author a polished visual hierarchy in code.
+
 Gum is FlatRedBall2's UI system, backed by the `Gum.MonoGame` NuGet package. It is **automatically initialized** by `FlatRedBallService.Initialize` — no setup required.
 
 ## Three Gum Usage Modes

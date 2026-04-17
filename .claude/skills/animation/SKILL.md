@@ -111,6 +111,10 @@ The `.achx` references the `.png` by relative path (`FileRelativeTextures` is `t
 
 **Customizing:** Delete chains you don't need, rename chains to match your game's conventions, and adjust `FrameLength` for timing. If using a different spritesheet, update `TextureName` and frame coordinates in each `<Frame>`. See the `references/achx-authoring.md` reference for the XML schema.
 
+## Platformer Animations
+
+FRB2 does not provide an engine-level animation controller for platformers. Animation state selection is game code — see the `platformer-movement` skill for the recommended pattern (a pattern match on `PlatformerBehavior` state + facing suffix).
+
 ## Gotchas
 
 - **`AnimationChains` must be set before `PlayAnimation`** — calling `PlayAnimation` on a sprite with null `AnimationChains` is a silent no-op.

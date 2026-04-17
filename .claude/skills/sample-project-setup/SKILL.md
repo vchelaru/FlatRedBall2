@@ -5,6 +5,8 @@ description: "Sample Project Setup for FlatRedBall2. Use when creating a new sam
 
 # Sample Project Setup
 
+> **See `content-boundary` skill first.** New projects should scaffold placeholder content files (TMX, Gum, coefficients JSON) rather than hardcoding content in C#. Set the project up so the human can drop in real art, levels, and UI without recompiling.
+
 How to create a new sample project (`.csproj`) under `samples/`. Follow this checklist exactly — two of these steps are easy to forget and cause hard-to-diagnose build failures.
 
 > **Do not read existing sample files to verify these templates.** The content below is authoritative. Only read source files if something fails and you have a specific reason to doubt the template.
