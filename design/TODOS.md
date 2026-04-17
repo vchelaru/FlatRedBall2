@@ -18,18 +18,92 @@ Externalizes `PlatformerValues` into a JSON file per entity. Canonical applicati
 
 FRB1 had an `AnimationController` / `PlatformerAnimationController` that mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this.** The controller was primarily useful for FRB1's code-generation model (Glue editor emitted animation layers that coexisted with hand-written code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable. See the `platformer-movement` skill for the recommended animation pattern.
 
-## PlatformerConfig Hot-Reload (File Watch)
-**Priority: Soon** — Watch `player.platformer.json` (and any config JSON loaded via `PlatformerConfig.FromJson`) for changes and re-apply values at runtime without recompiling. This is the payoff of the content-boundary split: a designer edits JSON, saves, and sees the result in the running game immediately.
+## Content Hot-Reload
+**Priority: Soon** — General-purpose content hot-reload system. The original scope was PlatformerConfig JSON only, but the real need is broader: PNGs, Tiled maps, JSON configs, and potentially any content file. Gum already supports hot-reload natively.
 
-- Use `FileSystemWatcher` (or equivalent) to detect writes to the loaded path.
-- On change: re-deserialize and re-apply via `ApplyTo`. Must handle partial/malformed saves gracefully (file may be mid-write) — retry on `IOException`, log parse errors rather than crashing.
-- Debounce: editors often write multiple events per save; collapse into a single reload after a short delay (~100-200ms).
-- API surface: something like `PlatformerConfig.WatchAndApply(path, behavior)` that returns a disposable handle, or a `FileWatchingConfig` wrapper. Exact shape TBD.
-- Consider generalizing beyond `PlatformerConfig` — any JSON config file could benefit from watch+reload. A generic `ConfigWatcher<T>` might be the right abstraction, with `PlatformerConfig` as the first consumer.
-- Thread safety: `FileSystemWatcher` fires on a threadpool thread; values must be applied on the game thread. Queue the reload and process it during the next `Update` tick.
+### Two reload strategies
 
-## Designer-Placed Spawn Markers
-**Priority: Soon** — Initial implementation landed. `TileMap.CreateEntities<T>` with `Origin` enum and reflection-based property mapping. AutoEvalCoinHopperSample converted. Needs runtime testing to verify coordinate conversion.
+Content changes fall into two categories:
+
+1. **In-place reload** — the engine patches the existing object without the game knowing. No screen restart, no state loss. Examples:
+   - `Texture2D.SetData` for a PNG that hasn't changed dimensions
+   - Value-by-value assignment for JSON configs (platformer values, etc.)
+   - Tile replacement in a TMX when only tile data changed (no structural changes)
+
+2. **Screen restart** — when in-place isn't possible, the engine restarts the current screen. Examples:
+   - PNG changed dimensions → must `new` the `Texture2D`, which invalidates all references
+   - TMX structural changes (object layers added/removed, map resized) → entities may have been modified since load (enemy moved, coin collected)
+   - Any change where the engine can't determine what's safe to patch
+
+The watcher should prefer in-place when possible and fall back to screen restart otherwise.
+
+### Implementation order
+
+#### 1. `RestartScreen()` — prerequisite, independently valuable
+
+Two modes:
+- `RestartScreen()` — death/retry restart. Fresh state, replay the configure callback values.
+- `RestartScreen(hotReload: true)` — hot-reload restart. Fresh state, but persist key variables to avoid jarring camera pops and player teleportation.
+
+**Mechanism:** The engine snapshots public settable property values on the screen (the ones set by the `MoveToScreen` configure callback) right before `CustomInitialize`. `RestartScreen()` creates a new instance of the same screen type and copies those values over. No need to remember the callback itself — just the resulting property values.
+
+**Hot-reload variable persistence:** A hot-reload restart should feel as close to in-place as possible. The engine automatically persists a small set of critical variables across the restart:
+- Camera position (from `CameraControllingEntity` or direct camera state)
+- The tracked entity's position, velocity, and acceleration
+
+This covers the common case — the camera doesn't pop and the player doesn't teleport back to spawn. For additional state (score, timer, collected items), games override:
+
+```csharp
+protected override void SaveHotReloadState(HotReloadState state)
+{
+    state.Set("score", _score);
+    state.Set("timeRemaining", _timeRemaining);
+}
+
+protected override void RestoreHotReloadState(HotReloadState state)
+{
+    _score = state.Get<int>("score");
+    _timeRemaining = state.Get<float>("timeRemaining");
+}
+```
+
+**Edge case:** Restoring player position after a TMX structural change could place the player inside new geometry. This is acceptable — collision pushes them out on the next frame, which is better than teleporting to spawn.
+
+#### 2. `ContentWatcher` — generic file watch infrastructure
+
+Handles the boring parts that are common across all content types:
+- `FileSystemWatcher` (or equivalent) to detect writes
+- Debounce: editors fire multiple events per save; collapse into a single reload after ~100-200ms
+- Thread safety: `FileSystemWatcher` fires on a threadpool thread; queue the reload and process it during the next `Update` tick on the game thread
+- Graceful error handling: retry on `IOException` (file mid-write), log parse errors rather than crashing
+- Returns a disposable handle for cleanup
+
+#### 3. JSON hot-reload — first consumer
+
+Simplest case. `ContentWatcher` detects change → deserialize → apply values in-place. No screen restart needed.
+
+```csharp
+var watcher = new ContentWatcher("Content/player.platformer.json", () => {
+    var config = PlatformerConfig.FromJson("Content/player.platformer.json");
+    config.ApplyTo(_player.Platformer);
+});
+```
+
+#### 4. PNG hot-reload
+
+- Same dimensions: `Texture2D.SetData` in-place. All existing references stay valid.
+- Different dimensions: trigger `RestartScreen(hotReload: true)`.
+- Requires the engine to track which textures were loaded from which files, or a registry pattern.
+
+#### 5. TMX hot-reload
+
+- Tile-only changes: replace tile data in existing layers, regenerate collision collections.
+- Structural changes (layers added/removed, objects changed, map resized): trigger `RestartScreen(hotReload: true)`.
+- Determining "tile-only vs structural" may be complex — could start conservative (always restart) and optimize later.
+
+## Designer-Placed Spawn Markers (Landed)
+
+> **Status: Complete.** `TileMap.CreateEntities<T>` with `Origin` enum and reflection-based property mapping. AutoEvalCoinHopperSample converted and runtime-tested. StandardTileset updated with visible entity marker tiles (Coin id 97, PlayerSpawn id 29, plus many others). Skills and template updated.
 
 ### Decision: Tiled Object Layers Behind a Stable Wrapper
 

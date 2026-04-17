@@ -44,28 +44,11 @@ This covers `.tmx`, `.tsx`, and `.png` files in the `Content/Tiled/` directory.
 
 ## StandardTileset Tile IDs
 
-The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. Use these GIDs in the CSV data:
+Read `.claude/templates/Tiled/StandardTileset.tsx` for the full list of tile IDs and their Classes. The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. GID 0 means empty (no tile). GID 1 is `SolidCollision` — used in virtually every game as the primary wall/floor/ceiling tile.
 
-| GID | Tile Type | Notes |
-|-----|-----------|-------|
-| 0 | Empty | No tile |
-| 1 | SolidCollision | Primary solid wall/floor tile |
-| 2 | SolidCollision | Visual variant |
-| 3 | SolidCollision | Visual variant |
-| 4 | JumpThroughCollision | Cloud-style: solid from above, drop-through with Down+Jump |
-| 7 | OneWayCollision | Hard one-way barrier: pass once, never return (e.g., Yoshi door) |
-| 10 | MovingPlatform | |
-| 33 | Water | |
-| 34 | BreakableCollision | |
-| 35 | IceCollision | |
-| 65 | Door | |
-| 29 | Coin | Entity marker — place on object layers, not tile layers |
-| 30 | PlayerSpawn | Entity marker — place on object layers, not tile layers |
-| 97 | Ladder | |
-
-Use **GID 1** for standard solid collision. Use **GID 0** for empty space.
-
-**Entity marker tiles** (GIDs 29, 30) are for object layers only — they have a Class but no collision. Place them as tile objects on an `<objectgroup>` layer. Game code reads them via `map.CreateEntities()`. See the `levels` skill for the API.
+Tiles fall into two categories:
+- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`.
+- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`) — place on object layers only. Game code reads them via `map.CreateEntities()`. See the `levels` skill for the API.
 
 ## Layer Conventions
 
