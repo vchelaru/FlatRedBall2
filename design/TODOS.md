@@ -83,11 +83,9 @@ var watcher = new ContentWatcher("Content/player.platformer.json", () => {
 - Different dimensions: trigger `RestartScreen(hotReload: true)`.
 - Requires the engine to track which textures were loaded from which files, or a registry pattern.
 
-#### 5. TMX hot-reload
+#### 5. TMX hot-reload — in-place tile data updates
 
-- Tile-only changes: replace tile data in existing layers, regenerate collision collections.
-- Structural changes (layers added/removed, objects changed, map resized): trigger `RestartScreen(hotReload: true)`.
-- Determining "tile-only vs structural" may be complex — could start conservative (always restart) and optimize later.
+> **Status: Landed.** See Done.md ("TMX Hot-Reload"). `TileMap.TryReloadFrom(path)` applies tile-data changes in place; structural changes return `false` for a fallback restart. AutoEvalCoinHopperSample wired and end-to-end verified.
 
 ## Designer-Placed Spawn Markers (Landed)
 

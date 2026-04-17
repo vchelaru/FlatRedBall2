@@ -132,6 +132,35 @@ public static class TileMapCollisionGenerator
     }
 
     /// <summary>
+    /// Repopulates an existing <see cref="TileShapeCollection"/> from the given layer using the
+    /// supplied predicate. Caller is responsible for clearing <paramref name="target"/> first if
+    /// stale cells should be removed. Used by <see cref="TileMap.TryReload"/>.
+    /// </summary>
+    internal static void RegenerateInto(
+        Tilemap tilemap,
+        TilemapTileLayer layer,
+        Func<TilemapTileData, bool> predicate,
+        TileShapeCollection target)
+    {
+        AddMatchingTiles(tilemap, layer, predicate, target);
+    }
+
+    /// <summary>
+    /// All-layers variant of <see cref="RegenerateInto(Tilemap, TilemapTileLayer, Func{TilemapTileData, bool}, TileShapeCollection)"/>.
+    /// </summary>
+    internal static void RegenerateInto(
+        Tilemap tilemap,
+        Func<TilemapTileData, bool> predicate,
+        TileShapeCollection target)
+    {
+        foreach (var layer in tilemap.Layers)
+        {
+            if (layer is TilemapTileLayer tileLayer)
+                AddMatchingTiles(tilemap, tileLayer, predicate, target);
+        }
+    }
+
+    /// <summary>
     /// Core generator. Iterates every cell in the layer, resolves tileset metadata for non-empty
     /// tiles, and adds a collision rectangle for each tile that satisfies <paramref name="predicate"/>.
     /// Tiled rows (Y-down) are flipped to engine rows (Y-up).

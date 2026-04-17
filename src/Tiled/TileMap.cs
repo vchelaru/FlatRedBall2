@@ -30,6 +30,7 @@ public class TileMap
 {
     private readonly Tilemap _tilemap;
     private readonly TilemapSpriteBatchRenderer _renderer;
+    private readonly GraphicsDevice? _graphicsDevice;
     private readonly List<TileMapLayer> _layers;
     private readonly Dictionary<string, TileMapLayer> _layersByName;
     private readonly float _width;
@@ -38,6 +39,16 @@ public class TileMap
     private readonly int _tileHeight;
     private float _x;
     private float _y;
+
+    // Tracked TSCs registered by GenerateCollisionFromClass / GenerateCollisionFromProperty.
+    // On TryReload, each is cleared and rebuilt against the updated tilemap so cell membership
+    // reflects the new tile data without the caller needing to rewire collision relationships.
+    private readonly List<TrackedCollection> _trackedCollections = new();
+
+    private readonly record struct TrackedCollection(
+        Func<TilemapTileData, bool> Predicate,
+        string? LayerName,
+        TileShapeCollection Collection);
 
     /// <summary>
     /// Loads a TMX file and positions the map in world space.
@@ -48,6 +59,7 @@ public class TileMap
     /// <param name="y">Top edge of the map in world space (Tiled convention). Default 0.</param>
     public TileMap(string tmxPath, GraphicsDevice graphicsDevice, float x = 0f, float y = 0f)
     {
+        _graphicsDevice = graphicsDevice;
         var parser = new TiledTmxParser();
         _tilemap = parser.ParseFromFile(tmxPath, graphicsDevice);
 
@@ -82,13 +94,48 @@ public class TileMap
     }
 
     /// <summary>
-    /// Internal constructor for unit testing — creates a TileMap without loading a TMX file.
+    /// Internal constructor for unit testing — creates a TileMap without loading a TMX file or
+    /// constructing a renderer. Pass a hand-built <see cref="Tilemap"/> from MonoGame.Extended.
+    /// </summary>
+    internal TileMap(Tilemap tilemap, float x = 0f, float y = 0f)
+    {
+        _tilemap = tilemap;
+        _renderer = null!;
+        _graphicsDevice = null;
+        _width = _tilemap.Width * _tilemap.TileWidth;
+        _height = _tilemap.Height * _tilemap.TileHeight;
+        _tileWidth = _tilemap.TileWidth;
+        _tileHeight = _tilemap.TileHeight;
+
+        _layers = new List<TileMapLayer>();
+        _layersByName = new Dictionary<string, TileMapLayer>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is TilemapTileLayer tileLayer)
+            {
+                var mapLayer = new TileMapLayer(tileLayer.Name);
+                _layers.Add(mapLayer);
+                _layersByName[tileLayer.Name] = mapLayer;
+            }
+        }
+
+        AssignDefaultZ();
+        _x = x;
+        _y = y;
+        PropagatePosition();
+    }
+
+    /// <summary>
+    /// Legacy internal constructor used by older tests that don't need a real
+    /// <see cref="Tilemap"/>. Kept for backward compatibility with TileMapTests.
     /// </summary>
     internal TileMap(float width, float height, int tileWidth, int tileHeight,
         List<TileMapLayer> layers, float x = 0f, float y = 0f)
     {
         _tilemap = null!;
         _renderer = null!;
+        _graphicsDevice = null;
         _width = width;
         _height = height;
         _tileWidth = tileWidth;
@@ -179,13 +226,15 @@ public class TileMap
     /// </param>
     public TileShapeCollection GenerateCollisionFromClass(string className, string? layerName = null)
     {
-        if (layerName != null)
-        {
-            var layer = GetInternalLayer(layerName);
-            return TileMapCollisionGenerator.GenerateFromClass(_tilemap, layer, className, _x, _y);
-        }
+        Func<TilemapTileData, bool> predicate = td =>
+            string.Equals(td.Class, className, StringComparison.OrdinalIgnoreCase);
 
-        return TileMapCollisionGenerator.GenerateFromClass(_tilemap, className, _x, _y);
+        TileShapeCollection tsc = layerName != null
+            ? TileMapCollisionGenerator.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
+            : TileMapCollisionGenerator.GenerateFromClass(_tilemap, className, _x, _y);
+
+        _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
+        return tsc;
     }
 
     /// <summary>
@@ -199,13 +248,15 @@ public class TileMap
     /// </param>
     public TileShapeCollection GenerateCollisionFromProperty(string propertyName, string? layerName = null)
     {
-        if (layerName != null)
-        {
-            var layer = GetInternalLayer(layerName);
-            return TileMapCollisionGenerator.GenerateFromProperty(_tilemap, layer, propertyName, _x, _y);
-        }
+        Func<TilemapTileData, bool> predicate = td =>
+            td.Properties.TryGetValue(propertyName, out _);
 
-        return TileMapCollisionGenerator.GenerateFromProperty(_tilemap, propertyName, _x, _y);
+        TileShapeCollection tsc = layerName != null
+            ? TileMapCollisionGenerator.GenerateFromProperty(_tilemap, GetInternalLayer(layerName), propertyName, _x, _y)
+            : TileMapCollisionGenerator.GenerateFromProperty(_tilemap, propertyName, _x, _y);
+
+        _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
+        return tsc;
     }
 
     /// <summary>
@@ -341,6 +392,129 @@ public class TileMap
             if (converted != null)
                 propInfo.SetValue(entity, converted);
         }
+    }
+
+    /// <summary>
+    /// Re-parses <paramref name="tmxPath"/> and applies tile-data changes in place.
+    /// Returns <c>true</c> if applied; <c>false</c> if the new TMX differs structurally
+    /// (map dimensions, layer set, tilesets, or object layers) — in which case the caller
+    /// should fall back to <c>RestartScreen(RestartMode.HotReload)</c>.
+    /// </summary>
+    /// <remarks>
+    /// In-place reload preserves all entity state, camera position, and live
+    /// <see cref="TileShapeCollection"/> references — collision relationships keep working
+    /// without reattachment. Hand-authored mutations made directly to a generated
+    /// <see cref="TileShapeCollection"/> after <see cref="GenerateCollisionFromClass"/>
+    /// (e.g. extra <c>AddPolygonTileAtCell</c> calls) are wiped: the engine rebuilds each
+    /// tracked collection from the new tile data. Put augmentations in
+    /// <c>CustomInitialize</c> if you need them to survive a full restart.
+    /// </remarks>
+    public bool TryReloadFrom(string tmxPath)
+    {
+        if (_graphicsDevice == null)
+            throw new InvalidOperationException(
+                "TryReloadFrom requires the TileMap to have been constructed with a GraphicsDevice.");
+
+        var parser = new TiledTmxParser();
+        var newTilemap = parser.ParseFromFile(tmxPath, _graphicsDevice);
+        return TryReload(newTilemap);
+    }
+
+    /// <summary>
+    /// Test seam for <see cref="TryReloadFrom"/>. Applies tile-data changes from
+    /// <paramref name="newTilemap"/> onto this map's existing layers, returning <c>false</c>
+    /// if the structures differ.
+    /// </summary>
+    internal bool TryReload(Tilemap newTilemap)
+    {
+        if (!IsStructurallyCompatible(_tilemap, newTilemap))
+            return false;
+
+        // Per-cell SetTile on the live TilemapTileLayer instances. The renderer holds the same
+        // layer references so it sees the new tile data automatically (we still rebuild its
+        // vertex cache below).
+        for (int li = 0; li < _tilemap.Layers.Count; li++)
+        {
+            if (_tilemap.Layers[li] is not TilemapTileLayer oldLayer) continue;
+            var newLayer = (TilemapTileLayer)newTilemap.Layers[li];
+
+            for (int row = 0; row < oldLayer.Height; row++)
+            {
+                for (int col = 0; col < oldLayer.Width; col++)
+                {
+                    var oldTile = oldLayer.GetTile(col, row);
+                    var newTile = newLayer.GetTile(col, row);
+                    if (!TilesEqual(oldTile, newTile))
+                        oldLayer.SetTile(col, row, newTile);
+                }
+            }
+        }
+
+        // Rebuild every tracked TSC against the now-updated _tilemap.
+        foreach (var tracked in _trackedCollections)
+        {
+            tracked.Collection.Clear();
+            if (tracked.LayerName != null)
+                TileMapCollisionGenerator.RegenerateInto(
+                    _tilemap, GetInternalLayer(tracked.LayerName), tracked.Predicate, tracked.Collection);
+            else
+                TileMapCollisionGenerator.RegenerateInto(
+                    _tilemap, tracked.Predicate, tracked.Collection);
+        }
+
+        // Refresh the renderer's vertex cache so the visual update is visible next frame.
+        // No-op in unit tests where _renderer is null.
+        _renderer?.LoadTilemap(_tilemap);
+
+        return true;
+    }
+
+    private static bool TilesEqual(TilemapTile? a, TilemapTile? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (a.HasValue != b.HasValue) return false;
+        return a!.Value.GlobalId == b!.Value.GlobalId &&
+               a.Value.FlipFlags == b.Value.FlipFlags;
+    }
+
+    private static bool IsStructurallyCompatible(Tilemap oldMap, Tilemap newMap)
+    {
+        if (oldMap.Width != newMap.Width) return false;
+        if (oldMap.Height != newMap.Height) return false;
+        if (oldMap.TileWidth != newMap.TileWidth) return false;
+        if (oldMap.TileHeight != newMap.TileHeight) return false;
+
+        if (oldMap.Layers.Count != newMap.Layers.Count) return false;
+        for (int i = 0; i < oldMap.Layers.Count; i++)
+        {
+            var a = oldMap.Layers[i];
+            var b = newMap.Layers[i];
+            if (a.GetType() != b.GetType()) return false;
+            if (!string.Equals(a.Name, b.Name, StringComparison.Ordinal)) return false;
+
+            if (a is TilemapTileLayer atl && b is TilemapTileLayer btl)
+            {
+                if (atl.Width != btl.Width || atl.Height != btl.Height) return false;
+            }
+            else if (a is TilemapObjectLayer aol && b is TilemapObjectLayer bol)
+            {
+                // Conservative: any object-count difference forces restart. v1 doesn't
+                // do per-object equality — if you move a spawn marker the screen restarts.
+                if (aol.Objects.Count != bol.Objects.Count) return false;
+            }
+        }
+
+        if (oldMap.Tilesets.Count != newMap.Tilesets.Count) return false;
+        for (int i = 0; i < oldMap.Tilesets.Count; i++)
+        {
+            var a = oldMap.Tilesets[i];
+            var b = newMap.Tilesets[i];
+            if (a.FirstGlobalId != b.FirstGlobalId) return false;
+            if (a.TileCount != b.TileCount) return false;
+            if (!string.Equals(a.Name, b.Name, StringComparison.Ordinal)) return false;
+        }
+
+        return true;
     }
 
     private TilemapTileLayer GetInternalLayer(string name)

@@ -76,7 +76,19 @@ Use when the change is small and the type/shape is unchanged. No screen restart,
 
 - **JSON configs** — read the new file, copy values onto the live object.
 - **PNG with same dimensions** — `Texture2D.SetData` patches pixels; existing `Sprite` references keep working.
-- **Tile-data-only TMX changes** — replace tile IDs in existing layers, regenerate `TileShapeCollection`.
+- **Tile-data-only TMX changes** — `TileMap.TryReloadFrom(path)` patches tile IDs in existing layers and rebuilds every TSC registered via `GenerateCollisionFromClass` / `GenerateCollisionFromProperty`. Returns `true` if applied; `false` if the new TMX differs structurally (map dims, layer set, tilesets, object layers) — caller falls back to `RestartScreen(RestartMode.HotReload)`. Hand-authored mutations on a generated TSC after `Generate*` (e.g. extra `AddPolygonTileAtCell` calls) are **wiped** on in-place reload — put augmentations in `CustomInitialize` so they survive a full restart.
+
+  ```csharp
+  WatchContentDirectory("Content", relPath =>
+  {
+      if (relPath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase))
+      {
+          if (!map.TryReloadFrom("Content/" + relPath))
+              RestartScreen(RestartMode.HotReload);
+      }
+      else RestartScreen(RestartMode.HotReload);
+  });
+  ```
 
 ### 2. Screen restart — `RestartScreen(RestartMode.HotReload)`
 

@@ -9,6 +9,10 @@ description: "TMX map file creation and editing for FlatRedBall2. Use when creat
 
 TMX files are the standard level format. A base template and standard tileset live in `.claude/templates/Tiled/`.
 
+## Hot-reload — see `content-hot-reload` skill
+
+`TileMap.TryReloadFrom(path)` applies tile-data changes (cell GID/flip changes) in place; structural changes (resize, layer set, tilesets, object layers) return `false` so the caller falls back to `RestartScreen(RestartMode.HotReload)`. Hand-authored mutations to a TSC after `GenerateCollisionFromClass` / `GenerateCollisionFromProperty` (e.g. `tsc.AddPolygonTileAtCell(...)` to extend the generated collision) are **wiped** on in-place reload — those live in `CustomInitialize`, which only re-runs on a full screen restart.
+
 ## Communication convention — reference tiles by numeric ID
 
 When discussing a tile (its polygon, class, position, collision shape, etc.), always refer to it by its numeric **tile ID** — e.g., "tile ID 11's polygon" rather than "the slope triangle". The ID is the unambiguous handle that matches the `.tsx` file and Tiled's editor; descriptions alone are ambiguous when multiple tiles have similar shapes.
