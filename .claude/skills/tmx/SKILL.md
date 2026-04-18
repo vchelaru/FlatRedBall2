@@ -9,6 +9,20 @@ description: "TMX map file creation and editing for FlatRedBall2. Use when creat
 
 TMX files are the standard level format. A base template and standard tileset live in `.claude/templates/Tiled/`.
 
+## Agent-authored TMX is *placeholder only*
+
+When the AI creates a TMX, the scope is strictly:
+
+1. Copy `base.tmx`, `StandardTileset.tsx`, `StandardTilesetIcons.png` into the project.
+2. Keep the map small — one screen (e.g. 30×20 at 16px) is ideal. Do not resize up.
+3. Edit the CSV minimally: a solid floor row, 1–3 platforms, clear the rest.
+4. Add one object layer with a player spawn and a handful of enemy spawns.
+5. Stop.
+
+That's the entire job. The human will open the TMX in Tiled and design the real level. Every minute the agent spends widening the map, adding decorative tiles, tuning layout, or (especially) writing a generator to produce tile data is wasted — the human is going to redo the content anyway.
+
+**Never** write a script (Python, shell, C# one-shot, ASCII-to-TMX converter, anything) to produce TMX data. If you think you need one because the map is too big to hand-author, the map is too big — shrink the scope instead. If the user's spec asks for a wider level, scaffold one screen and tell them to widen it in Tiled.
+
 ## Hot-reload — see `content-hot-reload` skill
 
 `TileMap.TryReloadFrom(path)` applies tile-data changes (cell GID/flip changes) in place; structural changes (resize, layer set, tilesets, object layers) return `false` so the caller falls back to `RestartScreen(RestartMode.HotReload)`. Hand-authored mutations to a TSC after `GenerateCollisionFromClass` / `GenerateCollisionFromProperty` (e.g. `tsc.AddPolygonTileAtCell(...)` to extend the generated collision) are **wiped** on in-place reload — those live in `CustomInitialize`, which only re-runs on a full screen restart.

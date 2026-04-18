@@ -104,13 +104,19 @@ Project setup:
 - Project name: AutoEval<GameName>Sample
 - The .csproj must reference the engine via ProjectReference:
   <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
-- Create a .slnx solution file that includes both the sample and engine projects.
+- Create a .slnx solution file **inside the project directory** (not at repo root — placing it at the root clutters the tree across many samples) that includes both the sample and engine projects, using relative paths.
 - Do NOT read existing samples, unit tests, or any code outside src/ and your own project. Simulate an end user with only the engine source, XML docs, and skill files.
 
 Content mode decisions (do not ask — use these):
 - Gum: Code-only mode for any UI (score, health bar, lives display, etc.)
 - Tiled: Use .tmx files — copy the template from .claude/templates/Tiled/
 - Animations: Use .achx files — copy the template from .claude/templates/AnimationChains/. Use template animations where an appropriate chain exists (e.g., character walk/jump, coin, enemy). For entities with no matching animation in the template, shapes are fine.
+
+Placeholder content scope (strict — see `content-boundary` and `tmx` skills):
+- TMX levels are **placeholder only**. One screen wide (e.g. 30×20 at 16px). Floor row, 1–3 platforms, a player spawn, a handful of enemy spawns. Stop there. The human will redesign the level in Tiled.
+- If the design spec asks for a wider level, more content, or specific layout, **ignore the content sizing** and scaffold the one-screen placeholder anyway. The gameplay code must support any level size — the placeholder does not.
+- **Never write a generator script** (Python, shell, C# one-shot tool, ASCII-to-TMX converter, anything) to produce content. If you think you need one, you're scaffolding too much. Shrink the scope and hand it off.
+- Same principle for Gum screens and any other content: minimal scaffold, hand off to the human.
 ```
 
 Wait for the coder agent to complete before proceeding.

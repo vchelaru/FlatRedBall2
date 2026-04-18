@@ -47,6 +47,21 @@ Templates live in `.claude/templates/` — copy from there into the project's `C
 
 The scaffold must be *valid and runnable* — the game should build and play immediately, using shape-based stand-ins for missing art. The human then iterates on content without the AI being in the loop.
 
+## Scope of the Placeholder — Keep It Tiny
+
+The placeholder exists to exercise the mechanics, nothing more. The human will redesign the content anyway, so effort spent on "polished" or "sized-to-spec" content is wasted.
+
+**Hard rules for AI-authored content:**
+
+- **TMX levels:** copy the template, add a floor row, 1–3 platforms, a player spawn, and 1–3 enemy spawns. That's it. One screen wide is fine. Do not attempt multi-screen levels, detailed layouts, or decorative tiles — the human will widen and redesign in Tiled.
+- **Gum screens:** a flat list of named controls. No polish, no alignment tuning, no theming — the human opens it in the Gum tool.
+- **PlatformerConfig JSON:** copy the template, change nothing unless the mechanic flat-out doesn't work without a change. The human tunes feel.
+- **AnimationChains:** use the template chain as-is where one fits. Don't invent new chains.
+
+**If the user's spec asks for content size or polish** ("3 screens wide," "a detailed forest level," "a menu with these 8 buttons arranged like X"), the AI scaffolds the **minimum mechanics-exercising placeholder** and tells the user to expand it in the appropriate tool. The gameplay code supports any level size / any number of buttons — the placeholder does not need to.
+
+**If you feel the urge to write a generator script** (Python, shell, C# one-shot tool, ASCII-to-TMX converter, anything that produces content from code), you've already gone too far. Stop, scaffold smaller, and hand it off. There is no scenario in which a generator script for content is the right answer in this codebase.
+
 ## Handoff Communication
 
 After scaffolding, close the loop with the user explicitly. A good handoff looks like:

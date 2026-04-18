@@ -68,14 +68,7 @@ Open questions when we get there: should the engine update the .csproj `<Content
 
 #### 3. JSON hot-reload — first consumer
 
-Simplest case. `ContentWatcher` detects change → deserialize → apply values in-place. No screen restart needed.
-
-```csharp
-var watcher = new ContentWatcher("Content/player.platformer.json", () => {
-    var config = PlatformerConfig.FromJson("Content/player.platformer.json");
-    config.ApplyTo(_player.Platformer);
-});
-```
+> **Status: Landed.** `PlatformerConfig.FromJson(...).ApplyTo(_player.Platformer)` in a `WatchContentDirectory` callback. Demoed in AutoEvalCoinHopperSample (`GameplayScreen.cs`). No new engine code was needed beyond the `ContentWatcher` infra + `PlatformerConfig` API that already existed.
 
 #### 4. PNG hot-reload
 
@@ -125,9 +118,6 @@ Reflection-based property mapping conflicts with the Native AOT goal (see Multi-
 ### Related friction (still open)
 - `TileMap.GetCellWorldPosition(int col, int row)` helper — independent of spawn markers, but addresses similar "where in world space is this tile?" friction.
 
-## Platformer Docs Audit (FRB1 → FRB2)
-**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. (Note: AnimationController is intentionally not ported — see the "Animation — intentionally not engine-managed" note above.)
-
 ## Implement `OneWayDirection` Down / Left / Right
 **Priority: Eventual** — Currently only `None` and `Up` are implemented; the other three throw `NotImplementedException`. `Down` supports ceiling-only / uppercut-style barriers; `Left`/`Right` support Yoshi's-Island-style one-way doors.
 
@@ -137,13 +127,6 @@ Reflection-based property mapping conflicts with the Native AOT goal (see Multi-
 - `Polygon.SuppressedEdges` bitfield exists but isn't wired into SAT correctly (opposite edges share the same axis, so edge-level suppression during SAT doesn't eliminate the axis)
 - Consider a post-process MTV filter analogous to rectangles' `ComputeDirectionalSeparation`, or a different approach entirely
 - Tests removed when we deferred this; re-add when addressed
-
-## CI: GitHub Action to Run Unit Tests as a Required Status Check on PRs to `main`
-**Priority: Eventual** — Two pieces:
-1. Add a `.github/workflows/` YAML action that runs `dotnet test tests/FlatRedBall2.Tests/` on every pull request targeting `main` (and ideally on direct pushes to `main` too). Should fail the check on any test failure or build error.
-2. Configure the branch protection rule on `main` to mark this check as a **required status check** so PRs cannot be merged unless it passes.
-
-Catches regressions before merge instead of after. No need immediately, but worth setting up before the contributor base expands.
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.
