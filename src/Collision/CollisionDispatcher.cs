@@ -24,9 +24,11 @@ internal static class CollisionDispatcher
 
     public static bool CollidesWith(ICollidable a, ICollidable b)
     {
-        // Lines have no separation vector (infinitely thin), so delegate to Line's own intersection test.
-        if (a is Line la) return la.CollidesWith(b);
-        if (b is Line lb) return lb.CollidesWith(a);
+        // Line vs AARect now has separation support — use the standard path.
+        // For other Line pairs (Line vs Line, Line vs Circle, Line vs Polygon),
+        // delegate to Line's own intersection test since no separation exists.
+        if (a is Line la && b is not AxisAlignedRectangle) return la.CollidesWith(b);
+        if (b is Line lb && a is not AxisAlignedRectangle) return lb.CollidesWith(a);
         return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
     }
 
@@ -49,6 +51,8 @@ internal static class CollisionDispatcher
             (AxisAlignedRectangle ra, Polygon pb)              => -PolygonVsAabb(pb, ra),
             (Polygon pa, Circle cb)                            => PolygonVsCircle(pa, cb),
             (Circle ca, Polygon pb)                            => -PolygonVsCircle(pb, ca),
+            (Line la, AxisAlignedRectangle rb)                 => LineVsAabb(la, rb),
+            (AxisAlignedRectangle ra, Line lb)                 => -LineVsAabb(lb, ra),
             (_, TileShapeCollection tsc)                       => tsc.GetSeparationFor(a),
             _                                                  => Vector2.Zero
         };
@@ -204,6 +208,13 @@ internal static class CollisionDispatcher
                 }
                 return (minX, maxX, minY, maxY);
             }
+            case Line line:
+            {
+                var p1 = line.AbsolutePoint1;
+                var p2 = line.AbsolutePoint2;
+                return (MathF.Min(p1.X, p2.X), MathF.Max(p1.X, p2.X),
+                        MathF.Min(p1.Y, p2.Y), MathF.Max(p1.Y, p2.Y));
+            }
             default:
                 return (0f, 0f, 0f, 0f);
         }
@@ -280,6 +291,35 @@ internal static class CollisionDispatcher
 
         float overlap = circle.Radius - dist;
         return new Vector2(dx / dist * overlap, dy / dist * overlap);
+    }
+
+    // Line segment vs AABB — treats the segment as a degenerate AABB (its bounding box).
+    // Exact for axis-aligned lines; bounding-box approximation for diagonal lines.
+    private static Vector2 LineVsAabb(Line line, AxisAlignedRectangle rect)
+    {
+        // First verify actual intersection (the segment might miss the rect even if bounding boxes overlap).
+        if (!line.CollideAgainst(rect)) return Vector2.Zero;
+
+        var p1 = line.AbsolutePoint1;
+        var p2 = line.AbsolutePoint2;
+        float lineMinX = MathF.Min(p1.X, p2.X), lineMaxX = MathF.Max(p1.X, p2.X);
+        float lineMinY = MathF.Min(p1.Y, p2.Y), lineMaxY = MathF.Max(p1.Y, p2.Y);
+        float lineCenterX = (lineMinX + lineMaxX) / 2f;
+        float lineCenterY = (lineMinY + lineMaxY) / 2f;
+        float lineHalfW = (lineMaxX - lineMinX) / 2f;
+        float lineHalfH = (lineMaxY - lineMinY) / 2f;
+
+        float rectHW = rect.Width / 2f, rectHH = rect.Height / 2f;
+
+        float overlapX = (lineHalfW + rectHW) - MathF.Abs(lineCenterX - rect.AbsoluteX);
+        float overlapY = (lineHalfH + rectHH) - MathF.Abs(lineCenterY - rect.AbsoluteY);
+
+        if (overlapX <= 0 || overlapY <= 0) return Vector2.Zero;
+
+        if (overlapX < overlapY)
+            return new Vector2(lineCenterX < rect.AbsoluteX ? -overlapX : overlapX, 0f);
+        else
+            return new Vector2(0f, lineCenterY < rect.AbsoluteY ? -overlapY : overlapY);
     }
 
     // Polygon vs Polygon — iterate convex parts of each, return minimum-magnitude MTV.

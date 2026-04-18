@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
-using FlatRedBall2.Collision;
+using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
 using XnaColor = Microsoft.Xna.Framework.Color;
 
@@ -82,11 +82,10 @@ public class CameraControllingEntity : Entity
     }
 
     /// <summary>
-    /// The level bounds. When set, the camera will not reveal world space outside this rectangle.
-    /// Assign a non-visible <see cref="AxisAlignedRectangle"/> sized to your level.
-    /// When null, the camera moves without bounds.
+    /// The level bounds as a <see cref="BoundsRectangle"/>. When set, the camera will not
+    /// reveal world space outside this rectangle. When null, the camera moves without bounds.
     /// </summary>
-    public AxisAlignedRectangle? Map { get; set; }
+    public BoundsRectangle? Map { get; set; }
 
     /// <summary>
     /// Padding inset from each edge of <see cref="Map"/>. Positive values shrink the usable camera
@@ -175,8 +174,9 @@ public class CameraControllingEntity : Entity
 
             float defaultVisibleW = Camera.TargetWidth  / _defaultZoom;
             float defaultVisibleH = Camera.TargetHeight / _defaultZoom;
-            float mapW = Map.Width  - 2 * ExtraMapPadding;
-            float mapH = Map.Height - 2 * ExtraMapPadding;
+            var map = Map.Value;
+            float mapW = map.Width  - 2 * ExtraMapPadding;
+            float mapH = map.Height - 2 * ExtraMapPadding;
 
             return MathF.Max(1f, MathF.Min(mapW / defaultVisibleW, mapH / defaultVisibleH));
         }
@@ -228,17 +228,18 @@ public class CameraControllingEntity : Entity
         {
             float visibleW = Camera.TargetWidth  / Camera.Zoom;
             float visibleH = Camera.TargetHeight / Camera.Zoom;
-            float mapLeft   = Map.AbsoluteX - Map.Width  / 2f + ExtraMapPadding;
-            float mapRight  = Map.AbsoluteX + Map.Width  / 2f - ExtraMapPadding;
-            float mapBottom = Map.AbsoluteY - Map.Height / 2f + ExtraMapPadding;
-            float mapTop    = Map.AbsoluteY + Map.Height / 2f - ExtraMapPadding;
+            var map = Map.Value;
+            float mapLeft   = map.Left   + ExtraMapPadding;
+            float mapRight  = map.Right  - ExtraMapPadding;
+            float mapBottom = map.Bottom + ExtraMapPadding;
+            float mapTop    = map.Top    - ExtraMapPadding;
 
-            if (Map.Width - 2 * ExtraMapPadding >= visibleW)
+            if (map.Width - 2 * ExtraMapPadding >= visibleW)
             {
                 if (X - visibleW / 2f < mapLeft)  X = mapLeft  + visibleW / 2f;
                 if (X + visibleW / 2f > mapRight)  X = mapRight - visibleW / 2f;
             }
-            if (Map.Height - 2 * ExtraMapPadding >= visibleH)
+            if (map.Height - 2 * ExtraMapPadding >= visibleH)
             {
                 if (Y - visibleH / 2f < mapBottom) Y = mapBottom + visibleH / 2f;
                 if (Y + visibleH / 2f > mapTop)    Y = mapTop    - visibleH / 2f;
@@ -332,15 +333,16 @@ public class CameraControllingEntity : Entity
         {
             float visibleW = Camera.TargetWidth  / Camera.Zoom;
             float visibleH = Camera.TargetHeight / Camera.Zoom;
-            float effectiveMapW = Map.Width  - 2 * ExtraMapPadding;
-            float effectiveMapH = Map.Height - 2 * ExtraMapPadding;
-            float mapLeft   = Map.AbsoluteX - Map.Width  / 2f + ExtraMapPadding;
-            float mapRight  = Map.AbsoluteX + Map.Width  / 2f - ExtraMapPadding;
-            float mapBottom = Map.AbsoluteY - Map.Height / 2f + ExtraMapPadding;
-            float mapTop    = Map.AbsoluteY + Map.Height / 2f - ExtraMapPadding;
+            var map = Map.Value;
+            float effectiveMapW = map.Width  - 2 * ExtraMapPadding;
+            float effectiveMapH = map.Height - 2 * ExtraMapPadding;
+            float mapLeft   = map.Left   + ExtraMapPadding;
+            float mapRight  = map.Right  - ExtraMapPadding;
+            float mapBottom = map.Bottom + ExtraMapPadding;
+            float mapTop    = map.Top    - ExtraMapPadding;
 
             if (visibleW >= effectiveMapW)
-                targetX = Map.AbsoluteX;
+                targetX = map.CenterX;
             else
             {
                 targetX = MathF.Max(targetX, mapLeft  + visibleW / 2f);
@@ -348,7 +350,7 @@ public class CameraControllingEntity : Entity
             }
 
             if (visibleH >= effectiveMapH)
-                targetY = Map.AbsoluteY;
+                targetY = map.CenterY;
             else
             {
                 targetY = MathF.Max(targetY, mapBottom + visibleH / 2f);

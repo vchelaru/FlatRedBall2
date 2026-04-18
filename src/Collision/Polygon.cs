@@ -21,6 +21,15 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     public IReadOnlyList<Vector2> Points => _points;
 
     /// <summary>
+    /// Bitfield where bit <c>i</c> suppresses edge <c>i</c>'s normal during SAT collision.
+    /// Edge <c>i</c> connects <c>Points[i]</c> to <c>Points[(i+1) % Points.Count]</c>.
+    /// Used by <see cref="TileShapeCollection"/> to eliminate snagging at seams between
+    /// adjacent polygon tiles, analogous to <see cref="AxisAlignedRectangle.RepositionDirections"/>
+    /// for rectangle tiles.
+    /// </summary>
+    internal int SuppressedEdges { get; set; }
+
+    /// <summary>
     /// The convex sub-polygons that tile this polygon's area, in local (unrotated, unpositioned) space.
     /// For convex polygons this contains a single entry equal to <see cref="Points"/>.
     /// For concave polygons this is the Hertel-Mehlhorn convex decomposition produced from ear-clip triangulation.

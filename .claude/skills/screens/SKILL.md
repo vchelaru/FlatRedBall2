@@ -126,17 +126,80 @@ FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 - **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.
 - **Do not call `MoveToScreen` from `CustomInitialize`** — the screen hasn't finished initializing yet. Use `CustomActivity` or an event callback.
-- **`MoveToScreen` can target the same screen type** — this fully destroys and recreates the screen, making it the correct pattern for restarting a level. Use the configure callback to pass state (e.g., level index):
+- **Restarting the current screen:** call `RestartScreen()`. The engine recreates a fresh instance of the same type and replays the most recently retained configure callback. Use this for death/retry. Like `MoveToScreen`, the transition is deferred to the next frame.
 
 ```csharp
-// Restart current level
-MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex);
+// Death/retry — replays the retained configure
+RestartScreen();
 
-// Advance to next level
-MoveToScreen<GameScreen>(s => s.LevelIndex = LevelIndex + 1);
+// Restart with a tweak — replaces the retained configure for this and future restarts
+this.RestartScreen(s => s.LevelIndex++);
 ```
 
-  Do **not** manually destroy entities or collision relationships before calling this — the engine handles all teardown automatically.
+  For "advance to next level" you can use either `MoveToScreen<SameType>` or the typed `RestartScreen` overload — both fully tear down and recreate. Use whichever reads more clearly at the call site.
+
+  Do **not** manually destroy entities or collision relationships before calling either — the engine handles all teardown automatically.
+
+- **One configure slot, last-writer-wins.** The engine retains a single configure callback per session. `Start<T>(d)` and `MoveToScreen<T>(d)` set it. `RestartScreen(d)` (typed extension) replaces it. Plain `RestartScreen()` replays whatever is currently in the slot.
+
+- **Closure gotcha — prefer literals to captured locals.** Because the retained callback is replayed against its current closure environment (not a snapshot), any mutable local the callback closed over will be re-read at restart time. Write `s => s.LevelIndex = 3` rather than `s => s.LevelIndex = level` if `level` may have changed by restart time.
+
+## Hot-Reload Restart
+
+When a content file changes on disk and you want to restart the screen *without* losing session state (player position, score, timer), use the hot-reload restart mode:
+
+```csharp
+RestartScreen(RestartMode.HotReload);
+```
+
+This is identical to a death/retry restart with two extra calls bracketing the teardown:
+
+1. `SaveHotReloadState(state)` runs on the OLD instance, before teardown — live game state is still intact, so you can read your fields and stuff them into the typed bag.
+2. `RestoreHotReloadState(state)` runs on the NEW instance, after `CustomInitialize` — the level has been freshly built, then your restore patches saved values on top.
+
+```csharp
+public override void SaveHotReloadState(HotReloadState state)
+{
+    state.Set("score", _score);
+    state.Set("timeRemaining", _timeRemaining);
+}
+
+public override void RestoreHotReloadState(HotReloadState state)
+{
+    _score = state.Get<int>("score");
+    _timeRemaining = state.Get<float>("timeRemaining");
+}
+```
+
+`HotReloadState` is a typed key/value bag: `Set<T>(key, value)`, `Get<T>(key)` (throws if missing), `TryGet<T>(key, out value)`.
+
+**Plain `RestartScreen()` is `RestartMode.DeathRetry` and never calls these hooks** — by design, so death/retry can't accidentally preserve stale state across a death.
+
+**Restore runs after `CustomInitialize` intentionally.** `CustomInitialize` builds the level from scratch, then restore patches saved values on top. The reverse order would let `CustomInitialize` clobber whatever restore set.
+
+**The engine does not auto-preserve anything.** Hot-reload preservation is entirely user-driven via `Save`/`RestoreHotReloadState`. In particular, **preserve player position to avoid a jarring camera pop**: if the player is restored to their pre-reload position, any `CameraControllingEntity` will follow them on the first frame and the camera lands correctly automatically. If you don't restore the player, the player respawns at the spawn marker and the camera snaps to the spawn point, even if you tried to preserve `Camera.X/Y` directly (the controller overwrites it on frame 1).
+
+Canonical recipe:
+
+```csharp
+public override void SaveHotReloadState(HotReloadState state)
+{
+    state.Set("playerX", _player.X);
+    state.Set("playerY", _player.Y);
+    state.Set("playerVx", _player.VelocityX);
+    state.Set("playerVy", _player.VelocityY);
+    state.Set("score", _score);
+}
+
+public override void RestoreHotReloadState(HotReloadState state)
+{
+    _player.X = state.Get<float>("playerX");
+    _player.Y = state.Get<float>("playerY");
+    _player.VelocityX = state.Get<float>("playerVx");
+    _player.VelocityY = state.Get<float>("playerVy");
+    _score = state.Get<int>("score");
+}
+```
 
 ## Pausing
 
@@ -150,8 +213,6 @@ bool paused = IsPaused;
 
 **What pauses:** entity physics, entity `CustomActivity`, collision processing.
 **What keeps running:** `Screen.CustomActivity`, Gum UI, input — so pause-menu logic lives in `CustomActivity` and Gum overlays still update.
-
-> **Dialogue gotcha:** When the screen is paused, entity `CustomActivity` stops — so "press A to advance" input cannot live on an NPC entity. Handle it in `Screen.CustomActivity` instead.
 
 Typical pattern:
 

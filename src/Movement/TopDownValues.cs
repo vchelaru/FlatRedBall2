@@ -6,23 +6,16 @@ public class TopDownValues
     public float MaxSpeed;
 
     /// <summary>
-    /// Seconds to accelerate from rest to <see cref="MaxSpeed"/>.
-    /// Ignored when <see cref="UsesAcceleration"/> is false.
+    /// Seconds to accelerate from rest to <see cref="MaxSpeed"/>. <c>0</c> means instant
+    /// (velocity is set directly to the input-scaled <see cref="MaxSpeed"/>).
     /// </summary>
     public float AccelerationTime;
 
     /// <summary>
     /// Seconds to decelerate from <see cref="MaxSpeed"/> to rest when input is released.
-    /// Ignored when <see cref="UsesAcceleration"/> is false.
+    /// <c>0</c> means instant.
     /// </summary>
     public float DecelerationTime;
-
-    /// <summary>
-    /// When false, velocity is set directly to the input-scaled <see cref="MaxSpeed"/> each frame
-    /// (instantaneous response). When true, <see cref="AccelerationTime"/> and <see cref="DecelerationTime"/>
-    /// are used to smoothly ramp speed.
-    /// </summary>
-    public bool UsesAcceleration;
 
     /// <summary>
     /// When true, <see cref="DirectionFacing"/> is updated from the input direction each frame.

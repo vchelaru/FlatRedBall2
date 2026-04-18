@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -25,13 +26,56 @@ public class FlatRedBallService
     private GraphicsDeviceManager? _graphicsManager;
     private SpriteBatch? _spriteBatch;
     private Action? _pendingScreenChange;
+    private Type? _lastScreenType;
+    private Action<Screen>? _lastScreenConfigure;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
     private float _lastGumCanvasWidth;
     private float _lastGumCanvasHeight;
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
 
-    public FlatRedBallService() { }
+    public FlatRedBallService()
+    {
+        SourceContentRoot = DetectSourceContentRoot(AppContext.BaseDirectory);
+        OutputContentRoot = AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// Absolute path to the project's source content folder, used by <see cref="Screen.WatchContent(string, Action, string?)"/>
+    /// and <see cref="Screen.WatchContentDirectory(string, Action{string}, string?)"/> to locate
+    /// the file the user actually edits (vs the copy MSBuild dropped into the build output).
+    /// <para>
+    /// Auto-detected at construction by walking up from <see cref="AppContext.BaseDirectory"/>
+    /// looking for a <c>.csproj</c>; in a shipping build this returns <c>null</c> and the
+    /// <c>WatchContent</c>* overloads silently no-op. Override this if auto-detection picks the
+    /// wrong root (e.g. unusual project layouts, multi-project repos).
+    /// </para>
+    /// </summary>
+    public string? SourceContentRoot { get; set; }
+
+    /// <summary>
+    /// Absolute path to the build-output folder where copied content lives at runtime. Defaults
+    /// to <see cref="AppContext.BaseDirectory"/>. Override only if your build pipeline writes
+    /// content to a directory other than the executable's folder.
+    /// </summary>
+    public string OutputContentRoot { get; set; } = AppContext.BaseDirectory;
+
+    /// <summary>
+    /// Walks up from <paramref name="startDirectory"/> looking for a <c>.csproj</c>. Returns the
+    /// directory containing the first match, or <c>null</c> if none found within ~10 levels.
+    /// Public for testing.
+    /// </summary>
+    public static string? DetectSourceContentRoot(string startDirectory)
+    {
+        var dir = new DirectoryInfo(startDirectory);
+        for (int i = 0; i < 10 && dir != null; i++)
+        {
+            if (dir.GetFiles("*.csproj").Length > 0)
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return null;
+    }
 
     /// <summary>
     /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize"/>.
@@ -74,11 +118,18 @@ public class FlatRedBallService
     /// <param name="configure">
     /// Optional callback invoked on the new screen instance before <see cref="Screen.CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// <para>
+    /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
+    /// on <see cref="Screen.RestartScreen"/>; mutating a captured local after this call changes what
+    /// restart sees. Pass values directly rather than via captured locals.
+    /// </para>
     /// </param>
     public void Start<T>(Action<T>? configure = null) where T : Screen, new()
     {
         var screen = new T();
-        configure?.Invoke(screen);
+        _lastScreenType = typeof(T);
+        _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+        _lastScreenConfigure?.Invoke(screen);
         ActivateScreen(screen, applyWindowSettings: true);
     }
 
@@ -86,20 +137,56 @@ public class FlatRedBallService
     {
         _pendingScreenChange = () =>
         {
-            CurrentScreen.CustomDestroy();
-            CurrentScreen.ContentManager.UnloadAll();
-
-            // Cancel all async work that was started on the old screen.
-            // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
-            // in any awaiting code); Clear discards stale continuations from the sync context queue.
-            CurrentScreen._cts.Cancel();
-            Time.ClearTasks();
-            _syncContext.Clear();
+            TeardownCurrentScreen();
 
             var screen = new T();
-            configure?.Invoke(screen);
+            _lastScreenType = typeof(T);
+            _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+            _lastScreenConfigure?.Invoke(screen);
             ActivateScreen(screen, applyWindowSettings: false);
         };
+    }
+
+    internal void RequestScreenRestart(Action<Screen>? newConfigure, RestartMode mode)
+    {
+        _pendingScreenChange = () =>
+        {
+            HotReloadState? state = null;
+            if (mode == RestartMode.HotReload)
+            {
+                state = new HotReloadState();
+                CurrentScreen.SaveHotReloadState(state);
+            }
+
+            TeardownCurrentScreen();
+
+            // If a new configure was supplied, it REPLACES the retained one — both for this
+            // restart and for any future restart that doesn't supply its own. There is one
+            // configure slot on the engine; whoever set it last wins.
+            if (newConfigure != null)
+                _lastScreenConfigure = newConfigure;
+
+            var screen = (Screen)Activator.CreateInstance(_lastScreenType!)!;
+            _lastScreenConfigure?.Invoke(screen);
+            ActivateScreen(screen, applyWindowSettings: false);
+
+            if (state != null)
+                screen.RestoreHotReloadState(state);
+        };
+    }
+
+    private void TeardownCurrentScreen()
+    {
+        CurrentScreen.DisposeContentWatchers();
+        CurrentScreen.CustomDestroy();
+        CurrentScreen.ContentManager.UnloadAll();
+
+        // Cancel all async work that was started on the old screen.
+        // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
+        // in any awaiting code); Clear discards stale continuations from the sync context queue.
+        CurrentScreen._cts.Cancel();
+        Time.ClearTasks();
+        _syncContext.Clear();
     }
 
     private void ActivateScreen(Screen screen, bool applyWindowSettings)
@@ -364,6 +451,10 @@ public class FlatRedBallService
             _pendingScreenChange = null;
             change();
         }
+
+        // Drain any pending content reloads BEFORE entity / collision / activity passes so the
+        // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
+        CurrentScreen.TickContentWatchers(DateTime.UtcNow);
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
         Input.Update();

@@ -24,7 +24,6 @@ public class Player : Entity
         var values = new TopDownValues
         {
             MaxSpeed = 200f,
-            UsesAcceleration = false,
         };
 
         _topDown.MovementValues = values;
@@ -46,8 +45,7 @@ public class Player : Entity
 |---|---|
 | `MaxSpeed` | Maximum speed in world units/sec |
 | `AccelerationTime` | Seconds to reach `MaxSpeed` from rest. 0 = instant |
-| `DecelerationTime` | Seconds to stop from `MaxSpeed`. 0 = instant |
-| `UsesAcceleration` | If false, velocity is set directly each frame (instant response) |
+| `DecelerationTime` | Seconds to stop from `MaxSpeed`. 0 = instant. Setting either accel or decel time to a non-zero value enables the ramp — no separate flag. |
 | `UpdateDirectionFromInput` | If true (default), `DirectionFacing` follows input direction |
 | `UpdateDirectionFromVelocity` | If true and `UpdateDirectionFromInput` is false, `DirectionFacing` follows actual velocity |
 | `IsUsingCustomDeceleration` | If true, uses `CustomDecelerationValue` when entity exceeds `MaxSpeed` (e.g. after a knockback) |
@@ -59,15 +57,15 @@ public class Player : Entity
 var values = new TopDownValues
 {
     MaxSpeed = 200f,
-    UsesAcceleration = true,
     AccelerationTime = 0.2f,   // 200ms to reach full speed
     DecelerationTime = 0.1f,   // 100ms to stop
 };
 ```
 
-When `UsesAcceleration` is true, the behavior blends between `AccelerationTime` and `DecelerationTime`
+When either time is non-zero, the behavior blends between `AccelerationTime` and `DecelerationTime`
 based on the angle between the current velocity and the desired direction. Perfectly reversing direction
-uses `DecelerationTime`; pressing directly forward uses `AccelerationTime`.
+uses `DecelerationTime`; pressing directly forward uses `AccelerationTime`. Both times zero = instant
+(velocity set directly each frame).
 
 ## Direction Facing
 
@@ -141,31 +139,6 @@ var dir = Vector2.Normalize(new Vector2(_target.X - X, _target.Y - Y));
 _aiInput.X = dir.X;
 _aiInput.Y = dir.Y;
 ```
-
-## Grid-Based (Tile-Snap) Movement — Pokémon / Classic Zelda Style
-
-**Do not use `TopDownBehavior` for grid movement.** `TopDownBehavior` controls velocity, not position — the entity will stop at sub-tile coordinates. Grid-style movement requires a state machine that commits to a target tile center, locks input mid-step, and snaps on arrival.
-
-**Do not use `CollisionRelationship` for solid tile collision in grid movement.** The standard collision system is move-then-correct (post-physics). Grid movement requires check-before-commit: query the target cell first, and only move if it's clear. Using both will produce confusing double-correction.
-
-Key implementation points:
-- Use `IsKeyDown` (not `WasKeyPressed`) — holding walks continuously, one tile at a time.
-- Declare a public property on the entity and inject `_solidTiles` from the screen after `Factory.Create()`:
-
-```csharp
-// In the entity:
-public TileShapeCollection? SolidTiles { get; set; }
-
-// In the screen, after Factory.Create():
-var player = _playerFactory.Create();
-player.SolidTiles = _solidCollision;
-```
-
-- Use `SolidTiles?.GetTileAtWorld(nx, ny) == null` to check the target cell before committing the move.
-- Snap to exact position on arrival (`X = _targetX`) — never accumulate sub-pixel drift.
-- Don't use `CollisionRelationship` for NPC/entity collision during grid movement — check target coordinates directly before committing the step.
-
-<!-- If this grid-movement section exceeds ~25 lines, move it to a dedicated grid-movement/SKILL.md skill. -->
 
 ## Gotchas
 

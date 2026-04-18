@@ -75,7 +75,7 @@ Each `<AnimationChain>` is a named sequence of frames.
 | `BottomCoordinate` | Yes | — | Bottom edge of source rectangle in pixels |
 | `FlipHorizontal` | No | `false` | Mirror the frame horizontally — used for left-facing variants |
 | `RelativeY` | No | `0` | Vertical offset from entity origin in world units. For a 16x32 character with origin at the feet, use `16` (half height) to center the sprite |
-| `ShapeCollectionSave` | No | — | Per-frame collision shapes. Include with empty child lists if not using per-frame shapes |
+| `ShapeCollectionSave` | No | — | Per-frame collision shapes (not yet implemented in FRB2 — present in the XML format for forward compatibility with FRB1 files) |
 
 ### Coordinate System
 

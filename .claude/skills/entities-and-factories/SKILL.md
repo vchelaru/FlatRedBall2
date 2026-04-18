@@ -177,6 +177,10 @@ This eliminates any dependency on Factory/CustomInitialize timing. There is no n
 
 Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>`. This keeps lifecycle, collision (`IEnumerable<T>`), and `Engine.GetFactory<T>()` all working consistently.
 
+## Spawning Entities from Tiled Object Layers
+
+For designer-placed entities (coins, enemies, spawn points), use `TileMap.CreateEntities` instead of hardcoded positions. See the `levels` skill for details.
+
 ## Spawning Entities from Within Another Entity
 
 ```csharp

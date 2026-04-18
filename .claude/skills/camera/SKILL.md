@@ -43,9 +43,9 @@ wall.Y = -Camera.TargetHeight / 2f;  // bottom of screen
 
 ```csharp
 var ds = FlatRedBallService.Default.DisplaySettings;
-ds.ResolutionWidth  = 1280;          // world units visible at Zoom=1
-ds.ResolutionHeight = 720;
-ds.Zoom             = 2f;            // initial camera zoom (2 = 2px per world unit)
+ds.ResolutionWidth  = 1280;          // design world width at Zoom=1 (see "Sizing" below)
+ds.ResolutionHeight = 720;           // design world height at Zoom=1
+ds.Zoom             = 1f;            // initial camera zoom — read "Sizing" before changing
 ds.ResizeMode       = ResizeMode.StretchVisibleArea;   // or IncreaseVisibleArea
 ds.FixedAspectRatio = 16f / 9f;     // null = fill window; set to add letterbox/pillarbox bars
 ds.LetterboxColor   = Color.Black;   // bar color when FixedAspectRatio is set
@@ -55,11 +55,61 @@ ds.PreferredWindowHeight = 720;
 ds.AllowUserResizing = true;         // whether the player can drag window borders
 ```
 
-**`ResizeMode`:**
-- `StretchVisibleArea` (default): the same `ResolutionWidth × ResolutionHeight` world area is always visible, scaled to fill the window.
-- `IncreaseVisibleArea`: pixels-per-world-unit stays fixed at `DisplaySettings.Zoom`; a larger window shows more of the world.
-
 **`Zoom` initializes `Camera.Zoom`** at each screen start. After that, the camera is independent — game code can modify `Camera.Zoom` freely during gameplay.
+
+## Sizing — Resolution × Window × Zoom
+
+Three knobs decide what's on screen. Get this wrong and entities silently fall off-screen.
+
+| Knob | Units | What it controls |
+|---|---|---|
+| `ResolutionWidth/Height` | world units | Design world size at `Zoom = 1` |
+| `PreferredWindowWidth/Height` | screen pixels | Actual window size |
+| `Zoom` | multiplier | Camera zoom on top of the above |
+
+**Effective screen-pixels per world-unit and visible world width:**
+
+| ResizeMode | Pixels per world unit | Visible world width |
+|---|---|---|
+| `StretchVisibleArea` (default) | `(window / resolution) × Zoom` | `resolution / Zoom` |
+| `IncreaseVisibleArea` | `Zoom` | `window / Zoom` |
+
+**Critical footgun (StretchVisibleArea):** `Zoom` multiplies *on top of* the window-vs-resolution stretch. If you set window = 2× resolution to scale up pixel art, the stretch already doubles everything. Setting `Zoom = 2` zooms in **4×**, hiding three-quarters of your design world.
+
+### Recipes
+
+**Pixel-art game — small native resolution, large window:**
+```csharp
+ds.ResolutionWidth  = 640;           // design world
+ds.ResolutionHeight = 352;
+ds.PreferredWindowWidth  = 1280;     // window 2× resolution → automatic 2× scale
+ds.PreferredWindowHeight = 704;
+ds.Zoom = 1f;                        // ← LEAVE AT 1; the window stretch does the scaling
+ds.ResizeMode = ResizeMode.StretchVisibleArea;
+```
+Result: full 640×352 world visible, scaled crisply 2× to fill 1280×704.
+
+**Window matches resolution, Zoom for cinematic effects:**
+```csharp
+ds.ResolutionWidth  = 1280;
+ds.ResolutionHeight = 720;
+ds.PreferredWindowWidth  = 1280;
+ds.PreferredWindowHeight = 720;
+ds.Zoom = 1f;                        // shows full 1280×720 world
+// Game code can later set Camera.Zoom = 2 to zoom in on a boss, etc.
+```
+
+**Crisp pixel ratio that grows with window:**
+```csharp
+ds.ResizeMode = ResizeMode.IncreaseVisibleArea;
+ds.Zoom = 2f;                        // exactly 2 screen pixels per world unit
+// No stretching, no fuzz. Bigger window reveals more world.
+```
+
+### ResizeMode summary
+
+- `StretchVisibleArea` (default) — same `ResolutionWidth × ResolutionHeight / Zoom` world area always visible, stretched to fill window. Use for fixed-screen games where the level should never reveal more or less of itself based on window size.
+- `IncreaseVisibleArea` — pixels-per-world-unit stays fixed at `Zoom`; a larger window reveals more world. Use for variable-window games where you want crisp art and don't mind the playfield growing.
 
 ## Runtime Camera Zoom
 
@@ -157,7 +207,7 @@ public override void CustomInitialize()
 {
     _cameraFactory = new Factory<CameraControllingEntity>(this);
 
-    var mapBounds = new AxisAlignedRectangle { Width = 2560f, Height = 1440f }; // centered at origin
+    var mapBounds = new BoundsRectangle(2560f, 1440f); // centered at origin; use BoundsRectangle(x, y, w, h) for maps not centered at origin
 
     var cam = _cameraFactory.Create(); // sets cam.Camera = Screen.Camera
     cam.Target = player;               // or cam.Targets.Add(p1); cam.Targets.Add(p2);
@@ -213,19 +263,8 @@ Useful when placing Gum HUD elements relative to world objects, or for click-to-
 
 ## Gotchas
 
-- **Manual map-clamping: guard against small maps.** `Math.Clamp(x, min, max)` throws `ArgumentException` if `min > max`. This happens when the map is smaller than the viewport — `mapHalfW - halfW` goes negative. Always guard:
-  ```csharp
-  Camera.X = mapHalfW > halfW
-      ? Math.Clamp(_player.X, -mapHalfW + halfW, mapHalfW - halfW)
-      : 0f;  // map fits in viewport — center it
-  ```
-  This applies to both X and Y axes. **Use `CameraControllingEntity` (with `Map` set) to avoid writing this yourself.**
-- **Use `DisplaySettings.Zoom` for setup; use `Camera.Zoom` for dynamic zoom effects.** `TargetWidth`/`TargetHeight` (the world coordinate extents) are calculated by the engine at screen-start time using `DisplaySettings.Zoom`. If you only set `Camera.Zoom` directly at setup time (e.g. in `CustomInitialize`), `TargetWidth`/`TargetHeight` were already sized for Zoom=1 — the rendered image is zoomed but the coordinate space is not, so objects placed at the edges of the intended world fall off-screen. Set the baseline zoom in `DisplaySettings` before `Start<T>()`:
-  ```csharp
-  FlatRedBallService.Default.DisplaySettings.Zoom = 2f;
-  FlatRedBallService.Default.Start<MyScreen>();
-  ```
-  `Camera.Zoom` is the right tool for dynamic zoom during gameplay (zoom-in on a boss, zoom-out to show the full arena, etc.) — just be aware that zoom is relative to the `TargetWidth`/`TargetHeight` established at screen start.
+- **Zoom multiplies the window-vs-resolution stretch in StretchVisibleArea mode.** If your window is 2× your resolution to scale pixel art, leave `Zoom = 1` — the window stretch already scales 2×. Setting Zoom = 2 there zooms in 4× and hides three-quarters of the level. See "Sizing — Resolution × Window × Zoom" above for the full math and recipes.
+- **Use `DisplaySettings.Zoom` for setup; use `Camera.Zoom` for dynamic zoom effects.** `TargetWidth/Height` are computed at screen-start from `DisplaySettings.Zoom`. Setting `Camera.Zoom` in `CustomInitialize` zooms the rendered image but not the coordinate space, so edge-placed objects fall off-screen. Use `DisplaySettings.Zoom` (or per-screen `PreferredDisplaySettings`) for the baseline; reserve `Camera.Zoom` for runtime tweens (zoom-in on a boss, etc.).
 - **`Camera.Zoom` is reset on every screen transition.** The engine sets `Camera.Zoom = DisplaySettings.Zoom` when a new screen starts. Any direct assignment to `Camera.Zoom` is lost on screen change. Use `DisplaySettings.Zoom` (or a per-screen `PreferredDisplaySettings` override) for the baseline zoom that should apply from the moment the screen appears.
 - **Gum coordinates are independent of Camera.** Gum X/Y are screen pixels, Y-down from the top-left — they do not shift when the camera moves. Only world-space objects (entities, shapes) are affected by camera position.
 - **TargetWidth/Height ≠ window pixel size.** The camera scales world units to fill whatever window resolution MonoGame uses. A 1280×720 world still renders correctly in an 800×480 window — it just appears smaller.

@@ -43,7 +43,7 @@ public class TopDownBehaviorTests
     public void Update_NoAcceleration_FullInput_SetsVelocityToMaxSpeed()
     {
         float maxSpeed = 200f;
-        var values = new TopDownValues { MaxSpeed = maxSpeed, UsesAcceleration = false };
+        var values = new TopDownValues { MaxSpeed = maxSpeed };
         var behavior = new TopDownBehavior { MovementValues = values, MovementInput = new MockAxisInput(x: 1f, y: 0f) };
         var entity = new Entity();
 
@@ -57,7 +57,7 @@ public class TopDownBehaviorTests
     public void Update_NoAcceleration_NormalizedDiagonalInput_SetsVelocityToMaxSpeed()
     {
         float maxSpeed = 200f;
-        var values = new TopDownValues { MaxSpeed = maxSpeed, UsesAcceleration = false };
+        var values = new TopDownValues { MaxSpeed = maxSpeed };
         // (1,1) will be normalized to ~(0.707, 0.707) — total magnitude should be maxSpeed
         var behavior = new TopDownBehavior { MovementValues = values, MovementInput = new MockAxisInput(x: 1f, y: 1f) };
         var entity = new Entity();
@@ -71,7 +71,7 @@ public class TopDownBehaviorTests
     [Fact]
     public void Update_NoInput_ZeroesVelocity()
     {
-        var values = new TopDownValues { MaxSpeed = 200f, UsesAcceleration = false };
+        var values = new TopDownValues { MaxSpeed = 200f };
         var behavior = new TopDownBehavior { MovementValues = values, MovementInput = new MockAxisInput(x: 0f, y: 0f) };
         var entity = new Entity { VelocityX = 100f, VelocityY = 50f };
 
@@ -89,7 +89,6 @@ public class TopDownBehaviorTests
         var values = new TopDownValues
         {
             MaxSpeed = maxSpeed,
-            UsesAcceleration = true,
             AccelerationTime = 1f,
             DecelerationTime = 1f,
         };
@@ -105,7 +104,7 @@ public class TopDownBehaviorTests
     public void Update_InputDisabled_DoesNotApplyInput()
     {
         float maxSpeed = 200f;
-        var values = new TopDownValues { MaxSpeed = maxSpeed, UsesAcceleration = false };
+        var values = new TopDownValues { MaxSpeed = maxSpeed };
         var behavior = new TopDownBehavior
         {
             MovementValues = values,
@@ -124,7 +123,7 @@ public class TopDownBehaviorTests
     {
         float maxSpeed = 200f;
         float multiplier = 0.5f;
-        var values = new TopDownValues { MaxSpeed = maxSpeed, UsesAcceleration = false };
+        var values = new TopDownValues { MaxSpeed = maxSpeed };
         var behavior = new TopDownBehavior
         {
             MovementValues = values,

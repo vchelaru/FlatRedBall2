@@ -5,6 +5,8 @@ description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, me
 
 # Gum Integration in FlatRedBall2
 
+> **See `content-boundary` skill first.** UI composition is a human task — AI should scaffold named controls in a flat list and let the human compose the layout in the Gum Tool. Do not try to hand-author a polished visual hierarchy in code.
+
 Gum is FlatRedBall2's UI system, backed by the `Gum.MonoGame` NuGet package. It is **automatically initialized** by `FlatRedBallService.Initialize` — no setup required.
 
 ## Three Gum Usage Modes
@@ -51,23 +53,10 @@ using MonoGameGum.GueDeriving;
 var fill = new ColoredRectangleRuntime { Width = 100, Height = 12, Color = Color.Red };
 fill.Anchor(Anchor.TopLeft);
 fill.X = 20; fill.Y = 20;
-Add(fill);  // Add(GraphicalUiElement) — works directly, no Panel wrapper needed
+Add(fill);
 
 // Shrink it as health decreases:
 fill.Width = _health / _maxHealth * 100f;
-
-// Color has R/G/B separate from Alpha (both int 0–255):
-fill.Red = 220; fill.Green = 50; fill.Blue = 50; fill.Alpha = 255;
-
-// Full-screen overlay: use Dock.Fill
-fill.Dock(Dock.Fill);
-```
-
-**Set text color on a Label** — `Label` wraps a text visual; access it via `TextComponent`:
-```csharp
-label.TextComponent.SetProperty("Red", 220);
-label.TextComponent.SetProperty("Green", 50);
-label.TextComponent.SetProperty("Blue", 50);
 ```
 
 **Rule: use Forms controls for interactive elements. Use visual types directly for non-interactive HUD (health indicators, icons, status bars).**
@@ -169,18 +158,6 @@ Add(scoreLabel, layer: hudLayer);
 **Screen-space (default)**: `screen.Add(element)` places elements in Gum's native coordinate system (pixels, Y-down, origin top-left). Use for HUDs, menus.
 
 **World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed.
-
-## HUD and Modal Input Boundary
-
-Gum UI draws over world entities but does **not** automatically block world-space input. When a modal or pause menu is visible, world-layer input in `Screen.CustomActivity` still fires. Guard against this explicitly:
-
-```csharp
-public override void CustomActivity(FrameTime time)
-{
-    if (_pauseOverlay.IsVisible) return;  // block world input while modal is up
-    // ... movement, tool use, etc.
-}
-```
 
 ## Loading Gum Screens from a .gumx Project File
 
@@ -330,8 +307,6 @@ Add(menu);
 ```
 
 For horizontal: `new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 }`.
-
-For typewriter-style text advancement and other character-rate accumulators, see the **rate accumulator pattern** in the timing skill — it covers `while`-loop accumulation and remainder-subtraction to prevent dropped characters across frame-rate spikes.
 
 ## Reference Files
 

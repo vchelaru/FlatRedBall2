@@ -88,20 +88,27 @@ skill-name/
 Skills use a three-level loading system:
 1. **Metadata** (name + description) - Always in context (~100 words)
 2. **SKILL.md body** - In context whenever skill triggers (<500 lines ideal)
-3. **Bundled resources** - As needed (unlimited, scripts can execute without loading)
+3. **Reference files** (`references/`) - Loaded only when relevant (unlimited size)
 
 These word counts are approximate and you can feel free to go longer if needed.
 
-**Key patterns:**
-- Keep SKILL.md under 500 lines; if you're approaching this limit, add an additional layer of hierarchy along with clear pointers about where the model using the skill should go next to follow up.
-- Reference files clearly from SKILL.md with guidance on when to read them
-- **Keep references one level deep from SKILL.md.** All reference files should link directly from SKILL.md — not from other reference files. Claude may only partially read files that are referenced from referenced files (e.g., using `head -100` to preview), resulting in incomplete information. Bad: `SKILL.md → advanced.md → details.md`. Good: `SKILL.md → advanced.md` and `SKILL.md → details.md`.
-- For large reference files (>300 lines), include a table of contents at the top so Claude can see the full scope of available information even when previewing
+**The cost argument:** Every line in SKILL.md is paid for on *every* invocation of the skill, whether or not it's relevant to the current task. A section about Aseprite loading is wasted context when someone asks about .achx XML authoring. A section about XML authoring is wasted context when someone asks about Aseprite. Moving each to its own reference file means only the relevant content is loaded. This is why SKILL.md should trend toward being a **router** — it tells the agent what exists and when to read each piece, rather than inlining all the content itself.
 
-**Domain organization**: When a skill supports multiple domains/frameworks, organize by variant:
+**How skills should evolve over time:**
+
+A new skill with one concern can put everything in SKILL.md. As the skill grows to cover multiple topics, workflows, or source formats, split each into a reference file under `references/`. SKILL.md keeps a short summary of each topic (1-3 lines) with a clear pointer to the reference and guidance on *when* to read it. The end state for a mature skill is that SKILL.md reads like a table of contents with just enough context for the agent to route to the right reference.
+
+Don't split prematurely — a 50-line SKILL.md doesn't need references. But when a section serves only a subset of the skill's invocations, that's the signal to extract it.
+
+**Key patterns:**
+- Keep SKILL.md under 500 lines; if you're approaching this limit, extract sections into `references/` with clear pointers about when to read each one.
+- **Keep references one level deep from SKILL.md.** All reference files should link directly from SKILL.md — not from other reference files. Claude may only partially read files that are referenced from referenced files (e.g., using `head -100` to preview), resulting in incomplete information. Bad: `SKILL.md → advanced.md → details.md`. Good: `SKILL.md → advanced.md` and `SKILL.md → details.md`.
+- For large reference files (>300 lines), include a table of contents at the top so Claude can see the full scope of available information even when previewing.
+
+**Domain organization**: When a skill supports multiple topics or domains, organize by variant:
 ```
 cloud-deploy/
-├── SKILL.md (workflow + selection)
+├── SKILL.md (routing + shared concepts)
 └── references/
     ├── aws.md
     ├── gcp.md

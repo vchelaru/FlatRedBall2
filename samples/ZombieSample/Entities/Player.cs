@@ -37,7 +37,6 @@ public class Player : Entity
         var values = new TopDownValues
         {
             MaxSpeed        = 250f,
-            UsesAcceleration = false,
         };
         _topDown.MovementValues = values;
 

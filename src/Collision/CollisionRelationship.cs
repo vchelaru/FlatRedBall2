@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using FlatRedBall2;
+using FlatRedBall2.Movement;
 
 namespace FlatRedBall2.Collision;
 
@@ -28,6 +29,70 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     private Func<A, ICollidable>? _firstShapeSelector;
     private Func<B, ICollidable>? _secondShapeSelector;
+
+    /// <summary>
+    /// Controls how this relationship resolves overlap with polygon tiles when one side is a
+    /// <see cref="TileShapeCollection"/>. Default <see cref="SlopeCollisionMode.Standard"/> uses
+    /// SAT (correct for top-down and non-player-vs-level pairs like a ball vs. tiles). Set to
+    /// <see cref="SlopeCollisionMode.PlatformerFloor"/> for platformer player-vs-level to get
+    /// heightmap-based vertical separation on floor slopes. Ignored when neither side is a
+    /// <see cref="TileShapeCollection"/>.
+    /// </summary>
+    /// <remarks>
+    /// Lives on the relationship — not the collection — so the same tile collection can be used
+    /// with different semantics per relationship (e.g., player = PlatformerFloor, ball = Standard).
+    /// Also required when <see cref="OneWayDirection"/> is set on a <see cref="TileShapeCollection"/>
+    /// containing polygon (sloped) tiles — without PlatformerFloor, sloped cloud tiles fall back
+    /// to SAT and the one-way gate won't compute the slope-aware LastPosition adjustment needed
+    /// for uphill walking.
+    /// </remarks>
+    public SlopeCollisionMode SlopeMode { get; set; } = SlopeCollisionMode.Standard;
+
+    /// <summary>
+    /// When set to a value other than <see cref="OneWayDirection.None"/>, this relationship only
+    /// resolves overlap when the computed separation pushes the entity in the configured
+    /// direction — e.g. <see cref="OneWayDirection.Up"/> creates a jump-through / cloud platform
+    /// that blocks downward motion only. The <see cref="CollisionOccurred"/> event does not fire
+    /// on skipped pairs. For <see cref="OneWayDirection.Up"/> three gates must pass:
+    /// separation has a positive Y component (pushing upward), the entity is moving downward or
+    /// stationary (<c>VelocityY &lt;= 0</c>), and the entity's <c>LastPosition</c> was at or
+    /// above where it will end up post-separation (i.e. it was cleanly on top last frame, not
+    /// peaking inside the tile from below). The separation's X component is zeroed so an entity
+    /// clipping a platform's side is lifted up rather than shoved sideways. On sloped tiles the
+    /// LastPosition gate is slope-aware — the surface-Y delta between last-frame X and current X
+    /// is folded in so uphill walking passes. Player drop-through (Down+Jump, or airborne
+    /// Down-held) only bypasses this relationship when <see cref="AllowDropThrough"/> is set to
+    /// <c>true</c> — see that property.
+    /// </summary>
+    /// <remarks>
+    /// For sloped cloud platforms (polygon tiles in a <see cref="TileShapeCollection"/>) also set
+    /// <see cref="SlopeMode"/> to <see cref="SlopeCollisionMode.PlatformerFloor"/> — otherwise
+    /// SAT is used, the surface-Y delta isn't computed, and uphill walking will fall through.
+    /// Only <see cref="OneWayDirection.None"/> and <see cref="OneWayDirection.Up"/> are
+    /// implemented. Setting Down/Left/Right is allowed but will throw
+    /// <see cref="NotImplementedException"/> on the next collision pass.
+    /// </remarks>
+    public OneWayDirection OneWayDirection { get; set; } = OneWayDirection.None;
+
+    /// <summary>
+    /// When <c>true</c>, this relationship is bypassed entirely on any pair where an
+    /// <see cref="FlatRedBall2.Movement.IPlatformerEntity"/> side reports
+    /// <see cref="FlatRedBall2.Movement.PlatformerBehavior.IsSuppressingOneWayCollision"/> as
+    /// true — i.e. the player is dropping through with Down+Jump or holding Down while airborne.
+    /// Use for cloud / jump-through platforms (Mario clouds, Sonic-style jump-through floors)
+    /// where the player should be able to intentionally fall through.
+    /// </summary>
+    /// <remarks>
+    /// Leave <c>false</c> (default) for hard one-way barriers such as Yoshi's Island ratchet
+    /// doors — those should always block in the configured direction regardless of player input.
+    /// Independent of <see cref="OneWayDirection"/>: in practice this only has an effect when
+    /// <see cref="OneWayDirection"/> is non-<see cref="OneWayDirection.None"/>, but the two are
+    /// deliberately orthogonal so future use cases can combine them freely. When
+    /// <see cref="SlopeMode"/> is <see cref="SlopeCollisionMode.PlatformerFloor"/>, an active
+    /// drop-through also skips ground-snap for this relationship — otherwise the snap raycast
+    /// would yank the player back onto the cloud the frame after drop-through begins.
+    /// </remarks>
+    public bool AllowDropThrough { get; set; } = false;
 
     /// <summary>
     /// When <c>true</c> and both lists are the same reference (self-collision), fires
@@ -195,6 +260,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (!CheckCollision(effectiveA, effectiveB)) continue;
 
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
@@ -208,10 +274,20 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var effectiveA = GetEffectiveA(a);
         var effectiveB = GetEffectiveB(b);
         DeepCollisionCount++;
-        if (!CheckCollision(effectiveA, effectiveB)) return;
+        if (!CheckCollision(effectiveA, effectiveB))
+        {
+            TryOfferGroundSnap(a, b);
+            return;
+        }
         var sep = ComputeSeparationVector(effectiveA, effectiveB);
+        if (!TryApplyOneWayGate(a, b, ref sep))
+        {
+            TryOfferGroundSnap(a, b);
+            return;
+        }
         ApplyResponse(a, b, sep);
         CollisionOccurred?.Invoke(a, b);
+        TryOfferGroundSnap(a, b);
     }
 
     // Both lists are already sorted by their respective factories. Uses indexed access where available.
@@ -249,10 +325,20 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (bLeft > aRight) break; // too far; all remaining are also too far
 
                 DeepCollisionCount++;
-                if (!CheckCollision(effectiveA, effectiveB)) continue;
+                if (!CheckCollision(effectiveA, effectiveB))
+                {
+                    TryOfferGroundSnap(a, b);
+                    continue;
+                }
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                if (!TryApplyOneWayGate(a, b, ref sep))
+                {
+                    TryOfferGroundSnap(a, b);
+                    continue;
+                }
                 ApplyResponse(a, b, sep);
                 CollisionOccurred?.Invoke(a, b);
+                TryOfferGroundSnap(a, b);
             }
         }
     }
@@ -281,6 +367,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (!CheckCollision(effectiveA, effectiveB)) continue;
 
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
@@ -289,18 +376,48 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
     }
 
+    // Offers this relationship's TileShapeCollection to any IPlatformerEntity side as a
+    // ground-snap candidate. Only fires when SlopeMode == PlatformerFloor. No-op otherwise.
+    private void TryOfferGroundSnap(A a, B b)
+    {
+        if (SlopeMode != SlopeCollisionMode.PlatformerFloor) return;
+
+        // Cloud / jump-through platforms: if the player is actively dropping through, suppress
+        // snap too — otherwise ConsiderSnappingTo would raycast down and yank the player back
+        // onto the cloud the frame after drop-through begins. Flat clouds don't hit this (they
+        // use SlopeMode.Standard), but sloped clouds require PlatformerFloor.
+        if (AllowDropThrough && OneWayDirection != OneWayDirection.None)
+        {
+            if (IsSuppressingDropThrough(a) || IsSuppressingDropThrough(b)) return;
+        }
+
+        if (a is IPlatformerEntity pa && pa is Entity ea && b is TileShapeCollection tscB)
+        {
+            pa.Platformer.ConsiderSnappingTo(ea, tscB);
+            pa.Platformer.ContributeSlopeProbe(ea, tscB);
+        }
+        else if (b is IPlatformerEntity pb && pb is Entity eb && a is TileShapeCollection tscA)
+        {
+            pb.Platformer.ConsiderSnappingTo(eb, tscA);
+            pb.Platformer.ContributeSlopeProbe(eb, tscA);
+        }
+    }
+
+    private static bool IsSuppressingDropThrough(object side) =>
+        side is Movement.IPlatformerEntity p && p.Platformer.IsSuppressingOneWayCollision;
+
     private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;
     private ICollidable GetEffectiveB(B b) => _secondShapeSelector != null ? _secondShapeSelector(b) : b;
 
     // Checks collision using CollisionDispatcher.CollidesWith so Line intersections are handled.
     // Iterates leaf shape pairs so any combination of leaf shapes, entities, and
     // TileShapeCollections is dispatched correctly — including selected-shape vs entity cases.
-    private static bool CheckCollision(ICollidable a, ICollidable b)
+    private bool CheckCollision(ICollidable a, ICollidable b)
     {
         if (b is TileShapeCollection tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
-                if (tsc.GetSeparationFor(leafA) != Vector2.Zero)
+                if (tsc.GetSeparationFor(leafA, SlopeMode) != Vector2.Zero)
                     return true;
             return false;
         }
@@ -314,13 +431,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
     // physics separation is meaningful (e.g., Lines are infinitely thin).
-    private static Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
+    private Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
     {
         if (b is TileShapeCollection tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
             {
-                var sep = tsc.GetSeparationFor(leafA);
+                var sep = tsc.GetSeparationFor(leafA, SlopeMode);
                 if (sep != Vector2.Zero) return sep;
             }
             return Vector2.Zero;
@@ -333,6 +450,61 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (sep != Vector2.Zero) return sep;
             }
         return Vector2.Zero;
+    }
+
+    // Applies the one-way gate: returns false when this pair should be skipped entirely
+    // (no separation, no event). When returning true, may rewrite 'sep' (e.g. zero X for Up)
+    // before the caller applies physics. Throws on unimplemented directions.
+    private bool TryApplyOneWayGate(A a, B b, ref Vector2 sep)
+    {
+        if (OneWayDirection == OneWayDirection.None) return true;
+
+        // Drop-through suppression only applies when this relationship opts in — hard one-way
+        // barriers (AllowDropThrough = false) ignore the player's drop-through state.
+        if (AllowDropThrough && (IsSuppressingDropThrough(a) || IsSuppressingDropThrough(b)))
+            return false;
+
+        switch (OneWayDirection)
+        {
+            case OneWayDirection.Up:
+                if (sep.Y <= 0f) return false;
+                if (a is Entity ea)
+                {
+                    // Velocity gate: an upward-moving entity overlapping deeply enough that SAT
+                    // picks the upward exit would otherwise be popped onto the top — wrong for
+                    // jump-through platforms. Require the entity to be moving downward (or stationary).
+                    if (ea.VelocityY > 0f) return false;
+                    // Positional gate: the entity must have been at or above the post-separation
+                    // Y last frame — i.e. it was cleanly on top of the tile and physics moved it
+                    // into a small overlap. An entity that jumped up into the tile from below and
+                    // is now starting to fall would otherwise pass the velocity gate but get
+                    // popped onto the top despite never having reached it.
+                    //
+                    // Slope-aware: on a cloud slope, the surface Y at LastPosition.X differs from
+                    // the surface at the current X. Fold that delta in so uphill walking on a
+                    // sloped one-way tile isn't rejected every frame. When the B side is a
+                    // TileShapeCollection we can query it; otherwise fall back to the flat check.
+                    const float epsilon = 0.001f;
+                    float surfaceDelta = 0f;
+                    if (b is TileShapeCollection tscGate)
+                    {
+                        float? lastSurface = tscGate.GetHeightmapSurfaceYAt(ea.LastPosition.X);
+                        float? thisSurface = tscGate.GetHeightmapSurfaceYAt(ea.Position.X);
+                        if (lastSurface.HasValue && thisSurface.HasValue)
+                            surfaceDelta = lastSurface.Value - thisSurface.Value;
+                    }
+                    if (ea.LastPosition.Y < ea.Position.Y + sep.Y + surfaceDelta - epsilon) return false;
+                }
+                sep = new Vector2(0f, sep.Y);
+                return true;
+            case OneWayDirection.Down:
+            case OneWayDirection.Left:
+            case OneWayDirection.Right:
+                throw new NotImplementedException(
+                    $"OneWayDirection.{OneWayDirection} is not yet implemented — see design/TODOS.md");
+            default:
+                return true;
+        }
     }
 
     private void ApplyResponse(A a, B b, Vector2 sep)

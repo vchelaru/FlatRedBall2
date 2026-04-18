@@ -48,7 +48,6 @@ public class ShipEntity : Entity
         _topDown.MovementValues = new TopDownValues
         {
             MaxSpeed = 200f,
-            UsesAcceleration = true,
             AccelerationTime = 0.1f,
             DecelerationTime = 0.08f,
         };

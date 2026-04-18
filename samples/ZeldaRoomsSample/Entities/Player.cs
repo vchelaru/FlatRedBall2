@@ -50,7 +50,6 @@ public class Player : Entity
         _topDown.MovementValues = new TopDownValues
         {
             MaxSpeed = 180f,
-            UsesAcceleration = false,
         };
         _topDown.MovementInput = new KeyboardInput2D(kb, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
             .Or(new KeyboardInput2D(kb, Keys.A, Keys.D, Keys.W, Keys.S));

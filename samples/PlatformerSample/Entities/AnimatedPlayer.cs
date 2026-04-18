@@ -41,7 +41,7 @@ public class AnimatedPlayer : Entity
 
         var animations = AnimationChainListSave
             .FromFile("Content/PlatformerAnimations.achx")
-            .ToAnimationChainList(Engine.GraphicsDevice);
+            .ToAnimationChainList(Engine.Content);
 
         _sprite.AnimationChains = animations;
         _sprite.IsLooping = true;
@@ -57,7 +57,6 @@ public class AnimatedPlayer : Entity
             JumpVelocity = 500f,
             JumpApplyLength = TimeSpan.FromSeconds(0.68),
             JumpApplyByButtonHold = true,
-            UsesAcceleration = true,
         };
 
         _platformer.AirMovement = new PlatformerValues
@@ -70,7 +69,6 @@ public class AnimatedPlayer : Entity
             JumpVelocity = 500f,
             JumpApplyLength = TimeSpan.FromSeconds(0.18),
             JumpApplyByButtonHold = true,
-            UsesAcceleration = true,
         };
 
         var keyboard = Engine.Input.Keyboard;

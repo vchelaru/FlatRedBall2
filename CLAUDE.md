@@ -27,7 +27,6 @@ Invoke these with the Skill tool when working on specific topics:
 - `collision-relationships` — AddCollisionRelationship, move/bounce semantics
 - `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
 - `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds
-- `isometric-rendering` — Isometric/trimetric projection strategy, depth sorting, input picking boundaries
 - `shapes` — AxisAlignedRectangle, Circle, Polygon, visual properties
 - `input-system` — Keyboard, gamepad, input binding
 - `camera` — Camera setup and transforms
@@ -35,7 +34,9 @@ Invoke these with the Skill tool when working on specific topics:
 - `gumcli` — **Ask first** before any Gum UI code: use gumcli tool or code-only? Covers gumcli new, .csproj content includes, codegen
 - `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
 - `content-and-assets` — Asset loading
+- `content-hot-reload` — `Screen.WatchContent`, `ContentWatcher`, debouncing, in-place vs screen-restart decision
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
+- `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
 - `levels` — Level data layout and progression
 - `tmx` — TMX map file creation/editing: base template, StandardTileset tile IDs, layer conventions, CSV data
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
@@ -113,8 +114,7 @@ Skill files are loaded into a limited context window — every line costs budget
 ## Agent Workflow
 
 **Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:
-- **Random / autonomous game creation** (e.g., "make a random game", "use the orchestrator") → `minigame-orchestrator` agent. It picks a game, presents a short pitch for approval, then designs and implements autonomously.
-- **User has a specific game vision** (e.g., "I want to make a game like X", "let's build a platformer") → `game-designer` agent (then product-manager, then coder)
+- **Game creation** (random or specific vision) → invoke the `orchestrator` skill. It handles both random game selection and user-provided designs, then delegates implementation to a coder sub-agent. Only skip the orchestrator if the user explicitly asks to (e.g., wants to use the game-designer agent for a longer design conversation instead).
 - **Engine feature or bug** → identify which subsystem (collision, rendering, input, etc.) to know which skill files are relevant
 - **Docs or refactor** → docs-writer or refactoring-specialist agent
 
@@ -125,7 +125,6 @@ This scoping step keeps context lean — only load the skills and files that are
 For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
 
 Available agents:
-- **minigame-orchestrator** — Autonomous random game creation. Picks a game, presents a short pitch for user approval, then designs and implements it without further interaction. Use when the user says "make a random game", "use the orchestrator", or similar. **Must be spawned with `subagent_type: "general-purpose"`** so it has access to the Agent tool for delegating implementation to a coder sub-agent. Pass the contents of `.claude/agents/minigame-orchestrator.md` as the prompt.
 - **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.
 - **coder** — Writing or modifying code and unit tests for new features or bugs
 - **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
@@ -133,13 +132,10 @@ Available agents:
 - **docs-writer** — Writing or updating documentation
 - **product-manager** — Breaking down tasks and tracking progress
 - **security-auditor** — Security reviews and vulnerability assessments
-- **edc** — Engine Debate Committee. Facilitates a structured three-agent debate on where a proposed documentation or API change belongs (skill, XML doc, API change, or project skill), then calls a vote. Invoke when the user types `/edc` followed by a proposed change, or when asked "where should this live?" or "should this be a skill or XML docs?". Sub-agents: `edc-engine-expert`, `edc-skill-defender`, `edc-reality-tester`.
 
 Select the agent that best matches the task at hand. For tasks that span multiple concerns (e.g., implement a feature and write tests), invoke the relevant agents in sequence.
 
-**Game creation rule**: If the user has a specific game vision — even if they give a reference title or genre — invoke the **game-designer** agent before the product-manager or coder. If the user wants a random/autonomous game, invoke the **minigame-orchestrator** instead.
-
-**EDC rule**: When the user types `edc` (as plain text — `/edc` is intercepted by the CLI as an unknown slash command), or asks "where should [X] live?", invoke the **edc** agent. Do not decide the question yourself — let the committee debate it. To run EDC on unstaged changes, type: `edc the current unstaged changes`.
+**Game creation rule**: For any game creation task — random or specific vision — invoke the **orchestrator** skill unless the user explicitly opts out. The orchestrator accepts user-provided designs (Step 1A) as well as picking random games. Only use the **game-designer** agent instead if the user specifically asks for a longer design conversation.
 
 ## Code Style
 

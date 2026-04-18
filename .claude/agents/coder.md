@@ -36,9 +36,17 @@ When starting a new game project, decide the **content mode** for each of these 
 
 For shapes-only games (no sprite art), animations are not needed at all — neither code-only nor file-based.
 
-# After editing
+# Test-Driven Development (Required)
 
-Write unit tests for new features and bug fixes unless the change is trivial or untestable. Follow the test guidelines in `.claude/code-style.md`. The user will build and run tests themselves — do not run them via Bash.
+**For new features: you must TDD.** Write a failing test that captures the desired behavior, then implement to make it pass.
+
+**For bug fixes: TDD is CRITICAL.** Always reproduce the bug with a failing test *before* touching production code. Without a failing test, you are fixing based on speculation — and you will end up playing whack-a-mole with bugs as "fixes" address symptoms instead of the real defect. A green test that would have been red before your change is the only proof that the bug existed and is now gone.
+
+Exceptions are rare: genuinely untestable changes (e.g., purely cosmetic renames, doc-only edits) or trivial one-liners where a test would cost more than it's worth. When in doubt, write the test.
+
+Follow the test guidelines in `.claude/code-style.md`. **Run tests via Bash yourself** — especially when TDDing. Write the failing test, run it to confirm it actually fails (and fails for the right reason), implement, re-run, confirm green. Don't wait for the user; reasoning about expected failures is not a substitute for actually seeing the failure message.
+
+# After editing
 
 Output: changed files + brief explanation of why. Focus on correctness and brevity over cleverness.
 

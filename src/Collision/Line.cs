@@ -106,12 +106,17 @@ public class Line : IAttachable, IRenderable, ICollidable
     public bool CollideAgainst(Polygon other)
         => other.Raycast(AbsolutePoint1, AbsolutePoint2, out _, out _);
 
-    // Lines are infinitely thin — no meaningful MTV exists.
-    public Vector2 GetSeparationVector(ICollidable other) => Vector2.Zero;
+    public Vector2 GetSeparationVector(ICollidable other)
+        => CollisionDispatcher.GetSeparationVector(this, other);
 
-    // Nothing to separate; lines carry no volume.
-    public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }
-    public void ApplySeparationOffset(Vector2 offset) { }
+    public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
+    {
+        var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
+        X += offset.X;
+        Y += offset.Y;
+    }
+
+    public void ApplySeparationOffset(Vector2 offset) { X += offset.X; Y += offset.Y; }
 
     // Velocity bounce is handled by Entity.AdjustVelocityFrom on the owning entity; no-op here.
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }

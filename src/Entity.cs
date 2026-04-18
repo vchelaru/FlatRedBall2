@@ -101,6 +101,11 @@ public class Entity : ICollidable, IAttachable
     // Records cumulative separation applied this frame; reset at the start of each PhysicsUpdate.
     public Vector2 LastReposition;
 
+    /// <summary>Position at the start of the current frame, captured by <c>PhysicsUpdate</c> before
+    /// movement is applied. Used by one-way collision to verify the entity was actually above
+    /// the platform before separating it onto the top.</summary>
+    public Vector2 LastPosition;
+
     // Hierarchy
     public Entity? Parent { get; set; }
     public IReadOnlyList<IAttachable> Children => _children;
@@ -261,6 +266,7 @@ public class Entity : ICollidable, IAttachable
         if (Parent != null) return; // only root entities drive physics; children move with parent
 
         LastReposition = Vector2.Zero;
+        LastPosition = new Vector2(Position.X, Position.Y);
         float dt = frameTime.DeltaSeconds;
         float halfDt2 = 0.5f * dt * dt;
 

@@ -91,10 +91,18 @@ public class DisplaySettings
 
     /// <summary>
     /// Initial camera zoom. Copied to <see cref="Camera.Zoom"/> at the start of each screen.
-    /// At 1.0, one world unit equals one pixel (at the reference window size).
-    /// At 2.0, one world unit equals two pixels — world objects appear twice as large.
-    /// For <see cref="ResizeMode.IncreaseVisibleArea"/>, this also fixes the pixels-per-world-unit
-    /// ratio so that resizing the window reveals more world rather than stretching.
+    /// Zoom &gt; 1 zooms in (fewer world units visible); Zoom &lt; 1 zooms out.
+    /// <para>
+    /// In <see cref="ResizeMode.StretchVisibleArea"/>, Zoom multiplies <em>on top of</em> the
+    /// window-vs-resolution stretch. Window = 2× resolution already gives 2 pixels per world unit
+    /// at Zoom = 1; setting Zoom = 2 in that case zooms in 4×, not 2×, and clips three-quarters
+    /// of the design world. For pixel-art games that scale a small native resolution to a larger
+    /// window, leave Zoom = 1 and let the window size do the scaling.
+    /// </para>
+    /// <para>
+    /// In <see cref="ResizeMode.IncreaseVisibleArea"/>, Zoom directly equals screen pixels per
+    /// world unit, independent of window size.
+    /// </para>
     /// </summary>
     public float Zoom { get; set; } = 1f;
 

@@ -53,12 +53,15 @@ public class AnimationChainListSave
 
     /// <summary>
     /// Converts this save object to a runtime <see cref="AnimationChainList"/>, loading
-    /// all referenced textures via MonoGame's content pipeline.
+    /// all referenced textures through <see cref="ContentManagerService.Load{T}"/>.
+    /// Texture paths are passed as-is: if the frame's <c>TextureName</c> includes an
+    /// extension (e.g. <c>"Player.png"</c>), it loads directly from disk and participates
+    /// in PNG hot-reload via <see cref="ContentManagerService.TryReload"/>; if there is
+    /// no extension, it goes through MonoGame's compiled xnb pipeline (not hot-reloadable).
     /// </summary>
     /// <remarks>
     /// Texture names are resolved relative to the .achx file location when
-    /// <see cref="FileRelativeTextures"/> is <c>true</c>. The file extension is stripped
-    /// before loading so the path matches MonoGame's content pipeline convention.
+    /// <see cref="FileRelativeTextures"/> is <c>true</c>.
     /// </remarks>
     public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentManagerService contentManager)
     {
@@ -72,45 +75,7 @@ public class AnimationChainListSave
                 ? Path.Combine(achxDir, frameSave.TextureName)
                 : frameSave.TextureName;
 
-            // Strip extension for MonoGame content pipeline
-            string contentPath = Path.ChangeExtension(texPath, null).Replace('\\', '/');
-            return contentManager.Load<Texture2D>(contentPath);
-        });
-    }
-
-    /// <summary>
-    /// Converts this save object to a runtime <see cref="AnimationChainList"/>, loading
-    /// textures directly from disk using <see cref="Texture2D.FromFile"/>.
-    /// Use this when textures are deployed as raw files rather than compiled through the
-    /// MonoGame content pipeline.
-    /// </summary>
-    /// <remarks>
-    /// Texture paths are resolved relative to the .achx file when
-    /// <see cref="FileRelativeTextures"/> is <c>true</c> (the default). Pass the absolute
-    /// or working-directory-relative path to the .achx via <see cref="FromFile"/> so that
-    /// <see cref="FileName"/> is set correctly before calling this method.
-    /// </remarks>
-    public AnimationChainList ToAnimationChainList(GraphicsDevice graphicsDevice)
-    {
-        string achxDir = string.IsNullOrEmpty(FileName) ? "" : Path.GetDirectoryName(FileName) ?? "";
-
-        // Cache loaded textures so frames that share the same file get the same instance.
-        var textureCache = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
-
-        return BuildList(frameSave =>
-        {
-            if (string.IsNullOrEmpty(frameSave.TextureName)) return null;
-
-            string texPath = FileRelativeTextures && !string.IsNullOrEmpty(achxDir)
-                ? Path.GetFullPath(Path.Combine(achxDir, frameSave.TextureName))
-                : Path.GetFullPath(frameSave.TextureName);
-
-            if (!textureCache.TryGetValue(texPath, out var tex))
-            {
-                tex = Texture2D.FromFile(graphicsDevice, texPath);
-                textureCache[texPath] = tex;
-            }
-            return tex;
+            return contentManager.Load<Texture2D>(texPath.Replace('\\', '/'));
         });
     }
 
