@@ -7,8 +7,11 @@ public class PlatformerValues
     /// <summary>
     /// Sets <see cref="JumpVelocity"/>, <see cref="JumpApplyLength"/>, and <see cref="JumpApplyByButtonHold"/>
     /// so that a tap produces a jump of <paramref name="minHeight"/> world units and a full hold
-    /// reaches <paramref name="maxHeight"/> world units. <see cref="Gravity"/> must be set before calling
-    /// this method, and changing it afterward will invalidate the computed jump values.
+    /// reaches <paramref name="maxHeight"/> world units. Uses this instance's <see cref="Gravity"/>
+    /// as the trajectory gravity — appropriate for an airborne-origin jump (double-jump) or any
+    /// slot where the jump arc runs under the same gravity as this slot. For a grounded jump that
+    /// immediately transitions to airborne physics with a different gravity, use the overload
+    /// taking an explicit <c>jumpGravity</c>.
     /// When <paramref name="maxHeight"/> is null or equal to <paramref name="minHeight"/>,
     /// the jump is fixed-height (button hold has no effect).
     /// </summary>
@@ -19,12 +22,30 @@ public class PlatformerValues
     {
         if (Gravity <= 0f)
             throw new InvalidOperationException("Gravity must be positive before calling SetJumpHeights.");
+        SetJumpHeights(minHeight, maxHeight, Gravity);
+    }
+
+    /// <summary>
+    /// Overload that takes the gravity governing the jump trajectory explicitly. Use when the
+    /// slot this <see cref="PlatformerValues"/> belongs to (e.g. a ground slot) has a different
+    /// <see cref="Gravity"/> than the airborne slot the entity transitions into the instant it
+    /// leaves the ground — the trajectory runs under the airborne gravity, so heights must be
+    /// derived from that value. <see cref="PlatformerConfigExtensions.ApplyTo"/> wires this up
+    /// automatically for JSON-authored configs.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="minHeight"/> is not positive,
+    /// <paramref name="maxHeight"/> is less than <paramref name="minHeight"/>, or
+    /// <paramref name="jumpGravity"/> is not positive.</exception>
+    public void SetJumpHeights(float minHeight, float? maxHeight, float jumpGravity)
+    {
+        if (jumpGravity <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(jumpGravity), "jumpGravity must be positive.");
         if (minHeight <= 0f)
             throw new ArgumentOutOfRangeException(nameof(minHeight), "minHeight must be positive.");
         if (maxHeight.HasValue && maxHeight.Value < minHeight)
             throw new ArgumentOutOfRangeException(nameof(maxHeight), "maxHeight must be >= minHeight.");
 
-        JumpVelocity = MathF.Sqrt(2f * Gravity * minHeight);
+        JumpVelocity = MathF.Sqrt(2f * jumpGravity * minHeight);
 
         if (maxHeight.HasValue && maxHeight.Value > minHeight)
         {
@@ -47,6 +68,13 @@ public class PlatformerValues
     /// <summary>Time to decelerate from <see cref="MaxSpeedX"/> to rest when input is released. <see cref="TimeSpan.Zero"/> (the default) means instant.</summary>
     public TimeSpan DecelerationTimeX;
 
+    /// <summary>
+    /// Downward acceleration applied to the entity while airborne. While grounded, collision
+    /// resolution cancels gravity so this field has no visible effect — it only governs the
+    /// trajectory during a jump or fall. A ground slot's <c>Gravity</c> is therefore effectively
+    /// a hint for <see cref="SetJumpHeights"/>'s fallback path; the actual jump arc runs under
+    /// the companion airborne slot's gravity (see the <c>jumpGravity</c> overload).
+    /// </summary>
     public float Gravity;
     public float MaxFallSpeed;
     public float JumpVelocity;
@@ -63,15 +91,19 @@ public class PlatformerValues
     /// <summary>
     /// Maximum downward distance the entity will "snap" onto a lower surface after losing ground
     /// contact while it was grounded the previous frame. Enables the standard platformer feel of
-    /// hugging a downslope or stepping off an up-ramp onto flat ground without floating for a
-    /// frame. Set to <c>0</c> to disable snapping entirely (e.g., a ball/wheel movement mode that
-    /// wants Sonic-style launch physics). Default <c>16</c> matches a typical one-tile step;
-    /// significantly larger values feel teleport-y. Requires
-    /// <see cref="PlatformerBehavior.CollisionShape"/> to be set and at least one collision
-    /// relationship in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/> mode —
-    /// each such relationship contributes its <see cref="TileShapeCollection"/> as a snap probe target.
+    /// hugging a downslope across tile seams without floating for a frame. Snap also requires
+    /// that the entity was on a non-flat surface last frame (<see cref="PlatformerBehavior.CurrentSlope"/>
+    /// non-zero) — walking off a flat ledge onto lower flat ground falls ballistically like a
+    /// cliff drop, as in most platformers. Set to <c>0</c> to disable snapping entirely (e.g., a
+    /// ball/wheel movement mode that wants Sonic-style launch physics). Default <c>8</c> — half
+    /// a typical 16px tile — is aggressive enough to hug downslopes that briefly go airborne at
+    /// seams but small enough not to reach onto a one-tile-lower step even if the slope gate were
+    /// absent. Requires <see cref="PlatformerBehavior.CollisionShape"/> to be set and at least one
+    /// collision relationship in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/>
+    /// mode — each such relationship contributes its <see cref="TileShapeCollection"/> as a snap
+    /// probe target.
     /// </summary>
-    public float SlopeSnapDistance { get; set; } = 16f;
+    public float SlopeSnapDistance { get; set; } = 8f;
 
     /// <summary>
     /// Surfaces whose upward normal is within this many degrees of straight up are considered

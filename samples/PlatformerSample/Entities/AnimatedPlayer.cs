@@ -41,7 +41,7 @@ public class AnimatedPlayer : Entity
 
         var animations = AnimationChainListSave
             .FromFile("Content/PlatformerAnimations.achx")
-            .ToAnimationChainList(Engine.GraphicsDevice);
+            .ToAnimationChainList(Engine.Content);
 
         _sprite.AnimationChains = animations;
         _sprite.IsLooping = true;

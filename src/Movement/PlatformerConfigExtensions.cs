@@ -18,18 +18,24 @@ public static class PlatformerConfigExtensions
         var movement = config.Movement;
         if (movement == null) return;
 
+        // Airborne gravity governs the jump trajectory regardless of which slot initiates the
+        // jump — collision cancels ground gravity, so a grounded jump's arc runs entirely under
+        // the air slot's gravity. Resolve once so every slot's derived-mode calculation uses the
+        // same trajectory gravity.
+        float? airGravity = movement.Air?.Gravity;
+
         if (movement.Ground != null)
-            behavior.GroundMovement = ToPlatformerValues(movement.Ground, "ground");
+            behavior.GroundMovement = ToPlatformerValues(movement.Ground, "ground", airGravity);
 
         if (movement.Air != null)
-            behavior.AirMovement = ToPlatformerValues(movement.Air, "air");
+            behavior.AirMovement = ToPlatformerValues(movement.Air, "air", airGravity);
 
         // afterDoubleJump is parsed (for forward-compat) but has no behavior slot to receive it.
         if (movement.AfterDoubleJump != null)
-            _ = ToPlatformerValues(movement.AfterDoubleJump, "afterDoubleJump");
+            _ = ToPlatformerValues(movement.AfterDoubleJump, "afterDoubleJump", airGravity);
     }
 
-    private static PlatformerValues ToPlatformerValues(MovementSlot slot, string slotName)
+    private static PlatformerValues ToPlatformerValues(MovementSlot slot, string slotName, float? airGravity)
     {
         var values = new PlatformerValues();
 
@@ -50,12 +56,12 @@ public static class PlatformerConfigExtensions
         if (slot.DownhillMaxSpeedMultiplier.HasValue) values.DownhillMaxSpeedMultiplier = slot.DownhillMaxSpeedMultiplier.Value;
         if (slot.CanFallThroughOneWayCollision.HasValue) values.CanFallThroughOneWayCollision = slot.CanFallThroughOneWayCollision.Value;
 
-        ApplyJumpMode(slot, values, slotName);
+        ApplyJumpMode(slot, values, slotName, airGravity);
 
         return values;
     }
 
-    private static void ApplyJumpMode(MovementSlot slot, PlatformerValues values, string slotName)
+    private static void ApplyJumpMode(MovementSlot slot, PlatformerValues values, string slotName, float? airGravity)
     {
         bool hasDerived = slot.MinJumpHeight.HasValue || slot.MaxJumpHeight.HasValue;
         bool hasRaw = slot.JumpVelocity.HasValue || slot.JumpApplyLength.HasValue || slot.JumpApplyByButtonHold.HasValue;
@@ -74,7 +80,11 @@ public static class PlatformerConfigExtensions
                 throw new InvalidOperationException(
                     $"Movement slot '{slotName}' specifies maxJumpHeight without minJumpHeight. Derived jump mode requires minJumpHeight.");
             }
-            values.SetJumpHeights(slot.MinJumpHeight.Value, slot.MaxJumpHeight);
+            // Trajectory gravity: air.Gravity if the air slot specifies one, else fall back to
+            // this slot's own Gravity. The fallback preserves existing behavior for ground-only
+            // configs (no air slot authored) while fixing the ground/air gravity-mismatch bug.
+            float jumpGravity = airGravity ?? values.Gravity;
+            values.SetJumpHeights(slot.MinJumpHeight.Value, slot.MaxJumpHeight, jumpGravity);
             return;
         }
 

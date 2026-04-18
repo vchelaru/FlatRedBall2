@@ -297,6 +297,12 @@ public class PlatformerBehavior
         if (entity.LastReposition.Y > 0f) { Diag("skip: already grounded"); return; }
         if (entity.VelocityY > 0f) { DiagRising(entity.VelocityY); return; }
         if (values.SlopeSnapDistance <= 0f) { Diag("skip: SlopeSnapDistance <= 0"); return; }
+        // Slope gate: snap is for hugging downslopes across tile seams, not for teleporting off
+        // flat ledges. If the prior-frame surface was flat, treat the edge as a cliff drop and
+        // fall ballistically. CurrentSlope was set by ContributeSlopeProbe last frame and survives
+        // into this frame's collision pass (CurrentSlope is only zeroed in Update when airborne,
+        // and the transition Update has not yet run).
+        if (CurrentSlope == 0f) { Diag("skip: prior surface flat"); return; }
 
         if (CollisionShape == null)
         {

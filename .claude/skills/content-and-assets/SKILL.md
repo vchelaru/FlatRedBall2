@@ -35,11 +35,17 @@ Load textures via MonoGame's content pipeline and render them with `Sprite`.
 ### Loading a Texture
 
 ```csharp
-// Inside an Entity's CustomInitialize:
+// Compiled xnb pipeline — bare asset name (no extension, as defined in the .mgcb):
 var texture = Engine.Content.Load<Texture2D>("ship_0001");
+
+// Raw PNG from disk — full path with extension. Participates in PNG hot-reload
+// via Engine.Content.TryReload(path). See the content-hot-reload skill.
+var bear = Engine.Content.Load<Texture2D>("Content/Bear.png");
 ```
 
-The string is the asset name (filename without extension) as defined in the `.mgcb` file. The `Content/` prefix is set by `Game1.Content.RootDirectory`.
+`Load<Texture2D>` routes on the presence of a file extension:
+- **Bare name** → MonoGame's xnb pipeline (requires a `.mgcb` entry). Not hot-reloadable.
+- **Path with extension** → loaded directly from disk via `Texture2D.FromFile`, tracked for hot-reload. Requires the file to be copied to the build output (see Content Pipeline Setup below or use a `<Content Include="Content/*.png" CopyToOutputDirectory="PreserveNewest" />` item).
 
 ### Creating a Sprite
 

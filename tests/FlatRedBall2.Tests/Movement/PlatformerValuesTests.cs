@@ -75,4 +75,38 @@ public class PlatformerValuesTests
 
         Should.Throw<ArgumentOutOfRangeException>(() => values.SetJumpHeights(0f));
     }
+
+    [Fact]
+    public void SetJumpHeights_ExplicitGravity_UsesGivenGravityNotOwnGravity()
+    {
+        // When the trajectory gravity differs from this slot's Gravity (ground slot deriving
+        // heights against airborne gravity), the overload must use the argument, not this.Gravity.
+        var values = new PlatformerValues { Gravity = 4400f };
+
+        values.SetJumpHeights(minHeight: 24f, maxHeight: 84f, jumpGravity: 800f);
+
+        values.JumpVelocity.ShouldBe(MathF.Sqrt(2f * 800f * 24f), tolerance: 0.01f);
+        float v = MathF.Sqrt(2f * 800f * 24f);
+        values.JumpApplyLength.TotalSeconds.ShouldBe((84f - 24f) / v, tolerance: 0.001);
+        values.JumpApplyByButtonHold.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DefaultSlopeSnapDistance_IsHalfTile()
+    {
+        // 8f = half a 16px tile. Aggressive enough to hug downslopes that briefly go airborne
+        // across tile seams, small enough not to teleport onto one-tile-lower steps. The
+        // historical default was 16f, which matched single-tile-step height exactly and made
+        // staircase geometry feel teleporty.
+        new PlatformerValues().SlopeSnapDistance.ShouldBe(8f);
+    }
+
+    [Fact]
+    public void SetJumpHeights_ExplicitGravityNotPositive_Throws()
+    {
+        var values = new PlatformerValues { Gravity = 1500f };
+
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => values.SetJumpHeights(minHeight: 24f, maxHeight: 84f, jumpGravity: 0f));
+    }
 }

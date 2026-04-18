@@ -75,7 +75,21 @@ WatchContentDirectory("Assets", relPath => ..., destinationDirectory: "Content")
 Use when the change is small and the type/shape is unchanged. No screen restart, no state loss.
 
 - **JSON configs** — read the new file, copy values onto the live object.
-- **PNG with same dimensions** — `Texture2D.SetData` patches pixels; existing `Sprite` references keep working.
+- **PNG with same dimensions** — `Engine.Content.TryReload(path)` patches pixels via `Texture2D.SetData`; existing `Sprite` references keep working. The texture must have been loaded via `Engine.Content.Load<Texture2D>("Content/foo.png")` (path with extension) so it was registered. Returns `false` if the new file has different dimensions (caller restarts) or the path was never loaded.
+
+  ```csharp
+  WatchContentDirectory("Content", relPath =>
+  {
+      if (relPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+      {
+          if (!Engine.Content.TryReload("Content/" + relPath))
+              RestartScreen(RestartMode.HotReload);
+      }
+      else RestartScreen(RestartMode.HotReload);
+  });
+  ```
+
+  **Scope (v1).** Only PNGs loaded via `Engine.Content.Load<Texture2D>("path.png")` are tracked. **Not** tracked: textures loaded through MonoGame's xnb pipeline (`Load<Texture2D>("bare_key")` — xnb is a build artifact and can't be reloaded at runtime), Aseprite atlas textures (generated in-memory, no single source PNG), TMX tileset textures (already covered by the TMX restart fallback).
 - **Tile-data-only TMX changes** — `TileMap.TryReloadFrom(path)` patches tile IDs in existing layers and rebuilds every TSC registered via `GenerateCollisionFromClass` / `GenerateCollisionFromProperty`. Returns `true` if applied; `false` if the new TMX differs structurally (map dims, layer set, tilesets, object layers) — caller falls back to `RestartScreen(RestartMode.HotReload)`. Hand-authored mutations on a generated TSC after `Generate*` (e.g. extra `AddPolygonTileAtCell` calls) are **wiped** on in-place reload — put augmentations in `CustomInitialize` so they survive a full restart.
 
   ```csharp

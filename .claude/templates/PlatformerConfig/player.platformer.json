@@ -1,12 +1,17 @@
 {
   // Slots: "ground" (on ground), "air" (airborne), "afterDoubleJump" (reserved, not yet wired).
   // Omitted fields fall back to engine defaults. Omitted slots are left untouched on the behavior.
+  //
+  // Gravity note: the jump *trajectory* always runs under the "air" slot's Gravity — while the
+  // entity is grounded, collision cancels gravity. Derived jump mode (minJumpHeight/maxJumpHeight)
+  // on the ground slot uses air.Gravity for its height math. If no "air" slot is authored, it
+  // falls back to this slot's own Gravity. For most games, use the same Gravity in both slots.
   "movement": {
     "ground": {
       "MaxSpeedX": 150,             // world units/sec
       "AccelerationTimeX": 0.5,     // seconds to reach MaxSpeedX from rest (0 = instant)
       "DecelerationTimeX": 0.25,    // seconds to stop from MaxSpeedX (0 = instant)
-      "Gravity": 700,               // downward acceleration (must be positive)
+      "Gravity": 700,               // see note above — effectively only matters if no "air" slot
       "MaxFallSpeed": 800,          // terminal velocity (must be > 0)
 
       // Jump: pick ONE mode per slot. Using both derived and raw in the same slot is an error.
@@ -22,7 +27,9 @@
       // "JumpApplyByButtonHold": true  // if true, releasing early cuts the jump short
 
       // Slope tuning (all optional, defaults shown):
-      // "SlopeSnapDistance": 16,           // max downward snap distance (0 disables)
+      // "SlopeSnapDistance": 8,            // max downward snap distance (0 disables). Also gated
+                                             // on "prior surface was a slope" — flat-to-flat cliff
+                                             // drops fall ballistically regardless of this value.
       // "SlopeSnapMaxAngleDegrees": 60,    // surfaces steeper than this won't snap
       // "UphillFullSpeedSlope": 0,         // degrees below which uphill = full speed
       // "UphillStopSpeedSlope": 60,        // degrees at which uphill speed = 0

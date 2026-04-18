@@ -462,6 +462,7 @@ public class PlatformerBehaviorTests
         var values = MakeSnapValues(snapDistance: 16f);
         var player = new PlayerEntity { X = 8f, Y = 20f };
         player.Behavior.AirMovement = values;
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate to reach the null check.
         // Deliberately no CollisionShape set.
         var rel = MakePlatformerRelationship(player, tiles);
 
@@ -500,6 +501,9 @@ public class PlatformerBehaviorTests
         // "Ran off a downslope onto lower flat ground" — the right cell (1,0) is a polygon
         // filling the bottom half (flat top at y=8). Player just crossed the seam at x=16
         // with feet at y=16 — an 8 unit gap to the flat ground below.
+        // CurrentSlope is primed non-zero to simulate the slope probe having fired while the
+        // entity was on the preceding downslope. Without this, the "was on a slope last frame"
+        // gate rejects the snap (see GroundSnap_FlatToFlatWithGap_DoesNotSnap).
         var tiles = MakeTiles();
         var lowerFlat = Polygon.FromPoints(new[]
         {
@@ -513,6 +517,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 20f, Y = 16f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // simulate "last frame was on a 30° downslope"
         var rel = MakePlatformerRelationship(player, tiles);
 
         player.LastReposition = new Vector2(0f, 1f);
@@ -523,6 +528,90 @@ public class PlatformerBehaviorTests
 
         player.Behavior.IsOnGround.ShouldBeTrue();
         player.Y.ShouldBe(8f);
+    }
+
+    [Fact]
+    public void GroundSnap_FlatToFlatWithGap_DoesNotSnap()
+    {
+        // Staircase case: walking off the top of a flat tile onto a lower flat tile within
+        // SlopeSnapDistance. Intent is a ballistic cliff drop — classic platformer feel. The
+        // snap must be gated on "was on a slope last frame"; CurrentSlope = 0 from flat-ground
+        // walking blocks it.
+        var tiles = MakeTiles();
+        var lowerFlat = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  0f),
+            new Vector2(-8f,  0f),
+        });
+        tiles.AddPolygonTileAtCell(1, 0, lowerFlat);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 20f, Y = 16f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        // CurrentSlope not primed — defaults to 0, representing "was walking on flat ground."
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeFalse();
+        player.Y.ShouldBe(16f); // unchanged — no snap, entity falls ballistically
+    }
+
+    [Fact]
+    public void GroundSnap_FlatToFlatWithGap_EmitsPriorSurfaceFlatDiagnostic()
+    {
+        // The new slope gate must emit a diagnostic matching the gate that fired, so logs make
+        // the no-snap reason unambiguous — same convention as the other skip reasons.
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        // CurrentSlope not primed — the gate should skip and emit the flat-surface reason.
+        var messages = new System.Collections.Generic.List<string>();
+        player.Behavior.OnSnapDiagnostic = messages.Add;
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        messages.Clear();
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+
+        messages.Count.ShouldBe(1);
+        messages[0].ShouldContain("skip: prior surface flat");
+    }
+
+    [Fact]
+    public void GroundSnap_SmallNonZeroSlope_StillSnaps()
+    {
+        // Gate is strict non-zero — a gentle 5° downslope last frame still produces the
+        // hug-across-seam behavior. No angle threshold on the snap gate itself (steepness
+        // of the candidate surface is a separate check via SlopeSnapMaxAngleDegrees).
+        var tiles = MakeTiles();
+        tiles.AddTileAtCell(0, 0);
+        var values = MakeSnapValues(snapDistance: 16f);
+        var player = new PlayerEntity { X = 8f, Y = 20f };
+        player.Behavior.AirMovement = values;
+        player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 5f; // very gentle downslope
+        var rel = MakePlatformerRelationship(player, tiles);
+
+        player.LastReposition = new Vector2(0f, 1f);
+        player.Behavior.Update(player, MakeFrame(1f / 60f));
+        player.LastReposition = Vector2.Zero;
+        rel.RunCollisions();
+        player.Behavior.Update(player, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        player.Behavior.IsOnGround.ShouldBeTrue();
+        player.Y.ShouldBe(16f);
     }
 
     [Fact]
@@ -558,6 +647,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 104f, Y = 20f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing multi-rel dispatch, not the slope gate.
         var messages = new System.Collections.Generic.List<string>();
         player.Behavior.OnSnapDiagnostic = messages.Add;
 
@@ -596,6 +686,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 8f, Y = 20f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing already-snapped diagnostic.
         var messages = new System.Collections.Generic.List<string>();
         player.Behavior.OnSnapDiagnostic = messages.Add;
         var relA = MakePlatformerRelationship(player, tilesA);
@@ -660,6 +751,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 8f, Y = 100f }; // far above — ray misses
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing raycast-miss diagnostic.
         var messages = new System.Collections.Generic.List<string>();
         player.Behavior.OnSnapDiagnostic = messages.Add;
         var rel = MakePlatformerRelationship(player, tiles);
@@ -683,6 +775,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 8f, Y = 20f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing successful-snap diagnostic.
         var messages = new System.Collections.Generic.List<string>();
         player.Behavior.OnSnapDiagnostic = messages.Add;
         var rel = MakePlatformerRelationship(player, tiles);
@@ -716,6 +809,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 4f, Y = 16f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing polygon shape-classification diagnostic.
         var messages = new System.Collections.Generic.List<string>();
         player.Behavior.OnSnapDiagnostic = messages.Add;
         var rel = MakePlatformerRelationship(player, tiles);
@@ -745,6 +839,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 4f, Y = 20f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing steepness gate specifically.
         var rel = MakePlatformerRelationship(player, tiles);
 
         player.LastReposition = new Vector2(0f, 1f);
@@ -766,6 +861,7 @@ public class PlatformerBehaviorTests
         var player = new PlayerEntity { X = 8f, Y = 20f };
         player.Behavior.AirMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
+        player.Behavior.CurrentSlope = 30f; // past the flat-surface gate — testing successful snap.
         var rel = MakePlatformerRelationship(player, tiles);
 
         player.LastReposition = new Vector2(0f, 1f);

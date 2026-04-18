@@ -79,9 +79,7 @@ var watcher = new ContentWatcher("Content/player.platformer.json", () => {
 
 #### 4. PNG hot-reload
 
-- Same dimensions: `Texture2D.SetData` in-place. All existing references stay valid.
-- Different dimensions: trigger `RestartScreen(hotReload: true)`.
-- Requires the engine to track which textures were loaded from which files, or a registry pattern.
+> **Status: Landed.** See Done.md ("PNG Hot-Reload"). `Engine.Content.Load<Texture2D>(path)` now routes on extension — path-with-extension loads via `Texture2D.FromFile` and registers for reload; bare names still go through the xnb pipeline. `Engine.Content.TryReload(path)` applies same-dimension changes via `SetData`; dimension mismatch returns `false` so the caller restarts. `AnimationChainListSave.ToAnimationChainList` now takes only `ContentManagerService` and routes frame textures through the same unified path. AutoEvalCoinHopperSample wired with a floating Bear.png sprite for end-to-end validation.
 
 #### 5. TMX hot-reload — in-place tile data updates
 

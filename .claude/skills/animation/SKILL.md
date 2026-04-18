@@ -40,10 +40,10 @@ Load with `AnimationChainListSave` from `FlatRedBall2.Animation.Content`. See `r
 using FlatRedBall2.Animation.Content;
 var animations = AnimationChainListSave
     .FromFile("Content/Characters/player.achx")
-    .ToAnimationChainList(GraphicsDevice);
+    .ToAnimationChainList(Engine.Content);
 ```
 
-`ToAnimationChainList` has two overloads: one takes `ContentManagerService` (content pipeline / `.xnb`), the other takes `GraphicsDevice` (raw `.png` files).
+`ToAnimationChainList` takes a `ContentManagerService` and routes each frame's `TextureName` through `Load<Texture2D>`: names with an extension (e.g. `"player.png"`) load directly from disk and participate in PNG hot-reload via `Engine.Content.TryReload`; bare names (no extension) go through the xnb pipeline.
 
 **Gotcha — FileRelativeTextures**: when `true` (the default), texture names in the .achx are relative to the .achx file itself. If your paths are off, check that the .achx and textures share the expected relative layout.
 

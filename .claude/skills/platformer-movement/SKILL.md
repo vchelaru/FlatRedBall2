@@ -46,9 +46,11 @@ Template: `.claude/templates/PlatformerConfig/player.platformer.json`
 **Movement slots** are fixed names mapping to behavior fields: `ground` → `GroundMovement`, `air` → `AirMovement`, `afterDoubleJump` → reserved (parsed but not applied until the behavior wires a double-jump slot). All fields in a slot are nullable; omitted fields fall back to `new PlatformerValues()` defaults.
 
 **Jump configuration** supports two mutually-exclusive modes per slot:
-- **Derived (preferred):** `minJumpHeight` + optional `maxJumpHeight` → calls `SetJumpHeights`. `Gravity` must be in the same slot (it's applied first internally).
+- **Derived (preferred):** `minJumpHeight` + optional `maxJumpHeight` → calls `SetJumpHeights`.
 - **Raw (escape hatch):** `JumpVelocity` + `JumpApplyLength` + `JumpApplyByButtonHold` set directly.
 - Specifying fields from both modes in the same slot throws `InvalidOperationException`.
+
+**Gravity gotcha — derived mode uses airborne gravity.** The jump trajectory always runs under the `air` slot's `Gravity` (while grounded, collision cancels gravity — so ground.Gravity never acts on the arc). `ApplyTo` resolves this automatically: derived mode on the ground slot uses `air.Gravity` for its `JumpVelocity`/`JumpApplyLength` math; if no `air` slot is authored, it falls back to the slot's own `Gravity`. Mismatched ground/air gravities with derived-mode jumps will produce correct heights, but the ground slot's `Gravity` field itself is effectively ceremonial for trajectory purposes — keep it equal to `air.Gravity` for a clear mental model.
 
 **TimeSpan fields** (`AccelerationTimeX`, `DecelerationTimeX`, `JumpApplyLength`) are represented as seconds (float) in JSON.
 
@@ -69,7 +71,7 @@ collision results — no special wiring needed.
 | `MaxSpeedX` | Maximum horizontal speed in world units/sec |
 | `AccelerationTimeX` | Time to reach `MaxSpeedX` from rest. `TimeSpan.Zero` = instant |
 | `DecelerationTimeX` | Time to stop from `MaxSpeedX`. `TimeSpan.Zero` = instant |
-| `Gravity` | Downward acceleration (positive value, Y− direction applied internally) |
+| `Gravity` | Downward acceleration (positive value, Y− direction applied internally). Only acts while airborne — collision cancels it while grounded. A ground slot's `Gravity` is used only as a fallback for `SetJumpHeights` when no air slot is present. |
 | `MaxFallSpeed` | Maximum downward speed (prevents infinite fall acceleration) |
 | `JumpVelocity` | Upward velocity applied when jump is triggered |
 | `JumpApplyLength` | How long to sustain `JumpVelocity` after pressing jump |
@@ -191,7 +193,7 @@ Players who run off a downslope or off the top of an up-ramp onto lower flat gro
 Wiring checklist — all three conditions must hold for snap to fire:
 1. The player entity implements `IPlatformerEntity` (exposes `Platformer => _platformer`)
 2. A `CollisionRelationship` between the player and a `TileShapeCollection` has `SlopeMode = SlopeCollisionMode.PlatformerFloor` — each such relationship automatically contributes its collection as a snap probe target
-3. `PlatformerBehavior.CollisionShape` is set to the player's collision `AxisAlignedRectangle`, and `PlatformerValues.SlopeSnapDistance > 0` on the active values set (default `16f`)
+3. `PlatformerBehavior.CollisionShape` is set to the player's collision `AxisAlignedRectangle`, and `PlatformerValues.SlopeSnapDistance > 0` on the active values set (default `8f`), and the entity was on a sloped surface last frame (`CurrentSlope != 0`)
 
 ```csharp
 public class Player : Entity, IPlatformerEntity
@@ -233,13 +235,15 @@ Tuning lives on `PlatformerValues`:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `SlopeSnapDistance` | `16f` | Max downward probe distance. `0` disables snap for this values set. |
+| `SlopeSnapDistance` | `8f` | Max downward probe distance. `0` disables snap for this values set. Snap is also gated on `CurrentSlope != 0` (was on a sloped surface last frame) — flat-to-flat cliff drops fall ballistically regardless of this value. |
 | `SlopeSnapMaxAngleDegrees` | `60f` | Surfaces whose upward normal is within this many degrees of straight up qualify as "walkable" for snap. |
 
 The mechanism:
-1. If the player was grounded last frame, is not grounded this frame, and is not rising,
+1. If the player was grounded last frame, is not grounded this frame, is not rising, and was on a sloped surface last frame (`CurrentSlope != 0`),
 2. Raycast straight down from the player's feet by `SlopeSnapDistance`,
 3. If it hits a walkable surface (normal within the angle threshold), move the player onto it, zero `VelocityY`, and set `IsOnGround = true`.
+
+**Flat-to-flat ledges fall ballistically.** The slope gate means walking off the edge of a flat tile onto a lower flat tile does *not* snap — behaves as a cliff drop, matching classic platformer feel. Snap is specifically for hugging downslopes across tile seams, not for stepping onto lower platforms.
 
 **Per-values-set config is intentional.** A walking state wants snap on; a ball/wheel state that wants Sonic-style launches off ramps should set `SlopeSnapDistance = 0` on its `PlatformerValues` so it flies off ramps naturally.
 

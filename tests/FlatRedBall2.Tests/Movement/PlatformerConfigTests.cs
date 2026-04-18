@@ -125,7 +125,7 @@ public class PlatformerConfigTests
 
         config.ApplyTo(behavior);
 
-        behavior.GroundMovement!.SlopeSnapDistance.ShouldBe(16f);
+        behavior.GroundMovement!.SlopeSnapDistance.ShouldBe(8f);
         behavior.GroundMovement.SlopeSnapMaxAngleDegrees.ShouldBe(60f);
         behavior.GroundMovement.DownhillMaxSpeedMultiplier.ShouldBe(1.5f);
         behavior.GroundMovement.CanFallThroughOneWayCollision.ShouldBeTrue();
@@ -154,6 +154,114 @@ public class PlatformerConfigTests
         behavior.GroundMovement!.JumpVelocity.ShouldBe(420f);
         behavior.GroundMovement.JumpApplyLength.ShouldBe(TimeSpan.FromSeconds(0.15));
         behavior.GroundMovement.JumpApplyByButtonHold.ShouldBeTrue();
+    }
+
+    // ── Derived-mode jump trajectory gravity ──
+    // The jump arc is governed by airborne gravity, not the grounded slot's gravity
+    // (collision cancels ground gravity, so ground.Gravity never acts on the trajectory).
+    // Derived-mode SetJumpHeights on the ground slot must use the paired air slot's
+    // gravity so authored min/max heights match what the player actually reaches.
+
+    [Fact]
+    public void ApplyTo_DerivedGroundJump_UsesAirGravityForJumpVelocity()
+    {
+        var json = """
+        {
+          "movement": {
+            "ground": { "Gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
+            "air":    { "Gravity": 800 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        // v = sqrt(2 * air.Gravity * minJumpHeight) = sqrt(2*800*24) ≈ 196
+        behavior.GroundMovement!.JumpVelocity.ShouldBe(MathF.Sqrt(2f * 800f * 24f), tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void ApplyTo_DerivedGroundJump_UsesAirGravityForSustainLength()
+    {
+        var json = """
+        {
+          "movement": {
+            "ground": { "Gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
+            "air":    { "Gravity": 800 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        // sustain = (max-min) / v where v uses air gravity
+        float v = MathF.Sqrt(2f * 800f * 24f);
+        double expected = (84f - 24f) / v;
+        behavior.GroundMovement!.JumpApplyLength.TotalSeconds.ShouldBe(expected, tolerance: 0.001);
+    }
+
+    [Fact]
+    public void ApplyTo_DerivedAirJump_UsesOwnGravity()
+    {
+        // An airborne-jump slot (e.g. future double-jump) derives heights from its own gravity —
+        // the entity is already in this environment when the jump fires.
+        var json = """
+        {
+          "movement": {
+            "ground": { "Gravity": 1500 },
+            "air":    { "Gravity": 900, "minJumpHeight": 20, "maxJumpHeight": 60 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        behavior.AirMovement.JumpVelocity.ShouldBe(MathF.Sqrt(2f * 900f * 20f), tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void ApplyTo_DerivedGroundJump_NoAirSlot_FallsBackToOwnGravity()
+    {
+        // No air slot authored — preserve existing behavior so ground-only configs don't regress.
+        var json = """
+        {
+          "movement": {
+            "ground": { "Gravity": 1500, "minJumpHeight": 48, "maxJumpHeight": 96 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        behavior.GroundMovement!.JumpVelocity.ShouldBe(MathF.Sqrt(2f * 1500f * 48f), tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void ApplyTo_RawGroundJump_JumpVelocityUnaffectedByAirGravity()
+    {
+        var json = """
+        {
+          "movement": {
+            "ground": { "Gravity": 1500, "JumpVelocity": 420, "JumpApplyLength": 0.15 },
+            "air":    { "Gravity": 800 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        behavior.GroundMovement!.JumpVelocity.ShouldBe(420f);
+        behavior.GroundMovement.JumpApplyLength.ShouldBe(TimeSpan.FromSeconds(0.15));
     }
 
     [Fact]
