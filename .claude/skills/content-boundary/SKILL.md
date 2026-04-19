@@ -47,6 +47,20 @@ Templates live in `.claude/templates/` — copy from there into the project's `C
 
 The scaffold must be *valid and runnable* — the game should build and play immediately, using shape-based stand-ins for missing art. The human then iterates on content without the AI being in the loop.
 
+## Hot Reload — Required for Every Gameplay Screen
+
+The human iterates on content (TMX, JSON, PNGs) while the game is running. Without hot reload they must restart the game after every edit — this breaks the feedback loop that makes content authoring practical.
+
+**Every gameplay screen must wire `WatchContentDirectory` in `CustomInitialize`.** The minimum recipe:
+
+```csharp
+WatchContentDirectory("Content", _ => RestartScreen(RestartMode.HotReload));
+```
+
+If the screen has state worth preserving across restarts (player position, score), also implement `SaveHotReloadState` / `RestoreHotReloadState`. See the `content-hot-reload` and `screens` skills for the full recipe.
+
+This is not optional polish — it is a prerequisite for the human to do their half of the work. Always include it.
+
 ## Handoff Communication
 
 After scaffolding, close the loop with the user explicitly. A good handoff looks like:
