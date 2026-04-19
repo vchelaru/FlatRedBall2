@@ -96,6 +96,8 @@ var player = map.CreateEntities("PlayerSpawn", _playerFactory, Origin.BottomCent
 map.CreateEntities("CeilingTurret", _turretFactory, Origin.TopCenter);
 ```
 
+The engine converts Tiled's pixel coordinates (Y-down) to world space (Y-up) and sets each spawned entity's `X`/`Y` to the world-space position of the tile object, adjusted by the `Origin` parameter.
+
 **Custom properties** set on tile objects in Tiled are automatically applied to matching entity properties via reflection. If a Coin entity has `public int Worth { get; set; }` and the Tiled object has a custom property `Worth=50`, it's set automatically. Supported types: `string`, `int`, `float`, `bool`.
 
 **Class matching** checks the object's Class first, then falls back to the tile definition's Class in the tileset. Case-insensitive.
