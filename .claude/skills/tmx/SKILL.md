@@ -56,7 +56,7 @@ Tiles fall into two categories:
 
 ## Layer Conventions
 
-- **GameplayLayer** (required) — collision/gameplay tiles using StandardTileset. Set `visible="0"` so collision tiles don't render over visual art.
+- **GameplayLayer** (required) — collision/gameplay tiles using StandardTileset.
 - Additional visual layers are game-specific. Add them above or below GameplayLayer as needed. Visual layers use a separate art tileset (not StandardTileset).
 
 ## CSV Tile Data Format
