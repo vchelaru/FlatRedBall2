@@ -177,6 +177,12 @@ This eliminates any dependency on Factory/CustomInitialize timing. There is no n
 
 Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>`. This keeps lifecycle, collision (`IEnumerable<T>`), and `Engine.GetFactory<T>()` all working consistently.
 
+## Solid-Grid Factories (`IsSolidGrid`)
+
+For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AxisAlignedRectangle` child's `RepositionDirections` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapeCollection` does for tile grids, but for entity factories.
+
+Cell size is inferred from the first entity's body; mismatched sizes throw. `TileMap.CreateEntities` automatically wraps its spawn loop in the factory's grid batch so RD is recomputed once at the end. For hand-authored bulk spawns, wrap the loop in `using (factory.BeginGridBatch()) { … }` — without batching, `Create` can't compute cell indices because `X`/`Y` aren't set until after `Create` returns.
+
 ## Spawning Entities from Tiled Object Layers
 
 For designer-placed entities (coins, enemies, spawn points), use `TileMap.CreateEntities` instead of hardcoded positions. See the `levels` skill for details.
