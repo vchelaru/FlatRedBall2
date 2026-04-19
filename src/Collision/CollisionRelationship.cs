@@ -262,6 +262,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
+                TryTransferPlatformVelocity(a, (B)(object)b, sep);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
                     CollisionOccurred?.Invoke(b, (B)(object)a);
@@ -286,6 +287,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             return;
         }
         ApplyResponse(a, b, sep);
+        TryTransferPlatformVelocity(a, b, sep);
         CollisionOccurred?.Invoke(a, b);
         TryOfferGroundSnap(a, b);
     }
@@ -337,6 +339,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                     continue;
                 }
                 ApplyResponse(a, b, sep);
+                TryTransferPlatformVelocity(a, b, sep);
                 CollisionOccurred?.Invoke(a, b);
                 TryOfferGroundSnap(a, b);
             }
@@ -369,6 +372,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var sep = ComputeSeparationVector(effectiveA, effectiveB);
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
+                TryTransferPlatformVelocity(a, (B)(object)b, sep);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
                     CollisionOccurred?.Invoke(b, (B)(object)a);
@@ -504,6 +508,25 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                     $"OneWayDirection.{OneWayDirection} is not yet implemented — see design/TODOS.md");
             default:
                 return true;
+        }
+    }
+
+    // Moving-platform support: when a platformer entity lands on top of another Entity, feed
+    // that entity's horizontal velocity into the platformer behavior so it rides the platform
+    // and inherits its momentum on jump. The "landed on top" check uses the sign of the side's
+    // separation Y (positive = pushed up). Tile collections are excluded — tiles don't have a
+    // meaningful VelocityX and game code shouldn't author moving level geometry through them.
+    private static void TryTransferPlatformVelocity(A a, B b, Vector2 sep)
+    {
+        // A is the platformer, A was pushed up by sep → sep.Y > 0
+        if (sep.Y > 0f && a is IPlatformerEntity pa && b is Entity entB && b is not TileShapeCollection)
+        {
+            pa.Platformer.ContributeGroundVelocity(entB.VelocityX);
+        }
+        // B is the platformer, B was pushed by -sep → B pushed up when sep.Y < 0
+        else if (sep.Y < 0f && b is IPlatformerEntity pb && a is Entity entA && a is not TileShapeCollection)
+        {
+            pb.Platformer.ContributeGroundVelocity(entA.VelocityX);
         }
     }
 

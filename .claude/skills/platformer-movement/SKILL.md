@@ -94,9 +94,10 @@ Common patterns:
 ## Reading State
 
 ```csharp
-_platformer.IsOnGround        // true if entity was pushed upward by a collision this frame
-_platformer.IsApplyingJump    // true while jump sustain is active (button held, duration not yet elapsed)
-_platformer.DirectionFacing   // HorizontalDirection.Left or .Right
+_platformer.IsOnGround               // true if entity was pushed upward by a collision this frame
+_platformer.IsApplyingJump           // true while jump sustain is active (button held, duration not yet elapsed)
+_platformer.DirectionFacing          // HorizontalDirection.Left or .Right
+_platformer.GroundHorizontalVelocity // platform velocity transferred this frame, 0 when not on a moving platform
 ```
 
 ## Double Jump (Air Jumps)
@@ -272,6 +273,25 @@ Under defaults, a 30° slope cuts uphill speed to 50% and boosts downhill speed 
 
 When using acceleration, the adjusted max speed drives `AccelerationTimeX` magnitude (speeding up); `DecelerationTimeX` still uses the raw `MaxSpeedX` so braking isn't slowed on an uphill.
 
+## Moving Platforms
+
+Standing on another `Entity` with non-zero `VelocityX` automatically transfers that horizontal
+velocity to the platformer entity for the frame — the player rides the platform with no input,
+and a jump carries the platform's momentum into the air. No opt-in needed: any `BounceOnCollision`
+relationship between an `IPlatformerEntity` and a regular `Entity` (not a `TileShapeCollection`)
+gets this behavior whenever the separation pushes the platformer upward.
+
+```csharp
+AddCollisionRelationship<Player, MovingPlatform>(_playerFactory, _platformFactory)
+    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+```
+
+The platform's own movement (path-follower, ping-pong in `CustomActivity`, etc.) is independent —
+the engine just reads its `VelocityX` at collision time. Tile collections are excluded by design;
+moving level geometry should be authored as entities.
+
+**Animation gotcha:** standing still on a moving platform leaves the player with `VelocityX != 0` (they inherit the platform's velocity), so drive walk/idle animations off `MovementInput.X`, not `VelocityX` — see the animation section below.
+
 ## One-Way Platforms and Drop-Through
 
 Jump-through (cloud) platforms are configured on the **collision relationship**, not the behavior — set `relationship.OneWayDirection = OneWayDirection.Up` and `relationship.AllowDropThrough = true`. The second flag is required for drop-through to bypass the relationship; leaving it `false` makes the barrier hard (e.g. Yoshi's Island ratchet doors — always blocks, Down+Jump has no effect on it). See the `collision-relationships` skill for the relationship-level semantics.
@@ -295,7 +315,8 @@ FRB2 does not provide an animation controller. Animation state selection is stra
 ```csharp
 private void UpdateAnimation()
 {
-    string chain = (_platformer.IsOnGround, Math.Abs(VelocityX) > 5f) switch
+    float inputX = _platformer.MovementInput?.X ?? 0f;
+    string chain = (_platformer.IsOnGround, MathF.Abs(inputX) > 0.1f) switch
     {
         (true, false) => "CharacterIdle",
         (true, true)  => "CharacterWalk",
@@ -306,6 +327,8 @@ private void UpdateAnimation()
     _sprite.PlayAnimation(chain);
 }
 ```
+
+**Why input, not velocity?** Velocity-based detection (`Math.Abs(VelocityX) > threshold`) breaks on moving platforms — the player stands still, inherits the platform's velocity, and the walk animation loops as if they're running. It also breaks on slippery ground — after releasing input the player is still sliding, so the walk animation keeps playing through the decel. Input-based selection is simpler and matches FRB1's state-driven approach. For games that genuinely want a slide animation distinct from walk, branch on `GroundHorizontalVelocity` (platform contribution this frame) or `VelocityX - GroundHorizontalVelocity` (speed relative to the platform).
 
 Call `UpdateAnimation()` at the end of `CustomActivity`, after `_platformer.Update`. `PlayAnimation` is idempotent — calling with the same chain name each frame does not restart the animation.
 
