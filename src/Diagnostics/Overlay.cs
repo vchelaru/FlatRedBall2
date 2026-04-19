@@ -14,6 +14,7 @@ using RectShape = FlatRedBall2.Collision.AxisAlignedRectangle;
 using LineShape = FlatRedBall2.Collision.Line;
 using PolyShape = FlatRedBall2.Collision.Polygon;
 using SpriteShape = FlatRedBall2.Rendering.Sprite;
+using RepositionDirections = FlatRedBall2.Collision.RepositionDirections;
 
 namespace FlatRedBall2.Diagnostics;
 
@@ -329,6 +330,96 @@ public class Overlay
         bg.Height = worldH;
         bg.Color = bgColor ?? new XnaColor(0, 0, 0, 200);
         return bg;
+    }
+
+    /// <summary>
+    /// Draws the four edges of each entity's first <see cref="AxisAlignedRectangle"/> child
+    /// for every instance tracked by <paramref name="factory"/>. Each edge is green when its
+    /// <see cref="RepositionDirections"/> bit is set (solid collision surface) and dim red when
+    /// cleared (suppressed / pass-through). Call from <c>CustomActivity</c> each frame while
+    /// diagnosing one-way platforms or <c>IsSolidGrid</c> seam issues. Entities without an
+    /// <see cref="AxisAlignedRectangle"/> child are silently skipped.
+    /// </summary>
+    public void DrawRepositionDirections<T>(Factory<T> factory) where T : Entity, new()
+    {
+        foreach (var entity in factory.Instances)
+        {
+            var body = FindBody(entity);
+            if (body != null) DrawRectRepositionDirections(body);
+        }
+    }
+
+    /// <summary>
+    /// Draws the four edges of every <see cref="AxisAlignedRectangle"/> tile in
+    /// <paramref name="tiles"/>. Each edge is green when its <see cref="RepositionDirections"/>
+    /// bit is set (solid collision surface) and dim red when cleared (suppressed, which is how
+    /// <see cref="TileShapeCollection"/> prevents seam snagging between adjacent tiles). Call
+    /// from <c>CustomActivity</c> each frame while diagnosing tile-grid collision issues.
+    /// </summary>
+    public void DrawRepositionDirections(TileShapeCollection tiles)
+    {
+        foreach (var renderable in tiles.AllTiles)
+        {
+            if (renderable is RectShape rect)
+                DrawRectRepositionDirections(rect);
+        }
+    }
+
+    private static AxisAlignedRectangle? FindBody(Entity entity)
+    {
+        foreach (var child in entity.Children)
+            if (child is AxisAlignedRectangle rect) return rect;
+        return null;
+    }
+
+    private void DrawRectRepositionDirections(RectShape rect)
+    {
+        var color = new XnaColor(60, 220, 60);
+        float cx = rect.AbsoluteX;
+        float cy = rect.AbsoluteY;
+        float halfW = rect.Width / 2f;
+        float halfH = rect.Height / 2f;
+        // Triangle lives entirely INSIDE the rect. Tip touches the face (pointing outward
+        // toward that face); base sits a fraction of the way toward the rect center. Fully
+        // contained, so adjacent rects never overlap visually.
+        const float EdgeInset = 1f;
+        float faceL = cx - halfW + EdgeInset;
+        float faceR = cx + halfW - EdgeInset;
+        float faceB = cy - halfH + EdgeInset;
+        float faceT = cy + halfH - EdgeInset;
+        float depthX = halfW * 0.42f;
+        float depthY = halfH * 0.42f;
+        float baseHalfX = halfW * 0.28f;
+        float baseHalfY = halfH * 0.28f;
+
+        var rd = rect.RepositionDirections;
+        if ((rd & RepositionDirections.Up) != 0)
+            Triangle(cx, faceT,
+                     cx - baseHalfX, faceT - depthY,
+                     cx + baseHalfX, faceT - depthY, color);
+        if ((rd & RepositionDirections.Down) != 0)
+            Triangle(cx, faceB,
+                     cx - baseHalfX, faceB + depthY,
+                     cx + baseHalfX, faceB + depthY, color);
+        if ((rd & RepositionDirections.Left) != 0)
+            Triangle(faceL, cy,
+                     faceL + depthX, cy - baseHalfY,
+                     faceL + depthX, cy + baseHalfY, color);
+        if ((rd & RepositionDirections.Right) != 0)
+            Triangle(faceR, cy,
+                     faceR - depthX, cy - baseHalfY,
+                     faceR - depthX, cy + baseHalfY, color);
+    }
+
+    private void Triangle(float ax, float ay, float bx, float by, float cx, float cy, XnaColor color)
+    {
+        var p = Polygon(ax, ay, new[]
+        {
+            new Vector2(0f, 0f),
+            new Vector2(bx - ax, by - ay),
+            new Vector2(cx - ax, cy - ay),
+        }, color);
+        p.IsFilled = true;
     }
 
     // ── Frame lifecycle ──────────────────────────────────────────────────

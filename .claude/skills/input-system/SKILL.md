@@ -134,11 +134,9 @@ _movement = new KeyboardInput2D(kb, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
 // Two gamepads on the same input (local co-op, shared control)
 _movement = new GamepadInput2D(pad0, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY)
     .Or(new GamepadInput2D(pad1, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY));
-
-// Analog stick plus d-pad on the same gamepad
-_movement = new GamepadInput2D(pad, GamepadAxis.LeftStickX, GamepadAxis.LeftStickY)
-    .Or(new GamepadInput2D(pad, GamepadAxis.DPadX, GamepadAxis.DPadY));
 ```
+
+The d-pad is exposed as four buttons (`Buttons.DPadLeft/Right/Up/Down`), not as axes — there is no `GamepadAxis.DPadX/Y`. To drive a `GamepadInput2D` from the d-pad, wrap the four buttons in your own `I2DInput` implementation.
 
 The same applies to `IPressableInput` via `.Or(other)` — any two pressable inputs merge into one.
 

@@ -52,7 +52,7 @@ Read `.claude/templates/Tiled/StandardTileset.tsx` for the full list of tile IDs
 
 Tiles fall into two categories:
 - **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`.
-- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`) — place on object layers only. Game code reads them via `map.CreateEntities()`. See the `levels` skill for the API.
+- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`, `BreakableCollision`) — place on object layers for precise per-entity placement, or paint them on regular tile layers for grid-aligned bulk spawns (e.g., rows of breakable bricks). Either way, `map.CreateEntities()` finds both and by default removes the source tile after spawning so it doesn't double-draw under the entity (opt out with `removeSourceTiles: false`). See the `levels` skill for the API.
 
 ## Layer Conventions
 

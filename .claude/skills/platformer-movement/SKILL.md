@@ -161,6 +161,8 @@ ceiling leaves the player with upward velocity and they float against it.
 `MoveFirstOnCollision` only repositions — it never touches velocity, which is wrong for
 platformer collision.
 
+**Entity solids arranged in a grid (brick rows, crate stacks, destructible walls) must set `factory.IsSolidGrid = true`** — otherwise the player snags on seams between adjacent entities (each body resolves separation independently). See `entities-and-factories`. Use `Overlay.DrawRepositionDirections(factory)` in `CustomActivity` to visualize.
+
 ## Slopes and Ramps
 
 Set `SlopeMode = SlopeCollisionMode.PlatformerFloor` on the **player's collision relationship** (not on the `TileShapeCollection`) to enable slope collision for polygon tiles. In this mode:

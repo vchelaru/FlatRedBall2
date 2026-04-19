@@ -106,3 +106,15 @@ Default is `RepositionDirections.All`. Values combine with `|` and `&= ~`.
 
 For detailed usage and dynamic tile grids, see:
 - `references/reposition-directions.md` — Full examples, dynamic grids, Gum naming conflict workaround
+
+### Debug overlay
+
+`Overlay.DrawRepositionDirections` visualizes RD state on the set of rectangles you ask about: each active face shows a small green triangle inside the rect pointing toward that face; suppressed faces show nothing. Pass a `Factory<T>` to inspect every entity's first `AxisAlignedRectangle` child, or a `TileShapeCollection` to inspect every tile. There is no parameterless overload — the caller always specifies what to see.
+
+```csharp
+public override void CustomActivity(FrameTime time)
+{
+    Overlay.DrawRepositionDirections(_brickFactory);
+    Overlay.DrawRepositionDirections(_solidTiles);
+}
+```

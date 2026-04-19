@@ -119,7 +119,7 @@ AddCollisionRelationship(_ballFactory, solidTiles)
     .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.7f);
 ```
 
-**Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
+**Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms) — and for grid-shaped arrangements of those, set `Factory<T>.IsSolidGrid = true` so the factory applies the same seam suppression across adjacent cells (see `entities-and-factories` skill).
 
 ### OneWayDirection (jump-through / cloud platforms)
 

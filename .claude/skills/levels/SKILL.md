@@ -81,7 +81,11 @@ playerVsSolid.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 
 See the `tmx` skill for how to author the polygon on the tileset tile.
 
-## Spawning Entities from Object Layers
+## Spawning Entities from Object Layers or Painted Tile Layers
+
+`CreateEntities` scans both **object layers** (for precisely-placed tile objects) and **regular tile layers** (for tiles painted with Tiled's brush). Any tile whose Class matches the requested name becomes one entity — use whichever authoring path fits the designer's workflow. Painted tile layers have no per-cell custom properties; reflection-based property mapping is a no-op for that path.
+
+The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapeCollection` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. The two methods never fight over the same tile — pick one per Class.
 
 Place tile objects on Tiled object layers (using tiles with a Class set in the tileset). Game code spawns entities from them with `CreateEntities`:
 
@@ -97,6 +101,8 @@ map.CreateEntities("CeilingTurret", _turretFactory, Origin.TopCenter);
 ```
 
 The engine converts Tiled's pixel coordinates (Y-down) to world space (Y-up) and sets each spawned entity's `X`/`Y` to the world-space position of the tile object, adjusted by the `Origin` parameter.
+
+**Source tiles are removed by default.** After spawning, `CreateEntities` clears the painted cell and removes the tile-object from its object layer so the source tile doesn't double-draw under the spawned entity. The mutation is in-memory only — the `.tmx` file is untouched, and a hot-reload repopulates the source tiles so the next spawn pass picks them up again. Pass `removeSourceTiles: false` to keep the source tile visible (e.g., the tile doubles as intentional background art). This is the opposite default from `GenerateCollisionFromClass`, which leaves source tiles visible because there the tile *is* the visual.
 
 **Custom properties** set on tile objects in Tiled are automatically applied to matching entity properties via reflection. If a Coin entity has `public int Worth { get; set; }` and the Tiled object has a custom property `Worth=50`, it's set automatically. Supported types: `string`, `int`, `float`, `bool`.
 

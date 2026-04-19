@@ -11,6 +11,67 @@ public class ScreenTests
 {
     private class TestScreen : Screen { }
 
+    private class BodiedEntity : Entity
+    {
+        public AxisAlignedRectangle Body { get; private set; } = null!;
+        public override void CustomInitialize()
+        {
+            Body = new AxisAlignedRectangle { Width = 16, Height = 16 };
+            Add(Body);
+        }
+    }
+
+    [Fact]
+    public void Overlay_DrawRepositionDirections_Factory_EmitsOneArrowPerSetBit()
+    {
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen { Engine = engine };
+        var factory = new Factory<BodiedEntity>(screen);
+        var entity = factory.Create();
+        // Up|Right → 2 arrows; Down and Left should emit nothing.
+        entity.Body.RepositionDirections = RepositionDirections.Up | RepositionDirections.Right;
+
+        int before = CountVisiblePolygons(screen);
+        screen.Overlay.DrawRepositionDirections(factory);
+        int after = CountVisiblePolygons(screen);
+
+        // One filled triangle polygon per active bit.
+        (after - before).ShouldBe(2);
+    }
+
+    [Fact]
+    public void Overlay_DrawRepositionDirections_TileShapeCollection_EmitsOneArrowPerActiveFace()
+    {
+        var screen = new TestScreen();
+        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+        tiles.AddTileAtCell(1, 0);
+        // Adjacent tiles → TSC suppresses shared faces: tile 0 loses Right, tile 1 loses Left.
+        // Each tile has 3 active bits → 3 arrows → 3 body lines per tile → 6 total.
+
+        int before = CountVisiblePolygons(screen);
+        screen.Overlay.DrawRepositionDirections(tiles);
+        int after = CountVisiblePolygons(screen);
+
+        (after - before).ShouldBe(6);
+    }
+
+    private static int CountVisiblePolygons(Screen screen)
+    {
+        int count = 0;
+        foreach (var r in screen.RenderList)
+            if (r is FlatRedBall2.Collision.Polygon poly && poly.IsVisible) count++;
+        return count;
+    }
+
+    private static int CountVisibleLines(Screen screen)
+    {
+        int count = 0;
+        foreach (var r in screen.RenderList)
+            if (r is Line line && line.IsVisible) count++;
+        return count;
+    }
+
     [Fact]
     public void Register_AddsRenderableChildrenToRenderList()
     {
