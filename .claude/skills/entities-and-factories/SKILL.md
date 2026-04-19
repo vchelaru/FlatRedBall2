@@ -71,7 +71,7 @@ Shape position is relative to the parent entity's position.
 
 ## Excluding a Shape from Default Collision
 
-Pass `isDefaultCollision: false` to attach a shape for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship:
+Pass `isDefaultCollision: false` to attach a **shape** (`AxisAlignedRectangle`, `Circle`, `Polygon`) for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship. This overload requires `ICollidable` — it does **not** exist for `Sprite`. For non-collision renderables like `Sprite`, use plain `Add(child)`:
 
 ```csharp
 // Visual range indicator — renders but never collides by default

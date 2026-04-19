@@ -141,6 +141,71 @@ public class SpriteAnimationTests
     }
 
     [Fact]
+    public void PlayAnimation_SameNameWhileAlreadyPlaying_DoesNotRestartAnimation()
+    {
+        var chain = new AnimationChain { Name = "Walk" };
+        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
+        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Walk");
+        sprite.AnimateSelf(0.15); // advances to frame 1 (RelativeX = 5)
+
+        sprite.X.ShouldBe(5f);   // sanity: we're on frame 1
+
+        sprite.PlayAnimation("Walk"); // same name — should NOT restart
+
+        sprite.X.ShouldBe(5f);   // still on frame 1, not reset to frame 0
+    }
+
+    [Fact]
+    public void PlayAnimation_SameChainWhileAlreadyPlaying_DoesNotRestartAnimation()
+    {
+        var chain = new AnimationChain { Name = "Walk" };
+        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
+        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation(chain);
+        sprite.AnimateSelf(0.15); // advances to frame 1
+
+        sprite.X.ShouldBe(5f);
+
+        sprite.PlayAnimation(chain); // same chain reference — should NOT restart
+
+        sprite.X.ShouldBe(5f);
+    }
+
+    [Fact]
+    public void PlayAnimation_DifferentNameWhilePlaying_RestartsFromBeginning()
+    {
+        var chain1 = new AnimationChain { Name = "Walk" };
+        chain1.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
+        chain1.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        var chain2 = new AnimationChain { Name = "Jump" };
+        chain2.Add(new AnimationFrame { FrameLength = 0.2f, RelativeX = 9f });
+        var list = new AnimationChainList();
+        list.Add(chain1);
+        list.Add(chain2);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Walk");
+        sprite.AnimateSelf(0.15); // on frame 1 of Walk
+
+        sprite.PlayAnimation("Jump"); // different chain — SHOULD restart
+
+        sprite.CurrentAnimation!.Name.ShouldBe("Jump");
+        sprite.X.ShouldBe(9f);
+    }
+
+    [Fact]
     public void PlayAnimation_ZeroRelativeOffset_ResetsXYToZero()
     {
         var chain = new AnimationChain { Name = "Idle" };

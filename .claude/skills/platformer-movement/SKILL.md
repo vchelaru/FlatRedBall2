@@ -26,8 +26,11 @@ public class Player : Entity
         PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
 
         var keyboard = Engine.Input.Keyboard;
-        _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space);
-        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down);
+        // Use .Or() to accept multiple key combos (e.g. Space or Up for jump, Arrows or WASD for move):
+        _platformer.JumpInput     = new KeyboardPressableInput(keyboard, Keys.Space)
+                                        .Or(new KeyboardPressableInput(keyboard, Keys.Up));
+        _platformer.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
+                                        .Or(new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
     }
 
     public override void CustomActivity(FrameTime time)
@@ -281,16 +284,20 @@ Triggers:
 
 ## Platformer Animations (User Code, Not Engine-Managed)
 
+**Always use the template animations for platformer characters** — copy `PlatformerAnimations.achx` and `AnimatedSpritesheet.png` from `.claude/templates/AnimationChains/` into the project's `Content/Animations/` directory and load via `.achx`. Do not fall back to a shape placeholder for the player character.
+
+The template chain names follow the pattern `Character<State><Direction>` — e.g. `CharacterIdleRight`, `CharacterWalkLeft`, `CharacterRunJumpRight`. There is no separate Fall chain; use `CharacterRunJump` for both jump and fall.
+
 FRB2 does not provide an animation controller. Animation state selection is straightforward game code — a pattern match on `PlatformerBehavior` state, plus a facing suffix:
 
 ```csharp
 private void UpdateAnimation()
 {
-    string chain = (_platformer.IsOnGround, VelocityX != 0) switch
+    string chain = (_platformer.IsOnGround, Math.Abs(VelocityX) > 5f) switch
     {
-        (true, false) => "Idle",
-        (true, true)  => "Walk",
-        _ => VelocityY > 0 ? "Jump" : "Fall"
+        (true, false) => "CharacterIdle",
+        (true, true)  => "CharacterWalk",
+        _             => "CharacterRunJump",
     };
 
     chain += _platformer.DirectionFacing == HorizontalDirection.Left ? "Left" : "Right";
