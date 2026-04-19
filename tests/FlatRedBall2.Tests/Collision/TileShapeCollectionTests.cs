@@ -8,6 +8,28 @@ namespace FlatRedBall2.Tests.Collision;
 
 public class TileShapeCollectionTests
 {
+    // ── GetCellWorldPosition ─────────────────────────────────────────────────
+
+    [Fact]
+    public void GetCellWorldPosition_ReturnsCellCenter_InverseOfGetCellAt()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f, X = 100f, Y = -50f };
+
+        // Cell (2, 3): bottom-left at (100 + 32, -50 + 48) = (132, -2); center = (140, 6)
+        tiles.GetCellWorldPosition(2, 3).ShouldBe(new Vector2(140f, 6f));
+
+        // Round-trip: GetCellAt of the center should recover the same cell
+        var center = tiles.GetCellWorldPosition(2, 3);
+        tiles.GetCellAt(center).ShouldBe((2, 3));
+    }
+
+    [Fact]
+    public void GetCellWorldPosition_NegativeCells_OK()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.GetCellWorldPosition(-1, -1).ShouldBe(new Vector2(-8f, -8f));
+    }
+
     // ── AddTileAtCell ────────────────────────────────────────────────────────
 
     [Fact]
