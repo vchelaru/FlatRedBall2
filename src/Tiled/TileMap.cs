@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.Tilemaps;
@@ -187,6 +188,17 @@ public class TileMap
 
     /// <summary>Height of a single tile in world units.</summary>
     public int TileHeight => _tileHeight;
+
+    /// <summary>
+    /// Returns the world-space center of the tile at (<paramref name="col"/>, <paramref name="row"/>),
+    /// using Tiled's row convention — row 0 is the top row, increasing row moves downward
+    /// (decreasing world Y). No bounds check — callers may pass coordinates outside the map.
+    /// Useful for procedurally spawning entities at specific tile coordinates without
+    /// duplicating the <c>X + col * TileWidth + TileWidth / 2</c> arithmetic.
+    /// </summary>
+    public Vector2 GetCellWorldPosition(int col, int row) => new(
+        _x + col * _tileWidth + _tileWidth / 2f,
+        _y - row * _tileHeight - _tileHeight / 2f);
 
     /// <summary>
     /// Returns a <see cref="BoundsRectangle"/> suitable for
