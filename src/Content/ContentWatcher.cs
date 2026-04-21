@@ -4,6 +4,25 @@ using System.IO;
 namespace FlatRedBall2.Content;
 
 /// <summary>
+/// Status result of a content watch registration attempt via <see cref="Screen.TryWatchContent"/>
+/// or <see cref="Screen.TryWatchContentDirectory"/>.
+/// </summary>
+public enum ContentWatchRegistrationStatus
+{
+    /// <summary>
+    /// Content watch registration succeeded. The file or directory is being monitored for changes.
+    /// </summary>
+    Registered,
+
+    /// <summary>
+    /// Content watch registration failed because the engine's <see cref="FlatRedBallService.SourceContentRoot"/>
+    /// is not set. This is typical in shipping builds where content is pre-built and embedded;
+    /// hot-reload is disabled in those scenarios.
+    /// </summary>
+    SourceContentRootUnavailable,
+}
+
+/// <summary>
 /// Wraps an <see cref="IFileWatcher"/> with debouncing and game-thread dispatch so a content file
 /// can be safely reloaded from the engine's <c>Update</c> tick. Editors typically fire several
 /// change events per save (write + rename + flush); the debounce window collapses those bursts

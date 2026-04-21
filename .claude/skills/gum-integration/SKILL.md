@@ -134,7 +134,7 @@ Most games need one or more UI layers. Create them in `CustomInitialize` and add
 | **HUD** | Persistent screen-anchored status display | Score, health bar, fuel gauge, minimap, timer |
 | **TopUI** | Modal overlays that block gameplay | Pause menu, "Exit game?" confirmation, options screen, critical messages |
 
-> For pause menus (TopUI), also call `PauseThisScreen()` / `ResumeThisScreen()` to actually freeze entity activity — adding the overlay alone does not pause the game. See the `screens` skill.
+> For pause menus (TopUI), also call `PauseThisScreen()` / `UnpauseThisScreen()` to actually freeze entity activity — adding the overlay alone does not pause the game. See the `screens` skill.
 
 ```csharp
 // In CustomInitialize — order matters: later = drawn on top
