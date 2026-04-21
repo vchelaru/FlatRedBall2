@@ -98,6 +98,20 @@ public class PlatformerBehavior
 
     private bool _dropThroughFrame;
     private bool _suppressOneWay;
+    // Per-frame additive horizontal velocity contributed by a platform the entity is standing on.
+    // Set during collision dispatch (CollisionRelationship.TryTransferPlatformVelocity) and
+    // consumed in Update before being reset. Survives from collision time → Update time because
+    // collision runs before CustomActivity in the frame loop.
+    private float _pendingGroundHorizontalVelocity;
+
+    /// <summary>
+    /// The horizontal velocity currently being transferred from a moving platform the entity is
+    /// standing on, or 0 when not on a moving platform. Reflects the value applied during the most
+    /// recent <see cref="Update"/>. Useful when computing the entity's velocity relative to the
+    /// platform — e.g. <c>VelocityX - GroundHorizontalVelocity</c> is zero when the player is idle
+    /// on a moving platform, regardless of platform speed.
+    /// </summary>
+    public float GroundHorizontalVelocity { get; private set; }
 
     private TimeSpan _jumpStartTime;
     private PlatformerValues? _jumpValues;
@@ -149,11 +163,11 @@ public class PlatformerBehavior
 
         if (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero)
         {
-            entity.VelocityX = inputX * effectiveMaxSpeedX;
+            entity.VelocityX = inputX * effectiveMaxSpeedX + _pendingGroundHorizontalVelocity;
         }
         else
         {
-            float targetSpeed = inputX * effectiveMaxSpeedX;
+            float targetSpeed = inputX * effectiveMaxSpeedX + _pendingGroundHorizontalVelocity;
             float velocityX = entity.VelocityX;
             float diff = targetSpeed - velocityX;
 
@@ -238,7 +252,24 @@ public class PlatformerBehavior
         _wasOnGroundLastFrame = IsOnGround;
         _snappedThisFrame = false;
         _slopeSampledThisFrame = false;
+        GroundHorizontalVelocity = _pendingGroundHorizontalVelocity;
+        _pendingGroundHorizontalVelocity = 0f;
     }
+
+    /// <summary>
+    /// Contributes the horizontal velocity of a platform the entity is standing on this frame.
+    /// Folded into the horizontal target inside the next <see cref="Update"/> call so the entity
+    /// rides the platform without input, and carries the platform's momentum into a jump.
+    /// Resets to zero at the end of <see cref="Update"/> — the collision pass must call this
+    /// every frame the entity is in contact with the platform.
+    /// </summary>
+    /// <remarks>
+    /// Called automatically by <see cref="FlatRedBall2.Collision.CollisionRelationship{A,B}"/>
+    /// after a successful response when the platformer side was pushed upward (landed on top of
+    /// the other side, which must be an <see cref="Entity"/>). Last writer wins within a frame —
+    /// if two platforms somehow contribute, only the latter is used.
+    /// </remarks>
+    internal void ContributeGroundVelocity(float vx) => _pendingGroundHorizontalVelocity = vx;
 
     private float ComputeSlopeAdjustedMaxSpeed(PlatformerValues values, float inputX)
     {

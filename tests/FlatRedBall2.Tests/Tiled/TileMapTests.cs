@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using FlatRedBall2.Tiled;
 using Shouldly;
 using Xunit;
@@ -16,6 +17,27 @@ public class TileMapTests
             layers.Add(new TileMapLayer(name));
 
         return new TileMap(width, height, tileWidth, tileHeight, layers, x, y);
+    }
+
+    [Fact]
+    public void GetCellWorldPosition_RowZeroIsAtTop_RowsGoDown()
+    {
+        // Map top-left at (0, 0), 16x16 tiles.
+        var map = CreateTestMap(160f, 160f, 16, 16, ["GameplayLayer"]);
+
+        // Cell (0, 0) center = top-left tile center = (8, -8).
+        map.GetCellWorldPosition(0, 0).ShouldBe(new Vector2(8f, -8f));
+        // Cell (2, 3): X = 2*16 + 8 = 40; Y = -(3*16 + 8) = -56.
+        map.GetCellWorldPosition(2, 3).ShouldBe(new Vector2(40f, -56f));
+    }
+
+    [Fact]
+    public void GetCellWorldPosition_RespectsMapOffset()
+    {
+        var map = CreateTestMap(160f, 160f, 16, 16, ["GameplayLayer"], x: 100f, y: 200f);
+
+        // Cell (0, 0): X = 100 + 8 = 108; Y = 200 - 8 = 192.
+        map.GetCellWorldPosition(0, 0).ShouldBe(new Vector2(108f, 192f));
     }
 
     [Fact]

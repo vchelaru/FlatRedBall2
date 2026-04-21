@@ -119,7 +119,7 @@ AddCollisionRelationship(_ballFactory, solidTiles)
     .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.7f);
 ```
 
-**Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms).
+**Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms) — and for grid-shaped arrangements of those, set `Factory<T>.IsSolidGrid = true` so the factory applies the same seam suppression across adjacent cells (see `entities-and-factories` skill).
 
 ### OneWayDirection (jump-through / cloud platforms)
 
@@ -156,6 +156,15 @@ playerVsClouds.AllowDropThrough = true;
 playerVsClouds.SlopeMode = SlopeCollisionMode.PlatformerFloor; // required for sloped clouds
 playerVsClouds.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
 ```
+
+### Moving-platform velocity transfer (automatic for platformer entities)
+
+When an `IPlatformerEntity` lands on top of a regular `Entity` (separation pushes the platformer
+upward), the engine automatically feeds the other entity's `VelocityX` into the platformer for
+that frame — the player rides the platform and inherits its horizontal momentum on jump. No
+opt-in flag; works on any relationship configured with the standard player setup. Tile
+collections are excluded (tiles don't have a meaningful velocity). See `platformer-movement` for
+the full picture.
 
 ### `AllowDropThrough` — cloud platforms vs. hard one-way barriers
 
