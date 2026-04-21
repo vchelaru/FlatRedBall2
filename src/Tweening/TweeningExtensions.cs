@@ -1,0 +1,72 @@
+using System;
+using FlatRedBall.Glue.StateInterpolation;
+
+namespace FlatRedBall2.Tweening;
+
+/// <summary>
+/// Entry points for tweening floats on <see cref="Entity"/> and <see cref="Screen"/>.
+/// <para>
+/// Tweens are advanced automatically each frame. Entity-scoped tweens are removed when the
+/// entity is destroyed; screen-scoped tweens when the screen is destroyed.
+/// </para>
+/// <para>
+/// Call sites need both <c>using FlatRedBall2.Tweening;</c> (for the extension methods) and
+/// <c>using FlatRedBall.Glue.StateInterpolation;</c> (for <see cref="InterpolationType"/> and
+/// <see cref="Easing"/>). See the tweening skill for the rationale.
+/// </para>
+/// </summary>
+public static class TweeningExtensions
+{
+    /// <summary>
+    /// Starts a tween on <paramref name="entity"/>. The returned <see cref="Tweener"/> is already
+    /// running; its <c>PositionChanged</c> delegate is wired to <paramref name="setter"/>, which
+    /// is invoked each frame with the interpolated value. The setter also receives exactly
+    /// <paramref name="to"/> as its final call when the tween completes. The tween is dropped
+    /// from the entity's internal list automatically on completion, <c>Stop()</c>, or entity destroy.
+    /// </summary>
+    public static Tweener Tween(
+        this Entity entity,
+        Action<float> setter,
+        float from,
+        float to,
+        float durationSeconds,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        var tweener = CreateRunning(setter, from, to, durationSeconds, type, easing);
+        entity._tweens.Add(tweener, setter, to);
+        return tweener;
+    }
+
+    /// <summary>
+    /// Starts a tween owned by <paramref name="screen"/>. Semantics match the entity overload,
+    /// but the tween lives for the screen's lifetime instead of an entity's. Use for tweens that
+    /// have no natural entity owner (camera shakes, UI reveals, global fades).
+    /// </summary>
+    public static Tweener Tween(
+        this Screen screen,
+        Action<float> setter,
+        float from,
+        float to,
+        float durationSeconds,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        var tweener = CreateRunning(setter, from, to, durationSeconds, type, easing);
+        screen._tweens.Add(tweener, setter, to);
+        return tweener;
+    }
+
+    private static Tweener CreateRunning(
+        Action<float> setter, float from, float to, float durationSeconds,
+        InterpolationType type, Easing easing)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        // The 5-arg Tweener ctor calls Start() internally then sets Running=false (upstream
+        // quirk). Call Start() again so the returned tweener is actually advancing.
+        var tweener = new Tweener(from, to, durationSeconds, type, easing);
+        tweener.Start();
+        tweener.PositionChanged = new Tweener.PositionChangedHandler(setter);
+        return tweener;
+    }
+}

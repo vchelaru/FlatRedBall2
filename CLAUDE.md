@@ -44,6 +44,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapeCollection`, enemy navigation pattern
 - `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
+- `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
 - `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
 
 ## Key Architecture Decisions

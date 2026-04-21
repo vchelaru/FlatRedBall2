@@ -138,6 +138,16 @@ public class Entity : ICollidable, IAttachable
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
+    // Tween list — advanced by Screen.Update each frame, cleared on Destroy.
+    internal readonly Tweening.TweenList _tweens = new();
+
+    /// <summary>
+    /// Controls whether this entity's tweens advance this frame. Default <c>true</c>.
+    /// Override to pause tweens for this entity without stopping them (e.g., during a
+    /// stun or per-entity pause state).
+    /// </summary>
+    protected internal virtual bool ShouldAdvanceTweens => true;
+
     /// <summary>
     /// Attaches <paramref name="child"/> to this entity and registers it for rendering.
     /// If <paramref name="child"/> is an <see cref="ICollidable"/> shape, it is included in default collision.
@@ -296,6 +306,7 @@ public class Entity : ICollidable, IAttachable
     public void Destroy()
     {
         CustomDestroy();
+        _tweens.Clear();
         foreach (var visual in _gumChildren)
             _engine?.CurrentScreen?.Remove(visual);
         _gumChildren.Clear();

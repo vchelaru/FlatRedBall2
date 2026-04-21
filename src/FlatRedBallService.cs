@@ -179,6 +179,7 @@ public class FlatRedBallService
     {
         CurrentScreen.DisposeContentWatchers();
         CurrentScreen.CustomDestroy();
+        CurrentScreen._tweens.Clear();
         CurrentScreen.ContentManager.UnloadAll();
 
         // Cancel all async work that was started on the old screen.
