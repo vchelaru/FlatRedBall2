@@ -1,5 +1,30 @@
 # FlatRedBall2 — Todo
 
+## HSV → RGB Color Helper
+**Priority: Eventual** — Every juice-heavy sample (tween popups, particle flashes, randomized enemies) needs vivid varied colors. MonoGame's `Color` is RGBA-only. We keep inlining a ~15-line HsvToRgb in each sample. Candidate: `Color.FromHsv(h, s, v)` (or extension in `FlatRedBall2.Rendering.ColorExtensions`). Surfaced by `AutoEvalTweeningSample` 2026-04-21. Low effort, high reuse.
+
+## Pre-Init vs Reactive-Property Tension
+**Priority: Design discussion** — The `entities-and-factories` skill mandates reactive properties (no configure-then-init). But many init-only fields (spawn color, variant index, starting size) have no meaningful reactive behavior — the property setter after spawn is a no-op unless the author wires it up to whatever the value was used to construct. `AutoEvalTweeningSample` 2026-04-21 hit this: `Pop.FillColor` was used inside `CustomInitialize` to build a `Circle`, and the spawn call site ran `Create()` *before* assigning `FillColor`, so every circle came out white. The fix (reactive property that updates the already-created Circle) works, but the footgun is that *not* writing the reactive version silently fails — no compile error, no runtime exception, just wrong output.
+
+Possible directions:
+- **Factory.Create overload** that takes an `Action<T>` configure callback, invoked before `CustomInitialize`. Entity reads init-only data inside `CustomInitialize` with guaranteed-set values. `_popFactory.Create(p => p.FillColor = color)`.
+- **Lifecycle hook for "after spawn parameters set":** something like `CustomInitializeAfterAssignment` or a two-phase init. Heavier.
+- **Status quo + better skill guidance:** push harder on the reactive rule, call out the "silent wrong output" failure mode.
+
+Decision needed before picking. The Factory.Create overload feels cleanest but adds surface area.
+
+## Tweening / Interpolation
+**Status: v1 landed.** `FlatRedBall.InterpolationCore` NuGet wired; `FlatRedBall2.Tweening` namespace ships `Entity.Tween(...)` (primary, dies with entity) and `Screen.Tween(...)` (secondary). Float-only. Pause-aware via the existing `Screen.IsPaused` branch plus a finer-grained `ShouldAdvanceTweens` override on both Entity and Screen. 10 tests covering lifecycle, completion, destroy-cleanup, concurrent tweens, Stop(), and the pause hook.
+
+Deferred:
+- **Vector2 / Color helpers.** Add once real sample code shows the two-tweener pattern getting verbose.
+
+Rejected:
+- **FRB2-owned `InterpolationType` / `Easing` / `Tween` wrappers.** A wrapper-enum version was committed and reverted. Gum already pulls `FlatRedBall.InterpolationCore` transitively via `FlatRedBall.GumCommon`, so the `FlatRedBall.Glue.StateInterpolation` namespace is present in every FRB2 project whether tweens are used or not. FRB2 wrappers with the same names (even in a different namespace) create IntelliSense auto-import ambiguity — the wrong import silently compiles with the wrong types. One source of truth, even with an ugly namespace, beats two sets of near-identical types. Call sites accept the two-`using` cost. Renames (`TweenCurve`/`Ease`) were considered and also rejected as unnecessary churn.
+
+Long-term idea (not planned):
+- **Extract a shared `FlatRedBall2.Tweening` library that Gum and FRB2 both consume.** Would let us own the type names (cleaner than `FlatRedBall.Glue.StateInterpolation`) via a single deliberate cross-project migration instead of coexisting wrappers. Only worth it if there's an independent reason to restructure the Gum/InterpolationCore dependency.
+
 ## Tiled Collision Objects — Non-goals
 
 Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and sub-cell rect adjacency (rect↔rect, rect↔full-cell, rect↔polygon) are complete. `SlopesSample` demonstrates all of it end-to-end. Remaining out-of-scope items:

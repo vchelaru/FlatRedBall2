@@ -203,6 +203,16 @@ public class Screen
             renderable.Layer = layer;
     }
 
+    // Tween list — advanced each frame, cleared on screen teardown.
+    internal readonly Tweening.TweenList _tweens = new();
+
+    /// <summary>
+    /// Controls whether this screen's tweens (and its entities' tweens) advance this frame.
+    /// Default <c>true</c>. Override for screen-wide tween pausing independent of
+    /// <see cref="IsPaused"/> — e.g., freeze tweens during a cinematic while gameplay still runs.
+    /// </summary>
+    protected virtual bool ShouldAdvanceTweens => true;
+
     // Pause state
     public bool IsPaused { get; private set; }
     public void PauseThisScreen() => IsPaused = true;
@@ -524,6 +534,17 @@ public class Screen
             // 2. Collision phase
             foreach (var rel in _collisionRelationships)
                 rel.RunCollisions();
+
+            // 2.5 Tween advancement — entity tweens before CustomActivity so setter-driven
+            //     state is visible to user code; screen tweens just before screen CustomActivity.
+            if (ShouldAdvanceTweens)
+            {
+                float dt = frameTime.DeltaSeconds;
+                foreach (var entity in _entities)
+                    if (entity.ShouldAdvanceTweens)
+                        entity._tweens.Update(dt);
+                _tweens.Update(dt);
+            }
 
             // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
             foreach (var entity in new List<Entity>(_entities))
