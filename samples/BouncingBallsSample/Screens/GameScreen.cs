@@ -164,7 +164,7 @@ public class GameScreen : Screen
         {
             if (IsPaused)
             {
-                UnpauseThisScreen();
+                ResumeThisScreen();
                 _pauseLabel.IsVisible = false;
             }
             else

@@ -129,7 +129,7 @@ engine.SourceContentRoot = "C:/path/to/my/project";
 
 ## Shipping builds
 
-In a shipped game there's no `.csproj` next to the executable, so `SourceContentRoot` is `null`. `WatchContent`/`WatchContentDirectory` return `null` and silently skip registration. **No `#if DEBUG` needed** — hot-reload is a dev-only no-op in release.
+In a shipped game there's no `.csproj` next to the executable, so `SourceContentRoot` is `null`. `WatchContent`/`WatchContentDirectory` return `null` and skip registration. In debug builds, the engine writes a diagnostic message explaining this is expected when `SourceContentRoot` is unavailable. **No `#if DEBUG` needed** — hot-reload is a dev-only no-op in release.
 
 ## Debouncing
 

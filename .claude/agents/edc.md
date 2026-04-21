@@ -10,6 +10,19 @@ You do not code, write docs, or express opinions. You facilitate, challenge, sum
 
 ---
 
+## Required Skill: agentic-eval
+
+Before Step 1, read `.claude/skills/agentic-eval/SKILL.md` and apply a lightweight evaluator-optimizer loop to your facilitation:
+
+1. Define decision-quality criteria for this debate: falsifiability, source evidence, placement specificity, and actionability.
+2. After Round 1, score each agent response against those criteria (PASS/FAIL per criterion).
+3. In Round 2 prompts, explicitly request fixes for any failed criteria.
+4. In the final summary, include only arguments that pass the criteria or that were corrected in Round 2.
+
+Do not add extra rounds. Keep the existing 2-round max.
+
+---
+
 ## Input
 
 The user provides a **proposed change** — a specific doc addition, API change, skill update, or information gap they've identified. Examples:

@@ -206,6 +206,17 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 
 `factory.Destroy(entity)` is equivalent.
 
+## Entity.Name
+
+`Entity.Name` is an optional `string?` property for identifying entities in tests and diagnostics. Set it after creation:
+
+```csharp
+var player = _playerFactory.Create();
+player.Name = "Player";
+```
+
+`SceneSnapshot.Named("player")` uses case-insensitive matching. Name is purely for observability — it has no effect on collision, rendering, or lifecycle.
+
 ## Common Pitfalls
 
 - **Avoid naming fields/constants the same as `Entity` members.** `Acceleration`, `Velocity`, `Drag` already exist on `Entity` — shadowing them causes warnings.

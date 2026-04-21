@@ -181,7 +181,8 @@ public class Sprite : IRenderable, IAttachable
 
     /// <summary>
     /// Starts playing the named animation from the beginning.
-    /// The name must match a chain in <see cref="AnimationChains"/>.
+    /// If <see cref="AnimationChains"/> is <c>null</c> or the name is missing, this is a no-op.
+    /// Calling this with the current chain name still restarts to frame 0.
     /// </summary>
     public void PlayAnimation(string name)
     {
@@ -279,6 +280,12 @@ public class Sprite : IRenderable, IAttachable
         ApplyCurrentFrame();
     }
 
+    /// <summary>
+    /// Applies the current frame to render state. This updates <see cref="Texture"/>,
+    /// <see cref="SourceRectangle"/>, flip flags, and relative offsets. When
+    /// <see cref="TextureScale"/> is non-null, width/height are recalculated from the frame's
+    /// source rectangle.
+    /// </summary>
     private void ApplyCurrentFrame()
     {
         if (_animationChains == null || _currentChainIndex < 0) return;

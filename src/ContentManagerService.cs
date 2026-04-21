@@ -59,6 +59,13 @@ public class ContentManagerService
     /// build artifact and can't be reloaded at runtime).</description></item>
     /// <item><description>Any other <c>T</c> — delegates to the MonoGame content pipeline.</description></item>
     /// </list>
+    /// <para>
+    /// <b>Cannot load JSON or save data.</b> JSON has no XNB representation; attempting
+    /// to load a <c>.json</c> file through this method throws
+    /// <see cref="Microsoft.Xna.Framework.Content.ContentLoadException"/>. For game data
+    /// files and save data, use <see cref="System.IO.File.ReadAllText"/> +
+    /// <c>System.Text.Json.JsonSerializer.Deserialize</c> directly.
+    /// </para>
     /// </summary>
     public T Load<T>(string path)
     {

@@ -20,6 +20,9 @@ public class Screen
     private readonly List<ICollisionRelationship> _collisionRelationships = new();
     private readonly List<GumRenderable> _gumRenderables = new();
 
+    /// <summary>All entities currently managed by this screen (registered via Factory or <see cref="Register"/>).</summary>
+    public IReadOnlyList<Entity> Entities => _entities;
+
     internal readonly CancellationTokenSource _cts = new();
 
     /// <summary>
@@ -204,9 +207,32 @@ public class Screen
     }
 
     // Pause state
+
+    /// <summary>
+    /// Whether this screen is currently paused. While <c>true</c>, entity physics, entity
+    /// <see cref="Entity.CustomActivity"/>, and collision processing are all suspended.
+    /// <see cref="CustomActivity"/>, Gum UI, and input continue to run normally.
+    /// </summary>
+    /// <seealso cref="PauseThisScreen"/>
+    /// <seealso cref="ResumeThisScreen"/>
     public bool IsPaused { get; private set; }
+
+    /// <summary>
+    /// Freezes entity physics, entity <see cref="Entity.CustomActivity"/>, and collision
+    /// processing. <see cref="CustomActivity"/>, Gum UI, and input remain active so
+    /// pause-menu logic can still respond to player input.
+    /// </summary>
+    /// <seealso cref="ResumeThisScreen"/>
+    /// <seealso cref="IsPaused"/>
     public void PauseThisScreen() => IsPaused = true;
-    public void UnpauseThisScreen() => IsPaused = false;
+
+    /// <summary>
+    /// Resumes a paused screen, re-enabling entity physics, entity
+    /// <see cref="Entity.CustomActivity"/>, and collision processing.
+    /// </summary>
+    /// <seealso cref="PauseThisScreen"/>
+    /// <seealso cref="IsPaused"/>
+    public void ResumeThisScreen() => IsPaused = false;
 
     // Display settings
 
@@ -231,12 +257,54 @@ public class Screen
     public virtual DisplaySettings? PreferredDisplaySettings => null;
 
     // Lifecycle
-    public virtual void CustomInitialize() { }
+
+    /// <summary>
+    /// Override to set up game logic, entities, and factories. Always headless-safe — no
+    /// graphics device is required. Called before <see cref="LoadContent"/>.
+    /// <para>
+    /// Put here: creature/entity state, <c>Factory&lt;T&gt;</c> construction, initial positions,
+    /// game-mode flags, anything that works without a GPU.
+    /// </para>
+    /// </summary>
+    public virtual void Initialize() { }
+
+    /// <summary>
+    /// Override to set up renderer-dependent resources — Gum UI, textures, layers, fonts.
+    /// Requires a graphics device. Called after <see cref="Initialize"/>.
+    /// <para>
+    /// Put here: <c>Layer</c>, <c>Camera.BackgroundColor</c>, Gum controls, HP bars, labels,
+    /// buttons. Anything that would throw in a headless test belongs here instead of
+    /// <see cref="Initialize"/>.
+    /// </para>
+    /// </summary>
+    public virtual void LoadContent() { }
+
+    /// <summary>
+    /// Convenience lifecycle hook called by the engine on screen activation. The default
+    /// implementation calls <see cref="Initialize"/> then <see cref="LoadContent"/> in order.
+    /// <para>
+    /// Prefer overriding <see cref="Initialize"/> and <see cref="LoadContent"/> individually
+    /// so that headless tests can call <see cref="Initialize"/> without a graphics device.
+    /// Override <c>CustomInitialize</c> directly only if you genuinely need both in one place
+    /// and don't care about headless testability.
+    /// </para>
+    /// </summary>
+    public virtual void CustomInitialize()
+    {
+        Initialize();
+        LoadContent();
+    }
+
     public virtual void CustomActivity(FrameTime time) { }
     public virtual void CustomDestroy() { }
 
     // Navigation
 
+    /// <summary>
+    /// Requests a transition to screen <typeparamref name="T"/> at the start of the next frame.
+    /// All entities, collision relationships, Gum UI, and async tasks from the current screen
+    /// are destroyed automatically.
+    /// </summary>
     /// <param name="configure">
     /// Optional callback invoked on the new screen instance before <see cref="CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
@@ -245,6 +313,12 @@ public class Screen
     /// on <see cref="RestartScreen"/>; because C# closures capture variables by reference, mutating
     /// a captured local after this call will change what restart sees. Pass values directly
     /// (<c>s =&gt; s.LevelIndex = 3</c>) rather than via captured locals.
+    /// </para>
+    /// <para>
+    /// To return data from a sub-screen back to its parent, pass the result through
+    /// <paramref name="configure"/> on the return transition:
+    /// <c>MoveToScreen&lt;ParentScreen&gt;(s =&gt; s.ReturnedResult = result)</c>.
+    /// The parent's <see cref="CustomInitialize"/> then reads the property before building the world.
     /// </para>
     /// </param>
     public void MoveToScreen<T>(Action<T>? configure = null) where T : Screen, new()
@@ -330,15 +404,39 @@ public class Screen
     /// your build pipeline maps the source to a different runtime path
     /// (e.g. <c>WatchContent("Assets/player.json", ..., "Content/player.json")</c>).
     /// </para>
+    /// <para>
+    /// For an explicit registration result, call <see cref="TryWatchContent"/>.
+    /// </para>
     /// </summary>
     public ContentWatcher? WatchContent(string sourcePath, Action onChanged, string? destinationPath = null)
     {
-        if (Engine.SourceContentRoot == null) return null;
+        TryWatchContent(sourcePath, onChanged, out var watcher, destinationPath);
+        return watcher;
+    }
+
+    /// <summary>
+    /// Attempts to watch a single content file and returns a registration status.
+    /// Unlike <see cref="WatchContent(string, Action, string?)"/>, this method lets callers
+    /// distinguish "watcher intentionally unavailable in shipping builds" from successful
+    /// registration without relying on null checks alone.
+    /// </summary>
+    public ContentWatchRegistrationStatus TryWatchContent(
+        string sourcePath,
+        Action onChanged,
+        out ContentWatcher? watcher,
+        string? destinationPath = null)
+    {
+        if (Engine.SourceContentRoot == null)
+        {
+            watcher = null;
+            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
+        }
 
         var srcAbs = Path.Combine(Engine.SourceContentRoot, sourcePath);
         var destAbs = Path.Combine(Engine.OutputContentRoot, destinationPath ?? sourcePath);
-        return WatchContent(new FileSystemFileWatcher(srcAbs), onChanged,
+        watcher = WatchContent(new FileSystemFileWatcher(srcAbs), onChanged,
             sourceAbsolutePath: srcAbs, destinationAbsolutePath: destAbs);
+        return ContentWatchRegistrationStatus.Registered;
     }
 
     /// <summary>
@@ -367,16 +465,40 @@ public class Screen
     /// Returns <c>null</c> when <see cref="FlatRedBallService.SourceContentRoot"/> is unset
     /// (shipping build).
     /// </para>
+    /// <para>
+    /// For an explicit registration result, call <see cref="TryWatchContentDirectory"/>.
+    /// </para>
     /// </summary>
     public ContentDirectoryWatcher? WatchContentDirectory(string sourceDirectory, Action<string> onChanged,
         string? destinationDirectory = null)
     {
-        if (Engine.SourceContentRoot == null) return null;
+        TryWatchContentDirectory(sourceDirectory, onChanged, out var watcher, destinationDirectory);
+        return watcher;
+    }
+
+    /// <summary>
+    /// Attempts to watch a content directory tree and returns a registration status.
+    /// Unlike <see cref="WatchContentDirectory(string, Action{string}, string?)"/>, this method
+    /// reports when registration is intentionally unavailable because source content paths do
+    /// not exist in the current runtime environment.
+    /// </summary>
+    public ContentWatchRegistrationStatus TryWatchContentDirectory(
+        string sourceDirectory,
+        Action<string> onChanged,
+        out ContentDirectoryWatcher? watcher,
+        string? destinationDirectory = null)
+    {
+        if (Engine.SourceContentRoot == null)
+        {
+            watcher = null;
+            return ContentWatchRegistrationStatus.SourceContentRootUnavailable;
+        }
 
         var srcAbs = Path.Combine(Engine.SourceContentRoot, sourceDirectory);
         var destAbs = Path.Combine(Engine.OutputContentRoot, destinationDirectory ?? sourceDirectory);
-        return WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
+        watcher = WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
             sourceAbsoluteRoot: srcAbs, destinationAbsoluteRoot: destAbs);
+        return ContentWatchRegistrationStatus.Registered;
     }
 
     /// <summary>

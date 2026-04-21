@@ -14,7 +14,7 @@ Platformer movement is provided by two classes in `FlatRedBall2.Movement`:
 
 ## Minimal Setup
 
-Movement coefficients **must** live in a JSON file, not hardcoded in C#. Copy the template from `.claude/templates/PlatformerConfig/player.platformer.json` into the project's `Content/` folder, adjust values, and add `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj`.
+Movement coefficients are **recommended** in a JSON file for fast tuning and hot-reload. Copy the template from `.claude/templates/PlatformerConfig/player.platformer.json` into the project's `Content/` folder, adjust values, and add `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj`. For prototypes/tests, equivalent hardcoded values in C# are valid.
 
 ```csharp
 public class Player : Entity
@@ -298,7 +298,7 @@ private void UpdateAnimation()
 }
 ```
 
-Call `UpdateAnimation()` at the end of `CustomActivity`, after `_platformer.Update`. `PlayAnimation` is idempotent — calling with the same chain name each frame does not restart the animation.
+Call `UpdateAnimation()` at the end of `CustomActivity`, after `_platformer.Update`. `PlayAnimation` is **not** idempotent — calling with the same chain name restarts from frame 0. Track the last requested chain and only call `PlayAnimation` when the requested chain changes.
 
 For additional states (run, land, wall-slide, double-jump), add cases to the pattern match. Priority is explicit in the code order — no registration API or priority constants needed.
 

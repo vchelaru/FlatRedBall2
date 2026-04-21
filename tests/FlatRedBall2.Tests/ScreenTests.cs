@@ -85,7 +85,7 @@ public class ScreenTests
     }
 
     [Fact]
-    public void UnpauseThisScreen_ResumesEntityCustomActivity()
+    public void ResumeThisScreen_ResumesEntityCustomActivity()
     {
         var engine = new FlatRedBallService();
         var screen = new TestScreen();
@@ -94,7 +94,7 @@ public class ScreenTests
         screen.Register(entity);
         screen.PauseThisScreen();
         screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
-        screen.UnpauseThisScreen();
+        screen.ResumeThisScreen();
         int expectedActivityCount = 1;
 
         screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
