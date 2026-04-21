@@ -1,5 +1,9 @@
 {
   "permissions": {
     "allow": []
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "cat | pwsh -NoProfile -Command '$d=[Console]::In.ReadToEnd()|ConvertFrom-Json -EA SilentlyContinue;$p=$d.context_window.used_percentage;$text=if($p){\"Context: \"+[math]::Round($p)+\"% used\"}else{\"Context: --\"};[char]27+\"[31m\"+$text+[char]27+\"[0m\"'"
   }
 }

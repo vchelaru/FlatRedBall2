@@ -71,7 +71,7 @@ Shape position is relative to the parent entity's position.
 
 ## Excluding a Shape from Default Collision
 
-Pass `isDefaultCollision: false` to attach a shape for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship:
+Pass `isDefaultCollision: false` to attach a **shape** (`AxisAlignedRectangle`, `Circle`, `Polygon`) for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship. This overload requires `ICollidable` — it does **not** exist for `Sprite`. For non-collision renderables like `Sprite`, use plain `Add(child)`:
 
 ```csharp
 // Visual range indicator — renders but never collides by default
@@ -176,6 +176,12 @@ This eliminates any dependency on Factory/CustomInitialize timing. There is no n
 ## Always Use Factory — Even for Single Instances
 
 Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>`. This keeps lifecycle, collision (`IEnumerable<T>`), and `Engine.GetFactory<T>()` all working consistently.
+
+## Solid-Grid Factories (`IsSolidGrid`)
+
+For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AxisAlignedRectangle` child's `RepositionDirections` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapeCollection` does for tile grids, but for entity factories.
+
+Cell size is inferred from the first entity's body; mismatched sizes throw. `TileMap.CreateEntities` automatically wraps its spawn loop in the factory's grid batch so RD is recomputed once at the end. For hand-authored bulk spawns, wrap the loop in `using (factory.BeginGridBatch()) { … }` — without batching, `Create` can't compute cell indices because `X`/`Y` aren't set until after `Create` returns.
 
 ## Spawning Entities from Tiled Object Layers
 

@@ -1,7 +1,5 @@
 # FlatRedBall2 — Todo
 
-See `Done.md` for completed items.
-
 ## Tiled Collision Objects — Non-goals
 
 Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and sub-cell rect adjacency (rect↔rect, rect↔full-cell, rect↔polygon) are complete. `SlopesSample` demonstrates all of it end-to-end. Remaining out-of-scope items:
@@ -41,7 +39,7 @@ The watcher should prefer in-place when possible and fall back to screen restart
 
 #### 1. `RestartScreen()` — prerequisite, independently valuable
 
-> **Status: Increments 1 & 2 landed.** See Done.md ("Screen Restart", "Hot-Reload Restart Hooks"). Death/retry, hot-reload mode, and user `Save`/`RestoreHotReloadState` hooks are in. Engine-managed automatic preservation is open — see below.
+> **Status: Increments 1 & 2 landed.** Death/retry, hot-reload mode, and user `Save`/`RestoreHotReloadState` hooks are in. Engine-managed automatic preservation is open — see below.
 
 **Engine-managed automatic preservation — open, deferred indefinitely until a real pattern emerges.** The original TODO described automatic preservation of camera position and tracked-entity kinematics so most games would get non-jarring hot-reload "for free." A naive `Camera.X/Y/Zoom` preservation was tried and reverted: in any game using `CameraControllingEntity` (the common case), that entity slams `Camera.X/Y` to the player position on the first frame after restart, clobbering any preserved value. The actually-useful preservation is **player position** — once the player is back where they were, `CameraControllingEntity` follows on frame 1 and the camera lands correctly automatically. But the engine doesn't know which entity is "the player." Future ideas worth exploring if friction warrants:
 - **Tagged entities for preservation.** Entities (or entity types) opt in via attribute or interface (e.g. `IHotReloadPreserved`); engine auto-saves their `X/Y/VelocityX/VelocityY/AccelerationX/AccelerationY`. Solves the identification problem with a small annotation cost.
@@ -53,7 +51,7 @@ Until then, the user `Save`/`RestoreHotReloadState` hooks handle this cleanly: w
 
 #### 2. `ContentWatcher` — generic file watch infrastructure
 
-> **Status: Landed.** See Done.md ("ContentWatcher Infrastructure" + "ContentWatcher: Source/Output Mapping + Directory Watch"). `Screen.WatchContent(sourcePath, onChanged, destinationPath?)` and `Screen.WatchContentDirectory(sourceDir, onChanged, destinationDir?)` both in. Auto source-root detection via csproj walk-up, copy-on-change, global debouncing, shipping-build no-op. `content-hot-reload` skill rewritten around directory watching.
+> **Status: Landed.** `Screen.WatchContent(sourcePath, onChanged, destinationPath?)` and `Screen.WatchContentDirectory(sourceDir, onChanged, destinationDir?)` both in. Auto source-root detection via csproj walk-up, copy-on-change, global debouncing, shipping-build no-op. `content-hot-reload` skill rewritten around directory watching.
 
 #### 2b. Allowlist for newly-added content files
 **Priority: Eventual** — Today the hot-reload watcher only fires for files that already exist in the build output (filters editor temp files). Side effect: brand-new content files require one rebuild before they're picked up. That's fine for one-off additions, but workflows like "add PNGs to a Gum project," "drop a new font file in," or "add an animation chain frame" suffer — the user wants the new file to flow into the running game without rebuilding.
@@ -79,11 +77,11 @@ var watcher = new ContentWatcher("Content/player.platformer.json", () => {
 
 #### 4. PNG hot-reload
 
-> **Status: Landed.** See Done.md ("PNG Hot-Reload"). `Engine.Content.Load<Texture2D>(path)` now routes on extension — path-with-extension loads via `Texture2D.FromFile` and registers for reload; bare names still go through the xnb pipeline. `Engine.Content.TryReload(path)` applies same-dimension changes via `SetData`; dimension mismatch returns `false` so the caller restarts. `AnimationChainListSave.ToAnimationChainList` now takes only `ContentManagerService` and routes frame textures through the same unified path. AutoEvalCoinHopperSample wired with a floating Bear.png sprite for end-to-end validation.
+> **Status: Landed.** `Engine.Content.Load<Texture2D>(path)` now routes on extension — path-with-extension loads via `Texture2D.FromFile` and registers for reload; bare names still go through the xnb pipeline. `Engine.Content.TryReload(path)` applies same-dimension changes via `SetData`; dimension mismatch returns `false` so the caller restarts. `AnimationChainListSave.ToAnimationChainList` now takes only `ContentManagerService` and routes frame textures through the same unified path. AutoEvalCoinHopperSample wired with a floating Bear.png sprite for end-to-end validation.
 
 #### 5. TMX hot-reload — in-place tile data updates
 
-> **Status: Landed.** See Done.md ("TMX Hot-Reload"). `TileMap.TryReloadFrom(path)` applies tile-data changes in place; structural changes return `false` for a fallback restart. AutoEvalCoinHopperSample wired and end-to-end verified.
+> **Status: Landed.** `TileMap.TryReloadFrom(path)` applies tile-data changes in place; structural changes return `false` for a fallback restart. AutoEvalCoinHopperSample wired and end-to-end verified.
 
 ## Designer-Placed Spawn Markers (Landed)
 
@@ -155,13 +153,6 @@ Until this ships, use the documented static-field stopgap in the `screens` skill
 - `Polygon.SuppressedEdges` bitfield exists but isn't wired into SAT correctly (opposite edges share the same axis, so edge-level suppression during SAT doesn't eliminate the axis)
 - Consider a post-process MTV filter analogous to rectangles' `ComputeDirectionalSeparation`, or a different approach entirely
 - Tests removed when we deferred this; re-add when addressed
-
-## CI: GitHub Action to Run Unit Tests as a Required Status Check on PRs to `main`
-**Priority: Eventual** — Two pieces:
-1. Add a `.github/workflows/` YAML action that runs `dotnet test tests/FlatRedBall2.Tests/` on every pull request targeting `main` (and ideally on direct pushes to `main` too). Should fail the check on any test failure or build error.
-2. Configure the branch protection rule on `main` to mark this check as a **required status check** so PRs cannot be merged unless it passes.
-
-Catches regressions before merge instead of after. No need immediately, but worth setting up before the contributor base expands.
 
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.

@@ -46,6 +46,16 @@ Exceptions are rare: genuinely untestable changes (e.g., purely cosmetic renames
 
 Follow the test guidelines in `.claude/code-style.md`. **Run tests via Bash yourself** — especially when TDDing. Write the failing test, run it to confirm it actually fails (and fails for the right reason), implement, re-run, confirm green. Don't wait for the user; reasoning about expected failures is not a substitute for actually seeing the failure message.
 
+# External / Third-Party APIs
+
+When you need to know the shape of a third-party API (MonoGame.Extended, MonoGame, Gum, etc.), use these sources in this order:
+
+1. **Official docs or the URL the caller provided.** If you were given a link, read it with WebFetch before anything else.
+2. **A WebSearch for the official docs**, if no link was provided.
+3. **The package's own public XML docs** as surfaced by the compiler / IDE tooltips or visible in referenced source.
+
+**Do NOT decompile DLLs, poke around in `~/.nuget/packages/`, or otherwise reverse-engineer compiled assemblies to figure out an API.** This is a last resort that consistently burns large amounts of time and tokens for little benefit. If the first three sources don't answer your question, **stop and ask the user** — do not proceed to decompilation without explicit permission. A one-line clarification from the user is always cheaper than a decompile spiral.
+
 # After editing
 
 Output: changed files + brief explanation of why. Focus on correctness and brevity over cleverness.

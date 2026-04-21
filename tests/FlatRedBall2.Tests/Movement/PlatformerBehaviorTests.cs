@@ -1313,6 +1313,59 @@ public class PlatformerBehaviorTests
     }
 
     [Fact]
+    public void ContributeGroundVelocity_NoInput_AddsPlatformVelocityToEntityVelocity()
+    {
+        // Standing on a platform moving right at 50 — entity should ride along even with no input.
+        var values = new PlatformerValues { MaxSpeedX = 200f, MaxFallSpeed = 1000f };
+        var behavior = new PlatformerBehavior { AirMovement = values, GroundMovement = values };
+        var entity = MakeGroundedEntity();
+
+        // Simulate the collision pass calling ContributeGroundVelocity, then the behavior runs.
+        behavior.ContributeGroundVelocity(50f);
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(50f);
+    }
+
+    [Fact]
+    public void ContributeGroundVelocity_WithInput_AddsToInputDrivenSpeed()
+    {
+        // Holding right on a right-moving platform stacks: input gives MaxSpeedX, platform adds 50.
+        float maxSpeedX = 200f;
+        var values = new PlatformerValues { MaxSpeedX = maxSpeedX, MaxFallSpeed = 1000f };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = values,
+            GroundMovement = values,
+            MovementInput = new MockAxisInput(x: 1f),
+        };
+        var entity = MakeGroundedEntity();
+
+        behavior.ContributeGroundVelocity(50f);
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityX.ShouldBe(maxSpeedX + 50f);
+    }
+
+    [Fact]
+    public void ContributeGroundVelocity_NotCalledNextFrame_OffsetClears()
+    {
+        // After leaving the platform, no more contribution → the additive offset must be 0.
+        var values = new PlatformerValues { MaxSpeedX = 200f, MaxFallSpeed = 1000f };
+        var behavior = new PlatformerBehavior { AirMovement = values, GroundMovement = values };
+        var entity = MakeGroundedEntity();
+
+        behavior.ContributeGroundVelocity(50f);
+        behavior.Update(entity, MakeFrame(1f / 60f));
+        entity.VelocityX.ShouldBe(50f);
+
+        // Next frame: no ContributeGroundVelocity call. Offset should reset to 0.
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        entity.VelocityX.ShouldBe(0f);
+    }
+
+    [Fact]
     public void ContributeSlopeProbe_On45DegSlope_PopulatesCurrentSlope()
     {
         var tiles = new FlatRedBall2.Collision.TileShapeCollection { GridSize = 16f };

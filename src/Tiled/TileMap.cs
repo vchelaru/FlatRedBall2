@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.Tilemaps;
@@ -189,6 +190,17 @@ public class TileMap
     public int TileHeight => _tileHeight;
 
     /// <summary>
+    /// Returns the world-space center of the tile at (<paramref name="col"/>, <paramref name="row"/>),
+    /// using Tiled's row convention — row 0 is the top row, increasing row moves downward
+    /// (decreasing world Y). No bounds check — callers may pass coordinates outside the map.
+    /// Useful for procedurally spawning entities at specific tile coordinates without
+    /// duplicating the <c>X + col * TileWidth + TileWidth / 2</c> arithmetic.
+    /// </summary>
+    public Vector2 GetCellWorldPosition(int col, int row) => new(
+        _x + col * _tileWidth + _tileWidth / 2f,
+        _y - row * _tileHeight - _tileHeight / 2f);
+
+    /// <summary>
     /// Returns a <see cref="BoundsRectangle"/> suitable for
     /// <see cref="Entities.CameraControllingEntity.Map"/>.
     /// Computed from the current <see cref="X"/>, <see cref="Y"/>,
@@ -269,13 +281,22 @@ public class TileMap
     }
 
     /// <summary>
-    /// Creates entities from tile objects placed on Tiled object layers whose tile class
-    /// matches <paramref name="className"/>. Scans all object layers in the map.
+    /// Creates entities from tiles whose class matches <paramref name="className"/>. Scans
+    /// both object layers (for precisely-placed tile objects) and regular tile layers (for
+    /// painted grid cells). Both sources feed into the same factory call.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Tiled custom properties on each object are automatically applied to matching public
     /// instance properties on the entity via reflection (case-insensitive name match).
     /// Supported property types: <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>.
+    /// Tile-layer cells have no per-cell custom properties; reflection mapping is a no-op
+    /// for that path.
+    /// </para>
+    /// <para>
+    /// If the factory has <see cref="Factory{T}.IsSolidGrid"/> set, the whole scan is wrapped
+    /// in a single grid batch so reposition-direction adjacency is recomputed once at the end.
+    /// </para>
     /// </remarks>
     /// <param name="className">
     /// The tile class to match (case-insensitive). Checked on the object first, then on the
@@ -285,8 +306,21 @@ public class TileMap
     /// <param name="origin">
     /// Which point on the tile becomes the entity's position. Default is <see cref="Origin.Center"/>.
     /// </param>
+    /// <param name="removeSourceTiles">
+    /// When <c>true</c> (default), each source tile is cleared after the entity spawns — the
+    /// painted cell is set to empty and the tile-object is removed from its object layer — so
+    /// the tile visual does not double-draw under the spawned entity. Contrast with
+    /// <see cref="GenerateCollisionFromClass"/>, which leaves source tiles visible because the
+    /// tile itself is the visual. In-memory only; the on-disk TMX is never modified and a fresh
+    /// load re-applies the removal. Pass <c>false</c> to keep the source tile visible (e.g.,
+    /// the tile is both a spawn marker and intentional background art).
+    /// </param>
     /// <returns>The created entities.</returns>
-    public IReadOnlyList<T> CreateEntities<T>(string className, Factory<T> factory, Origin origin = Origin.Center)
+    public IReadOnlyList<T> CreateEntities<T>(
+        string className,
+        Factory<T> factory,
+        Origin origin = Origin.Center,
+        bool removeSourceTiles = true)
         where T : Entity, new()
     {
         if (_tilemap == null)
@@ -295,30 +329,121 @@ public class TileMap
         var created = new List<T>();
         var entityProps = BuildPropertyMap<T>();
 
+        // Batch grid updates across the whole scan when the factory is an IsSolidGrid — a row of
+        // painted bricks should recompute RepositionDirections once at the end, not per-tile.
+        IDisposable? batch = factory.IsSolidGrid ? factory.BeginGridBatch() : null;
+
         foreach (var layer in _tilemap.Layers)
         {
-            if (layer is not TilemapObjectLayer objectLayer)
-                continue;
-
-            foreach (var obj in objectLayer.Objects)
+            switch (layer)
             {
-                if (obj is not TilemapTileObject tileObj)
-                    continue;
-
-                if (!MatchesClass(tileObj, className))
-                    continue;
-
-                var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
-                var entity = factory.Create();
-                entity.X = worldX;
-                entity.Y = worldY;
-
-                ApplyCustomProperties(entity, tileObj.Properties, entityProps);
-                created.Add(entity);
+                case TilemapObjectLayer objectLayer:
+                    ScanObjectLayer(objectLayer, className, origin, factory, entityProps, created, removeSourceTiles);
+                    break;
+                case TilemapTileLayer tileLayer:
+                    ScanTileLayer(tileLayer, className, origin, factory, created, removeSourceTiles);
+                    break;
             }
         }
 
+        batch?.Dispose();
         return created;
+    }
+
+    private void ScanObjectLayer<T>(
+        TilemapObjectLayer objectLayer,
+        string className,
+        Origin origin,
+        Factory<T> factory,
+        Dictionary<string, PropertyInfo> entityProps,
+        List<T> created,
+        bool removeSourceTiles) where T : Entity, new()
+    {
+        // Collect matches first so we can mutate the layer's object list after iteration.
+        List<TilemapTileObject>? toRemove = null;
+
+        foreach (var obj in objectLayer.Objects)
+        {
+            if (obj is not TilemapTileObject tileObj)
+                continue;
+
+            if (!MatchesClass(tileObj, className))
+                continue;
+
+            var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
+            var entity = factory.Create();
+            entity.X = worldX;
+            entity.Y = worldY;
+
+            ApplyCustomProperties(entity, tileObj.Properties, entityProps);
+            created.Add(entity);
+
+            if (removeSourceTiles)
+                (toRemove ??= new List<TilemapTileObject>()).Add(tileObj);
+        }
+
+        if (toRemove != null)
+            foreach (var obj in toRemove)
+                objectLayer.RemoveObject(obj);
+    }
+
+    private void ScanTileLayer<T>(
+        TilemapTileLayer tileLayer,
+        string className,
+        Origin origin,
+        Factory<T> factory,
+        List<T> created,
+        bool removeSourceTiles) where T : Entity, new()
+    {
+        int tw = _tileWidth;
+        int th = _tileHeight;
+
+        for (int row = 0; row < tileLayer.Height; row++)
+        {
+            for (int col = 0; col < tileLayer.Width; col++)
+            {
+                var tileNullable = tileLayer.GetTile(col, row);
+                if (!tileNullable.HasValue || tileNullable.Value.GlobalId == 0)
+                    continue;
+
+                var tileData = tileNullable.Value.GetTileData(_tilemap.Tilesets);
+                if (tileData == null ||
+                    !string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Tile (col, row) in Tiled pixel coords has its bottom-left at
+                // (col*tw, (row+1)*th) measured from the map's top-left, Y-down.
+                // Convert to world space (Y-up) using _x/_y = top-left.
+                float bottomLeftX = _x + col * tw;
+                float bottomLeftY = _y - (row + 1) * th;
+
+                var (worldX, worldY) = OriginOffset(bottomLeftX, bottomLeftY, tw, th, origin);
+
+                var entity = factory.Create();
+                entity.X = worldX;
+                entity.Y = worldY;
+                // Tile layers have no per-cell custom properties — skip reflection mapping.
+                created.Add(entity);
+
+                if (removeSourceTiles)
+                    tileLayer.SetTile(col, row, null);
+            }
+        }
+    }
+
+    private static (float x, float y) OriginOffset(float blX, float blY, float w, float h, Origin origin)
+    {
+        return origin switch
+        {
+            Origin.Center => (blX + w / 2f, blY + h / 2f),
+            Origin.BottomCenter => (blX + w / 2f, blY),
+            Origin.TopCenter => (blX + w / 2f, blY + h),
+            Origin.BottomLeft => (blX, blY),
+            Origin.TopLeft => (blX, blY + h),
+            Origin.BottomRight => (blX + w, blY),
+            Origin.TopRight => (blX + w, blY + h),
+            _ => (blX + w / 2f, blY + h / 2f),
+        };
     }
 
     private bool MatchesClass(TilemapTileObject tileObj, string className)

@@ -180,9 +180,9 @@ public class Sprite : IRenderable, IAttachable
     public event Action? AnimationFinished;
 
     /// <summary>
-    /// Starts playing the named animation from the beginning.
-    /// If <see cref="AnimationChains"/> is <c>null</c> or the name is missing, this is a no-op.
-    /// Calling this with the current chain name still restarts to frame 0.
+    /// Starts playing the named animation. If the named animation is already playing, this is a no-op —
+    /// the current frame and time are preserved so calling this every frame does not restart the animation.
+    /// The name must match a chain in <see cref="AnimationChains"/>.
     /// </summary>
     public void PlayAnimation(string name)
     {
@@ -192,6 +192,7 @@ public class Sprite : IRenderable, IAttachable
         {
             if (_animationChains[i].Name == name)
             {
+                if (_currentChainIndex == i) return;
                 _currentChainIndex = i;
                 _currentFrameIndex = 0;
                 _timeIntoAnimation = 0;
@@ -216,6 +217,7 @@ public class Sprite : IRenderable, IAttachable
             {
                 if (ReferenceEquals(_animationChains[i], chain))
                 {
+                    if (_currentChainIndex == i) return;
                     _currentChainIndex = i;
                     _currentFrameIndex = 0;
                     _timeIntoAnimation = 0;

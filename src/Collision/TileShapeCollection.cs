@@ -967,6 +967,16 @@ public class TileShapeCollection : ICollidable
         return (col, row);
     }
 
+    /// <summary>
+    /// Returns the world-space center of cell (<paramref name="col"/>, <paramref name="row"/>).
+    /// Inverse of <see cref="GetCellAt"/>. No bounds check — callers may pass coordinates
+    /// outside the currently-populated range (useful for procedurally spawning at grid
+    /// positions before any tile has been added there).
+    /// </summary>
+    public Vector2 GetCellWorldPosition(int col, int row) => new(
+        X + col * GridSize + GridSize / 2f,
+        Y + row * GridSize + GridSize / 2f);
+
     /// <inheritdoc cref="Raycast(Vector2, Vector2, out Vector2, out Vector2)"/>
     /// <param name="hitShape">
     /// The shape that produced the hit — an <see cref="AxisAlignedRectangle"/> (full-cell tile or
