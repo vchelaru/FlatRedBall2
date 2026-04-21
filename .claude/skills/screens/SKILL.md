@@ -258,7 +258,7 @@ public override void RestoreHotReloadState(HotReloadState state)
 
 ```csharp
 PauseThisScreen();    // freeze entities
-ResumeThisScreen();   // resume
+UnpauseThisScreen();  // resume
 bool paused = IsPaused;
 ```
 
@@ -272,7 +272,7 @@ public override void CustomActivity(FrameTime time)
 {
     if (Engine.Input.Keyboard.WasKeyPressed(Keys.Escape))
     {
-        if (IsPaused) { ResumeThisScreen(); _pauseOverlay.IsVisible = false; }
+        if (IsPaused) { UnpauseThisScreen(); _pauseOverlay.IsVisible = false; }
         else          { PauseThisScreen();   _pauseOverlay.IsVisible = true;  }
     }
 }

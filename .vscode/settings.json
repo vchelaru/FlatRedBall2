@@ -1,0 +1,12 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^\\$files = Get-ChildItem \\.claude/skills -Recurse -Filter SKILL\\.md; foreach\\(\\$f in \\$files\\)\\{ \\$lines = Get-Content \\$f\\.FullName; \\$inFence=\\$false; \\$fenceLang=''; \\$blocks=0; \\$codeLines=0; \\$csharpBlocks=0; \\$csharpLines=0; foreach\\(\\$line in \\$lines\\)\\{ if\\(\\$line -match '\\^```'\\)\\{ if\\(-not \\$inFence\\)\\{ \\$inFence=\\$true; \\$blocks\\+\\+; \\$fenceLang=\\$line\\.Substring\\(3\\)\\.Trim\\(\\)\\.ToLower\\(\\); if\\(\\$fenceLang -eq 'csharp'\\)\\{ \\$csharpBlocks\\+\\+ \\} \\} else \\{ \\$inFence=\\$false; \\$fenceLang='' \\} continue \\} if\\(\\$inFence\\)\\{ \\$codeLines\\+\\+; if\\(\\$fenceLang -eq 'csharp'\\)\\{ \\$csharpLines\\+\\+ \\} \\} \\}; \"\\$\\(\\$f\\.FullName\\.Replace\\(\\(Get-Location\\)\\.Path \\+ '\\\\\\\\',''\\)\\)`t\\$\\(\\$lines\\.Length\\)`t\\$blocks`t\\$codeLines`t\\$csharpBlocks`t\\$csharpLines\" \\} \\| Sort-Object$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\$files = Get-ChildItem \\.claude/skills -Recurse -Filter SKILL\\.md; foreach\\(\\$f in \\$files\\)\\{ \\$lines = Get-Content \\$f\\.FullName; \\$in=\\$false; \\$lang=''; \\$blocks=0; \\$csharpBlocks=0; \\$totalCodeLines=0; \\$csharpLines=0; foreach\\(\\$line in \\$lines\\)\\{ if\\(\\$line -match '\\^```'\\)\\{ if\\(-not \\$in\\)\\{ \\$in=\\$true; \\$blocks\\+\\+; \\$lang=\\$line\\.Substring\\(3\\)\\.Trim\\(\\)\\.ToLower\\(\\); if\\(\\$lang -eq 'csharp'\\)\\{ \\$csharpBlocks\\+\\+ \\} \\} else \\{ \\$in=\\$false; \\$lang='' \\}; continue \\}; if\\(\\$in\\)\\{ \\$totalCodeLines\\+\\+; if\\(\\$lang -eq 'csharp'\\)\\{ \\$csharpLines\\+\\+ \\} \\} \\}; \"\\$\\(\\$f\\.FullName\\.Replace\\(\\(Get-Location\\)\\.Path \\+ '\\\\\\\\',''\\)\\)`t\\$\\(\\$lines\\.Length\\)`t\\$blocks`t\\$csharpBlocks`t\\$csharpLines\" \\} \\| Sort-Object$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

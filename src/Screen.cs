@@ -214,7 +214,7 @@ public class Screen
     /// <see cref="CustomActivity"/>, Gum UI, and input continue to run normally.
     /// </summary>
     /// <seealso cref="PauseThisScreen"/>
-    /// <seealso cref="ResumeThisScreen"/>
+    /// <seealso cref="UnpauseThisScreen"/>
     public bool IsPaused { get; private set; }
 
     /// <summary>
@@ -222,7 +222,7 @@ public class Screen
     /// processing. <see cref="CustomActivity"/>, Gum UI, and input remain active so
     /// pause-menu logic can still respond to player input.
     /// </summary>
-    /// <seealso cref="ResumeThisScreen"/>
+    /// <seealso cref="UnpauseThisScreen"/>
     /// <seealso cref="IsPaused"/>
     public void PauseThisScreen() => IsPaused = true;
 
@@ -232,7 +232,7 @@ public class Screen
     /// </summary>
     /// <seealso cref="PauseThisScreen"/>
     /// <seealso cref="IsPaused"/>
-    public void ResumeThisScreen() => IsPaused = false;
+    public void UnpauseThisScreen() => IsPaused = false;
 
     // Display settings
 

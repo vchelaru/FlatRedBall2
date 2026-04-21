@@ -183,7 +183,7 @@ PauseThisScreen();           // freeze entities; UI and input stay active
 _dialogPanel.IsVisible = true;
 await Engine.Time.DelayUntil(() => _playerChose, Token);
 _dialogPanel.IsVisible = false;
-ResumeThisScreen();
+UnpauseThisScreen();
 ```
 
 `DelaySeconds` does **not** work here — it counts screen time, which is frozen while paused.

@@ -49,7 +49,7 @@ public class GameScreen : Screen
 
     private void Resume()
     {
-        ResumeThisScreen();
+        UnpauseThisScreen();
         _pauseOverlay.Visible = false;
     }
 }
