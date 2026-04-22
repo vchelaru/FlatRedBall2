@@ -34,6 +34,7 @@ public class MovementConfig
     public MovementSlot? Ground { get; set; }
     public MovementSlot? Air { get; set; }
     public MovementSlot? AfterDoubleJump { get; set; }
+    public MovementSlot? Climbing { get; set; }
 }
 
 /// <summary>
@@ -65,6 +66,8 @@ public class MovementSlot
     public float? JumpVelocity { get; set; }
     public double? JumpApplyLength { get; set; }
     public bool? JumpApplyByButtonHold { get; set; }
+
+    public float? ClimbingSpeed { get; set; }
 
     [JsonPropertyName("minJumpHeight")]
     public float? MinJumpHeight { get; set; }

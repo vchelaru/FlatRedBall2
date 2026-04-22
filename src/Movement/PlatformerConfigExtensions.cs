@@ -9,6 +9,8 @@ public static class PlatformerConfigExtensions
     /// Slots not present in the JSON are left untouched. An <c>afterDoubleJump</c> slot is parsed
     /// but intentionally ignored — <see cref="PlatformerBehavior"/> has no double-jump slot yet;
     /// the schema reserves the name so files authored today stay valid once the slot lands.
+    /// A <c>climbing</c> slot populates <see cref="PlatformerBehavior.ClimbingMovement"/>; jump
+    /// and slope fields inside it are accepted but ignored at runtime.
     /// </summary>
     /// <exception cref="InvalidOperationException">A slot specifies both derived jump fields
     /// (<c>minJumpHeight</c>/<c>maxJumpHeight</c>) and raw jump fields (<c>JumpVelocity</c>/
@@ -33,6 +35,9 @@ public static class PlatformerConfigExtensions
         // afterDoubleJump is parsed (for forward-compat) but has no behavior slot to receive it.
         if (movement.AfterDoubleJump != null)
             _ = ToPlatformerValues(movement.AfterDoubleJump, "afterDoubleJump", airGravity);
+
+        if (movement.Climbing != null)
+            behavior.ClimbingMovement = ToPlatformerValues(movement.Climbing, "climbing", airGravity);
     }
 
     private static PlatformerValues ToPlatformerValues(MovementSlot slot, string slotName, float? airGravity)
@@ -40,6 +45,7 @@ public static class PlatformerConfigExtensions
         var values = new PlatformerValues();
 
         if (slot.MaxSpeedX.HasValue) values.MaxSpeedX = slot.MaxSpeedX.Value;
+        if (slot.ClimbingSpeed.HasValue) values.ClimbingSpeed = slot.ClimbingSpeed.Value;
         if (slot.AccelerationTimeX.HasValue) values.AccelerationTimeX = TimeSpan.FromSeconds(slot.AccelerationTimeX.Value);
         if (slot.DecelerationTimeX.HasValue) values.DecelerationTimeX = TimeSpan.FromSeconds(slot.DecelerationTimeX.Value);
 

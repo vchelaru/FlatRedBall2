@@ -265,6 +265,28 @@ public class PlatformerConfigTests
     }
 
     [Fact]
+    public void ApplyTo_ClimbingSlot_PopulatesClimbingMovement()
+    {
+        var json = """
+        {
+          "movement": {
+            "ground":   { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 48 },
+            "air":      { "MaxSpeedX": 100, "Gravity": 1500 },
+            "climbing": { "MaxSpeedX": 80, "ClimbingSpeed": 120 }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        behavior.ClimbingMovement.ShouldNotBeNull();
+        behavior.ClimbingMovement!.MaxSpeedX.ShouldBe(80f);
+        behavior.ClimbingMovement.ClimbingSpeed.ShouldBe(120f);
+    }
+
+    [Fact]
     public void FromJsonString_UnknownTopLevelKeys_LoadsWithoutError()
     {
         // leftSuffix/rightSuffix/animations are not consumed by the loader but may appear in

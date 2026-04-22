@@ -47,6 +47,26 @@ Templates live in `.claude/templates/` — copy from there into the project's `C
 
 The scaffold must be *valid and runnable* — the game should build and play immediately, using shape-based stand-ins for missing art. The human then iterates on content without the AI being in the loop.
 
+### The One-of-Each Rule
+
+**Scaffold exactly one of each thing the code references — not zero, not many.** The scaffold's job is to prove every code path has a reachable content path. It is a smoke test, not a playable level.
+
+- **Zero is a silent failure.** If code calls `GenerateCollisionFromClass("Ladder")` but the TMX has no ladder tiles, the game builds and runs but the feature can't be tested. No error, just absent behavior — the worst kind of bug, because the user sees a working game and assumes the feature is broken.
+- **Many is AI doing level design.** More than one instance means AI is making placement decisions — pacing, spacing, challenge, layout — which is human work. Do not author a 60×30 "demo level" with platforms and gaps arranged to showcase mechanics; place one tile of each referenced class and stop.
+- **If you find yourself reaching for a loop, a procedural generator, or an external tool (Python, shell scripts) to produce tile data, stop.** You have crossed from scaffolding into authoring. The scaffold should be small enough to type by hand in under a minute.
+
+Concrete examples of "one of each":
+
+| Code references | Scaffold must contain |
+|-----------------|------------------------|
+| `GenerateCollisionFromClass("SolidCollision")` | The base template's walled arena (already present in `base.tmx` — do not strip it) |
+| `GenerateCollisionFromClass("Ladder")` | Exactly 1 ladder tile, placed in the open interior |
+| `GenerateCollisionFromClass("Fence")` | Exactly 1 fence tile, placed in the open interior |
+| `map.CreateEntities("Coin", coinFactory)` | Exactly 1 coin marker |
+| `map.CreateEntities("PlayerSpawn", ...)` | Exactly 1 player-spawn marker |
+
+The human opens the scaffold in Tiled, sees that every collision/entity type is hooked up correctly, and then designs the real level by copying tiles around. If anything is missing, they notice immediately — because the code references it but there's no tile for it.
+
 ## Hot Reload — Required for Every Gameplay Screen
 
 The human iterates on content (TMX, JSON, PNGs) while the game is running. Without hot reload they must restart the game after every edit — this breaks the feedback loop that makes content authoring practical.
@@ -92,6 +112,7 @@ Do not bury this in a summary. The user needs to know exactly which files to ope
 ## Anti-Patterns
 
 - **Hardcoding level geometry in C#** instead of a TMX — the human now has to edit code to move a platform.
+- **Authoring a full level in the scaffold** (platforms, gaps, challenge arrangements) instead of placing one of each referenced tile class. Violates the one-of-each rule above. If you're generating tile CSV with a loop or an external script, you have already failed the rule.
 - **Hardcoding `PlatformerValues` in C#** (`new PlatformerValues { MaxSpeedX = 150f, ... }`) instead of a `player.platformer.json` — every tuning pass is a recompile. Use `PlatformerConfig.FromJson(...).ApplyTo(behavior)` instead.
 - **Generating sprites procedurally "to avoid needing art"** — it is almost always better to use a shape placeholder and have the human drop real art in later.
 - **Silently skipping the handoff** — finishing a task without telling the user which files they need to touch.

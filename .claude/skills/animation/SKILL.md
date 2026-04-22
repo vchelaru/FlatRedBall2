@@ -82,7 +82,7 @@ sprite.PlayAnimation("Walk");
 | `AnimationChains` | `null` | Assign before calling `PlayAnimation` |
 | `PlayAnimation(string name)` | — | Looks up by name; no-op if not found |
 | `PlayAnimation(AnimationChain chain)` | — | Play a specific chain directly |
-| `Animate` | `false` | Set to `false` to pause mid-animation |
+| `Animate` | `false` | Auto-managed by `PlayAnimation` and the non-looping end-of-chain. **Do not write to this from game code to express idle/still/hanging state** — see Gotchas |
 | `IsLooping` | `true` | Set to `false` for one-shot animations |
 | `AnimationSpeed` | `1f` | Multiplier; `2f` = double speed |
 | `CurrentAnimation` | — | Read-only; returns the active `AnimationChain` |
@@ -117,6 +117,7 @@ FRB2 does not provide an engine-level animation controller for platformers. Anim
 
 ## Gotchas
 
+- **Never pause animation to express "still" state.** Animation runs continuously. If a state should appear motionless (idle, hanging on a ladder, holding a charge), the **content author** makes a chain that *looks* still — a 1-frame chain, or better, a multi-frame chain with subtle motion (hair blowing, eyes blinking, breath rise/fall). Game code switching `_sprite.Animate = false` is a layering violation: it bakes a content decision (is this state animated?) into engine-driving code, and it forecloses content choices the author may want later. The only correct writers of `Animate` are `PlayAnimation` (sets true) and the non-looping end-of-chain hook (sets false). If you find yourself reaching for `_sprite.Animate = ...`, you want a different chain instead.
 - **`AnimationChains` must be set before `PlayAnimation`** — calling `PlayAnimation` on a sprite with null `AnimationChains` is a silent no-op.
 - **Non-looping animation stops on the last frame** — `Animate` is set to `false` automatically; call `PlayAnimation` again to restart.
 - **Animation is paused when the screen is paused** — `AnimateSelf` is called inside the `!IsPaused` block in `Screen.Update`.

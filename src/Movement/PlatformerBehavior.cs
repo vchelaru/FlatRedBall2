@@ -15,6 +15,100 @@ public class PlatformerBehavior
 
     public PlatformerValues AirMovement { get; set; } = new();
 
+    /// <summary>
+    /// Movement values used while <see cref="IsClimbing"/> is true. Must be non-null before
+    /// <see cref="Update"/> runs with <see cref="IsClimbing"/> = true, or
+    /// <see cref="InvalidOperationException"/> is thrown. Consumed fields:
+    /// <see cref="PlatformerValues.MaxSpeedX"/> / <see cref="PlatformerValues.AccelerationTimeX"/>
+    /// / <see cref="PlatformerValues.DecelerationTimeX"/> (horizontal on ladder),
+    /// <see cref="PlatformerValues.ClimbingSpeed"/> (vertical), and
+    /// <see cref="PlatformerValues.JumpVelocity"/> / <see cref="PlatformerValues.JumpApplyLength"/>
+    /// / <see cref="PlatformerValues.JumpApplyByButtonHold"/> (applied when the player presses
+    /// jump to leave the ladder). Gravity, slope, and drop-through fields are ignored while
+    /// climbing.
+    /// </summary>
+    public PlatformerValues? ClimbingMovement { get; set; }
+
+    /// <summary>
+    /// Game-set flag that enters/exits the climbing state. While true, <see cref="Update"/>
+    /// selects <see cref="ClimbingMovement"/> as the active slot, suppresses gravity, drives
+    /// <c>VelocityY</c> from <c>MovementInput.Y * ClimbingMovement.ClimbingSpeed</c>, skips
+    /// fall-speed clamping and drop-through, and on a jump-press clears this flag and applies
+    /// <see cref="ClimbingMovement"/>'s jump fields. Ladder detection, enter triggers, fall-off,
+    /// and X-snap remain game-code concerns. To forbid jump-off entirely (rare), null
+    /// <see cref="JumpInput"/> while this is true.
+    /// </summary>
+    public bool IsClimbing { get; set; }
+
+    /// <summary>
+    /// Optional world-Y top of the climb column honored while <see cref="IsClimbing"/>. When
+    /// non-null, the entity is clamped so the climb-detection shape's bottom sits just inside
+    /// the column's top cell (preserves overlap so the climb persists at the top instead of
+    /// exiting and re-grabbing). Upward velocity is zeroed at the clamp. Leave null for
+    /// "walk off the top" ladders where the game handles top-exit itself. Set automatically
+    /// each frame to the top of the active column when <see cref="Ladders"/> or
+    /// <see cref="Fences"/> drives entry.
+    /// </summary>
+    public float? TopOfLadderY { get; set; }
+
+    /// <summary>
+    /// Snapping ladders — single-column, vertical-only. When assigned, the behavior runs an
+    /// overlap scan against the entity's <see cref="CollisionShape"/> each frame: pressing Up while
+    /// overlapping (or pressing Down while grounded above a ladder) snaps X to the column center,
+    /// sets <see cref="IsClimbing"/>, and re-pins X every frame so horizontal input does not drift
+    /// the entity off the ladder. Leave null to disable.
+    /// </summary>
+    public TileShapeCollection? Ladders { get; set; }
+
+    /// <summary>
+    /// 2D fence climb surfaces (SMW-style). When assigned, overlapping + Up/Down enters the
+    /// climbing state with X preserved; horizontal input remains active for L/R traversal across
+    /// the fence. Leave null to disable.
+    /// </summary>
+    public TileShapeCollection? Fences { get; set; }
+
+    /// <summary>
+    /// Threshold on <see cref="MovementInput"/>.Y for triggering ladder/fence enter/exit.
+    /// Default 0.5 matches digital keyboard/dpad input. Lower for analog sticks with a small
+    /// deadzone if the default feels unresponsive.
+    /// </summary>
+    public float DirectionalInputThreshold { get; set; } = 0.5f;
+
+    /// <summary>
+    /// Optional sub-shape used for <see cref="Ladders"/>/<see cref="Fences"/> overlap detection
+    /// instead of <see cref="CollisionShape"/>. When null (default), the climb scan uses
+    /// <see cref="CollisionShape"/> — same shape as wall/floor collision. Assign a separate
+    /// rectangle to decouple climb feel from physical body extent: a small rect at the body
+    /// center gives Mario-style "must be centered on the ladder" detection (player can hang over
+    /// the edge before letting go); a wider rect gives a generous grab. Parent it to the entity
+    /// so it follows the body — the scan reads <c>AbsoluteX</c>/<c>AbsoluteY</c>.
+    /// </summary>
+    public AxisAlignedRectangle? ClimbingShape { get; set; }
+
+    /// <summary>True while climbing a snapping ladder (X-locked). False for fence climbs and when not climbing.</summary>
+    public bool IsOnLadder => IsClimbing && _lockedLadderX.HasValue;
+
+    /// <summary>True while climbing a fence (X free).</summary>
+    public bool IsOnFence => IsClimbing && Fences != null && !_lockedLadderX.HasValue;
+
+    // Non-null while climbing a snapping ladder; null on fences. Used to re-pin X post-Update.
+    private float? _lockedLadderX;
+    // One-frame guard so a grounded enter (Up pressed while standing under a ladder) does not
+    // self-cancel via the IsOnGround exit condition on the same frame.
+    private bool _enteredClimbThisFrame;
+    // Set when the top-of-ladder clamp ran this frame. Triggers a post-clamp overlap re-scan in
+    // the exit gate — without this, a frame where physics overshot the top would see stale
+    // (pre-clamp) preLadderCol and spuriously exit even though the clamp pulled the entity back
+    // into the ladder. Without the rescan: physics overshoot → exit → fall → re-grab → bounce.
+    private bool _clampedAtTopThisFrame;
+    // Last known surface + column the entity was climbing. Maintained so a single frame of
+    // overshoot (physics moved the entity past the topmost cell) doesn't lose TopOfLadderY —
+    // without the cache, the overshoot frame computes TopOfLadderY = null, the clamp doesn't
+    // fire, and the entity sails past the top. Set on enter and refreshed each frame overlap
+    // is found; cleared on exit.
+    private TileShapeCollection? _activeClimbSurface;
+    private int _activeClimbCol;
+
     // Input — must be set before Update is called
     public IPressableInput? JumpInput { get; set; }
     public I2DInput? MovementInput { get; set; }
@@ -132,7 +226,72 @@ public class PlatformerBehavior
     {
         if (time.DeltaSeconds == 0f) return;
 
+        if (IsClimbing && ClimbingMovement == null)
+        {
+            throw new InvalidOperationException(
+                "PlatformerBehavior.IsClimbing is true but ClimbingMovement is null — " +
+                "assign a PlatformerValues with MaxSpeedX and ClimbingSpeed before entering the climbing state.");
+        }
+
         _frameIndex++;
+
+        // Pre-Update climb gate. Runs before "A. Determine ground state" so the right movement
+        // slot drives this frame's velocity. Short-circuits when no climb surfaces are assigned.
+        int? preLadderCol = null;
+        int? preFenceCol = null;
+        bool hasClimbSurfaces = Ladders != null || Fences != null;
+        if (hasClimbSurfaces)
+        {
+            if (CollisionShape == null)
+            {
+                throw new InvalidOperationException(
+                    "PlatformerBehavior needs CollisionShape set to resolve body overlap against " +
+                    "Ladders/Fences. Assign the entity's AxisAlignedRectangle to CollisionShape " +
+                    "before entering the activity loop.");
+            }
+
+            _enteredClimbThisFrame = false;
+            _clampedAtTopThisFrame = false;
+            float climbInputY = MovementInput?.Y ?? 0f;
+
+            preLadderCol = FindOverlappingColumn(Ladders, entity);
+            preFenceCol = FindOverlappingColumn(Fences, entity);
+            bool overlappingLadder = preLadderCol.HasValue;
+            bool overlappingFence = preFenceCol.HasValue;
+
+            if (!IsClimbing)
+            {
+                if (overlappingLadder && ShouldEnterLadder(entity, climbInputY))
+                    EnterLadder(entity, Ladders!, preLadderCol!.Value);
+                else if (overlappingFence && ShouldEnterFence(climbInputY))
+                    EnterFence();
+            }
+
+            // Refresh cached active surface+column whenever the body overlaps something. The
+            // cache lets TopOfLadderY survive a single-frame physics overshoot past the top of
+            // the column — without it, the overshoot frame would compute TopOfLadderY=null,
+            // the clamp would not fire, and the entity would sail past the top.
+            if (overlappingLadder)
+            {
+                _activeClimbSurface = Ladders;
+                _activeClimbCol = preLadderCol!.Value;
+            }
+            else if (overlappingFence)
+            {
+                _activeClimbSurface = Fences;
+                _activeClimbCol = preFenceCol!.Value;
+            }
+
+            // Track TopOfLadderY every frame we're climbing — including the entry frame and
+            // overshoot frames. For a fence with an uneven top edge, the value updates as the
+            // player slides L/R.
+            if (IsClimbing)
+            {
+                TopOfLadderY = _activeClimbSurface != null
+                    ? ComputeTopOfColumnY(_activeClimbSurface, _activeClimbCol)
+                    : null;
+            }
+        }
 
         if (DiagLogPerFrameState && OnSnapDiagnostic != null)
         {
@@ -156,9 +315,11 @@ public class PlatformerBehavior
         else if (inputX < 0f)
             DirectionFacing = HorizontalDirection.Left;
 
-        var current = IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement;
+        var current = IsClimbing
+            ? ClimbingMovement!
+            : (IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement);
 
-        if (!IsOnGround) CurrentSlope = 0f;
+        if (!IsOnGround || IsClimbing) CurrentSlope = 0f;
         float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
 
         if (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero)
@@ -189,64 +350,117 @@ public class PlatformerBehavior
             entity.AccelerationX = clampedDiff / time.DeltaSeconds;
         }
 
-        // C. Apply gravity
-        entity.AccelerationY = -current.Gravity;
-
-        // E. Handle jump (before fall-speed clamp so jump velocity is applied first).
-        // Down+Jump while grounded triggers drop-through instead of a regular jump, so the
-        // entity falls through any jump-through platform it is standing on. Suppression lasts
-        // one frame — after that, LastPosition is below the surface and the one-way gate's
-        // positional check naturally prevents re-landing.
         float inputY = MovementInput?.Y ?? 0f;
-        bool dropThroughTriggered =
-            IsOnGround
-            && JumpInput?.WasJustPressed == true
-            && inputY < -0.5f
-            && current.CanFallThroughOneWayCollision;
 
-        if (dropThroughTriggered)
+        if (IsClimbing)
         {
-            _dropThroughFrame = true;
+            // C'. Climbing: suppress gravity, drive VelocityY directly from input, skip
+            // fall-speed clamp and drop-through. Cancelling any active jump sustain here prevents
+            // "jumped into a ladder then entered climb" from leaving IsApplyingJump stuck true
+            // for the rest of the sustain window.
+            entity.AccelerationY = 0f;
+            entity.VelocityY = inputY * current.ClimbingSpeed;
+            IsApplyingJump = false;
+
+            // Jump-off: pressing jump while climbing exits climbing and applies the climbing
+            // slot's jump fields (same shape as a ground jump, sustain included). JumpVelocity = 0
+            // gives a "drop off without upward velocity" feel; games that want to forbid jump-off
+            // should null JumpInput while IsClimbing.
+            if (JumpInput?.WasJustPressed == true)
+            {
+                IsClimbing = false;
+                entity.VelocityY = current.JumpVelocity;
+                if (current.JumpApplyLength > TimeSpan.Zero)
+                {
+                    _jumpStartTime = time.SinceGameStart;
+                    _jumpValues = current;
+                    IsApplyingJump = true;
+                }
+            }
+            else if (TopOfLadderY.HasValue)
+            {
+                // Clamp so the climb shape's bottom rests 0.5 inside the column's top cell. If we
+                // clamped entity.Y to TopOfLadderY directly, the climb shape would sit just above
+                // the top tile — next frame's overlap scan would return null and lostOverlap would
+                // exit the climb, dropping the player back into the ladder for re-grab → bounce.
+                // Manual state-machine callers (no CollisionShape, no ClimbingShape) get the simple
+                // clamp at TopOfLadderY; they're driving IsClimbing themselves so the bounce
+                // doesn't apply.
+                var probe = ClimbingShape ?? CollisionShape;
+                float maxEntityY = probe != null
+                    ? TopOfLadderY.Value - (probe.AbsoluteY - probe.Height / 2f - entity.Y) - 0.5f
+                    : TopOfLadderY.Value;
+                if (entity.Y >= maxEntityY)
+                {
+                    entity.Y = maxEntityY;
+                    if (entity.VelocityY > 0f) entity.VelocityY = 0f;
+                    _clampedAtTopThisFrame = true;
+                }
+            }
+
+            _suppressOneWay = false;
+            _dropThroughFrame = false;
         }
-        else if (JumpInput?.WasJustPressed == true && IsOnGround)
+        else
         {
-            entity.VelocityY = current.JumpVelocity;
-            _jumpStartTime = time.SinceGameStart;
-            _jumpValues = current;
-            IsApplyingJump = true;
+            // C. Apply gravity
+            entity.AccelerationY = -current.Gravity;
+
+            // E. Handle jump (before fall-speed clamp so jump velocity is applied first).
+            // Down+Jump while grounded triggers drop-through instead of a regular jump, so the
+            // entity falls through any jump-through platform it is standing on. Suppression lasts
+            // one frame — after that, LastPosition is below the surface and the one-way gate's
+            // positional check naturally prevents re-landing.
+            bool dropThroughTriggered =
+                IsOnGround
+                && JumpInput?.WasJustPressed == true
+                && inputY < -0.5f
+                && current.CanFallThroughOneWayCollision;
+
+            if (dropThroughTriggered)
+            {
+                _dropThroughFrame = true;
+            }
+            else if (JumpInput?.WasJustPressed == true && IsOnGround)
+            {
+                entity.VelocityY = current.JumpVelocity;
+                _jumpStartTime = time.SinceGameStart;
+                _jumpValues = current;
+                IsApplyingJump = true;
+            }
+
+            if (IsApplyingJump && _jumpValues != null)
+            {
+                if (entity.LastReposition.Y < 0)
+                {
+                    // Ceiling hit — cancel sustain and kill upward velocity so the entity drops immediately
+                    IsApplyingJump = false;
+                    entity.VelocityY = 0f;
+                }
+                else if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
+                {
+                    IsApplyingJump = false;
+                }
+                else if (time.SinceGameStart - _jumpStartTime >= _jumpValues.JumpApplyLength)
+                {
+                    IsApplyingJump = false;
+                }
+                else
+                {
+                    entity.AccelerationY = 0f;
+                    entity.VelocityY = _jumpValues.JumpVelocity;
+                }
+            }
+
+            // D. Clamp fall speed (after jump sustain)
+            entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
+
+            // F. Drop-through state: the flag lasts exactly one frame (set above, consumed here).
+            _suppressOneWay =
+                _dropThroughFrame
+                || (!IsOnGround && inputY < -0.5f && current.CanFallThroughOneWayCollision);
+            _dropThroughFrame = false;
         }
-
-        if (IsApplyingJump && _jumpValues != null)
-        {
-            if (entity.LastReposition.Y < 0)
-            {
-                // Ceiling hit — cancel sustain and kill upward velocity so the entity drops immediately
-                IsApplyingJump = false;
-                entity.VelocityY = 0f;
-            }
-            else if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
-            {
-                IsApplyingJump = false;
-            }
-            else if (time.SinceGameStart - _jumpStartTime >= _jumpValues.JumpApplyLength)
-            {
-                IsApplyingJump = false;
-            }
-            else
-            {
-                entity.AccelerationY = 0f;
-                entity.VelocityY = _jumpValues.JumpVelocity;
-            }
-        }
-
-        // D. Clamp fall speed (after jump sustain)
-        entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
-
-        // F. Drop-through state: the flag lasts exactly one frame (set above, consumed here).
-        _suppressOneWay =
-            _dropThroughFrame
-            || (!IsOnGround && inputY < -0.5f && current.CanFallThroughOneWayCollision);
-        _dropThroughFrame = false;
 
         // G. Record ground state for next frame's snap gate, and reset per-frame flags.
         _wasOnGroundLastFrame = IsOnGround;
@@ -254,6 +468,156 @@ public class PlatformerBehavior
         _slopeSampledThisFrame = false;
         GroundHorizontalVelocity = _pendingGroundHorizontalVelocity;
         _pendingGroundHorizontalVelocity = 0f;
+
+        // Post-Update climb cleanup. Runs after IsOnGround is set for the current frame so the
+        // exit check sees this-frame ground state (the climbing branch above leaves IsOnGround
+        // alone since LastReposition still reflects collision results).
+        if (hasClimbSurfaces)
+        {
+            float climbInputY = MovementInput?.Y ?? 0f;
+
+            if (IsClimbing)
+            {
+                // If the top-of-ladder clamp moved the entity back into the ladder this frame,
+                // the start-of-frame preLadderCol/preFenceCol were computed at the overshot
+                // position and may be null — re-scan at the clamped position so reaching the top
+                // doesn't trigger a spurious exit (which would cause a fall/re-grab bounce).
+                int? lostScanLadder = preLadderCol;
+                int? lostScanFence = preFenceCol;
+                if (_clampedAtTopThisFrame)
+                {
+                    lostScanLadder = FindOverlappingColumn(Ladders, entity);
+                    lostScanFence = FindOverlappingColumn(Fences, entity);
+                    // Refresh cache from rescan so next frame's TopOfLadderY uses the post-clamp column.
+                    if (lostScanLadder.HasValue) { _activeClimbSurface = Ladders; _activeClimbCol = lostScanLadder.Value; }
+                    else if (lostScanFence.HasValue) { _activeClimbSurface = Fences; _activeClimbCol = lostScanFence.Value; }
+                }
+                bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue;
+                bool landedWhileDescending = IsOnGround && climbInputY <= 0f && !_enteredClimbThisFrame;
+                if (lostOverlap || landedWhileDescending)
+                {
+                    IsClimbing = false;
+                }
+            }
+
+            // Update may have cleared IsClimbing (jump-off) or we just cleared it above.
+            if (!IsClimbing)
+            {
+                _lockedLadderX = null;
+                _activeClimbSurface = null;
+            }
+            else if (_lockedLadderX.HasValue)
+            {
+                entity.X = _lockedLadderX.Value;
+                entity.VelocityX = 0f;
+            }
+        }
+    }
+
+    private bool ShouldEnterLadder(Entity entity, float inputY)
+    {
+        if (inputY > DirectionalInputThreshold) return true;
+        // Climb-down-from-top: standing on ground with a ladder cell directly below the feet.
+        if (IsOnGround && inputY < -DirectionalInputThreshold && IsLadderBelowFeet())
+            return true;
+        return false;
+    }
+
+    private bool ShouldEnterFence(float inputY)
+        => inputY > DirectionalInputThreshold || inputY < -DirectionalInputThreshold;
+
+    private void EnterLadder(Entity entity, TileShapeCollection surface, int col)
+    {
+        IsClimbing = true;
+        entity.VelocityY = 0f;
+        entity.X = surface.GetCellWorldPosition(col, 0).X;
+        _lockedLadderX = entity.X;
+        _enteredClimbThisFrame = true;
+    }
+
+    private void EnterFence()
+    {
+        IsClimbing = true;
+        // VelocityY cleared so a mid-fall entry doesn't carry residual speed into the climbing
+        // slot; Update overwrites VelocityY from inputY * ClimbingSpeed next anyway, but clearing
+        // matches the ladder-enter semantics and makes inputY=0 entries stationary.
+        _lockedLadderX = null;
+        _enteredClimbThisFrame = true;
+    }
+
+    // Finds the TSC column overlapping the entity's body (on X) that contains a climb tile (on Y)
+    // within the body's vertical span. Returns the column whose center is closest to the entity X
+    // when multiple overlap. Using the player's *center* column via GetCellAt alone produces an
+    // off-by-one snap when the player approaches a ladder from the side — the body overlaps the
+    // ladder but X floors to the adjacent empty column.
+    private int? FindOverlappingColumn(TileShapeCollection? surface, Entity entity)
+    {
+        if (surface == null) return null;
+
+        var body = ClimbingShape ?? CollisionShape!;
+        float halfW = body.Width / 2f;
+        float halfH = body.Height / 2f;
+        float centerX = body.AbsoluteX;
+        float bodyBottomY = body.AbsoluteY - halfH;
+        float bodyTopY = body.AbsoluteY + halfH - 0.5f;
+
+        var (colLeft, _) = surface.GetCellAt(new Vector2(centerX - halfW + 0.5f, bodyBottomY));
+        var (colRight, _) = surface.GetCellAt(new Vector2(centerX + halfW - 0.5f, bodyBottomY));
+        var (_, rowBottom) = surface.GetCellAt(new Vector2(centerX, bodyBottomY));
+        var (_, rowTop) = surface.GetCellAt(new Vector2(centerX, bodyTopY));
+
+        int? best = null;
+        float bestDist = float.MaxValue;
+        for (int c = colLeft; c <= colRight; c++)
+        {
+            bool hasTile = false;
+            for (int r = rowBottom; r <= rowTop; r++)
+            {
+                if (surface.GetTileAtCell(c, r) != null) { hasTile = true; break; }
+            }
+            if (!hasTile) continue;
+
+            float cx = surface.GetCellWorldPosition(c, 0).X;
+            float d = MathF.Abs(cx - centerX);
+            if (d < bestDist) { bestDist = d; best = c; }
+        }
+        return best;
+    }
+
+    // Top-of-column Y: find the top edge of the contiguous climb-tile segment in this column.
+    // Scans up from feet first (handles "feet at or below the ladder"), then down if nothing was
+    // found above (handles physics-overshoot frames where feet just went past the top).
+    private float? ComputeTopOfColumnY(TileShapeCollection surface, int col)
+    {
+        var body = ClimbingShape ?? CollisionShape!;
+        float bodyBottomY = body.AbsoluteY - body.Height / 2f;
+        var (_, feetRow) = surface.GetCellAt(new Vector2(body.AbsoluteX, bodyBottomY));
+        const int MaxSearch = 256;
+
+        int searchRow = feetRow;
+        for (int i = 0; i < MaxSearch && surface.GetTileAtCell(col, searchRow) == null; i++)
+            searchRow++;
+
+        if (surface.GetTileAtCell(col, searchRow) == null)
+        {
+            searchRow = feetRow - 1;
+            for (int i = 0; i < MaxSearch && surface.GetTileAtCell(col, searchRow) == null; i++)
+                searchRow--;
+            if (surface.GetTileAtCell(col, searchRow) == null) return null;
+        }
+
+        int topRow = searchRow;
+        while (surface.GetTileAtCell(col, topRow + 1) != null) topRow++;
+        return surface.GetCellWorldPosition(col, topRow).Y + surface.GridSize / 2f;
+    }
+
+    private bool IsLadderBelowFeet()
+    {
+        if (Ladders == null) return false;
+        var body = ClimbingShape ?? CollisionShape!;
+        float bodyBottomY = body.AbsoluteY - body.Height / 2f;
+        var (col, row) = Ladders.GetCellAt(new Vector2(body.AbsoluteX, bodyBottomY - 1f));
+        return Ladders.GetTileAtCell(col, row) != null;
     }
 
     /// <summary>

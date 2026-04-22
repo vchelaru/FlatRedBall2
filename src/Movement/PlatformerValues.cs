@@ -79,6 +79,16 @@ public class PlatformerValues
     public float MaxFallSpeed;
     public float JumpVelocity;
 
+    /// <summary>
+    /// Vertical speed (world units/sec) applied during climbing when <c>MovementInput.Y</c> is at
+    /// full magnitude. Only used when the containing values instance is assigned to
+    /// <see cref="PlatformerBehavior.ClimbingMovement"/> and
+    /// <see cref="PlatformerBehavior.IsClimbing"/> is true. Horizontal movement on a ladder uses
+    /// <see cref="MaxSpeedX"/> from the same slot; <see cref="Gravity"/>, jump fields, and slope
+    /// fields are ignored while climbing.
+    /// </summary>
+    public float ClimbingSpeed;
+
     /// <summary>How long the jump velocity continues to be applied while the button is held.</summary>
     public TimeSpan JumpApplyLength;
 
