@@ -40,6 +40,7 @@ When a game task adds a new piece of content, AI **must create a placeholder fil
 | A new level | Minimal TMX with collision layer, one spawn marker (see `tmx` skill) | `.claude/templates/Tiled/base.tmx` | Tiled |
 | A new UI screen | Gum screen with named controls in a flat list (see `gum-integration` / `gumcli` skills) | — | Gum Tool |
 | A new platformer entity | `player.platformer.json` with movement coefficients (see `platformer-movement` skill) | `.claude/templates/PlatformerConfig/player.platformer.json` | Text editor (JSON) |
+| A new top-down entity | `player.topdown.json` with movement coefficients (see `top-down-movement` skill) | `.claude/templates/TopDownConfig/player.topdown.json` | Text editor (JSON) |
 | A new animated entity | `.achx` referencing a placeholder spritesheet path | `.claude/templates/AnimationChains/` | Aseprite / FRB animation editor |
 | A new sprite-bearing entity | Code expects `EntityName.png` at a documented size/path | — | Any image editor |
 
@@ -114,6 +115,7 @@ Do not bury this in a summary. The user needs to know exactly which files to ope
 - **Hardcoding level geometry in C#** instead of a TMX — the human now has to edit code to move a platform.
 - **Authoring a full level in the scaffold** (platforms, gaps, challenge arrangements) instead of placing one of each referenced tile class. Violates the one-of-each rule above. If you're generating tile CSV with a loop or an external script, you have already failed the rule.
 - **Hardcoding `PlatformerValues` in C#** (`new PlatformerValues { MaxSpeedX = 150f, ... }`) instead of a `player.platformer.json` — every tuning pass is a recompile. Use `PlatformerConfig.FromJson(...).ApplyTo(behavior)` instead.
+- **Hardcoding `TopDownValues` in C#** (`new TopDownValues { MaxSpeed = 150f, ... }`) instead of a `player.topdown.json` — same reasoning. Use `TopDownConfig.FromJson(...).ApplyTo(behavior)` instead.
 - **Generating sprites procedurally "to avoid needing art"** — it is almost always better to use a shape placeholder and have the human drop real art in later.
 - **Silently skipping the handoff** — finishing a task without telling the user which files they need to touch.
 
