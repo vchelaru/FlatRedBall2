@@ -34,7 +34,10 @@ This single-list overload iterates unique pairs only — no duplicate checks or 
 | `.MoveFirstOnCollision()` | A gets pushed out, B stays fixed. Use for player vs. solid walls. |
 | `.MoveSecondOnCollision()` | B gets pushed out, A stays fixed. |
 | `.MoveBothOnCollision(firstMass, secondMass)` | Both objects share the separation weighted by mass. |
-| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Reflects A's velocity off B's surface normal using impulse physics. `firstMass: 0f` = A moves, B fixed (common for walls). |
+| `.BounceFirstOnCollision(elasticity)` | A bounces off B; B stays fixed. Use for a ball vs. immovable walls. |
+| `.BounceSecondOnCollision(elasticity)` | B bounces off A; A stays fixed. Mirror of the above when the static side is A. |
+| `.BounceBothOnCollision(firstMass, secondMass, elasticity)` | Both sides bounce; separation splits by mass ratio (equal masses share equally). |
+| `.BounceOnCollision(firstMass, secondMass, elasticity)` | Escape hatch for the asymmetric raw-mass case. Prefer the three above. |
 
 ## Responding to Collision Events
 
@@ -58,7 +61,7 @@ Override velocity after the engine's response:
 
 ```csharp
 AddCollisionRelationship(_balls, _paddles)
-    .BounceOnCollision(firstMass: 0f, secondMass: 1f)
+    .BounceFirstOnCollision()
     .CollisionOccurred += (ball, paddle) =>
     {
         ball.VelocityX = /* custom value */;
@@ -112,11 +115,11 @@ When one side is a `TileShapeCollection` containing polygon (slope) tiles, `rela
 ```csharp
 var playerVsTiles = AddCollisionRelationship(_playerFactory, solidTiles);
 playerVsTiles.SlopeMode = SlopeCollisionMode.PlatformerFloor;
-playerVsTiles.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+playerVsTiles.BounceFirstOnCollision(elasticity: 0f);
 
 // Same solidTiles, different relationship, Standard SAT — no conflict.
 AddCollisionRelationship(_ballFactory, solidTiles)
-    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.7f);
+    .BounceFirstOnCollision(elasticity: 0.7f);
 ```
 
 **Prefer `TileShapeCollection` over individual wall entities for static level geometry.** Individual entities sharing edges will cause the player to snag on seams between adjacent tiles because each entity maintains its own `RepositionDirections` independently. `TileShapeCollection` solves this by automatically suppressing interior shared edges. Use individual wall entities only when tiles need independent behavior (e.g., destructible blocks, moving platforms) — and for grid-shaped arrangements of those, set `Factory<T>.IsSolidGrid = true` so the factory applies the same seam suppression across adjacent cells (see `entities-and-factories` skill).
@@ -132,7 +135,7 @@ cloudTiles.AddTileAtCell(3, 5);
 var playerVsClouds = AddCollisionRelationship(_playerFactory, cloudTiles);
 playerVsClouds.OneWayDirection = OneWayDirection.Up;
 playerVsClouds.AllowDropThrough = true; // opt in to Down+Jump drop-through for clouds
-playerVsClouds.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+playerVsClouds.BounceFirstOnCollision(elasticity: 0f);
 ```
 
 Semantics for `Up` — three gates, all must pass:
@@ -154,7 +157,7 @@ var playerVsClouds = AddCollisionRelationship(_playerFactory, cloudTiles);
 playerVsClouds.OneWayDirection = OneWayDirection.Up;
 playerVsClouds.AllowDropThrough = true;
 playerVsClouds.SlopeMode = SlopeCollisionMode.PlatformerFloor; // required for sloped clouds
-playerVsClouds.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+playerVsClouds.BounceFirstOnCollision(elasticity: 0f);
 ```
 
 ### Moving-platform velocity transfer (automatic for platformer entities)
@@ -201,19 +204,24 @@ Direct `Vector2.Distance` checks are fine for simple one-off tests, but prefer s
 - **Type argument mismatch on overloads** — `AddCollisionRelationship<Enemy>(_enemies, _players)` is not the 2-list overload. Use two type args for entity-vs-entity (`<Enemy, Player>`), one type arg only for self-collision, and no explicit type args for `TileShapeCollection`.
 - **Player tunnels through thin walls** — Discrete collision detection; keep velocities reasonable.
 - **Don't use a `DiedThisFrame` flag** — The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
-- **Platformer gotcha**: swapping masses on BounceOnCollision can make the player phase through the floor.
+- **Platformer gotcha**: using the raw `BounceOnCollision(firstMass, secondMass, elasticity)` with swapped masses can make the player phase through the floor. Prefer `BounceFirstOnCollision` / `BounceSecondOnCollision` / `BounceBothOnCollision` — they name the intent and don't require decoding mass numbers at the call site.
 
-## BounceOnCollision — Practical Defaults
+## Bounce Family — Practical Defaults
 
-```csharp
-BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0.9f)
-```
-- **`firstMass = 0f`** — A is fully displaced; B stays fixed. Use for ball vs. immovable walls.
-- **`secondMass = 0f`** — B is fully displaced; A stays fixed. Rarely used.
-- **`elasticity = 1.0f`** — perfectly elastic. `0.9f` = 10% energy loss per bounce. `0f` = no bounce
+Prefer the named methods; they expand into the mass numbers for you:
 
->  **Wall/floor collisions**: keep `firstMass: 0f, secondMass: 1f` so the moving entity is separated from static geometry.
-> **Note:** `BounceOnCollision` only adjusts A's velocity. B is unchanged when `firstMass == 0f`.
+| Scenario | Call |
+|----------|------|
+| Moving entity bounces off static geometry (wall, floor, ceiling) | `.BounceFirstOnCollision(elasticity)` |
+| Static side is A, moving side is B (mirror of above) | `.BounceSecondOnCollision(elasticity)` |
+| Entity vs entity, both sides move (equal or weighted masses) | `.BounceBothOnCollision(firstMass, secondMass, elasticity)` |
+| Anything weirder | `.BounceOnCollision(firstMass, secondMass, elasticity)` (escape hatch) |
+
+**Elasticity**: `1.0f` = perfectly elastic; `0.9f` = 10% energy loss per bounce; `0f` = no bounce.
+
+> **Why name the intent?** In the raw `BounceOnCollision(firstMass, secondMass, elasticity)`, "which side moves" is encoded as a pair of numbers — `(0, 1, e)` means "first is displaced, second is fixed", same *shape* of call as `(1, 1, e)` for "both balls move." The named methods make the intent obvious without requiring the reader to decode masses.
+>
+> On the raw form: lower mass → more displacement. `firstMass = 0f` means A takes all the separation and B stays fixed (the wall case). Only matters when you need asymmetric non-0/non-1 masses, e.g. a light puck (mass 0.3) vs a heavier paddle (mass 1).
 
 ## Shape Dispatch
 

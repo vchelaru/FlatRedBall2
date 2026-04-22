@@ -16,6 +16,12 @@ public class Entity : ICollidable, IAttachable
     private readonly List<ICollidable> _shapes = new();
     private readonly List<GraphicalUiElement> _gumChildren = new();
 
+    /// <summary>
+    /// Optional display name for diagnostics and observability queries.
+    /// When <c>null</c>, tools fall back to <c>GetType().Name</c>.
+    /// </summary>
+    public string? Name { get; set; }
+
     // Position — relative to parent when attached, world when root
     public Vector2 Position;
     public float X { get => Position.X; set { ThrowIfNotFinite(value, nameof(X)); Position.X = value; } }

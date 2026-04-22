@@ -7,6 +7,20 @@ public interface IPressableInput
     bool IsDown { get; }
     bool WasJustPressed { get; }
     bool WasJustReleased { get; }
+
+    /// <summary>
+    /// An <see cref="IPressableInput"/> that is never down and never pressed. Use as a non-null
+    /// default for fields that will be replaced later (e.g. an entity's action input assigned
+    /// from a screen).
+    /// </summary>
+    public static IPressableInput Zero { get; } = new ZeroPressable();
+
+    private sealed class ZeroPressable : IPressableInput
+    {
+        public bool IsDown => false;
+        public bool WasJustPressed => false;
+        public bool WasJustReleased => false;
+    }
 }
 
 /// <summary>

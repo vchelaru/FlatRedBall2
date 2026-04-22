@@ -88,7 +88,7 @@ sprite.PlayAnimation("Walk");
 | `CurrentAnimation` | — | Read-only; returns the active `AnimationChain` |
 | `AnimationFinished` | — | `event Action?` — fires when non-looping animation ends |
 
-`PlayAnimation` resets time to frame 0 and sets `Animate = true`. Call it every time you switch animations (including re-triggering the same one from the start).
+`PlayAnimation` resets time to frame 0 and sets `Animate = true`. Use it when switching animations or intentionally re-triggering from the start. If you call it every frame with the same chain, the animation will keep restarting on frame 0.
 
 ---
 

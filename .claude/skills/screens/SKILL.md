@@ -1,6 +1,6 @@
 ---
 name: screens
-description: "Screens in FlatRedBall2. Use when working with screen lifecycle, screen transitions, MoveToScreen, passing data between screens, CustomInitialize/CustomActivity/CustomDestroy, or starting the first screen. Trigger on any screen management or game state transition question."
+description: "Screens in FlatRedBall2. Use when working with screen lifecycle, screen transitions, MoveToScreen, passing data between screens, CustomInitialize/CustomActivity/CustomDestroy, starting the first screen, pause menu, or pausing/resuming a screen. Trigger on any screen management or game state transition question."
 ---
 
 # Screens in FlatRedBall2
@@ -53,6 +53,39 @@ See `engine-overview` for the full 8-step frame loop. Key ordering for screens:
 | `ContentManager` | `ContentManagerService` | Load textures, fonts, and other content |
 | `RenderList` | `IReadOnlyList<IRenderable>` | All renderables sorted and drawn each frame; use `Add`/`Remove` to modify |
 | `Layers` | `List<Layer>` | Named layers for render ordering |
+
+## Returning Data from a Sub-Screen
+
+When a sub-screen (e.g., a battle screen) needs to pass results back to the parent, use the `configure` callback on the *return* transition. The configure runs before the destination screen's `CustomInitialize`, so the data is ready immediately:
+
+```csharp
+// In BattleScreen — when battle ends, navigate back with the result:
+MoveToScreen<ExplorationScreen>(s => s.ReturnedBattleResult = result);
+
+// In ExplorationScreen — declare the property and read it in CustomInitialize:
+public BattleResult? ReturnedBattleResult { get; set; }  // set via configure
+
+public override void CustomInitialize()
+{
+    if (ReturnedBattleResult != null) { /* resume world state based on result */ }
+}
+```
+
+If the return data must survive a full screen teardown (e.g., the destination is always freshly initialized), use a static field cleared in `CustomInitialize`. This is a stopgap until `Screen.PushScreen`/`PopScreen` ships:
+
+```csharp
+public class ExplorationScreen : Screen
+{
+    public static BattleResult? PendingReturn;  // BattleScreen sets this before transitioning back
+
+    public override void CustomInitialize()
+    {
+        var result = PendingReturn;
+        PendingReturn = null;    // clear — stale value on next entry otherwise
+        if (result != null) { /* apply */ }
+    }
+}
+```
 
 ## Navigating Between Screens
 
@@ -119,9 +152,27 @@ FlatRedBallService.Default.Start<MainMenuScreen>();
 FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
 ```
 
+## Observability — Screen.Entities and SceneSnapshot
+
+`Screen.Entities` exposes all managed entities as `IReadOnlyList<Entity>` (read-only — mutation still goes through `Factory<T>`). Combined with `SceneSnapshot.Capture(screen)`, this lets test code inspect the full game state:
+
+```csharp
+var harness = TestHarness.Create<GameScreen>();
+harness.Screen.CustomInitialize();
+harness.Step(10);
+var snap = harness.Snapshot();
+// Query by type, name, or proximity
+snap.OfType<Player>().ShouldHaveSingleItem();
+snap.Named("coin").Count.ShouldBe(5);
+snap.NearPoint(new Vector2(0, 0), 100f).ShouldNotBeEmpty();
+```
+
 ## Gotchas
 
+- **Delay before transitioning** — to pause before a screen change (e.g., a flash effect), `await Engine.Time.DelaySeconds(t, Token)` first, then call `MoveToScreen<T>()`. Never use `Thread.Sleep` — it freezes the render thread and blocks the game loop entirely.
 - **`MoveToScreen` is deferred** — the transition does not happen immediately. Code after `MoveToScreen<T>()` in the same frame still runs. If you want to stop processing, `return` after the call.
+- **Do not cache entity references across `MoveToScreen`** — the source screen's entities are destroyed on transition. Singletons and static fields must store data values only, not object references to entities.
+- **Save data is not a content asset** — player save files (`PlayerData`, inventory, progress) cannot be loaded via `ContentManager.Load<T>()`. Use `System.IO.File.ReadAllText` + `System.Text.Json.JsonSerializer` directly.
 - **All entities and factories are destroyed automatically** on screen change. You do not need to manually destroy them in `CustomDestroy`.
 - **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.

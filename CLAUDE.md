@@ -35,11 +35,14 @@ Invoke these with the Skill tool when working on specific topics:
 - `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
 - `content-and-assets` — Asset loading
 - `content-hot-reload` — `Screen.WatchContent`, `ContentWatcher`, debouncing, in-place vs screen-restart decision
+- `render-diagnostics` — Headed screenshot diagnostics: deterministic scene setup, camera lock, zoom sweeps, full-frame vs smart-crop, overlay capture, Gum zoom projection gotchas
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
+- `harness` — Headless testing: TestHarness setup, Initialize/LoadContent split, WorldStateTests pattern, what to test vs what not to test
 - `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
 - `levels` — Level data layout and progression
 - `tmx` — TMX map file creation/editing: base template, StandardTileset tile IDs, layer conventions, CSV data
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
+- `grid-movement` — Tile-by-tile grid movement (Pokémon/dungeon-crawler/roguelike): one key = one tile, input gate during tween, pre-move collision check
 - `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
 - `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapeCollection`, enemy navigation pattern
 - `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished

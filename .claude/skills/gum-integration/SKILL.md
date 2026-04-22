@@ -23,7 +23,7 @@ Choose the mode that matches the project setup (see `gumcli` skill for how to cr
 
 ### Forms Controls — interactive UI (`Gum.Forms.Controls`)
 
-High-level controls with built-in click, hover, focus, and keyboard navigation:
+High-level controls with built-in click, hover, focus, and Tab/accessibility keyboard navigation:
 
 | Control | Use for |
 |---------|---------|
@@ -134,6 +134,8 @@ Most games need one or more UI layers. Create them in `CustomInitialize` and add
 | **HUD** | Persistent screen-anchored status display | Score, health bar, fuel gauge, minimap, timer |
 | **TopUI** | Modal overlays that block gameplay | Pause menu, "Exit game?" confirmation, options screen, critical messages |
 
+> For pause menus (TopUI), also call `PauseThisScreen()` / `UnpauseThisScreen()` to actually freeze entity activity — adding the overlay alone does not pause the game. See the `screens` skill.
+
 ```csharp
 // In CustomInitialize — order matters: later = drawn on top
 var hudLayer = new Layer("HUD");
@@ -239,13 +241,42 @@ The API differs by type:
 
 ## Gotchas
 
+- **"Keyboard navigation" on Forms controls means Tab/accessibility focus only — not arrow keys.** Game action menus (battle commands, pause menus) require custom logic: maintain a `_selectedIndex` int and drive selection with `WasKeyPressed(Keys.Up/Down/Left/Right)` in `Screen.CustomActivity`. Apply visual highlight by toggling a property on the selected element. Do not try to use `Button.IsFocused` or `OnKeyDown` for this — Forms focus is designed for form tab-order, not game input.
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
 - **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
+- **Projected world coordinates under zoom** — `Camera.WorldToScreen` gives viewport pixels, but Gum applies zoom scaling during render. For projected Gum overlays (selection rectangles, tile highlights), convert viewport-pixel coordinates into Gum canvas units using zoom compensation (`1 / Camera.Zoom`) to avoid double-scaling drift.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.
 - **No persistence across screen transitions** — Gum elements are fully cleaned up. Add them fresh in each screen's `CustomInitialize`.
 - **World-space Gum**: Do not manually set `Visual.X/Y` on an entity-attached Gum element — it will be overwritten each frame.
+
+For headed screenshot diagnostics (zoom sweeps, overlays, full-frame vs smart-crop capture), use the `render-diagnostics` skill.
+
+## Zoom-Safe Screen-Space Layout Rule
+
+When you place Gum visuals by numeric `X`, `Y`, `Width`, or `Height` values that originate from screen pixels, keep all values in a single coordinate space:
+
+- `Camera.WorldToScreen` returns viewport pixels.
+- Gum visual properties are canvas units under camera zoom.
+
+Use one conversion helper and apply it to both position and size:
+
+```csharp
+static float ToGumUnits(float screenPixels, float zoom)
+  => zoom <= 0.0001f ? screenPixels : screenPixels / zoom;
+```
+
+Do not convert position but leave size unconverted (or vice versa). Mixed spaces cause drift and scale mismatch at non-1x zoom.
+
+### Quick Validation Checklist (Any Runtime Gum Layout)
+
+Before shipping code that computes Gum layout at runtime:
+
+1. Verify the same conversion is used for `X`/`Y` and `Width`/`Height`.
+2. Verify right-edge anchoring math with at least 2 zoom values (`0.5`, `2.0`).
+3. Verify hidden/off-screen panel positions remain fully off-screen at those zoom values.
+4. If values come from world projection, verify no double-scaling by comparing overlay alignment at zoom sweep values.
 
 ## Pattern: Transient World-Space Text (e.g., Floating Score)
 

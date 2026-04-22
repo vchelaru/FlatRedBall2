@@ -21,6 +21,18 @@ public class Camera
     /// <summary>World units visible vertically. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
     public int TargetHeight { get; internal set; } = 720;
 
+    /// <summary>World-space X coordinate of the left edge of the visible area. Accounts for <see cref="Zoom"/>.</summary>
+    public float Left => X - TargetWidth / (2f * Zoom);
+
+    /// <summary>World-space X coordinate of the right edge of the visible area. Accounts for <see cref="Zoom"/>.</summary>
+    public float Right => X + TargetWidth / (2f * Zoom);
+
+    /// <summary>World-space Y coordinate of the bottom edge of the visible area. Accounts for <see cref="Zoom"/> (Y+ up).</summary>
+    public float Bottom => Y - TargetHeight / (2f * Zoom);
+
+    /// <summary>World-space Y coordinate of the top edge of the visible area. Accounts for <see cref="Zoom"/> (Y+ up).</summary>
+    public float Top => Y + TargetHeight / (2f * Zoom);
+
     /// <summary>
     /// Runtime zoom factor. Values greater than 1 zoom in (fewer world units visible);
     /// values less than 1 zoom out (more world units visible). Reset to <see cref="DisplaySettings.Zoom"/> on each screen start.
