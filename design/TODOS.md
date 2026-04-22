@@ -1,5 +1,24 @@
 # FlatRedBall2 — Todo
 
+## CollisionRelationship Enter/Exit Events
+**Priority: Soon** — Add `CollisionStarted` and `CollisionEnded` events to `CollisionRelationship` (sibling to existing `CollisionOccurred`). Standard physics-engine vocabulary (Unity `OnTriggerEnter/Exit`, Box2D `BeginContact/EndContact`). Eliminates the recurring game-side boilerplate where game code must set a `_wasOverlappingX` bool every frame in `CollisionOccurred` and diff at end-of-frame to detect "left the zone." Direct motivator: multi-profile platformer movement (ice/water/sticky surfaces) — without enter/exit events, every zone needs the bool-diff dance in the player class. With them, it's a one-liner subscription.
+
+### Design
+
+- **Naming:** `CollisionStarted` / `CollisionEnded`. Symmetric with `CollisionOccurred`. Avoids Unity's "trigger" vocab (which doesn't fit FRB2's resolving relationships) and avoids "Overlap" (which doesn't fit `MoveFirstOnCollision` cleanly either).
+- **Fires for resolving relationships too** (not just sensors). "First frame the player touched the wall" / "first frame they pulled away" are useful for footsteps, dust puffs, landing animation triggers, etc.
+- **No per-frame allocation in steady state.** Specific data structure is left to the implementation per relationship arity, as long as warmup is the only allocation:
+  - `SingleVsSingle` → one `bool _wasOverlapping`. No collection.
+  - `SingleVsList<T>` → preallocated `HashSet<T>`, swap-and-clear with a previous-frame counterpart.
+  - `ListVsList<T,U>` → preallocated `HashSet<(T,U)>` pair (current/previous), `Clear()` + ref swap each frame. `ValueTuple<T,U>` doesn't box for reference-type entities, so steady state is zero alloc.
+- **Destroyed entity mid-overlap:** do **not** fire `CollisionEnded` on the destroyed entity itself (destruction is the end). **Do** fire `CollisionEnded` on every other entity that was overlapping it last frame, so their state machines clean up correctly. The relationship's tracking set must remove all entries referencing the destroyed entity to prevent stale-pair revivals if the slot is reused.
+- **Tunneling caveat (won't fix, document only):** if an entity moves so fast it overlaps for zero frames between checks, neither `Started` nor `Ended` fires. Same limitation as `CollisionOccurred` today, but the new events make people *expect* edge guarantees, so the skill needs a one-line note.
+
+### Out of scope for v1
+
+- Persistent contact lists exposed to game code (`relationship.CurrentContacts`). Possibly useful but adds API surface; defer until a use case demands it. The events alone solve the multi-profile movement and zone-enter/exit cases.
+- Continuous collision detection to fix tunneling. Separate problem, much larger scope.
+
 ## AnimationFrame Pivot / Origin Support
 **Priority: Eventual** — `AdobeAnimateAtlasSave` parses `pivotX`/`pivotY` per-SubTexture but discards them because `AnimationFrame` has no pivot field. Adobe Animate exports use pivots to keep a character's anchor (e.g. feet) stable across frames of different sizes. Overlaps semantically with the existing `RelativeX`/`RelativeY`, so pick one model: either have the Adobe importer convert pivot → `RelativeX/Y` at load time (no new field; sprites already obey RelativeX/Y) or add true per-frame pivot. The conversion path is probably simpler. Revisit when the first real Adobe-Animate-authored entity lands.
 

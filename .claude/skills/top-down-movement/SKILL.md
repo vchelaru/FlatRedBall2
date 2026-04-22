@@ -53,6 +53,19 @@ public class Player : Entity
 | `IsUsingCustomDeceleration` | If true, uses `CustomDecelerationValue` when entity exceeds `MaxSpeed` (e.g. after a knockback) |
 | `CustomDecelerationValue` | Deceleration magnitude (units/s²) used when `IsUsingCustomDeceleration` is true |
 
+## JSON Config (recommended for tunable values)
+
+Externalize movement values into a JSON file so designers/playtesters can tune feel without a rebuild. Mirrors the platformer `PlatformerConfig` pattern.
+
+```csharp
+using FlatRedBall2.Movement;
+
+var config = TopDownConfig.FromJson("Content/player.topdown.json");
+config.ApplyTo(_topDown);  // populates _topDown.MovementValues
+```
+
+Template: `.claude/templates/TopDownConfig/player.topdown.json`. Omitted fields fall back to engine defaults; partial files override only what they specify. Combine with `Screen.WatchContent` for hot-reload (see `content-hot-reload` skill).
+
 ## Acceleration Setup
 
 ```csharp
