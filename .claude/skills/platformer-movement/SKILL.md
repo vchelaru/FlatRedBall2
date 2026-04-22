@@ -46,7 +46,7 @@ public class Player : Entity
 
 Template: `.claude/templates/PlatformerConfig/player.platformer.json`
 
-**Movement slots** are fixed names mapping to behavior fields: `ground` → `GroundMovement`, `air` → `AirMovement`, `afterDoubleJump` → reserved (parsed but not applied until the behavior wires a double-jump slot). All fields in a slot are nullable; omitted fields fall back to `new PlatformerValues()` defaults.
+**Movement slots** are fixed names mapping to behavior fields: `ground` → `GroundMovement`, `air` → `AirMovement`, `climbing` → `ClimbingMovement` (see "Climbing Ladders" below), `afterDoubleJump` → reserved (parsed but not applied until the behavior wires a double-jump slot). All fields in a slot are nullable; omitted fields fall back to `new PlatformerValues()` defaults.
 
 **Jump configuration** supports two mutually-exclusive modes per slot:
 - **Derived (preferred):** `minJumpHeight` + optional `maxJumpHeight` → calls `SetJumpHeights`.
@@ -112,13 +112,14 @@ private const int MaxAirJumps = 1;  // 1 = double jump
 if (_platformer.IsOnGround)
     _airJumpsRemaining = MaxAirJumps;
 
-bool jumpJustPressed = keyboard.WasKeyPressed(Keys.Space);
-if (jumpJustPressed && !_platformer.IsOnGround && !_platformer.IsApplyingJump && _airJumpsRemaining > 0)
+if (_platformer.JumpInput.WasJustPressed && !_platformer.IsOnGround && !_platformer.IsApplyingJump && _airJumpsRemaining > 0)
 {
     VelocityY = _platformer.AirMovement.JumpVelocity;
     _airJumpsRemaining--;
 }
 ```
+
+Read the jump trigger off `_platformer.JumpInput` rather than the raw keyboard — that way the air jump automatically honors whatever binding (Space+Up, gamepad A, etc.) was configured in `CustomInitialize` via `.Or(...)`.
 
 The `!_platformer.IsApplyingJump` guard prevents the air jump from triggering during the sustain phase of the first jump — the player must reach the peak before double-jumping.
 
@@ -304,6 +305,113 @@ Triggers:
 
 `PlatformerBehavior.IsSuppressingOneWayCollision` reflects the combined state; the one-way gate on each relationship reads it via the player's `IPlatformerEntity.Platformer`, **but only when the relationship has `AllowDropThrough = true`**. Relationships with `AllowDropThrough = false` (the default) ignore the suppression flag so hard one-way barriers remain impassable.
 
+## Climbing Ladders (and SMW-Style Fences)
+
+Climbing is a **fourth movement slot** alongside `GroundMovement`, `AirMovement`, and the reserved `AfterDoubleJump` — authored the same way in JSON, selected by a game-set flag at runtime. The same mechanic covers vertical ladders (single column) and Super Mario World-style fences (multi-column climbable surfaces with potentially uneven tops).
+
+**The engine's contract.** When `PlatformerBehavior.IsClimbing == true` (and `ClimbingMovement` is assigned), `Update` switches the active slot to `ClimbingMovement`, zeros `AccelerationY`, drives `VelocityY = MovementInput.Y * ClimbingSpeed`, and skips fall-speed clamping and drop-through. On a jump press it clears `IsClimbing` and applies the climbing slot's `JumpVelocity`/`JumpApplyLength`/`JumpApplyByButtonHold` (same shape as a ground jump). Horizontal movement runs under the same accel/decel path as the other slots using the climbing slot's `MaxSpeedX`.
+
+**What the engine does NOT do.** Detect ladders. Decide when to enter. Snap the player's X to a ladder's center. Handle walking off the top or falling off the side. Those are game-code concerns — the flag is the full contract.
+
+### JSON
+
+```json
+"climbing": {
+  "MaxSpeedX": 80,             // horizontal speed while on a ladder (usually slower than ground)
+  "ClimbingSpeed": 120,        // vertical speed at full |MovementInput.Y|
+  "JumpVelocity": 250          // upward velocity applied when player presses jump to leave ladder
+                               //   (0 = "drop off" with no upward velocity; same shape as ground jump,
+                               //    so JumpApplyLength/JumpApplyByButtonHold also work here)
+}
+```
+
+**Consumed while climbing:** `MaxSpeedX`, `AccelerationTimeX`, `DecelerationTimeX`, `ClimbingSpeed`, `JumpVelocity`, `JumpApplyLength`, `JumpApplyByButtonHold`.
+
+**Ignored while climbing** (parse without error, no effect): `Gravity`, `MaxFallSpeed`, all slope fields, `CanFallThroughOneWayCollision`.
+
+### Detection: a separate `TileShapeCollection`
+
+Author ladders (and SMW-style fences — same mechanic, different art) as their own `TileShapeCollection`, parallel to the solid-geometry collection. Use a dedicated TMX tile layer (e.g. `"Ladders"`). Do **not** add a `CollisionRelationship` between the player and the ladder collection — the game polls overlap directly each frame, no separation needed.
+
+```csharp
+public class Player : Entity
+{
+    public TileShapeCollection? Ladders { get; set; }   // assigned by the screen after TMX load
+    private readonly PlatformerBehavior _platformer = new();
+}
+```
+
+### Enter / exit pattern
+
+```csharp
+public override void CustomActivity(FrameTime time)
+{
+    bool overlappingLadder = Ladders != null && this.CollidesWith(Ladders);
+    float inputY = _platformer.MovementInput?.Y ?? 0f;
+
+    if (!_platformer.IsClimbing)
+    {
+        bool enterFromMiddle = overlappingLadder && inputY > 0.5f;
+        bool enterFromTop = _platformer.IsOnGround && inputY < -0.5f && IsLadderBelowFeet();
+        if (enterFromMiddle || enterFromTop)
+        {
+            _platformer.IsClimbing = true;
+            VelocityY = 0f;
+            // Optional X-snap to the ladder cell's center — classic feel (Mega Man). Skip for
+            // free-floating fence climbing (SMW), where the player keeps their X.
+            var (col, _) = Ladders!.GetCellAt(new System.Numerics.Vector2(X, Y));
+            X = Ladders.GetCellWorldPosition(col, 0).X;
+        }
+    }
+    else
+    {
+        // Recompute TopOfLadderY every frame — it tracks the player's current column. For a
+        // single-column ladder the value is constant; for an SMW fence with an uneven top edge
+        // the cap updates as the player slides left/right.
+        _platformer.TopOfLadderY = ComputeTopOfLadderY();
+
+        // Exit on landing (engine collision handled separation) or losing overlap (climbed off
+        // the side, or fell off the bottom). Jump-off is engine-handled.
+        if (_platformer.IsOnGround || !overlappingLadder)
+            _platformer.IsClimbing = false;
+    }
+
+    _platformer.Update(this, time);
+}
+
+private bool IsLadderBelowFeet()
+{
+    if (Ladders == null) return false;
+    // Probe one unit below the entity's feet (entity Y = feet by platformer convention).
+    var (col, row) = Ladders.GetCellAt(new System.Numerics.Vector2(X, Y - 1f));
+    return Ladders.GetTileAtCell(col, row) != null;
+}
+
+private float? ComputeTopOfLadderY()
+{
+    if (Ladders == null) return null;
+    var (col, row) = Ladders.GetCellAt(new System.Numerics.Vector2(X, Y));
+    if (Ladders.GetTileAtCell(col, row) == null) return null;
+    int topRow = row;
+    while (Ladders.GetTileAtCell(col, topRow + 1) != null) topRow++;
+    // Cell world position is the cell center; +half grid = top edge.
+    return Ladders.GetCellWorldPosition(col, topRow).Y + Ladders.GridSize / 2f;
+}
+```
+
+### `TopOfLadderY` semantics
+
+`TopOfLadderY` clamps `Y` and zeros upward velocity — the player can hold Up forever and won't pass the top. To support **walk-off-the-top** ladders, set `TopOfLadderY = null` and the game decides when to flip `IsClimbing = false` (e.g. when the player clears the topmost ladder cell + presses Up). The `ComputeTopOfLadderY` helper above gives the standard "stop at the top of the column" behavior, which is what most games want and is what makes SMW-style uneven fence tops work for free.
+
+### Gotchas
+
+- **Bottom-of-ladder needs no special probe.** Climbing down past the bottom of the ladder ends overlap; the exit branch (`!overlappingLadder`) flips `IsClimbing` to false and gravity takes over. Climbing down onto solid ground engages the standard player↔solid collision, which sets `IsOnGround = true` and the same exit branch fires. Don't add separate "am I at the bottom" logic.
+- **`IPlatformerEntity` is not required for climbing.** Ground snap and the slope probe require it because collision relationships dispatch back into the behavior. The climbing path uses no relationship — the game polls `CollidesWith(Ladders)` directly — so a player class that only does climbing (no ground snap) doesn't need to implement `IPlatformerEntity`. If the player also wants ground snap, implement it for that reason, not for ladders.
+- **Always author `JumpVelocity` on the climbing slot.** It defaults to 0, and "field omitted" is indistinguishable from "explicitly 0" once parsed. A climbing slot without `JumpVelocity` makes jump-off look broken — the player presses jump, leaves the ladder, and drops straight down with no upward velocity. The engine does not fall back to `AirMovement.JumpVelocity`.
+- **`ClimbingMovement` null while `IsClimbing == true` throws** — same loud-failure pattern as `CollisionShape` with `SlopeSnapDistance > 0`. Assign the slot before entering the state.
+- **Zero `VelocityY` when entering.** The engine only drives `VelocityY` from input while climbing; any residual fall speed from the frame before entering would be overwritten to `inputY * ClimbingSpeed` the same frame, but an `inputY = 0` entry would leave the player floating with whatever leftover upward jump velocity was mid-arc. Just clear it on entry for clarity.
+- **Collision relationships still run.** If ladder-adjacent walls or one-way platforms should be passable while climbing (e.g., climbing up through a jump-through platform a ladder passes through), the game must either skip those relationships or rely on `AllowDropThrough` behavior while `IsClimbing` — the behavior does not auto-suppress them.
+
 ## Platformer Animations (User Code, Not Engine-Managed)
 
 **Always use the template animations for platformer characters** — copy `PlatformerAnimations.achx` and `AnimatedSpritesheet.png` from `.claude/templates/AnimationChains/` into the project's `Content/Animations/` directory and load via `.achx`. Do not fall back to a shape placeholder for the player character.
@@ -315,6 +423,14 @@ FRB2 does not provide an animation controller. Animation state selection is stra
 ```csharp
 private void UpdateAnimation()
 {
+    // Climb takes priority over ground/air. The template's climb chain has no Left/Right split
+    // (player faces the ladder) — use CharacterClimbFront (or CharacterClimbRear) directly.
+    if (_platformer.IsClimbing)
+    {
+        _sprite.PlayAnimation("CharacterClimbFront");
+        return;
+    }
+
     float inputX = _platformer.MovementInput?.X ?? 0f;
     string chain = (_platformer.IsOnGround, MathF.Abs(inputX) > 0.1f) switch
     {
@@ -327,6 +443,8 @@ private void UpdateAnimation()
     _sprite.PlayAnimation(chain);
 }
 ```
+
+**Do not pause the climb animation when the player is still on the ladder.** Animation runs continuously — a "hanging on the ladder, not moving" state is a content choice (a 1-frame chain, or a multi-frame chain with subtle motion like the player's hair drifting). See the `animation` skill's "Never pause animation to express still state" gotcha.
 
 **Why input, not velocity?** Velocity-based detection (`Math.Abs(VelocityX) > threshold`) breaks on moving platforms — the player stands still, inherits the platform's velocity, and the walk animation loops as if they're running. It also breaks on slippery ground — after releasing input the player is still sliding, so the walk animation keeps playing through the decel. Input-based selection is simpler and matches FRB1's state-driven approach. For games that genuinely want a slide animation distinct from walk, branch on `GroundHorizontalVelocity` (platform contribution this frame) or `VelocityX - GroundHorizontalVelocity` (speed relative to the platform).
 

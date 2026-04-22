@@ -1433,4 +1433,124 @@ public class PlatformerBehaviorTests
 
         entity.VelocityX.ShouldBe(200f);
     }
+
+    // ── Climbing ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsClimbing_JumpInput_ExitsClimbingAndAppliesClimbingJumpVelocity()
+    {
+        float climbJumpVelocity = 250f;
+        var climbing = new PlatformerValues
+        {
+            MaxSpeedX = 80f,
+            ClimbingSpeed = 100f,
+            JumpVelocity = climbJumpVelocity,
+        };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues { JumpVelocity = 400f, MaxFallSpeed = 1000f },
+            ClimbingMovement = climbing,
+            IsClimbing = true,
+            JumpInput = new MockPressableInput(isDown: true, wasJustPressed: true),
+        };
+        var entity = new Entity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        behavior.IsClimbing.ShouldBeFalse();
+        entity.VelocityY.ShouldBe(climbJumpVelocity);
+    }
+
+    [Fact]
+    public void IsClimbing_SuppressesGravity()
+    {
+        float gravity = 600f;
+        var climbing = new PlatformerValues { MaxSpeedX = 80f, ClimbingSpeed = 100f };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f },
+            ClimbingMovement = climbing,
+            IsClimbing = true,
+        };
+        var entity = new Entity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.AccelerationY.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void IsClimbing_TogglingOff_RestoresGravity()
+    {
+        float gravity = 600f;
+        var climbing = new PlatformerValues { MaxSpeedX = 80f, ClimbingSpeed = 100f };
+        var air = new PlatformerValues { Gravity = gravity, MaxFallSpeed = 1000f };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = air,
+            ClimbingMovement = climbing,
+            IsClimbing = true,
+        };
+        var entity = new Entity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+        behavior.IsClimbing = false;
+        behavior.Update(entity, MakeFrame(1f / 60f, totalSeconds: 1f / 60f));
+
+        entity.AccelerationY.ShouldBe(-gravity);
+    }
+
+    [Fact]
+    public void IsClimbing_TopOfLadderY_ClampsYAndZeroesUpwardVelocity()
+    {
+        float topY = 100f;
+        var climbing = new PlatformerValues { MaxSpeedX = 80f, ClimbingSpeed = 100f };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues(),
+            ClimbingMovement = climbing,
+            IsClimbing = true,
+            TopOfLadderY = topY,
+            MovementInput = new MockAxisInput(y: 1f), // pushing up into the top
+        };
+        var entity = new Entity { Y = topY + 5f }; // already past the top
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.Y.ShouldBe(topY);
+        entity.VelocityY.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void IsClimbing_VelocityY_TracksInputTimesClimbingSpeed()
+    {
+        float climbingSpeed = 120f;
+        var climbing = new PlatformerValues { MaxSpeedX = 80f, ClimbingSpeed = climbingSpeed };
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues(),
+            ClimbingMovement = climbing,
+            IsClimbing = true,
+            MovementInput = new MockAxisInput(y: 1f),
+        };
+        var entity = new Entity();
+
+        behavior.Update(entity, MakeFrame(1f / 60f));
+
+        entity.VelocityY.ShouldBe(climbingSpeed);
+    }
+
+    [Fact]
+    public void IsClimbing_WithNullClimbingMovement_Throws()
+    {
+        var behavior = new PlatformerBehavior
+        {
+            AirMovement = new PlatformerValues(),
+            IsClimbing = true,
+        };
+        var entity = new Entity();
+
+        var ex = Should.Throw<InvalidOperationException>(() => behavior.Update(entity, MakeFrame(1f / 60f)));
+        ex.Message.ShouldContain("ClimbingMovement is null");
+    }
 }

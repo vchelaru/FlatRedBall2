@@ -15,6 +15,38 @@ public class PlatformerBehavior
 
     public PlatformerValues AirMovement { get; set; } = new();
 
+    /// <summary>
+    /// Movement values used while <see cref="IsClimbing"/> is true. Must be non-null before
+    /// <see cref="Update"/> runs with <see cref="IsClimbing"/> = true, or
+    /// <see cref="InvalidOperationException"/> is thrown. Consumed fields:
+    /// <see cref="PlatformerValues.MaxSpeedX"/> / <see cref="PlatformerValues.AccelerationTimeX"/>
+    /// / <see cref="PlatformerValues.DecelerationTimeX"/> (horizontal on ladder),
+    /// <see cref="PlatformerValues.ClimbingSpeed"/> (vertical), and
+    /// <see cref="PlatformerValues.JumpVelocity"/> / <see cref="PlatformerValues.JumpApplyLength"/>
+    /// / <see cref="PlatformerValues.JumpApplyByButtonHold"/> (applied when the player presses
+    /// jump to leave the ladder). Gravity, slope, and drop-through fields are ignored while
+    /// climbing.
+    /// </summary>
+    public PlatformerValues? ClimbingMovement { get; set; }
+
+    /// <summary>
+    /// Game-set flag that enters/exits the climbing state. While true, <see cref="Update"/>
+    /// selects <see cref="ClimbingMovement"/> as the active slot, suppresses gravity, drives
+    /// <c>VelocityY</c> from <c>MovementInput.Y * ClimbingMovement.ClimbingSpeed</c>, skips
+    /// fall-speed clamping and drop-through, and on a jump-press clears this flag and applies
+    /// <see cref="ClimbingMovement"/>'s jump fields. Ladder detection, enter triggers, fall-off,
+    /// and X-snap remain game-code concerns. To forbid jump-off entirely (rare), null
+    /// <see cref="JumpInput"/> while this is true.
+    /// </summary>
+    public bool IsClimbing { get; set; }
+
+    /// <summary>
+    /// Optional world-Y ceiling honored while <see cref="IsClimbing"/>. When non-null and the
+    /// entity's Y reaches or exceeds this value, Y is clamped to it and upward velocity is zeroed.
+    /// Leave null for "walk off the top" ladders where the game handles top-exit itself.
+    /// </summary>
+    public float? TopOfLadderY { get; set; }
+
     // Input — must be set before Update is called
     public IPressableInput? JumpInput { get; set; }
     public I2DInput? MovementInput { get; set; }
@@ -132,6 +164,13 @@ public class PlatformerBehavior
     {
         if (time.DeltaSeconds == 0f) return;
 
+        if (IsClimbing && ClimbingMovement == null)
+        {
+            throw new InvalidOperationException(
+                "PlatformerBehavior.IsClimbing is true but ClimbingMovement is null — " +
+                "assign a PlatformerValues with MaxSpeedX and ClimbingSpeed before entering the climbing state.");
+        }
+
         _frameIndex++;
 
         if (DiagLogPerFrameState && OnSnapDiagnostic != null)
@@ -156,9 +195,11 @@ public class PlatformerBehavior
         else if (inputX < 0f)
             DirectionFacing = HorizontalDirection.Left;
 
-        var current = IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement;
+        var current = IsClimbing
+            ? ClimbingMovement!
+            : (IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement);
 
-        if (!IsOnGround) CurrentSlope = 0f;
+        if (!IsOnGround || IsClimbing) CurrentSlope = 0f;
         float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
 
         if (current.AccelerationTimeX == TimeSpan.Zero && current.DecelerationTimeX == TimeSpan.Zero)
@@ -189,64 +230,102 @@ public class PlatformerBehavior
             entity.AccelerationX = clampedDiff / time.DeltaSeconds;
         }
 
-        // C. Apply gravity
-        entity.AccelerationY = -current.Gravity;
-
-        // E. Handle jump (before fall-speed clamp so jump velocity is applied first).
-        // Down+Jump while grounded triggers drop-through instead of a regular jump, so the
-        // entity falls through any jump-through platform it is standing on. Suppression lasts
-        // one frame — after that, LastPosition is below the surface and the one-way gate's
-        // positional check naturally prevents re-landing.
         float inputY = MovementInput?.Y ?? 0f;
-        bool dropThroughTriggered =
-            IsOnGround
-            && JumpInput?.WasJustPressed == true
-            && inputY < -0.5f
-            && current.CanFallThroughOneWayCollision;
 
-        if (dropThroughTriggered)
+        if (IsClimbing)
         {
-            _dropThroughFrame = true;
+            // C'. Climbing: suppress gravity, drive VelocityY directly from input, skip
+            // fall-speed clamp and drop-through. Cancelling any active jump sustain here prevents
+            // "jumped into a ladder then entered climb" from leaving IsApplyingJump stuck true
+            // for the rest of the sustain window.
+            entity.AccelerationY = 0f;
+            entity.VelocityY = inputY * current.ClimbingSpeed;
+            IsApplyingJump = false;
+
+            // Jump-off: pressing jump while climbing exits climbing and applies the climbing
+            // slot's jump fields (same shape as a ground jump, sustain included). JumpVelocity = 0
+            // gives a "drop off without upward velocity" feel; games that want to forbid jump-off
+            // should null JumpInput while IsClimbing.
+            if (JumpInput?.WasJustPressed == true)
+            {
+                IsClimbing = false;
+                entity.VelocityY = current.JumpVelocity;
+                if (current.JumpApplyLength > TimeSpan.Zero)
+                {
+                    _jumpStartTime = time.SinceGameStart;
+                    _jumpValues = current;
+                    IsApplyingJump = true;
+                }
+            }
+            else if (TopOfLadderY.HasValue && entity.Y >= TopOfLadderY.Value)
+            {
+                entity.Y = TopOfLadderY.Value;
+                if (entity.VelocityY > 0f) entity.VelocityY = 0f;
+            }
+
+            _suppressOneWay = false;
+            _dropThroughFrame = false;
         }
-        else if (JumpInput?.WasJustPressed == true && IsOnGround)
+        else
         {
-            entity.VelocityY = current.JumpVelocity;
-            _jumpStartTime = time.SinceGameStart;
-            _jumpValues = current;
-            IsApplyingJump = true;
+            // C. Apply gravity
+            entity.AccelerationY = -current.Gravity;
+
+            // E. Handle jump (before fall-speed clamp so jump velocity is applied first).
+            // Down+Jump while grounded triggers drop-through instead of a regular jump, so the
+            // entity falls through any jump-through platform it is standing on. Suppression lasts
+            // one frame — after that, LastPosition is below the surface and the one-way gate's
+            // positional check naturally prevents re-landing.
+            bool dropThroughTriggered =
+                IsOnGround
+                && JumpInput?.WasJustPressed == true
+                && inputY < -0.5f
+                && current.CanFallThroughOneWayCollision;
+
+            if (dropThroughTriggered)
+            {
+                _dropThroughFrame = true;
+            }
+            else if (JumpInput?.WasJustPressed == true && IsOnGround)
+            {
+                entity.VelocityY = current.JumpVelocity;
+                _jumpStartTime = time.SinceGameStart;
+                _jumpValues = current;
+                IsApplyingJump = true;
+            }
+
+            if (IsApplyingJump && _jumpValues != null)
+            {
+                if (entity.LastReposition.Y < 0)
+                {
+                    // Ceiling hit — cancel sustain and kill upward velocity so the entity drops immediately
+                    IsApplyingJump = false;
+                    entity.VelocityY = 0f;
+                }
+                else if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
+                {
+                    IsApplyingJump = false;
+                }
+                else if (time.SinceGameStart - _jumpStartTime >= _jumpValues.JumpApplyLength)
+                {
+                    IsApplyingJump = false;
+                }
+                else
+                {
+                    entity.AccelerationY = 0f;
+                    entity.VelocityY = _jumpValues.JumpVelocity;
+                }
+            }
+
+            // D. Clamp fall speed (after jump sustain)
+            entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
+
+            // F. Drop-through state: the flag lasts exactly one frame (set above, consumed here).
+            _suppressOneWay =
+                _dropThroughFrame
+                || (!IsOnGround && inputY < -0.5f && current.CanFallThroughOneWayCollision);
+            _dropThroughFrame = false;
         }
-
-        if (IsApplyingJump && _jumpValues != null)
-        {
-            if (entity.LastReposition.Y < 0)
-            {
-                // Ceiling hit — cancel sustain and kill upward velocity so the entity drops immediately
-                IsApplyingJump = false;
-                entity.VelocityY = 0f;
-            }
-            else if (_jumpValues.JumpApplyByButtonHold && JumpInput?.IsDown == false)
-            {
-                IsApplyingJump = false;
-            }
-            else if (time.SinceGameStart - _jumpStartTime >= _jumpValues.JumpApplyLength)
-            {
-                IsApplyingJump = false;
-            }
-            else
-            {
-                entity.AccelerationY = 0f;
-                entity.VelocityY = _jumpValues.JumpVelocity;
-            }
-        }
-
-        // D. Clamp fall speed (after jump sustain)
-        entity.VelocityY = MathF.Max(-current.MaxFallSpeed, entity.VelocityY);
-
-        // F. Drop-through state: the flag lasts exactly one frame (set above, consumed here).
-        _suppressOneWay =
-            _dropThroughFrame
-            || (!IsOnGround && inputY < -0.5f && current.CanFallThroughOneWayCollision);
-        _dropThroughFrame = false;
 
         // G. Record ground state for next frame's snap gate, and reset per-frame flags.
         _wasOnGroundLastFrame = IsOnGround;
