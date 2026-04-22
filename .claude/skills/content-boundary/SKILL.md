@@ -61,11 +61,31 @@ If the screen has state worth preserving across restarts (player position, score
 
 This is not optional polish — it is a prerequisite for the human to do their half of the work. Always include it.
 
+## Visual Semantics Rule (Mechanic Readability)
+
+When using placeholder visuals, map gameplay function to a distinct shape + color combo:
+
+- If two things behave differently, they should not look like minor variations of each other.
+- Do not encode critical differences with color shade alone (for example, two similar reds).
+- Prefer shape differences first (circle vs square vs triangle vs etc), then reinforce with clearly separated colors.
+
+Quick checklist:
+
+- Different hazard mechanics (damage vs pushback) should not share the same silhouette.
+- State changes with gameplay impact should have a visible cue.
+
+This is a heuristic, not a rigid style guide, but default to it unless the user gives a conflicting art direction.
+
 ## Handoff Communication
 
 After scaffolding, close the loop with the user explicitly. A good handoff looks like:
 
 > I added `Content/Tiled/Level2.tmx` with a collision layer and a player-spawn tile. Open it in Tiled to lay out the level. I also added `Entities/Boss.cs` expecting `Content/Boss.png` (64×64) — drop that PNG in when you have art.
+
+Use this compact handoff template when possible:
+- File: `<path>`
+- Tool: `<Tiled | Gum Tool | text editor | image editor | animation editor>`
+- Action: `<what the human should tune or place>`
 
 Do not bury this in a summary. The user needs to know exactly which files to open and which tools to use, because that is the half of the work AI can't do.
 

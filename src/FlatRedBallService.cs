@@ -85,6 +85,14 @@ public class FlatRedBallService
     public Game Game => _game ?? throw new InvalidOperationException(
         "FlatRedBallService has not been initialized. Call Initialize() first.");
 
+    /// <summary>
+    /// Initializes the engine. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
+    /// </summary>
+    /// <remarks>
+    /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
+    /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
+    /// MonoGame defaults the property to <c>false</c>.
+    /// </remarks>
     public void Initialize(Game game, EngineInitSettings? settings = null)
     {
         _game = game;

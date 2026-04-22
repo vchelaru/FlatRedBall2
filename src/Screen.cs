@@ -80,6 +80,7 @@ public class Screen
 
     private readonly List<IRenderable> _renderList = new();
     public IReadOnlyList<IRenderable> RenderList => _renderList;
+    internal IReadOnlyList<Entity> Entities => _entities;
 
     public void Add(IRenderable renderable, Layer? layer = null)
     {

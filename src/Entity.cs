@@ -17,8 +17,7 @@ public class Entity : ICollidable, IAttachable
     private readonly List<GraphicalUiElement> _gumChildren = new();
 
     /// <summary>
-    /// Optional display name for diagnostics and observability queries.
-    /// When <c>null</c>, tools fall back to <c>GetType().Name</c>.
+    /// Optional logical name for diagnostics, snapshots, and game-specific lookup.
     /// </summary>
     public string? Name { get; set; }
 
