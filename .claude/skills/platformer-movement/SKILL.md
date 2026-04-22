@@ -330,88 +330,73 @@ Climbing is a **fourth movement slot** alongside `GroundMovement`, `AirMovement`
 
 **Ignored while climbing** (parse without error, no effect): `Gravity`, `MaxFallSpeed`, all slope fields, `CanFallThroughOneWayCollision`.
 
-### Detection: a separate `TileShapeCollection`
+### Assign `Ladders` / `Fences` on `PlatformerBehavior` — the canonical pattern
 
-Author ladders (and SMW-style fences — same mechanic, different art) as their own `TileShapeCollection`, parallel to the solid-geometry collection. Use a dedicated TMX tile layer (e.g. `"Ladders"`). Do **not** add a `CollisionRelationship` between the player and the ladder collection — the game polls overlap directly each frame, no separation needed.
+Climbing is configuration on `PlatformerBehavior` itself: assign one or both `TileShapeCollection` surfaces to the `Ladders` and `Fences` properties, and `Update` handles the rest — body-range column detection, enter/exit triggers, ladder X-snap + re-pin, fence 2D traversal, and per-frame `TopOfLadderY` tracking. There is one `Update` call whether or not climbing is used.
 
 ```csharp
-public class Player : Entity
+public class Player : Entity, IPlatformerEntity
 {
-    public TileShapeCollection? Ladders { get; set; }   // assigned by the screen after TMX load
     private readonly PlatformerBehavior _platformer = new();
+    private AxisAlignedRectangle _body = null!;
+
+    public PlatformerBehavior Platformer => _platformer;
+    public TileShapeCollection? Ladders { get => _platformer.Ladders; set => _platformer.Ladders = value; }
+    public TileShapeCollection? Fences  { get => _platformer.Fences;  set => _platformer.Fences  = value; }
+
+    public override void CustomInitialize()
+    {
+        _body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        Add(_body);
+
+        PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
+        // Input wiring (keyboard/gamepad) omitted — see input-system skill.
+        _platformer.CollisionShape = _body;   // required for body-range column scan when climbing is wired
+    }
+
+    public override void CustomActivity(FrameTime time) => _platformer.Update(this, time);
 }
 ```
 
-### Enter / exit pattern
+Screen wiring — no `AddCollisionRelationship` for ladders/fences; overlap is polled directly:
 
 ```csharp
-public override void CustomActivity(FrameTime time)
-{
-    bool overlappingLadder = Ladders != null && this.CollidesWith(Ladders);
-    float inputY = _platformer.MovementInput?.Y ?? 0f;
+var solids  = map.GenerateCollisionFromClass("SolidCollision");
+var ladders = map.GenerateCollisionFromClass("Ladder");
+var fences  = map.GenerateCollisionFromClass("Fence");
+Add(solids); Add(ladders); Add(fences);
 
-    if (!_platformer.IsClimbing)
-    {
-        bool enterFromMiddle = overlappingLadder && inputY > 0.5f;
-        bool enterFromTop = _platformer.IsOnGround && inputY < -0.5f && IsLadderBelowFeet();
-        if (enterFromMiddle || enterFromTop)
-        {
-            _platformer.IsClimbing = true;
-            VelocityY = 0f;
-            // Optional X-snap to the ladder cell's center — classic feel (Mega Man). Skip for
-            // free-floating fence climbing (SMW), where the player keeps their X.
-            var (col, _) = Ladders!.GetCellAt(new System.Numerics.Vector2(X, Y));
-            X = Ladders.GetCellWorldPosition(col, 0).X;
-        }
-    }
-    else
-    {
-        // Recompute TopOfLadderY every frame — it tracks the player's current column. For a
-        // single-column ladder the value is constant; for an SMW fence with an uneven top edge
-        // the cap updates as the player slides left/right.
-        _platformer.TopOfLadderY = ComputeTopOfLadderY();
+var player = map.CreateEntities("PlayerSpawn", _playerFactory, Origin.BottomCenter)[0];
+player.Ladders = ladders;
+player.Fences = fences;
 
-        // Exit on landing (engine collision handled separation) or losing overlap (climbed off
-        // the side, or fell off the bottom). Jump-off is engine-handled.
-        if (_platformer.IsOnGround || !overlappingLadder)
-            _platformer.IsClimbing = false;
-    }
-
-    _platformer.Update(this, time);
-}
-
-private bool IsLadderBelowFeet()
-{
-    if (Ladders == null) return false;
-    // Probe one unit below the entity's feet (entity Y = feet by platformer convention).
-    var (col, row) = Ladders.GetCellAt(new System.Numerics.Vector2(X, Y - 1f));
-    return Ladders.GetTileAtCell(col, row) != null;
-}
-
-private float? ComputeTopOfLadderY()
-{
-    if (Ladders == null) return null;
-    var (col, row) = Ladders.GetCellAt(new System.Numerics.Vector2(X, Y));
-    if (Ladders.GetTileAtCell(col, row) == null) return null;
-    int topRow = row;
-    while (Ladders.GetTileAtCell(col, topRow + 1) != null) topRow++;
-    // Cell world position is the cell center; +half grid = top edge.
-    return Ladders.GetCellWorldPosition(col, topRow).Y + Ladders.GridSize / 2f;
-}
+AddCollisionRelationship(_playerFactory, solids).BounceFirstOnCollision(elasticity: 0f);
+// No relationship for ladders or fences — PlatformerBehavior uses direct overlap polling.
 ```
+
+**Surfaces have distinct semantics:**
+- `Ladders` — on entry, snaps X to the ladder column's center and re-pins every frame. Horizontal input is ignored. Vertical-only.
+- `Fences` — on entry, X is preserved. Horizontal input remains active while climbing (SMW-style 2D traversal).
+
+Enter triggers (defaults): overlap + press Up (ladders or fences), or grounded + press Down with a ladder cell directly below the feet (climb-down-from-top, ladders only). Exit: lost body overlap, or grounded with `inputY <= 0` (landed while descending — not on the entry frame). Jump-off is handled by `PlatformerBehavior` (pressing jump while climbing applies `ClimbingMovement.JumpVelocity`). Read state via `platformer.IsOnLadder` / `platformer.IsOnFence`.
+
+### Manual state machine (advanced, rarely needed)
+
+If the built-in triggers don't fit (e.g. a "climb only on button press" scheme, or walk-off-the-top behavior), **leave `Ladders`/`Fences` null** and drive `IsClimbing` and `TopOfLadderY` yourself. The contract is: set `IsClimbing = true` while overlapping, set `TopOfLadderY` each frame to clamp the top (or leave it null for walk-off-the-top), clear `IsClimbing` when exit conditions fire. The built-in climb gate in `PlatformerBehavior.Update` is the reference implementation.
 
 ### `TopOfLadderY` semantics
 
-`TopOfLadderY` clamps `Y` and zeros upward velocity — the player can hold Up forever and won't pass the top. To support **walk-off-the-top** ladders, set `TopOfLadderY = null` and the game decides when to flip `IsClimbing = false` (e.g. when the player clears the topmost ladder cell + presses Up). The `ComputeTopOfLadderY` helper above gives the standard "stop at the top of the column" behavior, which is what most games want and is what makes SMW-style uneven fence tops work for free.
+`TopOfLadderY` clamps `Y` and zeros upward velocity — the player can hold Up forever and won't pass the top. When `Ladders`/`Fences` is assigned, it is set automatically each frame to the top edge of the currently-overlapping column, which gives the standard "stop at the top of the column" behavior and makes SMW-style uneven fence tops work for free. To get **walk-off-the-top** behavior (rare), use the manual state machine with `TopOfLadderY = null`.
 
 ### Gotchas
 
-- **Bottom-of-ladder needs no special probe.** Climbing down past the bottom of the ladder ends overlap; the exit branch (`!overlappingLadder`) flips `IsClimbing` to false and gravity takes over. Climbing down onto solid ground engages the standard player↔solid collision, which sets `IsOnGround = true` and the same exit branch fires. Don't add separate "am I at the bottom" logic.
-- **`IPlatformerEntity` is not required for climbing.** Ground snap and the slope probe require it because collision relationships dispatch back into the behavior. The climbing path uses no relationship — the game polls `CollidesWith(Ladders)` directly — so a player class that only does climbing (no ground snap) doesn't need to implement `IPlatformerEntity`. If the player also wants ground snap, implement it for that reason, not for ladders.
-- **Always author `JumpVelocity` on the climbing slot.** It defaults to 0, and "field omitted" is indistinguishable from "explicitly 0" once parsed. A climbing slot without `JumpVelocity` makes jump-off look broken — the player presses jump, leaves the ladder, and drops straight down with no upward velocity. The engine does not fall back to `AirMovement.JumpVelocity`.
-- **`ClimbingMovement` null while `IsClimbing == true` throws** — same loud-failure pattern as `CollisionShape` with `SlopeSnapDistance > 0`. Assign the slot before entering the state.
-- **Zero `VelocityY` when entering.** The engine only drives `VelocityY` from input while climbing; any residual fall speed from the frame before entering would be overwritten to `inputY * ClimbingSpeed` the same frame, but an `inputY = 0` entry would leave the player floating with whatever leftover upward jump velocity was mid-arc. Just clear it on entry for clarity.
-- **Collision relationships still run.** If ladder-adjacent walls or one-way platforms should be passable while climbing (e.g., climbing up through a jump-through platform a ladder passes through), the game must either skip those relationships or rely on `AllowDropThrough` behavior while `IsClimbing` — the behavior does not auto-suppress them.
+- **`CollisionShape` is required when `Ladders` or `Fences` is assigned.** Used for body-range column detection. Throws `InvalidOperationException` on first `Update` if null and any surface is assigned.
+- **Optional `ClimbingShape` decouples climb feel from physical body.** Assign a separate `AxisAlignedRectangle` (parented to the entity) to `PlatformerBehavior.ClimbingShape` to use it for ladder/fence overlap instead of `CollisionShape`. A narrow rect at the body center gives Mario-style "must be centered on the ladder" detection (player can hang over the edge before grabbing/letting go); a wider rect gives a generous grab. Leave null to use `CollisionShape` (default — fine for most games).
+- **Always author `JumpVelocity` on the climbing slot.** Defaults to 0 and "field omitted" is indistinguishable from "explicit 0" once parsed. A climbing slot without `JumpVelocity` makes jump-off look broken — the player presses jump, leaves the ladder, and drops straight down. The engine does not fall back to `AirMovement.JumpVelocity`.
+- **`ClimbingMovement` null while `IsClimbing == true` throws** — loud-failure pattern. `PlatformerConfig.FromJson` assigns it when the `climbing` slot is present; if you're driving state manually, assign before setting `IsClimbing = true`.
+- **No `CollisionRelationship` between player and ladders/fences.** Overlap is polled directly. Adding a relationship causes double-handling and physical separation (which fights the climb).
+- **Collision relationships with solids still run.** If ladder-adjacent walls or one-way platforms should be passable while climbing (e.g., climbing up through a jump-through platform a ladder passes through), the game must skip those relationships or rely on `AllowDropThrough` behavior while `IsClimbing` — climbing does not auto-suppress them.
+- **`IPlatformerEntity` is not required purely for climbing.** The climbing path uses no collision relationship — direct overlap polling. Implement `IPlatformerEntity` only if the player also needs ground-snap slopes.
 
 ## Platformer Animations (User Code, Not Engine-Managed)
 

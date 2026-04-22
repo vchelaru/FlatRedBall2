@@ -56,7 +56,9 @@ Tiles fall into two categories:
 
 ## Layer Conventions
 
-- **GameplayLayer** (required) — collision/gameplay tiles using StandardTileset.
+- **GameplayLayer** (required) — collision/gameplay tiles using StandardTileset. **All collision classes share this one layer.** Solid tiles, ladders, fences, jump-through platforms, spikes, etc. all go into `GameplayLayer` — do NOT create a separate layer per class (`LadderLayer`, `FenceLayer`, …). `GenerateCollisionFromClass("Ladder")` filters by tile Class within any layer it scans; splitting into per-class layers is redundant and breaks the convention games rely on.
+- **Do not rename or remove `GameplayLayer`.** The base template ships with it already populated (a walled arena); game code and downstream tooling assume it's present.
+- **The template's border walls are part of the scaffold — keep them.** Add new tiles inside the open interior, not on the border where solids already live. Stripping the walls is a silent way to break the "player doesn't fall off the world" guarantee the base template provides for free.
 - Additional visual layers are game-specific. Add them above or below GameplayLayer as needed. Visual layers use a separate art tileset (not StandardTileset).
 
 ## CSV Tile Data Format

@@ -111,6 +111,8 @@ Content mode decisions (do not ask — use these):
 - Gum: Code-only mode for any UI (score, health bar, lives display, etc.)
 - Tiled: Use .tmx files — copy the template from .claude/templates/Tiled/
 - Animations: Use .achx files — copy the template from .claude/templates/AnimationChains/. Use template animations where an appropriate chain exists (e.g., character walk/jump, coin, enemy). For entities with no matching animation in the template, shapes are fine.
+
+**Scaffolding rule (non-negotiable):** Follow the `content-boundary` skill's one-of-each rule. Place exactly one tile of each collision class the code references and exactly one marker of each entity type the code spawns — no more. Do not author a designed level, do not procedurally generate tile CSV, do not call out to Python or shell scripts to produce content. If you catch yourself writing a loop to fill tile data, stop — you have crossed from scaffolding into authoring. The human opens the TMX in Tiled and designs the real level.
 ```
 
 Wait for the coder agent to complete before proceeding.

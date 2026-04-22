@@ -145,6 +145,12 @@ map.CreateEntities("CeilingTurret", turretFactory, Origin.TopCenter);
 
 Reflection-based property mapping conflicts with the Native AOT goal (see Multi-Backend TODO). When AOT becomes a priority, this will need a source-generator or explicit-mapping alternative. Acceptable for now — AOT is `Priority: Eventual`.
 
+## Separate Climbing-Detection Shape on `PlatformerBehavior` (Landed)
+
+> **Status: Complete.** `PlatformerBehavior.ClimbingShape` (`AxisAlignedRectangle?`) added. Default null → falls back to `CollisionShape`. Non-null → used for `Ladders`/`Fences` overlap scans only, leaving wall/floor collision unaffected. AutoEvalMarioClimbSample wired with a 4×20 center probe demonstrating Mario-style center-only ladder grab.
+
+Bug fix that landed alongside: `FindOverlappingColumn`, `ComputeTopOfColumnY`, and `IsLadderBelowFeet` originally used `entity.X`/`entity.Y` and assumed the body was centered on entity X with bottom at entity Y. That works for the standard Player convention but silently produces wrong overlap if the shape is offset. Fixed to use `body.AbsoluteX`/`body.AbsoluteY ± Height/2`. Critical now that `ClimbingShape` can be a sub-shape with its own offset.
+
 ## Climbing slot — fall back to AirMovement.JumpVelocity when ClimbingMovement.JumpVelocity == 0?
 **Priority: Eventual — wait for use cases.** Today, `ClimbingMovement.JumpVelocity` is a hard `float` defaulting to 0; "field omitted" is indistinguishable from "explicitly 0" once parsed. A user who authors a `climbing` slot without `JumpVelocity` gets a jump-off that drops the player straight down — the kind of "silent wrong output" failure mode the project explicitly calls out as anti-pattern (see Pre-Init vs Reactive-Property Tension). Documented in the `platformer-movement` skill and JSON template as "AUTHOR THIS." Possible future fix: when `ClimbingMovement.JumpVelocity == 0`, fall back to `AirMovement.JumpVelocity` so the obvious-default feel ("press jump → leave ladder with the same hop as in air") is automatic. Tradeoff: a user who genuinely wants a 0-velocity drop-off has to pick a tiny non-zero value or use a different escape hatch. Defer until real games hit the footgun.
 ### Related friction (still open)
