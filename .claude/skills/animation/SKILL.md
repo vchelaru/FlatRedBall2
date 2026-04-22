@@ -47,6 +47,21 @@ var animations = AnimationChainListSave
 
 **Gotcha — FileRelativeTextures**: when `true` (the default), texture names in the .achx are relative to the .achx file itself. If your paths are off, check that the .achx and textures share the expected relative layout.
 
+### From Adobe Animate TextureAtlas XML
+
+Adobe Animate's "Generate sprite sheet" export produces a `<TextureAtlas>` XML plus a single atlas PNG. Load with `AdobeAnimateAtlasSave`:
+
+```csharp
+using FlatRedBall2.Animation.Content;
+var animations = AdobeAnimateAtlasSave
+    .FromFile("Content/Characters/eyeball.xml")
+    .ToAnimationChainList(Engine.Content, frameRate: 30f);
+```
+
+SubTextures are grouped into chains by stripping trailing digits from names (`Eyeball_Idle0000`, `Eyeball_Idle0001` → chain `Eyeball_Idle`), then sorted within a chain by name so `0000, 0001, 0002...` play in order. The format has no per-frame duration, so `frameRate` is applied uniformly.
+
+**Gotcha — pivot not applied**: Adobe Animate's `pivotX`/`pivotY` per-frame attributes are parsed but ignored; `AnimationFrame` has no pivot field yet. Use `RelativeX`/`RelativeY` manually if needed.
+
 ---
 
 ## Building Animations in Code
