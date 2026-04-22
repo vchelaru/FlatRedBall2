@@ -117,10 +117,19 @@ Wait for the coder agent to complete before proceeding.
 
 ## Step 5: Build
 
-Run `dotnet build` on the new sample project. If it fails, fix the errors and rebuild. Keep iterating until the build succeeds.
+Run `dotnet build` on the new sample project.
+
+Use this decision tree:
+- If build failures are in the new sample project, fix them and rebuild until success.
+- If build failures are outside the sample (for example, pre-existing `src/` errors unrelated to your generated project), do **not** repair unrelated engine code in this workflow.
+- In that blocked case, run an isolated sample compile (`dotnet build <sample.csproj> -p:BuildProjectReferences=false`) to validate the delegated game code, and record that full build was externally blocked.
 
 Record the path to the resulting `.exe` file. It will be at:
 `samples/auto/<ProjectName>/bin/Debug/net10.0/<ProjectName>.exe`
+
+Smoke-run guidance:
+- Preferred: `dotnet run` from the sample project when full build is healthy.
+- Fallback: if `dotnet run` is blocked only by unrelated upstream compile failures, launch the prebuilt executable directly and record this fallback in the result file.
 
 ## Step 5b: Self-Audit — Delegation Check
 
@@ -158,6 +167,10 @@ Create a result file at `samples/auto/eval-results/<game-name>.md` with this exa
 
 ## Feedback
 <Friction points from implementation — things that were confusing, required excessive context, had unclear APIs, missing/misleading docs, or missing skill coverage. If everything went smoothly, just write "No concerns.">
+
+## Failure Attribution
+- Build/Run attribution: <Sample issue | Engine issue | Process ambiguity>
+- Evidence: <1 sentence naming the file path(s) or command symptom that supports the attribution>
 ```
 
 # Feedback Guidelines

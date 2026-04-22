@@ -145,6 +145,7 @@ public Game1()
 {
     _graphics = new GraphicsDeviceManager(this);
     Content.RootDirectory = "Content";  // REQUIRED — Apos.Shapes loads its shader from here
+    IsMouseVisible = true;              // set to false only for keyboard/gamepad-only games
     FlatRedBall2.FlatRedBallService.Default.PrepareWindow<YourScreen>(_graphics);
 }
 

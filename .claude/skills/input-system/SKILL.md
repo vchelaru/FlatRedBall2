@@ -160,3 +160,4 @@ The concrete types on each side of `.Or` do not matter — anything implementing
 - **Input feels one frame late** — Input state is captured once at the start of each frame, before any entity logic runs. This is by design.
 - **Gamepad index out of range** — `GetGamepad` only accepts 0–3. Wrap in a try/catch or validate the index if it comes from user data.
 - **`WasKeyPressed` fires repeatedly** — This means you're checking `IsKeyDown` instead of `WasKeyPressed`. Use `WasKeyPressed` for one-shot actions.
+- **Mouse cursor is invisible** — MonoGame defaults `IsMouseVisible` to `false`. If the game uses `cursor.WorldPosition` or any click input, set `IsMouseVisible = true;` in the `Game1` constructor. Forgetting this makes the game appear unresponsive to mouse input since players cannot see where they are clicking.

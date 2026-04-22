@@ -165,7 +165,26 @@ For each item (auto-approved and debated):
 [Any related issues or open questions the debate surfaced but did not resolve]
 ```
 
-### 2. Structured action table
+### 2. Save the report
+
+Before presenting output to the user or asking what to do, **save the full report to disk**:
+
+```
+design/edc/edc-<slug>-<YYYY-MM-DD>.md
+```
+
+Where `<slug>` is a 2-4 word kebab-case description of the session topic (e.g., `is-mouse-visible`, `screen-transition-data`, `entity-lifetime-pattern`).
+
+The file must contain:
+- The date and scope line at the top
+- All auto-approved items with rationale
+- The full debate transcript for contested items (Round 1, groupthink challenge, Round 2 if run)
+- The final decision blocks
+- The action items table
+
+Create the `design/edc/` directory if it does not exist. Save the file **before** presenting results to the user or asking for any decisions.
+
+### 3. Structured action table
 
 End every EDC session with this exact table so the caller can apply changes mechanically:
 

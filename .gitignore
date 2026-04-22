@@ -37,3 +37,5 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 /samples/auto
 /samples/SlopesSample
 
+.claude/skill_change_log.jsonl
+/design/edc
