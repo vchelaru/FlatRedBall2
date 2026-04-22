@@ -126,6 +126,21 @@ await Engine.Time.DelayFrames(2); // wait exactly 2 frames
 
 Frame count always advances, even while paused — useful for UI sequencing that should not be affected by game pause.
 
+### Waiting for Player Input
+
+Use `DelayUntil` to bridge an event-driven UI action (e.g., a button click) into an async game loop, instead of polling with a flag in `CustomActivity`:
+
+```csharp
+BattleAction? _choice = null;
+attackButton.Click += (_, _) => _choice = BattleAction.Attack;
+fleeButton.Click   += (_, _) => _choice = BattleAction.Flee;
+
+await Engine.Time.DelayUntil(() => _choice.HasValue, Token);
+var chosen = _choice.Value;
+```
+
+> **Lifetime warning:** If the screen transitions before the player clicks, `Token` fires and the `await` cancels cleanly. Do not use `TaskCompletionSource.TrySetResult` from a button handler that may outlive the screen — the continuation would run against the new screen.
+
 ### Gotchas
 
 - **Always pass `Token`** to `DelaySeconds` and `DelayUntil`. Without it, a task created on one screen can complete after the screen has been destroyed and fire code against the new screen.
@@ -133,3 +148,42 @@ Frame count always advances, even while paused — useful for UI sequencing that
 - **`async void` only at the top level** — use `async void` for `CustomInitialize`/event callbacks. Internal helpers should return `Task` and be `await`ed.
 - **`DeltaSeconds` is not zero while paused** — timer fields decremented by `DeltaSeconds` in entity `CustomActivity` won't tick while paused because entity `CustomActivity` is skipped. But screen `CustomActivity` always runs, so timer fields there do still count down. Use `if (!IsPaused)` guards in screen code if needed.
 - **`DelaySeconds` deadlocks if the screen is paused** — `DelaySeconds` counts screen time, which freezes when `PauseThisScreen()` is active. Never `await DelaySeconds(...)` from within a code path that has already called `PauseThisScreen()`. Use `DelayFrames` instead for timed sequences that need the screen paused.
+
+## Simulation Clock (Pauseable, Variable Speed)
+
+Strategy and city-builder games need a game-wide clock that fires discrete "sim ticks" at a rate controlled by the player (pause / 1× / 2× / 3×). This is different from per-entity timers and from `DelaySeconds` (which counts real screen time and can't be sped up).
+
+```csharp
+// In Screen:
+private float _simAccumulator;
+private float _timeScale = 1f;   // 0 = paused, 1 = normal, 2 = fast, 3 = fastest
+private const float TickInterval = 2f; // real seconds at 1× speed
+
+// In CustomActivity:
+_simAccumulator += time.DeltaSeconds * _timeScale;
+while (_simAccumulator >= TickInterval)
+{
+    _simAccumulator -= TickInterval;
+    RunSimTick();
+}
+```
+
+**Why a `while` loop instead of `if`?** At high time scales, multiple ticks can accumulate in a single frame. Using `while` processes all of them before proceeding, which keeps the simulation deterministic.
+
+**Changing speed mid-game:** Update `_timeScale` at any time — the accumulator continues from wherever it left off. Pausing is `_timeScale = 0f`; the accumulator freezes until resumed.
+
+**Running ticks on the screen (not an entity)** is important: entity `CustomActivity` is skipped when the screen is paused, but screen `CustomActivity` always runs. Keep the accumulator and `RunSimTick()` call on the screen so you can gate it yourself with `_timeScale`.
+
+### Pause Gate — Awaiting Player Input While Paused
+
+To show a dialog and freeze the game until the player responds (NPC dialogue, skill selection, confirmation), pause the screen, display the UI, and `await DelayUntil` for the player's choice, then resume. `DelayUntil` evaluates its predicate every frame regardless of pause state, so it resolves the moment the player acts:
+
+```csharp
+PauseThisScreen();           // freeze entities; UI and input stay active
+_dialogPanel.IsVisible = true;
+await Engine.Time.DelayUntil(() => _playerChose, Token);
+_dialogPanel.IsVisible = false;
+UnpauseThisScreen();
+```
+
+`DelaySeconds` does **not** work here — it counts screen time, which is frozen while paused.

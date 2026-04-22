@@ -261,6 +261,95 @@ System.Numerics.Vector2 worldPos = Camera.ScreenToWorld(screenPos);
 
 Useful when placing Gum HUD elements relative to world objects, or for click-to-move logic where you receive screen-space mouse coordinates.
 
+## Free-Roaming Camera (No Entity to Follow)
+
+City builders, strategy games, and level editors require a camera that the player directly drives — there is no player entity to follow. Do **not** use `CameraControllingEntity` for this pattern; drive the camera directly from screen `CustomActivity`.
+
+### WASD Pan + Clamp to Map Bounds
+
+```csharp
+// In Screen.CustomActivity:
+const float PanSpeed = 400f;           // world units/sec
+const float MapHalfW = 128 * 16 / 2f; // half the world width  (tileCount * tileSize / 2)
+const float MapHalfH = 128 * 16 / 2f; // half the world height
+
+var kb = Engine.Input.Keyboard;
+
+Camera.VelocityX = 0f;
+Camera.VelocityY = 0f;
+
+if (kb.IsKeyDown(Keys.A) || kb.IsKeyDown(Keys.Left))  Camera.VelocityX = -PanSpeed;
+if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) Camera.VelocityX =  PanSpeed;
+if (kb.IsKeyDown(Keys.S) || kb.IsKeyDown(Keys.Down))  Camera.VelocityY = -PanSpeed;
+if (kb.IsKeyDown(Keys.W) || kb.IsKeyDown(Keys.Up))    Camera.VelocityY =  PanSpeed;
+
+// Clamp after the engine has applied velocity (do it next frame via properties):
+Camera.X = Math.Clamp(Camera.X, -MapHalfW + Camera.TargetWidth  / 2f,
+                                  MapHalfW - Camera.TargetWidth  / 2f);
+Camera.Y = Math.Clamp(Camera.Y, -MapHalfH + Camera.TargetHeight / 2f,
+                                  MapHalfH - Camera.TargetHeight / 2f);
+```
+
+> **Note:** Camera has no `Drag` — set velocity to `0` explicitly each frame when the key is not held. Setting velocity each frame (not accumulating) keeps movement instant and frame-rate independent.
+
+### Edge Scrolling
+
+When the cursor is near the screen edge, add pan velocity in that direction:
+
+```csharp
+const float EdgeThreshold = 20f; // screen pixels from edge
+var screenPos = Engine.Input.Cursor.ScreenPosition;
+
+if (screenPos.X < EdgeThreshold)                          Camera.VelocityX -= PanSpeed;
+if (screenPos.X > Engine.DisplaySettings.Width - EdgeThreshold) Camera.VelocityX += PanSpeed;
+if (screenPos.Y < EdgeThreshold)                          Camera.VelocityY += PanSpeed; // Y-down screen → Y-up world
+if (screenPos.Y > Engine.DisplaySettings.Height - EdgeThreshold) Camera.VelocityY -= PanSpeed;
+```
+
+Combine freely with WASD — velocities accumulate. Apply the same clamp after.
+
+### Middle-Mouse Drag Pan
+
+```csharp
+private Vector2 _dragStartCamera;
+private Vector2 _dragStartScreen;
+
+// In CustomActivity:
+var cursor = Engine.Input.Cursor;
+if (cursor.MiddlePressed)
+{
+    _dragStartCamera = new Vector2(Camera.X, Camera.Y);
+    _dragStartScreen = cursor.ScreenPosition;
+}
+if (cursor.MiddleDown)
+{
+    var delta = cursor.ScreenPosition - _dragStartScreen;
+    // Screen pixels → world units (screen pixel = 1 world unit / Zoom * PixelsPerUnit)
+    float ppu = Camera.PixelsPerUnit * Camera.Zoom;
+    Camera.X = _dragStartCamera.X - delta.X / ppu;
+    Camera.Y = _dragStartCamera.Y + delta.Y / ppu; // screen Y-down → world Y-up
+    Camera.VelocityX = 0f;
+    Camera.VelocityY = 0f;
+}
+```
+
+### Scroll Wheel Zoom with Clamp
+
+```csharp
+const float ZoomStep  = 0.1f;
+const float ZoomMin   = 0.5f;
+const float ZoomMax   = 3.0f;
+
+int scroll = Engine.Input.Cursor.ScrollWheelDelta;
+if (scroll != 0)
+{
+    float direction = scroll > 0 ? 1f : -1f;
+    Camera.Zoom = Math.Clamp(Camera.Zoom + direction * ZoomStep, ZoomMin, ZoomMax);
+}
+```
+
+`Camera.Zoom` is reset on every screen transition (see Gotchas). If you need a persistent zoom level, store it in a field and re-apply it in `CustomInitialize`.
+
 ## Gotchas
 
 - **Zoom multiplies the window-vs-resolution stretch in StretchVisibleArea mode.** If your window is 2× your resolution to scale pixel art, leave `Zoom = 1` — the window stretch already scales 2×. Setting Zoom = 2 there zooms in 4× and hides three-quarters of the level. See "Sizing — Resolution × Window × Zoom" above for the full math and recipes.
@@ -269,3 +358,4 @@ Useful when placing Gum HUD elements relative to world objects, or for click-to-
 - **Gum coordinates are independent of Camera.** Gum X/Y are screen pixels, Y-down from the top-left — they do not shift when the camera moves. Only world-space objects (entities, shapes) are affected by camera position.
 - **TargetWidth/Height ≠ window pixel size.** The camera scales world units to fill whatever window resolution MonoGame uses. A 1280×720 world still renders correctly in an 800×480 window — it just appears smaller.
 - **Do not set `TargetWidth`/`TargetHeight` directly.** They have `internal set` and are managed by the engine from `DisplaySettings`. Use `Camera.Zoom` for runtime zoom effects.
+- **Viewport edge coordinates**: Use `Camera.Left`, `Camera.Right`, `Camera.Top`, `Camera.Bottom` for world-space edges — these are Zoom-correct. Do not compute edges from `Camera.X ± Camera.TargetWidth / 2f` — that formula is wrong when `Zoom ≠ 1`.

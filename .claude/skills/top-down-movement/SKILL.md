@@ -3,6 +3,8 @@ name: top-down-movement
 description: "Top-Down Movement in FlatRedBall2. Use when implementing top-down movement mechanics including 4-way or 8-way movement, acceleration/deceleration, direction facing, or any bird's-eye-view player movement. Trigger on any top-down movement question."
 ---
 
+> **Not for grid/tile-locked movement.** If one key press should move the player exactly one tile (Pokémon, dungeon crawler, roguelike), use the `grid-movement` skill instead. `TopDownBehavior` produces continuous analog movement — wrong for that use case.
+
 # Top-Down Movement
 
 ## Overview

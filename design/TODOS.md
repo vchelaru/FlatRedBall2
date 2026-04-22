@@ -145,6 +145,30 @@ map.CreateEntities("CeilingTurret", turretFactory, Origin.TopCenter);
 
 Reflection-based property mapping conflicts with the Native AOT goal (see Multi-Backend TODO). When AOT becomes a priority, this will need a source-generator or explicit-mapping alternative. Acceptable for now — AOT is `Priority: Eventual`.
 
+### Related friction (still open)
+- `TileMap.GetCellWorldPosition(int col, int row)` helper — independent of spawn markers, but addresses similar "where in world space is this tile?" friction.
+
+## Screen.PushScreen / PopScreen — Sub-Screen Backstack
+**Priority: Soon** — Add `PushScreen<T>(configure)` and `PopScreen()` to `Screen` to support "go to a sub-screen and come back with results" without a static-field workaround. The current `MoveToScreen`-only model requires callers to store return data in a static field on the destination screen, cleared in `CustomInitialize`. That pattern works but is a footgun (stale value if not cleared) and isn't discoverable.
+
+API sketch:
+```csharp
+PushScreen<BattleScreen>(s => s.EncounterData = encounter);  // freeze this screen, activate BattleScreen
+// In BattleScreen when done:
+PopScreen(result);   // restore the previous screen, inject result via its pending-result property
+```
+
+Implementation concerns to resolve:
+- The frozen screen's entities and lifecycle must be preserved mid-frame without triggering `CustomDestroy` or re-running `CustomInitialize`.
+- Entity update loops must be fully suspended (not just `IsPaused`) while the screen is frozen — risk of entity leaks into the active screen's update.
+- Stack depth > 2 needs deliberate design (or explicit cap at depth 1 for the initial implementation).
+- `[Obsolete]` `UnpauseThisScreen` shim is already in — no naming conflicts.
+
+Until this ships, use the documented static-field stopgap in the `screens` skill.
+
+## Platformer Docs Audit (FRB1 → FRB2)
+**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. (Note: AnimationController is intentionally not ported — see the "Animation — intentionally not engine-managed" note above.)
+
 ## Implement `OneWayDirection` Down / Left / Right
 **Priority: Eventual** — Currently only `None` and `Up` are implemented; the other three throw `NotImplementedException`. `Down` supports ceiling-only / uppercut-style barriers; `Left`/`Right` support Yoshi's-Island-style one-way doors.
 

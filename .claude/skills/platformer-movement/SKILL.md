@@ -14,7 +14,7 @@ Platformer movement is provided by two classes in `FlatRedBall2.Movement`:
 
 ## Minimal Setup
 
-Movement coefficients **must** live in a JSON file, not hardcoded in C#. Copy the template from `.claude/templates/PlatformerConfig/player.platformer.json` into the project's `Content/` folder, adjust values, and add `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj`.
+Movement coefficients are **recommended** in a JSON file for fast tuning and hot-reload. Copy the template from `.claude/templates/PlatformerConfig/player.platformer.json` into the project's `Content/` folder, adjust values, and add `<Content Include="Content/*.json" CopyToOutputDirectory="PreserveNewest" />` to the `.csproj`. For prototypes/tests, equivalent hardcoded values in C# are valid.
 
 ```csharp
 public class Player : Entity
