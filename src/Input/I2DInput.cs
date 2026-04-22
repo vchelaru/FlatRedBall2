@@ -7,6 +7,18 @@ public interface I2DInput
 {
     float X { get; }
     float Y { get; }
+
+    /// <summary>
+    /// An <see cref="I2DInput"/> that always reports (0, 0). Use as a non-null default for
+    /// fields that will be replaced later (e.g. an entity's movement input assigned from a screen).
+    /// </summary>
+    public static I2DInput Zero { get; } = new ZeroInput();
+
+    private sealed class ZeroInput : I2DInput
+    {
+        public float X => 0f;
+        public float Y => 0f;
+    }
 }
 
 /// <summary>

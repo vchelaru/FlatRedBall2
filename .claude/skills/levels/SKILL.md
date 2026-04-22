@@ -74,7 +74,7 @@ Add(solid);
 
 var playerVsSolid = AddCollisionRelationship(_playerFactory, solid);
 playerVsSolid.SlopeMode = SlopeCollisionMode.PlatformerFloor;
-playerVsSolid.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+playerVsSolid.BounceFirstOnCollision(elasticity: 0f);
 ```
 
 `SlopeMode` is a per-relationship concern: the same `solid` collection can simultaneously back a player relationship (`PlatformerFloor`) and a ball relationship (default `Standard` SAT) without conflict.

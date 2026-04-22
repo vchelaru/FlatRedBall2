@@ -197,18 +197,17 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     private void IndexEntity(T entity)
     {
         var body = FindBody(entity);
-        if (_cellWidth == null)
+        if (_cellWidth is float cw && _cellHeight is float ch)
+        {
+            if (!FloatsEqual(body.Width, cw) || !FloatsEqual(body.Height, ch))
+                throw new InvalidOperationException(
+                    $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
+                    $"cell size. Expected {cw}x{ch} but got {body.Width}x{body.Height}.");
+        }
+        else
         {
             _cellWidth = body.Width;
             _cellHeight = body.Height;
-        }
-        else if (!FloatsEqual(body.Width, _cellWidth.Value) ||
-                 !FloatsEqual(body.Height, _cellHeight.Value))
-        {
-            throw new InvalidOperationException(
-                $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
-                $"cell size. Expected {_cellWidth.Value}x{_cellHeight.Value} but got " +
-                $"{body.Width}x{body.Height}.");
         }
 
         var cell = CellOf(body);
@@ -261,18 +260,17 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
         foreach (var entity in _gridMembers)
         {
             var body = FindBody(entity);
-            if (_cellWidth == null)
+            if (_cellWidth is float cw && _cellHeight is float ch)
+            {
+                if (!FloatsEqual(body.Width, cw) || !FloatsEqual(body.Height, ch))
+                    throw new InvalidOperationException(
+                        $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
+                        $"cell size. Expected {cw}x{ch} but got {body.Width}x{body.Height}.");
+            }
+            else
             {
                 _cellWidth = body.Width;
                 _cellHeight = body.Height;
-            }
-            else if (!FloatsEqual(body.Width, _cellWidth.Value) ||
-                     !FloatsEqual(body.Height, _cellHeight.Value))
-            {
-                throw new InvalidOperationException(
-                    $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
-                    $"cell size. Expected {_cellWidth.Value}x{_cellHeight.Value} but got " +
-                    $"{body.Width}x{body.Height}.");
             }
             var cell = CellOf(body);
             _grid[cell] = entity;

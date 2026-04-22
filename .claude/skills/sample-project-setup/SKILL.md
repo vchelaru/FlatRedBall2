@@ -41,6 +41,17 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
 </Project>
 ```
 
+### 1b. Add `YourSample.slnx` (REQUIRED — easy to forget)
+
+A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. Minimal content — the sample csproj plus the engine csproj:
+
+```xml
+<Solution>
+  <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="YourSample.csproj" />
+</Solution>
+```
+
 ### 2. Add `.config/dotnet-tools.json` (REQUIRED — easy to forget)
 
 Without this file, the first build fails with **"Cannot find a manifest file"** / **"dotnet-mgcb does not exist"**, even though other samples build fine (they have the file already).

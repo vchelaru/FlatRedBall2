@@ -143,19 +143,20 @@ The same applies to sprites — the `.achx` template uses `<RelativeY>16</Relati
 
 ## Collision Setup
 
-Use `BounceOnCollision` with `elasticity: 0f` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapeCollection` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):
+Use `BounceFirstOnCollision(elasticity: 0f)` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapeCollection` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):
 
 ```csharp
 // Against static tile geometry (preferred for level walls/floors)
 screen.AddCollisionRelationship(playerFactory, tileShapeCollection)
-      .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+      .BounceFirstOnCollision(elasticity: 0f);
 
 // Against entity-based solids (moving platforms, breakable walls, etc.)
 screen.AddCollisionRelationship<Player, MovingPlatform>(playerFactory, platformFactory)
-      .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+      .BounceFirstOnCollision(elasticity: 0f);
 ```
 
-`BounceOnCollision` both separates the player (populating `LastReposition` for ground
+`BounceFirstOnCollision` (which expands to the bounce with the player fully displaced
+and the solid fixed) both separates the player (populating `LastReposition` for ground
 detection) and zeroes the velocity component into the surface. Without it, hitting a
 ceiling leaves the player with upward velocity and they float against it.
 
@@ -187,7 +188,7 @@ tileShapeCollection.AddPolygonTileAtCell(col, row, upRampSlope);
 
 var playerVsTiles = AddCollisionRelationship(_playerFactory, tileShapeCollection);
 playerVsTiles.SlopeMode = SlopeCollisionMode.PlatformerFloor;
-playerVsTiles.BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+playerVsTiles.BounceFirstOnCollision(elasticity: 0f);
 ```
 
 Default is `SlopeCollisionMode.Standard` (SAT collision for polygon tiles), which is correct for top-down games but causes snagging in platformers. `SlopeMode` is per-relationship so the same tile collection can be shared by a platformer player (`PlatformerFloor`) and other entities (`Standard`, e.g. a kicked ball) at the same time.
@@ -277,13 +278,13 @@ When using acceleration, the adjusted max speed drives `AccelerationTimeX` magni
 
 Standing on another `Entity` with non-zero `VelocityX` automatically transfers that horizontal
 velocity to the platformer entity for the frame — the player rides the platform with no input,
-and a jump carries the platform's momentum into the air. No opt-in needed: any `BounceOnCollision`
+and a jump carries the platform's momentum into the air. No opt-in needed: any bounce
 relationship between an `IPlatformerEntity` and a regular `Entity` (not a `TileShapeCollection`)
 gets this behavior whenever the separation pushes the platformer upward.
 
 ```csharp
 AddCollisionRelationship<Player, MovingPlatform>(_playerFactory, _platformFactory)
-    .BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: 0f);
+    .BounceFirstOnCollision(elasticity: 0f);
 ```
 
 The platform's own movement (path-follower, ping-pong in `CustomActivity`, etc.) is independent —
