@@ -184,6 +184,35 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     }
 
     /// <summary>
+    /// Bounce response where A is fully displaced and B stays fixed. Use for moving entities
+    /// bouncing off static geometry (walls, floors, immovable obstacles). Equivalent to
+    /// <c>BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity)</c>.
+    /// </summary>
+    /// <param name="elasticity">1.0 = perfectly elastic; &lt;1.0 = energy loss per bounce.</param>
+    public CollisionRelationship<A, B> BounceFirstOnCollision(float elasticity = 1f)
+        => BounceOnCollision(firstMass: 0f, secondMass: 1f, elasticity: elasticity);
+
+    /// <summary>
+    /// Bounce response where B is fully displaced and A stays fixed. The mirror of
+    /// <see cref="BounceFirstOnCollision"/> — use when the static geometry is side A.
+    /// </summary>
+    /// <param name="elasticity">1.0 = perfectly elastic; &lt;1.0 = energy loss per bounce.</param>
+    public CollisionRelationship<A, B> BounceSecondOnCollision(float elasticity = 1f)
+        => BounceOnCollision(firstMass: 1f, secondMass: 0f, elasticity: elasticity);
+
+    /// <summary>
+    /// Bounce response where both sides are displaced. Separation splits by the mass ratio —
+    /// equal masses share equally; a heavier side moves proportionally less. Use for
+    /// entity-vs-entity collisions like balls bouncing off each other, or a light puck
+    /// bouncing off a heavier paddle.
+    /// </summary>
+    /// <param name="firstMass">Mass of A. Higher = moves less.</param>
+    /// <param name="secondMass">Mass of B. Higher = moves less.</param>
+    /// <param name="elasticity">1.0 = perfectly elastic; &lt;1.0 = energy loss per bounce.</param>
+    public CollisionRelationship<A, B> BounceBothOnCollision(float firstMass = 1f, float secondMass = 1f, float elasticity = 1f)
+        => BounceOnCollision(firstMass: firstMass, secondMass: secondMass, elasticity: elasticity);
+
+    /// <summary>
     /// Restricts collision detection (and physical response) to a specific shape on each A instance
     /// instead of testing all of A's shapes. Does not change which entity receives the response —
     /// separation and velocity adjustments still apply to A, not to the selected child shape.

@@ -13,7 +13,7 @@ public class RenderDiagnostics
 
     internal void BeginFrame() => _breaks.Clear();
 
-    internal void RecordBreak(IRenderBatch previous, IRenderBatch next, Layer layer, float z,
+    internal void RecordBreak(IRenderBatch previous, IRenderBatch next, Layer? layer, float z,
         string previousName, string nextName)
     {
         _breaks.Add(new BatchBreakInfo

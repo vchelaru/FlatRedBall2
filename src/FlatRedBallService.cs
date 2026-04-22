@@ -103,7 +103,9 @@ public class FlatRedBallService
         if (settings?.GumProjectFile is string gumProjectFile)
         {
             _gum.Initialize(game, gumProjectFile);
+#pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
             _gum.LoadAnimations();
+#pragma warning restore CS0618 // Type or member is obsolete
         }
         else
         {
