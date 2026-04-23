@@ -1,5 +1,15 @@
 # FlatRedBall2 — Todo
 
+## "Fire and Forget" Entities
+**Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
+
+Open questions for the future discussion:
+- Dedicated base class / interface vs. just a convention on top of existing `Entity` + `Timing`?
+- Pooling story (particles are the canonical case where allocation churn matters)?
+- Should these participate in collision at all, or be pure visual?
+- Relationship to a future particle system vs. one-off effect entities — same abstraction or different?
+- Spawn API shape: extension on `Screen`/`Entity`? A `FireAndForgetFactory<T>`? A helper like `Effects.Spawn<T>(x, y)`?
+
 ## CollisionRelationship Enter/Exit Events
 **Priority: Soon** — Add `CollisionStarted` and `CollisionEnded` events to `CollisionRelationship` (sibling to existing `CollisionOccurred`). Standard physics-engine vocabulary (Unity `OnTriggerEnter/Exit`, Box2D `BeginContact/EndContact`). Eliminates the recurring game-side boilerplate where game code must set a `_wasOverlappingX` bool every frame in `CollisionOccurred` and diff at end-of-frame to detect "left the zone." Direct motivator: multi-profile platformer movement (ice/water/sticky surfaces) — without enter/exit events, every zone needs the bool-diff dance in the player class. With them, it's a one-liner subscription.
 
