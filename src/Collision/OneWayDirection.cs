@@ -20,9 +20,14 @@ namespace FlatRedBall2.Collision;
 /// </remarks>
 public enum OneWayDirection
 {
+    /// <summary>Standard collision; blocks from all directions.</summary>
     None,
+    /// <summary>Jump-through platform; blocks entities moving down (approaching from above).</summary>
     Up,
+    /// <summary>Blocks entities moving up (approaching from below).</summary>
     Down,
+    /// <summary>Blocks entities moving right (approaching from the left).</summary>
     Left,
+    /// <summary>Blocks entities moving left (approaching from the right).</summary>
     Right,
 }

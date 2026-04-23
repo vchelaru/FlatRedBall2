@@ -2,6 +2,9 @@ using System;
 
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Defines the movement characteristics (speed, acceleration, deceleration, etc.) for top-down entities.
+/// </summary>
 public class TopDownValues
 {
     /// <summary>Maximum movement speed in world units per second.</summary>

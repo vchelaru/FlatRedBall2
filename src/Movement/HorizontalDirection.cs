@@ -5,4 +5,10 @@ namespace FlatRedBall2.Movement;
 /// <see cref="PlatformerBehavior.DirectionFacing"/> based on the most recent non-zero
 /// horizontal input — useful for selecting left/right-facing animations.
 /// </summary>
-public enum HorizontalDirection { Left, Right }
+public enum HorizontalDirection
+{
+    /// <summary>Facing left.</summary>
+    Left,
+    /// <summary>Facing right.</summary>
+    Right
+}

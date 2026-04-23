@@ -33,9 +33,11 @@ public class ShapesBatch : IRenderBatch
     // Apos.Shapes manages its own pixel-space projection internally.
     // Shape Draw() methods convert world coordinates to screen pixels via camera.WorldToScreen()
     // before submitting to Apos.Shapes, so no view matrix is needed here.
+    /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
         => _shapeBatch!.Begin();
 
+    /// <inheritdoc/>
     public void End(SpriteBatch spriteBatch)
     {
         try

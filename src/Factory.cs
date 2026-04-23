@@ -102,6 +102,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     {
         private Factory<T>? _owner;
         public GridBatch(Factory<T> owner) { _owner = owner; }
+        /// <inheritdoc/>
         public void Dispose()
         {
             var o = _owner; if (o == null) return;

@@ -33,6 +33,9 @@ internal static class CollisionDispatcher
         return sep * (otherMass / total);
     }
 
+    /// <summary>
+    /// Returns true if the two shapes overlap or are touching.
+    /// </summary>
     public static bool CollidesWith(ICollidable a, ICollidable b)
     {
         // Line vs AARect now has separation support — use the standard path.
@@ -43,6 +46,9 @@ internal static class CollisionDispatcher
         return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
     }
 
+    /// <summary>
+    /// Computes the separation vector required to push object 'a' out of 'b'.
+    /// </summary>
     // Returns the displacement needed to move 'a' out of 'b', respecting b's RepositionDirections.
     // Returns Vector2.Zero if no collision.
     // When b has RepositionDirections != All, computes the minimum displacement restricted to

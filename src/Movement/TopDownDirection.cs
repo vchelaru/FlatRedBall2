@@ -8,13 +8,21 @@ namespace FlatRedBall2.Movement;
 /// </summary>
 public enum TopDownDirection
 {
+    /// <summary>Facing right (+X).</summary>
     Right,
+    /// <summary>Facing up and right (+X, +Y).</summary>
     UpRight,
+    /// <summary>Facing up (+Y).</summary>
     Up,
+    /// <summary>Facing up and left (-X, +Y).</summary>
     UpLeft,
+    /// <summary>Facing left (-X).</summary>
     Left,
+    /// <summary>Facing down and left (-X, -Y).</summary>
     DownLeft,
+    /// <summary>Facing down (-Y).</summary>
     Down,
+    /// <summary>Facing down and right (+X, -Y).</summary>
     DownRight,
 }
 

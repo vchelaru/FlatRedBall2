@@ -4,6 +4,9 @@ using Microsoft.Xna.Framework;
 
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Handles top-down movement logic for an entity, applying input to position and velocity.
+/// </summary>
 public class TopDownBehavior
 {
     /// <summary>Movement parameters for this entity. Must be set before <see cref="Update"/> is called.</summary>

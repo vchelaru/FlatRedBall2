@@ -1259,14 +1259,23 @@ public class TileShapeCollection : ICollidable
     }
 
     // ICollidable — TileShapeCollection is static geometry; only the querying shape moves.
+    /// <inheritdoc/>
     public float AbsoluteX => X;
+    /// <inheritdoc/>
     public float AbsoluteY => Y;
+    /// <inheritdoc/>
     public float BroadPhaseRadius => float.MaxValue;
+    /// <inheritdoc/>
     public bool CollidesWith(ICollidable other) => GetSeparationFor(other) != Vector2.Zero;
+    /// <inheritdoc/>
     public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);
+    /// <inheritdoc/>
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f) { }
+    /// <inheritdoc/>
     public void ApplySeparationOffset(Vector2 offset) { }
+    /// <inheritdoc/>
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+    /// <inheritdoc/>
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 
     private void ShiftAllTiles(float dx, float dy)

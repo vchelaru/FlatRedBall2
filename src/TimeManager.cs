@@ -92,6 +92,11 @@ public class TimeManager
     public Task DelaySeconds(double seconds, CancellationToken cancellationToken = default)
         => Delay(TimeSpan.FromSeconds(seconds), cancellationToken);
 
+    /// <summary>
+    /// Returns a task that completes after the specified game-time duration.
+    /// </summary>
+    /// <param name="duration">Duration to delay.</param>
+    /// <param name="cancellationToken">Token to cancel the wait early.</param>
     public Task Delay(TimeSpan duration, CancellationToken cancellationToken = default)
     {
         if (duration <= TimeSpan.Zero)

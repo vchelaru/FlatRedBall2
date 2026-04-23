@@ -12,7 +12,16 @@ namespace FlatRedBall2.Animation.Content;
 /// produced by older FlatRedBall tooling.
 /// </summary>
 public enum TimeMeasurementUnit { Undefined, Second, Millisecond }
-public enum TextureCoordinateType { UV, Pixel }
+/// <summary>
+/// Defines how texture coordinates are interpreted (normalized 0-1 or raw pixels).
+/// </summary>
+public enum TextureCoordinateType
+{
+    /// <summary>Coordinates are normalized (0 to 1).</summary>
+    UV,
+    /// <summary>Coordinates are raw pixel values.</summary>
+    Pixel
+}
 
 /// <summary>
 /// Deserialized representation of a .achx animation file.
@@ -28,9 +37,12 @@ public class AnimationChainListSave
     /// </summary>
     public bool FileRelativeTextures = true;
 
+    /// <summary>The unit of time used by frames in this list.</summary>
     public TimeMeasurementUnit TimeMeasurementUnit = TimeMeasurementUnit.Second;
+    /// <summary>How texture coordinates in frames are specified.</summary>
     public TextureCoordinateType CoordinateType = TextureCoordinateType.UV;
 
+    /// <summary>The list of animation chains.</summary>
     [XmlElement("AnimationChain")]
     public List<AnimationChainSave> AnimationChains = new();
 

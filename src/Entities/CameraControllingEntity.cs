@@ -11,6 +11,9 @@ using XnaColor = Microsoft.Xna.Framework.Color;
 
 namespace FlatRedBall2.Entities;
 
+/// <summary>
+/// Defines how the camera approaches its target.
+/// </summary>
 public enum TargetApproachStyle
 {
     /// <summary>
@@ -194,6 +197,7 @@ public class CameraControllingEntity : Entity
 
     #region Initialization
 
+    /// <inheritdoc/>
     public override void CustomInitialize()
     {
         Camera ??= Engine.CurrentScreen.Camera;
@@ -203,6 +207,7 @@ public class CameraControllingEntity : Entity
 
     #region Activity
 
+    /// <inheritdoc/>
     public override void CustomActivity(FrameTime time)
     {
         if (!IsActive || Camera == null) return;
