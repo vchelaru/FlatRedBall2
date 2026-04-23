@@ -2,10 +2,21 @@ using System.Collections.Generic;
 
 namespace FlatRedBall2.Input;
 
+/// <summary>
+/// Boolean "button-like" input abstraction. Concrete implementations include
+/// <see cref="KeyboardPressableInput"/>, <see cref="GamepadPressableInput"/>, and the composite
+/// <see cref="OrPressableInput"/>. Use this anywhere you want to accept "any button" rather than
+/// hard-coding a specific key or gamepad button.
+/// </summary>
 public interface IPressableInput
 {
+    /// <summary>True every frame the input is held.</summary>
     bool IsDown { get; }
+
+    /// <summary>True only on the first frame the input transitions from up to down.</summary>
     bool WasJustPressed { get; }
+
+    /// <summary>True only on the first frame the input transitions from down to up.</summary>
     bool WasJustReleased { get; }
 
     /// <summary>
@@ -36,12 +47,14 @@ public class OrPressableInput : IPressableInput
     /// </summary>
     public List<IPressableInput> Inputs { get; } = new();
 
+    /// <summary>Creates a composite seeded with two inputs. Additional inputs can be appended via <see cref="IPressableInputExtensions.Or"/> or directly to <see cref="Inputs"/>.</summary>
     public OrPressableInput(IPressableInput input1, IPressableInput input2)
     {
         Inputs.Add(input1);
         Inputs.Add(input2);
     }
 
+    /// <summary>True if any contained input is currently down.</summary>
     public bool IsDown
     {
         get
@@ -52,6 +65,7 @@ public class OrPressableInput : IPressableInput
         }
     }
 
+    /// <summary>True if any contained input transitioned from up to down this frame.</summary>
     public bool WasJustPressed
     {
         get
@@ -78,6 +92,7 @@ public class OrPressableInput : IPressableInput
     }
 }
 
+/// <summary>Fluent helpers for combining <see cref="IPressableInput"/> sources.</summary>
 public static class IPressableInputExtensions
 {
     /// <summary>

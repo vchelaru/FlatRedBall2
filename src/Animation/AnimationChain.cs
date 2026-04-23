@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace FlatRedBall2.Animation;
@@ -9,14 +10,18 @@ namespace FlatRedBall2.Animation;
 /// </summary>
 public class AnimationChain : List<AnimationFrame>
 {
+    /// <summary>
+    /// Identifier used by <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/> and by
+    /// the <see cref="AnimationChainList"/> string indexer to look this chain up.
+    /// </summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Total duration of the animation in seconds (sum of all frame lengths).</summary>
-    public float TotalLength
+    /// <summary>Total duration of the animation (sum of all frame lengths).</summary>
+    public TimeSpan TotalLength
     {
         get
         {
-            float sum = 0f;
+            TimeSpan sum = TimeSpan.Zero;
             foreach (var frame in this)
                 sum += frame.FrameLength;
             return sum;

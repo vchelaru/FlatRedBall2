@@ -1,6 +1,11 @@
 # FlatRedBall2 — Todo
 
+**No speculative items.** Every entry must be either (a) ready to work on now or (b) ready to discuss now. "Eventually," "someday," "maybe if it comes up" do not belong here — they're noise that buries real work and never gets revisited. If an idea is interesting but not actionable, let it surface again organically when a real use case appears; don't pre-emptively log it.
+
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
+
+## Engine-Wide XML Docs Pass
+**Priority: Soon — gates NuGet release polish.** Sweep every public type and member in `src/` and bring XML docs up to the project's bar: succinct, adds clarification beyond the name, avoids redundancy, calls out gotchas. Many APIs were added incrementally and either lack docs or have stale ones. This matters extra for the NuGet release — once the package ships, XML docs are what IntelliSense surfaces to consumers who never read the skill files. Coordinate with the docs site TODO: if we go DocFX, the XML docs become the API reference verbatim, so quality here is doubly load-bearing. Approach: probably one subsystem at a time (Collision, Rendering, Input, Screens, Entities, Tweening, etc.) so review diffs stay digestible.
 
 ## KNI BlazorGL — Explicit Resolution Path
 **Priority: Eventual — verify before first browser-targeted game.** `ActivateScreen` skips `ApplyWindowSettings` when `Window.AllowUserResizing == true` AND the screen has no `PreferredDisplaySettings` (added 2026-04-23 to fix cursor offset on KNI BlazorGL — the engine was clamping the back buffer to its design resolution while the browser canvas stayed at 100vw/100vh, producing a coordinate-space mismatch in `Camera.ScreenToWorld`). The no-`PreferredDisplaySettings` branch is exercised by `samples/auto/AutoEvalKniBlazorSample`; the **explicit-resolution branch** on KNI is not. If a screen sets `PreferredDisplaySettings` with a fixed `PreferredWindowWidth/Height`, `ApplyWindowSettings` still runs and resizes the back buffer — same mismatch as before, just now opt-in. Open questions: should KNI honor the request and force the canvas DOM to match (CSS or JS interop)? Letterbox the design resolution inside the larger canvas? Ignore the request entirely and warn? Decide when the first KNI game actually needs a fixed resolution.
@@ -68,17 +73,20 @@ Decision needed before picking. The Factory.Create overload feels cleanest but a
 - **KNI / web (Blazor WASM) target.** KNI is the primary motivator here — it's the backend that unlocks running FRB2 games in the browser. Web deployment is a major distribution story for 2D games (itch.io, jam submissions, embeddable demos) and should be treated as a first-class target alongside desktop once the abstraction layer exists. Open questions: content pipeline story for WASM (mgcb output vs runtime loading), input differences (no gamepad polling guarantees, touch), audio latency, and how hot-reload interacts with a browser-hosted runtime.
 
 ## First Preview NuGet Release
-**Priority: Soon** — Ship `FlatRedBall2` as a preview NuGet package so external users can consume the engine without cloning the repo. Today everyone building on FRB2 must reference the `.csproj` directly.
+**Priority: Soon — target version 0.1.0.** Ship FlatRedBall2 as a preview NuGet package so external users can consume the engine without cloning the repo. Today everyone building on FRB2 must reference the `.csproj` directly.
+
+**Packaging shape — DECIDED: two packages.** Ship `FlatRedBall2.MonoGame` and `FlatRedBall2.Kni` as separate packages from day one. A single multi-TFM package would work today only because the backends happen to live on different TFMs (`net8.0` KNI, `net10.0` MonoGame), and that distinction collapses the moment KNI supports net10.0 — at which point single-package consumers face a forced reshaping (package ID rename or consumption-model change). Two packages give the same story forever: no migration, no breaking change for early adopters when KNI catches up. The cost (one CI matrix, two `dotnet pack` invocations) is small.
 
 Open questions to resolve before publishing:
-- **Package ID.** `FlatRedBall2` vs something else — ties into the naming discussion TODO below.
-- **Versioning scheme.** `0.1.0-preview.1`? SemVer starting point and what "preview" signals to consumers (expect breaking changes, API not stable).
-- **What ships in the package.** Main `FlatRedBall2.dll` for sure. Do Gum-integration, TMX loading, and other optional pieces ship as sub-packages (`FlatRedBall2.Gum`, `FlatRedBall2.Tiled`) or all-in-one? Current project is monolithic — splitting is a bigger refactor.
-- **Content pipeline assets.** Does the NuGet include the StandardTileset PNG/TSX? A `.targets` file that wires MGCB references? Consumers will hit "where does the tileset live" friction immediately otherwise.
-- **Symbols / source link.** Enable `PublishRepositoryUrl` + `EmbedUntrackedSources` + snupkg so consumers can step into engine code while debugging.
-- **CI publish pipeline.** GitHub Actions workflow on tag push → `dotnet pack` → `dotnet nuget push` to nuget.org. Needs an API key secret.
-- **README.md in the package.** NuGet now renders package READMEs on nuget.org — write a minimal "getting started" that points to the docs site (see below).
-- **License clarity.** Confirm the license file is in the repo root and referenced in the `.csproj` (`PackageLicenseFile`).
+- **Package IDs.** `FlatRedBall2.MonoGame` and `FlatRedBall2.Kni`. Name `FlatRedBall2` is locked in (decided previously — keep continuity with FRB1 brand, accept the `2` suffix).
+- **Version.** Start at `0.1.0` (per user). Decide whether to tag as `0.1.0` or `0.1.0-preview.1` — the `-preview.N` suffix signals "expect breaking changes" via NuGet's pre-release flag and keeps the package off default search until stable.
+- **What ships in the package.** Main `FlatRedBall2.dll`. Do Gum-integration, TMX loading, and other optional pieces ship as sub-packages (`FlatRedBall2.Gum`, `FlatRedBall2.Tiled`) or all-in-one? Current project is monolithic — splitting is a bigger refactor and probably post-0.1.
+- **Content pipeline assets.** Does the NuGet include the StandardTileset PNG/TSX? A `.targets` file that wires MGCB references? Consumers will hit "where does the tileset live" friction immediately otherwise. Likely needs a `build/FlatRedBall2.targets` shipped in the package.
+- **XML docs in the package.** Set `<GenerateDocumentationFile>true</GenerateDocumentationFile>` so the `.xml` ships alongside the `.dll` and IntelliSense lights up in consumer IDEs. Gates on the engine-wide XML docs pass landing first.
+- **Symbols / source link.** Enable `PublishRepositoryUrl` + `EmbedUntrackedSources` + `IncludeSymbols` + `SymbolPackageFormat=snupkg` so consumers can step into engine code while debugging.
+- **README.md in the package.** Set `<PackageReadmeFile>` — nuget.org renders it. Minimal "getting started" pointing to the docs site.
+- **License + metadata.** Confirm `LICENSE` is referenced via `<PackageLicenseFile>`, plus `<Authors>`, `<Description>`, `<RepositoryUrl>`, `<PackageTags>`, `<PackageProjectUrl>`.
+- **CI publish pipeline (this is the YAML part).** GitHub Actions workflow under `.github/workflows/publish.yml` on tag push (`v*`) → `dotnet pack -c Release` → `dotnet nuget push *.nupkg --api-key $NUGET_API_KEY`. Needs `NUGET_API_KEY` secret in repo settings.
 
 ## Documentation Site
 **Priority: Soon** — Stand up a public docs site for FlatRedBall2. Today all guidance lives in skill files (AI-facing, in-repo) and inline XML docs; a human-facing site is the missing third leg.
@@ -90,14 +98,4 @@ Open questions:
 - **API reference.** Generated from XML docs. DocFX does this well; MkDocs does not natively.
 - **Samples.** Link to the `Samples/` directory? Embed runnable examples? WASM-hosted demos once KNI lands?
 - **Versioning.** Docs site pinned to the latest preview NuGet vs `main` branch. Probably `main` during preview and switch to per-release after 1.0.
-
-## Naming Discussion
-**Priority: Design discussion** — Revisit the name `FlatRedBall2`. Open for debate before the first preview NuGet ships (naming is cheap now, expensive after external users depend on the package ID).
-
-Topics to cover:
-- **Keep `FlatRedBall2`?** Carries brand recognition for existing FRB1 users and signals continuity. Downside: `2` suffix can look unfinished or like a sequel rather than a replacement, and many developers won't have heard of FRB1 in the first place.
-- **Rename entirely?** A new name disconnects from FRB1 baggage (Glue editor, code generation, old forum reputation — good and bad) and sets a fresh tone. Downside: loses the existing community's search recognition and any SEO/word-of-mouth built up over 15+ years.
-- **Candidate considerations.** Short, pronounceable, available as a NuGet package ID, available as a .com or .dev domain, available as a GitHub org/repo, not colliding with an existing game-dev tool. Should the name hint at the domain (2D, MonoGame, etc.) or be neutral?
-- **Namespace implications.** Renaming changes the root `FlatRedBall2` namespace everywhere. Cheap with a single IDE rename before external consumers exist; painful after.
-- **Decision deadline.** Lock in before the first preview NuGet tag. After that, rename = new package ID + migration story for consumers.
 

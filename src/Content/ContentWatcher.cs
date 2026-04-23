@@ -28,7 +28,7 @@ public enum ContentWatchRegistrationStatus
 /// change events per save (write + rename + flush); the debounce window collapses those bursts
 /// into a single callback.
 /// <para>
-/// Construct manually with an <see cref="IFileWatcher"/>, or via <see cref="Screen.WatchContent(string, Action)"/>
+/// Construct manually with an <see cref="IFileWatcher"/>, or via <see cref="Screen.WatchContent(string, Action, string?)"/>
 /// which constructs one with a default <c>FileSystemFileWatcher</c> and registers it for
 /// per-frame ticking + automatic disposal on screen change.
 /// </para>
@@ -106,6 +106,7 @@ public class ContentWatcher : IDisposable
         }
     }
 
+    /// <summary>Stops watching, unhooks the source event, and disposes the underlying watcher. Idempotent.</summary>
     public void Dispose()
     {
         if (_disposed) return;

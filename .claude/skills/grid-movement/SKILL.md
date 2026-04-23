@@ -58,17 +58,17 @@ private bool IsBlocked(float x, float y)
 
 ## Tween Helper
 
-A lerp tween using `Engine.Time.CurrentScreenTimeSeconds` (accessible from any entity via `Engine`):
+A lerp tween using `Engine.Time.CurrentScreenTime` (accessible from any entity via `Engine`):
 
 ```csharp
-private async Task TweenTo(float tx, float ty, float duration)
+private async Task TweenTo(float tx, float ty, TimeSpan duration)
 {
     float startX = X, startY = Y;
-    double startTime = Engine.Time.CurrentScreenTimeSeconds;
+    TimeSpan startTime = Engine.Time.CurrentScreenTime;
     await Engine.Time.DelayUntil(() =>
     {
-        double elapsed = Engine.Time.CurrentScreenTimeSeconds - startTime;
-        float t = (float)Math.Clamp(elapsed / duration, 0.0, 1.0);
+        TimeSpan elapsed = Engine.Time.CurrentScreenTime - startTime;
+        float t = (float)Math.Clamp(elapsed.TotalSeconds / duration.TotalSeconds, 0.0, 1.0);
         X = startX + (tx - startX) * t;
         Y = startY + (ty - startY) * t;
         return t >= 1f;

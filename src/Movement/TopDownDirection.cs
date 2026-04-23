@@ -8,13 +8,21 @@ namespace FlatRedBall2.Movement;
 /// </summary>
 public enum TopDownDirection
 {
+    /// <summary>Facing right (+X).</summary>
     Right,
+    /// <summary>Facing up and right (+X, +Y).</summary>
     UpRight,
+    /// <summary>Facing up (+Y).</summary>
     Up,
+    /// <summary>Facing up and left (-X, +Y).</summary>
     UpLeft,
+    /// <summary>Facing left (-X).</summary>
     Left,
+    /// <summary>Facing down and left (-X, -Y).</summary>
     DownLeft,
+    /// <summary>Facing down (-Y).</summary>
     Down,
+    /// <summary>Facing down and right (+X, -Y).</summary>
     DownRight,
 }
 
@@ -70,6 +78,7 @@ public static class TopDownDirectionExtensions
     /// (Right, Up, Left, or Down). Cardinal inputs are returned unchanged.
     /// Useful for selecting animations when input is 8-way but art has only 4 chains.
     /// </summary>
+    /// <param name="direction">The direction to collapse.</param>
     /// <param name="axis">Which axis diagonals collapse onto. Defaults to <see cref="DiagonalAxis.Horizontal"/>.</param>
     public static TopDownDirection ToCardinal(this TopDownDirection direction, DiagonalAxis axis = DiagonalAxis.Horizontal)
         => axis == DiagonalAxis.Horizontal

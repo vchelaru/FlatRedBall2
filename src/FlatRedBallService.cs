@@ -18,8 +18,20 @@ using Microsoft.Xna.Framework.Content;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// The engine root. Owns the <see cref="CurrentScreen"/>, the per-engine subsystems
+/// (<see cref="Input"/>, <see cref="Audio"/>, <see cref="Content"/>, <see cref="Time"/>,
+/// <see cref="Random"/>, <see cref="RenderDiagnostics"/>), and the integration with the
+/// MonoGame <see cref="Microsoft.Xna.Framework.Game"/> loop.
+/// <para>
+/// Most games access the engine through <see cref="Default"/>, the single static instance,
+/// and call <see cref="Initialize"/>, <see cref="Update"/>, and <see cref="Draw"/> from the
+/// matching <c>Game</c> hooks.
+/// </para>
+/// </summary>
 public class FlatRedBallService
 {
+    /// <summary>The shared engine instance used by every screen, entity, and factory.</summary>
     public static FlatRedBallService Default { get; } = new FlatRedBallService();
 
     private Game? _game;
@@ -34,6 +46,11 @@ public class FlatRedBallService
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
 
+    /// <summary>
+    /// Constructs an engine instance and auto-detects <see cref="SourceContentRoot"/>. Most
+    /// games use <see cref="Default"/> rather than constructing their own — multi-instance
+    /// engines are only useful for advanced testing scenarios.
+    /// </summary>
     public FlatRedBallService()
     {
         SourceContentRoot = DetectSourceContentRoot(AppContext.BaseDirectory);
@@ -123,6 +140,10 @@ public class FlatRedBallService
     }
 
     // Screen management
+    /// <summary>
+    /// The screen currently being updated and drawn. Replaced by <see cref="Start{T}"/> /
+    /// <c>RequestScreenChange</c> at the next frame boundary — never mid-frame.
+    /// </summary>
     public Screen CurrentScreen { get; private set; } = new Screen();
 
     /// <param name="configure">
@@ -130,7 +151,7 @@ public class FlatRedBallService
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
     /// <para>
     /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
-    /// on <see cref="Screen.RestartScreen"/>; mutating a captured local after this call changes what
+    /// on <see cref="Screen.RestartScreen()"/>; mutating a captured local after this call changes what
     /// restart sees. Pass values directly rather than via captured locals.
     /// </para>
     /// </param>
@@ -452,12 +473,19 @@ public class FlatRedBallService
     }
 
     // Sub-systems
+    /// <summary>The MonoGame graphics device. Throws if accessed before <see cref="Initialize"/>.</summary>
     public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
+    /// <summary>Deterministic random number source — used by every gameplay system that needs randomness so seeds can be reproduced.</summary>
     public GameRandom Random { get; } = new GameRandom();
+    /// <summary>Polled keyboard, mouse, and gamepad state. Updated once per frame at the top of <see cref="Update"/>.</summary>
     public InputManager Input { get; } = new InputManager();
+    /// <summary>Sound effect and music playback service.</summary>
     public AudioManager Audio { get; } = new AudioManager();
+    /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
     public ContentManagerService Content { get; } = new ContentManagerService();
+    /// <summary>Engine clocks and async delay primitives. See <see cref="TimeManager"/>.</summary>
     public TimeManager Time { get; } = new TimeManager();
+    /// <summary>Per-frame draw-call instrumentation. Off by default — see <see cref="Diagnostics.RenderDiagnostics.IsEnabled"/>.</summary>
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
     /// <summary>
@@ -472,6 +500,11 @@ public class FlatRedBallService
     /// <summary>The active screen's overlay. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Overlay"/>.</summary>
     public Overlay Overlay => CurrentScreen.Overlay;
 
+    /// <summary>
+    /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
+    /// polling, content hot-reload, time accumulation, async continuations, and the active
+    /// screen's <see cref="Screen.CustomActivity"/> in that order.
+    /// </summary>
     public void Update(GameTime gameTime)
     {
         // Apply pending screen transition at start of frame
@@ -487,7 +520,7 @@ public class FlatRedBallService
         CurrentScreen.TickContentWatchers(DateTime.UtcNow);
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
-        Input.Update();
+        Input.Update(Time.RealTimeSinceStart);
 
         if (_spriteBatch != null)
         {
@@ -533,6 +566,12 @@ public class FlatRedBallService
         CurrentScreen.Update(Time.CurrentFrameTime);
     }
 
+    /// <summary>
+    /// Per-frame engine draw. Call from <c>Game.Draw</c> after your own <c>GraphicsDevice.Clear</c>
+    /// (the engine handles clearing only when <see cref="DisplaySettings"/>.<c>FixedAspectRatio</c>
+    /// is set). Resolves the camera viewport, sorts the renderable list by Layer/Z, and dispatches
+    /// to each renderable's <see cref="IRenderBatch"/>.
+    /// </summary>
     public void Draw()
     {
         if (_spriteBatch == null) return;

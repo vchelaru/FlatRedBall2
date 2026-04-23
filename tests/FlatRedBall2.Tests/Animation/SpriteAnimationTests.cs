@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Animation;
 using FlatRedBall2.Rendering;
 using Shouldly;
@@ -11,7 +12,7 @@ public class SpriteAnimationTests
     {
         var chain = new AnimationChain { Name = chainName };
         for (int i = 0; i < frameCount; i++)
-            chain.Add(new AnimationFrame { FrameLength = frameLength });
+            chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(frameLength) });
         var list = new AnimationChainList();
         list.Add(chain);
         return list;
@@ -102,7 +103,7 @@ public class SpriteAnimationTests
     public void PlayAnimation_FrameWithRelativeOffset_SetsXY()
     {
         var chain = new AnimationChain { Name = "Kick" };
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f, RelativeY = 10f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 5f, RelativeY = 10f });
 
         var list = new AnimationChainList();
         list.Add(chain);
@@ -119,8 +120,8 @@ public class SpriteAnimationTests
     public void AnimateSelf_FrameChange_UpdatesXY()
     {
         var chain = new AnimationChain { Name = "Walk" };
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f, RelativeY = 0f });
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 3f, RelativeY = 7f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 0f, RelativeY = 0f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 3f, RelativeY = 7f });
 
         var list = new AnimationChainList();
         list.Add(chain);
@@ -144,8 +145,8 @@ public class SpriteAnimationTests
     public void PlayAnimation_SameNameWhileAlreadyPlaying_DoesNotRestartAnimation()
     {
         var chain = new AnimationChain { Name = "Walk" };
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 0f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 5f });
         var list = new AnimationChainList();
         list.Add(chain);
 
@@ -165,8 +166,8 @@ public class SpriteAnimationTests
     public void PlayAnimation_SameChainWhileAlreadyPlaying_DoesNotRestartAnimation()
     {
         var chain = new AnimationChain { Name = "Walk" };
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
-        chain.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 0f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 5f });
         var list = new AnimationChainList();
         list.Add(chain);
 
@@ -186,10 +187,10 @@ public class SpriteAnimationTests
     public void PlayAnimation_DifferentNameWhilePlaying_RestartsFromBeginning()
     {
         var chain1 = new AnimationChain { Name = "Walk" };
-        chain1.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 0f });
-        chain1.Add(new AnimationFrame { FrameLength = 0.1f, RelativeX = 5f });
+        chain1.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 0f });
+        chain1.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), RelativeX = 5f });
         var chain2 = new AnimationChain { Name = "Jump" };
-        chain2.Add(new AnimationFrame { FrameLength = 0.2f, RelativeX = 9f });
+        chain2.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.2), RelativeX = 9f });
         var list = new AnimationChainList();
         list.Add(chain1);
         list.Add(chain2);
@@ -209,7 +210,7 @@ public class SpriteAnimationTests
     public void PlayAnimation_ZeroRelativeOffset_ResetsXYToZero()
     {
         var chain = new AnimationChain { Name = "Idle" };
-        chain.Add(new AnimationFrame { FrameLength = 0.2f, RelativeX = 0f, RelativeY = 0f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.2), RelativeX = 0f, RelativeY = 0f });
 
         var list = new AnimationChainList();
         list.Add(chain);

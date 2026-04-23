@@ -1,30 +1,35 @@
+using System;
+
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Defines the movement characteristics (speed, acceleration, deceleration, etc.) for top-down entities.
+/// </summary>
 public class TopDownValues
 {
     /// <summary>Maximum movement speed in world units per second.</summary>
     public float MaxSpeed;
 
     /// <summary>
-    /// Seconds to accelerate from rest to <see cref="MaxSpeed"/>. <c>0</c> means instant
+    /// Time to accelerate from rest to <see cref="MaxSpeed"/>. <see cref="TimeSpan.Zero"/> means instant
     /// (velocity is set directly to the input-scaled <see cref="MaxSpeed"/>).
     /// </summary>
-    public float AccelerationTime;
+    public TimeSpan AccelerationTime;
 
     /// <summary>
-    /// Seconds to decelerate from <see cref="MaxSpeed"/> to rest when input is released.
-    /// <c>0</c> means instant.
+    /// Time to decelerate from <see cref="MaxSpeed"/> to rest when input is released.
+    /// <see cref="TimeSpan.Zero"/> means instant.
     /// </summary>
-    public float DecelerationTime;
+    public TimeSpan DecelerationTime;
 
     /// <summary>
-    /// When true, <see cref="DirectionFacing"/> is updated from the input direction each frame.
+    /// When true, <see cref="TopDownBehavior.DirectionFacing"/> is updated from the input direction each frame.
     /// Takes priority over <see cref="UpdateDirectionFromVelocity"/>.
     /// </summary>
     public bool UpdateDirectionFromInput = true;
 
     /// <summary>
-    /// When true and <see cref="UpdateDirectionFromInput"/> is false, <see cref="DirectionFacing"/>
+    /// When true and <see cref="UpdateDirectionFromInput"/> is false, <see cref="TopDownBehavior.DirectionFacing"/>
     /// is updated from the entity's actual velocity.
     /// </summary>
     public bool UpdateDirectionFromVelocity;

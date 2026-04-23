@@ -5,6 +5,30 @@ using FlatRedBall2.Input;
 
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Drives side-scrolling platformer movement for an <see cref="Entity"/>: horizontal acceleration,
+/// gravity, jump (raw or derived from min/max heights with optional sustain), ground-snap across
+/// downslope seams, slope-aware speed scaling, drop-through one-way platforms, and ladder/fence
+/// climbing.
+/// <para>
+/// <b>Lifecycle:</b> assign <see cref="GroundMovement"/>/<see cref="AirMovement"/> (and optionally
+/// <see cref="ClimbingMovement"/>), wire <see cref="JumpInput"/>/<see cref="MovementInput"/>, set
+/// <see cref="CollisionShape"/> to the entity's body rectangle, and call <see cref="Update"/> from
+/// <c>CustomActivity</c> <b>after</b> collision resolution. The behavior reads
+/// <see cref="Entity.LastReposition"/> to detect ground contact, so it must run after the
+/// collision pass that produced it.
+/// </para>
+/// <para>
+/// <b>Tuning lives in <see cref="PlatformerValues"/></b> (one slot per movement state). Author
+/// values directly in C# or load them from JSON via <see cref="PlatformerConfig"/> +
+/// <see cref="PlatformerConfigExtensions.ApplyTo"/>.
+/// </para>
+/// <para>
+/// <b>Implement <see cref="IPlatformerEntity"/></b> on the owning entity so collision relationships
+/// in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/> mode discover this
+/// behavior automatically and contribute their <see cref="TileShapeCollection"/> as a snap target.
+/// </para>
+/// </summary>
 public class PlatformerBehavior
 {
     /// <summary>
@@ -13,6 +37,13 @@ public class PlatformerBehavior
     /// </summary>
     public PlatformerValues? GroundMovement { get; set; }
 
+    /// <summary>
+    /// Movement values used while the entity is airborne. Always non-null (defaults to a fresh
+    /// <see cref="PlatformerValues"/>) — the airborne slot's <see cref="PlatformerValues.Gravity"/>
+    /// governs the jump trajectory regardless of which slot initiated the jump, since collision
+    /// cancels ground gravity the moment the entity leaves a surface. <see cref="GroundMovement"/>
+    /// falls back to this when null.
+    /// </summary>
     public PlatformerValues AirMovement { get; set; } = new();
 
     /// <summary>
@@ -109,8 +140,19 @@ public class PlatformerBehavior
     private TileShapeCollection? _activeClimbSurface;
     private int _activeClimbCol;
 
-    // Input — must be set before Update is called
+    /// <summary>
+    /// Pressable input that triggers a jump on <c>WasJustPressed</c> and sustains the jump
+    /// (raises height up to the max) while <c>IsDown</c> if
+    /// <see cref="PlatformerValues.JumpApplyByButtonHold"/> is true. Null disables jumping —
+    /// useful while in cutscenes or to forbid jump-off from a ladder.
+    /// </summary>
     public IPressableInput? JumpInput { get; set; }
+
+    /// <summary>
+    /// 2D input driving horizontal movement (X) and ladder/fence climbing (Y). Y+ is up,
+    /// matching world space — pressing up on a ladder produces positive Y. Null treats input
+    /// as zero on both axes.
+    /// </summary>
     public I2DInput? MovementInput { get; set; }
 
     /// <summary>

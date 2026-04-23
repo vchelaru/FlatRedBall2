@@ -20,6 +20,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
     private readonly TilemapTileLayer _layer;
     private OrthographicCamera? _orthoCam;
 
+    /// <param name="layer">The tile layer.</param>
     /// <param name="renderer">
     /// A shared renderer with the tilemap already loaded via <see cref="TilemapSpriteBatchRenderer.LoadTilemap"/>.
     /// Reuse the same renderer for all layers of the same tilemap.
@@ -30,7 +31,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
         _layer = layer;
     }
 
-    /// <summary>Delegates to the underlying <see cref="TilemapTileLayer.IsVisible"/>.</summary>
+    /// <summary>Delegates to the underlying <c>IsVisible</c>.</summary>
     public bool IsVisible
     {
         get => _layer.IsVisible;
@@ -38,20 +39,32 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
     }
 
     // IAttachable
+    /// <inheritdoc/>
     public Entity? Parent { get; set; }
+    /// <inheritdoc/>
     public float X { get; set; }
+    /// <inheritdoc/>
     public float Y { get; set; }
+    /// <inheritdoc/>
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    /// <inheritdoc/>
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    /// <inheritdoc/>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+    /// <inheritdoc/>
     public void Destroy() { }
 
     // IRenderable
+    /// <inheritdoc/>
     public float Z { get; set; }
+    /// <inheritdoc/>
     public Layer? Layer { get; set; }
+    /// <inheritdoc/>
     public IRenderBatch Batch { get; set; } = TiledRenderBatch.Instance;
+    /// <inheritdoc/>
     public string? Name { get; set; }
 
+    /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!IsVisible) return;

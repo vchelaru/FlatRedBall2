@@ -33,7 +33,7 @@ public class EntityTweenTests
         var (_, factory) = MakeScreenAndFactory();
         var entity = factory.Create();
 
-        var tweener = entity.Tween(_ => { }, from: 0f, to: 1f, durationSeconds: 1f);
+        var tweener = entity.Tween(_ => { }, from: 0f, to: 1f, duration: TimeSpan.FromSeconds(1));
 
         tweener.Running.ShouldBeTrue();
     }
@@ -45,7 +45,7 @@ public class EntityTweenTests
         var entity = factory.Create();
         float lastValue = float.NaN;
         int endedCount = 0;
-        var tweener = entity.Tween(v => lastValue = v, from: 0f, to: 10f, durationSeconds: 1f);
+        var tweener = entity.Tween(v => lastValue = v, from: 0f, to: 10f, duration: TimeSpan.FromSeconds(1));
         tweener.Ended += () => endedCount++;
 
         // Drive Activity well past the tween duration (5 steps of 0.3s = 1.5s).
@@ -63,7 +63,7 @@ public class EntityTweenTests
         var (screen, factory) = MakeScreenAndFactory();
         var entity = factory.Create();
         int callCount = 0;
-        entity.Tween(_ => callCount++, from: 0f, to: 1f, durationSeconds: 1f);
+        entity.Tween(_ => callCount++, from: 0f, to: 1f, duration: TimeSpan.FromSeconds(1));
 
         screen.Update(Frame(0.1f));
         int callsAfterOneTick = callCount;
@@ -82,8 +82,8 @@ public class EntityTweenTests
         var (screen, factory) = MakeScreenAndFactory();
         var entity = factory.Create();
         int aCalls = 0, bCalls = 0;
-        entity.Tween(_ => aCalls++, 0f, 1f, 1f);
-        entity.Tween(_ => bCalls++, 0f, 1f, 1f);
+        entity.Tween(_ => aCalls++, 0f, 1f, TimeSpan.FromSeconds(1));
+        entity.Tween(_ => bCalls++, 0f, 1f, TimeSpan.FromSeconds(1));
 
         screen.Update(Frame(0.1f));
 
@@ -98,7 +98,7 @@ public class EntityTweenTests
         var entity = factory.Create();
         int setterCalls = 0;
         int endedCount = 0;
-        var tweener = entity.Tween(_ => setterCalls++, 0f, 1f, 1f);
+        var tweener = entity.Tween(_ => setterCalls++, 0f, 1f, TimeSpan.FromSeconds(1));
         tweener.Ended += () => endedCount++;
 
         tweener.Stop();
@@ -118,7 +118,7 @@ public class EntityTweenTests
         var entity = factory.Create();
         entity.CanAdvance = false;
         int callCount = 0;
-        entity.Tween(_ => callCount++, 0f, 1f, 1f);
+        entity.Tween(_ => callCount++, 0f, 1f, TimeSpan.FromSeconds(1));
 
         screen.Update(Frame(0.1f));
         callCount.ShouldBe(0);
@@ -135,7 +135,7 @@ public class EntityTweenTests
         var entity = factory.Create();
         float lastValue = float.NaN;
         int callCount = 0;
-        entity.Tween(v => { lastValue = v; callCount++; }, from: 0f, to: 10f, durationSeconds: 1f);
+        entity.Tween(v => { lastValue = v; callCount++; }, from: 0f, to: 10f, duration: TimeSpan.FromSeconds(1));
 
         screen.Update(Frame(0.1f));
 

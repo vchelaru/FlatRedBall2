@@ -2,6 +2,10 @@ using System;
 
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Extension methods that apply a JSON-loaded <see cref="PlatformerConfig"/> onto a runtime
+/// <see cref="PlatformerBehavior"/>.
+/// </summary>
 public static class PlatformerConfigExtensions
 {
     /// <summary>

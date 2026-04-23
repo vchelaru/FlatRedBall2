@@ -26,22 +26,36 @@ public class Line : IAttachable, IRenderable, ICollidable
     public Vector2 EndPoint { get; set; } = new Vector2(32f, 0f);
 
     // IAttachable
+    /// <inheritdoc/>
     public Entity? Parent { get; set; }
+    /// <summary>X of the first endpoint. Relative to <see cref="Parent"/> when attached, world when root.</summary>
     public float X { get; set; }
+    /// <summary>Y of the first endpoint (Y+ up). Relative to <see cref="Parent"/> when attached, world when root.</summary>
     public float Y { get; set; }
+    /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
+    /// <inheritdoc/>
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    /// <inheritdoc/>
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    /// <summary>Final Z after walking the parent chain.</summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+    /// <inheritdoc/>
     public float BroadPhaseRadius => EndPoint.Length();
 
     // IRenderable
+    /// <summary>Whether this line is drawn. Defaults to <c>false</c> — collision shapes are hidden by default.</summary>
     public bool IsVisible { get; set; } = false;
+    /// <inheritdoc/>
     public Layer? Layer { get; set; }
+    /// <inheritdoc/>
     public IRenderBatch Batch { get; set; } = ShapesBatch.Instance;
+    /// <summary>Optional logical name for diagnostics.</summary>
     public string? Name { get; set; }
 
+    /// <summary>Line color. Defaults to opaque white.</summary>
     public XnaColor Color { get; set; } = new XnaColor(255, 255, 255, 255);
+    /// <summary>Line thickness in pixels. Defaults to 1.</summary>
     public float LineThickness { get; set; } = 1f;
 
     /// <summary>World-space position of the first endpoint — same as (<see cref="AbsoluteX"/>, <see cref="AbsoluteY"/>).</summary>
@@ -55,6 +69,7 @@ public class Line : IAttachable, IRenderable, ICollidable
     /// </summary>
     public void SetAbsoluteEndpoint(Vector2 absolutePoint) => EndPoint = absolutePoint - AbsolutePoint1;
 
+    /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!IsVisible || Batch is not ShapesBatch sb) return;
@@ -79,6 +94,9 @@ public class Line : IAttachable, IRenderable, ICollidable
             c:Color);
     }
 
+    /// <summary>
+    /// Detaches this line from its parent entity. Called recursively by <see cref="Entity.Destroy"/>.
+    /// </summary>
     public void Destroy()
     {
         if (Parent is Entity entity)
@@ -106,9 +124,16 @@ public class Line : IAttachable, IRenderable, ICollidable
     public bool CollideAgainst(Polygon other)
         => other.Raycast(AbsolutePoint1, AbsolutePoint2, out _, out _);
 
+    /// <summary>
+    /// Returns the minimum displacement needed to separate this segment from <paramref name="other"/>.
+    /// Only meaningful for <see cref="AxisAlignedRectangle"/> targets — other shape pairings return
+    /// <see cref="Vector2.Zero"/> because there is no well-defined separation vector for a degenerate
+    /// (zero-width) segment.
+    /// </summary>
     public Vector2 GetSeparationVector(ICollidable other)
         => CollisionDispatcher.GetSeparationVector(this, other);
 
+    /// <inheritdoc/>
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
     {
         var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
@@ -116,10 +141,12 @@ public class Line : IAttachable, IRenderable, ICollidable
         Y += offset.Y;
     }
 
+    /// <inheritdoc/>
     public void ApplySeparationOffset(Vector2 offset) { X += offset.X; Y += offset.Y; }
 
-    // Velocity bounce is handled by Entity.AdjustVelocityFrom on the owning entity; no-op here.
+    /// <summary>No-op on shapes — only <see cref="Entity"/> carries velocity.</summary>
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+    /// <summary>No-op on shapes — see <see cref="AdjustVelocityFrom"/>.</summary>
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
 
     // ── Typed collision tests ─────────────────────────────────────────────

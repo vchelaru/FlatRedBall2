@@ -31,6 +31,122 @@ file sealed class FakeGamepad : IGamepad
     public float GetAxis(GamepadAxis axis) => 0f;
 }
 
+// --- Cursor ---
+
+public class CursorTests
+{
+    private static MouseState Mouse(ButtonState left = ButtonState.Released, ButtonState right = ButtonState.Released) =>
+        new MouseState(
+            x: 0, y: 0, scrollWheel: 0,
+            leftButton: left,
+            middleButton: ButtonState.Released,
+            rightButton: right,
+            xButton1: ButtonState.Released,
+            xButton2: ButtonState.Released);
+
+    private static TimeSpan Sec(double s) => TimeSpan.FromSeconds(s);
+
+    [Fact]
+    public void PrimaryClick_TransitionDownToUp_ReturnsTrue()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(left: ButtonState.Pressed), Sec(0));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.01));
+
+        cursor.PrimaryClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void PrimaryDoubleClick_TwoReleasesWithinThreshold_ReturnsTrue()
+    {
+        var cursor = new Cursor { DoubleClickThreshold = Sec(0.25) };
+
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.00));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.05));  // click 1
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.10));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.20));  // click 2 within threshold of click 1
+
+        cursor.PrimaryDoubleClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void PrimaryDoubleClick_TwoReleasesBeyondThreshold_ReturnsFalse()
+    {
+        var cursor = new Cursor { DoubleClickThreshold = Sec(0.25) };
+
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.00));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.05));
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.40));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.50));  // gap 0.45 > 0.25
+
+        cursor.PrimaryDoubleClick.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void PrimaryDoublePressed_TwoPressesWithinThreshold_ReturnsTrue()
+    {
+        var cursor = new Cursor { DoubleClickThreshold = Sec(0.25) };
+
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.00));
+        cursor.Update(Mouse(left: ButtonState.Released), Sec(0.05));
+        cursor.Update(Mouse(left: ButtonState.Pressed),  Sec(0.10));  // press 2 within threshold
+
+        cursor.PrimaryDoublePressed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SecondaryClick_TransitionDownToUp_ReturnsTrue()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0));
+        cursor.Update(Mouse(right: ButtonState.Released), Sec(0.01));
+
+        cursor.SecondaryClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SecondaryDoubleClick_TwoReleasesWithinThreshold_ReturnsTrue()
+    {
+        var cursor = new Cursor { DoubleClickThreshold = Sec(0.25) };
+
+        cursor.Update(Mouse(right: ButtonState.Pressed),  Sec(0.00));
+        cursor.Update(Mouse(right: ButtonState.Released), Sec(0.05));
+        cursor.Update(Mouse(right: ButtonState.Pressed),  Sec(0.10));
+        cursor.Update(Mouse(right: ButtonState.Released), Sec(0.20));
+
+        cursor.SecondaryDoubleClick.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SecondaryDown_RightMouseHeld_ReturnsTrue()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0));
+
+        cursor.SecondaryDown.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void SecondaryPressed_HeldAcrossTwoFrames_ReturnsFalse()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0));
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0.01));
+
+        cursor.SecondaryPressed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SecondaryPressed_TransitionUpToDown_ReturnsTrue()
+    {
+        var cursor = new Cursor();
+        cursor.Update(Mouse(right: ButtonState.Released), Sec(0));
+        cursor.Update(Mouse(right: ButtonState.Pressed), Sec(0.01));
+
+        cursor.SecondaryPressed.ShouldBeTrue();
+    }
+}
+
 // --- KeyboardPressableInput ---
 
 public class KeyboardPressableInputTests

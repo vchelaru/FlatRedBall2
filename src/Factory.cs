@@ -49,6 +49,11 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     private float? _cellHeight;
     private int _batchDepth;
 
+    /// <summary>
+    /// Constructs a factory and registers it with <paramref name="screen"/>. Typically called from
+    /// <see cref="Screen.CustomInitialize"/>: <c>_enemyFactory = new Factory&lt;Enemy&gt;(this);</c>.
+    /// The factory is automatically destroyed when the screen ends.
+    /// </summary>
     public Factory(Screen screen)
     {
         _screen = screen;
@@ -97,6 +102,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     {
         private Factory<T>? _owner;
         public GridBatch(Factory<T> owner) { _owner = owner; }
+        /// <inheritdoc/>
         public void Dispose()
         {
             var o = _owner; if (o == null) return;
@@ -107,6 +113,11 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
         }
     }
 
+    /// <summary>
+    /// Live list of every entity the factory has created and not yet destroyed. Iterate to apply
+    /// per-frame logic across the entire population (e.g., enemies). Add via <see cref="Create"/>;
+    /// remove via <see cref="Entity.Destroy"/>.
+    /// </summary>
     public IReadOnlyList<T> Instances => _instances;
 
     /// <summary>
@@ -140,9 +151,17 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     }
 
     // IReadOnlyList<T> — allows SelfCollisionRelationship to iterate by index without GetEnumerator.
+    /// <summary>Number of live entities; equivalent to <c>Instances.Count</c>.</summary>
     public int Count => _instances.Count;
+    /// <summary>Indexer into <see cref="Instances"/>.</summary>
     public T this[int index] => _instances[index];
 
+    /// <summary>
+    /// Creates a new <typeparamref name="T"/>, injects <see cref="Entity.Engine"/>, registers
+    /// it with the screen, and calls <see cref="Entity.CustomInitialize"/>. The returned entity
+    /// is fully wired into rendering, physics, and (if <see cref="IsSolidGrid"/> is set) the
+    /// solid-grid index.
+    /// </summary>
     public T Create()
     {
         var entity = new T();
@@ -286,6 +305,10 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// <summary>Destroys the entity. Equivalent to calling <see cref="Entity.Destroy"/> directly.</summary>
     public void Destroy(T instance) => instance.Destroy();
 
+    /// <summary>
+    /// Destroys every instance this factory has created. Iterates over a snapshot, so each
+    /// <see cref="Entity.Destroy"/> call freely mutates <see cref="Instances"/>.
+    /// </summary>
     public void DestroyAll()
     {
         foreach (var instance in new List<T>(_instances))

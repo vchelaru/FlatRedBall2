@@ -2,6 +2,10 @@ using System;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// Extension methods on <see cref="Screen"/> that benefit from generic type inference at the
+/// call site (cleaner than equivalent instance methods that would force explicit type args).
+/// </summary>
 public static class ScreenExtensions
 {
     /// <summary>

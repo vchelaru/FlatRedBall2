@@ -11,6 +11,9 @@ using AseTexture = AsepriteDotNet.Texture;
 
 namespace FlatRedBall2.Content.Aseprite;
 
+/// <summary>
+/// Extension methods for loading and processing Aseprite files into FlatRedBall2 animation and texture types.
+/// </summary>
 public static class AsepriteFileExtensions
 {
     /// <summary>
@@ -55,7 +58,7 @@ public static class AsepriteFileExtensions
                 var frame = new FlatRedBall2.Animation.AnimationFrame
                 {
                     Texture = texture,
-                    FrameLength = (float)aseFrame.Duration.TotalSeconds,
+                    FrameLength = aseFrame.Duration,
                     SourceRectangle = new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height),
                 };
                 chain.Add(frame);
@@ -133,7 +136,7 @@ public static class AsepriteFileExtensions
             chain.Add(new FlatRedBall2.Animation.AnimationFrame
             {
                 Texture = texture,
-                FrameLength = (float)file.Frames[i].Duration.TotalSeconds,
+                FrameLength = file.Frames[i].Duration,
                 SourceRectangle = new Rectangle(bounds.X, bounds.Y, bounds.Width, bounds.Height),
             });
         }

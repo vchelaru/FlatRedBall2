@@ -5,6 +5,17 @@ using FlatRedBall2.Math;
 
 namespace FlatRedBall2.Collision;
 
+/// <summary>
+/// Central dispatch table for shape-pair collision. Resolves any
+/// <see cref="ICollidable"/> pair to the correct narrow-phase routine
+/// (AABB vs AABB, circle vs polygon, line vs AABB, etc.) and returns either an overlap test
+/// or a minimum translation vector (MTV) suitable for separation.
+/// <para>
+/// Internal — game code should use the methods on <see cref="Entity"/>, the shape classes
+/// themselves, or a configured <see cref="CollisionRelationship{A,B}"/> rather than calling
+/// the dispatcher directly.
+/// </para>
+/// </summary>
 internal static class CollisionDispatcher
 {
     /// <summary>
@@ -22,6 +33,9 @@ internal static class CollisionDispatcher
         return sep * (otherMass / total);
     }
 
+    /// <summary>
+    /// Returns true if the two shapes overlap or are touching.
+    /// </summary>
     public static bool CollidesWith(ICollidable a, ICollidable b)
     {
         // Line vs AARect now has separation support — use the standard path.
@@ -32,6 +46,9 @@ internal static class CollisionDispatcher
         return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
     }
 
+    /// <summary>
+    /// Computes the separation vector required to push object 'a' out of 'b'.
+    /// </summary>
     // Returns the displacement needed to move 'a' out of 'b', respecting b's RepositionDirections.
     // Returns Vector2.Zero if no collision.
     // When b has RepositionDirections != All, computes the minimum displacement restricted to

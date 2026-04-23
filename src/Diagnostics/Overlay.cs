@@ -294,9 +294,9 @@ public class Overlay
 
     /// <summary>
     /// Draws a filled background rectangle behind <paramref name="label"/> for this frame.
-    /// Always call this immediately after <see cref="Text"/> in the same frame.
+    /// Always call this immediately after <see cref="Text(string, float, float)"/> in the same frame.
     /// </summary>
-    /// <param name="label">A label returned by <see cref="Text"/> this frame.</param>
+    /// <param name="label">A label returned by <see cref="Text(string, float, float)"/> this frame.</param>
     /// <param name="bgColor">Background fill color. Defaults to semi-transparent black.</param>
     public RectShape TextBackground(Label label, XnaColor? bgColor = null)
     {

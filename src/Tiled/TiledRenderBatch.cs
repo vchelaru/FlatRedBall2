@@ -14,7 +14,10 @@ internal class TiledRenderBatch : IRenderBatch
 {
     public static readonly TiledRenderBatch Instance = new();
 
+    /// <inheritdoc/>
     public bool FlipsY => false;
+    /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera) { }
+    /// <inheritdoc/>
     public void End(SpriteBatch spriteBatch) { }
 }

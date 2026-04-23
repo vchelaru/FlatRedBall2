@@ -1,5 +1,11 @@
+using System;
+
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Extension methods that apply a JSON-loaded <see cref="TopDownConfig"/> onto a runtime
+/// <see cref="TopDownBehavior"/>.
+/// </summary>
 public static class TopDownConfigExtensions
 {
     /// <summary>
@@ -16,8 +22,8 @@ public static class TopDownConfigExtensions
         var values = behavior.MovementValues ?? new TopDownValues();
 
         if (movement.MaxSpeed.HasValue) values.MaxSpeed = movement.MaxSpeed.Value;
-        if (movement.AccelerationTime.HasValue) values.AccelerationTime = movement.AccelerationTime.Value;
-        if (movement.DecelerationTime.HasValue) values.DecelerationTime = movement.DecelerationTime.Value;
+        if (movement.AccelerationTime.HasValue) values.AccelerationTime = TimeSpan.FromSeconds(movement.AccelerationTime.Value);
+        if (movement.DecelerationTime.HasValue) values.DecelerationTime = TimeSpan.FromSeconds(movement.DecelerationTime.Value);
         if (movement.UpdateDirectionFromInput.HasValue) values.UpdateDirectionFromInput = movement.UpdateDirectionFromInput.Value;
         if (movement.UpdateDirectionFromVelocity.HasValue) values.UpdateDirectionFromVelocity = movement.UpdateDirectionFromVelocity.Value;
         if (movement.IsUsingCustomDeceleration.HasValue) values.IsUsingCustomDeceleration = movement.IsUsingCustomDeceleration.Value;

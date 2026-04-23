@@ -4,11 +4,13 @@ using System.Collections.Generic;
 namespace FlatRedBall2.Input;
 
 /// <summary>
-/// Interface for input that returns a single axis value, typically in the range [-1, 1] for directional
-/// input or [0, 1] for trigger-style input.
+/// Single-axis input abstraction. <see cref="Value"/> is conventionally in the range [-1, 1] for
+/// directional input or [0, 1] for trigger-style input. Implementations include any source that can
+/// produce a scalar — buttons, axes, or composites built via <see cref="I1DInputExtensions.Or"/>.
 /// </summary>
 public interface I1DInput
 {
+    /// <summary>Current input value. Range depends on the source — typically [-1, 1] or [0, 1].</summary>
     float Value { get; }
 }
 
@@ -24,6 +26,10 @@ public class Multiple1DInputs : I1DInput
     /// </summary>
     public List<I1DInput> Inputs { get; } = new();
 
+    /// <summary>
+    /// Value of the contained input with the largest absolute magnitude, with sign preserved.
+    /// Returns 0 when <see cref="Inputs"/> is empty.
+    /// </summary>
     public float Value
     {
         get
@@ -39,6 +45,7 @@ public class Multiple1DInputs : I1DInput
     }
 }
 
+/// <summary>Fluent helpers for combining <see cref="I1DInput"/> sources.</summary>
 public static class I1DInputExtensions
 {
     /// <summary>

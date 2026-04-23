@@ -221,7 +221,7 @@ public class ScreenTests
         engine.RequestScreenChange<TestScreen>();
         engine.Update(new Microsoft.Xna.Framework.GameTime());
 
-        engine.Time.CurrentScreenTimeSeconds.ShouldBe(0.0, tolerance: 0.0001);
+        engine.Time.CurrentScreenTime.TotalSeconds.ShouldBe(0.0, tolerance: 0.0001);
     }
 
     private class ConfigurableTestScreen : Screen

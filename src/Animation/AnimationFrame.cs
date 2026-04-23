@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -15,8 +16,8 @@ public class AnimationFrame
     /// <summary>Name of the source texture file, used during loading.</summary>
     public string TextureName = string.Empty;
 
-    /// <summary>How long this frame is displayed, in seconds.</summary>
-    public float FrameLength;
+    /// <summary>How long this frame is displayed.</summary>
+    public TimeSpan FrameLength;
 
     /// <summary>
     /// The pixel-coordinate region of <see cref="Texture"/> to render.
@@ -24,7 +25,10 @@ public class AnimationFrame
     /// </summary>
     public Rectangle? SourceRectangle;
 
+    /// <summary>When <c>true</c>, the source region is mirrored along the X axis at draw time.</summary>
     public bool FlipHorizontal;
+
+    /// <summary>When <c>true</c>, the source region is mirrored along the Y axis at draw time.</summary>
     public bool FlipVertical;
 
     /// <summary>

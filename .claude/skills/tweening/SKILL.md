@@ -12,11 +12,11 @@ using FlatRedBall2.Tweening;              // Entity.Tween / Screen.Tween
 using FlatRedBall.Glue.StateInterpolation; // InterpolationType, Easing, Tweener
 
 // Entity-scoped (primary) — tween dies with the entity. Target a child shape directly:
-var t = this.Tween(v => _circle.Radius = v, from: 0f, to: 100f, durationSeconds: 0.5f,
+var t = this.Tween(v => _circle.Radius = v, from: 0f, to: 100f, duration: TimeSpan.FromSeconds(0.5),
                    InterpolationType.Cubic, Easing.Out);
 
 // Screen-scoped (for tweens with no natural entity owner).
-this.Tween(v => Camera.Zoom = v, Camera.Zoom, 1.5f, 0.3f);
+this.Tween(v => Camera.Zoom = v, Camera.Zoom, 1.5f, TimeSpan.FromSeconds(0.3));
 ```
 
 ## Two `using` directives — why
