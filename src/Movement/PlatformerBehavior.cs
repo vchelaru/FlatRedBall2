@@ -517,6 +517,7 @@ public class PlatformerBehavior
         if (hasClimbSurfaces)
         {
             float climbInputY = MovementInput?.Y ?? 0f;
+            float climbInputX = MovementInput?.X ?? 0f;
 
             if (IsClimbing)
             {
@@ -536,9 +537,22 @@ public class PlatformerBehavior
                 }
                 bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue;
                 bool landedWhileDescending = IsOnGround && climbInputY <= 0f && !_enteredClimbThisFrame;
-                if (lostOverlap || landedWhileDescending)
+                bool steppedOffTop = _clampedAtTopThisFrame
+                    && MathF.Abs(climbInputX) > DirectionalInputThreshold;
+
+                if (lostOverlap || landedWhileDescending || steppedOffTop)
                 {
                     IsClimbing = false;
+                    if (steppedOffTop)
+                    {
+                        // Snap feet to ladder top so cloud/solid collision catches the player on the next frame.
+                        var probe = ClimbingShape ?? CollisionShape;
+                        float feetOffset = probe != null
+                            ? probe.AbsoluteY - probe.Height / 2f - entity.Y
+                            : 0f;
+                        entity.Y = TopOfLadderY!.Value - feetOffset;
+                        entity.VelocityY = 0f;
+                    }
                 }
             }
 

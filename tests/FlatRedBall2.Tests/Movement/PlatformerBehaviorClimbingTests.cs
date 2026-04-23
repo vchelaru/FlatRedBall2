@@ -239,6 +239,60 @@ public class PlatformerBehaviorClimbingTests
         entity.VelocityY.ShouldBe(0f);                // no upward residual to overshoot again
     }
 
+    // ── Top-of-ladder horizontal-input exit ──────────────────────────────────
+
+    [Fact]
+    public void ClimbToTop_PressLeft_ExitsClimbingAndSnapsToLadderTop()
+    {
+        var ladder = LadderColumn(cellCenterX: 100f, bottomY: 0f, heightCells: 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var platformer = MakePlatformer(body, new AxisInput(x: -1f, y: 1f)); // left + up
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter climbing
+        entity.Y = 79.5f;
+        platformer.Update(entity, Frame()); // clamp fires, inputX < 0 → exit
+
+        platformer.IsClimbing.ShouldBeFalse();
+        entity.VelocityY.ShouldBe(0f);
+        entity.Y.ShouldBe(80f, tolerance: 0.1f); // feet snapped to TopOfLadderY
+    }
+
+    [Fact]
+    public void ClimbToTop_NoHorizontalInput_RemainsClimbing()
+    {
+        var ladder = LadderColumn(cellCenterX: 100f, bottomY: 0f, heightCells: 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var platformer = MakePlatformer(body, new AxisInput(y: 1f)); // up only, no horizontal
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter
+        entity.Y = 79.5f;
+        for (int i = 0; i < 5; i++) platformer.Update(entity, Frame());
+
+        platformer.IsClimbing.ShouldBeTrue();
+        entity.Y.ShouldBe(79.5f);
+    }
+
+    [Fact]
+    public void ClimbToTop_PressRight_ExitsClimbingAndSnapsToLadderTop()
+    {
+        var ladder = LadderColumn(cellCenterX: 100f, bottomY: 0f, heightCells: 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var platformer = MakePlatformer(body, new AxisInput(x: 1f, y: 1f)); // right + up
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter climbing
+        platformer.IsClimbing.ShouldBeTrue();
+
+        entity.Y = 79.5f; // at clamp threshold (TopOfLadderY=80, maxEntityY=79.5)
+        platformer.Update(entity, Frame()); // clamp fires, inputX > 0 → exit
+
+        platformer.IsClimbing.ShouldBeFalse();
+        entity.VelocityY.ShouldBe(0f);
+        entity.Y.ShouldBe(80f, tolerance: 0.1f); // feet snapped to TopOfLadderY
+    }
+
     // ── Exits ─────────────────────────────────────────────────────────────────
 
     [Fact]

@@ -1,0 +1,27 @@
+{
+  "movement": {
+    "ground": {
+      "MaxSpeedX": 150,
+      "AccelerationTimeX": 0.5,
+      "DecelerationTimeX": 0.25,
+      "Gravity": 700,
+      "MaxFallSpeed": 800,
+      "minJumpHeight": 24,
+      "maxJumpHeight": 64
+    },
+    "air": {
+      "MaxSpeedX": 150,
+      "AccelerationTimeX": 0.5,
+      "DecelerationTimeX": 0.25,
+      "Gravity": 700,
+      "MaxFallSpeed": 800,
+      "minJumpHeight": 24,
+      "maxJumpHeight": 64
+    },
+    "climbing": {
+      "MaxSpeedX": 60,
+      "ClimbingSpeed": 100,
+      "JumpVelocity": 300
+    }
+  }
+}

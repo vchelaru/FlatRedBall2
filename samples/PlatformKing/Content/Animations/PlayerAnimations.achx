@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FileRelativeTextures>true</FileRelativeTextures>
+  <TimeMeasurementUnit>Undefined</TimeMeasurementUnit>
+  <CoordinateType>Pixel</CoordinateType>
+  <AnimationChain>
+    <Name>IdleRight</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleLeft</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkRight</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>32</LeftCoordinate>
+      <RightCoordinate>64</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>64</LeftCoordinate>
+      <RightCoordinate>96</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>128</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkLeft</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>32</LeftCoordinate>
+      <RightCoordinate>64</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>64</LeftCoordinate>
+      <RightCoordinate>96</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>128</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>JumpRight</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>128</LeftCoordinate>
+      <RightCoordinate>160</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>9999</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>JumpLeft</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>128</LeftCoordinate>
+      <RightCoordinate>160</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>9999</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>FallRight</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>FallLeft</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+</AnimationChainArraySave>

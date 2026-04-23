@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="PlatformKing.csproj" />
+</Solution>
