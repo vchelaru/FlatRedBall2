@@ -10,6 +10,20 @@
       Promote to error before the first stable (non-preview) NuGet ships.
     -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- NuGet Metadata -->
+    <Authors>Victor Chelaru</Authors>
+    <Description>A modern, lightweight 2D game engine built on MonoGame and KNI.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    
+    <!-- SourceLink and Symbols (for debugging inside the NuGet package) -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <!--
       Backend is selected by TargetFramework (so NuGet restore picks the right packages):
         net8.0  -> Kni      (browser via Blazor WASM, plus future KNI mobile targets)
