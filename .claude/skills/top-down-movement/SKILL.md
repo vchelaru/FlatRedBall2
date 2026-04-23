@@ -135,24 +135,14 @@ Use `IsMoving` (not `MovementInput.X != 0`) to pick idle vs. walk animations —
 
 ## Mapping 8-Way Facing to 4-Direction Art
 
-Games often keep `PossibleDirections.EightWay` (the default) so diagonal input feels responsive but ship art with only 4 cardinal chains (`WalkUp`, `WalkDown`, `WalkLeft`, `WalkRight`). Collapse the diagonals at animation-selection time — do **not** switch to `FourWay`, which snaps the facing itself and makes diagonals feel notchy.
+Games often keep `PossibleDirections.EightWay` (the default) so diagonal input feels responsive but ship art with only 4 cardinal chains (`WalkUp`, `WalkDown`, `WalkLeft`, `WalkRight`). Collapse the diagonals at animation-selection time with `ToCardinal()` — do **not** switch to `FourWay`, which snaps the facing itself and makes diagonals feel notchy.
 
 ```csharp
-string suffix = _topDown.DirectionFacing switch
-{
-    TopDownDirection.Up                                         => "Up",
-    TopDownDirection.Down                                       => "Down",
-    TopDownDirection.Left or TopDownDirection.UpLeft
-                          or TopDownDirection.DownLeft          => "Left",
-    TopDownDirection.Right or TopDownDirection.UpRight
-                           or TopDownDirection.DownRight        => "Right",
-    _                                                           => "Down",
-};
-string chain = (_topDown.IsMoving ? "Walk" : "Idle") + suffix;
+string chain = (_topDown.IsMoving ? "Walk" : "Idle") + _topDown.DirectionFacing.ToCardinal();
 _sprite.PlayAnimation(chain);
 ```
 
-Diagonals collapse to left/right because horizontal silhouettes usually read better than vertical ones, but it's a game-by-game decision — collapse to up/down instead if the art calls for it.
+`ToCardinal()` defaults to `DiagonalAxis.Horizontal` (UpRight/DownRight → Right, UpLeft/DownLeft → Left) because horizontal silhouettes usually read more distinctly. Pass `DiagonalAxis.Vertical` when up/down poses are more distinct than left/right.
 
 ## Collision Setup
 

@@ -31,6 +31,17 @@ public enum PossibleDirections
 }
 
 /// <summary>
+/// Axis that diagonal directions collapse onto when reducing to a cardinal.
+/// </summary>
+public enum DiagonalAxis
+{
+    /// <summary>Diagonals collapse to Left/Right (e.g. UpRight → Right). Best for character art where horizontal silhouettes read most distinctly.</summary>
+    Horizontal,
+    /// <summary>Diagonals collapse to Up/Down (e.g. UpRight → Up). Best when up/down poses are more distinct than left/right.</summary>
+    Vertical,
+}
+
+/// <summary>
 /// Extension methods for <see cref="TopDownDirection"/>.
 /// </summary>
 public static class TopDownDirectionExtensions
@@ -53,4 +64,25 @@ public static class TopDownDirectionExtensions
         TopDownDirection.DownRight => new Vector2( D, -D),
         _                          => Vector2.Zero,
     };
+
+    /// <summary>
+    /// Collapses a diagonal <see cref="TopDownDirection"/> to its nearest cardinal
+    /// (Right, Up, Left, or Down). Cardinal inputs are returned unchanged.
+    /// Useful for selecting animations when input is 8-way but art has only 4 chains.
+    /// </summary>
+    /// <param name="axis">Which axis diagonals collapse onto. Defaults to <see cref="DiagonalAxis.Horizontal"/>.</param>
+    public static TopDownDirection ToCardinal(this TopDownDirection direction, DiagonalAxis axis = DiagonalAxis.Horizontal)
+        => axis == DiagonalAxis.Horizontal
+            ? direction switch
+            {
+                TopDownDirection.UpRight or TopDownDirection.DownRight => TopDownDirection.Right,
+                TopDownDirection.UpLeft  or TopDownDirection.DownLeft  => TopDownDirection.Left,
+                _ => direction,
+            }
+            : direction switch
+            {
+                TopDownDirection.UpRight or TopDownDirection.UpLeft     => TopDownDirection.Up,
+                TopDownDirection.DownRight or TopDownDirection.DownLeft => TopDownDirection.Down,
+                _ => direction,
+            };
 }
