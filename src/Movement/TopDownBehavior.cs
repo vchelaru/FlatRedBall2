@@ -31,6 +31,16 @@ public class TopDownBehavior
     public TopDownDirection DirectionFacing { get; set; } = TopDownDirection.Right;
 
     /// <summary>
+    /// True when the entity's velocity magnitude exceeds a small epsilon, recomputed each <see cref="Update"/> call.
+    /// Prefer this over checking input for animation decisions: input is non-zero while the entity is held
+    /// against a wall, but <see cref="IsMoving"/> correctly reports false because collision has zeroed velocity.
+    /// Returns false before the first <see cref="Update"/> call.
+    /// </summary>
+    public bool IsMoving { get; private set; }
+
+    private const float IsMovingEpsilonSquared = 0.25f; // 0.5 units/sec
+
+    /// <summary>
     /// Applies top-down movement to <paramref name="entity"/> for the current frame.
     /// Call this from <c>CustomActivity</c> — after collision resolution, which resets
     /// <c>entity.LastReposition</c> and adjusts velocity.
@@ -132,6 +142,8 @@ public class TopDownBehavior
             entity.AccelerationX = 0f;
             entity.AccelerationY = 0f;
         }
+
+        IsMoving = (entity.VelocityX * entity.VelocityX + entity.VelocityY * entity.VelocityY) > IsMovingEpsilonSquared;
     }
 
     private static float AngleDifference(float from, float to)

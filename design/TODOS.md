@@ -1,5 +1,8 @@
 # FlatRedBall2 — Todo
 
+## `TopDownDirection.ToCardinal()` Extension
+**Priority: Eventual** — Add an extension method that collapses any `TopDownDirection` (including diagonals) to the nearest cardinal (`Up`/`Down`/`Left`/`Right`). Motivator: 8-way input with 4-chain art is the common case, and every game currently writes a bespoke switch in its animation selector. A helper cleans up call sites: `var suffix = dir.ToCardinal();`. Open question: which axis do diagonals collapse to by default (horizontal reads best for character silhouettes, but games authored with up/down-dominant art would prefer vertical)? Options: a parameter `DiagonalAxis.Horizontal` (default) / `Vertical`, or two helpers `ToCardinalHorizontal()` / `ToCardinalVertical()`. Surfaced by `AutoEvalTopDownStrollSample` 2026-04-22 alongside the `IsMoving` addition and the skill-level collapse-pattern documentation; deferred because the skill snippet covers the common case without adding API surface.
+
 ## CollisionRelationship Enter/Exit Events
 **Priority: Soon** — Add `CollisionStarted` and `CollisionEnded` events to `CollisionRelationship` (sibling to existing `CollisionOccurred`). Standard physics-engine vocabulary (Unity `OnTriggerEnter/Exit`, Box2D `BeginContact/EndContact`). Eliminates the recurring game-side boilerplate where game code must set a `_wasOverlappingX` bool every frame in `CollisionOccurred` and diff at end-of-frame to detect "left the zone." Direct motivator: multi-profile platformer movement (ice/water/sticky surfaces) — without enter/exit events, every zone needs the bool-diff dance in the player class. With them, it's a one-liner subscription.
 
