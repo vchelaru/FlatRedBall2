@@ -71,7 +71,7 @@ public override void CustomInitialize()
 }
 ```
 
-If the return data must survive a full screen teardown (e.g., the destination is always freshly initialized), use a static field cleared in `CustomInitialize`. This is a stopgap until `Screen.PushScreen`/`PopScreen` ships:
+If the return data must survive a full screen teardown (e.g., the destination is always freshly initialized and the caller doesn't retain a reference to set the configure payload), use a static field cleared in `CustomInitialize`. There is no push/pop screen stack by design — `MoveToScreen` + configure covers the common cases, and pause/HUD overlays belong in Gum:
 
 ```csharp
 public class ExplorationScreen : Screen

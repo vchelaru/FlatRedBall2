@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering;
@@ -10,6 +9,29 @@ using Gum.Wireframe;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// Base class for everything in the game world that has a position, can attach children
+/// (shapes, sprites, Gum visuals, sub-entities), and participates in per-frame update
+/// and collision.
+/// <para>
+/// <b>Create via <see cref="Factory{T}.Create"/></b> — the factory injects <see cref="Engine"/>
+/// and calls <see cref="CustomInitialize"/> at the correct time. Direct <c>new Entity()</c>
+/// is only safe when followed immediately by <see cref="Screen.Register"/> plus a manual
+/// <see cref="CustomInitialize"/> call.
+/// </para>
+/// <para>
+/// <b>Root vs. child behavior:</b> a root entity (no <see cref="Parent"/>) runs its own
+/// physics each frame — position, velocity, acceleration, drag, and rotation integration.
+/// A child entity (attached via <see cref="Add(IAttachable, Layer?)"/>) moves rigidly with
+/// its parent — <see cref="X"/>/<see cref="Y"/>/<see cref="Rotation"/> are interpreted as
+/// offsets from the parent, and per-child physics is skipped.
+/// </para>
+/// <para>
+/// <b>Lifecycle:</b> <see cref="CustomInitialize"/> → per-frame <see cref="CustomActivity"/> →
+/// <see cref="Destroy"/> calls <see cref="CustomDestroy"/> and recursively destroys all
+/// attached children.
+/// </para>
+/// </summary>
 public class Entity : ICollidable, IAttachable
 {
     private readonly List<IAttachable> _children = new();
@@ -21,9 +43,24 @@ public class Entity : ICollidable, IAttachable
     /// </summary>
     public string? Name { get; set; }
 
-    // Position — relative to parent when attached, world when root
+    /// <summary>
+    /// 2D position. Interpreted in world space when this entity has no <see cref="Parent"/>,
+    /// or as an offset from the parent otherwise. Exposed as a field (not a property) so it
+    /// can be mutated component-wise without triggering finite-value validation on every write.
+    /// Prefer <see cref="X"/> / <see cref="Y"/> if you want NaN/∞ to throw.
+    /// </summary>
     public Vector2 Position;
+
+    /// <summary>
+    /// X-axis position. Throws <see cref="InvalidOperationException"/> on set if the value
+    /// is not finite (NaN or ±∞). Relative to <see cref="Parent"/> when attached; world when root.
+    /// </summary>
     public float X { get => Position.X; set { ThrowIfNotFinite(value, nameof(X)); Position.X = value; } }
+
+    /// <summary>
+    /// Y-axis position (Y+ up in world space). Throws <see cref="InvalidOperationException"/> on
+    /// set if the value is not finite. Relative to <see cref="Parent"/> when attached; world when root.
+    /// </summary>
     public float Y { get => Position.Y; set { ThrowIfNotFinite(value, nameof(Y)); Position.Y = value; } }
     /// <summary>
     /// Contributes to <see cref="AbsoluteZ"/> for position calculations (e.g. attachment to a parent).
@@ -67,11 +104,30 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
-    // Absolute world position
+    /// <summary>
+    /// Final world-space X after walking the parent chain. Equal to <see cref="X"/> when this
+    /// entity is a root; otherwise <c>Parent.AbsoluteX + X</c>.
+    /// </summary>
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+
+    /// <summary>
+    /// Final world-space Y after walking the parent chain. Equal to <see cref="Y"/> when this
+    /// entity is a root; otherwise <c>Parent.AbsoluteY + Y</c>.
+    /// </summary>
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+
+    /// <summary>
+    /// Final Z after walking the parent chain. Equal to <see cref="Z"/> when this entity is a
+    /// root; otherwise <c>Parent.AbsoluteZ + Z</c>. Does not directly control draw order —
+    /// see <see cref="Z"/> for the rendering implications.
+    /// </summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
+    /// <summary>
+    /// Maximum distance from <see cref="AbsoluteX"/>/<see cref="AbsoluteY"/> to the far edge of
+    /// any attached collision shape, used by the broad phase to cull entity pairs before
+    /// per-shape collision checks. Recomputed on access; reflects current shape positions.
+    /// </summary>
     public float BroadPhaseRadius
     {
         get
@@ -89,21 +145,63 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
-    // Rotation
+    /// <summary>
+    /// Rotation about the Z axis. Relative to <see cref="Parent"/> when attached, world when root.
+    /// Integrated by <see cref="RotationVelocity"/> each frame on root entities.
+    /// </summary>
     public Angle Rotation { get; set; }
+
+    /// <summary>
+    /// Final world-space rotation after walking the parent chain. Equal to <see cref="Rotation"/>
+    /// when this entity is a root; otherwise <c>Parent.AbsoluteRotation + Rotation</c>.
+    /// </summary>
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;
+
+    /// <summary>
+    /// Angular velocity applied to <see cref="Rotation"/> each frame on root entities. Child
+    /// entities inherit rotation from their parent and this value is ignored.
+    /// </summary>
     public Angle RotationVelocity { get; set; }
 
-    // Physics
+    /// <summary>
+    /// Linear velocity in units/second. Applied each frame on root entities via
+    /// <c>Position += Velocity * dt + Acceleration * dt² / 2</c>. Ignored on child entities.
+    /// Field (not property) to allow component-wise mutation without per-write validation —
+    /// use <see cref="VelocityX"/>/<see cref="VelocityY"/> for finite-value checking.
+    /// </summary>
     public Vector2 Velocity;
+
+    /// <summary>X component of <see cref="Velocity"/>; throws on non-finite values.</summary>
     public float VelocityX { get => Velocity.X; set { ThrowIfNotFinite(value, nameof(VelocityX)); Velocity.X = value; } }
+
+    /// <summary>Y component of <see cref="Velocity"/>; throws on non-finite values. Y+ is up.</summary>
     public float VelocityY { get => Velocity.Y; set { ThrowIfNotFinite(value, nameof(VelocityY)); Velocity.Y = value; } }
+
+    /// <summary>
+    /// Linear acceleration in units/second². Applied each frame on root entities; ignored on
+    /// children. Common use: gravity via <c>AccelerationY = -800f</c> (Y+ is up, so a negative
+    /// value pulls down).
+    /// </summary>
     public Vector2 Acceleration;
+
+    /// <summary>X component of <see cref="Acceleration"/>; throws on non-finite values.</summary>
     public float AccelerationX { get => Acceleration.X; set { ThrowIfNotFinite(value, nameof(AccelerationX)); Acceleration.X = value; } }
+
+    /// <summary>Y component of <see cref="Acceleration"/>; throws on non-finite values.</summary>
     public float AccelerationY { get => Acceleration.Y; set { ThrowIfNotFinite(value, nameof(AccelerationY)); Acceleration.Y = value; } }
+
+    /// <summary>
+    /// Velocity decay coefficient applied each frame as <c>Velocity -= Velocity * (Drag * dt)</c>.
+    /// Units: 1/seconds. A value of <c>0</c> disables drag; <c>1</c> removes ~63% of velocity per
+    /// second; higher values feel stickier. Ignored on child entities.
+    /// </summary>
     public float Drag { get; set; }
 
-    // Records cumulative separation applied this frame; reset at the start of each PhysicsUpdate.
+    /// <summary>
+    /// Cumulative collision separation applied to this entity during the current frame. Reset
+    /// to zero at the start of each physics update. Used by collision response code to
+    /// reconcile multiple overlapping separations without double-counting.
+    /// </summary>
     public Vector2 LastReposition;
 
     /// <summary>Position at the start of the current frame, captured by <c>PhysicsUpdate</c> before
@@ -111,12 +209,40 @@ public class Entity : ICollidable, IAttachable
     /// the platform before separating it onto the top.</summary>
     public Vector2 LastPosition;
 
-    // Hierarchy
+    /// <summary>
+    /// The entity this one is attached to, or <c>null</c> if this is a root entity. Set
+    /// automatically by <see cref="Add(IAttachable, Layer?)"/> / <see cref="Remove"/>; manual
+    /// assignment is permitted but bypasses child-list bookkeeping and is rarely correct.
+    /// </summary>
     public Entity? Parent { get; set; }
+
+    /// <summary>
+    /// All attached children (shapes, sprites, Gum visuals, sub-entities). Populated by
+    /// <see cref="Add(IAttachable, Layer?)"/> and <see cref="Add{T}(T, bool, Layer?)"/>.
+    /// </summary>
     public IReadOnlyList<IAttachable> Children => _children;
 
-    // Visibility
+    /// <summary>
+    /// Hides this entity and all of its renderable descendants (sprites, shapes, Gum visuals,
+    /// child entities) when <c>false</c>. Applied at draw time via the parent chain, so per-child
+    /// <c>IsVisible</c> values are preserved — toggling this on and off does not clobber
+    /// individually-hidden shapes or sprites.
+    /// <para>
+    /// Does not affect physics, collision, or <see cref="CustomActivity"/>: an invisible entity
+    /// still moves, collides, and ticks its activity. Use <see cref="Screen.PauseThisScreen"/>
+    /// or a custom gameplay flag to stop behavior.
+    /// </para>
+    /// </summary>
     public bool IsVisible { get; set; } = true;
+
+    /// <summary>
+    /// <c>true</c> only when this entity and every ancestor entity have <see cref="IsVisible"/>
+    /// set to <c>true</c>. The render loop consults this for every renderable's parent chain and
+    /// skips drawing anything whose absolute visibility is <c>false</c>. Naming mirrors
+    /// <see cref="AbsoluteX"/> / <see cref="AbsoluteY"/>: the final computed value after walking
+    /// the parent chain.
+    /// </summary>
+    public bool IsAbsoluteVisible => IsVisible && (Parent == null || Parent.IsAbsoluteVisible);
 
     // Engine reference — injected by Factory or Screen.Register
     private FlatRedBallService? _engine;
@@ -233,6 +359,11 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
+    /// <summary>
+    /// Detaches <paramref name="child"/> from this entity: clears its <see cref="Parent"/>,
+    /// removes it from collision participation if applicable, and unregisters it from the
+    /// screen's render list. Does not destroy the child — use <see cref="Destroy"/> for that.
+    /// </summary>
     public void Remove(IAttachable child)
     {
         _children.Remove(child);
@@ -304,10 +435,31 @@ public class Entity : ICollidable, IAttachable
     /// registration.
     /// </remarks>
     public virtual void CustomInitialize() { }
-    public virtual void CustomActivity(FrameTime time) { }
-    public virtual void CustomDestroy() { }
-    public virtual void CustomDraw(SpriteBatch spriteBatch, Camera camera) { }
 
+    /// <summary>
+    /// Override to run per-frame game logic. Called by <see cref="Screen"/> every frame after
+    /// physics and collision have resolved, so positions and velocities reflect the current
+    /// frame's state. Skipped while the screen is paused (<see cref="Screen.IsPaused"/>).
+    /// </summary>
+    public virtual void CustomActivity(FrameTime time) { }
+
+    /// <summary>
+    /// Override to release game-specific resources when this entity is destroyed. Called by
+    /// <see cref="Destroy"/> before children are torn down, while engine services, tweens,
+    /// and attached shapes are still valid.
+    /// </summary>
+    public virtual void CustomDestroy() { }
+
+    /// <summary>
+    /// Removes this entity from the game. Safe to call at any time, including from inside a
+    /// collision handler or <see cref="CustomActivity"/> on this or a different entity.
+    /// <para>
+    /// Order of operations: <see cref="CustomDestroy"/> runs first (with children/shapes/tweens
+    /// still intact), then tweens clear, Gum children detach, the parent detaches this entity,
+    /// all attached children are destroyed recursively, shape/child lists clear, and finally
+    /// the factory/screen registration is released.
+    /// </para>
+    /// </summary>
     public void Destroy()
     {
         CustomDestroy();
@@ -323,7 +475,11 @@ public class Entity : ICollidable, IAttachable
         _onDestroy?.Invoke();
     }
 
-    // ICollidable — aggregates all attached shapes, recursing through child entities.
+    /// <summary>
+    /// Returns <c>true</c> if any shape attached to this entity (recursively, through child
+    /// entities) overlaps <paramref name="other"/>. Shapes excluded from default collision
+    /// via <see cref="SetDefaultCollision"/> or <c>isDefaultCollision: false</c> are skipped.
+    /// </summary>
     public bool CollidesWith(ICollidable other)
     {
         foreach (var myLeaf in GetLeafShapes(this))
@@ -333,6 +489,11 @@ public class Entity : ICollidable, IAttachable
         return false;
     }
 
+    /// <summary>
+    /// Returns the minimum translation vector that pushes this entity's shapes out of
+    /// <paramref name="other"/>. Zero if there is no overlap. Returns the first non-zero
+    /// separation found — not a combined MTV across multiple overlapping shape pairs.
+    /// </summary>
     public Vector2 GetSeparationVector(ICollidable other)
     {
         foreach (var myLeaf in GetLeafShapes(this))
@@ -345,6 +506,12 @@ public class Entity : ICollidable, IAttachable
         return Vector2.Zero;
     }
 
+    /// <summary>
+    /// Pushes this entity out of <paramref name="other"/> using the mass-weighted share of the
+    /// separation vector. A mass ratio of <c>thisMass = 1, otherMass = 0</c> applies the full
+    /// separation to this entity; equal masses split the separation 50/50. Updates
+    /// <see cref="LastReposition"/>.
+    /// </summary>
     public void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f)
     {
         var offset = CollisionDispatcher.ComputeSeparationOffset(GetSeparationVector(other), thisMass, otherMass);
@@ -352,15 +519,37 @@ public class Entity : ICollidable, IAttachable
         LastReposition += offset;
     }
 
+    /// <summary>
+    /// Adds <paramref name="offset"/> to this entity's position and accumulates it into
+    /// <see cref="LastReposition"/>. Use when you've already computed the separation externally
+    /// (e.g., from a custom collision query) and need to apply it while keeping the frame's
+    /// reposition accounting consistent.
+    /// </summary>
     public void ApplySeparationOffset(Vector2 offset)
     {
         Position += offset;
         LastReposition += offset;
     }
 
+    /// <summary>
+    /// Reflects this entity's velocity away from <paramref name="other"/> using the collision
+    /// normal derived from <see cref="GetSeparationVector"/>. If <paramref name="other"/> is
+    /// an <see cref="Entity"/>, both entities' velocities are updated; otherwise
+    /// <paramref name="other"/> is treated as immovable static geometry.
+    /// </summary>
+    /// <param name="elasticity">
+    /// <c>0</c> = fully inelastic (no bounce, velocity zeroed along the normal);
+    /// <c>1</c> = perfectly elastic (full bounce). Values above 1 amplify energy.
+    /// </param>
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
         => AdjustVelocityFromSeparation(GetSeparationVector(other), other, thisMass, otherMass, elasticity);
 
+    /// <summary>
+    /// Lower-level variant of <see cref="AdjustVelocityFrom"/> that accepts a pre-computed
+    /// separation vector <paramref name="sep"/>. Use when you've already called
+    /// <see cref="GetSeparationVector"/> and want to reuse the result instead of recomputing.
+    /// A zero <paramref name="sep"/> short-circuits — no-op, no division.
+    /// </summary>
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
     {
         if (sep == Vector2.Zero) return;

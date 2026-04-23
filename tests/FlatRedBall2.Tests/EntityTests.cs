@@ -145,6 +145,64 @@ public class EntityTests
         entity.CollidesWith(other).ShouldBeTrue();
     }
 
+    [Fact]
+    public void IsAbsoluteVisible_DefaultsTrue()
+    {
+        var entity = new Entity();
+        entity.IsAbsoluteVisible.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsAbsoluteVisible_FalseWhenSelfInvisible()
+    {
+        var entity = new Entity { IsVisible = false };
+        entity.IsAbsoluteVisible.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsAbsoluteVisible_FalseWhenParentInvisible()
+    {
+        var parent = new Entity();
+        var child = new Entity();
+        parent.Add(child);
+
+        parent.IsVisible = false;
+
+        child.IsVisible.ShouldBeTrue();
+        child.IsAbsoluteVisible.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsAbsoluteVisible_RecoversWhenParentUnhidden_PreservingChildState()
+    {
+        var parent = new Entity();
+        var child = new Entity();
+        parent.Add(child);
+
+        parent.IsVisible = false;
+        parent.IsVisible = true;
+
+        // Child's own IsVisible was never touched, so it remains true and effective visibility returns.
+        child.IsVisible.ShouldBeTrue();
+        child.IsAbsoluteVisible.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsAbsoluteVisible_FalseWhenAncestorInvisible()
+    {
+        var grandparent = new Entity();
+        var parent = new Entity();
+        var child = new Entity();
+        grandparent.Add(parent);
+        parent.Add(child);
+
+        grandparent.IsVisible = false;
+
+        parent.IsVisible.ShouldBeTrue();
+        child.IsVisible.ShouldBeTrue();
+        child.IsAbsoluteVisible.ShouldBeFalse();
+    }
+
     private class DestroyTrackingEntity : Entity
     {
         public bool WasDestroyed { get; private set; }

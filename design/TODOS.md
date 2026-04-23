@@ -49,24 +49,6 @@ Decision needed before picking. The Factory.Create overload feels cleanest but a
 ## Climbing slot — fall back to AirMovement.JumpVelocity when ClimbingMovement.JumpVelocity == 0?
 **Priority: Eventual — wait for use cases.** Today, `ClimbingMovement.JumpVelocity` is a hard `float` defaulting to 0; "field omitted" is indistinguishable from "explicitly 0" once parsed. A user who authors a `climbing` slot without `JumpVelocity` gets a jump-off that drops the player straight down — the kind of "silent wrong output" failure mode the project explicitly calls out as anti-pattern (see Pre-Init vs Reactive-Property Tension). Documented in the `platformer-movement` skill and JSON template as "AUTHOR THIS." Possible future fix: when `ClimbingMovement.JumpVelocity == 0`, fall back to `AirMovement.JumpVelocity` so the obvious-default feel ("press jump → leave ladder with the same hop as in air") is automatic. Tradeoff: a user who genuinely wants a 0-velocity drop-off has to pick a tiny non-zero value or use a different escape hatch. Defer until real games hit the footgun.
 
-## Screen.PushScreen / PopScreen — Sub-Screen Backstack
-**Priority: Soon** — Add `PushScreen<T>(configure)` and `PopScreen()` to `Screen` to support "go to a sub-screen and come back with results" without a static-field workaround. The current `MoveToScreen`-only model requires callers to store return data in a static field on the destination screen, cleared in `CustomInitialize`. That pattern works but is a footgun (stale value if not cleared) and isn't discoverable.
-
-API sketch:
-```csharp
-PushScreen<BattleScreen>(s => s.EncounterData = encounter);  // freeze this screen, activate BattleScreen
-// In BattleScreen when done:
-PopScreen(result);   // restore the previous screen, inject result via its pending-result property
-```
-
-Implementation concerns to resolve:
-- The frozen screen's entities and lifecycle must be preserved mid-frame without triggering `CustomDestroy` or re-running `CustomInitialize`.
-- Entity update loops must be fully suspended (not just `IsPaused`) while the screen is frozen — risk of entity leaks into the active screen's update.
-- Stack depth > 2 needs deliberate design (or explicit cap at depth 1 for the initial implementation).
-- `[Obsolete]` `UnpauseThisScreen` shim is already in — no naming conflicts.
-
-Until this ships, use the documented static-field stopgap in the `screens` skill.
-
 ## Platformer Docs Audit (FRB1 → FRB2)
 **Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. `AnimationController` is a known intentional non-port (FRB1 needed it for codegen-driven Glue projects; FRB2 has no codegen and the pattern-match alternative is shorter and more debuggable) — audit should confirm nothing else from that family is missing.
 
@@ -86,3 +68,39 @@ Until this ships, use the documented static-field stopgap in the `screens` skill
 - Identify abstraction points for graphics init, fullscreen APIs, input, audio, content pipeline
 - AOT blockers: reflection-based code (`Activator.CreateInstance`, `MakeGenericMethod`, etc.) must be replaced — note that `TileMap.CreateEntities` uses reflection to map Tiled custom properties; will need a source-generator or explicit-mapping path
 - Flag any new reflection-heavy or AOT-hostile code for future cleanup
+- **KNI / web (Blazor WASM) target.** KNI is the primary motivator here — it's the backend that unlocks running FRB2 games in the browser. Web deployment is a major distribution story for 2D games (itch.io, jam submissions, embeddable demos) and should be treated as a first-class target alongside desktop once the abstraction layer exists. Open questions: content pipeline story for WASM (mgcb output vs runtime loading), input differences (no gamepad polling guarantees, touch), audio latency, and how hot-reload interacts with a browser-hosted runtime.
+
+## First Preview NuGet Release
+**Priority: Soon** — Ship `FlatRedBall2` as a preview NuGet package so external users can consume the engine without cloning the repo. Today everyone building on FRB2 must reference the `.csproj` directly.
+
+Open questions to resolve before publishing:
+- **Package ID.** `FlatRedBall2` vs something else — ties into the naming discussion TODO below.
+- **Versioning scheme.** `0.1.0-preview.1`? SemVer starting point and what "preview" signals to consumers (expect breaking changes, API not stable).
+- **What ships in the package.** Main `FlatRedBall2.dll` for sure. Do Gum-integration, TMX loading, and other optional pieces ship as sub-packages (`FlatRedBall2.Gum`, `FlatRedBall2.Tiled`) or all-in-one? Current project is monolithic — splitting is a bigger refactor.
+- **Content pipeline assets.** Does the NuGet include the StandardTileset PNG/TSX? A `.targets` file that wires MGCB references? Consumers will hit "where does the tileset live" friction immediately otherwise.
+- **Symbols / source link.** Enable `PublishRepositoryUrl` + `EmbedUntrackedSources` + snupkg so consumers can step into engine code while debugging.
+- **CI publish pipeline.** GitHub Actions workflow on tag push → `dotnet pack` → `dotnet nuget push` to nuget.org. Needs an API key secret.
+- **README.md in the package.** NuGet now renders package READMEs on nuget.org — write a minimal "getting started" that points to the docs site (see below).
+- **License clarity.** Confirm the license file is in the repo root and referenced in the `.csproj` (`PackageLicenseFile`).
+
+## Documentation Site
+**Priority: Soon** — Stand up a public docs site for FlatRedBall2. Today all guidance lives in skill files (AI-facing, in-repo) and inline XML docs; a human-facing site is the missing third leg.
+
+Open questions:
+- **Platform.** DocFX (generates from XML docs + markdown, good C# ecosystem fit), MkDocs Material (prettier, Markdown-only), or Docusaurus (more web-dev-flavored)? DocFX is probably the right default for a .NET library because it reads XML docs directly.
+- **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
+- **Where it's hosted.** GitHub Pages from the repo (free, simple) vs a dedicated domain. Starting with GitHub Pages is the low-friction path.
+- **API reference.** Generated from XML docs. DocFX does this well; MkDocs does not natively.
+- **Samples.** Link to the `Samples/` directory? Embed runnable examples? WASM-hosted demos once KNI lands?
+- **Versioning.** Docs site pinned to the latest preview NuGet vs `main` branch. Probably `main` during preview and switch to per-release after 1.0.
+
+## Naming Discussion
+**Priority: Design discussion** — Revisit the name `FlatRedBall2`. Open for debate before the first preview NuGet ships (naming is cheap now, expensive after external users depend on the package ID).
+
+Topics to cover:
+- **Keep `FlatRedBall2`?** Carries brand recognition for existing FRB1 users and signals continuity. Downside: `2` suffix can look unfinished or like a sequel rather than a replacement, and many developers won't have heard of FRB1 in the first place.
+- **Rename entirely?** A new name disconnects from FRB1 baggage (Glue editor, code generation, old forum reputation — good and bad) and sets a fresh tone. Downside: loses the existing community's search recognition and any SEO/word-of-mouth built up over 15+ years.
+- **Candidate considerations.** Short, pronounceable, available as a NuGet package ID, available as a .com or .dev domain, available as a GitHub org/repo, not colliding with an existing game-dev tool. Should the name hint at the domain (2D, MonoGame, etc.) or be neutral?
+- **Namespace implications.** Renaming changes the root `FlatRedBall2` namespace everywhere. Cheap with a single IDE rename before external consumers exist; painful after.
+- **Decision deadline.** Lock in before the first preview NuGet tag. After that, rename = new package ID + migration story for consumers.
+
