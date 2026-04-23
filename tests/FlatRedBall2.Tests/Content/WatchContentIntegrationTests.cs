@@ -250,6 +250,170 @@ public class WatchContentIntegrationTests : IDisposable
         File.Exists(Path.Combine(destDir, "~scratch.tmp")).ShouldBeFalse();
     }
 
+    [Fact]
+    public void WatchContentDirectory_NewPngWithNoDestination_AutoCopiesAndFiresCallback()
+    {
+        // Scenario: TMX now references a newly-added enemy.png. The PNG didn't exist at last
+        // build, so the dest-exists gate would normally filter it. .png is in the default
+        // AutoCopyExtensions allowlist, so the engine creates the dest and fires the callback.
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "enemy.png"), "PNGDATA");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        fake.Fire("enemy.png");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBe(new[] { "enemy.png" });
+        File.ReadAllText(Path.Combine(destDir, "enemy.png")).ShouldBe("PNGDATA");
+    }
+
+    [Fact]
+    public void WatchContentDirectory_NewTsxWithNoDestination_AutoCopiesAndFiresCallback()
+    {
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "new.tsx"), "TSX");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        fake.Fire("new.tsx");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBe(new[] { "new.tsx" });
+        File.ReadAllText(Path.Combine(destDir, "new.tsx")).ShouldBe("TSX");
+    }
+
+    [Fact]
+    public void WatchContentDirectory_NewJsonWithNoDestination_StillFiltered()
+    {
+        // JSON is not in the default AutoCopyExtensions allowlist — new .json files are still
+        // treated as possibly-editor-temp and ignored until a rebuild copies them.
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "config.json"), "{}");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        fake.Fire("config.json");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBeEmpty();
+        File.Exists(Path.Combine(destDir, "config.json")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WatchContentDirectory_UserAddsExtension_NewFileFlowsThrough()
+    {
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "music.ogg"), "OGG");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+        w.AutoCopyExtensions.Add(".ogg");
+
+        fake.Fire("music.ogg");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBe(new[] { "music.ogg" });
+        File.ReadAllText(Path.Combine(destDir, "music.ogg")).ShouldBe("OGG");
+    }
+
+    [Fact]
+    public void WatchContentDirectory_UserRemovesDefaultExtension_NewFileFiltered()
+    {
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "new.png"), "PNG");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+        w.AutoCopyExtensions.Remove(".png");
+
+        fake.Fire("new.png");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBeEmpty();
+        File.Exists(Path.Combine(destDir, "new.png")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void WatchContentDirectory_NewPngInNestedSubdirectory_CreatesDirectoryAndCopies()
+    {
+        var engine = MakeEngine();
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(Path.Combine(srcDir, "Tilesets"));
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "Tilesets", "art.png"), "ART");
+
+        var fake = new FakeDirectoryWatcher();
+        var calls = new System.Collections.Generic.List<string>();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: calls.Add,
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        var rel = Path.Combine("Tilesets", "art.png");
+        fake.Fire(rel);
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        calls.ShouldBe(new[] { rel });
+        File.ReadAllText(Path.Combine(destDir, "Tilesets", "art.png")).ShouldBe("ART");
+    }
+
     private class FakeFileWatcher : IFileWatcher
     {
         public event Action? Changed;

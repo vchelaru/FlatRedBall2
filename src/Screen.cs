@@ -520,32 +520,40 @@ public class Screen
     public ContentDirectoryWatcher WatchContentDirectory(IDirectoryWatcher source, Action<string> onChanged,
         string? sourceAbsoluteRoot = null, string? destinationAbsoluteRoot = null)
     {
+        ContentDirectoryWatcher? watcher = null;
         Func<string, bool> copy;
         if (sourceAbsoluteRoot != null && destinationAbsoluteRoot != null)
             copy = relPath => CopyFileIfNeeded(
                 Path.Combine(sourceAbsoluteRoot, relPath),
-                Path.Combine(destinationAbsoluteRoot, relPath));
+                Path.Combine(destinationAbsoluteRoot, relPath),
+                watcher!.AutoCopyExtensions);
         else
             copy = _ => true;
-        var watcher = new ContentDirectoryWatcher(source, onChanged, copy);
+        watcher = new ContentDirectoryWatcher(source, onChanged, copy);
         _contentDirectoryWatchers.Add(watcher);
         return watcher;
     }
 
     /// <returns>
     /// <c>false</c> when the source is missing (deletion) OR the destination doesn't exist yet
-    /// — engine tracks only files that are already part of the build output. This filters out
-    /// editor temp files (Photoshop scratch files, IDE autosaves, lock files) that appear in the
-    /// source folder but were never copied to the build output. New content files require a
-    /// rebuild before hot-reload picks them up.
+    /// AND the extension isn't in <paramref name="autoCopyExtensions"/>. The dest-exists gate
+    /// filters out editor temp files (Photoshop scratch files, IDE autosaves, lock files) that
+    /// appear in the source folder but were never copied to the build output; the allowlist
+    /// reopens the gate for known-safe asset types that can legitimately appear as new files
+    /// (e.g. a PNG a TMX now references).
     /// </returns>
-    private static bool CopyFileIfNeeded(string src, string dest)
+    private static bool CopyFileIfNeeded(string src, string dest, HashSet<string>? autoCopyExtensions = null)
     {
         // Same path → nothing to copy. Avoids the IOException File.Copy throws on self-copy.
         if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
             return File.Exists(dest);
         if (!File.Exists(src)) return false;
-        if (!File.Exists(dest)) return false;
+        if (!File.Exists(dest))
+        {
+            if (autoCopyExtensions == null || !autoCopyExtensions.Contains(Path.GetExtension(src)))
+                return false;
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        }
         File.Copy(src, dest, overwrite: true);
         return true;
     }
