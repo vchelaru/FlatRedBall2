@@ -114,7 +114,7 @@ public class TimeManagerTests
 
         Tick(time, 0.5); // 0.5 real × 2 = 1.0 screen time
 
-        time.CurrentScreenTimeSeconds.ShouldBe(1.0, tolerance: 0.0001);
+        time.CurrentScreenTime.TotalSeconds.ShouldBe(1.0, tolerance: 0.0001);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class TimeManagerTests
         Tick(time, 0.5, paused: true); // paused — screen time stays 0
 
         task.IsCompleted.ShouldBeFalse();
-        time.CurrentScreenTimeSeconds.ShouldBe(0.0, tolerance: 0.0001);
+        time.CurrentScreenTime.TotalSeconds.ShouldBe(0.0, tolerance: 0.0001);
     }
 
     // -------------------------------------------------------------------------
@@ -147,14 +147,14 @@ public class TimeManagerTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public void ResetScreen_ResetsCurrentScreenTimeSeconds()
+    public void ResetScreen_ResetsCurrentScreenTime()
     {
         var time = new TimeManager();
         Tick(time, 1.0);
 
         time.ResetScreen();
 
-        time.CurrentScreenTimeSeconds.ShouldBe(0.0, tolerance: 0.0001);
+        time.CurrentScreenTime.TotalSeconds.ShouldBe(0.0, tolerance: 0.0001);
     }
 
     [Fact]

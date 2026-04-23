@@ -6,7 +6,7 @@ namespace FlatRedBall2.Collision;
 /// Anything that can participate in collision: primitive shapes
 /// (<see cref="AxisAlignedRectangle"/>, <see cref="Circle"/>, <see cref="Polygon"/>,
 /// <see cref="Line"/>), <see cref="Entity"/> (an aggregate of leaf shapes), and static
-/// geometry (<see cref="TileShapeCollection"/>, <see cref="ShapeCollection"/>).
+/// geometry (<see cref="TileShapeCollection"/>).
 /// </summary>
 /// <remarks>
 /// Most game code interacts with collision via

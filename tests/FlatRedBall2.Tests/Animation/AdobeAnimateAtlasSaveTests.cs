@@ -72,6 +72,6 @@ public class AdobeAnimateAtlasSaveTests
         var save = Deserialize(SampleXml);
         var list = save.BuildList(null, frameRate: 24f);
 
-        list[0][0].FrameLength.ShouldBe(1f / 24f, tolerance: 0.0001f);
+        list[0][0].FrameLength.TotalSeconds.ShouldBe(1.0 / 24.0, tolerance: 0.0001);
     }
 }

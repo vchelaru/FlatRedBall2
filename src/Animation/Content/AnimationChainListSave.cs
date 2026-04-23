@@ -94,7 +94,7 @@ public class AnimationChainListSave
                 var frame = new AnimationFrame
                 {
                     TextureName = frameSave.TextureName,
-                    FrameLength = frameSave.FrameLength / frameLengthDivisor,
+                    FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
                     RelativeX = frameSave.RelativeX,

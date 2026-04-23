@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Animation;
 using Shouldly;
 using Xunit;
@@ -10,11 +11,11 @@ public class AnimationChainTests
     public void TotalLength_MultipleFrames_ReturnsSumOfFrameLengths()
     {
         var chain = new AnimationChain();
-        chain.Add(new AnimationFrame { FrameLength = 0.1f });
-        chain.Add(new AnimationFrame { FrameLength = 0.2f });
-        chain.Add(new AnimationFrame { FrameLength = 0.3f });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1) });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.2) });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.3) });
 
-        chain.TotalLength.ShouldBe(0.6f, tolerance: 0.0001f);
+        chain.TotalLength.TotalSeconds.ShouldBe(0.6, tolerance: 0.0001);
     }
 
     [Fact]

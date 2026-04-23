@@ -89,7 +89,10 @@ public class TopDownBehavior
                 accelerationRatio = 1f - MathF.Abs(angleDiff) / MathF.PI;
             }
 
-            float secondsToTake = Lerp(MovementValues.DecelerationTime, MovementValues.AccelerationTime, accelerationRatio);
+            float secondsToTake = Lerp(
+                (float)MovementValues.DecelerationTime.TotalSeconds,
+                (float)MovementValues.AccelerationTime.TotalSeconds,
+                accelerationRatio);
 
             if (secondsToTake == 0f)
             {

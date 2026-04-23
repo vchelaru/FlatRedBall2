@@ -8,18 +8,28 @@ namespace FlatRedBall2;
 
 /// <summary>
 /// Per-engine time service. Owns the running time clocks (since-game-start, since-screen-start),
-/// the global <see cref="TimeScale"/>, and async delay primitives (<see cref="DelaySeconds"/>,
+/// the global <see cref="TimeScale"/>, and async delay primitives (<see cref="Delay"/>,
 /// <see cref="DelayUntil"/>, <see cref="DelayFrames"/>) that complete on the game thread via
 /// the engine's <see cref="GameSynchronizationContext"/>.
 /// <para>
 /// Access via <see cref="FlatRedBallService.TimeManager"/>. The engine calls <c>Update</c> and
 /// <c>DoTaskLogic</c> internally each frame — game code never invokes them directly.
 /// </para>
+/// <para>
+/// <b>Time-type convention:</b> all elapsed-time state and duration parameters in the public API
+/// use <see cref="TimeSpan"/>, not <c>float</c> / <c>double</c> seconds. This applies engine-wide
+/// — animation lengths, tween durations, cooldowns, double-click thresholds, all use
+/// <see cref="TimeSpan"/>. The <b>only exception</b> is <see cref="FrameTime.DeltaSeconds"/>,
+/// which stays <c>float</c> because it's used in physics integration (<c>Position += Velocity *
+/// dt</c>) every frame on every entity — converting via <c>TimeSpan.TotalSeconds</c> at every
+/// math site would be hostile to the most common consumer pattern.
+/// </para>
 /// </summary>
 public class TimeManager
 {
     private TimeSpan _sinceGameStart;
     private TimeSpan _sinceScreenStart;
+    private TimeSpan _realSinceGameStart;
 
     /// <summary>Scaling factor applied to real elapsed time. Values &lt; 1 slow the game; &gt; 1 speed it up.</summary>
     public float TimeScale { get; set; } = 1f;
@@ -31,8 +41,16 @@ public class TimeManager
     /// </summary>
     public FrameTime CurrentFrameTime { get; private set; }
 
-    /// <summary>Elapsed game time since the current screen was activated, in seconds. Respects <see cref="TimeScale"/>.</summary>
-    public double CurrentScreenTimeSeconds => _sinceScreenStart.TotalSeconds;
+    /// <summary>Elapsed game time since the current screen was activated. Respects <see cref="TimeScale"/> and freezes while the screen is paused.</summary>
+    public TimeSpan CurrentScreenTime => _sinceScreenStart;
+
+    /// <summary>
+    /// Elapsed wall-clock time since <see cref="FlatRedBallService.Initialize"/> was called.
+    /// Unaffected by <see cref="TimeScale"/> and unaffected by screen pause — strictly monotonic.
+    /// Use this for input gestures (double-click thresholds, hold timers) and any other timing that
+    /// should not freeze when the game pauses or slow down when the game runs in slow motion.
+    /// </summary>
+    public TimeSpan RealTimeSinceStart => _realSinceGameStart;
 
     /// <summary>Total number of frames that have elapsed since <see cref="FlatRedBallService.Initialize"/> was called.</summary>
     public long CurrentFrame { get; private set; }
@@ -46,7 +64,7 @@ public class TimeManager
     private readonly List<PredicateTask> _predicateTasks = new();
     private readonly List<FrameTask> _frameTasks = new();
 
-    private readonly record struct TimedTask(double CompletionTime, TaskCompletionSource Tcs, CancellationToken Token);
+    private readonly record struct TimedTask(TimeSpan CompletionTime, TaskCompletionSource Tcs, CancellationToken Token);
     private readonly record struct PredicateTask(Func<bool> Predicate, TaskCompletionSource Tcs, CancellationToken Token);
     private readonly record struct FrameTask(long TargetFrame, TaskCompletionSource Tcs);
 
@@ -55,20 +73,32 @@ public class TimeManager
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Returns a task that completes after <paramref name="seconds"/> of screen time have elapsed.
+    /// Returns a task that completes after <paramref name="duration"/> of screen time has elapsed.
     /// Screen time respects <see cref="TimeScale"/>, pauses when the screen is paused, and resets when the screen changes.
+    /// </summary>
+    /// <param name="duration">How long to wait. Values ≤ <see cref="TimeSpan.Zero"/> complete immediately.</param>
+    /// <param name="cancellationToken">
+    /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
+    /// </param>
+    /// <summary>
+    /// Convenience wrapper around <see cref="Delay(TimeSpan, CancellationToken)"/> that takes a
+    /// raw seconds value, so call sites don't need <c>TimeSpan.FromSeconds(...)</c> for the common
+    /// case of a literal duration.
     /// </summary>
     /// <param name="seconds">Seconds to wait. Values ≤ 0 complete immediately.</param>
     /// <param name="cancellationToken">
     /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
     /// </param>
     public Task DelaySeconds(double seconds, CancellationToken cancellationToken = default)
+        => Delay(TimeSpan.FromSeconds(seconds), cancellationToken);
+
+    public Task Delay(TimeSpan duration, CancellationToken cancellationToken = default)
     {
-        if (seconds <= 0)
+        if (duration <= TimeSpan.Zero)
             return Task.CompletedTask;
 
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var completionTime = CurrentScreenTimeSeconds + seconds;
+        var completionTime = CurrentScreenTime + duration;
 
         // Insert sorted by completion time for efficient early-exit in DoTaskLogic.
         var index = _timedTasks.Count;
@@ -131,7 +161,7 @@ public class TimeManager
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Zeroes <see cref="CurrentScreenTimeSeconds"/>. Called by the engine on screen transition;
+    /// Zeroes <see cref="CurrentScreenTime"/>. Called by the engine on screen transition;
     /// rarely useful from game code (use <see cref="Screen.RestartScreen(RestartMode)"/> for a
     /// proper restart with full lifecycle hooks).
     /// </summary>
@@ -139,7 +169,9 @@ public class TimeManager
 
     internal void Update(GameTime gameTime, bool screenIsPaused)
     {
-        var scaledDelta = TimeSpan.FromSeconds(gameTime.ElapsedGameTime.TotalSeconds * TimeScale);
+        var realDelta = gameTime.ElapsedGameTime;
+        var scaledDelta = TimeSpan.FromSeconds(realDelta.TotalSeconds * TimeScale);
+        _realSinceGameStart += realDelta;
         _sinceGameStart += scaledDelta;
         if (!screenIsPaused)
             _sinceScreenStart += scaledDelta;
@@ -162,7 +194,7 @@ public class TimeManager
                 _timedTasks.RemoveAt(0);
                 task.Tcs.TrySetCanceled(task.Token);
             }
-            else if (task.CompletionTime <= CurrentScreenTimeSeconds)
+            else if (task.CompletionTime <= CurrentScreenTime)
             {
                 _timedTasks.RemoveAt(0);
                 task.Tcs.TrySetResult();

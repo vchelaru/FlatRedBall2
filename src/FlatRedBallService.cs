@@ -520,7 +520,7 @@ public class FlatRedBallService
         CurrentScreen.TickContentWatchers(DateTime.UtcNow);
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
-        Input.Update();
+        Input.Update(Time.RealTimeSinceStart);
 
         if (_spriteBatch != null)
         {

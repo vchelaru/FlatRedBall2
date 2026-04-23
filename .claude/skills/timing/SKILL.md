@@ -9,6 +9,17 @@ The engine provides `FrameTime` to every `CustomActivity` call. Use `time.DeltaS
 
 `FrameTime.SinceGameStart` is a `TimeSpan` (use `.TotalSeconds` for a float). It's useful for absolute timestamps but the countdown pattern below is simpler for most cases.
 
+## TimeSpan Convention
+
+Engine-wide rule: **public time-state and duration parameters use `TimeSpan`** (`Engine.Time.CurrentScreenTime`, `Engine.Time.RealTimeSinceStart`, `Engine.Time.Delay(TimeSpan)`, `Tween` `duration:`, `AnimationFrame.FrameLength`, etc.). The **deliberate exception** is `FrameTime.DeltaSeconds`, which stays `float` because per-frame physics math (`Position += Velocity * dt`) would be hostile if it required `(float)Delta.TotalSeconds` at every call site.
+
+For `Engine.Time.Delay`, a convenience overload `DelaySeconds(double)` is also available so call sites with literal seconds don't need `TimeSpan.FromSeconds(...)` ceremony — both forms are valid:
+
+```csharp
+await Engine.Time.Delay(TimeSpan.FromMilliseconds(500), Token); // canonical
+await Engine.Time.DelaySeconds(0.5, Token);                     // convenience
+```
+
 ---
 
 ## Cooldown Gate

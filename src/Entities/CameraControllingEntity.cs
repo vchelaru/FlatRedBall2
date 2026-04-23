@@ -482,29 +482,29 @@ public class CameraControllingEntity : Entity
 
     #region Screen Shake
 
-    private const float IndividualShakeDuration = 0.05f;
+    private static readonly TimeSpan IndividualShakeDuration = TimeSpan.FromMilliseconds(50);
 
     /// <summary>
     /// Shakes the camera for the specified duration by randomizing <see cref="CameraOffset"/> at
     /// <c>20 Hz</c>. Resets <see cref="CameraOffset"/> to zero when finished.
     /// </summary>
     /// <param name="shakeRadius">Maximum displacement in world units.</param>
-    /// <param name="durationInSeconds">Total shake duration in seconds.</param>
+    /// <param name="duration">Total shake duration.</param>
     /// <param name="cancellationToken">
     /// Cancel to stop early. <see cref="CameraOffset"/> is NOT reset on cancel — reset it manually
     /// if needed. Pass <see cref="Screen.Token"/> to auto-cancel on screen transition.
     /// </param>
-    public async Task ShakeScreen(float shakeRadius, float durationInSeconds,
+    public async Task ShakeScreen(float shakeRadius, TimeSpan duration,
         CancellationToken cancellationToken = default)
     {
         var random = Engine.Random;
-        for (float elapsed = 0; elapsed < durationInSeconds; elapsed += IndividualShakeDuration)
+        for (TimeSpan elapsed = TimeSpan.Zero; elapsed < duration; elapsed += IndividualShakeDuration)
         {
             if (cancellationToken.IsCancellationRequested) return;
             var point = random.PointInCircle(shakeRadius);
             CameraOffset.X = point.X;
             CameraOffset.Y = point.Y;
-            await Engine.Time.DelaySeconds(IndividualShakeDuration, cancellationToken);
+            await Engine.Time.Delay(IndividualShakeDuration, cancellationToken);
         }
         CameraOffset = Vector2.Zero;
     }
@@ -523,7 +523,7 @@ public class CameraControllingEntity : Entity
             CameraOffset.Y = point.Y;
             try
             {
-                await Engine.Time.DelaySeconds(IndividualShakeDuration);
+                await Engine.Time.Delay(IndividualShakeDuration);
             }
             catch (TaskCanceledException)
             {

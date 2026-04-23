@@ -25,7 +25,7 @@ public class ScreenTweenTests
         var screen = MakeScreen();
         float lastValue = float.NaN;
         int endedCount = 0;
-        var tweener = screen.Tween(v => lastValue = v, from: 0f, to: 5f, durationSeconds: 1f);
+        var tweener = screen.Tween(v => lastValue = v, from: 0f, to: 5f, duration: TimeSpan.FromSeconds(1));
         tweener.Ended += () => endedCount++;
 
         for (int i = 0; i < 5; i++)
@@ -44,7 +44,7 @@ public class ScreenTweenTests
         engine.Update(new Microsoft.Xna.Framework.GameTime());
         var originalScreen = (TestScreen)engine.CurrentScreen;
         int callCount = 0;
-        originalScreen.Tween(_ => callCount++, from: 0f, to: 1f, durationSeconds: 1f);
+        originalScreen.Tween(_ => callCount++, from: 0f, to: 1f, duration: TimeSpan.FromSeconds(1));
 
         originalScreen.MoveToScreen<TestScreen>();
         engine.Update(new Microsoft.Xna.Framework.GameTime()); // triggers teardown of original
@@ -60,7 +60,7 @@ public class ScreenTweenTests
     {
         var screen = MakeScreen();
         int callCount = 0;
-        screen.Tween(_ => callCount++, from: 0f, to: 1f, durationSeconds: 1f);
+        screen.Tween(_ => callCount++, from: 0f, to: 1f, duration: TimeSpan.FromSeconds(1));
 
         screen.Update(Frame(0.1f));
 

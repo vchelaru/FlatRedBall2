@@ -89,8 +89,8 @@ public class TopDownBehaviorTests
         var values = new TopDownValues
         {
             MaxSpeed = maxSpeed,
-            AccelerationTime = 1f,
-            DecelerationTime = 1f,
+            AccelerationTime = TimeSpan.FromSeconds(1),
+            DecelerationTime = TimeSpan.FromSeconds(1),
         };
         var behavior = new TopDownBehavior { MovementValues = values, MovementInput = new MockAxisInput(x: 1f, y: 0f) };
         var entity = new Entity();

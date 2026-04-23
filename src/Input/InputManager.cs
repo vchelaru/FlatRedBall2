@@ -42,10 +42,10 @@ public class InputManager
 
     internal void SetCamera(Camera camera) => _cursor.SetCamera(camera);
 
-    internal void Update()
+    internal void Update(TimeSpan realTimeSinceStart)
     {
         _keyboard.Update();
-        _cursor.Update();
+        _cursor.Update(realTimeSinceStart);
         foreach (var gp in _gamepads)
             gp.Update();
     }

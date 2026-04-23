@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Movement;
 using Shouldly;
 using Xunit;
@@ -29,8 +30,8 @@ public class TopDownConfigTests
 
         var v = behavior.MovementValues!;
         v.MaxSpeed.ShouldBe(200f);
-        v.AccelerationTime.ShouldBe(0.4f);
-        v.DecelerationTime.ShouldBe(0.2f);
+        v.AccelerationTime.ShouldBe(TimeSpan.FromSeconds(0.4));
+        v.DecelerationTime.ShouldBe(TimeSpan.FromSeconds(0.2));
         v.UpdateDirectionFromInput.ShouldBeFalse();
         v.UpdateDirectionFromVelocity.ShouldBeTrue();
         v.IsUsingCustomDeceleration.ShouldBeTrue();
@@ -45,8 +46,8 @@ public class TopDownConfigTests
             MovementValues = new TopDownValues
             {
                 MaxSpeed = 100,
-                AccelerationTime = 0.5f,
-                DecelerationTime = 0.5f,
+                AccelerationTime = TimeSpan.FromSeconds(0.5),
+                DecelerationTime = TimeSpan.FromSeconds(0.5),
             },
         };
         var json = """{ "movement": { "MaxSpeed": 250 } }""";
@@ -55,8 +56,8 @@ public class TopDownConfigTests
         config.ApplyTo(behavior);
 
         behavior.MovementValues!.MaxSpeed.ShouldBe(250f);
-        behavior.MovementValues.AccelerationTime.ShouldBe(0.5f);
-        behavior.MovementValues.DecelerationTime.ShouldBe(0.5f);
+        behavior.MovementValues.AccelerationTime.ShouldBe(TimeSpan.FromSeconds(0.5));
+        behavior.MovementValues.DecelerationTime.ShouldBe(TimeSpan.FromSeconds(0.5));
     }
 
     [Fact]

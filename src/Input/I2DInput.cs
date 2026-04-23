@@ -7,13 +7,23 @@ namespace FlatRedBall2.Input;
 /// Two-axis input abstraction (X/Y). Used for directional movement, look input, and any input
 /// surface that produces a 2D vector. Y+ is up by convention, matching world-space coordinates.
 /// Combine sources via <see cref="I2DInputExtensions.Or"/>.
+/// <para>
+/// <b>Magnitude convention (recommended, not enforced):</b> implementations should produce values
+/// bounded to the unit circle — i.e. <c>X² + Y² ≤ 1</c> — so that consumers can treat the vector
+/// as a normalized direction × magnitude. Analog sources (gamepad sticks) typically respect this
+/// naturally. Digital sources that combine independent axes (e.g. <see cref="KeyboardInput2D"/>)
+/// do <b>not</b>: holding two diagonal keys reports magnitude √2. The interface does not enforce
+/// the bound because clamping at the source loses information for some use cases. Consumers that
+/// need a true unit vector should normalize themselves; consumers that just multiply by a per-axis
+/// speed don't need to.
+/// </para>
 /// </summary>
 public interface I2DInput
 {
-    /// <summary>Current X-axis value. Range depends on the source — typically [-1, 1].</summary>
+    /// <summary>Current X-axis value. Typically in <c>[-1, 1]</c>; see the magnitude convention on <see cref="I2DInput"/>.</summary>
     float X { get; }
 
-    /// <summary>Current Y-axis value (Y+ up). Range depends on the source — typically [-1, 1].</summary>
+    /// <summary>Current Y-axis value (Y+ up). Typically in <c>[-1, 1]</c>; see the magnitude convention on <see cref="I2DInput"/>.</summary>
     float Y { get; }
 
     /// <summary>

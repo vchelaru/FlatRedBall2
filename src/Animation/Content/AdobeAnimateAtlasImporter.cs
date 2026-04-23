@@ -67,7 +67,7 @@ public class AdobeAnimateAtlasSave
         if (frameRate <= 0f)
             throw new ArgumentOutOfRangeException(nameof(frameRate), "frameRate must be positive.");
 
-        float frameLength = 1f / frameRate;
+        TimeSpan frameLength = TimeSpan.FromSeconds(1.0 / frameRate);
         var list = new AnimationChainList { Name = FileName };
         var chainsByName = new Dictionary<string, List<AdobeAnimateSubTexture>>(StringComparer.Ordinal);
         var chainOrder = new List<string>();

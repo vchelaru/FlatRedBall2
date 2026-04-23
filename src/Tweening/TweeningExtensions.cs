@@ -39,25 +39,25 @@ public static class TweeningExtensions
     /// <param name="setter">Invoked each frame with the interpolated value. Must not be <c>null</c>.</param>
     /// <param name="from">Starting value passed to <paramref name="setter"/> on the first update.</param>
     /// <param name="to">Final value; passed to <paramref name="setter"/> exactly on natural completion.</param>
-    /// <param name="durationSeconds">Tween length in seconds.</param>
+    /// <param name="duration">Tween length.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
     public static Tweener Tween(
         this Entity entity,
         Action<float> setter,
         float from,
         float to,
-        float durationSeconds,
+        TimeSpan duration,
         InterpolationType type = InterpolationType.Linear,
         Easing easing = Easing.InOut)
     {
-        var tweener = CreateRunning(setter, from, to, durationSeconds, type, easing);
+        var tweener = CreateRunning(setter, from, to, duration, type, easing);
         entity._tweens.Add(tweener, setter, to);
         return tweener;
     }
 
     /// <summary>
     /// Starts a tween owned by <paramref name="screen"/>. Semantics match
-    /// <see cref="Tween(Entity, Action{float}, float, float, float, InterpolationType, Easing)"/>,
+    /// <see cref="Tween(Entity, Action{float}, float, float, TimeSpan, InterpolationType, Easing)"/>,
     /// but the tween lives for the screen's lifetime instead of an entity's. Use for tweens that
     /// have no natural entity owner (camera shakes, UI reveals, global fades). Prefer the entity
     /// overload whenever the setter writes to an entity or one of its children — the entity-scoped
@@ -69,23 +69,23 @@ public static class TweeningExtensions
         Action<float> setter,
         float from,
         float to,
-        float durationSeconds,
+        TimeSpan duration,
         InterpolationType type = InterpolationType.Linear,
         Easing easing = Easing.InOut)
     {
-        var tweener = CreateRunning(setter, from, to, durationSeconds, type, easing);
+        var tweener = CreateRunning(setter, from, to, duration, type, easing);
         screen._tweens.Add(tweener, setter, to);
         return tweener;
     }
 
     private static Tweener CreateRunning(
-        Action<float> setter, float from, float to, float durationSeconds,
+        Action<float> setter, float from, float to, TimeSpan duration,
         InterpolationType type, Easing easing)
     {
         if (setter == null) throw new ArgumentNullException(nameof(setter));
         // The 5-arg Tweener ctor calls Start() internally then sets Running=false (upstream
         // quirk). Call Start() again so the returned tweener is actually advancing.
-        var tweener = new Tweener(from, to, durationSeconds, type, easing);
+        var tweener = new Tweener(from, to, (float)duration.TotalSeconds, type, easing);
         tweener.Start();
         tweener.PositionChanged = new Tweener.PositionChangedHandler(setter);
         return tweener;

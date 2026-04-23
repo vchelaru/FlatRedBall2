@@ -29,19 +29,71 @@ public class Cursor : ICursor
     private Vector2 _touchScreenPos;
     private bool _touchAvailable = true;
 
+    // Wall-clock timestamps of the last detected press/release per button.
+    // null means "never seen" — guarantees the first transition cannot accidentally register as a
+    // double. Using nullable instead of TimeSpan.MinValue because the latter overflows on subtraction.
+    private TimeSpan? _lastPrimaryPressTime;
+    private TimeSpan? _lastPrimaryClickTime;
+    private TimeSpan? _lastSecondaryPressTime;
+    private TimeSpan? _lastSecondaryClickTime;
+
+    private bool _primaryDoublePressed;
+    private bool _primaryDoubleClick;
+    private bool _secondaryDoublePressed;
+    private bool _secondaryDoubleClick;
+
+    /// <inheritdoc/>
+    public TimeSpan DoubleClickThreshold { get; set; } = TimeSpan.FromMilliseconds(250);
+
     internal void SetCamera(Camera camera) => _camera = camera;
 
     // Called once per frame by InputManager before entity/screen logic runs.
-    internal void Update()
+    internal void Update(TimeSpan realTimeSinceStart) => Update(Mouse.GetState(), realTimeSinceStart);
+
+    // Test seam: lets unit tests drive mouse-derived properties without a real GameWindow.
+    internal void Update(MouseState mouseState, TimeSpan realTimeSinceStart)
     {
         _previousMouse = _currentMouse;
-        _currentMouse = Mouse.GetState();
+        _currentMouse = mouseState;
 
         _touchActivePrev = _touchActive;
         _touchActive = false;
 
         if (_touchAvailable)
             UpdateTouch();
+
+        UpdateDoubleClicks(realTimeSinceStart);
+    }
+
+    private void UpdateDoubleClicks(TimeSpan now)
+    {
+        TimeSpan threshold = DoubleClickThreshold;
+
+        _primaryDoublePressed = false;
+        _primaryDoubleClick = false;
+        _secondaryDoublePressed = false;
+        _secondaryDoubleClick = false;
+
+        if (PrimaryPressed)
+        {
+            if (_lastPrimaryPressTime is { } prev && now - prev <= threshold) _primaryDoublePressed = true;
+            _lastPrimaryPressTime = now;
+        }
+        if (PrimaryClick)
+        {
+            if (_lastPrimaryClickTime is { } prev && now - prev <= threshold) _primaryDoubleClick = true;
+            _lastPrimaryClickTime = now;
+        }
+        if (SecondaryPressed)
+        {
+            if (_lastSecondaryPressTime is { } prev && now - prev <= threshold) _secondaryDoublePressed = true;
+            _lastSecondaryPressTime = now;
+        }
+        if (SecondaryClick)
+        {
+            if (_lastSecondaryClickTime is { } prev && now - prev <= threshold) _secondaryDoubleClick = true;
+            _lastSecondaryClickTime = now;
+        }
     }
 
     private void UpdateTouch()
@@ -96,4 +148,41 @@ public class Cursor : ICursor
         ? !_touchActivePrev
         : _currentMouse.LeftButton == ButtonState.Pressed &&
           _previousMouse.LeftButton == ButtonState.Released;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// True on the frame a touch ends, or the frame the left mouse button transitions from down
+    /// to up. Mirrors <see cref="PrimaryPressed"/> on the release edge.
+    /// </remarks>
+    public bool PrimaryClick => _touchActive
+        ? false
+        : _touchActivePrev
+            ? true
+            : _currentMouse.LeftButton == ButtonState.Released &&
+              _previousMouse.LeftButton == ButtonState.Pressed;
+
+    /// <inheritdoc/>
+    public bool PrimaryDoublePressed => _primaryDoublePressed;
+
+    /// <inheritdoc/>
+    public bool PrimaryDoubleClick => _primaryDoubleClick;
+
+    /// <inheritdoc/>
+    public bool SecondaryDown => _currentMouse.RightButton == ButtonState.Pressed;
+
+    /// <inheritdoc/>
+    public bool SecondaryPressed =>
+        _currentMouse.RightButton == ButtonState.Pressed &&
+        _previousMouse.RightButton == ButtonState.Released;
+
+    /// <inheritdoc/>
+    public bool SecondaryClick =>
+        _currentMouse.RightButton == ButtonState.Released &&
+        _previousMouse.RightButton == ButtonState.Pressed;
+
+    /// <inheritdoc/>
+    public bool SecondaryDoublePressed => _secondaryDoublePressed;
+
+    /// <inheritdoc/>
+    public bool SecondaryDoubleClick => _secondaryDoubleClick;
 }

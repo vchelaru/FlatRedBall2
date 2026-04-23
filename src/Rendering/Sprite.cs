@@ -307,8 +307,9 @@ public class Sprite : IRenderable, IAttachable
 
         _timeIntoAnimation += deltaSeconds * AnimationSpeed;
 
-        float totalLength = chain.TotalLength;
-        if (totalLength <= 0f) return;
+        // Convert TimeSpan totals to seconds once at the boundary; per-frame math stays in double.
+        double totalLength = chain.TotalLength.TotalSeconds;
+        if (totalLength <= 0) return;
 
         if (IsLooping)
         {
@@ -330,7 +331,7 @@ public class Sprite : IRenderable, IAttachable
         _currentFrameIndex = chain.Count - 1; // default to last frame
         for (int i = 0; i < chain.Count; i++)
         {
-            t -= chain[i].FrameLength;
+            t -= chain[i].FrameLength.TotalSeconds;
             if (t <= 0)
             {
                 _currentFrameIndex = i;
