@@ -3,6 +3,14 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <!--
+      Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
+      of the eventual NuGet package. CS1591 ("missing XML comment for publicly visible type
+      or member") is intentionally left as a warning — visible in build output as a tracked
+      metric so the doc-coverage gap is obvious, but not failing the build during preview.
+      Promote to error before the first stable (non-preview) NuGet ships.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!--
       Backend is selected by TargetFramework (so NuGet restore picks the right packages):
         net8.0  -> Kni      (browser via Blazor WASM, plus future KNI mobile targets)
         net10.0 -> MonoGame (desktop)

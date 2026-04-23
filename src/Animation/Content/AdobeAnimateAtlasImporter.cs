@@ -23,12 +23,15 @@ namespace FlatRedBall2.Animation.Content;
 [XmlRoot("TextureAtlas")]
 public class AdobeAnimateAtlasSave
 {
+    /// <summary>Relative path to the atlas PNG, as authored in the Adobe Animate export. Resolved against the atlas XML's directory at load time.</summary>
     [XmlAttribute("imagePath")]
     public string ImagePath = string.Empty;
 
+    /// <summary>All sub-texture entries from the atlas XML, in document order. Each one becomes a single <see cref="AnimationFrame"/> during <see cref="ToAnimationChainList"/>.</summary>
     [XmlElement("SubTexture")]
     public List<AdobeAnimateSubTexture> SubTextures = new();
 
+    /// <summary>Absolute path of the source XML file, populated by <see cref="FromFile"/>. Used to resolve <see cref="ImagePath"/> relative to the atlas directory.</summary>
     [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
@@ -114,19 +117,35 @@ public class AdobeAnimateAtlasSave
     }
 }
 
+/// <summary>
+/// A single sub-texture (frame) within an <see cref="AdobeAnimateAtlasSave"/>. Deserialized from one
+/// <c>&lt;SubTexture&gt;</c> element in the atlas XML. Content-interchange model — not a runtime type.
+/// </summary>
 public class AdobeAnimateSubTexture
 {
+    /// <summary>Frame name as authored by Adobe Animate (e.g. <c>Eyeball_Idle0000</c>). Trailing digits are stripped to group frames into an <see cref="AnimationChain"/>.</summary>
     [XmlAttribute("name")] public string Name = string.Empty;
+    /// <summary>Left edge of this frame within the atlas, in pixels.</summary>
     [XmlAttribute("x")] public int X;
+    /// <summary>Top edge of this frame within the atlas, in pixels.</summary>
     [XmlAttribute("y")] public int Y;
+    /// <summary>Width of this frame within the atlas, in pixels.</summary>
     [XmlAttribute("width")] public int Width;
+    /// <summary>Height of this frame within the atlas, in pixels.</summary>
     [XmlAttribute("height")] public int Height;
 
-    // Pivot attributes are optional per frame; NaN indicates "not specified."
-    // Parsed but not yet applied — AnimationFrame has no pivot field yet.
+    /// <summary>
+    /// X pivot (origin) for this frame as authored in Adobe Animate, or <see cref="float.NaN"/> if unspecified.
+    /// Parsed but not yet applied — <see cref="AnimationFrame"/> has no per-frame pivot field yet.
+    /// </summary>
     [XmlIgnore] public float PivotX = float.NaN;
+    /// <summary>
+    /// Y pivot (origin) for this frame as authored in Adobe Animate, or <see cref="float.NaN"/> if unspecified.
+    /// Parsed but not yet applied — <see cref="AnimationFrame"/> has no per-frame pivot field yet.
+    /// </summary>
     [XmlIgnore] public float PivotY = float.NaN;
 
+    /// <summary>Serialization shim for the XML <c>pivotX</c> attribute. Empty string round-trips as <see cref="float.NaN"/> on <see cref="PivotX"/>. Do not read at runtime — use <see cref="PivotX"/>.</summary>
     [XmlAttribute("pivotX")]
     public string PivotXText
     {
@@ -134,6 +153,7 @@ public class AdobeAnimateSubTexture
         set => PivotX = string.IsNullOrEmpty(value) ? float.NaN : float.Parse(value, CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Serialization shim for the XML <c>pivotY</c> attribute. Empty string round-trips as <see cref="float.NaN"/> on <see cref="PivotY"/>. Do not read at runtime — use <see cref="PivotY"/>.</summary>
     [XmlAttribute("pivotY")]
     public string PivotYText
     {
