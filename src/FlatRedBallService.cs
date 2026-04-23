@@ -218,7 +218,16 @@ public class FlatRedBallService
             ApplyCameraSettingsFrom(pref);
 
         if (applyWindowSettings)
-            ApplyWindowSettings(pref ?? DisplaySettings);
+        {
+            // When the host opts into Window.AllowUserResizing, the back buffer is being managed
+            // externally (e.g. KNI BlazorGL tracks the canvas DOM size). Forcing PreferredBackBuffer
+            // here would clamp the back buffer to the engine's design resolution while the canvas
+            // stays at its DOM size, producing a coordinate-space mismatch in Camera.ScreenToWorld.
+            // If the screen has explicit display settings, those still win.
+            bool externallyManaged = _game?.Window.AllowUserResizing == true && pref == null;
+            if (!externallyManaged)
+                ApplyWindowSettings(pref ?? DisplaySettings);
+        }
 
         screen.Engine = this;
         if (_game != null)
@@ -272,8 +281,10 @@ public class FlatRedBallService
             _graphicsManager.PreferredBackBufferHeight = mode.Height;
             _graphicsManager.IsFullScreen = true;
             _graphicsManager.ApplyChanges();
+#if !KNI
             if (_game != null)
                 _game.Window.Position = Point.Zero;
+#endif
         }
         else
         {
@@ -299,6 +310,7 @@ public class FlatRedBallService
             {
                 _game.Window.AllowUserResizing = source.AllowUserResizing;
 
+#if !KNI
                 // Re-center the window. When entering fullscreen we set Position = (0,0);
                 // without a reset the title bar stays above the visible screen area and the
                 // window appears borderless even though it is not.
@@ -306,6 +318,7 @@ public class FlatRedBallService
                 int cx = (display.Width  - _graphicsManager.PreferredBackBufferWidth)  / 2;
                 int cy = (display.Height - _graphicsManager.PreferredBackBufferHeight) / 2;
                 _game.Window.Position = new Point(System.Math.Max(0, cx), System.Math.Max(30, cy));
+#endif
             }
         }
 
@@ -353,6 +366,12 @@ public class FlatRedBallService
     /// <see cref="Rendering.WindowMode.FullscreenBorderless"/>.
     /// Call this from <c>Game1</c>'s constructor, passing the same screen type you will pass to
     /// <see cref="Start{T}"/>.
+    /// <para>
+    /// On browser hosts (KNI BlazorGL), set <c>Window.AllowUserResizing = true</c> in the
+    /// <c>Game</c> constructor before calling this. The browser canvas dictates the back-buffer
+    /// size, and that flag tells the engine to defer to it instead of clamping to a design
+    /// resolution — clamping would offset cursor coordinates relative to the displayed canvas.
+    /// </para>
     /// </summary>
     /// <example>
     /// <code>
