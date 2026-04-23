@@ -80,7 +80,7 @@ WatchContentDirectory("Content", _ => RestartScreen(RestartMode.HotReload));
 
 If the screen has state worth preserving across restarts (player position, score), also implement `SaveHotReloadState` / `RestoreHotReloadState`. See the `content-hot-reload` and `screens` skills for the full recipe.
 
-This is not optional polish — it is a prerequisite for the human to do their half of the work. Always include it.
+This is not optional polish — it is a prerequisite for the human to do their half of the work. Always include it. **When in doubt, add it.** This applies equally to test samples, eval samples, collision harnesses, and one-screen reaction tests — anything the human will open in Tiled, Aseprite, or a JSON editor to iterate. The only screens that may skip hot reload are ones with no loaded content at all (pure code-driven demos with no TMX/PNG/JSON/Gum files under `Content/`).
 
 ## Visual Semantics Rule (Mechanic Readability)
 
