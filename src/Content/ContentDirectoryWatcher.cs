@@ -27,6 +27,27 @@ public class ContentDirectoryWatcher : IDisposable
     /// </summary>
     public TimeSpan Debounce { get; set; } = TimeSpan.FromMilliseconds(150);
 
+    /// <summary>
+    /// File extensions (case-insensitive, leading dot) that should flow through the watcher even
+    /// when the destination file does not yet exist in the build output. Normally the engine
+    /// filters out unknown source paths to ignore editor temp/scratch files; that filter blocks
+    /// legitimately-new assets too (e.g. dropping a new PNG that a TMX now references). Extensions
+    /// in this set are treated as "new file is a real asset" — the engine creates the destination
+    /// directory if needed, copies the file, then fires the callback.
+    /// <para>
+    /// Defaults to <c>.png</c> and <c>.tsx</c> (the common TMX-references-new-asset case). Mutate
+    /// this set to customize: <c>watcher.AutoCopyExtensions.Add(".ogg")</c>. Removing an entry
+    /// restores the default "require dest to exist" behavior for that extension.
+    /// </para>
+    /// <para>
+    /// Gum file types (<c>.gumx</c>, <c>.gusx</c>, <c>.gutx</c>, <c>.behx</c>, <c>.ganx</c>) are
+    /// intentionally NOT included — Gum runs its own hot-reload pipeline and layering the engine's
+    /// copy on top would conflict.
+    /// </para>
+    /// </summary>
+    public HashSet<string> AutoCopyExtensions { get; } =
+        new(StringComparer.OrdinalIgnoreCase) { ".png", ".tsx" };
+
     /// <param name="source">Underlying directory event source.</param>
     /// <param name="onChanged">Invoked once per dirty file after copy succeeds.</param>
     /// <param name="copyToDestination">

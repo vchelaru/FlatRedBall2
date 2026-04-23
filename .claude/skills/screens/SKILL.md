@@ -235,22 +235,20 @@ Canonical recipe:
 ```csharp
 public override void SaveHotReloadState(HotReloadState state)
 {
-    state.Set("playerX", _player.X);
-    state.Set("playerY", _player.Y);
-    state.Set("playerVx", _player.VelocityX);
-    state.Set("playerVy", _player.VelocityY);
-    state.Set("score", _score);
+    state.Preserve(_player);           // position, velocity, acceleration, rotation, rotation velocity
+    state.Set("score", _score);        // custom values still use Set/Get
 }
 
 public override void RestoreHotReloadState(HotReloadState state)
 {
-    _player.X = state.Get<float>("playerX");
-    _player.Y = state.Get<float>("playerY");
-    _player.VelocityX = state.Get<float>("playerVx");
-    _player.VelocityY = state.Get<float>("playerVy");
-    _score = state.Get<int>("score");
+    state.Restore(_player);
+    if (state.TryGet<int>("score", out var s)) _score = s;
 }
 ```
+
+`state.Preserve(entity)` / `state.Restore(entity)` bundle the eight kinematic properties (six for `Camera`, which has no rotation). Call them in **matching order** in Save and Restore — keys are auto-generated per type (`Player_1`, `Player_2`, etc.), so asymmetric call order silently swaps state between entities of the same type. For multi-instance scenarios where explicit names are clearer, pass the optional second argument: `state.Preserve(_heroA, "heroA")`.
+
+Use `Set`/`Get`/`TryGet` directly for everything else (score, timers, inventory) — the helper only covers motion-and-rotation.
 
 ## Pausing
 
