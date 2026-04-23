@@ -7,11 +7,18 @@ namespace FlatRedBall2.Tiled;
 /// </summary>
 public enum Origin
 {
+    /// <summary>The center of the tile rectangle.</summary>
     Center,
+    /// <summary>The middle of the bottom edge.</summary>
     BottomCenter,
+    /// <summary>The middle of the top edge.</summary>
     TopCenter,
+    /// <summary>The bottom-left corner.</summary>
     BottomLeft,
+    /// <summary>The top-left corner.</summary>
     TopLeft,
+    /// <summary>The bottom-right corner.</summary>
     BottomRight,
+    /// <summary>The top-right corner.</summary>
     TopRight,
 }

@@ -38,20 +38,32 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
     }
 
     // IAttachable
+    /// <inheritdoc/>
     public Entity? Parent { get; set; }
+    /// <inheritdoc/>
     public float X { get; set; }
+    /// <inheritdoc/>
     public float Y { get; set; }
+    /// <inheritdoc/>
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    /// <inheritdoc/>
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    /// <inheritdoc/>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
+    /// <inheritdoc/>
     public void Destroy() { }
 
     // IRenderable
+    /// <inheritdoc/>
     public float Z { get; set; }
+    /// <inheritdoc/>
     public Layer? Layer { get; set; }
+    /// <inheritdoc/>
     public IRenderBatch Batch { get; set; } = TiledRenderBatch.Instance;
+    /// <inheritdoc/>
     public string? Name { get; set; }
 
+    /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!IsVisible) return;

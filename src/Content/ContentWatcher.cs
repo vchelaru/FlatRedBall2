@@ -106,6 +106,7 @@ public class ContentWatcher : IDisposable
         }
     }
 
+    /// <summary>Stops watching, unhooks the source event, and disposes the underlying watcher. Idempotent.</summary>
     public void Dispose()
     {
         if (_disposed) return;

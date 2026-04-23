@@ -3,12 +3,21 @@ using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Input;
 
+/// <summary>
+/// Top-level input access point: keyboard, mouse/touch cursor, and up to four gamepads.
+/// One instance lives on the engine and is exposed as <c>Engine.Input</c>; all input state
+/// is captured once per frame before entity and screen logic runs.
+/// </summary>
 public class InputManager
 {
     private readonly Keyboard _keyboard = new Keyboard();
     private readonly Cursor _cursor = new Cursor();
     private readonly Gamepad[] _gamepads;
 
+    /// <summary>
+    /// Creates the input manager and allocates four gamepad slots. Called once by the engine
+    /// during startup; game code does not construct this directly.
+    /// </summary>
     public InputManager()
     {
         _gamepads = new Gamepad[4];

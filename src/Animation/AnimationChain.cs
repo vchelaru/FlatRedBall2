@@ -9,6 +9,10 @@ namespace FlatRedBall2.Animation;
 /// </summary>
 public class AnimationChain : List<AnimationFrame>
 {
+    /// <summary>
+    /// Identifier used by <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/> and by
+    /// the <see cref="AnimationChainList"/> string indexer to look this chain up.
+    /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>Total duration of the animation in seconds (sum of all frame lengths).</summary>

@@ -1,5 +1,9 @@
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Extension methods that apply a JSON-loaded <see cref="TopDownConfig"/> onto a runtime
+/// <see cref="TopDownBehavior"/>.
+/// </summary>
 public static class TopDownConfigExtensions
 {
     /// <summary>

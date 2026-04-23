@@ -5,6 +5,17 @@ using FlatRedBall2.Math;
 
 namespace FlatRedBall2.Collision;
 
+/// <summary>
+/// Central dispatch table for shape-pair collision. Resolves any
+/// <see cref="ICollidable"/> pair to the correct narrow-phase routine
+/// (AABB vs AABB, circle vs polygon, line vs AABB, etc.) and returns either an overlap test
+/// or a minimum translation vector (MTV) suitable for separation.
+/// <para>
+/// Internal — game code should use the methods on <see cref="Entity"/>, the shape classes
+/// themselves, or a configured <see cref="CollisionRelationship{A,B}"/> rather than calling
+/// the dispatcher directly.
+/// </para>
+/// </summary>
 internal static class CollisionDispatcher
 {
     /// <summary>

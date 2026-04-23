@@ -8,6 +8,17 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// Per-screen content loader. Wraps MonoGame's <see cref="ContentManager"/> with extension-based
+/// routing so <c>Load&lt;Texture2D&gt;("ship.png")</c> bypasses the XNB pipeline and loads PNG
+/// files directly from disk; tracked PNG textures additionally support in-place hot-reload via
+/// <see cref="TryReload"/>.
+/// <para>
+/// Each <see cref="Screen"/> owns its own <see cref="ContentManagerService"/> via
+/// <see cref="Screen.Content"/>. <see cref="UnloadAll"/> is invoked automatically on screen
+/// transition — explicit unloads are only needed mid-screen.
+/// </para>
+/// </summary>
 public class ContentManagerService
 {
     private ContentManager? _contentManager;
@@ -35,6 +46,7 @@ public class ContentManagerService
     /// </summary>
     internal Func<Texture2D, string, bool> TextureReloader { get; set; }
 
+    /// <summary>Constructs a content service with the default texture loader/reloader. Call <c>Initialize</c> before use.</summary>
     public ContentManagerService()
     {
         TextureLoader = DefaultTextureLoader;
@@ -123,6 +135,11 @@ public class ContentManagerService
         return tex;
     }
 
+    /// <summary>
+    /// Unloads a single asset previously loaded through the MonoGame content pipeline (no-op on KNI,
+    /// where <c>UnloadAsset</c> is unsupported). Does not affect file-loaded textures tracked via
+    /// <see cref="TryReload"/> — those persist until <see cref="UnloadAll"/>.
+    /// </summary>
     public void Unload(string path)
     {
 #if !KNI
@@ -130,6 +147,10 @@ public class ContentManagerService
 #endif
     }
 
+    /// <summary>
+    /// Disposes every asset this service owns: pipeline-loaded content, manually <see cref="Track"/>ed
+    /// resources, and file-loaded texture cache. Called automatically on screen transition.
+    /// </summary>
     public void UnloadAll()
     {
         _contentManager?.Unload();
@@ -165,6 +186,10 @@ public class ContentManagerService
         return true;
     }
 
+    /// <summary>
+    /// Creates a content service whose load methods all return defaults — useful for headless
+    /// testing where no <see cref="GraphicsDevice"/> or <see cref="ContentManager"/> exists.
+    /// </summary>
     public static ContentManagerService CreateNull() => new NullContentManagerService();
 
     private class NullContentManagerService : ContentManagerService

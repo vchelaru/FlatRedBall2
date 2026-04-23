@@ -2,6 +2,18 @@ using System;
 
 namespace FlatRedBall2.Movement;
 
+/// <summary>
+/// Tunable parameters consumed by <see cref="PlatformerBehavior"/> for one movement state
+/// (ground, air, climbing, etc.). One instance per slot — assign them to the matching property on
+/// <see cref="PlatformerBehavior"/>. Authored directly in C# or loaded from JSON via
+/// <see cref="PlatformerConfig"/> + <see cref="PlatformerConfigExtensions.ApplyTo"/>.
+/// <para>
+/// <b>Slot semantics:</b> while climbing, only <see cref="MaxSpeedX"/>,
+/// <see cref="AccelerationTimeX"/>/<see cref="DecelerationTimeX"/>, <see cref="ClimbingSpeed"/>,
+/// and the jump fields are read; gravity and slope fields are ignored. While airborne the slope
+/// fields are also ignored (they apply only to grounded motion).
+/// </para>
+/// </summary>
 public class PlatformerValues
 {
     /// <summary>
@@ -60,6 +72,11 @@ public class PlatformerValues
         }
     }
 
+    /// <summary>Maximum horizontal speed in world units/second when input is at full magnitude.
+    /// Slope-walking may scale this further per
+    /// <see cref="UphillFullSpeedSlope"/>/<see cref="UphillStopSpeedSlope"/> /
+    /// <see cref="DownhillFullSpeedSlope"/>/<see cref="DownhillMaxSpeedSlope"/>/
+    /// <see cref="DownhillMaxSpeedMultiplier"/>.</summary>
     public float MaxSpeedX;
 
     /// <summary>Time to reach <see cref="MaxSpeedX"/> from rest. <see cref="TimeSpan.Zero"/> (the default) means instant.</summary>
@@ -76,7 +93,16 @@ public class PlatformerValues
     /// the companion airborne slot's gravity (see the <c>jumpGravity</c> overload).
     /// </summary>
     public float Gravity;
+
+    /// <summary>Positive cap on downward speed magnitude in world units/second. Applied each frame
+    /// after jump sustain so the entity never falls faster than this. Ignored while climbing.</summary>
     public float MaxFallSpeed;
+
+    /// <summary>Initial upward velocity in world units/second applied at jump start. Set directly
+    /// for raw-mode tuning, or have <see cref="SetJumpHeights"/> derive it from a target height.
+    /// On the climbing slot, applied when the player presses jump to leave a ladder — a value of
+    /// <c>0</c> there means "drop off without upward velocity" (see also the <c>climbing JumpVelocity == 0</c>
+    /// footgun noted in <c>design/TODOS.md</c>).</summary>
     public float JumpVelocity;
 
     /// <summary>

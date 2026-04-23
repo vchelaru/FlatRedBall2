@@ -7,6 +7,22 @@ using FlatRedBall2.Rendering.Batches;
 
 namespace FlatRedBall2.Rendering;
 
+/// <summary>
+/// Textured rectangle drawn each frame by the engine. Implements <see cref="IAttachable"/>
+/// so it can be added to an <see cref="Entity"/> via <c>Entity.Add(sprite)</c>; its
+/// <see cref="X"/>/<see cref="Y"/>/<see cref="Z"/> are then interpreted as offsets from
+/// the parent.
+/// <para>
+/// Defaults to <see cref="Batches.WorldSpaceBatch"/> (camera-transformed, Y+ up). For HUD
+/// or screen-space sprites, assign a screen-space layer or set <see cref="Batch"/> directly.
+/// </para>
+/// <para>
+/// <b>Sizing modes:</b> see <see cref="TextureScale"/> for how <see cref="Width"/> and
+/// <see cref="Height"/> are determined. <b>Animation:</b> assign <see cref="AnimationChains"/>
+/// then call <see cref="PlayAnimation(string)"/>; per-frame texture, source rectangle, flip
+/// flags, and relative offsets are applied automatically while <see cref="Animate"/> is true.
+/// </para>
+/// </summary>
 public class Sprite : IRenderable, IAttachable
 {
     private const float FallbackSize = 32f;
@@ -24,22 +40,43 @@ public class Sprite : IRenderable, IAttachable
     private int _currentFrameIndex;
     private double _timeIntoAnimation;
 
-    // IAttachable
+    /// <summary>The entity this sprite is attached to, or <c>null</c> if unattached. Set by <see cref="Entity.Add(IAttachable, Layer?)"/>.</summary>
     public Entity? Parent { get; set; }
+
+    /// <summary>X position. Relative to <see cref="Parent"/> when attached, world when unattached.</summary>
     public float X { get; set; }
+
+    /// <summary>Y position (Y+ up in world space). Relative to <see cref="Parent"/> when attached, world when unattached.</summary>
     public float Y { get; set; }
+
+    /// <summary>Per-sprite draw order within its <see cref="Layer"/>. See <see cref="IRenderable.Z"/> for sorting semantics.</summary>
     public float Z { get; set; }
+
+    /// <summary>Final world-space X after walking the parent chain.</summary>
     public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+
+    /// <summary>Final world-space Y after walking the parent chain.</summary>
     public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+
+    /// <summary>Final Z after walking the parent chain. Used for sort order; see <see cref="Z"/>.</summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
-    // Rotation
+    /// <summary>Rotation about the Z axis. Relative to <see cref="Parent"/> when attached, world when unattached.</summary>
     public Angle Rotation { get; set; }
+
+    /// <summary>Final world-space rotation after walking the parent chain.</summary>
     public Angle AbsoluteRotation => Parent != null ? Parent.AbsoluteRotation + Rotation : Rotation;
 
-    // IRenderable
+    /// <inheritdoc/>
     public Layer? Layer { get; set; }
+
+    /// <summary>
+    /// The batch this sprite renders through. Defaults to <see cref="WorldSpaceBatch.Instance"/>
+    /// (camera-transformed, Y-flip). Reassign for screen-space rendering or custom blend states.
+    /// </summary>
     public IRenderBatch Batch { get; set; } = WorldSpaceBatch.Instance;
+
+    /// <inheritdoc/>
     public string? Name { get; set; }
 
     // Visual
@@ -119,8 +156,23 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
+    /// <summary>
+    /// Color tint multiplied with the texture pixels. Default <c>White</c> (no tint).
+    /// Multiplied by <see cref="Alpha"/> at draw time.
+    /// </summary>
     public Color Color { get; set; } = Color.White;
+
+    /// <summary>
+    /// Opacity in the range 0 (fully transparent) to 1 (fully opaque). Default <c>1f</c>.
+    /// Multiplied with <see cref="Color"/> at draw time, so values outside [0, 1] over- or
+    /// under-saturate the result.
+    /// </summary>
     public float Alpha { get; set; } = 1f;
+
+    /// <summary>
+    /// When <c>false</c>, this sprite is skipped at draw time. Does not affect <see cref="Parent"/>
+    /// visibility — see <see cref="Entity.IsAbsoluteVisible"/> for the resolved chain.
+    /// </summary>
     public bool IsVisible { get; set; } = true;
 
     /// <summary>
@@ -138,8 +190,15 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    // Flip
+    /// <summary>Mirrors the texture left-to-right when <c>true</c>. Overwritten by the current animation frame while <see cref="Animate"/> is on.</summary>
     public bool FlipHorizontal { get; set; }
+
+    /// <summary>
+    /// Mirrors the texture top-to-bottom when <c>true</c>. Note that <see cref="Batches.WorldSpaceBatch"/>
+    /// already applies a base Y-flip to compensate for the camera transform — this property toggles
+    /// <em>relative to upright</em>, not relative to texture pixels. Overwritten by the current animation
+    /// frame while <see cref="Animate"/> is on.
+    /// </summary>
     public bool FlipVertical { get; set; }
 
     // Animation
@@ -304,6 +363,7 @@ public class Sprite : IRenderable, IAttachable
         RecalculateDimensions();
     }
 
+    /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!IsVisible || Texture == null) return;
@@ -337,6 +397,11 @@ public class Sprite : IRenderable, IAttachable
             0f);
     }
 
+    /// <summary>
+    /// Detaches this sprite from its parent entity (which also unregisters it from the screen).
+    /// Sprites do not own their <see cref="Texture"/> or <see cref="AnimationChains"/> — those
+    /// remain managed by the <c>ContentManagerService</c> that loaded them.
+    /// </summary>
     public void Destroy()
     {
         if (Parent is Entity entity)

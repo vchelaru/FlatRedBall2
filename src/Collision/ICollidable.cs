@@ -2,9 +2,23 @@ using System.Numerics;
 
 namespace FlatRedBall2.Collision;
 
+/// <summary>
+/// Anything that can participate in collision: primitive shapes
+/// (<see cref="AxisAlignedRectangle"/>, <see cref="Circle"/>, <see cref="Polygon"/>,
+/// <see cref="Line"/>), <see cref="Entity"/> (an aggregate of leaf shapes), and static
+/// geometry (<see cref="TileShapeCollection"/>, <see cref="ShapeCollection"/>).
+/// </summary>
+/// <remarks>
+/// Most game code interacts with collision via
+/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IEnumerable{A}, System.Collections.Generic.IEnumerable{B})"/>
+/// or <see cref="Entity.CollidesWith"/> rather than calling these methods directly. The
+/// per-shape methods exist for advanced/manual collision flows.
+/// </remarks>
 public interface ICollidable
 {
+    /// <summary>Final world-space X after walking the parent chain (for attached shapes).</summary>
     float AbsoluteX { get; }
+    /// <summary>Final world-space Y (Y+ up) after walking the parent chain.</summary>
     float AbsoluteY { get; }
 
     /// <summary>
@@ -27,8 +41,25 @@ public interface ICollidable
     /// </para>
     /// </remarks>
     bool CollidesWith(ICollidable other);
+
+    /// <summary>
+    /// Returns the minimum translation vector that pushes this object out of <paramref name="other"/>.
+    /// Returns <see cref="Vector2.Zero"/> when there is no overlap.
+    /// </summary>
     Vector2 GetSeparationVector(ICollidable other);
+
+    /// <summary>
+    /// Pushes this object out of <paramref name="other"/> using the mass-weighted share of the
+    /// separation vector. See <see cref="Entity.SeparateFrom"/> for mass-ratio semantics.
+    /// No-op on shapes that have no movable position of their own (e.g. <see cref="TileShapeCollection"/>).
+    /// </summary>
     void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f);
+
+    /// <summary>
+    /// Reflects this object's velocity off <paramref name="other"/> using impulse physics.
+    /// See <see cref="Entity.AdjustVelocityFrom"/> for mass and elasticity semantics.
+    /// No-op on shapes (only <see cref="Entity"/> carries velocity).
+    /// </summary>
     void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f);
 
     /// <summary>

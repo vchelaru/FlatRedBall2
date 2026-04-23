@@ -24,7 +24,10 @@ public class AnimationFrame
     /// </summary>
     public Rectangle? SourceRectangle;
 
+    /// <summary>When <c>true</c>, the source region is mirrored along the X axis at draw time.</summary>
     public bool FlipHorizontal;
+
+    /// <summary>When <c>true</c>, the source region is mirrored along the Y axis at draw time.</summary>
     public bool FlipVertical;
 
     /// <summary>

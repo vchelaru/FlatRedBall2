@@ -4,15 +4,43 @@ using NumericsVector2 = System.Numerics.Vector2;
 
 namespace FlatRedBall2.Rendering;
 
+/// <summary>
+/// World-space view origin. The camera's <see cref="X"/>/<see cref="Y"/> sit at the center
+/// of the visible area; <see cref="Left"/>/<see cref="Right"/>/<see cref="Top"/>/<see cref="Bottom"/>
+/// derive from that center plus <see cref="TargetWidth"/>/<see cref="TargetHeight"/> and
+/// <see cref="Zoom"/>.
+/// <para>
+/// Camera velocity and acceleration are integrated each frame by the engine
+/// (same second-order kinematic step as <see cref="Entity"/>: <c>pos += vel*dt + acc*dt²/2</c>),
+/// so a moving camera can be set up via <see cref="VelocityX"/>/<see cref="VelocityY"/> instead
+/// of mutating <see cref="X"/>/<see cref="Y"/> by hand each frame.
+/// </para>
+/// <para>
+/// <b>Y+ is up</b> in world space; the camera transform (see <see cref="GetTransformMatrix"/>)
+/// flips Y to screen space (Y+ down) for rendering.
+/// </para>
+/// </summary>
 public class Camera
 {
+    /// <summary>World-space X of the center of the visible area.</summary>
     public float X { get; set; }
+
+    /// <summary>World-space Y of the center of the visible area (Y+ up).</summary>
     public float Y { get; set; }
+
+    /// <summary>X velocity in world units / second. Integrated each frame by the engine.</summary>
     public float VelocityX { get; set; }
+
+    /// <summary>Y velocity in world units / second (Y+ up). Integrated each frame by the engine.</summary>
     public float VelocityY { get; set; }
+
+    /// <summary>X acceleration in world units / second². Integrated each frame by the engine.</summary>
     public float AccelerationX { get; set; }
+
+    /// <summary>Y acceleration in world units / second² (Y+ up). Integrated each frame by the engine.</summary>
     public float AccelerationY { get; set; }
 
+    /// <summary>Color cleared to the back buffer before any renderable draws. Default <c>Black</c>.</summary>
     public Color BackgroundColor { get; set; } = Color.Black;
 
     /// <summary>World units visible horizontally. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
@@ -61,6 +89,11 @@ public class Camera
         VelocityY += AccelerationY * dt;
     }
 
+    /// <summary>
+    /// Projects a world-space position to screen-space pixels (origin top-left, Y+ down).
+    /// Accounts for camera position, viewport size, and <see cref="Zoom"/>. Inverse of
+    /// <see cref="ScreenToWorld"/>.
+    /// </summary>
     public NumericsVector2 WorldToScreen(NumericsVector2 worldPosition)
     {
         var vpW = (float)_viewport.Width;
@@ -72,6 +105,10 @@ public class Camera
             -(worldPosition.Y - Y) * scaleY + vpH / 2f);
     }
 
+    /// <summary>
+    /// Unprojects a screen-space pixel position (origin top-left, Y+ down) to a world-space
+    /// position (Y+ up). Useful for picking, mouse-to-world, etc. Inverse of <see cref="WorldToScreen"/>.
+    /// </summary>
     public NumericsVector2 ScreenToWorld(NumericsVector2 screenPosition)
     {
         var vpW = (float)_viewport.Width;
@@ -83,6 +120,13 @@ public class Camera
             -(screenPosition.Y - vpH / 2f) / scaleY + Y);
     }
 
+    /// <summary>
+    /// Builds the world-to-screen transform passed to <c>SpriteBatch.Begin</c> by
+    /// world-space batches. Translates by <c>-Camera.Position</c>, scales by viewport-vs-target
+    /// ratio times <see cref="Zoom"/>, flips Y (world Y+ up → screen Y+ down), and recenters
+    /// in the viewport. <see cref="Sprite.Draw"/> compensates for the Y-flip via
+    /// <see cref="IRenderBatch.FlipsY"/> so texture pixels remain upright.
+    /// </summary>
     public Matrix GetTransformMatrix()
     {
         var vpW = (float)_viewport.Width;

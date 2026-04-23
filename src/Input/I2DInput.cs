@@ -3,9 +3,17 @@ using System.Collections.Generic;
 
 namespace FlatRedBall2.Input;
 
+/// <summary>
+/// Two-axis input abstraction (X/Y). Used for directional movement, look input, and any input
+/// surface that produces a 2D vector. Y+ is up by convention, matching world-space coordinates.
+/// Combine sources via <see cref="I2DInputExtensions.Or"/>.
+/// </summary>
 public interface I2DInput
 {
+    /// <summary>Current X-axis value. Range depends on the source — typically [-1, 1].</summary>
     float X { get; }
+
+    /// <summary>Current Y-axis value (Y+ up). Range depends on the source — typically [-1, 1].</summary>
     float Y { get; }
 
     /// <summary>
@@ -34,6 +42,7 @@ public class Multiple2DInputs : I2DInput
     /// </summary>
     public List<I2DInput> Inputs { get; } = new();
 
+    /// <summary>X value of the contained input with the largest absolute X, sign preserved. 0 if empty.</summary>
     public float X
     {
         get
@@ -48,6 +57,10 @@ public class Multiple2DInputs : I2DInput
         }
     }
 
+    /// <summary>
+    /// Y value of the contained input with the largest absolute Y, sign preserved. 0 if empty.
+    /// Selected independently of <see cref="X"/> — the X and Y components may come from different inputs.
+    /// </summary>
     public float Y
     {
         get
@@ -63,6 +76,7 @@ public class Multiple2DInputs : I2DInput
     }
 }
 
+/// <summary>Fluent helpers for combining <see cref="I2DInput"/> sources.</summary>
 public static class I2DInputExtensions
 {
     /// <summary>

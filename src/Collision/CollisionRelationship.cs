@@ -6,6 +6,29 @@ using FlatRedBall2.Movement;
 
 namespace FlatRedBall2.Collision;
 
+/// <summary>
+/// Pairs two collections of <see cref="ICollidable"/> objects and runs collision between them
+/// every frame. Configure response with the fluent <c>...OnCollision</c> methods
+/// (<see cref="MoveFirstOnCollision"/>, <see cref="BounceOnCollision"/>, etc.) and react to
+/// individual collisions via <see cref="CollisionOccurred"/>, <see cref="CollisionStarted"/>,
+/// and <see cref="CollisionEnded"/>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Created by
+/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IEnumerable{A}, System.Collections.Generic.IEnumerable{B})"/>
+/// — game code does not construct these directly. Once added, the screen calls
+/// <c>RunCollisions</c> on each registered relationship every frame.
+/// </para>
+/// <para>
+/// Performance: when both lists come from a <see cref="Factory{T}"/> sharing the same
+/// <see cref="Factory{T}.PartitionAxis"/>, a sweep-and-prune broad phase is used; otherwise
+/// the dispatch is O(n×m). Inspect <see cref="DeepCollisionCount"/> to verify partitioning is
+/// taking effect.
+/// </para>
+/// </remarks>
+/// <typeparam name="A">First collidable type.</typeparam>
+/// <typeparam name="B">Second collidable type.</typeparam>
 public class CollisionRelationship<A, B> : ICollisionRelationship
     where A : ICollidable
     where B : ICollidable
@@ -178,16 +201,30 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _listB = listB;
     }
 
+    /// <summary>
+    /// On collision, push only side A out of side B. Use when B is static geometry (walls, floors)
+    /// or when A should yield entirely. No velocity change — pair with
+    /// <see cref="BounceOnCollision"/> for a bounce response.
+    /// </summary>
     public CollisionRelationship<A, B> MoveFirstOnCollision()
     {
         _moveFirst = true; return this;
     }
 
+    /// <summary>
+    /// On collision, push only side B out of side A. Mirror of <see cref="MoveFirstOnCollision"/>.
+    /// </summary>
     public CollisionRelationship<A, B> MoveSecondOnCollision()
     {
         _moveSecond = true; return this;
     }
 
+    /// <summary>
+    /// On collision, push both sides apart by the mass-weighted share of the separation vector.
+    /// Equal masses split the separation 50/50; a heavier side moves proportionally less.
+    /// </summary>
+    /// <param name="firstMass">Mass of side A. Higher = moves less.</param>
+    /// <param name="secondMass">Mass of side B. Higher = moves less.</param>
     public CollisionRelationship<A, B> MoveBothOnCollision(float firstMass = 1f, float secondMass = 1f)
     {
         _moveBoth = true; _bothFirstMass = firstMass; _bothSecondMass = secondMass; return this;

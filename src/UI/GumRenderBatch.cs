@@ -13,6 +13,7 @@ namespace FlatRedBall2.UI;
 /// </summary>
 public class GumRenderBatch : IRenderBatch
 {
+    /// <summary>Singleton — every <see cref="GumRenderable"/> shares this batch.</summary>
     public static readonly GumRenderBatch Instance = new GumRenderBatch();
 
     private NativeGumBatch? _inner;

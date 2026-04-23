@@ -21,9 +21,26 @@ public static class TweeningExtensions
     /// Starts a tween on <paramref name="entity"/>. The returned <see cref="Tweener"/> is already
     /// running; its <c>PositionChanged</c> delegate is wired to <paramref name="setter"/>, which
     /// is invoked each frame with the interpolated value. The setter also receives exactly
-    /// <paramref name="to"/> as its final call when the tween completes. The tween is dropped
-    /// from the entity's internal list automatically on completion, <c>Stop()</c>, or entity destroy.
+    /// <paramref name="to"/> as its final call when the tween completes naturally — useful for
+    /// setters with a precise terminal value (e.g. snapping a fade to fully transparent). The
+    /// tween is dropped from the entity's internal list automatically on completion,
+    /// <see cref="Tweener.Stop"/>, or <see cref="Entity.Destroy"/>.
+    /// <para>
+    /// <b>Setter fires twice on the completing frame</b> — once from the upstream <c>PositionChanged</c>
+    /// at the near-final value, then again with exactly <paramref name="to"/>. Plain assignment
+    /// is fine; setters with side effects should guard them.
+    /// </para>
+    /// <para>
+    /// <b>Frozen while the screen is paused</b> — see <see cref="Screen.IsPaused"/>. Override
+    /// <see cref="Entity.ShouldAdvanceTweens"/> to pause an individual entity's tweens
+    /// (e.g. during a stun) without pausing the whole screen.
+    /// </para>
     /// </summary>
+    /// <param name="setter">Invoked each frame with the interpolated value. Must not be <c>null</c>.</param>
+    /// <param name="from">Starting value passed to <paramref name="setter"/> on the first update.</param>
+    /// <param name="to">Final value; passed to <paramref name="setter"/> exactly on natural completion.</param>
+    /// <param name="durationSeconds">Tween length in seconds.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
     public static Tweener Tween(
         this Entity entity,
         Action<float> setter,
@@ -39,10 +56,14 @@ public static class TweeningExtensions
     }
 
     /// <summary>
-    /// Starts a tween owned by <paramref name="screen"/>. Semantics match the entity overload,
+    /// Starts a tween owned by <paramref name="screen"/>. Semantics match
+    /// <see cref="Tween(Entity, Action{float}, float, float, float, InterpolationType, Easing)"/>,
     /// but the tween lives for the screen's lifetime instead of an entity's. Use for tweens that
-    /// have no natural entity owner (camera shakes, UI reveals, global fades).
+    /// have no natural entity owner (camera shakes, UI reveals, global fades). Prefer the entity
+    /// overload whenever the setter writes to an entity or one of its children — the entity-scoped
+    /// tween is cleared automatically if the entity dies mid-tween, eliminating use-after-destroy risk.
     /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
     public static Tweener Tween(
         this Screen screen,
         Action<float> setter,

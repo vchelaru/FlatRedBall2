@@ -1,5 +1,10 @@
 namespace FlatRedBall2.Rendering;
 
+/// <summary>
+/// Determines how renderables within a single <see cref="Layer"/> are ordered before drawing.
+/// Layer always wins over sort mode — a lower-indexed layer draws behind a higher-indexed
+/// layer regardless of which mode is selected.
+/// </summary>
 public enum SortMode
 {
     /// <summary>

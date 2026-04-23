@@ -14,6 +14,17 @@ using Gum.Wireframe;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// Base class for a game screen — a self-contained unit of game state with its own camera,
+/// content, entities, collision relationships, and rendering pipeline. Override
+/// <see cref="CustomInitialize"/>, <see cref="CustomActivity"/>, and <see cref="CustomDestroy"/>
+/// to build a game screen; switch between screens with <see cref="MoveToScreen{T}"/>.
+/// <para>
+/// The engine owns a single <see cref="FlatRedBallService.CurrentScreen"/> at a time. On screen
+/// transition, the outgoing screen's <see cref="Token"/> is cancelled, its content is unloaded,
+/// and its entities are destroyed before the new screen's <see cref="CustomInitialize"/> runs.
+/// </para>
+/// </summary>
 public class Screen
 {
     private readonly List<Entity> _entities = new();
@@ -34,8 +45,11 @@ public class Screen
     /// </summary>
     public CancellationToken Token => _cts.Token;
 
+    /// <summary>The camera that defines this screen's view into the world. Modify position/zoom each frame; the engine applies the transform during <see cref="FlatRedBallService.Draw"/>.</summary>
     public Camera Camera { get; } = new Camera();
+    /// <summary>This screen's content loader. Unloaded automatically on screen transition.</summary>
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
+    /// <summary>The engine that owns this screen. Injected before <see cref="CustomInitialize"/>.</summary>
     public FlatRedBallService Engine { get; internal set; } = null!;
 
     /// <summary>
@@ -44,8 +58,14 @@ public class Screen
     /// </summary>
     public Overlay Overlay { get; }
 
+    /// <summary>Constructs a new screen and its <see cref="Overlay"/>. Engine injection happens later, before <see cref="CustomInitialize"/>.</summary>
     public Screen() => Overlay = new Overlay(this);
 
+    /// <summary>
+    /// Custom rendering layers owned by this screen. Add to this list to introduce additional
+    /// sort buckets (e.g. a parallax background, a HUD on top of gameplay) and pass the layer
+    /// to <see cref="Add(IRenderable, Layer?)"/> when registering renderables.
+    /// </summary>
     public List<Layer> Layers { get; } = new();
 
     /// <summary>
@@ -79,8 +99,13 @@ public class Screen
     }
 
     private readonly List<IRenderable> _renderList = new();
+    /// <summary>All renderables registered on this screen, in insertion order. The render pass sorts a copy by Layer/Z each frame.</summary>
     public IReadOnlyList<IRenderable> RenderList => _renderList;
 
+    /// <summary>
+    /// Registers <paramref name="renderable"/> for drawing. Pass an explicit
+    /// <paramref name="layer"/> to override the screen's default <see cref="Layer"/>.
+    /// </summary>
     public void Add(IRenderable renderable, Layer? layer = null)
     {
         if (layer != null || Layer != null)
@@ -88,6 +113,7 @@ public class Screen
         _renderList.Add(renderable);
     }
 
+    /// <summary>Unregisters <paramref name="renderable"/> from drawing. Idempotent.</summary>
     public void Remove(IRenderable renderable) => _renderList.Remove(renderable);
 
     /// <summary>
@@ -305,7 +331,16 @@ public class Screen
         LoadContent();
     }
 
+    /// <summary>
+    /// Override to run per-frame screen logic. Called after entity activity, collision, and tween
+    /// advancement have completed for this frame. Skipped while <see cref="IsPaused"/> is <c>true</c>.
+    /// </summary>
     public virtual void CustomActivity(FrameTime time) { }
+
+    /// <summary>
+    /// Override to release screen-specific resources before the screen tears down. Runs before
+    /// entities and content are destroyed — engine subsystems are still valid here.
+    /// </summary>
     public virtual void CustomDestroy() { }
 
     // Navigation

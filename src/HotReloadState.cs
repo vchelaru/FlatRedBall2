@@ -18,10 +18,21 @@ public class HotReloadState
     private readonly Dictionary<Type, int> _saveCounts = new();
     private readonly Dictionary<Type, int> _restoreCounts = new();
 
+    /// <summary>Stores <paramref name="value"/> under <paramref name="key"/>, overwriting any previous value.</summary>
     public void Set<T>(string key, T value) => _values[key] = value;
 
+    /// <summary>
+    /// Retrieves the value previously stored under <paramref name="key"/>, cast to <typeparamref name="T"/>.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">No entry exists for <paramref name="key"/>.</exception>
+    /// <exception cref="System.InvalidCastException">The stored value is not assignable to <typeparamref name="T"/>.</exception>
     public T Get<T>(string key) => (T)_values[key]!;
 
+    /// <summary>
+    /// Attempts to retrieve the value stored under <paramref name="key"/> as <typeparamref name="T"/>.
+    /// Returns <c>false</c> if the key is absent or the stored value is the wrong type — pair with
+    /// "leave default" semantics on the first hot-reload before any prior save.
+    /// </summary>
     public bool TryGet<T>(string key, out T value)
     {
         if (_values.TryGetValue(key, out var raw) && raw is T typed)

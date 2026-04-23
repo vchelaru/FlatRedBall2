@@ -9,9 +9,14 @@ namespace FlatRedBall2.Animation;
 /// </summary>
 public class AnimationChainList : List<AnimationChain>
 {
+    /// <summary>Optional identifier for this list — typically the source file name (e.g. <c>"Player.achx"</c>).</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Returns the chain with the given name, or null if not found.</summary>
+    /// <summary>
+    /// Returns the chain whose <see cref="AnimationChain.Name"/> matches <paramref name="name"/>,
+    /// or <c>null</c> if no chain with that name exists. Linear scan — O(n) in the chain count;
+    /// fine for typical animation lists (rarely more than a handful of chains per entity).
+    /// </summary>
     public AnimationChain? this[string name]
     {
         get

@@ -9,5 +9,8 @@ namespace FlatRedBall2.Movement;
 /// </summary>
 public interface IPlatformerEntity
 {
+    /// <summary>The behavior driving this entity's platformer movement. Must never be null
+    /// once the entity is registered with the engine — the collision system dereferences it
+    /// during ground-snap and slope-probe dispatch.</summary>
     PlatformerBehavior Platformer { get; }
 }

@@ -6,6 +6,16 @@ using Microsoft.Xna.Framework;
 
 namespace FlatRedBall2;
 
+/// <summary>
+/// Per-engine time service. Owns the running time clocks (since-game-start, since-screen-start),
+/// the global <see cref="TimeScale"/>, and async delay primitives (<see cref="DelaySeconds"/>,
+/// <see cref="DelayUntil"/>, <see cref="DelayFrames"/>) that complete on the game thread via
+/// the engine's <see cref="GameSynchronizationContext"/>.
+/// <para>
+/// Access via <see cref="FlatRedBallService.TimeManager"/>. The engine calls <c>Update</c> and
+/// <c>DoTaskLogic</c> internally each frame — game code never invokes them directly.
+/// </para>
+/// </summary>
 public class TimeManager
 {
     private TimeSpan _sinceGameStart;
@@ -14,6 +24,11 @@ public class TimeManager
     /// <summary>Scaling factor applied to real elapsed time. Values &lt; 1 slow the game; &gt; 1 speed it up.</summary>
     public float TimeScale { get; set; } = 1f;
 
+    /// <summary>
+    /// The <see cref="FrameTime"/> bundle for the frame currently in progress. Updated once per
+    /// frame at the top of <c>FlatRedBallService.Update</c>; passed automatically to
+    /// <see cref="Entity.CustomActivity"/> — there's rarely a reason to read this directly.
+    /// </summary>
     public FrameTime CurrentFrameTime { get; private set; }
 
     /// <summary>Elapsed game time since the current screen was activated, in seconds. Respects <see cref="TimeScale"/>.</summary>
@@ -115,6 +130,11 @@ public class TimeManager
     // Internal lifecycle
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Zeroes <see cref="CurrentScreenTimeSeconds"/>. Called by the engine on screen transition;
+    /// rarely useful from game code (use <see cref="Screen.RestartScreen(RestartMode)"/> for a
+    /// proper restart with full lifecycle hooks).
+    /// </summary>
     public void ResetScreen() => _sinceScreenStart = TimeSpan.Zero;
 
     internal void Update(GameTime gameTime, bool screenIsPaused)
