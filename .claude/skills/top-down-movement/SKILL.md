@@ -126,9 +126,33 @@ Scales `MaxSpeed` without modifying the `TopDownValues` object.
 
 ```csharp
 _topDown.DirectionFacing   // TopDownDirection enum — updated each frame
+_topDown.IsMoving          // true when velocity magnitude > epsilon (use this for animation, NOT input)
 _topDown.SpeedMultiplier   // read/write, defaults to 1f
 _topDown.InputEnabled      // set false to freeze input without destroying movement values
 ```
+
+Use `IsMoving` (not `MovementInput.X != 0`) to pick idle vs. walk animations — input stays non-zero when the entity is held against a wall, but `IsMoving` correctly flips to false because collision zeroes velocity.
+
+## Mapping 8-Way Facing to 4-Direction Art
+
+Games often keep `PossibleDirections.EightWay` (the default) so diagonal input feels responsive but ship art with only 4 cardinal chains (`WalkUp`, `WalkDown`, `WalkLeft`, `WalkRight`). Collapse the diagonals at animation-selection time — do **not** switch to `FourWay`, which snaps the facing itself and makes diagonals feel notchy.
+
+```csharp
+string suffix = _topDown.DirectionFacing switch
+{
+    TopDownDirection.Up                                         => "Up",
+    TopDownDirection.Down                                       => "Down",
+    TopDownDirection.Left or TopDownDirection.UpLeft
+                          or TopDownDirection.DownLeft          => "Left",
+    TopDownDirection.Right or TopDownDirection.UpRight
+                           or TopDownDirection.DownRight        => "Right",
+    _                                                           => "Down",
+};
+string chain = (_topDown.IsMoving ? "Walk" : "Idle") + suffix;
+_sprite.PlayAnimation(chain);
+```
+
+Diagonals collapse to left/right because horizontal silhouettes usually read better than vertical ones, but it's a game-by-game decision — collapse to up/down instead if the art calls for it.
 
 ## Collision Setup
 
