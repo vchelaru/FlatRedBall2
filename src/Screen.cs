@@ -330,6 +330,17 @@ public class Screen
     /// <c>MoveToScreen&lt;ParentScreen&gt;(s =&gt; s.ReturnedResult = result)</c>.
     /// The parent's <see cref="CustomInitialize"/> then reads the property before building the world.
     /// </para>
+    /// <para>
+    /// <b>No push/pop screen stack by design.</b> FlatRedBall2 intentionally uses full-screen
+    /// transitions only — there is no "freeze parent, activate sub-screen, pop back" stack. The
+    /// lifecycle and subsystem-interaction cost of a frozen-parent state (collision, tweens,
+    /// timing, content hot-reload all needing to respect it) is not justified by the use cases:
+    /// pause menus and HUD overlays belong in Gum as UI layered over the active screen, and
+    /// battle / shop / dialog hand-offs fit the <c>MoveToScreen</c> + return-via-configure pattern
+    /// above. For full-teardown cases where the parent's type is re-entered fresh (and the return
+    /// configure can't be set because the caller doesn't retain a parent reference), store the
+    /// payload in a static field on the destination screen and clear it in <c>CustomInitialize</c>.
+    /// </para>
     /// </param>
     public void MoveToScreen<T>(Action<T>? configure = null) where T : Screen, new()
         => Engine.RequestScreenChange(configure);
@@ -695,6 +706,10 @@ public class Screen
 
         foreach (var renderable in RenderList)
         {
+            if (renderable is IAttachable attachable && attachable.Parent != null
+                && !attachable.Parent.IsAbsoluteVisible)
+                continue;
+
             var batch = renderable.Batch;
             if (batch != currentBatch)
             {
