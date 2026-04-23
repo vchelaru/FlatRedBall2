@@ -378,7 +378,7 @@ AddCollisionRelationship(_playerFactory, solids).BounceFirstOnCollision(elastici
 - `Ladders` — on entry, snaps X to the ladder column's center and re-pins every frame. Horizontal input is ignored. Vertical-only.
 - `Fences` — on entry, X is preserved. Horizontal input remains active while climbing (SMW-style 2D traversal).
 
-Enter triggers (defaults): overlap + press Up (ladders or fences), or grounded + press Down with a ladder cell directly below the feet (climb-down-from-top, ladders only). Exit: lost body overlap, or grounded with `inputY <= 0` (landed while descending — not on the entry frame). Jump-off is handled by `PlatformerBehavior` (pressing jump while climbing applies `ClimbingMovement.JumpVelocity`). Read state via `platformer.IsOnLadder` / `platformer.IsOnFence`.
+Enter triggers (defaults): overlap + press Up (ladders or fences), or grounded + press Down with a ladder cell directly below the feet (climb-down-from-top, ladders only). Exit: lost body overlap; grounded with `inputY <= 0` (landed while descending — not on the entry frame); or clamped at `TopOfLadderY` with `|inputX| > threshold` (step-off top — player presses left/right at the top to land on the platform above, snapping feet to `TopOfLadderY` so the next frame's collision catches them). Jump-off is handled by `PlatformerBehavior` (pressing jump while climbing applies `ClimbingMovement.JumpVelocity`). Read state via `platformer.IsOnLadder` / `platformer.IsOnFence`.
 
 ### Manual state machine (advanced, rarely needed)
 
@@ -386,7 +386,7 @@ If the built-in triggers don't fit (e.g. a "climb only on button press" scheme, 
 
 ### `TopOfLadderY` semantics
 
-`TopOfLadderY` clamps `Y` and zeros upward velocity — the player can hold Up forever and won't pass the top. When `Ladders`/`Fences` is assigned, it is set automatically each frame to the top edge of the currently-overlapping column, which gives the standard "stop at the top of the column" behavior and makes SMW-style uneven fence tops work for free. To get **walk-off-the-top** behavior (rare), use the manual state machine with `TopOfLadderY = null`.
+`TopOfLadderY` clamps `Y` and zeros upward velocity — the player can hold Up forever and won't pass the top. Pressing left or right while clamped at the top exits climbing and snaps feet to `TopOfLadderY`; the platform's collision then catches the player on the next frame. When `Ladders`/`Fences` is assigned, it is set automatically each frame to the top edge of the currently-overlapping column, which gives the standard "stop at the top of the column" behavior and makes SMW-style uneven fence tops work for free. To get **walk-off-the-top** behavior (rare), use the manual state machine with `TopOfLadderY = null`.
 
 ### Gotchas
 
