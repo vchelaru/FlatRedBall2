@@ -1,5 +1,7 @@
 # FlatRedBall2 — Todo
 
+Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
+
 ## "Fire and Forget" Entities
 **Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
 
@@ -9,6 +11,7 @@ Open questions for the future discussion:
 - Should these participate in collision at all, or be pure visual?
 - Relationship to a future particle system vs. one-off effect entities — same abstraction or different?
 - Spawn API shape: extension on `Screen`/`Entity`? A `FireAndForgetFactory<T>`? A helper like `Effects.Spawn<T>(x, y)`?
+
 ## Tween from Mid-Curve ("Pulse/Bump" from Rest)
 **Priority: Eventual** — Use case: a circle sits at its resting radius, gets poked, and should "bump" — grow past rest and settle back via elastic-out — without first snapping to a smaller value. Today an elastic-out tween from `rest → rest+10` starts at `rest` and overshoots *above* `rest+10`, not below it. What the user wants is the *tail half* of an elastic curve: as if the animation had already played the wind-up and is catching the second half of the oscillation. Conceptually this is "start a tween at t=0.5 (or some other phase) of its curve," with the visible value beginning exactly at the current rest value. Surfaced by `AutoEvalCollisionEnterExitSample` 2026-04-22 while designing the damage-tile pulse reaction.
 
@@ -20,21 +23,6 @@ Open questions:
 
 ## `TopDownDirection.ToCardinal()` Extension
 **Priority: Eventual** — Add an extension method that collapses any `TopDownDirection` (including diagonals) to the nearest cardinal (`Up`/`Down`/`Left`/`Right`). Motivator: 8-way input with 4-chain art is the common case, and every game currently writes a bespoke switch in its animation selector. A helper cleans up call sites: `var suffix = dir.ToCardinal();`. Open question: which axis do diagonals collapse to by default (horizontal reads best for character silhouettes, but games authored with up/down-dominant art would prefer vertical)? Options: a parameter `DiagonalAxis.Horizontal` (default) / `Vertical`, or two helpers `ToCardinalHorizontal()` / `ToCardinalVertical()`. Surfaced by `AutoEvalTopDownStrollSample` 2026-04-22 alongside the `IsMoving` addition and the skill-level collapse-pattern documentation; deferred because the skill snippet covers the common case without adding API surface.
-
-## CollisionRelationship Enter/Exit Events (Landed)
-
-> **Status: Complete.** `CollisionStarted` and `CollisionEnded` events shipped on `CollisionRelationship<A, B>`. Firing order on entry frame: physics response → `Started` → `Occurred`. Destroying an `Entity` side mid-overlap fires `Ended` synchronously via `Entity._onDestroy` (zero-delay on the common "player touches coin → coin dies" pattern, including inside a `CollisionOccurred` handler). Zero-overhead when neither event has a subscriber — tracking sets are only allocated on first subscription. 11 tests (`CollisionEnterExitTests`) cover entry/exit lifecycle, cycling, ordering, list-vs-list and self-collision pair tracking, physics-still-applied regression, destroy-mid-overlap, and destroy-inside-handler.
-
-### Key design decisions locked in during implementation
-
-- **Arity simplification.** The TODO originally proposed three per-arity data structures (bool / HashSet / HashSet of tuples). In practice `CollisionRelationship<A, B>` is a single generic class and all arities collapse to one `HashSet<(A,B)>` — `ValueTuple<A,B>` of two reference types is a struct of two refs, zero boxing in steady state. Two sets swap-and-clear per frame.
-- **Destroy handling.** Chose synchronous `_onDestroy` subscription (not diff-only) because the "destroy inside a collision handler" case is extremely common and diff-only would delay `Ended` by one frame there. Relationship subscribes the first time it sees an entity in a contact pair; destroy handler scrubs the pair from both contact sets and fires `Ended` once. Re-entrancy is bounded because every subsequent destroy just removes scrubbed pairs.
-- **Zero-subscriber fast path.** Gated on `CollisionStarted != null || CollisionEnded != null`. Everything collapses to a single null-event check in the hot path if nothing is listening.
-
-### Intentionally deferred
-
-- Persistent `relationship.CurrentContacts` list exposed to game code. Events alone cover multi-profile platformer movement and zone-enter/exit — revisit if a real use case demands enumeration.
-- CCD / tunneling fix. Still the same "zero-frame overlap = no event" limitation as `CollisionOccurred`. Documented in the skill.
 
 ## AnimationFrame Pivot / Origin Support
 **Priority: Eventual** — `AdobeAnimateAtlasSave` parses `pivotX`/`pivotY` per-SubTexture but discards them because `AnimationFrame` has no pivot field. Adobe Animate exports use pivots to keep a character's anchor (e.g. feet) stable across frames of different sizes. Overlaps semantically with the existing `RelativeX`/`RelativeY`, so pick one model: either have the Adobe importer convert pivot → `RelativeX/Y` at load time (no new field; sprites already obey RelativeX/Y) or add true per-frame pivot. The conversion path is probably simpler. Revisit when the first real Adobe-Animate-authored entity lands.
@@ -52,148 +40,14 @@ Possible directions:
 
 Decision needed before picking. The Factory.Create overload feels cleanest but adds surface area.
 
-## Tweening / Interpolation
-**Status: v1 landed.** `FlatRedBall.InterpolationCore` NuGet wired; `FlatRedBall2.Tweening` namespace ships `Entity.Tween(...)` (primary, dies with entity) and `Screen.Tween(...)` (secondary). Float-only. Pause-aware via the existing `Screen.IsPaused` branch plus a finer-grained `ShouldAdvanceTweens` override on both Entity and Screen. 10 tests covering lifecycle, completion, destroy-cleanup, concurrent tweens, Stop(), and the pause hook.
+## Tweening — Vector2 / Color Helpers
+**Priority: Eventual** — Add `Tween` overloads for `Vector2` and `Color` once real sample code shows the two-tweener-per-value pattern getting verbose. Today users compose two float tweens for a position/color change; not painful enough to justify the API surface yet.
 
-Deferred:
-- **Vector2 / Color helpers.** Add once real sample code shows the two-tweener pattern getting verbose.
-
-Rejected:
-- **FRB2-owned `InterpolationType` / `Easing` / `Tween` wrappers.** A wrapper-enum version was committed and reverted. Gum already pulls `FlatRedBall.InterpolationCore` transitively via `FlatRedBall.GumCommon`, so the `FlatRedBall.Glue.StateInterpolation` namespace is present in every FRB2 project whether tweens are used or not. FRB2 wrappers with the same names (even in a different namespace) create IntelliSense auto-import ambiguity — the wrong import silently compiles with the wrong types. One source of truth, even with an ugly namespace, beats two sets of near-identical types. Call sites accept the two-`using` cost. Renames (`TweenCurve`/`Ease`) were considered and also rejected as unnecessary churn.
-
-Long-term idea (not planned):
-- **Extract a shared `FlatRedBall2.Tweening` library that Gum and FRB2 both consume.** Would let us own the type names (cleaner than `FlatRedBall.Glue.StateInterpolation`) via a single deliberate cross-project migration instead of coexisting wrappers. Only worth it if there's an independent reason to restructure the Gum/InterpolationCore dependency.
-
-## Tiled Collision Objects — Non-goals
-
-Phases 1 (polygon tiles), 2 (sub-cell `<object>` rectangles, flip flags), and sub-cell rect adjacency (rect↔rect, rect↔full-cell, rect↔polygon) are complete. `SlopesSample` demonstrates all of it end-to-end. Remaining out-of-scope items:
-
-- `TilemapEllipseObject` stays out of scope: FRB2 has `Circle` with uniform radius only, and Tiled ellipses allow `rx != ry`; no realistic tile-collision use case justifies the approximation work.
-
-## PlatformerConfig JSON — Coefficients (Landed)
-
-> **Status: Complete.** `PlatformerConfig.FromJson` / `ApplyTo` extension landed. SlopesSample and AutoEvalCoinHopperSample converted. Template at `.claude/templates/PlatformerConfig/`. Skills and content-boundary updated. Hot-reload is a separate TODO below.
-
-Externalizes `PlatformerValues` into a JSON file per entity. Canonical application of the `content-boundary` philosophy. Fills the fixed slots FRB2 already has: `movement.ground` → `PlatformerBehavior.GroundMovement`, `movement.air` → `AirMovement`, future `movement.afterDoubleJump` → the not-yet-wired double-jump slot.
-
-### Animation — intentionally not engine-managed
-
-FRB1 had an `AnimationController` / `PlatformerAnimationController` that mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this.** The controller was primarily useful for FRB1's code-generation model (Glue editor emitted animation layers that coexisted with hand-written code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable. See the `platformer-movement` skill for the recommended animation pattern.
-
-## Content Hot-Reload
-**Priority: Soon** — General-purpose content hot-reload system. The original scope was PlatformerConfig JSON only, but the real need is broader: PNGs, Tiled maps, JSON configs, and potentially any content file. Gum already supports hot-reload natively.
-
-### Two reload strategies
-
-Content changes fall into two categories:
-
-1. **In-place reload** — the engine patches the existing object without the game knowing. No screen restart, no state loss. Examples:
-   - `Texture2D.SetData` for a PNG that hasn't changed dimensions
-   - Value-by-value assignment for JSON configs (platformer values, etc.)
-   - Tile replacement in a TMX when only tile data changed (no structural changes)
-
-2. **Screen restart** — when in-place isn't possible, the engine restarts the current screen. Examples:
-   - PNG changed dimensions → must `new` the `Texture2D`, which invalidates all references
-   - TMX structural changes (object layers added/removed, map resized) → entities may have been modified since load (enemy moved, coin collected)
-   - Any change where the engine can't determine what's safe to patch
-
-The watcher should prefer in-place when possible and fall back to screen restart otherwise.
-
-### Implementation order
-
-#### 1. `RestartScreen()` — prerequisite, independently valuable
-
-> **Status: Increments 1 & 2 landed.** Death/retry, hot-reload mode, and user `Save`/`RestoreHotReloadState` hooks are in. Engine-managed automatic preservation is open — see below.
-
-**Engine-managed automatic preservation — open, deferred indefinitely until a real pattern emerges.** The original TODO described automatic preservation of camera position and tracked-entity kinematics so most games would get non-jarring hot-reload "for free." A naive `Camera.X/Y/Zoom` preservation was tried and reverted: in any game using `CameraControllingEntity` (the common case), that entity slams `Camera.X/Y` to the player position on the first frame after restart, clobbering any preserved value. The actually-useful preservation is **player position** — once the player is back where they were, `CameraControllingEntity` follows on frame 1 and the camera lands correctly automatically. But the engine doesn't know which entity is "the player." Future ideas worth exploring if friction warrants:
-- **Tagged entities for preservation.** Entities (or entity types) opt in via attribute or interface (e.g. `IHotReloadPreserved`); engine auto-saves their `X/Y/VelocityX/VelocityY/AccelerationX/AccelerationY`. Solves the identification problem with a small annotation cost.
-- **`Player` / `CameraControllingEntity`-specific opt-in.** Same idea but only for these two well-known concepts.
-
-Until then, the user `Save`/`RestoreHotReloadState` hooks handle this cleanly: write `state.Set("playerX", _player.X)` and the matching restore. CameraControllingEntity follows on frame 1 → camera lands at the right place. Documenting this manual pattern as the canonical hot-reload recipe in the `screens` skill is the current state of the art.
-
-**Edge case:** Restoring player position after a TMX structural change could place the player inside new geometry. This is acceptable — collision pushes them out on the next frame, which is better than teleporting to spawn.
-
-#### 2. `ContentWatcher` — generic file watch infrastructure
-
-> **Status: Landed.** `Screen.WatchContent(sourcePath, onChanged, destinationPath?)` and `Screen.WatchContentDirectory(sourceDir, onChanged, destinationDir?)` both in. Auto source-root detection via csproj walk-up, copy-on-change, global debouncing, shipping-build no-op. `content-hot-reload` skill rewritten around directory watching.
-
-#### 2b. Allowlist for newly-added content files
-**Priority: Eventual** — Today the hot-reload watcher only fires for files that already exist in the build output (filters editor temp files). Side effect: brand-new content files require one rebuild before they're picked up. That's fine for one-off additions, but workflows like "add PNGs to a Gum project," "drop a new font file in," or "add an animation chain frame" suffer — the user wants the new file to flow into the running game without rebuilding.
-
-Possible direction: extension-based allowlist. If a watched directory is registered with an allowlist (e.g. `[".png", ".ttf", ".gumx"]`), the engine treats matching new files as additions to track — copies to dest and invokes the callback even when dest doesn't exist yet. Other extensions still require the dest-exists check.
-
-```csharp
-WatchContentDirectory("Content", relPath => ..., newFileExtensions: [".png", ".ttf"]);
-```
-
-Open questions when we get there: should the engine update the .csproj `<Content Include>` list too, or assume the user's MSBuild rules already include the new file by glob? How does this interact with Gum's own hot-reload pipeline (Gum already supports hot-reload natively — may not need engine help inside `.gumx` projects)?
-
-#### 3. JSON hot-reload — first consumer
-
-Simplest case. `ContentWatcher` detects change → deserialize → apply values in-place. No screen restart needed.
-
-```csharp
-var watcher = new ContentWatcher("Content/player.platformer.json", () => {
-    var config = PlatformerConfig.FromJson("Content/player.platformer.json");
-    config.ApplyTo(_player.Platformer);
-});
-```
-
-#### 4. PNG hot-reload
-
-> **Status: Landed.** `Engine.Content.Load<Texture2D>(path)` now routes on extension — path-with-extension loads via `Texture2D.FromFile` and registers for reload; bare names still go through the xnb pipeline. `Engine.Content.TryReload(path)` applies same-dimension changes via `SetData`; dimension mismatch returns `false` so the caller restarts. `AnimationChainListSave.ToAnimationChainList` now takes only `ContentManagerService` and routes frame textures through the same unified path. AutoEvalCoinHopperSample wired with a floating Bear.png sprite for end-to-end validation.
-
-#### 5. TMX hot-reload — in-place tile data updates
-
-> **Status: Landed.** `TileMap.TryReloadFrom(path)` applies tile-data changes in place; structural changes return `false` for a fallback restart. AutoEvalCoinHopperSample wired and end-to-end verified.
-
-## Designer-Placed Spawn Markers (Landed)
-
-> **Status: Complete.** `TileMap.CreateEntities<T>` with `Origin` enum and reflection-based property mapping. AutoEvalCoinHopperSample converted and runtime-tested. StandardTileset updated with visible entity marker tiles (Coin id 97, PlayerSpawn id 29, plus many others). Skills and template updated.
-
-### Decision: Tiled Object Layers Behind a Stable Wrapper
-
-Use Tiled object layers with **visual tiles** (designers place tiles from the art tileset onto object layers) and **Tiled Classes** on tile definitions for type identification. The engine surfaces these through a wrapper API so the underlying source (Tiled today, possibly LDTK later) can change without breaking game code.
-
-### Design Decisions
-
-- **Visual tiles with classes.** Designers place tiles from the visual tileset onto object layers. Each tile definition in the tileset has a Class (e.g., `"Coin"`, `"Player"`, `"CeilingTurret"`). This differs from collision layers, which use the StandardTileset on dedicated tile layers — the difference is justified because spawn markers are concrete visible things, not abstract geometry.
-- **Any number of object layers.** The engine scans all object layers for matching classes. Designers organize layers however they want — one big "Entities" layer or separate layers per category. The engine doesn't care.
-- **Class name as discriminator.** `CreateEntities` filters by tile Class, not by layer name or object name. Stringly-typed at the engine level; game code switches on the class string.
-- **Spawn data lives in the TMX.** Spawn positions are inherently coupled to level geometry — if you move a platform, you want to see the coin sitting on it. Separate files create sync bugs.
-- **World-space positions, always.** The engine converts Tiled's top-down pixel coordinates to world space (Y+ up). No opt-out flag; raw pixel coords are available by reading TMX directly.
-- **Origin is a code-level concern, not a Tiled property.** The designer shouldn't see confusing alignment settings in Tiled that do nothing visually but break things in-game. Origin is an optional parameter on `CreateEntities`, defaulting to `Center`.
-- **Custom properties auto-applied via reflection.** Tiled custom properties (e.g., `worth=50`, `patrolRadius=100`) are automatically mapped to matching entity properties by the engine using reflection. Zero boilerplate for game code — if the entity has `public int Worth { get; set; }` and the Tiled object has `worth=50`, it just works.
-
-### Core API Shape
-
-```csharp
-// Spawn all Coin entities from any object layer
-map.CreateEntities("Coin", coinFactory);
-
-// Player spawns with feet-at-bottom origin
-map.CreateEntities("Player", playerFactory, Origin.BottomCenter);
-
-// Ceiling turret with top origin
-map.CreateEntities("CeilingTurret", turretFactory, Origin.TopCenter);
-```
-
-`Origin` enum: `Center` (default), `BottomCenter`, `TopCenter`, `BottomLeft`, `TopLeft`, etc.
-
-### AOT Consideration
-
-Reflection-based property mapping conflicts with the Native AOT goal (see Multi-Backend TODO). When AOT becomes a priority, this will need a source-generator or explicit-mapping alternative. Acceptable for now — AOT is `Priority: Eventual`.
-
-## Separate Climbing-Detection Shape on `PlatformerBehavior` (Landed)
-
-> **Status: Complete.** `PlatformerBehavior.ClimbingShape` (`AxisAlignedRectangle?`) added. Default null → falls back to `CollisionShape`. Non-null → used for `Ladders`/`Fences` overlap scans only, leaving wall/floor collision unaffected. AutoEvalMarioClimbSample wired with a 4×20 center probe demonstrating Mario-style center-only ladder grab.
-
-Bug fix that landed alongside: `FindOverlappingColumn`, `ComputeTopOfColumnY`, and `IsLadderBelowFeet` originally used `entity.X`/`entity.Y` and assumed the body was centered on entity X with bottom at entity Y. That works for the standard Player convention but silently produces wrong overlap if the shape is offset. Fixed to use `body.AbsoluteX`/`body.AbsoluteY ± Height/2`. Critical now that `ClimbingShape` can be a sub-shape with its own offset.
+## `TileMap.GetCellWorldPosition(int col, int row)` Helper
+**Priority: Eventual** — Gameplay code that wants "where in world space is tile (col, row)?" currently repeats the arithmetic (tile size × index + map origin, Y-flip for Y+ up). A single helper on `TileMap` collapses every call site.
 
 ## Climbing slot — fall back to AirMovement.JumpVelocity when ClimbingMovement.JumpVelocity == 0?
 **Priority: Eventual — wait for use cases.** Today, `ClimbingMovement.JumpVelocity` is a hard `float` defaulting to 0; "field omitted" is indistinguishable from "explicitly 0" once parsed. A user who authors a `climbing` slot without `JumpVelocity` gets a jump-off that drops the player straight down — the kind of "silent wrong output" failure mode the project explicitly calls out as anti-pattern (see Pre-Init vs Reactive-Property Tension). Documented in the `platformer-movement` skill and JSON template as "AUTHOR THIS." Possible future fix: when `ClimbingMovement.JumpVelocity == 0`, fall back to `AirMovement.JumpVelocity` so the obvious-default feel ("press jump → leave ladder with the same hop as in air") is automatic. Tradeoff: a user who genuinely wants a 0-velocity drop-off has to pick a tiny non-zero value or use a different escape hatch. Defer until real games hit the footgun.
-### Related friction (still open)
-- `TileMap.GetCellWorldPosition(int col, int row)` helper — independent of spawn markers, but addresses similar "where in world space is this tile?" friction.
 
 ## Screen.PushScreen / PopScreen — Sub-Screen Backstack
 **Priority: Soon** — Add `PushScreen<T>(configure)` and `PopScreen()` to `Screen` to support "go to a sub-screen and come back with results" without a static-field workaround. The current `MoveToScreen`-only model requires callers to store return data in a static field on the destination screen, cleared in `CustomInitialize`. That pattern works but is a footgun (stale value if not cleared) and isn't discoverable.
@@ -214,7 +68,7 @@ Implementation concerns to resolve:
 Until this ships, use the documented static-field stopgap in the `screens` skill.
 
 ## Platformer Docs Audit (FRB1 → FRB2)
-**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. (Note: AnimationController is intentionally not ported — see the "Animation — intentionally not engine-managed" note above.)
+**Priority: Soon** — Manual pass through FRB1's platformer documentation (wiki, plugin README, CSV column names, PlatformerValues fields, predefined profiles, behavior hooks) to inventory every feature and flag gaps vs FRB2. Produce a checklist of what's ported, what's intentionally dropped, and what's still missing. Likely surfaces: climbing/ladders, moving-platform `groundHorizontalVelocity`, `IsUsingCustomDeceleration`, `MaxClimbingSpeed`, CSV-driven values. `AnimationController` is a known intentional non-port (FRB1 needed it for codegen-driven Glue projects; FRB2 has no codegen and the pattern-match alternative is shorter and more debuggable) — audit should confirm nothing else from that family is missing.
 
 ## Implement `OneWayDirection` Down / Left / Right
 **Priority: Eventual** — Currently only `None` and `Up` are implemented; the other three throw `NotImplementedException`. `Down` supports ceiling-only / uppercut-style barriers; `Left`/`Right` support Yoshi's-Island-style one-way doors.
@@ -230,6 +84,5 @@ Until this ships, use the documented static-field stopgap in the `screens` skill
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.
 
 - Identify abstraction points for graphics init, fullscreen APIs, input, audio, content pipeline
-- AOT blockers: reflection-based code (`Activator.CreateInstance`, `MakeGenericMethod`, etc.) must be replaced
+- AOT blockers: reflection-based code (`Activator.CreateInstance`, `MakeGenericMethod`, etc.) must be replaced — note that `TileMap.CreateEntities` uses reflection to map Tiled custom properties; will need a source-generator or explicit-mapping path
 - Flag any new reflection-heavy or AOT-hostile code for future cleanup
-

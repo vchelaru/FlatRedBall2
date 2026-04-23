@@ -149,11 +149,22 @@ w.Debounce = TimeSpan.FromMilliseconds(50);
 - File events fire on a background thread; the engine queues them and drains on the game thread during `Update` (right after the pending screen change is flushed, before entity / collision / activity passes).
 - If your callback throws `IOException` (file mid-write), the watcher silently retries after the next debounce window. Other exceptions propagate.
 
-## Only files already in the build output are tracked
+## Only files already in the build output are tracked (with an allowlist)
 
-The engine ignores any file that doesn't already exist in the build output, even if a change event fires for it in the source folder. This filters out editor temp files (Photoshop scratch files, IDE autosaves, lock files) that appear in the content directory but were never copied by MSBuild — they don't trigger your callback, so a directory-wide `RestartScreen` handler isn't fired by editor noise.
+By default the engine ignores any source-folder change for a file that doesn't already exist in the build output. This filters out editor temp files (Photoshop scratch files, IDE autosaves, lock files) that appear in the content directory but were never copied by MSBuild — they don't trigger your callback, so a directory-wide `RestartScreen` handler isn't fired by editor noise.
 
-**Side effect: brand-new content files require one rebuild before hot-reload notices them.** If you drop a new `enemy.png` into `Content/` and edit it, nothing happens until you rebuild — the rebuild copies it to the output, and from then on edits flow through the watcher. This matches the normal "I added a new asset" workflow (you usually need to rebuild anyway to reference the file from code).
+**Exception: the auto-copy allowlist.** `ContentDirectoryWatcher.AutoCopyExtensions` defaults to `{ ".png", ".tsx" }`. Files with those extensions flow through even when the destination doesn't exist yet — the engine creates the dest directory, copies the file, and fires the callback. This covers the common "TMX now references a newly-added PNG / tileset" case without requiring a rebuild first.
+
+Customize per-watcher:
+```csharp
+var w = WatchContentDirectory("Content", reload);
+w.AutoCopyExtensions.Add(".ogg");    // opt in a new type
+w.AutoCopyExtensions.Remove(".png"); // or opt out of a default
+```
+
+Gum file types (`.gumx`, `.gusx`, `.gutx`, `.behx`, `.ganx`) are intentionally excluded — Gum runs its own hot-reload pipeline and doubling up would conflict. Don't add them.
+
+Other extensions still follow the dest-exists gate — a brand-new `.json` or `.tmx` still requires one rebuild before hot-reload notices it (acceptable for non-asset files, since code usually needs to reference them anyway).
 
 ## Gotchas
 
