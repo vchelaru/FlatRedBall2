@@ -2,6 +2,9 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
+## KNI BlazorGL — Explicit Resolution Path
+**Priority: Eventual — verify before first browser-targeted game.** `ActivateScreen` skips `ApplyWindowSettings` when `Window.AllowUserResizing == true` AND the screen has no `PreferredDisplaySettings` (added 2026-04-23 to fix cursor offset on KNI BlazorGL — the engine was clamping the back buffer to its design resolution while the browser canvas stayed at 100vw/100vh, producing a coordinate-space mismatch in `Camera.ScreenToWorld`). The no-`PreferredDisplaySettings` branch is exercised by `samples/auto/AutoEvalKniBlazorSample`; the **explicit-resolution branch** on KNI is not. If a screen sets `PreferredDisplaySettings` with a fixed `PreferredWindowWidth/Height`, `ApplyWindowSettings` still runs and resizes the back buffer — same mismatch as before, just now opt-in. Open questions: should KNI honor the request and force the canvas DOM to match (CSS or JS interop)? Letterbox the design resolution inside the larger canvas? Ignore the request entirely and warn? Decide when the first KNI game actually needs a fixed resolution.
+
 ## "Fire and Forget" Entities
 **Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
 

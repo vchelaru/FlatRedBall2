@@ -123,7 +123,12 @@ public class ContentManagerService
         return tex;
     }
 
-    public void Unload(string path) => _contentManager?.UnloadAsset(path);
+    public void Unload(string path)
+    {
+#if !KNI
+        _contentManager?.UnloadAsset(path);
+#endif
+    }
 
     public void UnloadAll()
     {
@@ -142,14 +147,16 @@ public class ContentManagerService
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        return Texture2D.FromFile(_graphicsDevice, path);
+        using var stream = File.OpenRead(path);
+        return Texture2D.FromStream(_graphicsDevice, stream);
     }
 
     private bool DefaultTextureReloader(Texture2D existing, string path)
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        using var incoming = Texture2D.FromFile(_graphicsDevice, path);
+        using var stream = File.OpenRead(path);
+        using var incoming = Texture2D.FromStream(_graphicsDevice, stream);
         if (incoming.Width != existing.Width || incoming.Height != existing.Height)
             return false;
         var buffer = new Color[incoming.Width * incoming.Height];

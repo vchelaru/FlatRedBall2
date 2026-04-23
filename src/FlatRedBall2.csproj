@@ -1,18 +1,51 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
+    <!--
+      Backend is selected by TargetFramework (so NuGet restore picks the right packages):
+        net8.0  -> Kni      (browser via Blazor WASM, plus future KNI mobile targets)
+        net10.0 -> MonoGame (desktop)
+      We tie Backend to TFM rather than expose it as a free property because
+      AdditionalProperties on ProjectReference doesn't propagate through NuGet restore,
+      so a free property silently gets the wrong package set.
+    -->
+    <Backend Condition="'$(TargetFramework)' == 'net8.0'">Kni</Backend>
+    <Backend Condition="'$(TargetFramework)' == 'net10.0'">MonoGame</Backend>
+    <DefineConstants Condition="'$(Backend)' == 'Kni'">$(DefineConstants);KNI</DefineConstants>
+    <DefineConstants Condition="'$(Backend)' == 'MonoGame'">$(DefineConstants);MONOGAME</DefineConstants>
   </PropertyGroup>
+
+  <!-- Backend-agnostic packages -->
   <ItemGroup>
-    <PackageReference Include="Apos.Shapes" Version="*" />
     <PackageReference Include="AsepriteDotNet" Version="1.9.1" />
     <PackageReference Include="FlatRedBall.InterpolationCore" Version="2025.4.22.1" />
+  </ItemGroup>
+
+  <!-- MonoGame backend -->
+  <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
+    <PackageReference Include="Apos.Shapes" Version="*" />
     <PackageReference Include="Gum.MonoGame" Version="2026.2.23.1" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="MonoGame.Extended" Version="6.0.0-preview.*" />
   </ItemGroup>
+
+  <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
+  <ItemGroup Condition="'$(Backend)' == 'Kni'">
+    <PackageReference Include="Apos.Shapes.KNI" Version="*" />
+    <PackageReference Include="Gum.KNI" Version="2026.2.23.1" />
+    <PackageReference Include="KNI.Extended" Version="6.0.0-preview.*" />
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+  </ItemGroup>
+
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>FlatRedBall2.Tests</_Parameter1>
