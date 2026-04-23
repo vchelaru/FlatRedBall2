@@ -89,7 +89,7 @@ public class PlatformerValues
     /// Downward acceleration applied to the entity while airborne. While grounded, collision
     /// resolution cancels gravity so this field has no visible effect — it only governs the
     /// trajectory during a jump or fall. A ground slot's <c>Gravity</c> is therefore effectively
-    /// a hint for <see cref="SetJumpHeights"/>'s fallback path; the actual jump arc runs under
+    /// a hint for <see cref="SetJumpHeights(float, float?)"/>'s fallback path; the actual jump arc runs under
     /// the companion airborne slot's gravity (see the <c>jumpGravity</c> overload).
     /// </summary>
     public float Gravity;
@@ -99,7 +99,7 @@ public class PlatformerValues
     public float MaxFallSpeed;
 
     /// <summary>Initial upward velocity in world units/second applied at jump start. Set directly
-    /// for raw-mode tuning, or have <see cref="SetJumpHeights"/> derive it from a target height.
+    /// for raw-mode tuning, or have <see cref="SetJumpHeights(float, float?)"/> derive it from a target height.
     /// On the climbing slot, applied when the player presses jump to leave a ladder — a value of
     /// <c>0</c> there means "drop off without upward velocity" (see also the <c>climbing JumpVelocity == 0</c>
     /// footgun noted in <c>design/TODOS.md</c>).</summary>
@@ -136,7 +136,7 @@ public class PlatformerValues
     /// seams but small enough not to reach onto a one-tile-lower step even if the slope gate were
     /// absent. Requires <see cref="PlatformerBehavior.CollisionShape"/> to be set and at least one
     /// collision relationship in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/>
-    /// mode — each such relationship contributes its <see cref="TileShapeCollection"/> as a snap
+    /// mode — each such relationship contributes its <see cref="FlatRedBall2.Collision.TileShapeCollection"/> as a snap
     /// probe target.
     /// </summary>
     public float SlopeSnapDistance { get; set; } = 8f;

@@ -12,8 +12,10 @@ namespace FlatRedBall2.Utilities;
 /// </summary>
 public class GameRandom : Random
 {
+    /// <summary>Constructs a new GameRandom.</summary>
     public GameRandom() : base() { }
 
+    /// <summary>Constructs a new GameRandom with the specified seed.</summary>
     public GameRandom(int seed) : base(seed) { }
 
     /// <summary>

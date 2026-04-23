@@ -151,7 +151,7 @@ public class FlatRedBallService
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
     /// <para>
     /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
-    /// on <see cref="Screen.RestartScreen"/>; mutating a captured local after this call changes what
+    /// on <see cref="Screen.RestartScreen()"/>; mutating a captured local after this call changes what
     /// restart sees. Pass values directly rather than via captured locals.
     /// </para>
     /// </param>

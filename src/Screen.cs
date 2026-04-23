@@ -355,7 +355,7 @@ public class Screen
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
     /// <para>
     /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
-    /// on <see cref="RestartScreen"/>; because C# closures capture variables by reference, mutating
+    /// on <see cref="RestartScreen()"/>; because C# closures capture variables by reference, mutating
     /// a captured local after this call will change what restart sees. Pass values directly
     /// (<c>s =&gt; s.LevelIndex = 3</c>) rather than via captured locals.
     /// </para>
@@ -635,6 +635,9 @@ public class Screen
     /// With one type argument, the compiler chooses the self-collision overload,
     /// so the second argument is invalid for that method.
     /// </remarks>
+    /// <summary>
+    /// Registers a collision relationship between a single entity and a group of entities.
+    /// </summary>
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
         IEnumerable<A> listA, IEnumerable<B> listB)
         where A : ICollidable
@@ -645,6 +648,9 @@ public class Screen
         return rel;
     }
 
+    /// <summary>
+    /// Registers a collision relationship between a single entity and a group of entities.
+    /// </summary>
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
         A single, IEnumerable<B> list)
         where A : ICollidable
@@ -668,6 +674,9 @@ public class Screen
         return rel;
     }
 
+    /// <summary>
+    /// Registers a collision relationship between a group of entities and static geometry.
+    /// </summary>
     public CollisionRelationship<A, TGeometry> AddCollisionRelationship<A, TGeometry>(
         IEnumerable<A> entities, TGeometry staticGeometry)
         where A : ICollidable

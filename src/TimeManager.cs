@@ -12,7 +12,7 @@ namespace FlatRedBall2;
 /// <see cref="DelayUntil"/>, <see cref="DelayFrames"/>) that complete on the game thread via
 /// the engine's <see cref="GameSynchronizationContext"/>.
 /// <para>
-/// Access via <see cref="FlatRedBallService.TimeManager"/>. The engine calls <c>Update</c> and
+/// Access via <c>FlatRedBallService.TimeManager</c>. The engine calls <c>Update</c> and
 /// <c>DoTaskLogic</c> internally each frame — game code never invokes them directly.
 /// </para>
 /// <para>
@@ -73,14 +73,6 @@ public class TimeManager
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Returns a task that completes after <paramref name="duration"/> of screen time has elapsed.
-    /// Screen time respects <see cref="TimeScale"/>, pauses when the screen is paused, and resets when the screen changes.
-    /// </summary>
-    /// <param name="duration">How long to wait. Values ≤ <see cref="TimeSpan.Zero"/> complete immediately.</param>
-    /// <param name="cancellationToken">
-    /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
-    /// </param>
-    /// <summary>
     /// Convenience wrapper around <see cref="Delay(TimeSpan, CancellationToken)"/> that takes a
     /// raw seconds value, so call sites don't need <c>TimeSpan.FromSeconds(...)</c> for the common
     /// case of a literal duration.
@@ -123,6 +115,7 @@ public class TimeManager
     /// Returns a task that completes once <paramref name="predicate"/> returns <c>true</c>.
     /// Checked once per frame.
     /// </summary>
+    /// <param name="predicate">The condition to check each frame.</param>
     /// <param name="cancellationToken">
     /// Pass <see cref="Screen.Token"/> to have the task automatically cancel when the screen switches.
     /// </param>

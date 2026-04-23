@@ -73,7 +73,7 @@ public class MovementConfig
 /// <para>
 /// Jump configuration supports two mutually-exclusive modes: derived
 /// (<see cref="MinJumpHeight"/> + optional <see cref="MaxJumpHeight"/>, which calls
-/// <see cref="PlatformerValues.SetJumpHeights"/>) and raw (<see cref="JumpVelocity"/> +
+/// <see cref="PlatformerValues.SetJumpHeights(float, float?)"/>) and raw (<see cref="JumpVelocity"/> +
 /// <see cref="JumpApplyLength"/> + <see cref="JumpApplyByButtonHold"/>). Specifying fields from
 /// both modes in the same slot is an error.
 /// </para>
@@ -111,7 +111,7 @@ public class MovementSlot
 
     /// <summary>Derived-mode jump: minimum jump height in world units (tap). Required when any
     /// derived field is present. Mutually exclusive with raw-mode jump fields. Triggers
-    /// <see cref="PlatformerValues.SetJumpHeights"/> on apply, using the air slot's gravity (or
+    /// <see cref="PlatformerValues.SetJumpHeights(float, float?)"/> on apply, using the air slot's gravity (or
     /// this slot's, if no air slot is authored) as the trajectory gravity.</summary>
     [JsonPropertyName("minJumpHeight")]
     public float? MinJumpHeight { get; set; }

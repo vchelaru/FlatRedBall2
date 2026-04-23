@@ -15,7 +15,7 @@ namespace FlatRedBall2;
 /// <see cref="TryReload"/>.
 /// <para>
 /// Each <see cref="Screen"/> owns its own <see cref="ContentManagerService"/> via
-/// <see cref="Screen.Content"/>. <see cref="UnloadAll"/> is invoked automatically on screen
+/// <c>Screen.ContentManager</c>. <see cref="UnloadAll"/> is invoked automatically on screen
 /// transition — explicit unloads are only needed mid-screen.
 /// </para>
 /// </summary>
@@ -33,7 +33,7 @@ public class ContentManagerService
 
     /// <summary>
     /// Loader used by <see cref="Load{T}"/> when routing a texture-from-file call.
-    /// Production default: <see cref="Texture2D.FromFile"/> against the engine's
+    /// Production default: <c>Texture2D.FromFile</c> against the engine's
     /// <see cref="GraphicsDevice"/>. Tests override to avoid disk + GPU.
     /// </summary>
     internal Func<string, Texture2D> TextureLoader { get; set; }
@@ -63,7 +63,7 @@ public class ContentManagerService
     /// Loads content by path. Extension-based routing:
     /// <list type="bullet">
     /// <item><description><c>Load&lt;Texture2D&gt;("Content/ship.png")</c> (has extension) —
-    /// loads the PNG directly from disk via <see cref="Texture2D.FromFile"/> and tracks
+    /// loads the PNG directly from disk via <c>Texture2D.FromFile</c> and tracks
     /// it for hot-reload via <see cref="TryReload"/>. Second call with the same path
     /// returns the cached instance.</description></item>
     /// <item><description><c>Load&lt;Texture2D&gt;("ship_0001")</c> (no extension) — goes
@@ -75,7 +75,7 @@ public class ContentManagerService
     /// <b>Cannot load JSON or save data.</b> JSON has no XNB representation; attempting
     /// to load a <c>.json</c> file through this method throws
     /// <see cref="Microsoft.Xna.Framework.Content.ContentLoadException"/>. For game data
-    /// files and save data, use <see cref="System.IO.File.ReadAllText"/> +
+    /// files and save data, use <see cref="System.IO.File.ReadAllText(string)"/> +
     /// <c>System.Text.Json.JsonSerializer.Deserialize</c> directly.
     /// </para>
     /// </summary>
@@ -102,7 +102,7 @@ public class ContentManagerService
     /// <summary>
     /// Attempts an in-place hot-reload of a texture previously loaded via
     /// <c>Load&lt;Texture2D&gt;(path)</c>. Returns <c>true</c> if the new file has the
-    /// same dimensions and was applied via <c>SetData</c> (existing <see cref="Sprite"/>
+    /// same dimensions and was applied via <c>SetData</c> (existing <see cref="FlatRedBall2.Rendering.Sprite"/>
     /// references stay valid), <c>false</c> otherwise — the caller should fall back to
     /// <c>RestartScreen(RestartMode.HotReload)</c>. Returns <c>false</c> if the path was
     /// never loaded through this service.

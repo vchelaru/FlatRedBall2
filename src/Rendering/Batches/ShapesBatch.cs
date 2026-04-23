@@ -12,6 +12,7 @@ namespace FlatRedBall2.Rendering.Batches;
 /// </summary>
 public class ShapesBatch : IRenderBatch
 {
+    /// <summary>The shared singleton instance.</summary>
     public static readonly ShapesBatch Instance = new();
 
     private ShapeBatch? _shapeBatch;

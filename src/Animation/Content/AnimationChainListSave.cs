@@ -11,7 +11,15 @@ namespace FlatRedBall2.Animation.Content;
 /// Undefined is treated identically to Second and exists for compatibility with .achx files
 /// produced by older FlatRedBall tooling.
 /// </summary>
-public enum TimeMeasurementUnit { Undefined, Second, Millisecond }
+public enum TimeMeasurementUnit
+{
+    /// <summary>Undefined.</summary>
+    Undefined,
+    /// <summary>Seconds.</summary>
+    Second,
+    /// <summary>Milliseconds.</summary>
+    Millisecond
+}
 /// <summary>
 /// Defines how texture coordinates are interpreted (normalized 0-1 or raw pixels).
 /// </summary>

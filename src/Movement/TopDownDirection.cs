@@ -78,6 +78,7 @@ public static class TopDownDirectionExtensions
     /// (Right, Up, Left, or Down). Cardinal inputs are returned unchanged.
     /// Useful for selecting animations when input is 8-way but art has only 4 chains.
     /// </summary>
+    /// <param name="direction">The direction to collapse.</param>
     /// <param name="axis">Which axis diagonals collapse onto. Defaults to <see cref="DiagonalAxis.Horizontal"/>.</param>
     public static TopDownDirection ToCardinal(this TopDownDirection direction, DiagonalAxis axis = DiagonalAxis.Horizontal)
         => axis == DiagonalAxis.Horizontal

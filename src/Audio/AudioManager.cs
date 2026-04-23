@@ -23,6 +23,7 @@ public class AudioManager
     private int _playlistIndex;
     private bool _songLoops;
 
+    /// <summary>Constructs a new AudioManager.</summary>
     public AudioManager()
     {
         MediaPlayer.MediaStateChanged += OnMediaStateChanged;

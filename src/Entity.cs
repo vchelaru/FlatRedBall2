@@ -211,7 +211,7 @@ public class Entity : ICollidable, IAttachable
 
     /// <summary>
     /// The entity this one is attached to, or <c>null</c> if this is a root entity. Set
-    /// automatically by <see cref="Add(IAttachable, Layer?)"/> / <see cref="Remove"/>; manual
+    /// automatically by <see cref="Add(IAttachable, Layer?)"/> / <see cref="Remove(IAttachable)"/>; manual
     /// assignment is permitted but bypasses child-list bookkeeping and is rarely correct.
     /// </summary>
     public Entity? Parent { get; set; }
@@ -537,6 +537,9 @@ public class Entity : ICollidable, IAttachable
     /// an <see cref="Entity"/>, both entities' velocities are updated; otherwise
     /// <paramref name="other"/> is treated as immovable static geometry.
     /// </summary>
+    /// <param name="other">The other collidable.</param>
+    /// <param name="thisMass">Mass of this entity.</param>
+    /// <param name="otherMass">Mass of the other entity.</param>
     /// <param name="elasticity">
     /// <c>0</c> = fully inelastic (no bounce, velocity zeroed along the normal);
     /// <c>1</c> = perfectly elastic (full bounce). Values above 1 amplify energy.

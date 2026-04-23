@@ -101,7 +101,7 @@ public class TileShapeCollection : ICollidable
 
     /// <summary>
     /// Returns all tile shapes (rectangles and polygons) currently in this collection. Used by
-    /// <see cref="Screen.Add(TileShapeCollection)"/> to register tiles for rendering.
+    /// <c>Screen.Add(TileShapeCollection)</c> to register tiles for rendering.
     /// </summary>
     internal IEnumerable<IRenderable> AllTiles
     {
@@ -978,6 +978,10 @@ public class TileShapeCollection : ICollidable
         Y + row * GridSize + GridSize / 2f);
 
     /// <inheritdoc cref="Raycast(Vector2, Vector2, out Vector2, out Vector2)"/>
+    /// <param name="start">Start point.</param>
+    /// <param name="end">End point.</param>
+    /// <param name="hitPoint">Hit point.</param>
+    /// <param name="hitNormal">Hit normal.</param>
     /// <param name="hitShape">
     /// The shape that produced the hit — an <see cref="AxisAlignedRectangle"/> (full-cell tile or
     /// sub-cell rect) or a <see cref="Polygon"/>. <c>null</c> if no hit.

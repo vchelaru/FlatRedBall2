@@ -20,6 +20,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
     private readonly TilemapTileLayer _layer;
     private OrthographicCamera? _orthoCam;
 
+    /// <param name="layer">The tile layer.</param>
     /// <param name="renderer">
     /// A shared renderer with the tilemap already loaded via <see cref="TilemapSpriteBatchRenderer.LoadTilemap"/>.
     /// Reuse the same renderer for all layers of the same tilemap.
@@ -30,7 +31,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
         _layer = layer;
     }
 
-    /// <summary>Delegates to the underlying <see cref="TilemapTileLayer.IsVisible"/>.</summary>
+    /// <summary>Delegates to the underlying <c>IsVisible</c>.</summary>
     public bool IsVisible
     {
         get => _layer.IsVisible;

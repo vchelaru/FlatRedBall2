@@ -36,10 +36,13 @@ public static class TweeningExtensions
     /// (e.g. during a stun) without pausing the whole screen.
     /// </para>
     /// </summary>
-    /// <param name="setter">Invoked each frame with the interpolated value. Must not be <c>null</c>.</param>
+    /// <param name="entity">The entity to attach the tween to.</param>
+    /// <param name="setter">The action invoked each frame with the interpolated value.</param>
     /// <param name="from">Starting value passed to <paramref name="setter"/> on the first update.</param>
     /// <param name="to">Final value; passed to <paramref name="setter"/> exactly on natural completion.</param>
     /// <param name="duration">Tween length.</param>
+    /// <param name="type">The interpolation type (linear, bounce, elastic, etc).</param>
+    /// <param name="easing">The easing curve applied to the interpolation type.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
     public static Tweener Tween(
         this Entity entity,

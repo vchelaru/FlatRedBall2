@@ -223,6 +223,7 @@ public class Path : IRenderable
     /// Returns the unit tangent vector (direction of travel) at <paramref name="length"/> units along the path.
     /// Falls back to <see cref="Vector2.UnitX"/> if the tangent cannot be determined.
     /// </summary>
+    /// <param name="length">The distance along the path.</param>
     /// <param name="epsilon">
     /// Look-ahead/look-behind distance for numerical tangent estimation.
     /// Increase for very short paths; decrease for tight curves where detail matters.

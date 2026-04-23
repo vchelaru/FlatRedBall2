@@ -23,13 +23,13 @@ public class TopDownValues
     public TimeSpan DecelerationTime;
 
     /// <summary>
-    /// When true, <see cref="DirectionFacing"/> is updated from the input direction each frame.
+    /// When true, <see cref="TopDownBehavior.DirectionFacing"/> is updated from the input direction each frame.
     /// Takes priority over <see cref="UpdateDirectionFromVelocity"/>.
     /// </summary>
     public bool UpdateDirectionFromInput = true;
 
     /// <summary>
-    /// When true and <see cref="UpdateDirectionFromInput"/> is false, <see cref="DirectionFacing"/>
+    /// When true and <see cref="UpdateDirectionFromInput"/> is false, <see cref="TopDownBehavior.DirectionFacing"/>
     /// is updated from the entity's actual velocity.
     /// </summary>
     public bool UpdateDirectionFromVelocity;
