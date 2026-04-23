@@ -1,6 +1,6 @@
 ---
 name: collision-relationships
-description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, static geometry, sensor shapes, awareness radius, or trigger zones. Trigger on any collision-related question."
+description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred / CollisionStarted / CollisionEnded events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, static geometry, sensor shapes, awareness radius, trigger zones, or zone-enter/zone-exit detection. Trigger on any collision-related question."
 ---
 
 # Collision Relationships in FlatRedBall2
@@ -81,6 +81,22 @@ AddCollisionRelationship(_balls, _deathZoneFactory)
         OnBallLost();
     };
 ```
+
+## Enter/Exit Events — `CollisionStarted` / `CollisionEnded`
+
+`CollisionStarted` fires once on the first frame a pair begins overlapping. `CollisionEnded` fires once when a previously-overlapping pair stops overlapping. Use these instead of hand-rolling a per-frame `_wasOverlapping` bool.
+
+```csharp
+var rel = AddCollisionRelationship(_player, _iceZones);
+rel.CollisionStarted += (_, zone) => _player.ApplyMovementProfile(zone.Profile);
+rel.CollisionEnded   += (_, _)    => _player.ResetMovementProfile();
+```
+
+- **Fires on resolving relationships too**, not just triggers. `Started` is useful for footstep sounds, dust puffs, landing-animation triggers.
+- **Order on entry frame:** physics response → `CollisionStarted` → `CollisionOccurred`.
+- **Destroying a side mid-overlap fires `Ended` synchronously** on the same frame (e.g. inside a `CollisionOccurred` handler). The destroyed entity's shapes have already been cleared by the time the handler runs, so use the argument for identity only — don't query geometry.
+- **Tunneling:** if an entity moves so fast it overlaps for zero frames, neither event fires. Same limitation as `CollisionOccurred`.
+- **Zero-overhead when unused** — no tracking runs if neither event has a subscriber.
 
 ## Execution Order
 

@@ -49,8 +49,8 @@
  <tile id="67" type="Boss"/>
  <tile id="68" type="Goal"/>
  <tile id="69" type="Death"/>
- <tile id="70" type="SpikeBlock"/>
- <tile id="71" type="SpikeGround"/>
+ <tile id="70" type="DamageBlock"/>
+ <tile id="71" type="DamageGround"/>
  <tile id="72" type="Slime"/>
  <tile id="73" type="SolidCollision"/>
  <tile id="74" type="SolidCollision"/>

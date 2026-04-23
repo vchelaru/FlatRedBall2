@@ -59,6 +59,8 @@ ds.AllowUserResizing = true;         // whether the player can drag window borde
 
 ## Sizing — Resolution × Window × Zoom
 
+> **Default assumption: FRB games are pixel games rendered at 2× scale.** Unless the user explicitly says otherwise (HD art, vector art, 1× pixel-perfect, 3×+ chunky, etc.), pick a small design resolution and scale it up 2× on the way to the window. The two recipes below both deliver a 2× scale — pick based on whether the visible world should stay fixed (`StretchVisibleArea`) or grow with the window (`IncreaseVisibleArea`). If in doubt, use the first recipe.
+
 Three knobs decide what's on screen. Get this wrong and entities silently fall off-screen.
 
 | Knob | Units | What it controls |

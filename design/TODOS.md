@@ -1,26 +1,40 @@
 # FlatRedBall2 — Todo
 
+## "Fire and Forget" Entities
+**Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
+
+Open questions for the future discussion:
+- Dedicated base class / interface vs. just a convention on top of existing `Entity` + `Timing`?
+- Pooling story (particles are the canonical case where allocation churn matters)?
+- Should these participate in collision at all, or be pure visual?
+- Relationship to a future particle system vs. one-off effect entities — same abstraction or different?
+- Spawn API shape: extension on `Screen`/`Entity`? A `FireAndForgetFactory<T>`? A helper like `Effects.Spawn<T>(x, y)`?
+## Tween from Mid-Curve ("Pulse/Bump" from Rest)
+**Priority: Eventual** — Use case: a circle sits at its resting radius, gets poked, and should "bump" — grow past rest and settle back via elastic-out — without first snapping to a smaller value. Today an elastic-out tween from `rest → rest+10` starts at `rest` and overshoots *above* `rest+10`, not below it. What the user wants is the *tail half* of an elastic curve: as if the animation had already played the wind-up and is catching the second half of the oscillation. Conceptually this is "start a tween at t=0.5 (or some other phase) of its curve," with the visible value beginning exactly at the current rest value. Surfaced by `AutoEvalCollisionEnterExitSample` 2026-04-22 while designing the damage-tile pulse reaction.
+
+Open questions:
+- Do we expose a `startPhase` / `startT` parameter on `Entity.Tween` / `Screen.Tween` (0..1, default 0) that samples the easing curve starting at that offset? Internally the tween would still run full-duration but offset its `t` by `startPhase`.
+- Alternative: a dedicated `Pulse` / `Bump` helper that takes `(from, peak, backTo, duration, curve)` and composes two tweens (linear-out to peak, elastic-out back) — less general but more discoverable for the common case.
+- Which curves does "start mid-phase" even make sense for? Elastic and bounce have well-defined pre-settle oscillation; ease-in-out mid-phase is just a different ease-out. Maybe the parameter only applies to oscillating curves.
+- Does this compose with the existing tween-stacking semantics (last-started wins the property setter)?
+
 ## `TopDownDirection.ToCardinal()` Extension
 **Priority: Eventual** — Add an extension method that collapses any `TopDownDirection` (including diagonals) to the nearest cardinal (`Up`/`Down`/`Left`/`Right`). Motivator: 8-way input with 4-chain art is the common case, and every game currently writes a bespoke switch in its animation selector. A helper cleans up call sites: `var suffix = dir.ToCardinal();`. Open question: which axis do diagonals collapse to by default (horizontal reads best for character silhouettes, but games authored with up/down-dominant art would prefer vertical)? Options: a parameter `DiagonalAxis.Horizontal` (default) / `Vertical`, or two helpers `ToCardinalHorizontal()` / `ToCardinalVertical()`. Surfaced by `AutoEvalTopDownStrollSample` 2026-04-22 alongside the `IsMoving` addition and the skill-level collapse-pattern documentation; deferred because the skill snippet covers the common case without adding API surface.
 
-## CollisionRelationship Enter/Exit Events
-**Priority: Soon** — Add `CollisionStarted` and `CollisionEnded` events to `CollisionRelationship` (sibling to existing `CollisionOccurred`). Standard physics-engine vocabulary (Unity `OnTriggerEnter/Exit`, Box2D `BeginContact/EndContact`). Eliminates the recurring game-side boilerplate where game code must set a `_wasOverlappingX` bool every frame in `CollisionOccurred` and diff at end-of-frame to detect "left the zone." Direct motivator: multi-profile platformer movement (ice/water/sticky surfaces) — without enter/exit events, every zone needs the bool-diff dance in the player class. With them, it's a one-liner subscription.
+## CollisionRelationship Enter/Exit Events (Landed)
 
-### Design
+> **Status: Complete.** `CollisionStarted` and `CollisionEnded` events shipped on `CollisionRelationship<A, B>`. Firing order on entry frame: physics response → `Started` → `Occurred`. Destroying an `Entity` side mid-overlap fires `Ended` synchronously via `Entity._onDestroy` (zero-delay on the common "player touches coin → coin dies" pattern, including inside a `CollisionOccurred` handler). Zero-overhead when neither event has a subscriber — tracking sets are only allocated on first subscription. 11 tests (`CollisionEnterExitTests`) cover entry/exit lifecycle, cycling, ordering, list-vs-list and self-collision pair tracking, physics-still-applied regression, destroy-mid-overlap, and destroy-inside-handler.
 
-- **Naming:** `CollisionStarted` / `CollisionEnded`. Symmetric with `CollisionOccurred`. Avoids Unity's "trigger" vocab (which doesn't fit FRB2's resolving relationships) and avoids "Overlap" (which doesn't fit `MoveFirstOnCollision` cleanly either).
-- **Fires for resolving relationships too** (not just sensors). "First frame the player touched the wall" / "first frame they pulled away" are useful for footsteps, dust puffs, landing animation triggers, etc.
-- **No per-frame allocation in steady state.** Specific data structure is left to the implementation per relationship arity, as long as warmup is the only allocation:
-  - `SingleVsSingle` → one `bool _wasOverlapping`. No collection.
-  - `SingleVsList<T>` → preallocated `HashSet<T>`, swap-and-clear with a previous-frame counterpart.
-  - `ListVsList<T,U>` → preallocated `HashSet<(T,U)>` pair (current/previous), `Clear()` + ref swap each frame. `ValueTuple<T,U>` doesn't box for reference-type entities, so steady state is zero alloc.
-- **Destroyed entity mid-overlap:** do **not** fire `CollisionEnded` on the destroyed entity itself (destruction is the end). **Do** fire `CollisionEnded` on every other entity that was overlapping it last frame, so their state machines clean up correctly. The relationship's tracking set must remove all entries referencing the destroyed entity to prevent stale-pair revivals if the slot is reused.
-- **Tunneling caveat (won't fix, document only):** if an entity moves so fast it overlaps for zero frames between checks, neither `Started` nor `Ended` fires. Same limitation as `CollisionOccurred` today, but the new events make people *expect* edge guarantees, so the skill needs a one-line note.
+### Key design decisions locked in during implementation
 
-### Out of scope for v1
+- **Arity simplification.** The TODO originally proposed three per-arity data structures (bool / HashSet / HashSet of tuples). In practice `CollisionRelationship<A, B>` is a single generic class and all arities collapse to one `HashSet<(A,B)>` — `ValueTuple<A,B>` of two reference types is a struct of two refs, zero boxing in steady state. Two sets swap-and-clear per frame.
+- **Destroy handling.** Chose synchronous `_onDestroy` subscription (not diff-only) because the "destroy inside a collision handler" case is extremely common and diff-only would delay `Ended` by one frame there. Relationship subscribes the first time it sees an entity in a contact pair; destroy handler scrubs the pair from both contact sets and fires `Ended` once. Re-entrancy is bounded because every subsequent destroy just removes scrubbed pairs.
+- **Zero-subscriber fast path.** Gated on `CollisionStarted != null || CollisionEnded != null`. Everything collapses to a single null-event check in the hot path if nothing is listening.
 
-- Persistent contact lists exposed to game code (`relationship.CurrentContacts`). Possibly useful but adds API surface; defer until a use case demands it. The events alone solve the multi-profile movement and zone-enter/exit cases.
-- Continuous collision detection to fix tunneling. Separate problem, much larger scope.
+### Intentionally deferred
+
+- Persistent `relationship.CurrentContacts` list exposed to game code. Events alone cover multi-profile platformer movement and zone-enter/exit — revisit if a real use case demands enumeration.
+- CCD / tunneling fix. Still the same "zero-frame overlap = no event" limitation as `CollisionOccurred`. Documented in the skill.
 
 ## AnimationFrame Pivot / Origin Support
 **Priority: Eventual** — `AdobeAnimateAtlasSave` parses `pivotX`/`pivotY` per-SubTexture but discards them because `AnimationFrame` has no pivot field. Adobe Animate exports use pivots to keep a character's anchor (e.g. feet) stable across frames of different sizes. Overlaps semantically with the existing `RelativeX`/`RelativeY`, so pick one model: either have the Adobe importer convert pivot → `RelativeX/Y` at load time (no new field; sprites already obey RelativeX/Y) or add true per-frame pivot. The conversion path is probably simpler. Revisit when the first real Adobe-Animate-authored entity lands.

@@ -131,6 +131,47 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// </remarks>
     public event Action<A, B>? CollisionOccurred;
 
+    /// <summary>
+    /// Fires once on the first frame a pair begins overlapping, immediately before
+    /// <see cref="CollisionOccurred"/>. Does not re-fire while the pair stays overlapping.
+    /// Mirrors Unity's <c>OnTriggerEnter</c> / Box2D's <c>BeginContact</c>.
+    /// </summary>
+    /// <remarks>
+    /// Physics response (bounce, separation) is applied before this event fires, matching
+    /// <see cref="CollisionOccurred"/>. Tunneling caveat: if an entity moves so fast it overlaps
+    /// for zero frames between checks, neither <c>CollisionStarted</c> nor <see cref="CollisionEnded"/>
+    /// fires — same limitation as <see cref="CollisionOccurred"/>.
+    /// </remarks>
+    public event Action<A, B>? CollisionStarted;
+
+    /// <summary>
+    /// Fires once on the frame a previously-overlapping pair stops overlapping. Also fires
+    /// synchronously when an <see cref="Entity"/> side is destroyed mid-overlap (via
+    /// <c>Destroy()</c>), so handlers see the separation immediately — not one frame later.
+    /// Mirrors Unity's <c>OnTriggerExit</c> / Box2D's <c>EndContact</c>.
+    /// </summary>
+    /// <remarks>
+    /// When fired due to destruction, the destroyed entity's child shapes have already been cleared,
+    /// so the argument can be read for identity (e.g. to look up state in a dictionary) but should
+    /// not be queried for shape geometry. Tunneling: see <see cref="CollisionStarted"/>.
+    /// </remarks>
+    public event Action<A, B>? CollisionEnded;
+
+    // Enter/exit tracking — lazily allocated on first subscription. HashSet<(A,B)> holds value
+    // tuples of two reference types → zero boxing in steady state. Two sets are swap-and-cleared
+    // each frame so we can diff "overlapping last frame" vs "overlapping this frame".
+    private HashSet<(A, B)>? _currentContacts;
+    private HashSet<(A, B)>? _previousContacts;
+    // Reused scratch list for firing Ended during end-of-frame diff — avoids mid-iteration mutation.
+    private List<(A, B)>? _scratchEndedPairs;
+    // Entities we've subscribed to _onDestroy for so we can fire Ended synchronously on destruction.
+    // Tracked in a set to avoid double-subscribing across frames. HashSet<object> because A or B
+    // may be Entity, shape, or TileShapeCollection; only Entity has _onDestroy.
+    private HashSet<object>? _hookedEntities;
+    // Reused scratch set when a destroy hook fires, to dedupe pairs across current+previous before
+    // firing Ended once per unique pair.
+    private HashSet<(A, B)>? _scratchDestroyedPairs;
+
     internal CollisionRelationship(IEnumerable<A> listA, IEnumerable<B> listB)
     {
         _listA = listA;
@@ -232,6 +273,63 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _secondShapeSelector = selector; return this;
     }
 
+    // True when at least one of Started/Ended has a subscriber — gates all tracking work so
+    // zero-subscriber relationships (the vast majority) pay no overhead.
+    private bool IsTrackingContacts => CollisionStarted != null || CollisionEnded != null;
+
+    // Records that (a, b) is overlapping this frame. Fires CollisionStarted if the pair wasn't
+    // in _previousContacts (i.e. this is the entry frame). Must be called AFTER physics response
+    // and BEFORE CollisionOccurred so Started precedes Occurred on the entry frame.
+    private void RecordContact(A a, B b)
+    {
+        if (!IsTrackingContacts) return;
+        _currentContacts ??= new HashSet<(A, B)>();
+        _previousContacts ??= new HashSet<(A, B)>();
+
+        var pair = (a, b);
+        _currentContacts.Add(pair);
+        if (!_previousContacts.Contains(pair))
+        {
+            CollisionStarted?.Invoke(a, b);
+        }
+        HookEntityForDestroy(a);
+        HookEntityForDestroy(b);
+    }
+
+    private void HookEntityForDestroy(object side)
+    {
+        if (side is not Entity entity) return;
+        _hookedEntities ??= new HashSet<object>();
+        if (!_hookedEntities.Add(entity)) return; // already subscribed
+        entity._onDestroy += () => OnHookedEntityDestroyed(entity);
+    }
+
+    private void OnHookedEntityDestroyed(object destroyed)
+    {
+        // Fire CollisionEnded exactly once for each unique pair that referenced the destroyed
+        // entity — whether the pair was in _current, _previous, or both. Removing from both sets
+        // prevents the end-of-frame diff from double-firing.
+        _scratchDestroyedPairs ??= new HashSet<(A, B)>();
+        _scratchDestroyedPairs.Clear();
+
+        if (_currentContacts != null)
+            foreach (var p in _currentContacts)
+                if (ReferenceEquals(p.Item1, destroyed) || ReferenceEquals(p.Item2, destroyed))
+                    _scratchDestroyedPairs.Add(p);
+        if (_previousContacts != null)
+            foreach (var p in _previousContacts)
+                if (ReferenceEquals(p.Item1, destroyed) || ReferenceEquals(p.Item2, destroyed))
+                    _scratchDestroyedPairs.Add(p);
+
+        foreach (var p in _scratchDestroyedPairs)
+        {
+            _currentContacts?.Remove(p);
+            _previousContacts?.Remove(p);
+            CollisionEnded?.Invoke(p.Item1, p.Item2);
+        }
+        _hookedEntities?.Remove(destroyed);
+    }
+
     void ICollisionRelationship.RunCollisions() => RunCollisions();
 
     internal void RunCollisions()
@@ -245,19 +343,53 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 RunSameListCollisionsSweep(axis.Value);
             else
                 RunSameListCollisions();
-            return;
         }
-
-        Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
-        Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
-        if (axisA != null && axisA == axisB)
-            RunCrossListCollisionsSweep(axisA.Value);
         else
         {
-            foreach (var a in _listA)
-                foreach (var b in _listB)
-                    RunPair(a, b);
+            Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
+            Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
+            if (axisA != null && axisA == axisB)
+                RunCrossListCollisionsSweep(axisA.Value);
+            else
+            {
+                foreach (var a in _listA)
+                    foreach (var b in _listB)
+                        RunPair(a, b);
+            }
         }
+
+        EndOfFrameContactDiff();
+    }
+
+    // Fires CollisionEnded for any pair that was overlapping last frame but not this frame,
+    // then swaps and clears the contact sets for the next frame. No-op when nothing is tracked.
+    private void EndOfFrameContactDiff()
+    {
+        if (!IsTrackingContacts) return;
+        if (_previousContacts != null && _previousContacts.Count > 0)
+        {
+            _scratchEndedPairs ??= new List<(A, B)>();
+            _scratchEndedPairs.Clear();
+            if (_currentContacts == null || _currentContacts.Count == 0)
+            {
+                foreach (var p in _previousContacts) _scratchEndedPairs.Add(p);
+            }
+            else
+            {
+                foreach (var p in _previousContacts)
+                    if (!_currentContacts.Contains(p))
+                        _scratchEndedPairs.Add(p);
+            }
+            for (int i = 0; i < _scratchEndedPairs.Count; i++)
+            {
+                var p = _scratchEndedPairs[i];
+                CollisionEnded?.Invoke(p.Item1, p.Item2);
+            }
+        }
+
+        // Swap current → previous; clear the new current for next frame.
+        (_previousContacts, _currentContacts) = (_currentContacts, _previousContacts);
+        _currentContacts?.Clear();
     }
 
     // Called when _listA and _listB are the same reference (self/intra-list collision).
@@ -292,9 +424,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
                 TryTransferPlatformVelocity(a, (B)(object)b, sep);
+                RecordContact(a, (B)(object)b);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
+                {
+                    RecordContact(b, (B)(object)a);
                     CollisionOccurred?.Invoke(b, (B)(object)a);
+                }
             }
         }
     }
@@ -317,6 +453,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
         ApplyResponse(a, b, sep);
         TryTransferPlatformVelocity(a, b, sep);
+        RecordContact(a, b);
         CollisionOccurred?.Invoke(a, b);
         TryOfferGroundSnap(a, b);
     }
@@ -369,6 +506,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 }
                 ApplyResponse(a, b, sep);
                 TryTransferPlatformVelocity(a, b, sep);
+                RecordContact(a, b);
                 CollisionOccurred?.Invoke(a, b);
                 TryOfferGroundSnap(a, b);
             }
@@ -402,9 +540,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
                 ApplyResponse(a, (B)(object)b, sep);
                 TryTransferPlatformVelocity(a, (B)(object)b, sep);
+                RecordContact(a, (B)(object)b);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
                 if (AllowDuplicatePairs)
+                {
+                    RecordContact(b, (B)(object)a);
                     CollisionOccurred?.Invoke(b, (B)(object)a);
+                }
             }
         }
     }
