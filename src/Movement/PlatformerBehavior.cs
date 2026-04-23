@@ -305,6 +305,16 @@ public class PlatformerBehavior
             {
                 if (overlappingLadder && ShouldEnterLadder(entity, climbInputY))
                     EnterLadder(entity, Ladders!, preLadderCol!.Value);
+                else if (!overlappingLadder && entity.LastReposition.Y > 0 && climbInputY < -DirectionalInputThreshold)
+                {
+                    // Climb-down from standing: grounded, pressing down, no body overlap yet —
+                    // but a ladder tile exists directly below the feet. Uses LastReposition.Y
+                    // (current-frame ground result) rather than IsOnGround (set later in step A).
+                    // lostOverlap is suppressed this frame by _enteredClimbThisFrame.
+                    int? belowCol = LadderColumnBelowFeet();
+                    if (belowCol.HasValue)
+                        EnterLadder(entity, Ladders!, belowCol.Value);
+                }
                 else if (overlappingFence && ShouldEnterFence(climbInputY))
                     EnterFence();
             }
@@ -440,7 +450,9 @@ public class PlatformerBehavior
                 }
             }
 
-            _suppressOneWay = false;
+            // Suppress one-way collision while descending so the player can climb down
+            // through jump-through (cloud) platforms on the ladder.
+            _suppressOneWay = inputY < -DirectionalInputThreshold;
             _dropThroughFrame = false;
         }
         else
@@ -535,7 +547,9 @@ public class PlatformerBehavior
                     if (lostScanLadder.HasValue) { _activeClimbSurface = Ladders; _activeClimbCol = lostScanLadder.Value; }
                     else if (lostScanFence.HasValue) { _activeClimbSurface = Fences; _activeClimbCol = lostScanFence.Value; }
                 }
-                bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue;
+                // Suppress lostOverlap on the entry frame — when entering via "below feet" the
+                // body has no overlap yet and would otherwise exit on the same frame it entered.
+                bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue && !_enteredClimbThisFrame;
                 bool landedWhileDescending = IsOnGround && climbInputY <= 0f && !_enteredClimbThisFrame;
                 bool steppedOffTop = _clampedAtTopThisFrame
                     && MathF.Abs(climbInputX) > DirectionalInputThreshold;
@@ -667,13 +681,15 @@ public class PlatformerBehavior
         return surface.GetCellWorldPosition(col, topRow).Y + surface.GridSize / 2f;
     }
 
-    private bool IsLadderBelowFeet()
+    private bool IsLadderBelowFeet() => LadderColumnBelowFeet().HasValue;
+
+    private int? LadderColumnBelowFeet()
     {
-        if (Ladders == null) return false;
+        if (Ladders == null) return null;
         var body = ClimbingShape ?? CollisionShape!;
         float bodyBottomY = body.AbsoluteY - body.Height / 2f;
         var (col, row) = Ladders.GetCellAt(new Vector2(body.AbsoluteX, bodyBottomY - 1f));
-        return Ladders.GetTileAtCell(col, row) != null;
+        return Ladders.GetTileAtCell(col, row) != null ? col : null;
     }
 
     /// <summary>
