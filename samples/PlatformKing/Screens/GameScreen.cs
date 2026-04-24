@@ -59,7 +59,7 @@ public class GameScreen : Screen
         // Spawn entities from object layers.
         map.CreateEntities("BreakableCollision", _boxFactory);
         map.CreateEntities("EnemyFlag", _enemyFactory);
-        map.CreateEntities("Door", _doorFactory);
+        map.CreateEntities("Door", _doorFactory, Origin.BottomCenter);
 
         var players = map.CreateEntities("PlayerFlag", _playerFactory, Origin.BottomCenter);
         var player = players[0];

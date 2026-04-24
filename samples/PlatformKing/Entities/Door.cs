@@ -16,7 +16,7 @@ public class Door : Entity
             Height = 16f,
             Y = 8f,
             Color = new Color(255, 215, 0, 80),
-            IsVisible = true,
+            IsVisible = false,
         };
         Add(Body);
     }
