@@ -100,6 +100,12 @@ public class TileShapeCollection : ICollidable
     internal Action<IRenderable>? _onTileRemoved;
 
     /// <summary>
+    /// Optional logical name for diagnostics, snapshots, and game-specific lookup.
+    /// </summary>
+    public string? Name { get; set; }
+
+
+    /// <summary>
     /// Returns all tile shapes (rectangles and polygons) currently in this collection. Used by
     /// <c>Screen.Add(TileShapeCollection)</c> to register tiles for rendering.
     /// </summary>
@@ -746,6 +752,14 @@ public class TileShapeCollection : ICollidable
     // resolution depends on the relationship, not on the tile geometry — the same collection
     // may be used by a player with PlatformerFloor semantics and a ball with Standard SAT.
     internal Vector2 GetSeparationFor(ICollidable shape, SlopeCollisionMode slopeMode = SlopeCollisionMode.Standard)
+        => GetSeparationFor(shape, slopeMode, out _);
+
+    // Overload that also reports whether every contributing per-tile sep was axis-aligned
+    // (pure X or pure Y). When true, the aggregated vector is a sum of perpendicular
+    // contacts (wall + floor) and bounce can safely decompose per-axis; when false, at
+    // least one contribution was a diagonal polygon SAT normal that must be bounced as a
+    // single normal (otherwise slope reflection is wrong).
+    internal Vector2 GetSeparationFor(ICollidable shape, SlopeCollisionMode slopeMode, out bool axisAlignedAggregate)
     {
         var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(shape);
         float centerX = (minX + maxX) / 2f;
@@ -756,6 +770,7 @@ public class TileShapeCollection : ICollidable
         int rowMax = (int)MathF.Floor((maxY - Y) / GridSize);
 
         Vector2 total = Vector2.Zero;
+        bool anyDiagonalContribution = false;
         for (int col = colMin; col <= colMax; col++)
         {
             for (int row = rowMin; row <= rowMax; row++)
@@ -819,6 +834,11 @@ public class TileShapeCollection : ICollidable
 
                 if (sep != Vector2.Zero)
                 {
+                    // A sep with both axes non-zero came from polygon SAT (a true diagonal
+                    // normal). Rect tiles and heightmap slopes only ever push on one axis.
+                    if (sep.X != 0f && sep.Y != 0f)
+                        anyDiagonalContribution = true;
+
                     // Take the largest push on each axis independently to avoid double-counting
                     // when the shape overlaps multiple tiles on the same side.
                     if (MathF.Abs(sep.X) > MathF.Abs(total.X))
@@ -850,6 +870,7 @@ public class TileShapeCollection : ICollidable
             }
         }
 
+        axisAlignedAggregate = !anyDiagonalContribution;
         return total;
     }
 
@@ -1299,6 +1320,12 @@ public class TileShapeCollection : ICollidable
     public void AdjustVelocityFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
     /// <inheritdoc/>
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f) { }
+
+    /// <inheritdoc/>
+    public override string? ToString()
+    {
+        return !string.IsNullOrEmpty(Name) ? Name : base.ToString();
+    }
 
     private void ShiftAllTiles(float dx, float dy)
     {

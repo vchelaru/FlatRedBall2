@@ -47,22 +47,6 @@
     <Frame>
       <TextureName>characters.png</TextureName>
       <FrameLength>0.1</FrameLength>
-      <LeftCoordinate>0</LeftCoordinate>
-      <RightCoordinate>32</RightCoordinate>
-      <TopCoordinate>32</TopCoordinate>
-      <BottomCoordinate>64</BottomCoordinate>
-      <RelativeY>16</RelativeY>
-      <ShapeCollectionSave>
-        <AxisAlignedRectangleSaves />
-        <AxisAlignedCubeSaves />
-        <PolygonSaves />
-        <CircleSaves />
-        <SphereSaves />
-      </ShapeCollectionSave>
-    </Frame>
-    <Frame>
-      <TextureName>characters.png</TextureName>
-      <FrameLength>0.1</FrameLength>
       <LeftCoordinate>32</LeftCoordinate>
       <RightCoordinate>64</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
@@ -97,6 +81,22 @@
       <FrameLength>0.1</FrameLength>
       <LeftCoordinate>96</LeftCoordinate>
       <RightCoordinate>128</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
       <BottomCoordinate>64</BottomCoordinate>
       <RelativeY>16</RelativeY>
@@ -115,23 +115,6 @@
       <FlipHorizontal>true</FlipHorizontal>
       <TextureName>characters.png</TextureName>
       <FrameLength>0.1</FrameLength>
-      <LeftCoordinate>0</LeftCoordinate>
-      <RightCoordinate>32</RightCoordinate>
-      <TopCoordinate>32</TopCoordinate>
-      <BottomCoordinate>64</BottomCoordinate>
-      <RelativeY>16</RelativeY>
-      <ShapeCollectionSave>
-        <AxisAlignedRectangleSaves />
-        <AxisAlignedCubeSaves />
-        <PolygonSaves />
-        <CircleSaves />
-        <SphereSaves />
-      </ShapeCollectionSave>
-    </Frame>
-    <Frame>
-      <FlipHorizontal>true</FlipHorizontal>
-      <TextureName>characters.png</TextureName>
-      <FrameLength>0.1</FrameLength>
       <LeftCoordinate>32</LeftCoordinate>
       <RightCoordinate>64</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
@@ -168,6 +151,23 @@
       <FrameLength>0.1</FrameLength>
       <LeftCoordinate>96</LeftCoordinate>
       <RightCoordinate>128</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
       <BottomCoordinate>64</BottomCoordinate>
       <RelativeY>16</RelativeY>
@@ -279,6 +279,92 @@
       <FrameLength>0.1</FrameLength>
       <LeftCoordinate>160</LeftCoordinate>
       <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>ClimbIdle</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>576</LeftCoordinate>
+      <RightCoordinate>608</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>ClimbMove</Name>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.05</FrameLength>
+      <LeftCoordinate>576</LeftCoordinate>
+      <RightCoordinate>608</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.05</FrameLength>
+      <LeftCoordinate>608</LeftCoordinate>
+      <RightCoordinate>640</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.05</FrameLength>
+      <LeftCoordinate>640</LeftCoordinate>
+      <RightCoordinate>672</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <RelativeY>16</RelativeY>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>characters.png</TextureName>
+      <FrameLength>0.05</FrameLength>
+      <LeftCoordinate>672</LeftCoordinate>
+      <RightCoordinate>704</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
       <BottomCoordinate>64</BottomCoordinate>
       <RelativeY>16</RelativeY>

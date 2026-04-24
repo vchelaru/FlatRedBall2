@@ -457,9 +457,9 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 DeepCollisionCount++;
                 if (!CheckCollision(effectiveA, effectiveB)) continue;
 
-                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
-                ApplyResponse(a, (B)(object)b, sep);
+                ApplyResponse(a, (B)(object)b, sep, axisAligned);
                 TryTransferPlatformVelocity(a, (B)(object)b, sep);
                 RecordContact(a, (B)(object)b);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
@@ -482,13 +482,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             TryOfferGroundSnap(a, b);
             return;
         }
-        var sep = ComputeSeparationVector(effectiveA, effectiveB);
+        var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
         if (!TryApplyOneWayGate(a, b, ref sep))
         {
             TryOfferGroundSnap(a, b);
             return;
         }
-        ApplyResponse(a, b, sep);
+        ApplyResponse(a, b, sep, axisAligned);
         TryTransferPlatformVelocity(a, b, sep);
         RecordContact(a, b);
         CollisionOccurred?.Invoke(a, b);
@@ -535,13 +535,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                     TryOfferGroundSnap(a, b);
                     continue;
                 }
-                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (!TryApplyOneWayGate(a, b, ref sep))
                 {
                     TryOfferGroundSnap(a, b);
                     continue;
                 }
-                ApplyResponse(a, b, sep);
+                ApplyResponse(a, b, sep, axisAligned);
                 TryTransferPlatformVelocity(a, b, sep);
                 RecordContact(a, b);
                 CollisionOccurred?.Invoke(a, b);
@@ -573,9 +573,9 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 DeepCollisionCount++;
                 if (!CheckCollision(effectiveA, effectiveB)) continue;
 
-                var sep = ComputeSeparationVector(effectiveA, effectiveB);
+                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
-                ApplyResponse(a, (B)(object)b, sep);
+                ApplyResponse(a, (B)(object)b, sep, axisAligned);
                 TryTransferPlatformVelocity(a, (B)(object)b, sep);
                 RecordContact(a, (B)(object)b);
                 CollisionOccurred?.Invoke(a, (B)(object)b);
@@ -643,18 +643,24 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
     // physics separation is meaningful (e.g., Lines are infinitely thin).
-    private Vector2 ComputeSeparationVector(ICollidable a, ICollidable b)
+    // axisAlignedAggregate is true when the sep came from a TileShapeCollection whose
+    // per-tile contributions were all axis-aligned (no polygon SAT diagonal) — bounce
+    // callers use this to choose between a single-normal reflection (slope) and per-axis
+    // zeroing (wall + floor corner).
+    private Vector2 ComputeSeparationVector(ICollidable a, ICollidable b, out bool axisAlignedAggregate)
     {
         if (b is TileShapeCollection tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
             {
-                var sep = tsc.GetSeparationFor(leafA, SlopeMode);
+                var sep = tsc.GetSeparationFor(leafA, SlopeMode, out axisAlignedAggregate);
                 if (sep != Vector2.Zero) return sep;
             }
+            axisAlignedAggregate = false;
             return Vector2.Zero;
         }
 
+        axisAlignedAggregate = false;
         foreach (var leafA in Entity.GetLeafShapes(a))
             foreach (var leafB in Entity.GetLeafShapes(b))
             {
@@ -738,7 +744,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
     }
 
-    private void ApplyResponse(A a, B b, Vector2 sep)
+    private void ApplyResponse(A a, B b, Vector2 sep, bool axisAlignedAggregate)
     {
         if (_moveFirst)
             a.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(sep, 0f, 1f));
@@ -752,7 +758,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         if (_bounce)
         {
             // Pass entity b so velocity exchange happens between entities, not selected child shapes.
-            a.AdjustVelocityFromSeparation(sep, b, _bounceMassA, _bounceMassB, _bounceElasticity);
+            a.AdjustVelocityFromSeparation(sep, b, _bounceMassA, _bounceMassB, _bounceElasticity, axisAlignedAggregate);
             a.ApplySeparationOffset(CollisionDispatcher.ComputeSeparationOffset(sep, _bounceMassA, _bounceMassB));
         }
     }

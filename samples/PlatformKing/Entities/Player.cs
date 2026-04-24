@@ -99,16 +99,23 @@ public class Player : Entity, IPlatformerEntity
     private void UpdateAnimation()
     {
         if (_sprite.AnimationChains == null) return;
-
+        _sprite.AnimationSpeed = 1;
         string facing = _platformer.DirectionFacing == HorizontalDirection.Left ? "Left" : "Right";
 
         if (_platformer.IsClimbing)
         {
-            _sprite.PlayAnimation("Idle" + facing);
+            if(VelocityY != 0)
+            {
+                _sprite.PlayAnimation("ClimbMove");
+            }
+            else
+            {
+                _sprite.PlayAnimation("ClimbIdle");
+            }
             return;
         }
 
-        if (_isSwimming)
+        if (_isSwimming && !_platformer.IsOnGround)
         {
             _sprite.PlayAnimation("Fall" + facing);
             return;
@@ -117,9 +124,14 @@ public class Player : Entity, IPlatformerEntity
         float inputX = _platformer.MovementInput?.X ?? 0f;
         string chain;
         if (_platformer.IsOnGround)
+        {
             chain = MathF.Abs(inputX) > 0.1f ? "Walk" : "Idle";
+        }
         else
+        {
             chain = VelocityY > 0f ? "Jump" : "Fall";
+        }
+
 
         _sprite.PlayAnimation(chain + facing);
     }
