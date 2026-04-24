@@ -1,4 +1,4 @@
-name: Publish FlatRedBall2.Kni
+name: Publish FlatRedBall2
 
 on:
   workflow_dispatch:
@@ -11,6 +11,14 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - packageId: FlatRedBall2.MonoGame
+            targetFrameworks: net10.0
+          - packageId: FlatRedBall2.Kni
+            targetFrameworks: net8.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,19 +26,18 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x' # Use 10.0.x as it's the SDK version for the project
+          dotnet-version: '10.0.x'
 
       - name: Restore dependencies
         run: dotnet restore src/FlatRedBall2.csproj
 
-      - name: Build and Pack
-        # We override PackageId to FlatRedBall2.Kni and restrict TargetFrameworks to net8.0
+      - name: Build and Pack (${{ matrix.packageId }})
         run: >
-          dotnet pack src/FlatRedBall2.csproj 
-          -c Release 
-          -p:PackageId=FlatRedBall2.Kni 
-          -p:TargetFrameworks=net8.0 
-          -p:PackageVersion=${{ github.event.inputs.version }} 
+          dotnet pack src/FlatRedBall2.csproj
+          -c Release
+          -p:PackageId=${{ matrix.packageId }}
+          -p:TargetFrameworks=${{ matrix.targetFrameworks }}
+          -p:PackageVersion=${{ github.event.inputs.version }}
           -o out
 
       - name: Publish to NuGet
