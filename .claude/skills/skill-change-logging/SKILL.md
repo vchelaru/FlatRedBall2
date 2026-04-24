@@ -5,7 +5,7 @@ description: Log every FlatRedBall2 skill modification to .claude/skill_change_l
 
 # Skill Change Logging
 
-Use this skill whenever a file under `.claude/skills/` changes.
+Use this skill whenever a skill file changes — both the 3rd-party game-dev skills under `ai-reference/` and the 1st-party engine-contributor skills under `.claude/skills/`. Log the canonical path (e.g. `ai-reference/animation/SKILL.md`, not the symlinked path).
 
 ## Required Log File
 
