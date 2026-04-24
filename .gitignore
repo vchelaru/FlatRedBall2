@@ -16,3 +16,31 @@
 # Sample folders intentionally excluded from source control
 /samples/auto
 /samples/SlopesSample
+
+# Local symlinks — canonical 3rd-party skills live in /ai-reference/.
+# Symlinks under .claude/skills/ exist so Claude Code's skill discovery
+# finds them locally during engine development. Not portable across clones.
+/.claude/skills/animation
+/.claude/skills/audio
+/.claude/skills/camera
+/.claude/skills/collision-relationships
+/.claude/skills/content-and-assets
+/.claude/skills/content-hot-reload
+/.claude/skills/engine-overview
+/.claude/skills/entities-and-factories
+/.claude/skills/grid-movement
+/.claude/skills/gum-integration
+/.claude/skills/gumcli
+/.claude/skills/input-system
+/.claude/skills/levels
+/.claude/skills/path-and-pathfollower
+/.claude/skills/physics-and-movement
+/.claude/skills/platformer-movement
+/.claude/skills/screens
+/.claude/skills/shapes
+/.claude/skills/tile-grid
+/.claude/skills/tile-node-network
+/.claude/skills/timing
+/.claude/skills/tmx
+/.claude/skills/top-down-movement
+/.claude/skills/tweening

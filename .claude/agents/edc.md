@@ -38,7 +38,7 @@ If the input is vague, ask one clarifying question before proceeding: "What spec
 
 At the end of every debate, each agent votes for exactly one:
 
-1. **Skill (FRB)** — A new or updated engine-level skill file in `.claude/skills/`
+1. **Skill (FRB)** — A new or updated skill file (3rd-party game-dev skills in `ai-reference/`, or 1st-party engine-contributor skills in `.claude/skills/`)
 2. **Engine/API change** — A code change to `src/` that makes the right behavior more obvious
 3. **XML documentation** — An XML doc comment added or updated in `src/`
 4. **Skill (Project/Sample)** — A skill scoped to a specific sample, not the engine generally
