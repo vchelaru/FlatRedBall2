@@ -91,6 +91,33 @@ Common patterns:
 - Reduced air control: set a lower `MaxSpeedX` or `AccelerationTimeX` in `AirMovement`
 - Ice: high `AccelerationTimeX` and `DecelerationTimeX` in `GroundMovement`
 
+## Multiple Movement Sets (Water, Ice, Power-ups)
+
+A `PlatformerConfig` JSON maps to one context. For a second context (swimming, ice, mud, power-up state) use a second JSON file and a temporary behavior to extract the values:
+
+```csharp
+// CustomInitialize — capture both sets
+PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
+_normalGroundMovement  = _platformer.GroundMovement;
+_normalAirMovement     = _platformer.AirMovement;
+_normalAfterDoubleJump = _platformer.AfterDoubleJump;
+
+var waterBehavior = new PlatformerBehavior();
+PlatformerConfig.FromJson("Content/player.water.platformer.json").ApplyTo(waterBehavior);
+_waterGroundMovement = waterBehavior.GroundMovement;
+_waterAirMovement    = waterBehavior.AirMovement;
+// _waterAfterDoubleJump omitted → null disables double jump while swimming
+
+// CustomActivity — swap every frame
+bool swimming = IsInWater();
+_platformer.GroundMovement  = swimming ? _waterGroundMovement  : _normalGroundMovement;
+_platformer.AirMovement     = swimming ? _waterAirMovement     : _normalAirMovement;
+_platformer.AfterDoubleJump = swimming ? null                  : _normalAfterDoubleJump;
+_platformer.Update(this, time);
+```
+
+**Swap all three slots.** Forgetting `AfterDoubleJump` is a silent bug: the first air jump while swimming restores `AfterDoubleJump` (normal speed values) and the player moves at full land speed mid-water.
+
 ## Reading State
 
 ```csharp
