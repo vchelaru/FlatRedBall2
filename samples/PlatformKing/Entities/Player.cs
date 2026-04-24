@@ -10,8 +10,6 @@ namespace PlatformKing.Entities;
 
 public class Player : Entity, IPlatformerEntity
 {
-    private const int MaxAirJumps = 1;
-
     // Swimming constants
     private const float SwimGravity = -200f;   // gentle upward buoyancy
     private const float SwimMaxFallSpeed = 80f; // max downward speed in water
@@ -22,7 +20,6 @@ public class Player : Entity, IPlatformerEntity
 
     private AxisAlignedRectangle _body = null!;
     private Sprite _sprite = null!;
-    private int _airJumpsRemaining;
     private bool _isSwimming;
 
     // Track velocity before the platformer update so box-break detection can see it.
@@ -88,9 +85,7 @@ public class Player : Entity, IPlatformerEntity
         }
         else
         {
-            bool wasClimbing = _platformer.IsClimbing;
             _platformer.Update(this, time);
-            HandleDoubleJump(wasClimbing);
         }
 
         UpdateAnimation();
@@ -99,9 +94,6 @@ public class Player : Entity, IPlatformerEntity
     private void HandleSwimming(FrameTime time)
     {
         float dt = time.DeltaSeconds;
-
-        // Disable double jump while swimming.
-        _airJumpsRemaining = 0;
 
         // Horizontal movement — capped.
         float inputX = _platformer.MovementInput?.X ?? 0f;
@@ -122,25 +114,6 @@ public class Player : Entity, IPlatformerEntity
 
         // Clamp fall speed in water.
         VelocityY = MathF.Max(-SwimMaxFallSpeed, VelocityY);
-    }
-
-    private void HandleDoubleJump(bool wasClimbing = false)
-    {
-        if (_platformer.IsOnGround)
-            _airJumpsRemaining = MaxAirJumps;
-
-        // If the player was climbing before this frame's update, the jump input was used to
-        // exit the ladder — don't also consume it as a double jump.
-        if (wasClimbing) return;
-
-        if (_platformer.JumpInput?.WasJustPressed == true
-            && !_platformer.IsOnGround
-            && !_platformer.IsApplyingJump
-            && _airJumpsRemaining > 0)
-        {
-            VelocityY = _platformer.AirMovement.JumpVelocity;
-            _airJumpsRemaining--;
-        }
     }
 
     private void UpdateAnimation()

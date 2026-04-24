@@ -116,6 +116,22 @@ public class PlatformerBehavior
     /// </summary>
     public AxisAlignedRectangle? ClimbingShape { get; set; }
 
+    /// <summary>
+    /// Movement values applied after the first air jump. When non-null, the first air jump
+    /// transitions to this slot; subsequent air-jump attempts use <em>this</em> slot's
+    /// <see cref="PlatformerValues.JumpVelocity"/>. A value of 0 locks the player out of
+    /// further air jumps (standard double jump). A value &gt; 0 allows continued jumping from
+    /// this slot (double jump then flutter). When null, the player always uses
+    /// <see cref="AirMovement"/> for air jumps (infinite flutter as long as
+    /// <see cref="PlatformerValues.JumpVelocity"/> &gt; 0). Resets to use
+    /// <see cref="AirMovement"/> again each time the player lands.
+    /// </summary>
+    public PlatformerValues? AfterDoubleJump { get; set; }
+
+    // Tracks which air slot is currently active. Null = using AirMovement. Set to AfterDoubleJump
+    // after the first air jump (when AfterDoubleJump != null). Reset to null on landing.
+    private PlatformerValues? _activeAirValues;
+
     /// <summary>True while climbing a snapping ladder (X-locked). False for fence climbs and when not climbing.</summary>
     public bool IsOnLadder => IsClimbing && _lockedLadderX.HasValue;
 
@@ -370,7 +386,7 @@ public class PlatformerBehavior
 
         var current = IsClimbing
             ? ClimbingMovement!
-            : (IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement);
+            : (IsOnGround ? (GroundMovement ?? AirMovement) : (_activeAirValues ?? AirMovement));
 
         if (!IsOnGround || IsClimbing) CurrentSlope = 0f;
         float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
@@ -467,6 +483,8 @@ public class PlatformerBehavior
         }
         else
         {
+            if (IsOnGround) _activeAirValues = null;
+
             // C. Apply gravity
             entity.AccelerationY = -current.Gravity;
 
@@ -491,6 +509,19 @@ public class PlatformerBehavior
                 _jumpStartTime = time.SinceGameStart;
                 _jumpValues = current;
                 IsApplyingJump = true;
+            }
+            else if (JumpInput?.WasJustPressed == true && !IsOnGround && !IsApplyingJump)
+            {
+                var airValues = _activeAirValues ?? AirMovement;
+                if (airValues.JumpVelocity > 0f)
+                {
+                    entity.VelocityY = airValues.JumpVelocity;
+                    _jumpStartTime = time.SinceGameStart;
+                    _jumpValues = airValues;
+                    IsApplyingJump = airValues.JumpApplyLength > TimeSpan.Zero;
+                    if (_activeAirValues == null && AfterDoubleJump != null)
+                        _activeAirValues = AfterDoubleJump;
+                }
             }
 
             if (IsApplyingJump && _jumpValues != null)

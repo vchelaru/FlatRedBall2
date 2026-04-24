@@ -10,11 +10,11 @@ public static class PlatformerConfigExtensions
 {
     /// <summary>
     /// Applies <paramref name="config"/>'s movement slots to <paramref name="behavior"/>.
-    /// Slots not present in the JSON are left untouched. An <c>afterDoubleJump</c> slot is parsed
-    /// but intentionally ignored — <see cref="PlatformerBehavior"/> has no double-jump slot yet;
-    /// the schema reserves the name so files authored today stay valid once the slot lands.
-    /// A <c>climbing</c> slot populates <see cref="PlatformerBehavior.ClimbingMovement"/>; jump
-    /// and slope fields inside it are accepted but ignored at runtime.
+    /// Slots not present in the JSON are left untouched. A <c>climbing</c> slot populates
+    /// <see cref="PlatformerBehavior.ClimbingMovement"/>; an <c>afterDoubleJump</c> slot
+    /// populates <see cref="PlatformerBehavior.AfterDoubleJump"/> — when present, the first
+    /// air jump transitions to this slot (its <c>JumpVelocity</c> governs whether further air
+    /// jumps are allowed; 0 locks out additional jumps for a standard double jump).
     /// </summary>
     /// <exception cref="InvalidOperationException">A slot specifies both derived jump fields
     /// (<c>minJumpHeight</c>/<c>maxJumpHeight</c>) and raw jump fields (<c>JumpVelocity</c>/
@@ -36,9 +36,8 @@ public static class PlatformerConfigExtensions
         if (movement.Air != null)
             behavior.AirMovement = ToPlatformerValues(movement.Air, "air", airGravity);
 
-        // afterDoubleJump is parsed (for forward-compat) but has no behavior slot to receive it.
         if (movement.AfterDoubleJump != null)
-            _ = ToPlatformerValues(movement.AfterDoubleJump, "afterDoubleJump", airGravity);
+            behavior.AfterDoubleJump = ToPlatformerValues(movement.AfterDoubleJump, "afterDoubleJump", airGravity);
 
         if (movement.Climbing != null)
             behavior.ClimbingMovement = ToPlatformerValues(movement.Climbing, "climbing", airGravity);
