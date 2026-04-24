@@ -2,11 +2,7 @@
 <tileset version="1.10" tiledversion="1.11.0" name="TiledIcons" tilewidth="16" tileheight="16" tilecount="1024" columns="32">
  <image source="StandardTilesetIcons.png" width="512" height="512"/>
  <tile id="0" type="SolidCollision"/>
- <tile id="1" type="SolidCollision"/>
- <tile id="2" type="SolidCollision"/>
  <tile id="3" type="JumpThroughCollision"/>
- <tile id="4" type="JumpThroughCollision"/>
- <tile id="5" type="JumpThroughCollision"/>
  <tile id="6" type="OneWayCollision"/>
  <tile id="8" type="ConveyorBelt"/>
  <tile id="9" type="MovingPlatform"/>

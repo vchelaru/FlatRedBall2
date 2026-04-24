@@ -126,7 +126,14 @@ This scoping step keeps context lean — only load the skills and files that are
 
 **Step 0b — Load all relevant skills before touching any source files.** Decompose the task into every concern it touches, and load a skill for each one. A task that involves creating an entity, giving it a shape, and setting up collision requires `entities-and-factories` + `shapes` + `collision-relationships` — all three, up front. Skills are cheap to load and save enormous amounts of time; reading source to compensate for a missing skill is always the wrong trade. If in doubt, load the skill.
 
-For every task, invoke the appropriate agent from `.claude/agents/` before proceeding. The agent's instructions provide guidelines for how the task should be performed. Before doing any work, announce which agent you are using such as "Invoking coder agent for this task..."
+For every task, one of the following must happen before you proceed:
+
+1. **Spawn the matching agent from `.claude/agents/`** and transfer the relevant context in the prompt. Preferred when the agent would need to explore files you haven't already loaded, or when the task is self-contained enough to brief in a short prompt. Announce the spawn: "Invoking coder agent for this task..."
+2. **Or, do it inline yourself — but first read the agent's `.md` file** (e.g. `.claude/agents/coder.md`) at the start of the task and follow its rules. Preferred when you already have the relevant context loaded and the transfer cost to a sub-agent would be high.
+
+This keeps the agent files as the single source of truth for how each kind of work is done (TDD discipline, file-reading order, code-style enforcement, etc.) — CLAUDE.md does not duplicate those rules, so they can't drift.
+
+Re-read the agent file at the **start of each new coding task**, not just once per session. Context drifts across long sessions; fresh load each task keeps the discipline active. Inline work without reading the agent file first is not an option.
 
 Available agents:
 - **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.

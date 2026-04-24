@@ -45,6 +45,39 @@ public class CollisionTests
         firedFirstArgs[1].ShouldBe(b); // second firing: (b, a)
     }
 
+    // ── One-way platform — tall body spanning two tiles ───────────────────────
+
+    [Fact]
+    public void OneWayPlatform_TallBodySpansLowerAndUpperTile_PushesUpNotThrough()
+    {
+        // When a tall entity body overlaps a lower one-way tile (landing from above) AND an
+        // upper one-way tile (entered from below), GetSeparationFor must return a positive Y
+        // so the one-way gate allows the collision. Previously the upper tile's larger downward
+        // push overrode the lower tile's upward push, making sep.Y negative and causing the
+        // one-way gate to reject the collision — the player fell through.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // bottom tile: top at y=16
+        tiles.AddTileAtCell(0, 2); // upper tile: bottom at y=32 (one-cell gap)
+
+        // Entity feet at y=14 (2 inside bottom tile), top at y=38 (6 inside upper tile).
+        var entity = new Entity { X = 8f, Y = 14f };
+        entity.LastPosition = new System.Numerics.Vector2(8f, 16f); // was on tile top last frame
+        var shape = new AxisAlignedRectangle { Width = 12f, Height = 24f, Y = 12f };
+        entity.Add(shape);
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.BounceFirstOnCollision(elasticity: 0f);
+
+        rel.RunCollisions();
+
+        // Entity must be pushed up (grounded on bottom tile), not fall through.
+        entity.LastReposition.Y.ShouldBeGreaterThan(0f);
+    }
+
     [Fact]
     public void CollidesWith_AARectVsAARect_NotOverlapping_ReturnsFalse()
     {
@@ -818,5 +851,75 @@ public class CollisionTests
         rel.RunCollisions();
 
         fireCount.ShouldBe(1);
+    }
+
+    // ── Non-default shapes vs TileShapeCollection ────────────────────────
+    // Models the "ledge probe" / "weak spot" / "muzzle point" pattern:
+    // an auxiliary shape attached to an entity for manual queries or a
+    // different collision relationship, which must NOT participate in the
+    // entity's default collision against terrain.
+
+    [Fact]
+    public void NonDefaultShape_OverlappingTiles_DoesNotTriggerRelationship()
+    {
+        // Entity's default body sits above the tile row (Y=20, tile spans Y=0..16).
+        // An auxiliary "foot probe" poked below the body overlaps the tile.
+        // If the probe is non-default, the Entity-vs-TSC relationship must ignore it.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // tile occupying X=0..16, Y=0..16
+
+        var entity = new Entity { X = 8f, Y = 20f };
+        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f }; // at (8,20), no tile overlap
+        entity.Add(body);
+        var footProbe = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), inside tile
+        entity.Add(footProbe, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles });
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(0, "non-default probe must not drag the entity into a tile collision");
+    }
+
+    [Fact]
+    public void NonDefaultShape_CanStillQueryTilesViaCollidesWith()
+    {
+        // Ledge-detection use case: a probe excluded from default collision
+        // must still be usable for manual CollidesWith queries against a TSC.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        var entity = new Entity { X = 8f, Y = 20f };
+        var footOnGround = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), in tile
+        var footOffLedge = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 24f, Y = -13f }; // at (32,7), no tile
+        entity.Add(footOnGround, isDefaultCollision: false);
+        entity.Add(footOffLedge, isDefaultCollision: false);
+
+        footOnGround.CollidesWith(tiles).ShouldBeTrue("probe over tile should report collision when queried directly");
+        footOffLedge.CollidesWith(tiles).ShouldBeFalse("probe over empty space should report no collision");
+    }
+
+    [Fact]
+    public void NonDefaultShape_DefaultBodyOverlappingTiles_StillTriggersRelationship()
+    {
+        // Inverse guard: excluding a probe must NOT suppress the default body's collision.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        var entity = new Entity { X = 8f, Y = 8f }; // body sits inside the tile
+        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f };
+        entity.Add(body);
+        var probe = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 100f }; // far away
+        entity.Add(probe, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles });
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1, "default body overlapping a tile must still trigger the relationship");
     }
 }

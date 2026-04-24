@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Utilities;
 using Shouldly;
@@ -160,5 +161,114 @@ public class BounceTests
         // Perfect elastic collision with equal masses → velocities exchange.
         entityA.VelocityX.ShouldBe(-100f, tolerance: 0.01f);
         entityB.VelocityX.ShouldBe(100f, tolerance: 0.01f);
+    }
+
+    // 45° up-right slope at cell (0,0): vertices (0,0), (16,0), (16,16); hypotenuse from
+    // bottom-left to top-right. Outward normal of the hypotenuse (into the air side)
+    // is (-1, 1)/√2 ≈ (-0.707, 0.707). Interior of the polygon is below-right of the line.
+    private static Polygon UpRightSlope(float halfSize = 8f) => Polygon.FromPoints(new[]
+    {
+        new Vector2(-halfSize, -halfSize),
+        new Vector2( halfSize, -halfSize),
+        new Vector2( halfSize,  halfSize),
+    });
+
+    [Fact]
+    public void BounceAgainstSlopePolygon_InStandardMode_ReflectsAlongSlopeNormal()
+    {
+        // A ball falling straight down onto a 45° up-right slope (no walls, no floor rects
+        // in the collection — just the slope polygon) must reflect along the slope's
+        // outward normal (-1/√2, 1/√2). For incoming V = (0, -100) and elasticity = 1:
+        //   V·n = -100 · (1/√2) = -70.71
+        //   V' = V - 2(V·n)n = (0, -100) + 141.42 · (-0.707, 0.707) ≈ (-100, 0)
+        // So the ball should deflect horizontally to the LEFT, not bounce straight up.
+        //
+        // The wall-slam fix gates on "other is TileShapeCollection && both axes non-zero"
+        // and decomposes per-axis — which, for a slope polygon's diagonal SAT normal,
+        // produces V' = (0, +100) (straight up) instead of the correct (-100, 0).
+        // This test should be RED with that gate in place.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
+
+        var ball = new Entity { X = 9f, Y = 9.5f };
+        var bodyCircle = new Circle { Radius = 4f };
+        ball.Add(bodyCircle);
+        ball.VelocityX = 0f;
+        ball.VelocityY = -100f;
+
+        // Sanity: make sure the setup actually penetrates the slope (SAT produces a non-zero diagonal sep).
+        var sep = tiles.GetSeparationFor(bodyCircle, SlopeCollisionMode.Standard);
+        sep.X.ShouldBeLessThan(-0.01f, "slope SAT must push ball left (away from the slope)");
+        sep.Y.ShouldBeGreaterThan(0.01f, "slope SAT must push ball up (away from the slope)");
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { ball }, new[] { tiles });
+        rel.SlopeMode = SlopeCollisionMode.Standard;
+        rel.BounceFirstOnCollision(elasticity: 1f);
+
+        rel.RunCollisions();
+
+        // Correct reflection across (-1/√2, 1/√2): expect ball to go LEFT, not up.
+        ball.VelocityX.ShouldBeLessThan(-50f,
+            customMessage: "Ball should deflect LEFT off 45° slope (per-axis decomposition would leave X at 0)");
+        ball.VelocityY.ShouldBeInRange(-10f, 10f,
+            customMessage: "Ball's downward motion should be fully converted to horizontal, not reflected straight up");
+    }
+
+    [Fact]
+    public void BounceAgainstTileCorner_DoesNotConvertHorizontalVelocityIntoUpwardKick()
+    {
+        // Reproduces the wall-slam pop-up: player running left into a wall while
+        // gravity has sunk them 0.097 units into the floor.
+        //
+        // Geometry (GridSize = 16, collection origin at 0,0):
+        //   Wall tile at (col=-1, row=0):  X [-16, 0], Y [0, 16]
+        //   Floor tile at (col=0, row=-1): X [0, 16],  Y [-16, 0]
+        //
+        // Player AABB (16x32) centered at (-0.33, 15.903) — body spans Y [-0.097, 31.903]:
+        //   X [-8.33, 7.67], Y [-0.097, 31.903]
+        //   vs wall → min-axis exit right: sep = (8.33, 0)
+        //   vs floor → min-axis exit up:   sep = (0, 0.097)
+        // Aggregated sep → (8.33, 0.097) — identical to the live game repro.
+        //
+        // Physically, the player is pressed against two perpendicular surfaces
+        // (wall on the left, floor below). Each should zero velocity along its own
+        // axis → final velocity should be (0, 0).
+        //
+        // Pre-fix: AdjustVelocityFromSeparation normalizes the sum into one diagonal
+        // normal ≈ (0.99993, 0.01167) and projects the -250 X velocity through it,
+        // leaving ~(+0.1, -8.75) — wall push tilted ~2.92 units of horizontal
+        // momentum upward, leaving Y velocity well short of the -11.67 it should
+        // have been zeroed from.
+        //
+        // Post-fix: each axis is zeroed independently → (0, 0).
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(-1, 0);
+        tiles.AddTileAtCell(0, -1);
+
+        var player = new Entity { X = -0.33342f, Y = 15.90277f };
+        var body = new AxisAlignedRectangle { Width = 16f, Height = 32f };
+        player.Add(body);
+        player.VelocityX = -250f;
+        player.VelocityY = -11.66669f;
+
+        // Sanity-check the setup produces the same sep as the live game.
+        var sep = tiles.GetSeparationFor(body, SlopeCollisionMode.PlatformerFloor);
+        sep.X.ShouldBe(8.33342f, tolerance: 0.001f);
+        sep.Y.ShouldBe(0.097229f, tolerance: 0.001f);
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { player }, new[] { tiles });
+        rel.SlopeMode = SlopeCollisionMode.PlatformerFloor;
+        rel.BounceFirstOnCollision(elasticity: 0f);
+
+        rel.RunCollisions();
+
+        // Both perpendicular contacts should zero their respective velocity
+        // components — final velocity is (0, 0) to within rounding.
+        player.VelocityX.ShouldBe(0f, tolerance: 0.01f,
+            customMessage: "Wall contact should zero horizontal velocity");
+        player.VelocityY.ShouldBe(0f, tolerance: 0.01f,
+            customMessage: "Floor contact should zero vertical velocity (no diagonal-normal leakage from wall impulse)");
     }
 }

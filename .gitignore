@@ -40,3 +40,6 @@ samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
 .claude/skill_change_log.jsonl
 /design/edc
 /out
+/samples/PlatformKing/.vs
+/samples/PlatformKing/bin
+/samples/PlatformKing/obj

@@ -76,4 +76,15 @@ public interface ICollidable
     /// Used by <see cref="Collision.CollisionRelationship{A,B}"/> when a per-shape selector is active.
     /// </summary>
     void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f);
+
+    /// <summary>
+    /// Overload of <see cref="AdjustVelocityFromSeparation(Vector2, ICollidable, float, float, float)"/>
+    /// that lets the caller flag <paramref name="sep"/> as a sum of axis-aligned per-tile
+    /// contacts (wall + floor corner). When true and both components are non-zero, Entity
+    /// applies per-axis impulses instead of a single diagonal normal — which is needed for
+    /// corner contact but wrong for a genuine diagonal normal (slope polygon SAT). Default
+    /// implementation delegates to the original signature; only Entity needs the override.
+    /// </summary>
+    void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass, float otherMass, float elasticity, bool axisAlignedSeparation)
+        => AdjustVelocityFromSeparation(sep, other, thisMass, otherMass, elasticity);
 }

@@ -57,6 +57,34 @@ public class TileShapeCollectionTests
             RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
     }
 
+    // ── GetSeparationFor — opposite-direction Y accumulation ─────────────────
+
+    [Fact]
+    public void GetSeparationFor_TallBodySpansLowerAndUpperTile_ReturnsPositiveY()
+    {
+        // Repro for "player falls through cloud when tall body overlaps two tiles."
+        // Body is tall enough to overlap the lower tile from above (+2 upward push)
+        // AND the upper tile from below (-6 downward push).
+        // Bug: GetSeparationFor takes the largest absolute Y push — -6 beats +2, so
+        // sep.Y is negative, the one-way gate's first check (sep.Y <= 0) rejects the
+        // collision, and the player falls through.
+        // Fix: an established Y push direction must not be overridden by an opposite push.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // bottom: Y=[0,16], top at y=16
+        tiles.AddTileAtCell(0, 2); // upper: Y=[32,48], bottom at y=32 (one-cell gap at row 1)
+
+        // Body: bottom=14 (2 units inside lower tile), top=38 (6 units inside upper tile).
+        var entity = new Entity { X = 8f, Y = 14f };
+        var shape = new AxisAlignedRectangle { Width = 12f, Height = 24f, Y = 12f };
+        entity.Add(shape);
+
+        var sep = tiles.GetSeparationFor(shape);
+
+        // Positive Y (push up) must win — the lower tile's +2 push should not be
+        // replaced by the upper tile's -6 push.
+        sep.Y.ShouldBeGreaterThan(0f);
+    }
+
     [Fact]
     public void AddTileAtCell_TilePositionedCorrectly()
     {
@@ -181,6 +209,40 @@ public class TileShapeCollectionTests
         var rect = new AxisAlignedRectangle { Width = 16f, Height = 16f, X = 100f, Y = 100f };
 
         tiles.CollidesWith(rect).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CollidesWith_ShapeFullySurroundedByTiles_ReturnsTrue()
+    {
+        // Bug: GetSeparationFor accumulates separation vectors. When the shape is fully
+        // surrounded, opposing tiles cancel each other to Vector2.Zero → CollidesWith
+        // returned false even though the shape clearly overlaps the tile collection.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        for (int c = -1; c <= 1; c++)
+            for (int r = -1; r <= 1; r++)
+                tiles.AddTileAtCell(c, r); // 3×3 block; center tile at cell (0,0)
+
+        // Small shape sitting fully inside the center cell (0,0): world [0..16]×[0..16]
+        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+
+        tiles.CollidesWith(rect).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CollidesWith_RectCallerFullySurroundedByTiles_ReturnsTrue()
+    {
+        // The actual game-code path: rect.CollidesWith(tileShapeCollection).
+        // AxisAlignedRectangle.CollidesWith delegates to CollisionDispatcher.GetSeparationVector,
+        // which calls TileShapeCollection.GetSeparationFor — same zero-cancellation bug as above
+        // but exercised from the other direction.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        for (int c = -1; c <= 1; c++)
+            for (int r = -1; r <= 1; r++)
+                tiles.AddTileAtCell(c, r);
+
+        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+
+        rect.CollidesWith(tiles).ShouldBeTrue();
     }
 
     // ── GetSeparationFor ─────────────────────────────────────────────────────

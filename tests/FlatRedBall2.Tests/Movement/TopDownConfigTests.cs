@@ -39,8 +39,27 @@ public class TopDownConfigTests
     }
 
     [Fact]
-    public void ApplyTo_OmittedFields_LeaveExistingValuesUntouched()
+    public void ApplyTo_CalledTwice_MutatesExistingTopDownValuesInstance()
     {
+        // Per-frame context swapping relies on ApplyTo reusing the existing TopDownValues
+        // instance, so it allocates nothing on the hot path.
+        var firstJson = """{ "movement": { "MaxSpeed": 200, "AccelerationTime": 0.4 } }""";
+        var secondJson = """{ "movement": { "MaxSpeed": 50,  "AccelerationTime": 0.1 } }""";
+        var behavior = new TopDownBehavior();
+        TopDownConfig.FromJsonString(firstJson).ApplyTo(behavior);
+        var original = behavior.MovementValues;
+
+        TopDownConfig.FromJsonString(secondJson).ApplyTo(behavior);
+
+        behavior.MovementValues.ShouldBeSameAs(original);
+        behavior.MovementValues!.MaxSpeed.ShouldBe(50f);
+    }
+
+    [Fact]
+    public void ApplyTo_OmittedFields_ResetsToDefaults()
+    {
+        // Replace semantic: fields absent from the JSON revert to TopDownValues defaults, not
+        // retained from the prior state.
         var behavior = new TopDownBehavior
         {
             MovementValues = new TopDownValues
@@ -56,8 +75,8 @@ public class TopDownConfigTests
         config.ApplyTo(behavior);
 
         behavior.MovementValues!.MaxSpeed.ShouldBe(250f);
-        behavior.MovementValues.AccelerationTime.ShouldBe(TimeSpan.FromSeconds(0.5));
-        behavior.MovementValues.DecelerationTime.ShouldBe(TimeSpan.FromSeconds(0.5));
+        behavior.MovementValues.AccelerationTime.ShouldBe(TimeSpan.Zero);
+        behavior.MovementValues.DecelerationTime.ShouldBe(TimeSpan.Zero);
     }
 
     [Fact]

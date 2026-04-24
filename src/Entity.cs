@@ -554,8 +554,25 @@ public class Entity : ICollidable, IAttachable
     /// A zero <paramref name="sep"/> short-circuits — no-op, no division.
     /// </summary>
     public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass = 1f, float otherMass = 1f, float elasticity = 1f)
+        => AdjustVelocityFromSeparation(sep, other, thisMass, otherMass, elasticity, axisAlignedSeparation: false);
+
+    /// <inheritdoc cref="ICollidable.AdjustVelocityFromSeparation(Vector2, ICollidable, float, float, float, bool)"/>
+    public void AdjustVelocityFromSeparation(Vector2 sep, ICollidable other, float thisMass, float otherMass, float elasticity, bool axisAlignedSeparation)
     {
         if (sep == Vector2.Zero) return;
+
+        // Perpendicular-contact decomposition: when the sep is known to be a sum of
+        // axis-aligned per-tile pushes (wall + floor corner), resolve as two independent
+        // axis impulses instead of one diagonal normal. A single normalize(sep) impulse
+        // would tilt large horizontal momentum into vertical (wall-slam pop-up).
+        // For genuinely diagonal normals (slope polygon SAT) this flag is false and the
+        // original single-normal formula runs — otherwise slope reflection is wrong.
+        if (axisAlignedSeparation && sep.X != 0f && sep.Y != 0f && other is not Entity)
+        {
+            ApplyOneSidedAxisImpulse(new Vector2(MathF.Sign(sep.X), 0f), thisMass, otherMass, elasticity);
+            ApplyOneSidedAxisImpulse(new Vector2(0f, MathF.Sign(sep.Y)), thisMass, otherMass, elasticity);
+            return;
+        }
 
         // Collision normal: the direction to push 'this' out of 'other'.
         var normal = Vector2.Normalize(sep);
@@ -595,6 +612,22 @@ public class Entity : ICollidable, IAttachable
             float impulse = -(1f + elasticity) * relVelAlongNormal;
             Velocity += impulse * thisRatio * normal;
         }
+    }
+
+    // Helper for the TileShapeCollection per-axis decomposition path above.
+    // TileShapeCollection is static geometry, so this mirrors the non-Entity branch
+    // of AdjustVelocityFromSeparation but against a pre-chosen axis-aligned normal.
+    private void ApplyOneSidedAxisImpulse(Vector2 normal, float thisMass, float otherMass, float elasticity)
+    {
+        float totalMass = thisMass + otherMass;
+        if (totalMass == 0f) return;
+
+        float thisRatio = otherMass == 0f ? 1f : otherMass / totalMass;
+        float relVelAlongNormal = Vector2.Dot(Velocity, normal);
+        if (relVelAlongNormal >= 0f) return;
+
+        float impulse = -(1f + elasticity) * relVelAlongNormal;
+        Velocity += impulse * thisRatio * normal;
     }
 
     // Recursively yields the primitive shapes (Circle, AxisAlignedRectangle, Polygon) reachable

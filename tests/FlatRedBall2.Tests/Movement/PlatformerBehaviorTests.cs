@@ -51,10 +51,10 @@ public class PlatformerBehaviorTests
     }
 
     [Fact]
-    public void Jump_WhenNotOnGround_DoesNotJump()
+    public void Jump_WhenNotOnGround_ZeroAirJumpVelocity_DoesNotJump()
     {
-        float jumpVelocity = 400f;
-        var values = new PlatformerValues { JumpVelocity = jumpVelocity };
+        // With JumpVelocity = 0 on AirMovement, pressing jump while airborne must not apply velocity.
+        var values = new PlatformerValues { JumpVelocity = 0f };
         var jumpInput = new MockPressableInput(wasJustPressed: true);
         var behavior = new PlatformerBehavior { AirMovement = values, JumpInput = jumpInput };
         var entity = new Entity();

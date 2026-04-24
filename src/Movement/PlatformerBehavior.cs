@@ -116,6 +116,22 @@ public class PlatformerBehavior
     /// </summary>
     public AxisAlignedRectangle? ClimbingShape { get; set; }
 
+    /// <summary>
+    /// Movement values applied after the first air jump. When non-null, the first air jump
+    /// transitions to this slot; subsequent air-jump attempts use <em>this</em> slot's
+    /// <see cref="PlatformerValues.JumpVelocity"/>. A value of 0 locks the player out of
+    /// further air jumps (standard double jump). A value &gt; 0 allows continued jumping from
+    /// this slot (double jump then flutter). When null, the player always uses
+    /// <see cref="AirMovement"/> for air jumps (infinite flutter as long as
+    /// <see cref="PlatformerValues.JumpVelocity"/> &gt; 0). Resets to use
+    /// <see cref="AirMovement"/> again each time the player lands.
+    /// </summary>
+    public PlatformerValues? AfterDoubleJump { get; set; }
+
+    // Tracks which air slot is currently active. Null = using AirMovement. Set to AfterDoubleJump
+    // after the first air jump (when AfterDoubleJump != null). Reset to null on landing.
+    private PlatformerValues? _activeAirValues;
+
     /// <summary>True while climbing a snapping ladder (X-locked). False for fence climbs and when not climbing.</summary>
     public bool IsOnLadder => IsClimbing && _lockedLadderX.HasValue;
 
@@ -232,6 +248,7 @@ public class PlatformerBehavior
     /// </summary>
     public bool IsSuppressingOneWayCollision => _suppressOneWay;
 
+    private float _previousInputY;
     private bool _dropThroughFrame;
     private bool _suppressOneWay;
     // Per-frame additive horizontal velocity contributed by a platform the entity is standing on.
@@ -305,6 +322,16 @@ public class PlatformerBehavior
             {
                 if (overlappingLadder && ShouldEnterLadder(entity, climbInputY))
                     EnterLadder(entity, Ladders!, preLadderCol!.Value);
+                else if (!overlappingLadder && entity.LastReposition.Y > 0 && climbInputY < -DirectionalInputThreshold)
+                {
+                    // Climb-down from standing: grounded, pressing down, no body overlap yet —
+                    // but a ladder tile exists directly below the feet. Uses LastReposition.Y
+                    // (current-frame ground result) rather than IsOnGround (set later in step A).
+                    // lostOverlap is suppressed this frame by _enteredClimbThisFrame.
+                    int? belowCol = LadderColumnBelowFeet();
+                    if (belowCol.HasValue)
+                        EnterLadder(entity, Ladders!, belowCol.Value);
+                }
                 else if (overlappingFence && ShouldEnterFence(climbInputY))
                     EnterFence();
             }
@@ -359,7 +386,7 @@ public class PlatformerBehavior
 
         var current = IsClimbing
             ? ClimbingMovement!
-            : (IsOnGround ? (GroundMovement ?? AirMovement) : AirMovement);
+            : (IsOnGround ? (GroundMovement ?? AirMovement) : (_activeAirValues ?? AirMovement));
 
         if (!IsOnGround || IsClimbing) CurrentSlope = 0f;
         float effectiveMaxSpeedX = ComputeSlopeAdjustedMaxSpeed(current, inputX);
@@ -404,19 +431,28 @@ public class PlatformerBehavior
             entity.VelocityY = inputY * current.ClimbingSpeed;
             IsApplyingJump = false;
 
-            // Jump-off: pressing jump while climbing exits climbing and applies the climbing
-            // slot's jump fields (same shape as a ground jump, sustain included). JumpVelocity = 0
-            // gives a "drop off without upward velocity" feel; games that want to forbid jump-off
+            // Jump-off: pressing jump while climbing exits climbing. When descending (inputY < 0),
+            // the player wants to fall off — apply zero velocity so they drop without an upward
+            // kick. When ascending or neutral, apply the climbing slot's jump fields so the player
+            // can hop off the top of the ladder. Games that want to forbid jump-off entirely
             // should null JumpInput while IsClimbing.
             if (JumpInput?.WasJustPressed == true)
             {
+                bool descending = inputY < -DirectionalInputThreshold;
                 IsClimbing = false;
-                entity.VelocityY = current.JumpVelocity;
-                if (current.JumpApplyLength > TimeSpan.Zero)
+                if (!descending)
                 {
-                    _jumpStartTime = time.SinceGameStart;
-                    _jumpValues = current;
-                    IsApplyingJump = true;
+                    entity.VelocityY = current.JumpVelocity;
+                    if (current.JumpApplyLength > TimeSpan.Zero)
+                    {
+                        _jumpStartTime = time.SinceGameStart;
+                        _jumpValues = current;
+                        IsApplyingJump = true;
+                    }
+                }
+                else
+                {
+                    entity.VelocityY = 0f;
                 }
             }
             else if (TopOfLadderY.HasValue)
@@ -440,11 +476,15 @@ public class PlatformerBehavior
                 }
             }
 
-            _suppressOneWay = false;
+            // Suppress one-way collision while descending so the player can climb down
+            // through jump-through (cloud) platforms on the ladder.
+            _suppressOneWay = inputY < -DirectionalInputThreshold;
             _dropThroughFrame = false;
         }
         else
         {
+            if (IsOnGround) _activeAirValues = null;
+
             // C. Apply gravity
             entity.AccelerationY = -current.Gravity;
 
@@ -469,6 +509,19 @@ public class PlatformerBehavior
                 _jumpStartTime = time.SinceGameStart;
                 _jumpValues = current;
                 IsApplyingJump = true;
+            }
+            else if (JumpInput?.WasJustPressed == true && !IsOnGround && !IsApplyingJump)
+            {
+                var airValues = _activeAirValues ?? AirMovement;
+                if (airValues.JumpVelocity > 0f)
+                {
+                    entity.VelocityY = airValues.JumpVelocity;
+                    _jumpStartTime = time.SinceGameStart;
+                    _jumpValues = airValues;
+                    IsApplyingJump = airValues.JumpApplyLength > TimeSpan.Zero;
+                    if (_activeAirValues == null && AfterDoubleJump != null)
+                        _activeAirValues = AfterDoubleJump;
+                }
             }
 
             if (IsApplyingJump && _jumpValues != null)
@@ -510,6 +563,7 @@ public class PlatformerBehavior
         _slopeSampledThisFrame = false;
         GroundHorizontalVelocity = _pendingGroundHorizontalVelocity;
         _pendingGroundHorizontalVelocity = 0f;
+        _previousInputY = MovementInput?.Y ?? 0f;
 
         // Post-Update climb cleanup. Runs after IsOnGround is set for the current frame so the
         // exit check sees this-frame ground state (the climbing branch above leaves IsOnGround
@@ -517,6 +571,7 @@ public class PlatformerBehavior
         if (hasClimbSurfaces)
         {
             float climbInputY = MovementInput?.Y ?? 0f;
+            float climbInputX = MovementInput?.X ?? 0f;
 
             if (IsClimbing)
             {
@@ -534,11 +589,26 @@ public class PlatformerBehavior
                     if (lostScanLadder.HasValue) { _activeClimbSurface = Ladders; _activeClimbCol = lostScanLadder.Value; }
                     else if (lostScanFence.HasValue) { _activeClimbSurface = Fences; _activeClimbCol = lostScanFence.Value; }
                 }
-                bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue;
+                // Suppress lostOverlap on the entry frame — when entering via "below feet" the
+                // body has no overlap yet and would otherwise exit on the same frame it entered.
+                bool lostOverlap = !lostScanLadder.HasValue && !lostScanFence.HasValue && !_enteredClimbThisFrame;
                 bool landedWhileDescending = IsOnGround && climbInputY <= 0f && !_enteredClimbThisFrame;
-                if (lostOverlap || landedWhileDescending)
+                bool steppedOffTop = _clampedAtTopThisFrame
+                    && MathF.Abs(climbInputX) > DirectionalInputThreshold;
+
+                if (lostOverlap || landedWhileDescending || steppedOffTop)
                 {
                     IsClimbing = false;
+                    if (steppedOffTop)
+                    {
+                        // Snap feet to ladder top so cloud/solid collision catches the player on the next frame.
+                        var probe = ClimbingShape ?? CollisionShape;
+                        float feetOffset = probe != null
+                            ? probe.AbsoluteY - probe.Height / 2f - entity.Y
+                            : 0f;
+                        entity.Y = TopOfLadderY!.Value - feetOffset;
+                        entity.VelocityY = 0f;
+                    }
                 }
             }
 
@@ -561,6 +631,12 @@ public class PlatformerBehavior
         if (inputY > DirectionalInputThreshold) return true;
         // Climb-down-from-top: standing on ground with a ladder cell directly below the feet.
         if (IsOnGround && inputY < -DirectionalInputThreshold && IsLadderBelowFeet())
+            return true;
+        // Airborne: fresh press of down grabs the ladder. Held-down is excluded to prevent
+        // re-grab on the frame immediately after a jump-off while descending.
+        // Uses LastReposition.Y (pre-step-A ground result) to detect airborne state —
+        // IsOnGround is set later in step A, so it is not available here.
+        if (entity.LastReposition.Y <= 0f && inputY < -DirectionalInputThreshold && _previousInputY >= -DirectionalInputThreshold)
             return true;
         return false;
     }
@@ -653,13 +729,15 @@ public class PlatformerBehavior
         return surface.GetCellWorldPosition(col, topRow).Y + surface.GridSize / 2f;
     }
 
-    private bool IsLadderBelowFeet()
+    private bool IsLadderBelowFeet() => LadderColumnBelowFeet().HasValue;
+
+    private int? LadderColumnBelowFeet()
     {
-        if (Ladders == null) return false;
+        if (Ladders == null) return null;
         var body = ClimbingShape ?? CollisionShape!;
         float bodyBottomY = body.AbsoluteY - body.Height / 2f;
         var (col, row) = Ladders.GetCellAt(new Vector2(body.AbsoluteX, bodyBottomY - 1f));
-        return Ladders.GetTileAtCell(col, row) != null;
+        return Ladders.GetTileAtCell(col, row) != null ? col : null;
     }
 
     /// <summary>

@@ -245,6 +245,8 @@ public class TileMap
             ? TileMapCollisionGenerator.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
             : TileMapCollisionGenerator.GenerateFromClass(_tilemap, className, _x, _y);
 
+        tsc.Name = className;
+
         _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
         return tsc;
     }

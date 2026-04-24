@@ -114,7 +114,7 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
 
     /// <inheritdoc/>
     public bool CollidesWith(ICollidable other)
-        => CollisionDispatcher.GetSeparationVector(this, other) != Vector2.Zero;
+        => CollisionDispatcher.CollidesWith(this, other);
 
     /// <inheritdoc/>
     public Vector2 GetSeparationVector(ICollidable other)

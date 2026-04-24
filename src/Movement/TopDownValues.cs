@@ -7,6 +7,23 @@ namespace FlatRedBall2.Movement;
 /// </summary>
 public class TopDownValues
 {
+    /// <summary>
+    /// Resets every field to the same state as a freshly constructed <see cref="TopDownValues"/>.
+    /// Called by <see cref="TopDownConfigExtensions.ApplyTo"/> before re-populating a reused
+    /// instance so leftover values from a prior apply don't leak into the new state. When adding a
+    /// new field to this class, also add it here.
+    /// </summary>
+    internal void ResetToDefaults()
+    {
+        MaxSpeed = 0f;
+        AccelerationTime = TimeSpan.Zero;
+        DecelerationTime = TimeSpan.Zero;
+        UpdateDirectionFromInput = true;
+        UpdateDirectionFromVelocity = false;
+        IsUsingCustomDeceleration = false;
+        CustomDecelerationValue = 0f;
+    }
+
     /// <summary>Maximum movement speed in world units per second.</summary>
     public float MaxSpeed;
 
