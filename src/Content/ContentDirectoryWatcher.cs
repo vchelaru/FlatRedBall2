@@ -48,6 +48,24 @@ public class ContentDirectoryWatcher : IDisposable
     public HashSet<string> AutoCopyExtensions { get; } =
         new(StringComparer.OrdinalIgnoreCase) { ".png", ".tsx" };
 
+    /// <summary>
+    /// File extensions (case-insensitive, leading dot) whose changes should trigger
+    /// <see cref="AutoReloadAction"/> before the user callback runs. Defaults to <c>.png</c> so
+    /// a texture edit patches the live <c>Texture2D</c> via <c>Engine.Content.TryReload</c>
+    /// without per-game boilerplate. Add <c>.achx</c> / other types as engine support lands.
+    /// </summary>
+    public HashSet<string> AutoReloadExtensions { get; } =
+        new(StringComparer.OrdinalIgnoreCase) { ".png" };
+
+    /// <summary>
+    /// Per-path reload step invoked after successful copy but before <c>onChanged</c>, when the
+    /// file's extension is in <see cref="AutoReloadExtensions"/>. The <see cref="Screen"/> wires
+    /// this to <c>Engine.Content.TryReload(destPath)</c> when the watcher is registered via
+    /// <see cref="Screen.WatchContentDirectory(string, Action{string}, string?)"/>. Null by default
+    /// — the bare constructor does not assume a reload policy.
+    /// </summary>
+    public Action<string>? AutoReloadAction { get; set; }
+
     /// <param name="source">Underlying directory event source.</param>
     /// <param name="onChanged">Invoked once per dirty file after copy succeeds.</param>
     /// <param name="copyToDestination">
@@ -105,7 +123,14 @@ public class ContentDirectoryWatcher : IDisposable
             try
             {
                 if (_copyToDestination(rel))
+                {
+                    if (AutoReloadAction != null
+                        && AutoReloadExtensions.Contains(Path.GetExtension(rel)))
+                    {
+                        AutoReloadAction(rel);
+                    }
                     _onChanged(rel);
+                }
             }
             catch (IOException)
             {

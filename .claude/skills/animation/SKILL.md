@@ -130,6 +130,10 @@ The `.achx` references the `.png` by relative path (`FileRelativeTextures` is `t
 
 FRB2 does not provide an engine-level animation controller for platformers. Animation state selection is game code — see the `platformer-movement` skill for the recommended pattern (a pattern match on `PlatformerBehavior` state + facing suffix).
 
+## Hot-Reload
+
+`AnimationChainList.TryReloadFrom(path, content)` patches the list in place, matching chains by name so live `Sprite.CurrentAnimation` references keep playing with the new frames. Removed chains are left orphaned. Returns `false` on parse failure. **Every sprite must share one list instance** — entities that re-parse the `.achx` on each spawn defeat this. Wire via `WatchContentDirectory` — see `content-hot-reload`.
+
 ## Gotchas
 
 - **Never pause animation to express "still" state.** Animation runs continuously. If a state should appear motionless (idle, hanging on a ladder, holding a charge), the **content author** makes a chain that *looks* still — a 1-frame chain, or better, a multi-frame chain with subtle motion (hair blowing, eyes blinking, breath rise/fall). Game code switching `_sprite.Animate = false` is a layering violation: it bakes a content decision (is this state animated?) into engine-driving code, and it forecloses content choices the author may want later. The only correct writers of `Animate` are `PlayAnimation` (sets true) and the non-looping end-of-chain hook (sets false). If you find yourself reaching for `_sprite.Animate = ...`, you want a different chain instead.
@@ -137,3 +141,4 @@ FRB2 does not provide an engine-level animation controller for platformers. Anim
 - **Non-looping animation stops on the last frame** — `Animate` is set to `false` automatically; call `PlayAnimation` again to restart.
 - **Animation is paused when the screen is paused** — `AnimateSelf` is called inside the `!IsPaused` block in `Screen.Update`.
 - **`TextureScale` applies to the source frame size** — if `TextureScale` is set (default `1f`), `Width`/`Height` are recalculated automatically when the frame changes. This keeps animated sprites correctly sized without manual width/height assignment.
+- **`Sprite.X` and `Sprite.Y` are overwritten on every frame switch** — each `AnimationFrame` carries a `RelativeX`/`RelativeY` (both default `0`), and advancing to a new frame assigns those to the sprite unconditionally. Code like `_booster.Y = -10;` in `CustomInitialize` works for exactly one frame, then snaps back to 0 on the next advance. To offset an animated sprite relative to its parent entity, bake the offset into each frame's `RelativeX`/`RelativeY` in the `.achx` — that is what the field is for. Alternatives: attach the sprite to a child entity whose own `X`/`Y` carries the offset, or assign the offset after `PlayAnimation` every time the chain changes (fragile).

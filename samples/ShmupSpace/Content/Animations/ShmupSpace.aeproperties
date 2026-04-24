@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AESettingsSave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <OffsetMultiplier>1</OffsetMultiplier>
+  <AnimationChainSettings />
+  <ExpandedNode>ShipTurnLeft</ExpandedNode>
+  <ExpandedNode>ShipStraight</ExpandedNode>
+  <ExpandedNode>ShipTurnRight</ExpandedNode>
+  <ExpandedNode>ShipBoosterStrong</ExpandedNode>
+  <ExpandedNode>EnemyClam</ExpandedNode>
+  <ExpandedNode>PlayerShot1</ExpandedNode>
+  <ExpandedNode>Explosion</ExpandedNode>
+  <ExpandedNode>EnemyShot</ExpandedNode>
+  <UnitType>Pixel</UnitType>
+  <SnapToGrid>true</SnapToGrid>
+  <GridSize>16</GridSize>
+</AESettingsSave>

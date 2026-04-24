@@ -414,6 +414,67 @@ public class WatchContentIntegrationTests : IDisposable
         File.ReadAllText(Path.Combine(destDir, "Tilesets", "art.png")).ShouldBe("ART");
     }
 
+    [Fact]
+    public void WatchContentDirectory_PngChanged_AutoReloadsRegisteredTexture()
+    {
+        var engine = MakeEngine();
+
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "ship.png"), "v2-src");
+        File.WriteAllText(Path.Combine(destDir, "ship.png"), "v1-dest"); // simulate prior MSBuild copy
+
+        // Register at the absolute dest path the watcher will pass to TryReload.
+        engine.Content.TextureLoader = _ => null!;
+        int reloaderCalls = 0;
+        engine.Content.TextureReloader = (_, _) => { reloaderCalls++; return true; };
+        engine.Content.Load<Microsoft.Xna.Framework.Graphics.Texture2D>(Path.Combine(destDir, "ship.png"));
+
+        var fake = new FakeDirectoryWatcher();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: _ => { },
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        fake.Fire("ship.png");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        reloaderCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public void WatchContentDirectory_JsonChanged_DoesNotInvokeTextureReloader()
+    {
+        var engine = MakeEngine();
+        engine.Content.TextureLoader = _ => null!;
+        int reloaderCalls = 0;
+        engine.Content.TextureReloader = (_, _) => { reloaderCalls++; return true; };
+
+        var srcDir = Path.Combine(_srcRoot, "Content");
+        var destDir = Path.Combine(_destRoot, "Content");
+        Directory.CreateDirectory(srcDir);
+        Directory.CreateDirectory(destDir);
+        File.WriteAllText(Path.Combine(srcDir, "config.json"), "v2");
+        File.WriteAllText(Path.Combine(destDir, "config.json"), "v1");
+
+        var fake = new FakeDirectoryWatcher();
+        var w = engine.CurrentScreen.WatchContentDirectory(
+            fake,
+            onChanged: _ => { },
+            sourceAbsoluteRoot: srcDir,
+            destinationAbsoluteRoot: destDir);
+        w.Debounce = TimeSpan.Zero;
+
+        fake.Fire("config.json");
+        engine.Update(new Microsoft.Xna.Framework.GameTime());
+
+        reloaderCalls.ShouldBe(0);
+    }
+
     private class FakeFileWatcher : IFileWatcher
     {
         public event Action? Changed;

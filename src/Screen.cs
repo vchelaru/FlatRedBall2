@@ -576,6 +576,12 @@ public class Screen
         else
             copy = _ => true;
         watcher = new ContentDirectoryWatcher(source, onChanged, copy);
+        // Default auto-reload policy: PNG edits patch the live Texture2D in-place via
+        // Engine.Content.TryReload before onChanged fires. No-op when the texture isn't
+        // registered. Set watcher.AutoReloadAction = null to opt out.
+        if (destinationAbsoluteRoot != null)
+            watcher.AutoReloadAction = relPath =>
+                Engine.Content.TryReload(Path.Combine(destinationAbsoluteRoot, relPath));
         _contentDirectoryWatchers.Add(watcher);
         return watcher;
     }
@@ -720,26 +726,41 @@ public class Screen
             foreach (var rel in _collisionRelationships)
                 rel.RunCollisions();
 
+            // Loops 2.5, 3, 4 fire user callbacks (tween Ended, CustomActivity, AnimationFinished)
+            // that may Destroy entities — mutating _entities and _renderList. Reverse-for with a
+            // bounds check tolerates mutation without allocating. Forward foreach would throw;
+            // snapshot-via-new-List is forbidden here (per-frame hotpath — see engine-tdd skill).
+
             // 2.5 Tween advancement — entity tweens before CustomActivity so setter-driven
             //     state is visible to user code; screen tweens just before screen CustomActivity.
             if (ShouldAdvanceTweens)
             {
                 float dt = frameTime.DeltaSeconds;
-                foreach (var entity in _entities)
+                for (int i = _entities.Count - 1; i >= 0; i--)
+                {
+                    if (i >= _entities.Count) continue;
+                    var entity = _entities[i];
                     if (entity.ShouldAdvanceTweens)
                         entity._tweens.Update(dt);
+                }
                 _tweens.Update(dt);
             }
 
             // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
-            foreach (var entity in new List<Entity>(_entities))
-                entity.CustomActivity(frameTime);
+            for (int i = _entities.Count - 1; i >= 0; i--)
+            {
+                if (i >= _entities.Count) continue;
+                _entities[i].CustomActivity(frameTime);
+            }
 
             // 4. Animate sprites
             double animDt = frameTime.DeltaSeconds;
-            foreach (var renderable in _renderList)
-                if (renderable is Sprite sprite)
+            for (int i = _renderList.Count - 1; i >= 0; i--)
+            {
+                if (i >= _renderList.Count) continue;
+                if (_renderList[i] is Sprite sprite)
                     sprite.AnimateSelf(animDt);
+            }
         }
 
         // 5. Screen CustomActivity — always runs so pause menu logic can respond to input

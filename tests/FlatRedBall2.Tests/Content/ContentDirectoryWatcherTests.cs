@@ -198,4 +198,102 @@ public class ContentDirectoryWatcherTests
 
         calls.ShouldBe(new[] { "zoo.json" });
     }
+
+    // Auto-reload: when a file whose extension is in AutoReloadExtensions changes, the watcher
+    // invokes AutoReloadAction before firing onChanged. The Screen wires this to
+    // Engine.Content.TryReload so PNG edits patch existing Texture2D instances without
+    // requiring per-game boilerplate in HandleContentChanged.
+
+    [Fact]
+    public void AutoReload_PngChanged_InvokesAutoReloadActionThenOnChanged()
+    {
+        var src = new FakeDirectoryWatcher();
+        var order = new List<string>();
+        var w = Make(src, rel => order.Add($"onChanged:{rel}"));
+        w.AutoReloadAction = rel => order.Add($"reload:{rel}");
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("ship.png", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        order.ShouldBe(new[] { "reload:ship.png", "onChanged:ship.png" });
+    }
+
+    [Fact]
+    public void AutoReload_NonPngChanged_DoesNotInvokeAutoReloadAction()
+    {
+        var src = new FakeDirectoryWatcher();
+        var calls = new List<string>();
+        var reloads = new List<string>();
+        var w = Make(src, calls.Add);
+        w.AutoReloadAction = reloads.Add;
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("config.json", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        reloads.ShouldBeEmpty();
+        calls.ShouldBe(new[] { "config.json" });
+    }
+
+    [Fact]
+    public void AutoReload_NullAction_PngChangeStillFiresOnChanged()
+    {
+        var src = new FakeDirectoryWatcher();
+        var calls = new List<string>();
+        var w = Make(src, calls.Add);
+        // No AutoReloadAction set.
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("ship.png", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        calls.ShouldBe(new[] { "ship.png" });
+    }
+
+    [Fact]
+    public void AutoReload_CopyFails_AutoReloadNotInvoked()
+    {
+        var src = new FakeDirectoryWatcher();
+        var reloads = new List<string>();
+        var w = Make(src, _ => { }, copyToDestination: _ => false);
+        w.AutoReloadAction = reloads.Add;
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("ship.png", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        reloads.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AutoReload_CaseInsensitiveExtensionMatch()
+    {
+        var src = new FakeDirectoryWatcher();
+        var reloads = new List<string>();
+        var w = Make(src, _ => { });
+        w.AutoReloadAction = reloads.Add;
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("SHIP.PNG", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        reloads.ShouldBe(new[] { "SHIP.PNG" });
+    }
+
+    [Fact]
+    public void AutoReload_CustomExtension_InvokesAction()
+    {
+        var src = new FakeDirectoryWatcher();
+        var reloads = new List<string>();
+        var w = Make(src, _ => { });
+        w.AutoReloadExtensions.Add(".achx");
+        w.AutoReloadAction = reloads.Add;
+        var t0 = DateTime.UtcNow;
+
+        w.MarkChangedAt("player.achx", t0);
+        w.Tick(t0 + TimeSpan.FromMilliseconds(250));
+
+        reloads.ShouldBe(new[] { "player.achx" });
+    }
 }

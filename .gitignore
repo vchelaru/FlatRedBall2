@@ -1,45 +1,18 @@
-/src/.vs
-/src/obj
-/tests/FlatRedBall2.Tests/bin
-/tests/FlatRedBall2.Tests/obj
-/src/bin
-/samples/PlatformerSample/bin
-/samples/PlatformerSample/obj
-/samples/SampleProject1/.vs
-/samples/SampleProject1/bin
-/samples/SampleProject1/obj
-/samples/SpaceInvadersSample/bin
-/samples/SpaceInvadersSample/obj
-/samples/ShmupSample/bin
-/samples/ShmupSample/obj
-samples/KoalaPickleSample/bin/Debug/net9.0/Apos.Shapes.dll
-/samples/KoalaPickleSample/bin
-/samples/KoalaPickleSample/obj
-/samples/ShipSample/bin
-/samples/ShipSample/Content/obj
-/samples/ShipSample/obj
-/samples/TopDownMenuSample/bin
-/samples/TopDownMenuSample/obj
-/samples/TopDownMenuSampleWithCodeGen/bin
-/samples/TopDownMenuSampleWithCodeGen/obj
-/samples/ZombieSample/bin
-/samples/ZombieSample/obj
-/samples/PongGravity/bin
-/samples/PongGravity/obj
-/samples/BouncingBallsSample/bin
-/samples/BouncingBallsSample/obj
-/samples/BouncingBallsSample/Content/obj
-**/settings.local.json
-/samples/SampleProject1/Content/bin
-/samples/SampleProject1/Content/obj
-/samples/ZeldaRoomsSample/bin
-/samples/ZeldaRoomsSample/obj
-/samples/auto
-/samples/SlopesSample
+# Build output
+**/bin/
+**/obj/
 
+# Visual Studio / Rider / IDE
+**/.vs/
+
+# Per-machine Claude settings
+**/settings.local.json
+
+# Engine / tooling scratch
 .claude/skill_change_log.jsonl
 /design/edc
 /out
-/samples/PlatformKing/.vs
-/samples/PlatformKing/bin
-/samples/PlatformKing/obj
+
+# Sample folders intentionally excluded from source control
+/samples/auto
+/samples/SlopesSample

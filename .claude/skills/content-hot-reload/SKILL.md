@@ -72,37 +72,24 @@ WatchContentDirectory("Assets", relPath => ..., destinationDirectory: "Content")
 
 ### 1. In-place reload — patch the existing object
 
-Use when the change is small and the type/shape is unchanged. No screen restart, no state loss.
+Dispatch by extension; each path either patches the live object or returns `false` so you can fall back to restart:
 
-- **JSON configs** — read the new file, copy values onto the live object.
-- **PNG with same dimensions** — `Engine.Content.TryReload(path)` patches pixels via `Texture2D.SetData`; existing `Sprite` references keep working. The texture must have been loaded via `Engine.Content.Load<Texture2D>("Content/foo.png")` (path with extension) so it was registered. Returns `false` if the new file has different dimensions (caller restarts) or the path was never loaded.
+```csharp
+WatchContentDirectory("Content", rel =>
+{
+    var ext = Path.GetExtension(rel);
+    if (ext == ".json")      ReloadJsonConfig(rel);                              // copy new values onto live object
+    else if (ext == ".png")  { }                                                 // engine auto-reloaded before callback
+    else if (ext == ".tmx"   && !map.TryReloadFrom("Content/" + rel))            RestartScreen(RestartMode.HotReload);
+    else if (ext == ".achx"  && !Animations.TryReloadFrom("Content/" + rel, Engine.Content)) RestartScreen(RestartMode.HotReload);
+    else RestartScreen(RestartMode.HotReload);
+});
+```
+<!-- skill-creator: allow-long-csharp reason="canonical dispatch table — collapsing to prose loses the per-type pattern that makes the section useful" -->
 
-  ```csharp
-  WatchContentDirectory("Content", relPath =>
-  {
-      if (relPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-      {
-          if (!Engine.Content.TryReload("Content/" + relPath))
-              RestartScreen(RestartMode.HotReload);
-      }
-      else RestartScreen(RestartMode.HotReload);
-  });
-  ```
-
-  **Scope (v1).** Only PNGs loaded via `Engine.Content.Load<Texture2D>("path.png")` are tracked. **Not** tracked: textures loaded through MonoGame's xnb pipeline (`Load<Texture2D>("bare_key")` — xnb is a build artifact and can't be reloaded at runtime), Aseprite atlas textures (generated in-memory, no single source PNG), TMX tileset textures (already covered by the TMX restart fallback).
-- **Tile-data-only TMX changes** — `TileMap.TryReloadFrom(path)` patches tile IDs in existing layers and rebuilds every TSC registered via `GenerateCollisionFromClass` / `GenerateCollisionFromProperty`. Returns `true` if applied; `false` if the new TMX differs structurally (map dims, layer set, tilesets, object layers) — caller falls back to `RestartScreen(RestartMode.HotReload)`. Hand-authored mutations on a generated TSC after `Generate*` (e.g. extra `AddPolygonTileAtCell` calls) are **wiped** on in-place reload — put augmentations in `CustomInitialize` so they survive a full restart.
-
-  ```csharp
-  WatchContentDirectory("Content", relPath =>
-  {
-      if (relPath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase))
-      {
-          if (!map.TryReloadFrom("Content/" + relPath))
-              RestartScreen(RestartMode.HotReload);
-      }
-      else RestartScreen(RestartMode.HotReload);
-  });
-  ```
+- **`.png`** — auto-reloaded before the callback (`AutoReloadAction` → `Engine.Content.TryReload`, patches `Texture2D` pixels in place). Only tracks PNGs loaded via `Engine.Content.Load<Texture2D>("path.png")` (extension required; xnb pipeline loads are not tracked). Opt out: set `watcher.AutoReloadAction = null`. Dimension change silently fails — add an explicit `.png → Engine.Content.TryReload` + restart fallback if you edit resolutions.
+- **`.tmx`** — `TileMap.TryReloadFrom` patches tile IDs and rebuilds every TSC registered via `GenerateCollisionFromClass`/`Property`. Returns `false` on structural change (map/layer/tileset diff). Hand-authored mutations on a generated TSC are **wiped** — put augmentations in `CustomInitialize`.
+- **`.achx`** — `AnimationChainList.TryReloadFrom` patches by chain name; live `Sprite.CurrentAnimation` references keep playing. Every sprite must share one list instance — per-spawn re-parse defeats this. See the `animation` skill.
 
 ### 2. Screen restart — `RestartScreen(RestartMode.HotReload)`
 
