@@ -75,7 +75,19 @@ WatchContentDirectory("Assets", relPath => ..., destinationDirectory: "Content")
 Use when the change is small and the type/shape is unchanged. No screen restart, no state loss.
 
 - **JSON configs** — read the new file, copy values onto the live object.
-- **PNG with same dimensions** — `Engine.Content.TryReload(path)` patches pixels via `Texture2D.SetData`; existing `Sprite` references keep working. The texture must have been loaded via `Engine.Content.Load<Texture2D>("Content/foo.png")` (path with extension) so it was registered. Returns `false` if the new file has different dimensions (caller restarts) or the path was never loaded.
+- **PNG with same dimensions — handled automatically by `WatchContentDirectory`.** When a `.png` under the watched tree changes, the engine calls `Engine.Content.TryReload` *before* firing your `onChanged` callback. Existing `Sprite.Texture` references keep working — pixels are patched in place via `Texture2D.SetData`. The texture must have been loaded via `Engine.Content.Load<Texture2D>("path.png")` (extension in the path) to be tracked. **In your `onChanged` dispatcher, skip `.png` explicitly** — a blanket `else → RestartScreen` will wipe the auto-reload win by restarting the screen anyway.
+
+  ```csharp
+  WatchContentDirectory("Content", relPath =>
+  {
+      var ext = Path.GetExtension(relPath);
+      if (ext == ".json") ReloadJsonConfig(relPath);
+      else if (ext == ".png") return;           // engine already patched the texture
+      else RestartScreen(RestartMode.HotReload); // catch-all for structural assets
+  });
+  ```
+
+  Opt out by setting `watcher.AutoReloadAction = null` after registering (or removing `.png` from `watcher.AutoReloadExtensions`). Falls back to manual `Engine.Content.TryReload` inside the callback if you need the boolean result to decide restart vs. no-op — `TryReload` returns `false` on dimension mismatch or untracked path.
 
   ```csharp
   WatchContentDirectory("Content", relPath =>

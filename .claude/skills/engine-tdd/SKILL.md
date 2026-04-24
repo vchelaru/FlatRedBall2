@@ -1,0 +1,12 @@
+---
+name: engine-tdd
+description: "Test-first discipline for FlatRedBall2 engine changes. Triggers whenever editing any file under src/ for a behavior change (bug fix or feature). Not for XML docs, renames, style-only edits, or sample code."
+---
+
+# Engine Changes Require a Failing Test First
+
+Behavior changes in `src/` require a failing test in `tests/FlatRedBall2.Tests/` **before** the source edit. Write it, run it, watch it fail, then fix.
+
+No "the cause is obvious, I'll skip the test" exception — that reasoning is how silent regressions ship. If you're about to edit `src/` without a failing test open, stop.
+
+Exceptions: XML docs, style-only edits, pure renames, dead-code removal.

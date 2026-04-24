@@ -43,10 +43,28 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>The entity this sprite is attached to, or <c>null</c> if unattached. Set by <see cref="Entity.Add(IAttachable, Layer?)"/>.</summary>
     public Entity? Parent { get; set; }
 
-    /// <summary>X position. Relative to <see cref="Parent"/> when attached, world when unattached.</summary>
+    /// <summary>
+    /// X position. Relative to <see cref="Parent"/> when attached, world when unattached.
+    /// <para>
+    /// <b>Animated sprites:</b> this value is overwritten with <see cref="AnimationFrame.RelativeX"/>
+    /// on every frame switch. Assigning <see cref="X"/> in game code on a sprite that is playing
+    /// an animation is clobbered on the next advance — bake the offset into the frames' <c>RelativeX</c>
+    /// in the <c>.achx</c> / source asset instead, or attach the sprite to a child entity whose own
+    /// <c>X</c> carries the offset.
+    /// </para>
+    /// </summary>
     public float X { get; set; }
 
-    /// <summary>Y position (Y+ up in world space). Relative to <see cref="Parent"/> when attached, world when unattached.</summary>
+    /// <summary>
+    /// Y position (Y+ up in world space). Relative to <see cref="Parent"/> when attached, world when unattached.
+    /// <para>
+    /// <b>Animated sprites:</b> this value is overwritten with <see cref="AnimationFrame.RelativeY"/>
+    /// on every frame switch. Assigning <see cref="Y"/> in game code on a sprite that is playing
+    /// an animation is clobbered on the next advance — bake the offset into the frames' <c>RelativeY</c>
+    /// in the <c>.achx</c> / source asset instead, or attach the sprite to a child entity whose own
+    /// <c>Y</c> carries the offset.
+    /// </para>
+    /// </summary>
     public float Y { get; set; }
 
     /// <summary>Per-sprite draw order within its <see cref="Layer"/>. See <see cref="IRenderable.Z"/> for sorting semantics.</summary>
