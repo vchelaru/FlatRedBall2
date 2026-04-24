@@ -10,17 +10,17 @@ namespace PlatformKing.Entities;
 
 public class Player : Entity, IPlatformerEntity
 {
-    // Swimming constants
-    private const float SwimGravity = -200f;   // gentle upward buoyancy
-    private const float SwimMaxFallSpeed = 80f; // max downward speed in water
-    private const float SwimHorizontalMax = 100f;
-    private const float SwimJumpBoost = 200f;
-
     private readonly PlatformerBehavior _platformer = new();
 
     private AxisAlignedRectangle _body = null!;
     private Sprite _sprite = null!;
     private bool _isSwimming;
+
+    private PlatformerValues? _normalGroundMovement;
+    private PlatformerValues _normalAirMovement = null!;
+    private PlatformerValues? _normalAfterDoubleJump;
+    private PlatformerValues? _waterGroundMovement;
+    private PlatformerValues _waterAirMovement = null!;
 
     // Track velocity before the platformer update so box-break detection can see it.
     public float VelocityYBeforeCollision { get; private set; }
@@ -54,7 +54,7 @@ public class Player : Entity, IPlatformerEntity
             Width = 12f,
             Height = 20f,
             Y = 10f,
-            IsVisible = true,
+            IsVisible = false,
             IsFilled = false
         };
         Add(_body);
@@ -70,51 +70,31 @@ public class Player : Entity, IPlatformerEntity
         PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
         _platformer.CollisionShape = _body;
 
+        _normalGroundMovement = _platformer.GroundMovement;
+        _normalAirMovement = _platformer.AirMovement;
+        _normalAfterDoubleJump = _platformer.AfterDoubleJump;
+
+        var waterBehavior = new PlatformerBehavior();
+        PlatformerConfig.FromJson("Content/player.water.platformer.json").ApplyTo(waterBehavior);
+        _waterGroundMovement = waterBehavior.GroundMovement;
+        _waterAirMovement = waterBehavior.AirMovement;
     }
 
     public override void CustomActivity(FrameTime time)
     {
         VelocityYBeforeCollision = VelocityY;
 
-        // Determine swimming state (check before platformer update).
-        _isSwimming = WaterZones != null && _body.CollidesWith(WaterZones);
+        _isSwimming = IsInWater();
+        _platformer.GroundMovement = _isSwimming ? _waterGroundMovement : _normalGroundMovement;
+        _platformer.AirMovement = _isSwimming ? _waterAirMovement : _normalAirMovement;
+        _platformer.AfterDoubleJump = _isSwimming ? null : _normalAfterDoubleJump;
 
-        if (_isSwimming)
-        {
-            HandleSwimming(time);
-        }
-        else
-        {
-            _platformer.Update(this, time);
-        }
+        _platformer.Update(this, time);
 
         UpdateAnimation();
     }
 
-    private void HandleSwimming(FrameTime time)
-    {
-        float dt = time.DeltaSeconds;
-
-        // Horizontal movement — capped.
-        float inputX = _platformer.MovementInput?.X ?? 0f;
-        VelocityX = MathF.Max(-SwimHorizontalMax, MathF.Min(SwimHorizontalMax, inputX * SwimHorizontalMax));
-
-        // Vertical physics — gentle upward buoyancy + input.
-        float inputY = _platformer.MovementInput?.Y ?? 0f;
-        VelocityY += SwimGravity * dt;
-
-        if (inputY > 0.1f)
-            VelocityY += 200f * dt;
-        else if (inputY < -0.1f)
-            VelocityY -= 200f * dt;
-
-        // Jump while swimming = upward boost.
-        if (_platformer.JumpInput?.WasJustPressed == true)
-            VelocityY = SwimJumpBoost;
-
-        // Clamp fall speed in water.
-        VelocityY = MathF.Max(-SwimMaxFallSpeed, VelocityY);
-    }
+    private bool IsInWater() => WaterZones != null && _body.CollidesWith(WaterZones);
 
     private void UpdateAnimation()
     {

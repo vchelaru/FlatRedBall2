@@ -25,15 +25,6 @@ public class Enemy : Entity
 
     public override void CustomInitialize()
     {
-        Body = new AxisAlignedRectangle
-        {
-            Width = 14f,
-            Height = 20f,
-            Y = 10f,
-            Color = Color.Cyan,
-            IsVisible = true,
-        };
-        Add(Body);
 
         _sprite = new Sprite { Y = 16f };
         var animations = AnimationChainListSave
@@ -41,6 +32,17 @@ public class Enemy : Entity
             .ToAnimationChainList(Engine.Content);
         _sprite.AnimationChains = animations;
         Add(_sprite);
+
+        Body = new AxisAlignedRectangle
+        {
+            Width = 14f,
+            Height = 14,
+            Y = 7,
+            Color = Color.Cyan,
+            IsVisible = false,
+            IsFilled = false
+        };
+        Add(Body);
 
         PlatformerConfig.FromJson("Content/enemy.platformer.json").ApplyTo(_platformer);
         _platformer.MovementInput = _patrolInput;

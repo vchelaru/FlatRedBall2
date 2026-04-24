@@ -1276,7 +1276,19 @@ public class TileShapeCollection : ICollidable
     /// <inheritdoc/>
     public float BroadPhaseRadius => float.MaxValue;
     /// <inheritdoc/>
-    public bool CollidesWith(ICollidable other) => GetSeparationFor(other) != Vector2.Zero;
+    public bool CollidesWith(ICollidable other)
+    {
+        var (minX, maxX, minY, maxY) = CollisionDispatcher.GetBounds(other);
+        int colMin = (int)MathF.Floor((minX - X) / GridSize);
+        int colMax = (int)MathF.Floor((maxX - X) / GridSize);
+        int rowMin = (int)MathF.Floor((minY - Y) / GridSize);
+        int rowMax = (int)MathF.Floor((maxY - Y) / GridSize);
+        for (int col = colMin; col <= colMax; col++)
+            for (int row = rowMin; row <= rowMax; row++)
+                if (_tiles.ContainsKey((col, row)) || _polyTiles.ContainsKey((col, row)))
+                    return true;
+        return false;
+    }
     /// <inheritdoc/>
     public Vector2 GetSeparationVector(ICollidable other) => GetSeparationFor(other);
     /// <inheritdoc/>

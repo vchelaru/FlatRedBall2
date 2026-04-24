@@ -219,6 +219,12 @@ public override void CustomInitialize()
 }
 ```
 
+**When using a `TileMap`, derive bounds from the map instead of hardcoding:**
+```csharp
+cam.Map = new BoundsRectangle(map.X + map.Width / 2f, map.Y - map.Height / 2f, map.Width, map.Height);
+```
+`TileMap.Width`/`Height` are in world units (tiles × tile size). `map.X`/`map.Y` is the map's bottom-left corner, so `+ Width/2` / `+ Height/2` converts to center. `BoundsRectangle` is in `FlatRedBall2.Math`.
+
 **Approach styles:**
 - `Immediate` — locks to target each frame (no lag)
 - `Smooth` — exponential ease; speed = coefficient × distance (default 5)

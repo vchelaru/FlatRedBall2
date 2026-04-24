@@ -43,6 +43,10 @@ internal static class CollisionDispatcher
         // delegate to Line's own intersection test since no separation exists.
         if (a is Line la && b is not AxisAlignedRectangle) return la.CollidesWith(b);
         if (b is Line lb && a is not AxisAlignedRectangle) return lb.CollidesWith(a);
+        // TileShapeCollection.CollidesWith uses a direct cell-occupancy scan that is
+        // correct even when the caller is fully surrounded (net separation == zero).
+        if (a is TileShapeCollection tsca) return tsca.CollidesWith(b);
+        if (b is TileShapeCollection tscb) return tscb.CollidesWith(a);
         return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
     }
 

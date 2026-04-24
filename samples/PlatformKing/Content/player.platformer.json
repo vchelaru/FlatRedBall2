@@ -16,7 +16,7 @@
       "Gravity": 700,
       "MaxFallSpeed": 800,
       "minJumpHeight": 24,
-      "maxJumpHeight": 64
+      "maxJumpHeight": 24
     },
     "afterDoubleJump": {
       "MaxSpeedX": 150,

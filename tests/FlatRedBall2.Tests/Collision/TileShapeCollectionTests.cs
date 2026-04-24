@@ -211,6 +211,40 @@ public class TileShapeCollectionTests
         tiles.CollidesWith(rect).ShouldBeFalse();
     }
 
+    [Fact]
+    public void CollidesWith_ShapeFullySurroundedByTiles_ReturnsTrue()
+    {
+        // Bug: GetSeparationFor accumulates separation vectors. When the shape is fully
+        // surrounded, opposing tiles cancel each other to Vector2.Zero → CollidesWith
+        // returned false even though the shape clearly overlaps the tile collection.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        for (int c = -1; c <= 1; c++)
+            for (int r = -1; r <= 1; r++)
+                tiles.AddTileAtCell(c, r); // 3×3 block; center tile at cell (0,0)
+
+        // Small shape sitting fully inside the center cell (0,0): world [0..16]×[0..16]
+        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+
+        tiles.CollidesWith(rect).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CollidesWith_RectCallerFullySurroundedByTiles_ReturnsTrue()
+    {
+        // The actual game-code path: rect.CollidesWith(tileShapeCollection).
+        // AxisAlignedRectangle.CollidesWith delegates to CollisionDispatcher.GetSeparationVector,
+        // which calls TileShapeCollection.GetSeparationFor — same zero-cancellation bug as above
+        // but exercised from the other direction.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        for (int c = -1; c <= 1; c++)
+            for (int r = -1; r <= 1; r++)
+                tiles.AddTileAtCell(c, r);
+
+        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+
+        rect.CollidesWith(tiles).ShouldBeTrue();
+    }
+
     // ── GetSeparationFor ─────────────────────────────────────────────────────
 
     [Fact]

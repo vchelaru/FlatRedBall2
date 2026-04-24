@@ -14,7 +14,7 @@ public class Game1 : Game
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
-        FlatRedBallService.Default.DisplaySettings.Zoom = 2f;
+        FlatRedBallService.Default.DisplaySettings.Zoom = 3f;
         FlatRedBallService.Default.PrepareWindow<GameScreen>(_graphics);
     }
 

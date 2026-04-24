@@ -1,5 +1,7 @@
 using FlatRedBall2;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Entities;
+using FlatRedBall2.Math;
 using FlatRedBall2.Tiled;
 using PlatformKing.Entities;
 
@@ -13,6 +15,7 @@ public class GameScreen : Screen
     private Factory<Box> _boxFactory = null!;
     private Factory<Enemy> _enemyFactory = null!;
     private Factory<Door> _doorFactory = null!;
+    private Factory<CameraControllingEntity> _cameraFactory = null!;
 
     private TileShapeCollection _solid = null!;
     private TileShapeCollection _jumpThrough = null!;
@@ -36,7 +39,6 @@ public class GameScreen : Screen
         // Generate collision layers.
         _solid = map.GenerateCollisionFromClass("SolidCollision");
         _jumpThrough = map.GenerateCollisionFromClass("JumpThroughCollision");
-        _jumpThrough.IsVisible = true;
         _ladders = map.GenerateCollisionFromClass("Ladder");
         _water = map.GenerateCollisionFromClass("Water");
         _deathTiles = map.GenerateCollisionFromClass("Death");
@@ -63,6 +65,13 @@ public class GameScreen : Screen
         var player = players[0];
         player.Ladders = _ladders;
         player.WaterZones = _water;
+
+        _cameraFactory = new Factory<CameraControllingEntity>(this);
+        var cam = _cameraFactory.Create();
+        cam.Target = player;
+        cam.Map = new BoundsRectangle(map.X + map.Width / 2f, map.Y - map.Height / 2f, map.Width, map.Height);
+        cam.TargetApproachStyle = TargetApproachStyle.Smooth;
+        cam.TargetApproachCoefficient = 8f;
 
         // Collision relationships.
         var playerVsSolid = AddCollisionRelationship(_playerFactory, _solid);
