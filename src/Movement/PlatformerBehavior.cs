@@ -232,6 +232,7 @@ public class PlatformerBehavior
     /// </summary>
     public bool IsSuppressingOneWayCollision => _suppressOneWay;
 
+    private float _previousInputY;
     private bool _dropThroughFrame;
     private bool _suppressOneWay;
     // Per-frame additive horizontal velocity contributed by a platform the entity is standing on.
@@ -414,19 +415,28 @@ public class PlatformerBehavior
             entity.VelocityY = inputY * current.ClimbingSpeed;
             IsApplyingJump = false;
 
-            // Jump-off: pressing jump while climbing exits climbing and applies the climbing
-            // slot's jump fields (same shape as a ground jump, sustain included). JumpVelocity = 0
-            // gives a "drop off without upward velocity" feel; games that want to forbid jump-off
+            // Jump-off: pressing jump while climbing exits climbing. When descending (inputY < 0),
+            // the player wants to fall off — apply zero velocity so they drop without an upward
+            // kick. When ascending or neutral, apply the climbing slot's jump fields so the player
+            // can hop off the top of the ladder. Games that want to forbid jump-off entirely
             // should null JumpInput while IsClimbing.
             if (JumpInput?.WasJustPressed == true)
             {
+                bool descending = inputY < -DirectionalInputThreshold;
                 IsClimbing = false;
-                entity.VelocityY = current.JumpVelocity;
-                if (current.JumpApplyLength > TimeSpan.Zero)
+                if (!descending)
                 {
-                    _jumpStartTime = time.SinceGameStart;
-                    _jumpValues = current;
-                    IsApplyingJump = true;
+                    entity.VelocityY = current.JumpVelocity;
+                    if (current.JumpApplyLength > TimeSpan.Zero)
+                    {
+                        _jumpStartTime = time.SinceGameStart;
+                        _jumpValues = current;
+                        IsApplyingJump = true;
+                    }
+                }
+                else
+                {
+                    entity.VelocityY = 0f;
                 }
             }
             else if (TopOfLadderY.HasValue)
@@ -522,6 +532,7 @@ public class PlatformerBehavior
         _slopeSampledThisFrame = false;
         GroundHorizontalVelocity = _pendingGroundHorizontalVelocity;
         _pendingGroundHorizontalVelocity = 0f;
+        _previousInputY = MovementInput?.Y ?? 0f;
 
         // Post-Update climb cleanup. Runs after IsOnGround is set for the current frame so the
         // exit check sees this-frame ground state (the climbing branch above leaves IsOnGround
@@ -589,6 +600,12 @@ public class PlatformerBehavior
         if (inputY > DirectionalInputThreshold) return true;
         // Climb-down-from-top: standing on ground with a ladder cell directly below the feet.
         if (IsOnGround && inputY < -DirectionalInputThreshold && IsLadderBelowFeet())
+            return true;
+        // Airborne: fresh press of down grabs the ladder. Held-down is excluded to prevent
+        // re-grab on the frame immediately after a jump-off while descending.
+        // Uses LastReposition.Y (pre-step-A ground result) to detect airborne state —
+        // IsOnGround is set later in step A, so it is not available here.
+        if (entity.LastReposition.Y <= 0f && inputY < -DirectionalInputThreshold && _previousInputY >= -DirectionalInputThreshold)
             return true;
         return false;
     }

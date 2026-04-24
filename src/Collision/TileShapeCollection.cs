@@ -823,7 +823,13 @@ public class TileShapeCollection : ICollidable
                     // when the shape overlaps multiple tiles on the same side.
                     if (MathF.Abs(sep.X) > MathF.Abs(total.X))
                         total = new Vector2(sep.X, total.Y);
-                    if (MathF.Abs(sep.Y) > MathF.Abs(total.Y))
+                    // Only replace the Y push with a larger one in the same direction. An
+                    // opposite-direction push (e.g. upward from the floor tile below AND
+                    // downward from a tile the body entered from below) must not override the
+                    // first-found direction — otherwise the downward push wins, the one-way gate
+                    // rejects the collision, and the entity falls through.
+                    if (MathF.Abs(sep.Y) > MathF.Abs(total.Y) &&
+                        (total.Y == 0f || MathF.Sign(sep.Y) == MathF.Sign(total.Y)))
                         total = new Vector2(total.X, sep.Y);
                 }
 

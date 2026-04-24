@@ -43,6 +43,65 @@ public class PlatformerBehaviorClimbingTests
         return tsc;
     }
 
+    // ── Aerial ladder grab ────────────────────────────────────────────────────
+
+    [Fact]
+    public void AerialGrab_AfterJumpOffDescending_DoesNotReGrab()
+    {
+        var ladder = LadderColumn(100f, 0f, 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(body, new AxisInput(y: 1f));
+        platformer.JumpInput = jump;
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter climbing going up
+        platformer.IsClimbing.ShouldBeTrue();
+
+        platformer.MovementInput = new AxisInput(y: -1f);
+        jump.Press();
+        platformer.Update(entity, Frame()); // jump off while descending → _previousInputY=-1
+        platformer.IsClimbing.ShouldBeFalse();
+
+        jump.Release();
+        platformer.Update(entity, Frame()); // still holding down, still overlapping — must not re-grab
+
+        platformer.IsClimbing.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AerialGrab_FreshDownPress_EntersClimbing()
+    {
+        // _previousInputY defaults to 0, so the first frame with down pressed is a fresh press.
+        var ladder = LadderColumn(100f, 0f, 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 20f); // inside ladder, airborne
+        var platformer = MakePlatformer(body, new AxisInput(y: -1f));
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame());
+
+        platformer.IsClimbing.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AerialGrab_HoldingDown_DoesNotEnter()
+    {
+        // Run one Update far from the ladder so _previousInputY is set to -1 without entering
+        // climbing. Then move entity into the ladder — held down (not fresh) must not grab.
+        var ladder = LadderColumn(100f, 0f, 5);
+        var (entity, body) = MakeEntity(x: 500f, y: 20f); // far from ladder
+        var platformer = MakePlatformer(body, new AxisInput(y: -1f));
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // sets _previousInputY = -1, no overlap → no grab
+        platformer.IsClimbing.ShouldBeFalse();
+
+        entity.X = 100f; // move into ladder
+        platformer.Update(entity, Frame()); // held, not fresh → no grab
+
+        platformer.IsClimbing.ShouldBeFalse();
+    }
+
     // ── Ladder enter ──────────────────────────────────────────────────────────
 
     [Fact]
@@ -122,6 +181,49 @@ public class PlatformerBehaviorClimbingTests
 
         entity.X.ShouldBe(xAfterEnter);
         entity.VelocityX.ShouldBe(0f);
+    }
+
+    // ── Jump-off while climbing ───────────────────────────────────────────────
+
+    [Fact]
+    public void JumpOff_WhileAscending_AppliesJumpVelocity()
+    {
+        var ladder = LadderColumn(100f, 0f, 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(body, new AxisInput(y: 1f));
+        platformer.JumpInput = jump;
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter climbing
+        platformer.IsClimbing.ShouldBeTrue();
+
+        jump.Press();
+        platformer.Update(entity, Frame());
+
+        platformer.IsClimbing.ShouldBeFalse();
+        entity.VelocityY.ShouldBeGreaterThan(0f);
+    }
+
+    [Fact]
+    public void JumpOff_WhileDescending_FallsOff_VelocityYIsZero()
+    {
+        var ladder = LadderColumn(100f, 0f, 5);
+        var (entity, body) = MakeEntity(x: 100f, y: 8f);
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(body, new AxisInput(y: 1f));
+        platformer.JumpInput = jump;
+        platformer.Ladders = ladder;
+
+        platformer.Update(entity, Frame()); // enter climbing
+        platformer.IsClimbing.ShouldBeTrue();
+
+        platformer.MovementInput = new AxisInput(y: -1f);
+        jump.Press();
+        platformer.Update(entity, Frame());
+
+        platformer.IsClimbing.ShouldBeFalse();
+        entity.VelocityY.ShouldBe(0f);
     }
 
     // ── Top-of-ladder clamp ───────────────────────────────────────────────────
@@ -507,5 +609,31 @@ public class PlatformerBehaviorClimbingTests
         public float X { get; }
         public float Y { get; }
         public AxisInput(float x = 0f, float y = 0f) { X = x; Y = y; }
+    }
+
+    /// <summary>
+    /// Manual pressable input for tests. Call Press() before an Update to simulate a button
+    /// press that frame, then Release() to clear it. WasJustPressed and IsDown are not
+    /// auto-reset — tests control them explicitly.
+    /// </summary>
+    private sealed class PressableInput : IPressableInput
+    {
+        public bool IsDown { get; private set; }
+        public bool WasJustPressed { get; private set; }
+        public bool WasJustReleased { get; private set; }
+
+        public void Press()
+        {
+            WasJustPressed = true;
+            IsDown = true;
+            WasJustReleased = false;
+        }
+
+        public void Release()
+        {
+            WasJustReleased = true;
+            IsDown = false;
+            WasJustPressed = false;
+        }
     }
 }

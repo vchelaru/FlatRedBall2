@@ -88,8 +88,9 @@ public class Player : Entity, IPlatformerEntity
         }
         else
         {
+            bool wasClimbing = _platformer.IsClimbing;
             _platformer.Update(this, time);
-            HandleDoubleJump();
+            HandleDoubleJump(wasClimbing);
         }
 
         UpdateAnimation();
@@ -123,10 +124,14 @@ public class Player : Entity, IPlatformerEntity
         VelocityY = MathF.Max(-SwimMaxFallSpeed, VelocityY);
     }
 
-    private void HandleDoubleJump()
+    private void HandleDoubleJump(bool wasClimbing = false)
     {
         if (_platformer.IsOnGround)
             _airJumpsRemaining = MaxAirJumps;
+
+        // If the player was climbing before this frame's update, the jump input was used to
+        // exit the ladder — don't also consume it as a double jump.
+        if (wasClimbing) return;
 
         if (_platformer.JumpInput?.WasJustPressed == true
             && !_platformer.IsOnGround

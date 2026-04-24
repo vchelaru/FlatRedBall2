@@ -45,6 +45,39 @@ public class CollisionTests
         firedFirstArgs[1].ShouldBe(b); // second firing: (b, a)
     }
 
+    // ── One-way platform — tall body spanning two tiles ───────────────────────
+
+    [Fact]
+    public void OneWayPlatform_TallBodySpansLowerAndUpperTile_PushesUpNotThrough()
+    {
+        // When a tall entity body overlaps a lower one-way tile (landing from above) AND an
+        // upper one-way tile (entered from below), GetSeparationFor must return a positive Y
+        // so the one-way gate allows the collision. Previously the upper tile's larger downward
+        // push overrode the lower tile's upward push, making sep.Y negative and causing the
+        // one-way gate to reject the collision — the player fell through.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // bottom tile: top at y=16
+        tiles.AddTileAtCell(0, 2); // upper tile: bottom at y=32 (one-cell gap)
+
+        // Entity feet at y=14 (2 inside bottom tile), top at y=38 (6 inside upper tile).
+        var entity = new Entity { X = 8f, Y = 14f };
+        entity.LastPosition = new System.Numerics.Vector2(8f, 16f); // was on tile top last frame
+        var shape = new AxisAlignedRectangle { Width = 12f, Height = 24f, Y = 12f };
+        entity.Add(shape);
+
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles })
+        {
+            OneWayDirection = OneWayDirection.Up,
+        };
+        rel.BounceFirstOnCollision(elasticity: 0f);
+
+        rel.RunCollisions();
+
+        // Entity must be pushed up (grounded on bottom tile), not fall through.
+        entity.LastReposition.Y.ShouldBeGreaterThan(0f);
+    }
+
     [Fact]
     public void CollidesWith_AARectVsAARect_NotOverlapping_ReturnsFalse()
     {

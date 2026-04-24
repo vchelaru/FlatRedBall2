@@ -99,7 +99,7 @@
 </data>
  </layer>
  <objectgroup id="2" name="Entities">
-  <object id="1" gid="66" x="32" y="304" width="16" height="16"/>
+  <object id="1" gid="66" x="76" y="244" width="16" height="16"/>
   <object id="2" gid="67" x="176" y="288" width="16" height="16"/>
   <object id="3" gid="34" x="240" y="288" width="16" height="16"/>
   <object id="4" gid="65" x="400" y="288" width="16" height="16"/>
