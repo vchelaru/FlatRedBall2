@@ -16,14 +16,11 @@ public class Player : Entity, IPlatformerEntity
     private Sprite _sprite = null!;
     private bool _isSwimming;
 
-    private PlatformerValues? _normalGroundMovement;
-    private PlatformerValues _normalAirMovement = null!;
-    private PlatformerValues? _normalAfterDoubleJump;
-    private PlatformerValues? _waterGroundMovement;
-    private PlatformerValues _waterAirMovement = null!;
-
-    // Track velocity before the platformer update so box-break detection can see it.
-    public float VelocityYBeforeCollision { get; private set; }
+    // Two loaded configs; we re-apply one of them to _platformer each frame
+    // based on water overlap. ApplyTo is idempotent — cheaper than tracking
+    // edge-triggered transitions with a "wasSwimming" field.
+    private PlatformerConfig _normalConfig = null!;
+    private PlatformerConfig _waterConfig = null!;
 
     public AxisAlignedRectangle CollisionBody => _body;
 
@@ -35,11 +32,15 @@ public class Player : Entity, IPlatformerEntity
         set => _platformer.Ladders = value;
     }
 
+    // Ladders are built into PlatformerBehavior; water is a game-defined concept,
+    // so we hold the zone ourselves and use it to swap movement values each frame.
     public TileShapeCollection? WaterZones { get; set; }
 
     public override void CustomInitialize()
     {
 
+        // Sprite is offset above the body so the sprite's feet align with the
+        // bottom of the collision rectangle (body Y=10, Height=20 → bottom at Y=0).
         _sprite = new Sprite
         {
             Y = 16f,
@@ -66,27 +67,17 @@ public class Player : Entity, IPlatformerEntity
         _platformer.JumpInput =
             new KeyboardPressableInput(keyboard, Keys.Space);
 
-        PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
+        _normalConfig = PlatformerConfig.FromJson("Content/player.platformer.json");
+        _waterConfig = PlatformerConfig.FromJson("Content/player.water.platformer.json");
+        _normalConfig.ApplyTo(_platformer);
         _platformer.CollisionShape = _body;
-
-        _normalGroundMovement = _platformer.GroundMovement;
-        _normalAirMovement = _platformer.AirMovement;
-        _normalAfterDoubleJump = _platformer.AfterDoubleJump;
-
-        var waterBehavior = new PlatformerBehavior();
-        PlatformerConfig.FromJson("Content/player.water.platformer.json").ApplyTo(waterBehavior);
-        _waterGroundMovement = waterBehavior.GroundMovement;
-        _waterAirMovement = waterBehavior.AirMovement;
     }
 
     public override void CustomActivity(FrameTime time)
     {
-        VelocityYBeforeCollision = VelocityY;
-
         _isSwimming = IsInWater();
-        _platformer.GroundMovement = _isSwimming ? _waterGroundMovement : _normalGroundMovement;
-        _platformer.AirMovement = _isSwimming ? _waterAirMovement : _normalAirMovement;
-        _platformer.AfterDoubleJump = _isSwimming ? null : _normalAfterDoubleJump;
+        if (_isSwimming) _waterConfig.ApplyTo(_platformer);
+        else             _normalConfig.ApplyTo(_platformer);
 
         _platformer.Update(this, time);
 
@@ -98,7 +89,6 @@ public class Player : Entity, IPlatformerEntity
     private void UpdateAnimation()
     {
         if (_sprite.AnimationChains == null) return;
-        _sprite.AnimationSpeed = 1;
         string facing = _platformer.DirectionFacing == HorizontalDirection.Left ? "Left" : "Right";
 
         if (_platformer.IsClimbing)

@@ -10,7 +10,9 @@ namespace PlatformKing.Entities;
 
 public class Enemy : Entity
 {
-    // Simple I2DInput that lets us set X programmatically each frame.
+    // PlatformerBehavior.MovementInput expects an I2DInput. For AI-driven
+    // movement we supply this stand-in and mutate X from patrol logic
+    // instead of reading from a keyboard/gamepad.
     private sealed class PatrolInput : I2DInput
     {
         public float X { get; set; }
@@ -41,8 +43,8 @@ public class Enemy : Entity
         Body = new AxisAlignedRectangle
         {
             Width = 14f,
-            Height = 14,
-            Y = 7,
+            Height = 14f,
+            Y = 7f,
             Color = Color.Cyan,
             IsVisible = false,
             IsFilled = false

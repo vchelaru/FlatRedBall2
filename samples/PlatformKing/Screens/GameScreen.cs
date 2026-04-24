@@ -54,6 +54,8 @@ public class GameScreen : Screen
         _boxFactory = new Factory<Box>(this);
         _enemyFactory = new Factory<Enemy>(this);
         _doorFactory = new Factory<Door>(this);
+        // Boxes are axis-aligned tile-sized obstacles; flagging the factory as a
+        // solid grid lets the collision system short-circuit spatial queries.
         _boxFactory.IsSolidGrid = true;
 
         // Spawn entities from object layers.
@@ -88,14 +90,8 @@ public class GameScreen : Screen
         playerVsJumpThrough.AllowDropThrough = true;
         playerVsJumpThrough.BounceFirstOnCollision(elasticity: 0f);
 
-        var playerVsBox = AddCollisionRelationship<Player, Box>(_playerFactory, _boxFactory);
-        playerVsBox.BounceFirstOnCollision(elasticity: 0f);
-        playerVsBox.CollisionOccurred += (p, box) =>
-        {
-            // Destroy box when player stomps it (downward velocity, pushed upward).
-            if (p.VelocityYBeforeCollision < 0f && p.LastReposition.Y > 0f)
-                box.Destroy();
-        };
+        AddCollisionRelationship<Player, Box>(_playerFactory, _boxFactory)
+            .BounceFirstOnCollision(elasticity: 0f);
 
         var enemyVsSolid = AddCollisionRelationship(_enemyFactory, _solid);
         enemyVsSolid.BounceFirstOnCollision(elasticity: 0f);
@@ -118,9 +114,4 @@ public class GameScreen : Screen
             };
     }
 
-    public override void CustomActivity(FrameTime time)
-    {
-        // Water overlap is handled reactively in Player.CustomActivity via WaterZones.
-        // All collision-event-based logic runs in the registered callbacks above.
-    }
 }

@@ -93,30 +93,11 @@ Common patterns:
 
 ## Multiple Movement Sets (Water, Ice, Power-ups)
 
-A `PlatformerConfig` JSON maps to one context. For a second context (swimming, ice, mud, power-up state) use a second JSON file and a temporary behavior to extract the values:
+A `PlatformerConfig` JSON is a **full description** of a movement state. For a second context (swimming, ice, mud, power-up state) load a second JSON file into a second `PlatformerConfig` field and call `ApplyTo(_platformer)` on whichever one matches the current state. Call it each frame from `CustomActivity` — `ApplyTo` mutates the existing `PlatformerValues` instances in place (zero allocation on the hot path).
 
-```csharp
-// CustomInitialize — capture both sets
-PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
-_normalGroundMovement  = _platformer.GroundMovement;
-_normalAirMovement     = _platformer.AirMovement;
-_normalAfterDoubleJump = _platformer.AfterDoubleJump;
+**Replace semantics, not overlay.** `ApplyTo` makes the behavior reflect the JSON exactly. Slots the JSON omits become `null` (for `GroundMovement`, `AfterDoubleJump`, `ClimbingMovement`) or reset to defaults (for `AirMovement`, which is non-nullable). To disable a slot in the alternate context (e.g. no double jump while swimming), simply omit `afterDoubleJump` from the water JSON — no code-side null-outs. Inside a present slot, fields the JSON omits reset to their `PlatformerValues` defaults, not the previous config's values.
 
-var waterBehavior = new PlatformerBehavior();
-PlatformerConfig.FromJson("Content/player.water.platformer.json").ApplyTo(waterBehavior);
-_waterGroundMovement = waterBehavior.GroundMovement;
-_waterAirMovement    = waterBehavior.AirMovement;
-// _waterAfterDoubleJump omitted → null disables double jump while swimming
-
-// CustomActivity — swap every frame
-bool swimming = IsInWater();
-_platformer.GroundMovement  = swimming ? _waterGroundMovement  : _normalGroundMovement;
-_platformer.AirMovement     = swimming ? _waterAirMovement     : _normalAirMovement;
-_platformer.AfterDoubleJump = swimming ? null                  : _normalAfterDoubleJump;
-_platformer.Update(this, time);
-```
-
-**Swap all three slots.** Forgetting `AfterDoubleJump` is a silent bug: the first air jump while swimming restores `AfterDoubleJump` (normal speed values) and the player moves at full land speed mid-water.
+**Do not harvest `PlatformerValues` into local fields** and swap them manually — that's more code for the same outcome, and fights the zero-allocation in-place mutation.
 
 ## Reading State
 

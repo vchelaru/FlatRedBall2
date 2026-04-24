@@ -20,7 +20,7 @@ A classic 2D platformer where the player jumps across cloud platforms, climbs la
 ### Level Progression
 - Two levels: `Level1.tmx` and `Level2.tmx`. Same structure, different layouts.
 - Each level has a `Door` tile (class `Door`) that serves as the exit trigger. Touching the door transitions to the other level (`MoveToScreen<GameScreen>` with `LevelIndex` toggled between 0 and 1).
-- Player position at entry is determined by the `PlayerSpawn` tile in the destination level. The spawn must be placed near the door side the player would logically emerge from — human will design this in Tiled.
+- Player position at entry is determined by the `PlayerFlag` tile in the destination level. The spawn must be placed near the door side the player would logically emerge from — human will design this in Tiled.
 - No overall win state — the player can travel back and forth indefinitely.
 
 ### No HUD
@@ -51,7 +51,7 @@ No health bar, score, lives counter, or any UI elements. Pure gameplay screen.
 | `Ladder` | Climbable ladder tiles (ID 96) |
 | `Water` | Swimming zones (ID 32) |
 | `BreakableCollision` | Box entity spawn marker (ID 33) |
-| `PlayerSpawn` | Player spawn point (ID 29) |
+| `PlayerFlag` | Player spawn point (ID 65) |
 | `EnemyFlag` | Enemy spawn marker (ID 66) |
 | `Door` | Level-exit trigger (ID 64) |
 | `Death` | Instant-kill zones (ID 69) |

@@ -17,6 +17,33 @@ namespace FlatRedBall2.Movement;
 public class PlatformerValues
 {
     /// <summary>
+    /// Resets every field to the same state as a freshly constructed <see cref="PlatformerValues"/>.
+    /// Called by <see cref="PlatformerConfigExtensions.ApplyTo"/> before re-populating a reused
+    /// instance so leftover values from a prior apply don't leak into the new state. When adding a
+    /// new field to this class, also add it here.
+    /// </summary>
+    internal void ResetToDefaults()
+    {
+        MaxSpeedX = 0f;
+        AccelerationTimeX = TimeSpan.Zero;
+        DecelerationTimeX = TimeSpan.Zero;
+        Gravity = 0f;
+        MaxFallSpeed = 0f;
+        JumpVelocity = 0f;
+        ClimbingSpeed = 0f;
+        JumpApplyLength = TimeSpan.Zero;
+        JumpApplyByButtonHold = false;
+        SlopeSnapDistance = 8f;
+        SlopeSnapMaxAngleDegrees = 60f;
+        UphillFullSpeedSlope = 0f;
+        UphillStopSpeedSlope = 60f;
+        DownhillFullSpeedSlope = 0f;
+        DownhillMaxSpeedSlope = 60f;
+        DownhillMaxSpeedMultiplier = 1.5f;
+        CanFallThroughOneWayCollision = true;
+    }
+
+    /// <summary>
     /// Sets <see cref="JumpVelocity"/>, <see cref="JumpApplyLength"/>, and <see cref="JumpApplyByButtonHold"/>
     /// so that a tap produces a jump of <paramref name="minHeight"/> world units and a full hold
     /// reaches <paramref name="maxHeight"/> world units. Uses this instance's <see cref="Gravity"/>

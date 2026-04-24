@@ -24,6 +24,105 @@ public class PlatformerConfigTests
     }
 
     [Fact]
+    public void ApplyTo_AbsentSlot_NullsPreviouslyPopulatedSlot()
+    {
+        // Replace semantic: a second config that omits a slot must clear it, not leave the
+        // previous config's values in place. Guards against the "residual slot" silent bug.
+        var firstJson = """
+        {
+          "movement": {
+            "ground":          { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
+            "air":             { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
+            "afterDoubleJump": { "MaxSpeedX": 160, "Gravity": 1500, "JumpVelocity": 300 },
+            "climbing":        { "MaxSpeedX": 80,  "ClimbingSpeed": 100, "JumpVelocity": 200 }
+          }
+        }
+        """;
+        var secondJson = """
+        {
+          "movement": {
+            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
+            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+          }
+        }
+        """;
+        var behavior = new PlatformerBehavior();
+        PlatformerConfig.FromJsonString(firstJson).ApplyTo(behavior);
+        behavior.AfterDoubleJump.ShouldNotBeNull();
+        behavior.ClimbingMovement.ShouldNotBeNull();
+
+        PlatformerConfig.FromJsonString(secondJson).ApplyTo(behavior);
+
+        behavior.AfterDoubleJump.ShouldBeNull();
+        behavior.ClimbingMovement.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ApplyTo_CalledTwice_FieldAbsentInSecondConfig_ResetsToDefault()
+    {
+        // Replace semantic applies at the field level too: a field the second config omits must
+        // revert to the PlatformerValues default, not retain the first config's value.
+        // SlopeSnapDistance defaults to 8f; first config sets it to 4f, second config omits it.
+        var firstJson = """
+        {
+          "movement": {
+            "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32, "SlopeSnapDistance": 4 },
+            "air":    { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 }
+          }
+        }
+        """;
+        var secondJson = """
+        {
+          "movement": {
+            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
+            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+          }
+        }
+        """;
+        var behavior = new PlatformerBehavior();
+        PlatformerConfig.FromJsonString(firstJson).ApplyTo(behavior);
+        behavior.GroundMovement!.SlopeSnapDistance.ShouldBe(4f);
+
+        PlatformerConfig.FromJsonString(secondJson).ApplyTo(behavior);
+
+        behavior.GroundMovement!.SlopeSnapDistance.ShouldBe(8f);
+    }
+
+    [Fact]
+    public void ApplyTo_CalledTwice_MutatesExistingPlatformerValuesInstance()
+    {
+        // Per-frame context swapping (water/ice/power-up) relies on ApplyTo reusing the
+        // existing PlatformerValues instances so it allocates nothing on the hot path.
+        var firstJson = """
+        {
+          "movement": {
+            "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
+            "air":    { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 }
+          }
+        }
+        """;
+        var secondJson = """
+        {
+          "movement": {
+            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
+            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+          }
+        }
+        """;
+        var behavior = new PlatformerBehavior();
+        PlatformerConfig.FromJsonString(firstJson).ApplyTo(behavior);
+        var originalGround = behavior.GroundMovement;
+        var originalAir = behavior.AirMovement;
+
+        PlatformerConfig.FromJsonString(secondJson).ApplyTo(behavior);
+
+        behavior.GroundMovement.ShouldBeSameAs(originalGround);
+        behavior.AirMovement.ShouldBeSameAs(originalAir);
+        behavior.GroundMovement!.MaxSpeedX.ShouldBe(40f);
+        behavior.AirMovement.MaxSpeedX.ShouldBe(40f);
+    }
+
+    [Fact]
     public void ApplyTo_GroundAndAirSlots_PopulatesBehaviorSlots()
     {
         var json = """
