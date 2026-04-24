@@ -852,4 +852,74 @@ public class CollisionTests
 
         fireCount.ShouldBe(1);
     }
+
+    // ── Non-default shapes vs TileShapeCollection ────────────────────────
+    // Models the "ledge probe" / "weak spot" / "muzzle point" pattern:
+    // an auxiliary shape attached to an entity for manual queries or a
+    // different collision relationship, which must NOT participate in the
+    // entity's default collision against terrain.
+
+    [Fact]
+    public void NonDefaultShape_OverlappingTiles_DoesNotTriggerRelationship()
+    {
+        // Entity's default body sits above the tile row (Y=20, tile spans Y=0..16).
+        // An auxiliary "foot probe" poked below the body overlaps the tile.
+        // If the probe is non-default, the Entity-vs-TSC relationship must ignore it.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0); // tile occupying X=0..16, Y=0..16
+
+        var entity = new Entity { X = 8f, Y = 20f };
+        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f }; // at (8,20), no tile overlap
+        entity.Add(body);
+        var footProbe = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), inside tile
+        entity.Add(footProbe, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles });
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(0, "non-default probe must not drag the entity into a tile collision");
+    }
+
+    [Fact]
+    public void NonDefaultShape_CanStillQueryTilesViaCollidesWith()
+    {
+        // Ledge-detection use case: a probe excluded from default collision
+        // must still be usable for manual CollidesWith queries against a TSC.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        var entity = new Entity { X = 8f, Y = 20f };
+        var footOnGround = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), in tile
+        var footOffLedge = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 24f, Y = -13f }; // at (32,7), no tile
+        entity.Add(footOnGround, isDefaultCollision: false);
+        entity.Add(footOffLedge, isDefaultCollision: false);
+
+        footOnGround.CollidesWith(tiles).ShouldBeTrue("probe over tile should report collision when queried directly");
+        footOffLedge.CollidesWith(tiles).ShouldBeFalse("probe over empty space should report no collision");
+    }
+
+    [Fact]
+    public void NonDefaultShape_DefaultBodyOverlappingTiles_StillTriggersRelationship()
+    {
+        // Inverse guard: excluding a probe must NOT suppress the default body's collision.
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddTileAtCell(0, 0);
+
+        var entity = new Entity { X = 8f, Y = 8f }; // body sits inside the tile
+        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f };
+        entity.Add(body);
+        var probe = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 100f }; // far away
+        entity.Add(probe, isDefaultCollision: false);
+
+        int fireCount = 0;
+        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+            new[] { entity }, new[] { tiles });
+        rel.CollisionOccurred += (_, _) => fireCount++;
+        rel.RunCollisions();
+
+        fireCount.ShouldBe(1, "default body overlapping a tile must still trigger the relationship");
+    }
 }

@@ -58,7 +58,12 @@ public class GameScreen : Screen
 
         // Spawn entities from object layers.
         map.CreateEntities("BreakableCollision", _boxFactory);
-        map.CreateEntities("EnemyFlag", _enemyFactory);
+        var enemies = map.CreateEntities("EnemyFlag", _enemyFactory, Origin.BottomCenter);
+        foreach (var enemy in enemies)
+        {
+            enemy.SolidCollision = _solid;
+            enemy.JumpThroughCollision = _jumpThrough;
+        }
         map.CreateEntities("Door", _doorFactory, Origin.BottomCenter);
 
         var players = map.CreateEntities("PlayerFlag", _playerFactory, Origin.BottomCenter);
@@ -94,6 +99,10 @@ public class GameScreen : Screen
 
         var enemyVsSolid = AddCollisionRelationship(_enemyFactory, _solid);
         enemyVsSolid.BounceFirstOnCollision(elasticity: 0f);
+
+        var enemyVsJumpThrough = AddCollisionRelationship(_enemyFactory, _jumpThrough);
+        enemyVsJumpThrough.OneWayDirection = OneWayDirection.Up;
+        enemyVsJumpThrough.BounceFirstOnCollision(elasticity: 0f);
 
         AddCollisionRelationship<Player, Enemy>(_playerFactory, _enemyFactory)
             .CollisionOccurred += (_, _) => RestartScreen();

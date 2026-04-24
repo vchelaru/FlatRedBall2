@@ -21,7 +21,12 @@ public class Enemy : Entity
     private readonly PatrolInput _patrolInput = new() { X = 1f };
 
     public AxisAlignedRectangle Body { get; private set; } = null!;
+    private AxisAlignedRectangle _leftFoot = null!;
+    private AxisAlignedRectangle _rightFoot = null!;
     private Sprite _sprite = null!;
+
+    public TileShapeCollection? SolidCollision { get; set; }
+    public TileShapeCollection? JumpThroughCollision { get; set; }
 
     public override void CustomInitialize()
     {
@@ -44,6 +49,33 @@ public class Enemy : Entity
         };
         Add(Body);
 
+        // Foot probes sit just outside the body's left/right edges and just below
+        // its bottom. Each frame we check whether the probe overlaps any ground;
+        // if the one ahead of travel does not, we've reached a ledge and flip.
+        _leftFoot = new AxisAlignedRectangle
+        {
+            Width = 2f,
+            Height = 2f,
+            X = -8f,
+            Y = -1f,
+            Color = Color.Yellow,
+            IsVisible = false,
+            IsFilled = false
+        };
+        Add(_leftFoot, isDefaultCollision: false);
+
+        _rightFoot = new AxisAlignedRectangle
+        {
+            Width = 2f,
+            Height = 2f,
+            X = 8f,
+            Y = -1f,
+            Color = Color.Yellow,
+            IsVisible = false,
+            IsFilled = false
+        };
+        Add(_rightFoot, isDefaultCollision: false);
+
         PlatformerConfig.FromJson("Content/enemy.platformer.json").ApplyTo(_platformer);
         _platformer.MovementInput = _patrolInput;
         // No JumpInput assigned — enemy never jumps.
@@ -51,12 +83,33 @@ public class Enemy : Entity
 
     public override void CustomActivity(FrameTime time)
     {
-        // Flip patrol direction when solid collision pushes us horizontally.
+        // Flip patrol direction when solid collision pushes us horizontally,
+        // or — only while on the ground — when the foot probe in the direction
+        // of travel is over empty space. Skipping the ledge check while airborne
+        // prevents mid-jump/fall jitter when both feet are temporarily off ground.
         if (LastReposition.X != 0f)
+        {
             _patrolInput.X = -_patrolInput.X;
+        }
+        else if (_platformer.IsOnGround)
+        {
+            if (_patrolInput.X > 0f && !HasGround(_rightFoot))
+                _patrolInput.X = -1f;
+            else if (_patrolInput.X < 0f && !HasGround(_leftFoot))
+                _patrolInput.X = 1f;
+        }
 
         _platformer.Update(this, time);
 
         _sprite.PlayAnimation(_patrolInput.X >= 0f ? "WalkRight" : "WalkLeft");
+    }
+
+    private bool HasGround(AxisAlignedRectangle foot)
+    {
+        if (SolidCollision != null && foot.CollidesWith(SolidCollision))
+            return true;
+        if (JumpThroughCollision != null && foot.CollidesWith(JumpThroughCollision))
+            return true;
+        return false;
     }
 }

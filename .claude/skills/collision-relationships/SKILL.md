@@ -195,23 +195,55 @@ the full picture.
 
 Both forms are driven by the same `OneWayDirection` gate — the only difference is whether drop-through can bypass them. See the `platformer-movement` skill for drop-through wiring on the behavior.
 
-## Sensor Shapes (Awareness, Trigger Zones)
+## Default vs Non-Default Collision Shapes
 
-For non-physical overlap detection — e.g., enemy awareness radius, pickup range, trigger zones — add an extra shape child and target it with `WithFirstShape`.
+Every shape attached with `Add(shape)` joins the entity's **default collision** — it participates in every `CollisionRelationship` the entity is on. That's what you want for the main body, but *not* for auxiliary shapes like:
 
-Assume the entity already exposes `Body` (physical collider) and `Sensor` (larger trigger collider).
+- **Awareness radius / trigger zone** — larger shape that fires events but shouldn't push the entity.
+- **Weak spot** — shape hit by bullets but not by terrain.
+- **Probe** (ledge-detect, wall-slide-detect) — small shape queried manually via `CollidesWith`.
+- **Muzzle point / attach anchor** — positional reference only, no collision at all.
+
+If any of those join default collision, the entity gets shoved around by its own probes or weak spots. The fix is a single flag:
 
 ```csharp
-AddCollisionRelationship(_enemies, solidTiles)
-    .WithFirstShape(e => e.Body)
-    .MoveFirstOnCollision();
+Body = new AxisAlignedRectangle { Width = 14, Height = 14 };
+Add(Body); // default collision — participates in relationships
 
+Sensor = new Circle { Radius = 64 };
+Add(Sensor, isDefaultCollision: false); // attached, moves with entity, but NOT in default collision
+
+_footProbe = new AxisAlignedRectangle { Width = 2, Height = 2, Y = -1 };
+Add(_footProbe, isDefaultCollision: false); // manual-query only
+```
+
+`SetDefaultCollision(shape, bool)` flips the flag after the fact if needed.
+
+### Using a non-default shape in its own relationship
+
+Register the shape's selector on the relationship — default collision stays untouched, the non-default shape participates only in this one:
+
+```csharp
 AddCollisionRelationship<Enemy, Player>(_enemies, _playerFactory)
     .WithFirstShape(e => e.Sensor)
     .CollisionOccurred += (enemy, player) => enemy.Alert(player);
+
+AddCollisionRelationship<Bullet, Enemy>(_bullets, _enemies)
+    .WithSecondShape(e => e.WeakSpot)
+    .CollisionOccurred += (b, e) => e.TakeCritical(b.Damage);
 ```
 
-Direct `Vector2.Distance` checks are fine for simple one-off tests, but prefer sensor shapes when you want `CollisionOccurred` events, debug-shape visibility, or consistent integration with the collision pass.
+### Using a non-default shape for manual queries
+
+Probes queried each frame don't need a relationship at all — just call `CollidesWith` directly:
+
+```csharp
+// Ledge detection
+if (_patrolInput.X > 0f && !_rightFoot.CollidesWith(SolidCollision))
+    _patrolInput.X = -1f;
+```
+
+**Footgun**: forgetting `isDefaultCollision: false` on a probe/sensor silently drags the entity into collision responses (e.g., a ground-check probe pushing the entity upward every frame → jitter). If an entity misbehaves near terrain, check every `Add` call for this flag first.
 
 ## Common Pitfalls
 

@@ -64,8 +64,7 @@ public class Player : Entity, IPlatformerEntity
             new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
             .Or(new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
         _platformer.JumpInput =
-            new KeyboardPressableInput(keyboard, Keys.Space)
-            .Or(new KeyboardPressableInput(keyboard, Keys.Up));
+            new KeyboardPressableInput(keyboard, Keys.Space);
 
         PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
         _platformer.CollisionShape = _body;
