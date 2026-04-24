@@ -3,8 +3,8 @@
   // hot-reload in place (GameScreen watches this file). Add fields here instead of
   // sprinkling consts across entity classes.
   "player": {
-    "FireInterval": 0.22,   // seconds between shots while Space is held
-    "BulletSpeed": 260,     // world units/sec, upward
+    "FireInterval": 0.17,   // seconds between shots while Space is held
+    "BulletSpeed": 300,     // world units/sec, upward
     "EdgeMargin": 8         // pixels the ship stops short of the camera edges
   },
   "enemy": {

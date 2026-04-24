@@ -116,6 +116,14 @@ public class GameScreen : Screen
         {
             // Engine auto-reloaded the texture in place — no restart needed.
         }
+        else if (ext.Equals(".achx", StringComparison.OrdinalIgnoreCase))
+        {
+            // In-place reload preserves chain identity, so live sprites (already holding
+            // CurrentAnimation pointers) pick up the new frames without restarting.
+            var full = Path.Combine("Content", relativePath);
+            if (!Animations.TryReloadFrom(full, Engine.Content))
+                RestartScreen(RestartMode.HotReload);
+        }
         else
         {
             RestartScreen(RestartMode.HotReload);

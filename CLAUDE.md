@@ -38,6 +38,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `render-diagnostics` — Headed screenshot diagnostics: deterministic scene setup, camera lock, zoom sweeps, full-frame vs smart-crop, overlay capture, Gum zoom projection gotchas
 - `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
 - `engine-tdd` — **Load before editing `src/`.** Failing test in `tests/FlatRedBall2.Tests/` required before any behavior change in `src/`
+- `skill-creator` — **Load before editing any `.claude/skills/*/SKILL.md`.** Applies the deletion test, 8-line code-block cap, and shared-context budget discipline
 - `harness` — Headless testing: TestHarness setup, Initialize/LoadContent split, WorldStateTests pattern, what to test vs what not to test
 - `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
 - `levels` — Level data layout and progression

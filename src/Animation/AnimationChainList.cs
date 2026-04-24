@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Xml;
+using FlatRedBall2.Animation.Content;
 
 namespace FlatRedBall2.Animation;
 
@@ -25,5 +28,51 @@ public class AnimationChainList : List<AnimationChain>
                 if (chain.Name == name) return chain;
             return null;
         }
+    }
+
+    /// <summary>
+    /// Re-parses the .achx at <paramref name="path"/> and applies the result in place so any
+    /// live <see cref="FlatRedBall2.Rendering.Sprite.CurrentAnimation"/> reference keeps working.
+    /// For each chain in the reloaded file, matches by <see cref="AnimationChain.Name"/>: if the
+    /// name exists in this list the existing chain's frames are replaced (instance identity
+    /// preserved); otherwise the fresh chain is appended. Chains only in this list (removed from
+    /// the file) are left alone — sprites still playing them keep rendering their old art until
+    /// the caller switches them.
+    /// <para>
+    /// Returns <c>false</c> on I/O or XML parse failure (e.g. file mid-write). Callers should
+    /// fall back to <c>RestartScreen(RestartMode.HotReload)</c> in that case, or retry after
+    /// the next debounce window.
+    /// </para>
+    /// </summary>
+    public bool TryReloadFrom(string path, ContentManagerService content)
+    {
+        AnimationChainList fresh;
+        try
+        {
+            fresh = AnimationChainListSave.FromFile(path).ToAnimationChainList(content);
+        }
+        catch (IOException) { return false; }
+        // XmlSerializer.Deserialize wraps parse errors in InvalidOperationException with an
+        // XmlException inner. Anything else under that type is a genuine bug from downstream
+        // code (e.g. a broken texture loader) and must propagate so it isn't papered over as
+        // "file mid-write, retry later."
+        catch (System.InvalidOperationException ex) when (ex.InnerException is XmlException) { return false; }
+
+        foreach (var freshChain in fresh)
+        {
+            var existing = this[freshChain.Name];
+            if (existing != null)
+            {
+                // Replace frames in place — preserves the AnimationChain instance and therefore
+                // any Sprite.CurrentAnimation reference that points at it.
+                existing.Clear();
+                existing.AddRange(freshChain);
+            }
+            else
+            {
+                Add(freshChain);
+            }
+        }
+        return true;
     }
 }

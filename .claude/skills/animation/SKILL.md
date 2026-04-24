@@ -130,6 +130,10 @@ The `.achx` references the `.png` by relative path (`FileRelativeTextures` is `t
 
 FRB2 does not provide an engine-level animation controller for platformers. Animation state selection is game code — see the `platformer-movement` skill for the recommended pattern (a pattern match on `PlatformerBehavior` state + facing suffix).
 
+## Hot-Reload
+
+`AnimationChainList.TryReloadFrom(path, content)` patches the list in place, matching chains by name so live `Sprite.CurrentAnimation` references keep playing with the new frames. Removed chains are left orphaned. Returns `false` on parse failure. **Every sprite must share one list instance** — entities that re-parse the `.achx` on each spawn defeat this. Wire via `WatchContentDirectory` — see `content-hot-reload`.
+
 ## Gotchas
 
 - **Never pause animation to express "still" state.** Animation runs continuously. If a state should appear motionless (idle, hanging on a ladder, holding a charge), the **content author** makes a chain that *looks* still — a 1-frame chain, or better, a multi-frame chain with subtle motion (hair blowing, eyes blinking, breath rise/fall). Game code switching `_sprite.Animate = false` is a layering violation: it bakes a content decision (is this state animated?) into engine-driving code, and it forecloses content choices the author may want later. The only correct writers of `Animate` are `PlayAnimation` (sets true) and the non-looping end-of-chain hook (sets false). If you find yourself reaching for `_sprite.Animate = ...`, you want a different chain instead.

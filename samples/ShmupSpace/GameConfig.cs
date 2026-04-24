@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 
 namespace ShmupSpace;
@@ -6,6 +8,11 @@ namespace ShmupSpace;
 // Mirror of shmupspace.game.json. Game code reads from the live instance exposed on GameScreen;
 // hot-reload re-parses the file and copies fields onto that same instance, so entities
 // referencing GameScreen.Config pick up changes on their next frame.
+//
+// Why reflection for CopyFrom: a hand-written field-by-field copy is one more place that has to
+// be edited every time a new config field is added (JSON + POCO + CopyFrom — miss the third and
+// the field silently stops hot-reloading). Reflection walks the tree automatically. Suitable for
+// plain POCO configs like this one; would need more care for classes with non-trivial state.
 public class GameConfig
 {
     public PlayerSection Player { get; set; } = new();
@@ -45,21 +52,32 @@ public class GameConfig
         return JsonSerializer.Deserialize<GameConfig>(json, Options) ?? new GameConfig();
     }
 
-    // Copy each field from another instance onto this one — lets live entities keep their
-    // reference to a single Config object across hot-reloads.
-    public void CopyFrom(GameConfig other)
+    public void CopyFrom(GameConfig other) => CopyProperties(this, other);
+
+    private static void CopyProperties(object dest, object src)
     {
-        Player.FireInterval = other.Player.FireInterval;
-        Player.BulletSpeed = other.Player.BulletSpeed;
-        Player.EdgeMargin = other.Player.EdgeMargin;
-        Enemy.FallSpeed = other.Enemy.FallSpeed;
-        Enemy.ZigSpeed = other.Enemy.ZigSpeed;
-        Enemy.ZigInterval = other.Enemy.ZigInterval;
-        Spawn.EnemyInterval = other.Spawn.EnemyInterval;
-        Spawn.EnemyEdgeMargin = other.Spawn.EnemyEdgeMargin;
-        Spawn.PlayerRespawnDelay = other.Spawn.PlayerRespawnDelay;
-        Scoring.PerEnemyKill = other.Scoring.PerEnemyKill;
+        foreach (var prop in dest.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!prop.CanRead) continue;
+            var srcVal = prop.GetValue(src);
+            if (srcVal == null) continue;
+
+            if (IsLeaf(prop.PropertyType))
+            {
+                if (prop.CanWrite) prop.SetValue(dest, srcVal);
+            }
+            else
+            {
+                // Recurse into nested sections (PlayerSection, EnemySection, ...) to preserve
+                // the dest instance — entities hold references to these nested objects too.
+                var destVal = prop.GetValue(dest);
+                if (destVal != null) CopyProperties(destVal, srcVal);
+            }
+        }
     }
+
+    private static bool IsLeaf(Type t)
+        => t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(decimal);
 
     private static readonly JsonSerializerOptions Options = new()
     {
