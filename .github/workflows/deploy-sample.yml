@@ -1,0 +1,54 @@
+name: Deploy Sample to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: 'Sample to deploy'
+        required: true
+        default: 'ShmupSpace'
+        type: choice
+        options:
+          - ShmupSpace
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Publish ${{ inputs.sample }}.BlazorGL
+        run: >
+          dotnet publish
+          samples/${{ inputs.sample }}/${{ inputs.sample }}.BlazorGL/${{ inputs.sample }}.BlazorGL.csproj
+          -c Release
+          -o publish
+
+      - name: Rewrite base href for GitHub Pages subpath
+        run: |
+          sed -i 's|<base href="\./" />|<base href="/FlatRedBall2/${{ inputs.sample }}/" />|' \
+            publish/wwwroot/index.html
+          grep -q '<base href="/FlatRedBall2/${{ inputs.sample }}/"' publish/wwwroot/index.html
+
+      - name: Add .nojekyll
+        run: touch publish/wwwroot/.nojekyll
+
+      - name: Deploy to gh-pages/${{ inputs.sample }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./publish/wwwroot
+          destination_dir: ${{ inputs.sample }}
+          keep_files: true
+          commit_message: 'Deploy ${{ inputs.sample }} (${{ github.sha }})'
