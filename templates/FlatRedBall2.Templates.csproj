@@ -15,6 +15,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="frb2-desktop\**\*" />
-    <Content Include="frb2-skills\**\*" />
+    <!-- frb2-skills: template.json lives in the directory; ai-reference files
+         are pulled directly from the canonical source to avoid duplication. -->
+    <Content Include="frb2-skills\.template.config\**\*" />
+    <Content Include="..\ai-reference\**\*">
+      <PackagePath>content/frb2-skills/ai-reference/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+    </Content>
   </ItemGroup>
 </Project>
