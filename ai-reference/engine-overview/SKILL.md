@@ -97,8 +97,8 @@ public class GameScreen : Screen
 
         // Bottom wall
         var wall = _wallFactory.Create();
-        wall.X = 0; wall.Y = -Camera.TargetHeight / 2f;
-        wall.Rectangle.Width = Camera.TargetWidth; wall.Rectangle.Height = 40;
+        wall.X = 0; wall.Y = -Camera.OrthogonalHeight / 2f;
+        wall.Rectangle.Width = Camera.OrthogonalWidth; wall.Rectangle.Height = 40;
 
         AddCollisionRelationship<Player, Wall>(_playerFactory, _wallFactory)
             .MoveFirstOnCollision();

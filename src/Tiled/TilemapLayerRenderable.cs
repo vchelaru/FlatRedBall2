@@ -84,7 +84,7 @@ public class TileMapLayerRenderable : IRenderable, IAttachable
         _orthoCam.Position = new Vector2(
             camera.X - AbsoluteX - vpW / 2f,
             AbsoluteY - camera.Y - vpH / 2f);
-        _orthoCam.Zoom = vpW / camera.TargetWidth * camera.Zoom;
+        _orthoCam.Zoom = vpW / camera.OrthogonalWidth * camera.Zoom;
 
         _renderer.DrawLayer(spriteBatch, _orthoCam, _layer.Name);
     }

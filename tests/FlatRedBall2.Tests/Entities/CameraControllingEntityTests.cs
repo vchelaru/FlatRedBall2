@@ -16,8 +16,8 @@ public class CameraControllingEntityTests
     {
         var camera = new Camera();
         camera.SetViewport(new Viewport(0, 0, targetWidth, targetHeight));
-        camera.TargetWidth  = targetWidth;
-        camera.TargetHeight = targetHeight;
+        camera.OrthogonalWidth  = targetWidth;
+        camera.OrthogonalHeight = targetHeight;
         camera.Zoom = zoom;
 
         var controller = new CameraControllingEntity();

@@ -7,7 +7,7 @@ namespace FlatRedBall2.Rendering;
 /// <summary>
 /// World-space view origin. The camera's <see cref="X"/>/<see cref="Y"/> sit at the center
 /// of the visible area; <see cref="Left"/>/<see cref="Right"/>/<see cref="Top"/>/<see cref="Bottom"/>
-/// derive from that center plus <see cref="TargetWidth"/>/<see cref="TargetHeight"/> and
+/// derive from that center plus <see cref="OrthogonalWidth"/>/<see cref="OrthogonalHeight"/> and
 /// <see cref="Zoom"/>.
 /// <para>
 /// Camera velocity and acceleration are integrated each frame by the engine
@@ -43,27 +43,31 @@ public class Camera
     /// <summary>Color cleared to the back buffer before any renderable draws. Default <c>Black</c>.</summary>
     public Color BackgroundColor { get; set; } = Color.Black;
 
-    /// <summary>World units visible horizontally. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
-    public int TargetWidth { get; internal set; } = 1280;
+    /// <summary>World units visible horizontally at <see cref="Zoom"/> = 1. Managed by the engine from <see cref="DisplaySettings"/>; use <see cref="Zoom"/> for runtime zoom.</summary>
+    public int OrthogonalWidth { get; internal set; } = 1280;
 
-    /// <summary>World units visible vertically. Managed by the engine; use <see cref="Zoom"/> for runtime zoom.</summary>
-    public int TargetHeight { get; internal set; } = 720;
+    /// <summary>World units visible vertically at <see cref="Zoom"/> = 1. Managed by the engine from <see cref="DisplaySettings"/>; use <see cref="Zoom"/> for runtime zoom.</summary>
+    public int OrthogonalHeight { get; internal set; } = 720;
 
     /// <summary>World-space X coordinate of the left edge of the visible area. Accounts for <see cref="Zoom"/>.</summary>
-    public float Left => X - TargetWidth / (2f * Zoom);
+    public float Left => X - OrthogonalWidth / (2f * Zoom);
 
     /// <summary>World-space X coordinate of the right edge of the visible area. Accounts for <see cref="Zoom"/>.</summary>
-    public float Right => X + TargetWidth / (2f * Zoom);
+    public float Right => X + OrthogonalWidth / (2f * Zoom);
 
     /// <summary>World-space Y coordinate of the bottom edge of the visible area. Accounts for <see cref="Zoom"/> (Y+ up).</summary>
-    public float Bottom => Y - TargetHeight / (2f * Zoom);
+    public float Bottom => Y - OrthogonalHeight / (2f * Zoom);
 
     /// <summary>World-space Y coordinate of the top edge of the visible area. Accounts for <see cref="Zoom"/> (Y+ up).</summary>
-    public float Top => Y + TargetHeight / (2f * Zoom);
+    public float Top => Y + OrthogonalHeight / (2f * Zoom);
 
     /// <summary>
     /// Runtime zoom factor. Values greater than 1 zoom in (fewer world units visible);
-    /// values less than 1 zoom out (more world units visible). Reset to <see cref="DisplaySettings.Zoom"/> on each screen start.
+    /// values less than 1 zoom out (more world units visible). Reset to 1 on each screen start —
+    /// screens wanting a non-default starting zoom assign in <see cref="Screen.CustomInitialize"/>.
+    /// Most games leave this at 1 and express their on-screen scale via the
+    /// <see cref="DisplaySettings.PreferredWindowWidth"/>-vs-<see cref="DisplaySettings.ResolutionWidth"/> ratio;
+    /// reserve runtime <c>Zoom</c> changes for cinematic effects (boss zoom-in, screen shake, etc.).
     /// </summary>
     public float Zoom { get; set; } = 1f;
 
@@ -72,7 +76,7 @@ public class Camera
     /// Use this for pixel-perfect calculations such as snapping camera position to the nearest pixel
     /// (<c>snapInterval = 1f / PixelsPerUnit</c>).
     /// </summary>
-    public float PixelsPerUnit => _viewport.Height / (float)TargetHeight * Zoom;
+    public float PixelsPerUnit => _viewport.Height / (float)OrthogonalHeight * Zoom;
 
     private Viewport _viewport;
 
@@ -98,8 +102,8 @@ public class Camera
     {
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
-        var scaleX = vpW / TargetWidth * Zoom;
-        var scaleY = vpH / TargetHeight * Zoom;
+        var scaleX = vpW / OrthogonalWidth * Zoom;
+        var scaleY = vpH / OrthogonalHeight * Zoom;
         return new NumericsVector2(
             (worldPosition.X - X) * scaleX + vpW / 2f,
             -(worldPosition.Y - Y) * scaleY + vpH / 2f);
@@ -113,8 +117,8 @@ public class Camera
     {
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
-        var scaleX = vpW / TargetWidth * Zoom;
-        var scaleY = vpH / TargetHeight * Zoom;
+        var scaleX = vpW / OrthogonalWidth * Zoom;
+        var scaleY = vpH / OrthogonalHeight * Zoom;
         return new NumericsVector2(
             (screenPosition.X - vpW / 2f) / scaleX + X,
             -(screenPosition.Y - vpH / 2f) / scaleY + Y);
@@ -132,7 +136,7 @@ public class Camera
         var vpW = (float)_viewport.Width;
         var vpH = (float)_viewport.Height;
         return Matrix.CreateTranslation(-X, -Y, 0)
-            * Matrix.CreateScale(vpW / TargetWidth * Zoom, -(vpH / TargetHeight * Zoom), 1f)
+            * Matrix.CreateScale(vpW / OrthogonalWidth * Zoom, -(vpH / OrthogonalHeight * Zoom), 1f)
             * Matrix.CreateTranslation(vpW / 2f, vpH / 2f, 0f);
     }
 }

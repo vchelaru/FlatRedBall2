@@ -266,7 +266,7 @@ public class Overlay
     /// put regardless of camera movement. Use this for HUD text, diagnostics, or any overlay
     /// that should not move with the world.
     /// Coordinates are in Gum canvas space (origin top-left, Y increases downward).
-    /// Canvas size = <c>Camera.TargetWidth</c> x <c>Camera.TargetHeight</c>.
+    /// Canvas size = <c>Camera.OrthogonalWidth</c> x <c>Camera.OrthogonalHeight</c>.
     /// For text anchored to a world position, use <see cref="Text(string, float, float)"/> instead.
     /// </summary>
     /// <returns>

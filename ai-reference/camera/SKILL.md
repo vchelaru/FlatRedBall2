@@ -1,6 +1,6 @@
 ---
 name: camera
-description: "Camera in FlatRedBall2. Use when working with camera setup, background color, world bounds, window resolution, scrolling, screen shake, coordinate conversion between world and screen space, or Camera.TargetWidth/TargetHeight. Trigger on any camera-related question including viewport, following a player, or screen boundaries."
+description: "Camera in FlatRedBall2. Use when working with camera setup, background color, world bounds, window resolution, scrolling, screen shake, coordinate conversion between world and screen space, AspectPolicy / ResizeMode / DominantAxis, or Camera.OrthogonalWidth/OrthogonalHeight. Trigger on any camera-related question including viewport, following a player, letterboxing, or screen boundaries."
 ---
 
 # Camera in FlatRedBall2
@@ -22,96 +22,98 @@ Set this in `CustomInitialize`. It applies immediately.
 
 ## World Bounds
 
-`Camera.TargetWidth` and `Camera.TargetHeight` define the world coordinate space. They are managed by the engine — do not set them directly.
+`Camera.OrthogonalWidth` and `Camera.OrthogonalHeight` are the visible world extents at `Zoom = 1`. They are computed by the engine from `DisplaySettings` — do not assign directly.
 
 World coordinates are **centered at the origin**:
 
-- X ∈ [−TargetWidth/2, TargetWidth/2]  →  [−640, 640] at default 1280×720
-- Y ∈ [−TargetHeight/2, TargetHeight/2]  →  [−360, 360] at default 1280×720
+- X ∈ [−OrthogonalWidth/2, OrthogonalWidth/2]
+- Y ∈ [−OrthogonalHeight/2, OrthogonalHeight/2]
 
-Y+ is **up** (see `physics-and-movement`). Top = +360, bottom = −360.
+Y+ is **up** (see `physics-and-movement`).
 
 ```csharp
-wall.Y = -Camera.TargetHeight / 2f;  // bottom of screen
+wall.Y = -Camera.OrthogonalHeight / 2f;  // bottom of screen
 ```
+
+Prefer `Camera.Left`/`Right`/`Top`/`Bottom` for edges — they account for `Zoom` and camera position.
 
 > **Screen-edge boundaries** (keeping entities in bounds) are a collision concern, not a camera concern — use wall entities or `TileShapeCollection`. See the `collision-relationships` and `shapes` skills.
 
-## DisplaySettings — Resolution, Zoom, and Letterboxing
+## DisplaySettings — Resolution, Aspect, Zoom
 
 `FlatRedBallService.Default.DisplaySettings` controls how the camera is configured at each screen start. Set these before calling `Start<T>()` or between screens.
 
 ```csharp
 var ds = FlatRedBallService.Default.DisplaySettings;
-ds.ResolutionWidth  = 1280;          // design world width at Zoom=1 (see "Sizing" below)
-ds.ResolutionHeight = 720;           // design world height at Zoom=1
-ds.Zoom             = 1f;            // initial camera zoom — read "Sizing" before changing
-ds.ResizeMode       = ResizeMode.StretchVisibleArea;   // or IncreaseVisibleArea
-ds.FixedAspectRatio = 16f / 9f;     // null = fill window; set to add letterbox/pillarbox bars
-ds.LetterboxColor   = Color.Black;   // bar color when FixedAspectRatio is set
-ds.WindowMode       = WindowMode.Windowed;             // or FullscreenBorderless
+ds.ResolutionWidth  = 1280;          // design world width  in world units
+ds.ResolutionHeight = 720;           // design world height in world units
+ds.AspectPolicy     = AspectPolicy.Locked;       // default: pillar/letterbox to aspect
+ds.FixedAspectRatio = null;          // default: derive from Resolution; set to override
+ds.DominantAxis     = DominantAxis.Height;       // default: pin design height when aspect differs
+ds.ResizeMode       = ResizeMode.StretchVisibleArea; // default: same world always visible
+ds.LetterboxColor   = Color.Black;
+ds.WindowMode       = WindowMode.Windowed;       // or FullscreenBorderless
 ds.PreferredWindowWidth  = 1280;     // startup window pixel size (null = leave as-is)
 ds.PreferredWindowHeight = 720;
-ds.AllowUserResizing = true;         // whether the player can drag window borders
+ds.AllowUserResizing = false;        // default: fixed canvas; set true to let the player resize
 ```
 
-**`Zoom` initializes `Camera.Zoom`** at each screen start. After that, the camera is independent — game code can modify `Camera.Zoom` freely during gameplay.
+## Three Knobs: AspectPolicy × ResizeMode × DominantAxis
 
-## Sizing — Resolution × Window × Zoom
+Three orthogonal settings decide what the player sees on resize. The defaults are the safe choice — pillarbox to design aspect, world stays put, no distortion ever.
 
-> **Default assumption: FRB games are pixel games rendered at 2× scale.** Unless the user explicitly says otherwise (HD art, vector art, 1× pixel-perfect, 3×+ chunky, etc.), pick a small design resolution and scale it up 2× on the way to the window. The two recipes below both deliver a 2× scale — pick based on whether the visible world should stay fixed (`StretchVisibleArea`) or grow with the window (`IncreaseVisibleArea`). If in doubt, use the first recipe.
+### AspectPolicy
 
-Three knobs decide what's on screen. Get this wrong and entities silently fall off-screen.
+- **`Locked`** (default) — viewport is centered inside the window with letterbox/pillarbox bars to enforce the effective aspect ratio. Aspect comes from `FixedAspectRatio` if set, else `ResolutionWidth/ResolutionHeight`.
+- **`Free`** — viewport fills the window. The visible world's aspect follows the window's; resizing changes how much world is visible.
 
-| Knob | Units | What it controls |
-|---|---|---|
-| `ResolutionWidth/Height` | world units | Design world size at `Zoom = 1` |
-| `PreferredWindowWidth/Height` | screen pixels | Actual window size |
-| `Zoom` | multiplier | Camera zoom on top of the above |
+### ResizeMode
 
-**Effective screen-pixels per world-unit and visible world width:**
+- **`StretchVisibleArea`** (default) — the dominant-axis world extent is fixed at its `Resolution*` value. A larger window just rescales pixels. Combined with `Locked` aspect, the entire design world is always exactly visible.
+- **`IncreaseVisibleArea`** — pixels-per-world-unit is fixed at `Zoom`. A larger window reveals more world (proportionally on both axes under Locked, on the non-dominant axis under Free + Stretch — see below).
 
-| ResizeMode | Pixels per world unit | Visible world width |
-|---|---|---|
-| `StretchVisibleArea` (default) | `(window / resolution) × Zoom` | `resolution / Zoom` |
-| `IncreaseVisibleArea` | `Zoom` | `window / Zoom` |
+### DominantAxis
 
-**Critical footgun (StretchVisibleArea):** `Zoom` multiplies *on top of* the window-vs-resolution stretch. If you set window = 2× resolution to scale up pixel art, the stretch already doubles everything. Setting `Zoom = 2` zooms in **4×**, hiding three-quarters of your design world.
+Consulted under `Free`, or under `Locked` if `FixedAspectRatio` is set to a value that differs from the design ratio.
 
-### Recipes
+- **`Height`** (default) — design height stays at `ResolutionHeight`; design width tracks the effective aspect.
+- **`Width`** — design width stays at `ResolutionWidth`; design height tracks.
 
-**Pixel-art game — small native resolution, large window:**
+## Recipes
+
+**Default — locked aspect, no surprises (recommended for fixed-camera games):**
 ```csharp
-ds.ResolutionWidth  = 640;           // design world
-ds.ResolutionHeight = 352;
-ds.PreferredWindowWidth  = 1280;     // window 2× resolution → automatic 2× scale
-ds.PreferredWindowHeight = 704;
-ds.Zoom = 1f;                        // ← LEAVE AT 1; the window stretch does the scaling
-ds.ResizeMode = ResizeMode.StretchVisibleArea;
+ds.ResolutionWidth  = 240;   ds.ResolutionHeight = 320;
+ds.PreferredWindowWidth = 720; ds.PreferredWindowHeight = 960;  // 3× scale
+// AspectPolicy.Locked, ResizeMode.StretchVisibleArea, FixedAspectRatio=null are all defaults
+ds.AllowUserResizing = true;
 ```
-Result: full 640×352 world visible, scaled crisply 2× to fill 1280×704.
+Result: 240×320 world always visible. Resize freely — the rendered area pillarboxes/letterboxes to keep 0.75 aspect; the playfield never grows.
 
-**Window matches resolution, Zoom for cinematic effects:**
+**Pixel-art crisp scaling that grows with the window:**
 ```csharp
-ds.ResolutionWidth  = 1280;
-ds.ResolutionHeight = 720;
-ds.PreferredWindowWidth  = 1280;
-ds.PreferredWindowHeight = 720;
-ds.Zoom = 1f;                        // shows full 1280×720 world
-// Game code can later set Camera.Zoom = 2 to zoom in on a boss, etc.
+ds.AspectPolicy = AspectPolicy.Free;
+ds.ResizeMode   = ResizeMode.IncreaseVisibleArea;
+// Pixels-per-unit comes from PreferredWindowWidth/Height vs ResolutionWidth/Height,
+// or from a CustomInitialize override of Camera.Zoom for non-default starts.
 ```
+No bars; bigger window reveals more world on both axes. Sprites stay at native pixel size.
 
-**Crisp pixel ratio that grows with window:**
+**Side-scroller — fixed camera height, world width tracks window aspect:**
 ```csharp
-ds.ResizeMode = ResizeMode.IncreaseVisibleArea;
-ds.Zoom = 2f;                        // exactly 2 screen pixels per world unit
-// No stretching, no fuzz. Bigger window reveals more world.
+ds.AspectPolicy = AspectPolicy.Free;
+ds.DominantAxis = DominantAxis.Height;
+ds.ResizeMode   = ResizeMode.StretchVisibleArea;
 ```
+Window grows wider → more level visible horizontally. Window grows taller → height stays at `ResolutionHeight`, pixels just bigger.
 
-### ResizeMode summary
-
-- `StretchVisibleArea` (default) — same `ResolutionWidth × ResolutionHeight / Zoom` world area always visible, stretched to fill window. Use for fixed-screen games where the level should never reveal more or less of itself based on window size.
-- `IncreaseVisibleArea` — pixels-per-world-unit stays fixed at `Zoom`; a larger window reveals more world. Use for variable-window games where you want crisp art and don't mind the playfield growing.
+**Explicit display ratio different from design (e.g. 320×240 design always rendered 16:9):**
+```csharp
+ds.ResolutionWidth = 320; ds.ResolutionHeight = 240;
+ds.AspectPolicy     = AspectPolicy.Locked;
+ds.FixedAspectRatio = 16f / 9f;        // override; design gets letterboxed inside 16:9
+ds.DominantAxis     = DominantAxis.Height;
+```
 
 ## Runtime Camera Zoom
 
@@ -120,41 +122,31 @@ Camera.Zoom = 2f;   // zoom in: shows half the world area
 Camera.Zoom = 0.5f; // zoom out: shows double the world area
 ```
 
-`Camera.Zoom` is reset to `DisplaySettings.Zoom` at the start of each new screen.
+`Camera.Zoom` is reset to `1f` at the start of each new screen. Screens that want a non-default starting zoom assign `Camera.Zoom` in `CustomInitialize`. Most games leave runtime zoom at 1 — the on-screen scale comes from the window-vs-resolution ratio, not from `Zoom`.
 
 ## Window Resolution and Fullscreen
 
-`Camera.TargetWidth/Height` do **not** control the actual window pixel size. Window size is set via `DisplaySettings` and applied in two ways:
+`Camera.OrthogonalWidth/Height` do **not** control the actual window pixel size. Window size is set via `DisplaySettings` and applied in two ways:
 
 **Startup** — call `PrepareWindow<T>` from the `Game1` constructor (before `Initialize`) so the window opens at the right size with no flicker:
 ```csharp
 public Game1()
 {
     _graphics = new GraphicsDeviceManager(this);
-    FlatRedBallService.Default.DisplaySettings.PreferredWindowWidth  = 1280;
-    FlatRedBallService.Default.DisplaySettings.PreferredWindowHeight = 720;
+    var ds = FlatRedBallService.Default.DisplaySettings;
+    ds.PreferredWindowWidth  = 1280;
+    ds.PreferredWindowHeight = 720;
     FlatRedBallService.Default.PrepareWindow<MyStartScreen>(_graphics);
 }
 ```
 
-**Runtime** (settings menu, F11 toggle, etc.) — call `ApplyWindowSettings` at any time:
+**Runtime** (settings menu, F11 toggle) — call `ApplyWindowSettings` at any time:
 ```csharp
-// Toggle fullscreen
 var newMode = Engine.DisplaySettings.WindowMode == WindowMode.Windowed
     ? WindowMode.FullscreenBorderless
     : WindowMode.Windowed;
 Engine.ApplyWindowSettings(new DisplaySettings { WindowMode = newMode });
-
-// Change windowed size without touching fullscreen state
-Engine.ApplyWindowSettings(new DisplaySettings
-{
-    WindowMode           = WindowMode.Windowed,
-    PreferredWindowWidth  = 1920,
-    PreferredWindowHeight = 1080,
-});
 ```
-
-`Engine.DisplaySettings.WindowMode` always reflects the current active mode after `ApplyWindowSettings` returns.
 
 ## Camera Position (Scrolling)
 
@@ -180,15 +172,15 @@ Camera.AccelerationY
 The camera is updated by the same physics loop as entities — set velocity or acceleration and it moves automatically each frame. **Do not lerp `Camera.X`/`Camera.Y` manually** — use velocity instead.
 
 ```csharp
-// Slide camera right one screen width
-Camera.VelocityX = Camera.TargetWidth;  // moves one screen-width per second
+// Slide camera right one screen width per second
+Camera.VelocityX = Camera.OrthogonalWidth;
 ```
 
 For a timed one-shot slide, use an async delay to stop it:
 
 ```csharp
-float targetX = Camera.X + Camera.TargetWidth;
-Camera.VelocityX = Camera.TargetWidth;
+float targetX = Camera.X + Camera.OrthogonalWidth;
+Camera.VelocityX = Camera.OrthogonalWidth;
 await Engine.Time.DelaySeconds(1.0, Token);
 Camera.VelocityX = 0f;
 Camera.X = targetX;   // snap to exact position to eliminate drift
@@ -209,13 +201,13 @@ public override void CustomInitialize()
 {
     _cameraFactory = new Factory<CameraControllingEntity>(this);
 
-    var mapBounds = new BoundsRectangle(2560f, 1440f); // centered at origin; use BoundsRectangle(x, y, w, h) for maps not centered at origin
+    var mapBounds = new BoundsRectangle(2560f, 1440f); // centered at origin
 
-    var cam = _cameraFactory.Create(); // sets cam.Camera = Screen.Camera
-    cam.Target = player;               // or cam.Targets.Add(p1); cam.Targets.Add(p2);
+    var cam = _cameraFactory.Create();
+    cam.Target = player;
     cam.Map = mapBounds;               // clamps camera; null = no bounds
     cam.TargetApproachStyle = TargetApproachStyle.Smooth;
-    cam.TargetApproachCoefficient = 8f; // higher = faster
+    cam.TargetApproachCoefficient = 8f;
 }
 ```
 
@@ -223,29 +215,20 @@ public override void CustomInitialize()
 ```csharp
 cam.Map = new BoundsRectangle(map.X + map.Width / 2f, map.Y - map.Height / 2f, map.Width, map.Height);
 ```
-`TileMap.Width`/`Height` are in world units (tiles × tile size). `map.X`/`map.Y` is the map's bottom-left corner, so `+ Width/2` / `+ Height/2` converts to center. `BoundsRectangle` is in `FlatRedBall2.Math`.
 
-**Approach styles:**
-- `Immediate` — locks to target each frame (no lag)
-- `Smooth` — exponential ease; speed = coefficient × distance (default 5)
-- `ConstantSpeed` — moves at fixed world-units/sec, snaps when close
+**Approach styles:** `Immediate`, `Smooth`, `ConstantSpeed`.
 
-**Deadzone** — camera only pans when the target leaves the window:
+**Deadzone:**
 ```csharp
 cam.ScrollingWindowWidth  = 200f;
 cam.ScrollingWindowHeight = 120f;
 ```
 
-**Pixel-perfect snapping** — on by default (`SnapToPixel = true`). Uses `Camera.PixelsPerUnit` for exactness across window resizes.
+**Pixel-perfect snapping** — on by default (`SnapToPixel = true`). Uses `Camera.PixelsPerUnit`.
 
-**Screen shake** (async, pass `Token` to cancel on screen transition):
+**Screen shake** (async; pass `Token` to cancel on screen transition):
 ```csharp
 _ = cam.ShakeScreen(radius: 8f, durationInSeconds: 0.4f, Token);
-```
-
-**Debug overlay** — shows the deadzone window:
-```csharp
-cam.ShowDebugOverlay = true;
 ```
 
 **Multi-target auto-zoom** (frames all targets in view):
@@ -253,33 +236,21 @@ cam.ShowDebugOverlay = true;
 cam.EnableAutoZooming(defaultZoom: Camera.Zoom, furthestMultiplier: 3f);
 ```
 
-## Screen Shake (manual, no CameraControllingEntity)
-
-Set `Camera.X`/`Camera.Y` directly each frame to a random offset that decays to zero. No drift; resets cleanly.
-
 ## Coordinate Conversion
 
 ```csharp
-// World → screen pixels
 System.Numerics.Vector2 screenPos = Camera.WorldToScreen(worldPos);
-
-// Screen pixels → world
-System.Numerics.Vector2 worldPos = Camera.ScreenToWorld(screenPos);
+System.Numerics.Vector2 worldPos  = Camera.ScreenToWorld(screenPos);
 ```
-
-Useful when placing Gum HUD elements relative to world objects, or for click-to-move logic where you receive screen-space mouse coordinates.
 
 ## Free-Roaming Camera (No Entity to Follow)
 
-City builders, strategy games, and level editors require a camera that the player directly drives — there is no player entity to follow. Do **not** use `CameraControllingEntity` for this pattern; drive the camera directly from screen `CustomActivity`.
-
-### WASD Pan + Clamp to Map Bounds
+Drive the camera directly from screen `CustomActivity`. Set velocity each frame (no `Drag` — zero it explicitly):
 
 ```csharp
-// In Screen.CustomActivity:
-const float PanSpeed = 400f;           // world units/sec
-const float MapHalfW = 128 * 16 / 2f; // half the world width  (tileCount * tileSize / 2)
-const float MapHalfH = 128 * 16 / 2f; // half the world height
+const float PanSpeed = 400f;
+const float MapHalfW = 128 * 16 / 2f;
+const float MapHalfH = 128 * 16 / 2f;
 
 var kb = Engine.Input.Keyboard;
 
@@ -291,62 +262,16 @@ if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) Camera.VelocityX =  PanSpe
 if (kb.IsKeyDown(Keys.S) || kb.IsKeyDown(Keys.Down))  Camera.VelocityY = -PanSpeed;
 if (kb.IsKeyDown(Keys.W) || kb.IsKeyDown(Keys.Up))    Camera.VelocityY =  PanSpeed;
 
-// Clamp after the engine has applied velocity (do it next frame via properties):
-Camera.X = Math.Clamp(Camera.X, -MapHalfW + Camera.TargetWidth  / 2f,
-                                  MapHalfW - Camera.TargetWidth  / 2f);
-Camera.Y = Math.Clamp(Camera.Y, -MapHalfH + Camera.TargetHeight / 2f,
-                                  MapHalfH - Camera.TargetHeight / 2f);
-```
-
-> **Note:** Camera has no `Drag` — set velocity to `0` explicitly each frame when the key is not held. Setting velocity each frame (not accumulating) keeps movement instant and frame-rate independent.
-
-### Edge Scrolling
-
-When the cursor is near the screen edge, add pan velocity in that direction:
-
-```csharp
-const float EdgeThreshold = 20f; // screen pixels from edge
-var screenPos = Engine.Input.Cursor.ScreenPosition;
-
-if (screenPos.X < EdgeThreshold)                          Camera.VelocityX -= PanSpeed;
-if (screenPos.X > Engine.DisplaySettings.Width - EdgeThreshold) Camera.VelocityX += PanSpeed;
-if (screenPos.Y < EdgeThreshold)                          Camera.VelocityY += PanSpeed; // Y-down screen → Y-up world
-if (screenPos.Y > Engine.DisplaySettings.Height - EdgeThreshold) Camera.VelocityY -= PanSpeed;
-```
-
-Combine freely with WASD — velocities accumulate. Apply the same clamp after.
-
-### Middle-Mouse Drag Pan
-
-```csharp
-private Vector2 _dragStartCamera;
-private Vector2 _dragStartScreen;
-
-// In CustomActivity:
-var cursor = Engine.Input.Cursor;
-if (cursor.MiddlePressed)
-{
-    _dragStartCamera = new Vector2(Camera.X, Camera.Y);
-    _dragStartScreen = cursor.ScreenPosition;
-}
-if (cursor.MiddleDown)
-{
-    var delta = cursor.ScreenPosition - _dragStartScreen;
-    // Screen pixels → world units (screen pixel = 1 world unit / Zoom * PixelsPerUnit)
-    float ppu = Camera.PixelsPerUnit * Camera.Zoom;
-    Camera.X = _dragStartCamera.X - delta.X / ppu;
-    Camera.Y = _dragStartCamera.Y + delta.Y / ppu; // screen Y-down → world Y-up
-    Camera.VelocityX = 0f;
-    Camera.VelocityY = 0f;
-}
+Camera.X = Math.Clamp(Camera.X, -MapHalfW + Camera.OrthogonalWidth  / 2f,
+                                  MapHalfW - Camera.OrthogonalWidth  / 2f);
+Camera.Y = Math.Clamp(Camera.Y, -MapHalfH + Camera.OrthogonalHeight / 2f,
+                                  MapHalfH - Camera.OrthogonalHeight / 2f);
 ```
 
 ### Scroll Wheel Zoom with Clamp
 
 ```csharp
-const float ZoomStep  = 0.1f;
-const float ZoomMin   = 0.5f;
-const float ZoomMax   = 3.0f;
+const float ZoomStep = 0.1f, ZoomMin = 0.5f, ZoomMax = 3.0f;
 
 int scroll = Engine.Input.Cursor.ScrollWheelDelta;
 if (scroll != 0)
@@ -356,14 +281,13 @@ if (scroll != 0)
 }
 ```
 
-`Camera.Zoom` is reset on every screen transition (see Gotchas). If you need a persistent zoom level, store it in a field and re-apply it in `CustomInitialize`.
+`Camera.Zoom` is reset on every screen transition. For a persistent zoom, store it in a field and re-apply in `CustomInitialize`.
 
 ## Gotchas
 
-- **Zoom multiplies the window-vs-resolution stretch in StretchVisibleArea mode.** If your window is 2× your resolution to scale pixel art, leave `Zoom = 1` — the window stretch already scales 2×. Setting Zoom = 2 there zooms in 4× and hides three-quarters of the level. See "Sizing — Resolution × Window × Zoom" above for the full math and recipes.
-- **Use `DisplaySettings.Zoom` for setup; use `Camera.Zoom` for dynamic zoom effects.** `TargetWidth/Height` are computed at screen-start from `DisplaySettings.Zoom`. Setting `Camera.Zoom` in `CustomInitialize` zooms the rendered image but not the coordinate space, so edge-placed objects fall off-screen. Use `DisplaySettings.Zoom` (or per-screen `PreferredDisplaySettings`) for the baseline; reserve `Camera.Zoom` for runtime tweens (zoom-in on a boss, etc.).
-- **`Camera.Zoom` is reset on every screen transition.** The engine sets `Camera.Zoom = DisplaySettings.Zoom` when a new screen starts. Any direct assignment to `Camera.Zoom` is lost on screen change. Use `DisplaySettings.Zoom` (or a per-screen `PreferredDisplaySettings` override) for the baseline zoom that should apply from the moment the screen appears.
-- **Gum coordinates are independent of Camera.** Gum X/Y are screen pixels, Y-down from the top-left — they do not shift when the camera moves. Only world-space objects (entities, shapes) are affected by camera position.
-- **TargetWidth/Height ≠ window pixel size.** The camera scales world units to fill whatever window resolution MonoGame uses. A 1280×720 world still renders correctly in an 800×480 window — it just appears smaller.
-- **Do not set `TargetWidth`/`TargetHeight` directly.** They have `internal set` and are managed by the engine from `DisplaySettings`. Use `Camera.Zoom` for runtime zoom effects.
-- **Viewport edge coordinates**: Use `Camera.Left`, `Camera.Right`, `Camera.Top`, `Camera.Bottom` for world-space edges — these are Zoom-correct. Do not compute edges from `Camera.X ± Camera.TargetWidth / 2f` — that formula is wrong when `Zoom ≠ 1`.
+- **`Camera.OrthogonalWidth/Height` ≠ window pixel size.** Under default `Locked` + `Stretch`, OrthogonalWidth/Height equal `ResolutionWidth/Height` regardless of window size — the window is just rescaled to fit. Under `Free` + `Stretch`, the non-dominant axis tracks the window aspect; under `IncreaseVisibleArea`, both axes track viewport pixels.
+- **Express on-screen scale via window-vs-resolution, not zoom.** A 426×240 design rendered to a 1280×720 window auto-scales 3×. Setting `Camera.Zoom = 3` on top of that zooms in 3× (showing 1/3 of the design world) — almost always wrong. Reserve `Camera.Zoom` for runtime cinematic effects.
+- **Do not set `OrthogonalWidth`/`OrthogonalHeight` directly.** They have `internal set` and are managed by the engine from `DisplaySettings`. Use `Camera.Zoom` for runtime zoom.
+- **Viewport edge coordinates**: Use `Camera.Left`, `Camera.Right`, `Camera.Top`, `Camera.Bottom` — these are Zoom- and position-correct. Do not compute edges from `Camera.X ± Camera.OrthogonalWidth / 2f`.
+- **Gum coordinates are independent of Camera.** Gum X/Y are screen pixels, Y-down from the top-left — they do not shift when the camera moves.
+- **`AllowUserResizing` defaults to `false`.** Set to `true` opt-in. The default `Locked` aspect policy means resize is safe (pillarboxes), but you must opt in for the player to be able to drag window borders.
