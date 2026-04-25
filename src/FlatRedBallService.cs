@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -140,7 +141,7 @@ public class FlatRedBallService
             _gum.Initialize(game, DefaultVisualsVersion.V3);
         }
         GumRenderBatch.Instance.Initialize();
-        Console.WriteLine("FlatRedBall2 initialized.");
+        System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
     }
 
     // Screen management
@@ -365,6 +366,8 @@ public class FlatRedBallService
             $"No factory registered for {typeof(T).Name}. Create a Factory<{typeof(T).Name}> in CustomInitialize before calling GetFactory.");
     }
 
+    internal IEnumerable<IFactory> EnumerateFactories() => _factories.Values;
+
     internal void SortPartitionedFactories()
     {
         foreach (var factory in _factories.Values)
@@ -536,6 +539,41 @@ public class FlatRedBallService
     /// <summary>The active screen's overlay. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Overlay"/>.</summary>
     public Overlay Overlay => CurrentScreen.Overlay;
 
+#if DEBUG
+    private Automation.AutomationMode? _automationMode;
+
+    /// <summary>
+    /// Activates automation mode when the game is launched with --frb-auto. No-op otherwise.
+    /// Call in Game.Initialize after base.Initialize(). In Release builds this is a no-op.
+    /// </summary>
+    public void EnableAutomationMode()
+    {
+        if (System.Environment.GetCommandLineArgs().Contains("--frb-auto"))
+        {
+            _automationMode = new Automation.AutomationMode(this);
+            _automationMode.Start();
+        }
+    }
+
+    /// <summary>
+    /// Registers a named state provider for automation-mode queries: {"cmd":"query","target":"name"}.
+    /// No-op if automation mode is not active.
+    /// </summary>
+    public void RegisterStateProvider(string name, Func<object> provider)
+        => _automationMode?.RegisterStateProvider(name, provider);
+
+    /// <summary>
+    /// Registers a value setter for automation-mode set commands: {"cmd":"set","entity":"name","prop":"X","value":...}.
+    /// No-op if automation mode is not active.
+    /// </summary>
+    public void RegisterValueSetter(string entityName, string propName, Action<double> setter)
+        => _automationMode?.RegisterValueSetter(entityName, propName, setter);
+#else
+    public void EnableAutomationMode() { }
+    public void RegisterStateProvider(string name, Func<object> provider) { }
+    public void RegisterValueSetter(string entityName, string propName, Action<double> setter) { }
+#endif
+
     /// <summary>
     /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
     /// polling, content hot-reload, time accumulation, async continuations, and the active
@@ -543,6 +581,17 @@ public class FlatRedBallService
     /// </summary>
     public void Update(GameTime gameTime)
     {
+#if DEBUG
+        if (_automationMode != null)
+        {
+            if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
+            {
+                _game!.SuppressDraw();
+                return;
+            }
+        }
+#endif
+
         // Apply pending screen transition at start of frame
         if (_pendingScreenChange != null)
         {
@@ -646,5 +695,9 @@ public class FlatRedBallService
         }
 
         CurrentScreen.Draw(_spriteBatch, RenderDiagnostics);
+
+#if DEBUG
+        _automationMode?.FlushStepResponse(Time.CurrentFrame);
+#endif
     }
 }
