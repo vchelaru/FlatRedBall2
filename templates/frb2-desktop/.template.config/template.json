@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "FlatRedBall2",
+  "classifications": ["Games", "MonoGame", "FlatRedBall2"],
+  "identity": "FlatRedBall2.Templates.Desktop",
+  "name": "FlatRedBall2 Desktop Game",
+  "shortName": "frb2-desktop",
+  "sourceName": "MyGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  }
+}
