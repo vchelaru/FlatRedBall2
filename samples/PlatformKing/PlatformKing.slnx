@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
-  <Project Path="PlatformKing.csproj" />
+  <Project Path="PlatformKing.Common/PlatformKing.Common.csproj" />
+  <Project Path="PlatformKing.Desktop/PlatformKing.Desktop.csproj" />
+  <Project Path="PlatformKing.BlazorGL/PlatformKing.BlazorGL.csproj" />
 </Solution>

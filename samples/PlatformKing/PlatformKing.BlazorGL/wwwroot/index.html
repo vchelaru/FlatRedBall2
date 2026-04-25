@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlatformKing (KNI BlazorGL)</title>
+    <base href="./" />
+</head>
+<body>
+    <div id="app">Loading...</div>
+    <div id="blazor-error-ui" style="display:none; position:fixed; bottom:0; left:0; width:100%; padding:0.6rem 1.25rem; background:lightyellow; z-index:1000;">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss" style="cursor:pointer; position:absolute; right:0.75rem; top:0.5rem;">x</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <script src="_content/nkast.Wasm.JSInterop/js/JSObject.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Window.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Document.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Navigator.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Gamepad.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Dom/js/Media.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.XHR/js/XHR.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Canvas/js/Canvas.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Canvas/js/CanvasGLContext.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.Audio/js/Audio.8.0.11.js"></script>
+    <script src="_content/nkast.Wasm.XR/js/XR.8.0.11.js"></script>
+
+    <script>
+        function tickJS() {
+            window.theInstance.invokeMethod('TickDotNet');
+            window.requestAnimationFrame(tickJS);
+        }
+
+        window.initRenderJS = (instance) => {
+            window.theInstance = instance;
+            var canvas = document.getElementById('theCanvas');
+            var holder = document.getElementById('canvasHolder');
+            canvas.width = holder.clientWidth;
+            canvas.height = holder.clientHeight;
+            canvas.addEventListener("contextmenu", e => e.preventDefault());
+            window.requestAnimationFrame(tickJS);
+        };
+    </script>
+</body>
+</html>

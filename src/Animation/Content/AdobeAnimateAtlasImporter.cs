@@ -5,6 +5,7 @@ using System.IO;
 using System.Xml.Serialization;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -35,13 +36,20 @@ public class AdobeAnimateAtlasSave
     [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
-    /// <summary>Deserializes an Adobe Animate TextureAtlas XML file from disk.</summary>
+    // Test seam — and the layer that routes atlas XML reads through TitleContainer instead of
+    // File.IO, so the same code path works on backends without a filesystem (KNI Blazor / WASM).
+    internal static Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
+
+    /// <summary>Deserializes an Adobe Animate TextureAtlas XML file from the title container.</summary>
     public static AdobeAnimateAtlasSave FromFile(string filePath)
     {
-        using var stream = File.OpenRead(filePath);
+        using var stream = StreamProvider(filePath);
         var serializer = new XmlSerializer(typeof(AdobeAnimateAtlasSave));
         var result = (AdobeAnimateAtlasSave)serializer.Deserialize(stream)!;
-        result.FileName = Path.GetFullPath(filePath);
+        // Store the path as-given so ToAnimationChainList can resolve the sibling PNG via
+        // the same title-container-relative scheme. Path.GetFullPath would prepend CWD,
+        // which is "/" on WASM.
+        result.FileName = filePath;
         return result;
     }
 

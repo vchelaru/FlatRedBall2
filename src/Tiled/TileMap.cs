@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
+using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 using MonoGame.Extended.Tilemaps;
 using MonoGame.Extended.Tilemaps.Rendering;
 using MonoGame.Extended.Tilemaps.Tiled;
@@ -41,6 +42,23 @@ public class TileMap
     private float _x;
     private float _y;
 
+    // Test seam — and the layer that routes TMX reads through TitleContainer instead of File.IO,
+    // so the same code path works on backends without a filesystem (KNI Blazor / WASM).
+    // TitleContainer.OpenStream resolves relative paths against the title location on every
+    // backend: the working directory on DesktopGL, an HTTP fetch on Blazor.
+    internal static Func<string, GraphicsDevice, Tilemap> TmxLoader { get; set; } = DefaultTmxLoader;
+
+    private static Tilemap DefaultTmxLoader(string tmxPath, GraphicsDevice graphicsDevice)
+    {
+        // basePath is what the parser uses to resolve referenced TSX/PNG files. We hand it
+        // the directory portion of the TMX path so child references resolve relative to the
+        // TMX, matching ParseFromFile's behavior.
+        string basePath = System.IO.Path.GetDirectoryName(tmxPath) ?? string.Empty;
+        var parser = new TiledTmxParser();
+        using var stream = XnaTitleContainer.OpenStream(tmxPath);
+        return parser.ParseFromStream(stream, graphicsDevice, basePath);
+    }
+
     // Tracked TSCs registered by GenerateCollisionFromClass / GenerateCollisionFromProperty.
     // On TryReload, each is cleared and rebuilt against the updated tilemap so cell membership
     // reflects the new tile data without the caller needing to rewire collision relationships.
@@ -61,8 +79,7 @@ public class TileMap
     public TileMap(string tmxPath, GraphicsDevice graphicsDevice, float x = 0f, float y = 0f)
     {
         _graphicsDevice = graphicsDevice;
-        var parser = new TiledTmxParser();
-        _tilemap = parser.ParseFromFile(tmxPath, graphicsDevice);
+        _tilemap = TmxLoader(tmxPath, graphicsDevice);
 
         _width = _tilemap.Width * _tilemap.TileWidth;
         _height = _tilemap.Height * _tilemap.TileHeight;
@@ -542,8 +559,7 @@ public class TileMap
             throw new InvalidOperationException(
                 "TryReloadFrom requires the TileMap to have been constructed with a GraphicsDevice.");
 
-        var parser = new TiledTmxParser();
-        var newTilemap = parser.ParseFromFile(tmxPath, _graphicsDevice);
+        var newTilemap = TmxLoader(tmxPath, _graphicsDevice);
         return TryReload(newTilemap);
     }
 
