@@ -10,3 +10,7 @@ Behavior changes in `src/` require a failing test in `tests/FlatRedBall2.Tests/`
 No "the cause is obvious, I'll skip the test" exception — that reasoning is how silent regressions ship. If you're about to edit `src/` without a failing test open, stop.
 
 Exceptions: XML docs, style-only edits, pure renames, dead-code removal.
+
+## API Design — Flag Before Implementing
+
+Before adding any new `public` or `virtual` member to an engine base class (`Screen`, `Entity`, `FlatRedBallService`, etc.), stop and flag it as an API design decision. Ask before writing code. New public/virtual surface is a footgun risk — it implies intent to users, shows up in IntelliSense, and is hard to remove once shipped.

@@ -29,8 +29,27 @@ dotnet add package FlatRedBall2.Kni        # browser / Blazor WASM (.NET 8)
 
 ## Quick Start
 
-1. Create a new MonoGame project and install the NuGet package above.
-2. Replace `Game1.cs` with the following:
+Install the project template (re-run this before each new project to get the latest):
+
+```
+dotnet new install FlatRedBall2.Templates
+```
+
+Then scaffold a new project:
+
+```
+dotnet new frb2-desktop -n YourGameName
+cd YourGameName/YourGameName.Desktop
+dotnet tool restore
+cd ..
+dotnet build YourGameName.Desktop/YourGameName.Desktop.csproj
+```
+
+Your project is ready. `YourGameName.Common/Screens/GameScreen.cs` is where your game code goes.
+
+### Manual setup (advanced)
+
+If you prefer to wire things up yourself, install the NuGet package and set up `Game1.cs` as follows:
 
 ```csharp
 using FlatRedBall2;

@@ -295,34 +295,9 @@ public class Screen
     // Lifecycle
 
     /// <summary>
-    /// Override to set up game logic, entities, and factories. Always headless-safe — no
-    /// graphics device is required. Called before <see cref="LoadContent"/>.
-    /// <para>
-    /// Put here: creature/entity state, <c>Factory&lt;T&gt;</c> construction, initial positions,
-    /// game-mode flags, anything that works without a GPU.
-    /// </para>
-    /// </summary>
-    public virtual void Initialize() { }
-
-    /// <summary>
-    /// Override to set up renderer-dependent resources — Gum UI, textures, layers, fonts.
-    /// Requires a graphics device. Called after <see cref="Initialize"/>.
-    /// <para>
-    /// Put here: <c>Layer</c>, <c>Camera.BackgroundColor</c>, Gum controls, HP bars, labels,
-    /// buttons. Anything that would throw in a headless test belongs here instead of
-    /// <see cref="Initialize"/>.
-    /// </para>
-    /// </summary>
-    public virtual void LoadContent() { }
-
-    /// <summary>
-    /// Lifecycle hook called by the engine after <see cref="Initialize"/> and <see cref="LoadContent"/>
-    /// have both run. Override for setup that needs both logic and renderer-dependent resources in one place.
-    /// <para>
-    /// The engine always calls all three methods in order — <see cref="Initialize"/>,
-    /// <see cref="LoadContent"/>, then <c>CustomInitialize</c> — regardless of which you override.
+    /// Override to initialize the screen — create entities, set up factories, configure the camera,
+    /// load content. Called by the engine when the screen activates.
     /// Do <b>not</b> call <c>base.CustomInitialize()</c>; the base is empty.
-    /// </para>
     /// </summary>
     public virtual void CustomInitialize() { }
 
