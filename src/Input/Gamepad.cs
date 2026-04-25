@@ -1,3 +1,4 @@
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 
 namespace FlatRedBall2.Input;
@@ -17,14 +18,42 @@ public class Gamepad : IGamepad
     private readonly int _index;
     private GamePadState _current;
     private GamePadState _previous;
+    private bool _hasInjection;
+    private Buttons _injectedButtons;
+    private float _leftStickX, _leftStickY, _rightStickX, _rightStickY, _leftTrigger, _rightTrigger;
 
     internal Gamepad(int index) => _index = index;
+
+    internal void InjectButton(Buttons button, bool down)
+    {
+        _hasInjection = true;
+        if (down) _injectedButtons |= button;
+        else _injectedButtons &= ~button;
+    }
+
+    internal void InjectAxis(GamepadAxis axis, float value)
+    {
+        _hasInjection = true;
+        if (axis == GamepadAxis.LeftStickX)       _leftStickX  = value;
+        else if (axis == GamepadAxis.LeftStickY)  _leftStickY  = value;
+        else if (axis == GamepadAxis.RightStickX) _rightStickX = value;
+        else if (axis == GamepadAxis.RightStickY) _rightStickY = value;
+        else if (axis == GamepadAxis.LeftTrigger)  _leftTrigger  = value;
+        else if (axis == GamepadAxis.RightTrigger) _rightTrigger = value;
+    }
 
     // Called once per frame by InputManager before entity/screen logic runs.
     internal void Update()
     {
         _previous = _current;
-        _current = GamePad.GetState(_index);
+        if (_hasInjection)
+            _current = new GamePadState(
+                new GamePadThumbSticks(new Vector2(_leftStickX, _leftStickY), new Vector2(_rightStickX, _rightStickY)),
+                new GamePadTriggers(_leftTrigger, _rightTrigger),
+                new GamePadButtons(_injectedButtons),
+                new GamePadDPad());
+        else
+            _current = GamePad.GetState(_index);
     }
 
     /// <inheritdoc/>

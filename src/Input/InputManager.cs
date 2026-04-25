@@ -1,5 +1,6 @@
 using System;
 using FlatRedBall2.Rendering;
+using Microsoft.Xna.Framework.Input;
 
 namespace FlatRedBall2.Input;
 
@@ -41,6 +42,10 @@ public class InputManager
     }
 
     internal void SetCamera(Camera camera) => _cursor.SetCamera(camera);
+
+    internal void InjectKey(Keys key, bool down) => _keyboard.InjectKey(key, down);
+    internal void InjectGamepadButton(int playerIndex, Buttons button, bool down) => _gamepads[playerIndex].InjectButton(button, down);
+    internal void InjectGamepadAxis(int playerIndex, GamepadAxis axis, float value) => _gamepads[playerIndex].InjectAxis(axis, value);
 
     internal void Update(TimeSpan realTimeSinceStart)
     {

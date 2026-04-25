@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework.Input;
 
 namespace FlatRedBall2.Input;
@@ -12,12 +14,23 @@ public class Keyboard : IKeyboard
 {
     private KeyboardState _current;
     private KeyboardState _previous;
+    private bool _hasInjection;
+    private readonly HashSet<Keys> _injectedKeys = new();
+
+    internal void InjectKey(Keys key, bool down)
+    {
+        _hasInjection = true;
+        if (down) _injectedKeys.Add(key);
+        else _injectedKeys.Remove(key);
+    }
 
     // Called once per frame by InputManager before entity/screen logic runs.
     internal void Update()
     {
         _previous = _current;
-        _current = Microsoft.Xna.Framework.Input.Keyboard.GetState();
+        _current = _hasInjection
+            ? new KeyboardState(_injectedKeys.ToArray())
+            : Microsoft.Xna.Framework.Input.Keyboard.GetState();
     }
 
     /// <inheritdoc/>
