@@ -34,6 +34,15 @@ jobs:
           -c Release
           -o publish
 
+      - name: Diagnose published content (TEMP)
+        shell: bash
+        run: |
+          echo "=== publish/wwwroot/Content (final, deployed) ==="
+          find publish/wwwroot/Content -type f 2>/dev/null | sort || echo "(no Content/ dir)"
+          echo
+          echo "=== source wwwroot/Content (where MGCB writes) ==="
+          find samples/${{ inputs.sample }}/${{ inputs.sample }}.BlazorGL/wwwroot/Content -type f 2>/dev/null | sort || echo "(empty)"
+
       - name: Rewrite base href for GitHub Pages subpath
         run: |
           sed -i 's|<base href="\./" />|<base href="/FlatRedBall2/${{ inputs.sample }}/" />|' \
