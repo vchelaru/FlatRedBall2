@@ -11,6 +11,8 @@ internal interface IFactory
     void DestroyAll();
     Axis? PartitionAxis { get; }
     void SortForPartition();
+    System.Type EntityType { get; }
+    System.Collections.Generic.IReadOnlyList<Entity> EntityInstances { get; }
 }
 
 /// <summary>
@@ -119,6 +121,9 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// remove via <see cref="Entity.Destroy"/>.
     /// </summary>
     public IReadOnlyList<T> Instances => _instances;
+
+    Type IFactory.EntityType => typeof(T);
+    IReadOnlyList<Entity> IFactory.EntityInstances => _instances;
 
     /// <summary>
     /// When set, this factory's entity list is sorted along the chosen axis once per frame before

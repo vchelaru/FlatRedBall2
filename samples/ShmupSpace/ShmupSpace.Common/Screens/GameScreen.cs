@@ -75,6 +75,11 @@ public class GameScreen : Screen
 
         BuildHud();
 
+        // Automation-mode introspection. Entities, their public properties, and `set entity:"X" prop:"Y"`
+        // are picked up automatically via reflection — no per-property registration needed. Only derived
+        // state that isn't a plain entity property (like Score and Lives) needs a custom provider.
+        Engine.RegisterStateProvider("hud", () => new { Score = _score, Lives = _lives });
+
         // Hot-reload: JSON tweaks apply in place; asset changes (.achx, .png) restart the screen.
         WatchContentDirectory("Content", HandleContentChanged);
     }

@@ -366,6 +366,8 @@ public class FlatRedBallService
             $"No factory registered for {typeof(T).Name}. Create a Factory<{typeof(T).Name}> in CustomInitialize before calling GetFactory.");
     }
 
+    internal IEnumerable<IFactory> EnumerateFactories() => _factories.Values;
+
     internal void SortPartitionedFactories()
     {
         foreach (var factory in _factories.Values)
@@ -582,8 +584,7 @@ public class FlatRedBallService
 #if DEBUG
         if (_automationMode != null)
         {
-            _automationMode.ProcessQueuedCommands(Time.CurrentFrame);
-            if (!_automationMode.ConsumeStep())
+            if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
             {
                 _game!.SuppressDraw();
                 return;

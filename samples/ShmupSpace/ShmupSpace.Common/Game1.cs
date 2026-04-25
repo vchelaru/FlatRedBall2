@@ -42,6 +42,7 @@ public class Game1 : Game
     {
         base.Initialize();
         FlatRedBallService.Default.Initialize(this);
+        FlatRedBallService.Default.EnableAutomationMode();
         FlatRedBallService.Default.Start<TitleScreen>();
     }
 
