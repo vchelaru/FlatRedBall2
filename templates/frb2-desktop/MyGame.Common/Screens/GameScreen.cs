@@ -8,7 +8,7 @@ public class GameScreen : Screen
     {
     }
 
-    public override void CustomActivity(bool firstTimeCalled)
+    public override void CustomActivity(FrameTime time)
     {
     }
 

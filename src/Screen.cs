@@ -316,20 +316,15 @@ public class Screen
     public virtual void LoadContent() { }
 
     /// <summary>
-    /// Convenience lifecycle hook called by the engine on screen activation. The default
-    /// implementation calls <see cref="Initialize"/> then <see cref="LoadContent"/> in order.
+    /// Lifecycle hook called by the engine after <see cref="Initialize"/> and <see cref="LoadContent"/>
+    /// have both run. Override for setup that needs both logic and renderer-dependent resources in one place.
     /// <para>
-    /// Prefer overriding <see cref="Initialize"/> and <see cref="LoadContent"/> individually
-    /// so that headless tests can call <see cref="Initialize"/> without a graphics device.
-    /// Override <c>CustomInitialize</c> directly only if you genuinely need both in one place
-    /// and don't care about headless testability.
+    /// The engine always calls all three methods in order — <see cref="Initialize"/>,
+    /// <see cref="LoadContent"/>, then <c>CustomInitialize</c> — regardless of which you override.
+    /// Do <b>not</b> call <c>base.CustomInitialize()</c>; the base is empty.
     /// </para>
     /// </summary>
-    public virtual void CustomInitialize()
-    {
-        Initialize();
-        LoadContent();
-    }
+    public virtual void CustomInitialize() { }
 
     /// <summary>
     /// Override to run per-frame screen logic. Called after entity activity, collision, and tween
