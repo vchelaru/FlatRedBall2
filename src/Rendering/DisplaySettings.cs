@@ -71,9 +71,27 @@ public class DisplaySettings
     public WindowMode WindowMode { get; set; } = WindowMode.Windowed;
 
     /// <summary>
-    /// Whether the player can drag the window border to resize it.
-    /// Applied only when this screen is the starting screen.
-    /// Ignored when <see cref="WindowMode"/> is <see cref="WindowMode.FullscreenBorderless"/>.
+    /// Whether the surface (desktop window border, browser canvas) is treated as resizable
+    /// by the host. Source of truth for two engine gates:
+    /// <list type="bullet">
+    /// <item><description>
+    /// <b>Initialization:</b> when this is <c>true</c> and the starting screen has no
+    /// <see cref="Screen.PreferredDisplaySettings"/>, the engine skips
+    /// <see cref="FlatRedBallService.ApplyWindowSettings"/> so the host (KNI BlazorGL canvas,
+    /// resizable desktop window) can drive the back-buffer size. Setting this to <c>false</c>
+    /// (combined with <see cref="PreferredWindowWidth"/>/<see cref="PreferredWindowHeight"/>)
+    /// is the fixed-canvas pattern: the engine clamps the back buffer to the requested size and
+    /// keeps it there.
+    /// </description></item>
+    /// <item><description>
+    /// <b>Runtime resize events:</b> propagates to <c>Game.Window.AllowUserResizing</c> via
+    /// <see cref="FlatRedBallService.ApplyWindowSettings"/>. <c>HandleClientSizeChanged</c> ignores
+    /// browser/window resize echoes when that flag is <c>false</c>, so a CSS-pinned KNI canvas
+    /// stays at its design resolution even when the browser window resizes.
+    /// </description></item>
+    /// </list>
+    /// Applied only when this screen is the starting screen. Ignored when
+    /// <see cref="WindowMode"/> is <see cref="WindowMode.FullscreenBorderless"/>.
     /// </summary>
     public bool AllowUserResizing { get; set; } = true;
 

@@ -65,13 +65,43 @@ The two known places `#if KNI` is needed today:
 - **`GraphicsProfile`** — Apos.Shapes ships SM 4.0+ shaders. MonoGame's top profile is `HiDef`. KNI's equivalent is `FL10_0`, which doesn't exist on MonoGame. The `Reach` default (SM 2.0) crashes at runtime with "Shader model 4.0 is not supported."
 - **Anywhere a backend exposes a type the other doesn't.** Stay vigilant; most XNA surface is shared.
 
-## Game1 settings required for KNI BlazorGL
+## Two canvas patterns — pick one before writing Game1
 
-Let the browser canvas drive back-buffer size — anything that hard-codes a buffer dimension reintroduces the canvas-vs-buffer mismatch and `Camera.ScreenToWorld` returns wrong cursor coordinates.
+Stretch-to-viewport (canvas fills the browser) and fixed-size canvas (matches the desktop window) need opposite engine settings. Each pattern is a coordinated set across Game1, holder CSS, body CSS, and the JS host script — mixing them produces the squashing / shifting bugs the engine gates were added to prevent.
 
-- `Window.AllowUserResizing = true;` — engine skips `ApplyWindowSettings` only when this is set. Harmless on Desktop.
-- Don't set `FlatRedBallService.Default.DisplaySettings.PreferredWindowWidth` / `PreferredWindowHeight` on KNI. `PrepareWindow<T>` writes them onto `GraphicsDeviceManager.PreferredBackBufferWidth/Height` in the Game1 constructor — that runs *before* `ActivateScreen`'s externally-managed-skip branch, so the back buffer gets clamped before any screen logic runs. Guard with `#if !KNI` if your desktop game wants a fixed window size.
-- Leave per-screen `PreferredDisplaySettings` unset. Same root cause: setting a fixed resolution re-runs `ApplyWindowSettings`. The explicit-resolution path on KNI is unsolved (see `design/TODOS.md`).
+`DisplaySettings.AllowUserResizing` is the source-of-truth signal — it propagates to `Game.Window.AllowUserResizing` at init and gates two engine behaviors: the `externallyManaged` check that skips `ApplyWindowSettings`, and `HandleClientSizeChanged` short-circuiting browser resize echoes.
+
+### Pattern A — Stretch-to-viewport
+
+Canvas fills the browser; world content rescales as the viewport changes. Reference: `samples/PlatformKing`.
+
+- **Game1**: `Window.AllowUserResizing = true;`. Don't set `PreferredWindowWidth/Height` on KNI (`PrepareWindow<T>` writes them onto `GraphicsDeviceManager.PreferredBackBufferWidth/Height` in the constructor — clamps the buffer before the externally-managed branch runs). Guard with `#if !KNI` if your desktop build wants a fixed window size. Leave per-screen `PreferredDisplaySettings` unset.
+- **Holder CSS** (`Pages/Index.razor`): `position: fixed; top: 0; left: 0; right: 0; bottom: 0` — fills viewport.
+- **Body CSS** (`wwwroot/index.html`): default — no flex centering needed.
+- **JS** (`wwwroot/index.html`): default `initRenderJS` from AutoEvalKniBlazorSample (sets canvas buffer once from holder size).
+
+### Pattern B — Fixed-size canvas
+
+Canvas locked at the desktop window's dimensions; browser resize doesn't reshape gameplay. Reference: `samples/ShmupSpace`.
+
+- **Game1**: set `PreferredWindowWidth/Height` on **both** backends, plus `ds.AllowUserResizing = false`. Don't set `Window.AllowUserResizing = true`. Per-screen `PreferredDisplaySettings` left unset (same as Pattern A).
+- **Holder CSS**: `width: NNNpx; height: MMMpx; flex-shrink: 0;` — explicit dims, won't shrink in flex centering.
+- **Canvas CSS**: `width: NNNpx; height: MMMpx; display: block;` — explicit dims, not `100%` (defense in depth if holder is overridden).
+- **Body CSS**: `display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; background: #222;` — centers the canvas; scrolls when viewport is smaller than the canvas.
+- **JS**: replace `tickJS` with a version that re-pins `canvas.width` / `canvas.height` every frame. KNI BlazorGL auto-resizes the drawing buffer when the browser resizes; the per-frame lock undoes that:
+
+```js
+var lockW = 0, lockH = 0;
+function tickJS() {
+    var c = document.getElementById('theCanvas');
+    if (c) { if (c.width !== lockW) c.width = lockW; if (c.height !== lockH) c.height = lockH; }
+    window.theInstance.invokeMethod('TickDotNet');
+    window.requestAnimationFrame(tickJS);
+}
+// In initRenderJS, set lockW/lockH from holder.clientWidth/Height before scheduling tickJS.
+```
+
+All four parts must be present together — omit any one and the buffer or viewport drifts on browser resize.
 
 ## Game code must avoid `System.IO.File` for content
 
