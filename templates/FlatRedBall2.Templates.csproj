@@ -15,5 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="frb2-desktop\**\*" />
+    <Content Include="frb2-skills\**\*" />
   </ItemGroup>
 </Project>
