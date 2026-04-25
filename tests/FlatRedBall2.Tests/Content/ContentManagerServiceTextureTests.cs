@@ -51,7 +51,40 @@ public class ContentManagerServiceTextureTests
 
         svc.Load<Texture2D>("Content/ship.png");
 
-        receivedPath.ShouldBe("content/ship.png");
+        receivedPath.ShouldBe("Content/ship.png");
+    }
+
+    [Fact]
+    public void Load_TextureWithExtension_LoaderReceivesOriginalCasePath()
+    {
+        // Regression: a previous NormalizePath lowercased the path before passing it to
+        // the loader, which works on Windows (case-insensitive FS) but 404s on case-
+        // sensitive HTTP servers (KNI BlazorGL on GitHub Pages). The cache may dedupe
+        // case-insensitively, but the loader must receive the original-case path so the
+        // underlying TitleContainer.OpenStream / HTTP fetch hits the actual file.
+        var svc = new ContentManagerService();
+        string? receivedPath = null;
+        svc.TextureLoader = p => { receivedPath = p; return null!; };
+
+        svc.Load<Texture2D>("Content/Animations/Arcade_Space_Shooter.PNG");
+
+        receivedPath.ShouldBe("Content/Animations/Arcade_Space_Shooter.PNG");
+    }
+
+    [Fact]
+    public void TryReload_ReloaderReceivesOriginalCasePath()
+    {
+        // Same case-preservation contract as the loader — a hot-reload triggered by a
+        // ContentWatcher event hands back the original-case path the file was loaded with.
+        var svc = new ContentManagerService();
+        svc.TextureLoader = p => null!;
+        string? reloaderPath = null;
+        svc.TextureReloader = (existing, path) => { reloaderPath = path; return true; };
+
+        svc.Load<Texture2D>("Content/Animations/Arcade_Space_Shooter.PNG");
+        svc.TryReload("Content/Animations/Arcade_Space_Shooter.PNG").ShouldBeTrue();
+
+        reloaderPath.ShouldBe("Content/Animations/Arcade_Space_Shooter.PNG");
     }
 
     [Fact]

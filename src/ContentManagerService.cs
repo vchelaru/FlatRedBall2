@@ -92,11 +92,11 @@ public class ContentManagerService
 
     private Texture2D LoadTextureFromFile(string path)
     {
-        var key = NormalizePath(path);
-        if (_textureRegistry.TryGetValue(key, out var cached))
+        var canonical = CanonicalizeSlashes(path);
+        if (_textureRegistry.TryGetValue(canonical, out var cached))
             return cached;
-        var texture = TextureLoader(key);
-        _textureRegistry[key] = texture;
+        var texture = TextureLoader(canonical);
+        _textureRegistry[canonical] = texture;
         return texture;
     }
 
@@ -110,10 +110,10 @@ public class ContentManagerService
     /// </summary>
     public bool TryReload(string path)
     {
-        var key = NormalizePath(path);
-        if (!_textureRegistry.TryGetValue(key, out var live))
+        var canonical = CanonicalizeSlashes(path);
+        if (!_textureRegistry.TryGetValue(canonical, out var live))
             return false;
-        return TextureReloader(live, key);
+        return TextureReloader(live, canonical);
     }
 
     /// <summary>
@@ -163,13 +163,12 @@ public class ContentManagerService
         _textureRegistry.Clear();
     }
 
-    // Cache key normalization. Must NOT call Path.GetFullPath: on WASM the working directory
-    // is "/", so GetFullPath("Content/foo.png") returns "/Content/foo.png" — the leading slash
-    // then propagates into TitleContainer.OpenStream and produces "Could not find a part of
-    // the path" errors. Slash-and-case normalization is enough to dedupe registry entries
-    // across platforms without depending on filesystem layout.
-    private static string NormalizePath(string path) =>
-        path.Replace('\\', '/').ToLowerInvariant();
+    // Slash-only canonicalization. Must NOT call Path.GetFullPath (on WASM the CWD is "/", so
+    // GetFullPath prepends a leading slash that breaks TitleContainer.OpenStream) and must NOT
+    // lowercase (the result is passed straight to TitleContainer/HTTP, which on case-sensitive
+    // hosts like GitHub Pages 404s on a mismatch). Cache de-duplication of case variants is
+    // handled by _textureRegistry's OrdinalIgnoreCase comparer, not by mangling the I/O path.
+    private static string CanonicalizeSlashes(string path) => path.Replace('\\', '/');
 
     private Texture2D DefaultTextureLoader(string path)
     {
