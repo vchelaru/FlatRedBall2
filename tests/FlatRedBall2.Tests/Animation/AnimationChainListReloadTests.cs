@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using FlatRedBall2.Animation;
@@ -13,17 +14,26 @@ namespace FlatRedBall2.Tests.Animation;
 // Sprite.CurrentAnimation reference keeps playing from the updated frames without resetting.
 public class AnimationChainListReloadTests : IDisposable
 {
-    private readonly string _tempDir;
+    // In-memory file system: path → XML bytes. Routed through AnimationChainListSave.StreamProvider
+    // so the engine never touches the disk and matches the production WASM/desktop code path
+    // (TitleContainer.OpenStream rejects absolute filesystem paths).
+    private readonly Dictionary<string, byte[]> _virtualFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<string, Stream> _originalProvider;
 
     public AnimationChainListReloadTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), "frb2-achx-reload-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_tempDir);
+        _originalProvider = AnimationChainListSave.StreamProvider;
+        AnimationChainListSave.StreamProvider = path =>
+        {
+            if (!_virtualFiles.TryGetValue(path, out var bytes))
+                throw new FileNotFoundException(path);
+            return new MemoryStream(bytes);
+        };
     }
 
     public void Dispose()
     {
-        try { Directory.Delete(_tempDir, recursive: true); } catch { }
+        AnimationChainListSave.StreamProvider = _originalProvider;
     }
 
     private ContentManagerService MakeContent()
@@ -58,10 +68,14 @@ public class AnimationChainListReloadTests : IDisposable
         }
         sb.AppendLine("</AnimationChainArraySave>");
 
-        var path = Path.Combine(_tempDir, fileName);
-        File.WriteAllText(path, sb.ToString());
-        return path;
+        _virtualFiles[fileName] = Encoding.UTF8.GetBytes(sb.ToString());
+        return fileName;
     }
+
+    private void WriteRaw(string fileName, string contents)
+        => _virtualFiles[fileName] = Encoding.UTF8.GetBytes(contents);
+
+    private void DeleteFile(string fileName) => _virtualFiles.Remove(fileName);
 
     private AnimationChainList LoadFresh(string path, ContentManagerService content)
         => AnimationChainListSave.FromFile(path).ToAnimationChainList(content);
@@ -72,7 +86,7 @@ public class AnimationChainListReloadTests : IDisposable
         var content = MakeContent();
         var list = LoadFresh(WriteAchx("base.achx", ("Walk", 2)), content);
 
-        var result = list.TryReloadFrom(Path.Combine(_tempDir, "does-not-exist.achx"), content);
+        var result = list.TryReloadFrom("does-not-exist.achx", content);
 
         result.ShouldBeFalse();
     }
@@ -82,10 +96,9 @@ public class AnimationChainListReloadTests : IDisposable
     {
         var content = MakeContent();
         var list = LoadFresh(WriteAchx("base.achx", ("Walk", 2)), content);
-        var bad = Path.Combine(_tempDir, "bad.achx");
-        File.WriteAllText(bad, "not valid xml at all");
+        WriteRaw("bad.achx", "not valid xml at all");
 
-        var result = list.TryReloadFrom(bad, content);
+        var result = list.TryReloadFrom("bad.achx", content);
 
         result.ShouldBeFalse();
     }
@@ -102,7 +115,6 @@ public class AnimationChainListReloadTests : IDisposable
 
         // Add a chain referencing a new texture name so the reload hits the loader (cached
         // textures bypass it). Break the loader so any fresh load throws.
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 1), ("NewChain", 1));
         content.TextureLoader = _ => throw new System.InvalidOperationException("simulated downstream failure");
 
@@ -118,7 +130,6 @@ public class AnimationChainListReloadTests : IDisposable
         var walkBefore = list["Walk"];
 
         // Author edits the file — same chain name, same frame count.
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 2));
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
@@ -134,7 +145,6 @@ public class AnimationChainListReloadTests : IDisposable
         var list = LoadFresh(path, content);
         list["Walk"]!.Count.ShouldBe(5);
 
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 2));
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
@@ -149,7 +159,6 @@ public class AnimationChainListReloadTests : IDisposable
         var path = WriteAchx("anim.achx", ("Walk", 2));
         var list = LoadFresh(path, content);
 
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 6));
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
@@ -164,7 +173,6 @@ public class AnimationChainListReloadTests : IDisposable
         var path = WriteAchx("anim.achx", ("Walk", 2));
         var list = LoadFresh(path, content);
 
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 2), ("Run", 3));
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
@@ -183,7 +191,6 @@ public class AnimationChainListReloadTests : IDisposable
         var runBefore = list["Run"];
 
         // Author removes "Run" from the file.
-        File.Delete(path);
         WriteAchx("anim.achx", ("Walk", 2));
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
@@ -203,7 +210,6 @@ public class AnimationChainListReloadTests : IDisposable
         var walkBefore = list["Walk"];
 
         // Rewrite with different coordinates (simulate author moving the frame in the atlas).
-        File.Delete(path);
         var sb = new StringBuilder();
         sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
         sb.AppendLine("<AnimationChainArraySave>");
@@ -221,7 +227,7 @@ public class AnimationChainListReloadTests : IDisposable
         sb.AppendLine("    </Frame>");
         sb.AppendLine("  </AnimationChain>");
         sb.AppendLine("</AnimationChainArraySave>");
-        File.WriteAllText(path, sb.ToString());
+        WriteRaw(path, sb.ToString());
 
         list.TryReloadFrom(path, content).ShouldBeTrue();
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Xml.Serialization;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -58,16 +59,25 @@ public class AnimationChainListSave
     [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
+    // Test seam — and the layer that routes .achx reads through TitleContainer instead of File.IO,
+    // so the same code path works on backends without a filesystem (KNI Blazor / WASM).
+    // TitleContainer.OpenStream resolves relative paths against the title location on every
+    // backend: the working directory on DesktopGL, an HTTP fetch on Blazor.
+    internal static Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
+
     /// <summary>
-    /// Deserializes a .achx file from disk.
+    /// Deserializes a .achx file from the title container (project content folder).
     /// </summary>
-    /// <param name="filePath">Path to the .achx file, relative to the executable or absolute.</param>
+    /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
     public static AnimationChainListSave FromFile(string filePath)
     {
-        using var stream = File.OpenRead(filePath);
+        using var stream = StreamProvider(filePath);
         var serializer = new XmlSerializer(typeof(AnimationChainListSave));
         var result = (AnimationChainListSave)serializer.Deserialize(stream)!;
-        result.FileName = Path.GetFullPath(filePath);
+        // Store the path as-given so ToAnimationChainList can resolve sibling textures
+        // through the same title-container-relative scheme. Path.GetFullPath would prepend
+        // the CWD, which is "/" on WASM and produces wrong texture paths.
+        result.FileName = filePath;
         return result;
     }
 

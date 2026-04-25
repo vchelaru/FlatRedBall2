@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.Xna.Framework;
 
 namespace ShmupSpace;
 
@@ -48,8 +49,9 @@ public class GameConfig
 
     public static GameConfig FromJson(string path)
     {
-        var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<GameConfig>(json, Options) ?? new GameConfig();
+        using var stream = TitleContainer.OpenStream(path);
+        using var reader = new StreamReader(stream);
+        return JsonSerializer.Deserialize<GameConfig>(reader.ReadToEnd(), Options) ?? new GameConfig();
     }
 
     public void CopyFrom(GameConfig other) => CopyProperties(this, other);

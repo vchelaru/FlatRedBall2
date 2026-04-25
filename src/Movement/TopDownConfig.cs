@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2.Movement;
 
@@ -16,11 +17,14 @@ public class TopDownConfig
     public TopDownMovementConfig? Movement { get; set; }
 
     /// <summary>Loads a <see cref="TopDownConfig"/> from the JSON file at <paramref name="path"/>.
-    /// Comments and trailing commas are tolerated; property name matching is case-insensitive.</summary>
+    /// The path is resolved through <c>TitleContainer</c> so it works on both desktop and web
+    /// backends. Comments and trailing commas are tolerated; property name matching is
+    /// case-insensitive.</summary>
     public static TopDownConfig FromJson(string path)
     {
-        string json = File.ReadAllText(path);
-        return FromJsonString(json);
+        using var stream = XnaTitleContainer.OpenStream(path);
+        using var reader = new StreamReader(stream);
+        return FromJsonString(reader.ReadToEnd());
     }
 
     /// <summary>Parses a <see cref="TopDownConfig"/> from a JSON string. Returns an empty config

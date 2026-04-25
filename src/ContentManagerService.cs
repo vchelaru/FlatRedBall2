@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2;
 
@@ -162,13 +163,19 @@ public class ContentManagerService
         _textureRegistry.Clear();
     }
 
-    private static string NormalizePath(string path) => Path.GetFullPath(path);
+    // Cache key normalization. Must NOT call Path.GetFullPath: on WASM the working directory
+    // is "/", so GetFullPath("Content/foo.png") returns "/Content/foo.png" — the leading slash
+    // then propagates into TitleContainer.OpenStream and produces "Could not find a part of
+    // the path" errors. Slash-and-case normalization is enough to dedupe registry entries
+    // across platforms without depending on filesystem layout.
+    private static string NormalizePath(string path) =>
+        path.Replace('\\', '/').ToLowerInvariant();
 
     private Texture2D DefaultTextureLoader(string path)
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        using var stream = File.OpenRead(path);
+        using var stream = XnaTitleContainer.OpenStream(path);
         return Texture2D.FromStream(_graphicsDevice, stream);
     }
 
@@ -176,7 +183,7 @@ public class ContentManagerService
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        using var stream = File.OpenRead(path);
+        using var stream = XnaTitleContainer.OpenStream(path);
         using var incoming = Texture2D.FromStream(_graphicsDevice, stream);
         if (incoming.Width != existing.Width || incoming.Height != existing.Height)
             return false;

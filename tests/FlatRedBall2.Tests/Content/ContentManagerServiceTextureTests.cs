@@ -39,6 +39,38 @@ public class ContentManagerServiceTextureTests
     }
 
     [Fact]
+    public void Load_TextureWithExtension_LoaderReceivesInputPathWithoutFilesystemResolution()
+    {
+        // Regression: NormalizePath used Path.GetFullPath which prepended the working
+        // directory, producing "/Content/..." on browsers (WASM CWD == "/"). The loader
+        // must receive the input path unchanged so TitleContainer.OpenStream can resolve
+        // it relative to the title location on every backend.
+        var svc = new ContentManagerService();
+        string? receivedPath = null;
+        svc.TextureLoader = p => { receivedPath = p; return null!; };
+
+        svc.Load<Texture2D>("Content/ship.png");
+
+        receivedPath.ShouldBe("content/ship.png");
+    }
+
+    [Fact]
+    public void Load_TextureWithExtension_MixedSlashes_HitSameRegistryEntry()
+    {
+        // Path.GetFullPath happened to normalize backslashes on Windows; the replacement
+        // normalization must preserve that registry-hit semantics so a second Load with
+        // a different slash style returns the cached texture.
+        var svc = new ContentManagerService();
+        int loadCount = 0;
+        svc.TextureLoader = p => { loadCount++; return null!; };
+
+        svc.Load<Texture2D>("Content/ship.png");
+        svc.Load<Texture2D>("Content\\ship.png");
+
+        loadCount.ShouldBe(1);
+    }
+
+    [Fact]
     public void Load_TextureWithExtension_CachesBySamePath_LoaderCalledOnce()
     {
         var svc = new ContentManagerService();

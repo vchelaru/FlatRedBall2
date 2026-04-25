@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>PlatformKing.BlazorGL</RootNamespace>
+    <AssemblyName>PlatformKing.BlazorGL</AssemblyName>
+    <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
+    <KniPlatform>BlazorGL</KniPlatform>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pages\Index.razor.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Devices" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Storage" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.XR" Version="4.2.9001" />
+    <PackageReference Include="nkast.Kni.Platform.Blazor.GL" Version="4.2.9001.1" />
+    <!-- Required to compile KniContentReference items (e.g. Apos.Shapes.KNI's apos-shapes.fx) into XNB. -->
+    <PackageReference Include="nkast.Xna.Framework.Content.Pipeline.Builder" Version="4.2.9001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.17" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.17" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PlatformKing.Common\PlatformKing.Common.csproj" />
+  </ItemGroup>
+
+  <!--
+    Raw runtime-loaded assets (TMX, JSON, PNG) must live in the project's PHYSICAL wwwroot/ so
+    Blazor's static-web-asset manifest picks them up. `<Content Link="wwwroot\...">` only copies
+    to bin output, which the dev server does not serve. Copy from Common before the manifest is
+    gathered. The copied tree is gitignored via wwwroot/Content/.gitignore.
+  -->
+  <ItemGroup>
+    <_CommonRawAssets Include="..\PlatformKing.Common\Content\**\*.*"
+                      Exclude="..\PlatformKing.Common\Content\**\*.mgcb;..\PlatformKing.Common\Content\bin\**;..\PlatformKing.Common\Content\obj\**" />
+  </ItemGroup>
+  <Target Name="CopyCommonRawAssetsToWwwroot"
+          BeforeTargets="GenerateStaticWebAssetsManifest;AssignTargetPaths"
+          Inputs="@(_CommonRawAssets)"
+          Outputs="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(_CommonRawAssets)"
+          DestinationFiles="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    Blazor WebAssembly only serves files under wwwroot/. The KNI content pipeline defaults to
+    writing XNBs under bin/.../Content/, which the browser can't reach. Redirect the output
+    (and intermediate) directories so compiled XNBs land in wwwroot/Content where the Blazor
+    static-web-asset pipeline picks them up.
+  -->
+  <Target Name="RedirectKniContentToWwwroot" AfterTargets="CollectContentReferences">
+    <ItemGroup>
+      <ContentReference>
+        <ContentOutputDir>$(MSBuildProjectDirectory)\wwwroot\Content\%(ContentReference.OutputFolder)\</ContentOutputDir>
+      </ContentReference>
+    </ItemGroup>
+  </Target>
+
+</Project>

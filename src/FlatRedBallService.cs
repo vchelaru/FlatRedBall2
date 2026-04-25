@@ -240,11 +240,12 @@ public class FlatRedBallService
 
         if (applyWindowSettings)
         {
-            // When the host opts into Window.AllowUserResizing, the back buffer is being managed
-            // externally (e.g. KNI BlazorGL tracks the canvas DOM size). Forcing PreferredBackBuffer
-            // here would clamp the back buffer to the engine's design resolution while the canvas
-            // stays at its DOM size, producing a coordinate-space mismatch in Camera.ScreenToWorld.
-            // If the screen has explicit display settings, those still win.
+            // Window.AllowUserResizing == true means the host owns the back-buffer size: a
+            // resizable desktop window or a stretch-to-viewport KNI canvas. Skip ApplyWindowSettings
+            // so we don't clamp the buffer to the design resolution while the surface is sized
+            // differently — that mismatch breaks Camera.ScreenToWorld. Per-screen
+            // PreferredDisplaySettings still wins. The flag's source of truth is
+            // DisplaySettings.AllowUserResizing, which propagates here through ApplyWindowSettings.
             bool externallyManaged = _game?.Window.AllowUserResizing == true && pref == null;
             if (!externallyManaged)
                 ApplyWindowSettings(pref ?? DisplaySettings);
@@ -449,11 +450,26 @@ public class FlatRedBallService
     private void HandleClientSizeChanged(object? sender, EventArgs e)
     {
         var bounds = _game!.Window.ClientBounds;
-        if (bounds.Width <= 0 || bounds.Height <= 0)
+        ApplyClientSizeChange(bounds.Width, bounds.Height, _game!.Window.AllowUserResizing, CurrentScreen.Camera);
+    }
+
+    /// <summary>
+    /// Test seam for the client-size-changed handler. Recomputes the camera viewport from the new
+    /// surface dimensions, unless <paramref name="allowUserResizing"/> is false — in which case the
+    /// surface dimensions are owned by the host and the event is ignored. Use case: fixed-size
+    /// canvas on KNI BlazorGL, where browser-window resizes echo through ClientSizeChanged with
+    /// the browser's dimensions even though the canvas DOM stays at its CSS-pinned size.
+    /// </summary>
+    internal void ApplyClientSizeChange(int width, int height, bool allowUserResizing, Camera camera)
+    {
+        if (width <= 0 || height <= 0)
             return;
 
-        var dest = DisplaySettings.ComputeDestinationViewport(bounds.Width, bounds.Height);
-        var camera = CurrentScreen.Camera;
+        // Fixed-size canvas on KNI BlazorGL: ignore browser-resize echoes; the canvas DOM is host-managed.
+        if (!allowUserResizing)
+            return;
+
+        var dest = DisplaySettings.ComputeDestinationViewport(width, height);
         camera.SetViewport(dest);
 
         if (DisplaySettings.ResizeMode == Rendering.ResizeMode.IncreaseVisibleArea)
