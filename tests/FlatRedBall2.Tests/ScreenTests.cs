@@ -572,41 +572,6 @@ public class ScreenTests
         fake.Disposed.ShouldBeTrue();
     }
 
-    // ---------- Initialize / LoadContent / CustomInitialize call order ----------
-
-    private class LifecycleOrderScreen : Screen
-    {
-        public List<string> CallOrder { get; } = new();
-        public override void Initialize() => CallOrder.Add("Initialize");
-        public override void LoadContent() => CallOrder.Add("LoadContent");
-        public override void CustomInitialize() => CallOrder.Add("CustomInitialize"); // intentionally no base call
-    }
-
-    [Fact]
-    public void Start_CallsInitialize_EvenWhenCustomInitializeOverriddenWithoutBase()
-    {
-        var engine = new FlatRedBallService();
-        engine.Start<LifecycleOrderScreen>();
-        ((LifecycleOrderScreen)engine.CurrentScreen).CallOrder.ShouldContain("Initialize");
-    }
-
-    [Fact]
-    public void Start_CallsLoadContent_EvenWhenCustomInitializeOverriddenWithoutBase()
-    {
-        var engine = new FlatRedBallService();
-        engine.Start<LifecycleOrderScreen>();
-        ((LifecycleOrderScreen)engine.CurrentScreen).CallOrder.ShouldContain("LoadContent");
-    }
-
-    [Fact]
-    public void Start_LifecycleCallOrder_Is_Initialize_LoadContent_CustomInitialize()
-    {
-        var engine = new FlatRedBallService();
-        engine.Start<LifecycleOrderScreen>();
-        ((LifecycleOrderScreen)engine.CurrentScreen).CallOrder
-            .ShouldBe(new[] { "Initialize", "LoadContent", "CustomInitialize" });
-    }
-
     private class ActivityTrackingEntity : Entity
     {
         public int ActivityCount { get; private set; }

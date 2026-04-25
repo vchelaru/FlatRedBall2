@@ -258,8 +258,6 @@ public class FlatRedBallService
         Time.ResetScreen();
 
         CurrentScreen = screen;
-        screen.Initialize();
-        screen.LoadContent();
         screen.CustomInitialize();
     }
 
