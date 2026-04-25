@@ -6,6 +6,6 @@
     <RootNamespace>MyGame</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="FlatRedBall2.MonoGame" Version="*" />
+    <PackageReference Include="FlatRedBall2.MonoGame" Version="*-*" />
   </ItemGroup>
 </Project>
