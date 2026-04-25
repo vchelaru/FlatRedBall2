@@ -13,7 +13,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -44,12 +44,14 @@ jobs:
           find samples/${{ inputs.sample }}/${{ inputs.sample }}.BlazorGL/wwwroot/Content -type f 2>/dev/null | sort || echo "(empty)"
 
       - name: Rewrite base href for GitHub Pages subpath
+        shell: bash
         run: |
           sed -i 's|<base href="\./" />|<base href="/FlatRedBall2/${{ inputs.sample }}/" />|' \
             publish/wwwroot/index.html
           grep -q '<base href="/FlatRedBall2/${{ inputs.sample }}/"' publish/wwwroot/index.html
 
       - name: Add .nojekyll
+        shell: bash
         run: touch publish/wwwroot/.nojekyll
 
       - name: Deploy to gh-pages/${{ inputs.sample }}
