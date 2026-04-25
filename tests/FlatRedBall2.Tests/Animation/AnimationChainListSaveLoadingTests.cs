@@ -9,6 +9,7 @@ namespace FlatRedBall2.Tests.Animation;
 // Verifies that AnimationChainListSave.FromFile reads .achx bytes through an injectable seam
 // — proof that the engine no longer hard-codes a File.IO path and can route reads through
 // TitleContainer (required for KNI Blazor / WASM, where there is no filesystem).
+[Collection("AnimationChainListSaveStaticState")]
 public class AnimationChainListSaveLoadingTests
 {
     [Fact]
