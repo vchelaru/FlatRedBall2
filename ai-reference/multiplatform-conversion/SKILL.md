@@ -78,32 +78,37 @@ Stretch-to-viewport (canvas fills the browser) and fixed-size canvas (matches th
 Canvas fills the browser; the engine pillarbox/letterboxes the design world to its locked aspect ratio inside the canvas. Reference: `samples/ShmupSpace`, `samples/PlatformKing`.
 
 - **Game1**: identical code on Desktop and KNI — set `ResolutionWidth/Height`, `PreferredWindowWidth/Height`, `AllowUserResizing = true`, all on `DisplaySettings`. The engine ignores `PreferredWindowWidth/Height` on KNI (the canvas DOM owns sizing) so no `#if KNI` is needed.
-- **Holder CSS** (`Pages/Index.razor`): `position: fixed; top: 0; left: 0; right: 0; bottom: 0` — fills viewport.
+- **Holder + canvas markup**: ships from the `FlatRedBall2.BlazorGL` package's `Pages/Index.razor` — fills viewport via `position: fixed; top: 0; left: 0; right: 0; bottom: 0`. No per-sample Razor needed.
 - **Body CSS** (`wwwroot/index.html`): `margin: 0; overflow: hidden;` — no flex centering needed.
-- **JS** (`wwwroot/index.html`): default `initRenderJS` from AutoEvalKniBlazorSample (sets canvas buffer once from holder size).
+- **JS**: ships from the package as `_content/FlatRedBall2.BlazorGL/frb-host.js` (referenced via one `<script>` tag in `index.html`). Defines `initRenderJS` and `tickJS`; sets canvas buffer once from holder size.
 
 ### Pattern B — Fixed-size canvas (legacy)
 
 Canvas locked at exact pixel dimensions; nothing scales. Use only for embeds with a strict pixel budget; otherwise prefer Pattern A + locked aspect.
 
 - **Game1**: set `PreferredWindowWidth/Height` on **both** backends, plus `ds.AllowUserResizing = false`. Don't set `Window.AllowUserResizing = true`. Per-screen `PreferredDisplaySettings` left unset (same as Pattern A).
-- **Holder CSS**: `width: NNNpx; height: MMMpx; flex-shrink: 0;` — explicit dims, won't shrink in flex centering.
-- **Canvas CSS**: `width: NNNpx; height: MMMpx; display: block;` — explicit dims, not `100%` (defense in depth if holder is overridden).
+- **Index.razor override**: ship a per-sample `Pages/Index.razor` that overrides the package's route (`@page "/"`) with explicit-dimension CSS:
+  - **Holder CSS**: `width: NNNpx; height: MMMpx; flex-shrink: 0;` — explicit dims, won't shrink in flex centering.
+  - **Canvas CSS**: `width: NNNpx; height: MMMpx; display: block;` — explicit dims, not `100%` (defense in depth if holder is overridden).
 - **Body CSS**: `display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; background: #222;` — centers the canvas; scrolls when viewport is smaller than the canvas.
-- **JS**: replace `tickJS` with a version that re-pins `canvas.width` / `canvas.height` every frame. KNI BlazorGL auto-resizes the drawing buffer when the browser resizes; the per-frame lock undoes that:
+- **JS hooks**: still load `frb-host.js` from the package; add an inline override script that uses the `frbBeforeTick` hook to re-pin canvas dimensions each frame. KNI BlazorGL auto-resizes the drawing buffer when the browser resizes; the per-frame lock undoes that:
 
-```js
-var lockW = 0, lockH = 0;
-function tickJS() {
-    var c = document.getElementById('theCanvas');
-    if (c) { if (c.width !== lockW) c.width = lockW; if (c.height !== lockH) c.height = lockH; }
-    window.theInstance.invokeMethod('TickDotNet');
-    window.requestAnimationFrame(tickJS);
-}
-// In initRenderJS, set lockW/lockH from holder.clientWidth/Height before scheduling tickJS.
+```html
+<script src="_content/FlatRedBall2.BlazorGL/frb-host.js"></script>
+<script>
+    var lockW = 0, lockH = 0;
+    window.frbAfterInit = function (canvas, holder) {
+        lockW = holder.clientWidth;
+        lockH = holder.clientHeight;
+    };
+    window.frbBeforeTick = function () {
+        var c = document.getElementById('theCanvas');
+        if (c) { if (c.width !== lockW) c.width = lockW; if (c.height !== lockH) c.height = lockH; }
+    };
+</script>
 ```
 
-All four parts must be present together — omit any one and the buffer or viewport drifts on browser resize.
+All parts must be present together — omit any one and the buffer or viewport drifts on browser resize.
 
 ## Game code must avoid `System.IO.File` for content
 
@@ -148,12 +153,24 @@ Keep `Content/` in `Common`. Both heads consume it without duplication.
 
 Same pattern as the `RedirectKniContentToWwwroot` target, which writes XNBs to the physical wwwroot. Gitignore the destination tree (`wwwroot/Content/.gitignore` excluding `*` except itself) so the copies aren't committed.
 
-## BlazorGL csproj boilerplate
+## BlazorGL head — minimum setup
 
-Copy verbatim from `AutoEvalKniBlazorSample.BlazorGL.csproj` and namespace-rename:
-- SDK = `Microsoft.NET.Sdk.BlazorWebAssembly`, `<KniPlatform>BlazorGL</KniPlatform>`, the full nkast.Xna and nkast.Kni.Platform.Blazor.GL package list, the `RedirectKniContentToWwwroot` target.
-- Owns `Program.cs`, `App.razor`, `_Imports.razor`, `MainLayout.razor`, `Pages/Index.razor` + `.razor.cs`, `wwwroot/index.html`, `Properties/launchSettings.json`. Same files, namespace-renamed, with the Game1 type swapped to your Common's Game1.
-- **Pick a unique launch port** in `launchSettings.json`. AutoEvalKniBlazorSample uses 50470/50471; pick something else. Concurrent debugging across samples breaks if ports collide.
+Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head owns only:
+
+- **`.csproj`** — SDK = `Microsoft.NET.Sdk.BlazorWebAssembly`, `<KniPlatform>BlazorGL</KniPlatform>`, the nkast.Xna / nkast.Kni.Platform.Blazor.GL package list, the `RedirectKniContentToWwwroot` target. **`<ProjectReference>` to `src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj`** (the host package, not the engine itself).
+- **`Program.cs`** — standard Blazor WASM bootstrap. Two FRB-specific lines:
+  ```csharp
+  builder.RootComponents.Add<FlatRedBall2.BlazorGL.App>("#app");
+  builder.Services.AddSingleton<Func<Game>>(_ => () => new MyNamespace.Game1());
+  ```
+- **`wwwroot/index.html`** — the standard Blazor scaffold + two script tags:
+  ```html
+  <script src="_framework/blazor.webassembly.js"></script>
+  <script src="_content/FlatRedBall2.BlazorGL/frb-host.js"></script>
+  ```
+- **`Properties/launchSettings.json`** — pick a unique launch port. AutoEvalKniBlazorSample uses 50470/50471; pick something else. Concurrent debugging across samples breaks if ports collide.
+
+**Do not duplicate** `App.razor`, `MainLayout.razor`, `_Imports.razor`, `Pages/Index.razor`, or the `tickJS`/`initRenderJS` JS block. They ship from `FlatRedBall2.BlazorGL` and are wired by the `RootComponents.Add<App>` and `frb-host.js` reference above. The package's Index resolves `Func<Game>` from DI on the first tick — that's why `Program.cs` must register it.
 
 ## Verification
 

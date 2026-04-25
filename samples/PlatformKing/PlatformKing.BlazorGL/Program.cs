@@ -1,9 +1,11 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using FlatRedBall2.BlazorGL;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Xna.Framework;
 
 namespace PlatformKing.BlazorGL
 {
@@ -18,6 +20,7 @@ namespace PlatformKing.BlazorGL
             {
                 BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
             });
+            builder.Services.AddSingleton<Func<Game>>(_ => () => new PlatformKing.Game1());
             await builder.Build().RunAsync();
         }
     }

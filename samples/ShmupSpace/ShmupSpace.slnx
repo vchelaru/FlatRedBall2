@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
   <Project Path="ShmupSpace.Common/ShmupSpace.Common.csproj" />
   <Project Path="ShmupSpace.Desktop/ShmupSpace.Desktop.csproj" />
   <Project Path="ShmupSpace.BlazorGL/ShmupSpace.BlazorGL.csproj" />

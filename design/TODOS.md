@@ -4,9 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## BlazorGL Host Boilerplate as Static Web Assets
-**Priority: Soon — gates "minimum-setup" browser story.** Today every BlazorGL sample hand-rolls `Pages/Index.razor` (canvas holder div), `wwwroot/index.html` (`initRenderJS` / `tickJS`), and the KNI script-tag block (`nkast.Wasm.*` JS shims). All identical across samples. Ship these as static web assets in `FlatRedBall2.Kni` so a consumer's `index.html` reduces to a single `<script src="_content/FlatRedBall2.Kni/frb-host.js">` and `Pages/Index.razor` either ships from the package or lives in a `dotnet new flatredball-blazor` template.
-
 ## `AnimationChainListSave.StreamProvider` is Static Mutable State
 **Priority: Discussion — violates the "no static state" rule.** `AnimationChainListSave.StreamProvider` is `internal static Func<string, Stream>`, defaulting to `XnaTitleContainer.OpenStream`. Two test classes (`AnimationChainListReloadTests`, `AnimationChainListSaveLoadingTests`) mutate it to swap in test stream sources, and on Linux CI 2026-04-25 they raced — xUnit parallelizes test classes, the second class's ctor captured the *first* class's lambda as `_originalProvider`, and `TryReloadFrom_NewChainInSource_AppendedToList` read through the wrong provider and got 1 chain instead of 2. Patched by sharing an xUnit `[Collection("AnimationChainListSaveStaticState")]` so the two classes serialize, but that's a band-aid: the underlying static is the actual smell, and any future caller (test or game code) that mutates the global will hit the same race.
 
