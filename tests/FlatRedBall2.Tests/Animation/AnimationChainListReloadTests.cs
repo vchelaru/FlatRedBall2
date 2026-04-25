@@ -12,6 +12,7 @@ namespace FlatRedBall2.Tests.Animation;
 // Covers AnimationChainList.TryReloadFrom — the in-place reload path for .achx edits during
 // hot-reload. Design intent: preserve chain-instance identity by name so any live
 // Sprite.CurrentAnimation reference keeps playing from the updated frames without resetting.
+[Collection("AnimationChainListSaveStaticState")]
 public class AnimationChainListReloadTests : IDisposable
 {
     // In-memory file system: path → XML bytes. Routed through AnimationChainListSave.StreamProvider
