@@ -1,0 +1,9 @@
+{
+  // Player ship movement. See .claude/templates/TopDownConfig/player.topdown.json for all fields.
+  "movement": {
+    "MaxSpeed": 130,
+    "AccelerationTime": 0.08,
+    "DecelerationTime": 0.06,
+    "UpdateDirectionFromInput": true
+  }
+}
