@@ -8,7 +8,11 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <ContentTargetFolders>content</ContentTargetFolders>
     <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>NU5128</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="frb2-desktop\**\*" />
   </ItemGroup>
