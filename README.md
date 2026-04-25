@@ -44,6 +44,8 @@ dotnet tool restore    # installs the MGCB content pipeline tool (local to this 
 dotnet run
 ```
 
+> **Note:** `dotnet tool restore` must be run from `YourGameName.Desktop/`. That subdirectory is where `.config/dotnet-tools.json` lives (the MGCB tool manifest). Running it from the solution root silently does nothing.
+
 A window opens. `YourGameName.Common/Screens/GameScreen.cs` is where your game code goes.
 
 ### Manual setup (advanced)
@@ -101,7 +103,17 @@ public class GameScreen : Screen
 {
     public override void CustomInitialize()
     {
-        // your game logic here
+        // set up your entities and shapes here
+    }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        // called every frame; put game logic here
+    }
+
+    public override void CustomDestroy()
+    {
+        // called when the screen is removed
     }
 }
 ```

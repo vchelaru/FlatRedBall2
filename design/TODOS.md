@@ -4,6 +4,9 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
+## Automation Mode (stdin/stdout Game Control)
+**Priority: Discussion — design ready.** See [`.claude/designs/automation-mode.md`](../.claude/designs/automation-mode.md) for the full design. Stdin/stdout NDJSON protocol that lets external agents (AI or otherwise) advance frames, inject input, query game state, and force values — analogous to Chrome DevTools Protocol for browsers. Activated via `--frb-auto` flag; game opts in with `FlatRedBallService.Default.EnableAutomationMode()`. Key open questions before implementation: input injection layer (FRB2 abstraction vs. raw MonoGame state), state query model (explicit registration vs. reflection), and fixed vs. wall-clock `GameTime` in step mode.
+
 ## BlazorGL Host Boilerplate as Static Web Assets
 **Priority: Soon — gates "minimum-setup" browser story.** Today every BlazorGL sample hand-rolls `Pages/Index.razor` (canvas holder div), `wwwroot/index.html` (`initRenderJS` / `tickJS`), and the KNI script-tag block (`nkast.Wasm.*` JS shims). All identical across samples. Ship these as static web assets in `FlatRedBall2.Kni` so a consumer's `index.html` reduces to a single `<script src="_content/FlatRedBall2.Kni/frb-host.js">` and `Pages/Index.razor` either ships from the package or lives in a `dotnet new flatredball-blazor` template.
 
