@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "FlatRedBall2",
+  "classifications": ["Games", "MonoGame", "FlatRedBall2", "AI"],
+  "identity": "FlatRedBall2.Templates.Skills",
+  "name": "FlatRedBall2 AI Reference Skills",
+  "shortName": "frb2-skills",
+  "tags": {
+    "type": "item"
+  }
+}

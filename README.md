@@ -44,6 +44,8 @@ dotnet tool restore    # installs the MGCB content pipeline tool (local to this 
 dotnet run
 ```
 
+> **Note:** `dotnet tool restore` must be run from `YourGameName.Desktop/`. That subdirectory is where `.config/dotnet-tools.json` lives (the MGCB tool manifest). Running it from the solution root silently does nothing.
+
 A window opens. `YourGameName.Common/Screens/GameScreen.cs` is where your game code goes.
 
 ### Manual setup (advanced)
@@ -101,7 +103,17 @@ public class GameScreen : Screen
 {
     public override void CustomInitialize()
     {
-        // your game logic here
+        // set up your entities and shapes here
+    }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        // called every frame; put game logic here
+    }
+
+    public override void CustomDestroy()
+    {
+        // called when the screen is removed
     }
 }
 ```
@@ -117,19 +129,30 @@ See the `samples/` directory for complete working examples.
 
 ## Working with AI Assistants
 
-FlatRedBall2 ships with skill files in [`/ai-reference/`](ai-reference/) — plain Markdown guides covering common engine tasks (entities, collision, physics, animation, audio, and more). Any AI coding assistant can use them; paste the relevant file into your context before starting a task.
+FlatRedBall2 ships with skill files in [`/ai-reference/`](ai-reference/) — plain Markdown guides covering common engine tasks (entities, collision, physics, animation, audio, and more). Copy them into your game repo so your AI coding assistant has engine context without you pasting anything manually.
 
-**Claude Code** users get slash-command integration automatically:
+Add the skill files to your project:
 
 ```
-/entities-and-factories    — entity lifecycle, spawning, factories
-/collision-relationships   — move/bounce collision setup
-/physics-and-movement      — gravity, drag, velocity
-/animation                 — sprite animation chains
-/screens                   — screen lifecycle and transitions
+dotnet new install FlatRedBall2.Templates   # skip if already installed
+dotnet new frb2-skills
 ```
 
-See the full list in [`ai-reference/`](ai-reference/).
+This creates an `ai-reference/` folder in your project. Most AI tools can be pointed at that folder or configured to load files from it automatically.
+
+**Claude Code** — copy the skills into `.claude/skills/` so they are picked up automatically:
+
+```
+# macOS / Linux
+cp -r ai-reference/. .claude/skills/
+
+# Windows
+xcopy /E /I ai-reference .claude\skills
+```
+
+You can keep `ai-reference/` as the source of truth and gitignore `.claude/skills/`, or drop `ai-reference/` and commit `.claude/skills/` directly — either works.
+
+**Other AI tools** — paste the relevant file from `ai-reference/` into your context window before starting a task. Each file is self-contained.
 
 ## FlatRedBall vs FlatRedBall2
 
