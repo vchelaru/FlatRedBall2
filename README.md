@@ -35,21 +35,24 @@ Install the project template (re-run this before each new project to get the lat
 dotnet new install FlatRedBall2.Templates
 ```
 
-Then scaffold a new project:
+Scaffold and run:
 
 ```
 dotnet new frb2-desktop -n YourGameName
 cd YourGameName/YourGameName.Desktop
-dotnet tool restore
-cd ..
-dotnet build YourGameName.Desktop/YourGameName.Desktop.csproj
+dotnet tool restore    # installs the MGCB content pipeline tool (local to this folder)
+dotnet run
 ```
 
-Your project is ready. `YourGameName.Common/Screens/GameScreen.cs` is where your game code goes.
+A window opens. `YourGameName.Common/Screens/GameScreen.cs` is where your game code goes.
 
 ### Manual setup (advanced)
 
-If you prefer to wire things up yourself, install the NuGet package and set up `Game1.cs` as follows:
+If you prefer to wire things up yourself:
+
+1. Install the NuGet package: `dotnet add package FlatRedBall2.MonoGame`
+
+2. Set up `Game1.cs`:
 
 ```csharp
 using FlatRedBall2;
