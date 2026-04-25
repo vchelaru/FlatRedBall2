@@ -140,6 +140,7 @@ public class FlatRedBallService
             _gum.Initialize(game, DefaultVisualsVersion.V3);
         }
         GumRenderBatch.Instance.Initialize();
+        Console.WriteLine("FlatRedBall2 initialized.");
     }
 
     // Screen management
