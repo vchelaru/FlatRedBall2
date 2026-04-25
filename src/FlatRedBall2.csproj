@@ -36,6 +36,14 @@
     <Backend Condition="'$(TargetFramework)' == 'net10.0'">MonoGame</Backend>
     <DefineConstants Condition="'$(Backend)' == 'Kni'">$(DefineConstants);KNI</DefineConstants>
     <DefineConstants Condition="'$(Backend)' == 'MonoGame'">$(DefineConstants);MONOGAME</DefineConstants>
+
+    <!--
+      The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
+      this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
+      compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
+      reference the AspNetCore.Components / JSInterop assemblies.
+    -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->
