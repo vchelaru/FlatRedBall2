@@ -21,11 +21,14 @@ public class Game1 : Game
 #endif
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
-        // Required on KNI BlazorGL so the canvas back buffer tracks the canvas DOM size.
-        // The engine skips ApplyWindowSettings only when AllowUserResizing=true AND
-        // no PreferredDisplaySettings is set. Harmless on DesktopGL.
-        Window.AllowUserResizing = true;
-        FlatRedBallService.Default.DisplaySettings.Zoom = 3f;
+        // 426x240 design resolution — pixel-art scale comes from window-vs-resolution.
+        // 1280x720 desktop window = ~3 px/world unit. KNI ignores window size (canvas DOM drives it).
+        var ds = FlatRedBallService.Default.DisplaySettings;
+        ds.ResolutionWidth = 426;
+        ds.ResolutionHeight = 240;
+        ds.PreferredWindowWidth = 1280;
+        ds.PreferredWindowHeight = 720;
+        ds.AllowUserResizing = true;
         FlatRedBallService.Default.PrepareWindow<GameScreen>(_graphics);
     }
 

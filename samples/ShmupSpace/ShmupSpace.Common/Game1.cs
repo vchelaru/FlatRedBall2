@@ -24,18 +24,16 @@ public class Game1 : Game
         Content.RootDirectory = "Content";
         IsMouseVisible = false;
 
-        // Fixed 720x960 portrait window/canvas on both backends. The BlazorGL canvas DOM is
-        // CSS-constrained to 720x960 in Pages/Index.razor, so the back buffer and canvas display
-        // size match — no stretch. (Contrast: a stretch-to-viewport canvas would set
-        // Window.AllowUserResizing=true and leave PreferredWindowWidth/Height unset.)
+        // 240x320 portrait design. AspectPolicy.Locked (default) + null FixedAspectRatio derives
+        // the 0.75 aspect from the resolution, so resizing pillarboxes/letterboxes the playfield
+        // without changing its world extents. Same code runs on Desktop and BlazorGL — the engine
+        // ignores PreferredWindowWidth/Height on KNI (canvas DOM owns sizing).
         var ds = FlatRedBallService.Default.DisplaySettings;
         ds.ResolutionWidth = 240;
         ds.ResolutionHeight = 320;
-        ds.Zoom = 3f;
-        ds.ResizeMode = ResizeMode.IncreaseVisibleArea;
         ds.PreferredWindowWidth = 720;
         ds.PreferredWindowHeight = 960;
-        ds.AllowUserResizing = false;
+        ds.AllowUserResizing = true;
 
         FlatRedBallService.Default.PrepareWindow<TitleScreen>(_graphics);
     }

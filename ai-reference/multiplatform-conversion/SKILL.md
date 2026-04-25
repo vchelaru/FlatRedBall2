@@ -69,20 +69,22 @@ The two known places `#if KNI` is needed today:
 
 Stretch-to-viewport (canvas fills the browser) and fixed-size canvas (matches the desktop window) need opposite engine settings. Each pattern is a coordinated set across Game1, holder CSS, body CSS, and the JS host script — mixing them produces the squashing / shifting bugs the engine gates were added to prevent.
 
+> **Pattern A is the recommended default.** With `DisplaySettings.AspectPolicy = AspectPolicy.Locked` (the engine default), the canvas can fill the browser viewport and the engine pillarboxes/letterboxes the gameplay area to the design ratio internally — no playfield reshaping. Pattern B is only needed for legacy fixed-canvas embeds.
+
 `DisplaySettings.AllowUserResizing` is the source-of-truth signal — it propagates to `Game.Window.AllowUserResizing` at init and gates two engine behaviors: the `externallyManaged` check that skips `ApplyWindowSettings`, and `HandleClientSizeChanged` short-circuiting browser resize echoes.
 
-### Pattern A — Stretch-to-viewport
+### Pattern A — Stretch-to-viewport (recommended)
 
-Canvas fills the browser; world content rescales as the viewport changes. Reference: `samples/PlatformKing`.
+Canvas fills the browser; the engine pillarbox/letterboxes the design world to its locked aspect ratio inside the canvas. Reference: `samples/ShmupSpace`, `samples/PlatformKing`.
 
-- **Game1**: `Window.AllowUserResizing = true;`. Don't set `PreferredWindowWidth/Height` on KNI (`PrepareWindow<T>` writes them onto `GraphicsDeviceManager.PreferredBackBufferWidth/Height` in the constructor — clamps the buffer before the externally-managed branch runs). Guard with `#if !KNI` if your desktop build wants a fixed window size. Leave per-screen `PreferredDisplaySettings` unset.
+- **Game1**: identical code on Desktop and KNI — set `ResolutionWidth/Height`, `PreferredWindowWidth/Height`, `AllowUserResizing = true`, all on `DisplaySettings`. The engine ignores `PreferredWindowWidth/Height` on KNI (the canvas DOM owns sizing) so no `#if KNI` is needed.
 - **Holder CSS** (`Pages/Index.razor`): `position: fixed; top: 0; left: 0; right: 0; bottom: 0` — fills viewport.
-- **Body CSS** (`wwwroot/index.html`): default — no flex centering needed.
+- **Body CSS** (`wwwroot/index.html`): `margin: 0; overflow: hidden;` — no flex centering needed.
 - **JS** (`wwwroot/index.html`): default `initRenderJS` from AutoEvalKniBlazorSample (sets canvas buffer once from holder size).
 
-### Pattern B — Fixed-size canvas
+### Pattern B — Fixed-size canvas (legacy)
 
-Canvas locked at the desktop window's dimensions; browser resize doesn't reshape gameplay. Reference: `samples/ShmupSpace`.
+Canvas locked at exact pixel dimensions; nothing scales. Use only for embeds with a strict pixel budget; otherwise prefer Pattern A + locked aspect.
 
 - **Game1**: set `PreferredWindowWidth/Height` on **both** backends, plus `ds.AllowUserResizing = false`. Don't set `Window.AllowUserResizing = true`. Per-screen `PreferredDisplaySettings` left unset (same as Pattern A).
 - **Holder CSS**: `width: NNNpx; height: MMMpx; flex-shrink: 0;` — explicit dims, won't shrink in flex centering.

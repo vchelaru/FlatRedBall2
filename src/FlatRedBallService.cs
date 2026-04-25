@@ -37,6 +37,7 @@ public class FlatRedBallService
     private Game? _game;
     private GraphicsDeviceManager? _graphicsManager;
     private SpriteBatch? _spriteBatch;
+    private Texture2D? _whitePixel;
     private Action? _pendingScreenChange;
     private Type? _lastScreenType;
     private Action<Screen>? _lastScreenConfigure;
@@ -115,6 +116,8 @@ public class FlatRedBallService
         _game = game;
         _graphicsManager = game.Services.GetService(typeof(IGraphicsDeviceManager)) as GraphicsDeviceManager;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
+        _whitePixel = new Texture2D(game.GraphicsDevice, 1, 1);
+        _whitePixel.SetData(new[] { Color.White });
         SynchronizationContext.SetSynchronizationContext(_syncContext);
         Content.Initialize(game.Content, game.GraphicsDevice);
         ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
@@ -239,17 +242,7 @@ public class FlatRedBallService
             ApplyCameraSettingsFrom(pref);
 
         if (applyWindowSettings)
-        {
-            // Window.AllowUserResizing == true means the host owns the back-buffer size: a
-            // resizable desktop window or a stretch-to-viewport KNI canvas. Skip ApplyWindowSettings
-            // so we don't clamp the buffer to the design resolution while the surface is sized
-            // differently — that mismatch breaks Camera.ScreenToWorld. Per-screen
-            // PreferredDisplaySettings still wins. The flag's source of truth is
-            // DisplaySettings.AllowUserResizing, which propagates here through ApplyWindowSettings.
-            bool externallyManaged = _game?.Window.AllowUserResizing == true && pref == null;
-            if (!externallyManaged)
-                ApplyWindowSettings(pref ?? DisplaySettings);
-        }
+            ApplyWindowSettings(pref ?? DisplaySettings);
 
         screen.Engine = this;
         if (_game != null)
@@ -270,9 +263,10 @@ public class FlatRedBallService
 
     private void ApplyCameraSettingsFrom(DisplaySettings source)
     {
-        DisplaySettings.Zoom = source.Zoom;
         DisplaySettings.ResizeMode = source.ResizeMode;
+        DisplaySettings.AspectPolicy = source.AspectPolicy;
         DisplaySettings.FixedAspectRatio = source.FixedAspectRatio;
+        DisplaySettings.DominantAxis = source.DominantAxis;
         DisplaySettings.ResolutionWidth = source.ResolutionWidth;
         DisplaySettings.ResolutionHeight = source.ResolutionHeight;
         DisplaySettings.LetterboxColor = source.LetterboxColor;
@@ -295,6 +289,14 @@ public class FlatRedBallService
     {
         if (_graphicsManager == null) return;
 
+#if KNI
+        // Browser host (KNI BlazorGL): the canvas DOM owns the back-buffer size; touching
+        // PreferredBackBufferWidth/Height would fight the canvas. OS window position is meaningless.
+        // We still propagate AllowUserResizing in case the host honors it.
+        if (_game != null)
+            _game.Window.AllowUserResizing = source.AllowUserResizing;
+        DisplaySettings.WindowMode = source.WindowMode;
+#else
         if (source.WindowMode == Rendering.WindowMode.FullscreenBorderless)
         {
             _graphicsManager.HardwareModeSwitch = false;
@@ -303,10 +305,8 @@ public class FlatRedBallService
             _graphicsManager.PreferredBackBufferHeight = mode.Height;
             _graphicsManager.IsFullScreen = true;
             _graphicsManager.ApplyChanges();
-#if !KNI
             if (_game != null)
                 _game.Window.Position = Point.Zero;
-#endif
         }
         else
         {
@@ -332,7 +332,6 @@ public class FlatRedBallService
             {
                 _game.Window.AllowUserResizing = source.AllowUserResizing;
 
-#if !KNI
                 // Re-center the window. When entering fullscreen we set Position = (0,0);
                 // without a reset the title bar stays above the visible screen area and the
                 // window appears borderless even though it is not.
@@ -340,11 +339,11 @@ public class FlatRedBallService
                 int cx = (display.Width  - _graphicsManager.PreferredBackBufferWidth)  / 2;
                 int cy = (display.Height - _graphicsManager.PreferredBackBufferHeight) / 2;
                 _game.Window.Position = new Point(System.Math.Max(0, cx), System.Math.Max(30, cy));
-#endif
             }
         }
 
         DisplaySettings.WindowMode = source.WindowMode;
+#endif
     }
 
     // Factory registry — populated automatically when a Factory<T> is constructed
@@ -389,10 +388,9 @@ public class FlatRedBallService
     /// Call this from <c>Game1</c>'s constructor, passing the same screen type you will pass to
     /// <see cref="Start{T}"/>.
     /// <para>
-    /// On browser hosts (KNI BlazorGL), set <c>Window.AllowUserResizing = true</c> in the
-    /// <c>Game</c> constructor before calling this. The browser canvas dictates the back-buffer
-    /// size, and that flag tells the engine to defer to it instead of clamping to a design
-    /// resolution — clamping would offset cursor coordinates relative to the displayed canvas.
+    /// On browser hosts (KNI BlazorGL) this is a no-op — the canvas DOM (sized by your
+    /// <c>index.html</c>/<c>Index.razor</c>) drives the back-buffer size automatically. Same Game1
+    /// code works on both backends.
     /// </para>
     /// </summary>
     /// <example>
@@ -406,6 +404,13 @@ public class FlatRedBallService
     /// </example>
     public void PrepareWindow<T>(GraphicsDeviceManager graphics) where T : Screen, new()
     {
+#if KNI
+        // Browser host: the canvas DOM owns the back-buffer size. Setting
+        // PreferredBackBufferWidth/Height here clamps the buffer before the canvas can drive it,
+        // producing the cursor-coordinate offset bug that motivated the externally-managed escape
+        // hatch. Skip entirely on KNI; the browser canvas is sized by index.html / Index.razor.
+        _ = graphics;
+#else
         var settings = new T().PreferredDisplaySettings ?? DisplaySettings;
         if (settings.WindowMode == Rendering.WindowMode.FullscreenBorderless)
         {
@@ -420,31 +425,15 @@ public class FlatRedBallService
             graphics.PreferredBackBufferWidth  = settings.PreferredWindowWidth.Value;
             graphics.PreferredBackBufferHeight = settings.PreferredWindowHeight!.Value;
         }
+#endif
     }
 
     private void ApplyCameraSettings(Camera camera, int windowWidth, int windowHeight)
     {
-        var dest = DisplaySettings.ComputeDestinationViewport(windowWidth, windowHeight);
-        camera.SetViewport(dest);
-        camera.Zoom = DisplaySettings.Zoom;
-
-        if (DisplaySettings.ResizeMode == Rendering.ResizeMode.IncreaseVisibleArea)
-        {
-            // TargetWidth tracks the viewport so scale = Zoom at all window sizes.
-            // Visible world = vpW / Zoom — grows as the window grows.
-            camera.TargetWidth = dest.Width;
-            camera.TargetHeight = dest.Height;
-        }
-        else
-        {
-            // Height-dominant: fix the vertical world extent to ResolutionHeight and derive
-            // TargetWidth so that both axes use the same height-based scale. This prevents
-            // non-uniform stretching when the window aspect ratio differs from the design resolution.
-            camera.TargetHeight = DisplaySettings.ResolutionHeight;
-            camera.TargetWidth = dest.Height > 0
-                ? (int)(dest.Width * DisplaySettings.ResolutionHeight / (float)dest.Height)
-                : DisplaySettings.ResolutionWidth;
-        }
+        UpdateCameraViewportAndExtents(camera, windowWidth, windowHeight);
+        // Reset runtime zoom to 1 at screen activation. Screens that want a non-default starting
+        // zoom assign Camera.Zoom in CustomInitialize.
+        camera.Zoom = 1f;
     }
 
     private void HandleClientSizeChanged(object? sender, EventArgs e)
@@ -454,38 +443,68 @@ public class FlatRedBallService
     }
 
     /// <summary>
-    /// Test seam for the client-size-changed handler. Recomputes the camera viewport from the new
-    /// surface dimensions, unless <paramref name="allowUserResizing"/> is false — in which case the
-    /// surface dimensions are owned by the host and the event is ignored. Use case: fixed-size
-    /// canvas on KNI BlazorGL, where browser-window resizes echo through ClientSizeChanged with
-    /// the browser's dimensions even though the canvas DOM stays at its CSS-pinned size.
+    /// Test seam for the client-size-changed handler. Recomputes the camera viewport and orthogonal
+    /// extents from the new surface dimensions, unless <paramref name="allowUserResizing"/> is false —
+    /// in which case the surface dimensions are owned by the host and the event is ignored. Use case:
+    /// fixed-size canvas on KNI BlazorGL, where browser-window resizes echo through ClientSizeChanged
+    /// with the browser's dimensions even though the canvas DOM stays at its CSS-pinned size.
     /// </summary>
     internal void ApplyClientSizeChange(int width, int height, bool allowUserResizing, Camera camera)
     {
         if (width <= 0 || height <= 0)
             return;
 
-        // Fixed-size canvas on KNI BlazorGL: ignore browser-resize echoes; the canvas DOM is host-managed.
+        // Fixed-size surface (host-managed): ignore resize echoes.
         if (!allowUserResizing)
             return;
 
-        var dest = DisplaySettings.ComputeDestinationViewport(width, height);
+        UpdateCameraViewportAndExtents(camera, width, height);
+    }
+
+    /// <summary>
+    /// Resolves the camera's viewport rectangle (letterbox/pillarbox under <see cref="AspectPolicy.Locked"/>,
+    /// full window under <see cref="AspectPolicy.Free"/>) and the orthogonal world extents from the
+    /// current <see cref="DisplaySettings"/>. Does not touch <see cref="Camera.Zoom"/> — runtime zoom is
+    /// preserved across resizes.
+    /// </summary>
+    private void UpdateCameraViewportAndExtents(Camera camera, int windowWidth, int windowHeight)
+    {
+        var ds = DisplaySettings;
+        var dest = ds.ComputeDestinationViewport(windowWidth, windowHeight);
         camera.SetViewport(dest);
 
-        if (DisplaySettings.ResizeMode == Rendering.ResizeMode.IncreaseVisibleArea)
+        int orthoW, orthoH;
+
+        if (ds.ResizeMode == Rendering.ResizeMode.IncreaseVisibleArea)
         {
-            camera.TargetWidth = dest.Width;
-            camera.TargetHeight = dest.Height;
+            // Pixels-per-world-unit fixed by Zoom: orthogonal extents track the viewport pixel size,
+            // so a larger window reveals more world. Aspect is enforced by the viewport itself under
+            // Locked, or by the window itself under Free.
+            orthoW = dest.Width;
+            orthoH = dest.Height;
         }
-        else
+        else // StretchVisibleArea
         {
-            // StretchVisibleArea: height-dominant — TargetHeight is fixed, TargetWidth tracks
-            // the viewport width so the height-based scale stays uniform on resize.
-            camera.TargetHeight = DisplaySettings.ResolutionHeight;
-            camera.TargetWidth = dest.Height > 0
-                ? (int)(dest.Width * DisplaySettings.ResolutionHeight / (float)dest.Height)
-                : DisplaySettings.ResolutionWidth;
+            // The dominant axis is pinned to its design Resolution* value; the non-dominant axis
+            // is derived from the viewport's aspect so the world is rendered without distortion.
+            // Under Locked, the viewport's aspect equals the effective ratio (resolution-derived or
+            // explicit FixedAspectRatio). Under Free, the viewport's aspect equals the window's, and
+            // the non-dominant world extent grows or shrinks with the window.
+            float vpAspect = dest.Height > 0 ? dest.Width / (float)dest.Height : ds.GetEffectiveAspectRatio();
+            if (ds.DominantAxis == DominantAxis.Height)
+            {
+                orthoH = ds.ResolutionHeight;
+                orthoW = (int)(orthoH * vpAspect);
+            }
+            else
+            {
+                orthoW = ds.ResolutionWidth;
+                orthoH = vpAspect > 0 ? (int)(orthoW / vpAspect) : ds.ResolutionHeight;
+            }
         }
+
+        camera.OrthogonalWidth = orthoW;
+        camera.OrthogonalHeight = orthoH;
     }
 
     // Sub-systems
@@ -543,13 +562,14 @@ public class FlatRedBallService
             Audio.Update();
             CurrentScreen.Overlay.BeginFrame();
 
-            // Keep the Gum canvas in sync with the current viewport so that UI layout
-            // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) resolves to the
-            // correct screen dimensions rather than the stale project defaults.
-            var viewport = CurrentScreen.Camera.Viewport;
-            var zoom = CurrentScreen.Camera.Zoom;
-            _gum.CanvasWidth = viewport.Width / zoom;
-            _gum.CanvasHeight = viewport.Height / zoom;
+            // Keep the Gum canvas in sync with the camera's visible world extents so that UI layout
+            // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) uses design units rather
+            // than raw viewport pixels — and so Gum follows the same effective scale as the game
+            // world, regardless of whether that scale comes from Camera.Zoom or from the
+            // window-vs-resolution ratio.
+            var camera = CurrentScreen.Camera;
+            _gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom;
+            _gum.CanvasHeight = camera.OrthogonalHeight / camera.Zoom;
 
             // Route input events (click, hover, etc.) to all active Gum elements.
             // _gum.Root covers anything added via AddToRoot();
@@ -583,10 +603,13 @@ public class FlatRedBallService
     }
 
     /// <summary>
-    /// Per-frame engine draw. Call from <c>Game.Draw</c> after your own <c>GraphicsDevice.Clear</c>
-    /// (the engine handles clearing only when <see cref="DisplaySettings"/>.<c>FixedAspectRatio</c>
-    /// is set). Resolves the camera viewport, sorts the renderable list by Layer/Z, and dispatches
-    /// to each renderable's <see cref="IRenderBatch"/>.
+    /// Per-frame engine draw. Call from <c>Game.Draw</c>. The engine handles all back-buffer clearing:
+    /// under <see cref="Rendering.AspectPolicy.Locked"/> it first fills the full back buffer with
+    /// <see cref="DisplaySettings"/>.<c>LetterboxColor</c> to paint pillarbox/letterbox bars, then paints
+    /// the camera viewport with <see cref="Camera.BackgroundColor"/>. Under
+    /// <see cref="Rendering.AspectPolicy.Free"/> the camera viewport is the full back buffer so a single
+    /// clear suffices. Sorts the renderable list by Layer/Z and dispatches to each renderable's
+    /// <see cref="IRenderBatch"/>.
     /// </summary>
     public void Draw()
     {
@@ -596,17 +619,30 @@ public class FlatRedBallService
 
         var gd = _spriteBatch.GraphicsDevice;
 
-        if (DisplaySettings.FixedAspectRatio.HasValue)
+        var camera = CurrentScreen.Camera;
+        var pp = gd.PresentationParameters;
+
+        if (DisplaySettings.AspectPolicy == Rendering.AspectPolicy.Locked)
         {
-            // Paint the letterbox/pillarbox bars by clearing the full window first.
-            var pp = gd.PresentationParameters;
+            // 1) Paint the letterbox/pillarbox bars by clearing the entire back buffer.
             gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
             gd.Clear(DisplaySettings.LetterboxColor);
-        }
 
-        // Always set the viewport — MonoGame does not reset it between frames, so a
-        // previous screen's sub-viewport would persist into the next screen otherwise.
-        gd.Viewport = CurrentScreen.Camera.Viewport;
+            // 2) Set the camera viewport, then paint Camera.BackgroundColor INSIDE it via a SpriteBatch
+            //    quad. GraphicsDevice.Clear is not reliably viewport-respecting across backends, but
+            //    a SpriteBatch.Draw is — it runs through the rasterizer with the active viewport.
+            gd.Viewport = camera.Viewport;
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_whitePixel, new Rectangle(0, 0, camera.Viewport.Width, camera.Viewport.Height), camera.BackgroundColor);
+            _spriteBatch.End();
+        }
+        else
+        {
+            // Free policy: viewport == full window, so a single full-buffer clear suffices.
+            gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+            gd.Clear(camera.BackgroundColor);
+            gd.Viewport = camera.Viewport;
+        }
 
         CurrentScreen.Draw(_spriteBatch, RenderDiagnostics);
     }

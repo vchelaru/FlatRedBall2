@@ -175,8 +175,8 @@ public class CameraControllingEntity : Entity
             if (Camera == null || Map == null)
                 return float.PositiveInfinity;
 
-            float defaultVisibleW = Camera.TargetWidth  / _defaultZoom;
-            float defaultVisibleH = Camera.TargetHeight / _defaultZoom;
+            float defaultVisibleW = Camera.OrthogonalWidth  / _defaultZoom;
+            float defaultVisibleH = Camera.OrthogonalHeight / _defaultZoom;
             var map = Map.Value;
             float mapW = map.Width  - 2 * ExtraMapPadding;
             float mapH = map.Height - 2 * ExtraMapPadding;
@@ -231,8 +231,8 @@ public class CameraControllingEntity : Entity
         // disabling smooth-follow (which causes a jarring snap at the boundary).
         if (Map != null && approachX != TargetApproachStyle.Immediate)
         {
-            float visibleW = Camera.TargetWidth  / Camera.Zoom;
-            float visibleH = Camera.TargetHeight / Camera.Zoom;
+            float visibleW = Camera.OrthogonalWidth  / Camera.Zoom;
+            float visibleH = Camera.OrthogonalHeight / Camera.Zoom;
             var map = Map.Value;
             float mapLeft   = map.Left   + ExtraMapPadding;
             float mapRight  = map.Right  - ExtraMapPadding;
@@ -283,8 +283,8 @@ public class CameraControllingEntity : Entity
     private void ApplySeparationForZoom(Vector2 separation)
     {
         float noZoomDistance = MathF.Min(
-            Camera!.TargetWidth  / _defaultZoom,
-            Camera!.TargetHeight / _defaultZoom) * 0.8f;
+            Camera!.OrthogonalWidth  / _defaultZoom,
+            Camera!.OrthogonalHeight / _defaultZoom) * 0.8f;
 
         float currentDistance = separation.Length();
         float desired;
@@ -336,8 +336,8 @@ public class CameraControllingEntity : Entity
         // Clamp to map bounds.
         if (Camera != null && Map != null)
         {
-            float visibleW = Camera.TargetWidth  / Camera.Zoom;
-            float visibleH = Camera.TargetHeight / Camera.Zoom;
+            float visibleW = Camera.OrthogonalWidth  / Camera.Zoom;
+            float visibleH = Camera.OrthogonalHeight / Camera.Zoom;
             var map = Map.Value;
             float effectiveMapW = map.Width  - 2 * ExtraMapPadding;
             float effectiveMapH = map.Height - 2 * ExtraMapPadding;
@@ -469,8 +469,8 @@ public class CameraControllingEntity : Entity
 
     private void KeepTargetsInView()
     {
-        float visibleW = Camera!.TargetWidth  / Camera.Zoom * ViewableAreaMultiplier;
-        float visibleH = Camera!.TargetHeight / Camera.Zoom * ViewableAreaMultiplier;
+        float visibleW = Camera!.OrthogonalWidth  / Camera.Zoom * ViewableAreaMultiplier;
+        float visibleH = Camera!.OrthogonalHeight / Camera.Zoom * ViewableAreaMultiplier;
         float halfW = visibleW / 2f;
         float halfH = visibleH / 2f;
 

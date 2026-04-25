@@ -34,14 +34,14 @@ public class GumRenderBatch : IRenderBatch
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
-        // When Camera.Zoom != 1, scale the Gum render to match.
-        // The update loop already divides CanvasWidth/Height by zoom so that Gum layout
-        // units stay consistent; the matrix here makes the rendered output fill the screen
-        // at the same scale as the game world.
-        var zoom = camera.Zoom;
-        var matrix = zoom == 1f
+        // Render Gum at the camera's effective pixels-per-design-unit so that UI scales identically
+        // to the game world. PixelsPerUnit folds together both sources of scale: viewport/Orthogonal
+        // ratio (the implicit window-vs-resolution scale) AND runtime Camera.Zoom. The update loop
+        // sets CanvasWidth/Height in design units, so this matrix maps those units to screen pixels.
+        var scale = camera.PixelsPerUnit;
+        var matrix = scale == 1f
             ? (Matrix?)null
-            : Matrix.CreateScale(zoom, zoom, 1f);
+            : Matrix.CreateScale(scale, scale, 1f);
         _inner!.Begin(matrix);
     }
 

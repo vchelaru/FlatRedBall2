@@ -6,7 +6,7 @@
     <title>ShmupSpace (KNI BlazorGL)</title>
     <base href="./" />
 </head>
-<body style="margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: auto; background: #222;">
+<body style="margin: 0; overflow: hidden; background: #000;">
     <div id="app">Loading...</div>
     <div id="blazor-error-ui" style="display:none; position:fixed; bottom:0; left:0; width:100%; padding:0.6rem 1.25rem; background:lightyellow; z-index:1000;">
         An unhandled error has occurred.
@@ -29,15 +29,7 @@
     <script src="_content/nkast.Wasm.XR/js/XR.8.0.11.js"></script>
 
     <script>
-        // KNI BlazorGL resizes canvas.width/height on browser resize. Re-pin every frame so
-        // the drawing buffer stays at the design resolution set by initRenderJS.
-        var lockW = 0, lockH = 0;
         function tickJS() {
-            var canvas = document.getElementById('theCanvas');
-            if (canvas) {
-                if (canvas.width !== lockW) canvas.width = lockW;
-                if (canvas.height !== lockH) canvas.height = lockH;
-            }
             window.theInstance.invokeMethod('TickDotNet');
             window.requestAnimationFrame(tickJS);
         }
@@ -46,10 +38,8 @@
             window.theInstance = instance;
             var canvas = document.getElementById('theCanvas');
             var holder = document.getElementById('canvasHolder');
-            lockW = holder.clientWidth;
-            lockH = holder.clientHeight;
-            canvas.width = lockW;
-            canvas.height = lockH;
+            canvas.width = holder.clientWidth;
+            canvas.height = holder.clientHeight;
             canvas.addEventListener("contextmenu", e => e.preventDefault());
             window.requestAnimationFrame(tickJS);
         };

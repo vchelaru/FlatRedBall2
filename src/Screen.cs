@@ -275,7 +275,7 @@ public class Screen
     /// <summary>
     /// Override to declare this screen's preferred display configuration.
     /// <para>
-    /// Camera properties (<see cref="DisplaySettings.Zoom"/>, <see cref="DisplaySettings.ResizeMode"/>,
+    /// Camera properties (<see cref="DisplaySettings.ResizeMode"/>,
     /// <see cref="DisplaySettings.FixedAspectRatio"/>, etc.) are applied every time this screen activates,
     /// whether via <see cref="FlatRedBallService.Start{T}"/> or <see cref="MoveToScreen{T}"/>.
     /// </para>
@@ -767,11 +767,12 @@ public class Screen
         CustomActivity(frameTime);
     }
 
-    // Internal draw — called by FlatRedBallService
+    // Internal draw — called by FlatRedBallService. The engine has already cleared the back buffer
+    // (LetterboxColor full-buffer + BackgroundColor inside the camera viewport under Locked, or a
+    // single BackgroundColor clear under Free), so do not call GraphicsDevice.Clear here — it would
+    // ignore the viewport on MonoGame's OpenGL backend and wipe out the letterbox bars.
     internal void Draw(SpriteBatch spriteBatch, RenderDiagnostics diagnostics)
     {
-        spriteBatch.GraphicsDevice.Clear(Camera.BackgroundColor);
-
         SortRenderList();
 
         IRenderBatch? currentBatch = null;
