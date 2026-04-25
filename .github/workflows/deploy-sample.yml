@@ -45,6 +45,15 @@ jobs:
         shell: bash
         run: touch publish/wwwroot/.nojekyll
 
+      # peaceiris/actions-gh-pages does `git add` inside the publish dir, which honors any
+      # .gitignore files it finds. The source projects keep a wwwroot/Content/.gitignore to
+      # exclude generated XNBs from source control — that file gets copied into publish/ and
+      # would silently strip every asset from the deploy. Remove all .gitignore files from
+      # publish/ before handing off.
+      - name: Strip .gitignore files from publish output
+        shell: bash
+        run: find publish/wwwroot -name .gitignore -delete
+
       - name: Deploy to gh-pages/${{ inputs.sample }}
         uses: peaceiris/actions-gh-pages@v4
         with:
