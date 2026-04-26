@@ -12,35 +12,23 @@ namespace FlatRedBall2.Tests.Animation;
 // Covers AnimationChainList.TryReloadFrom — the in-place reload path for .achx edits during
 // hot-reload. Design intent: preserve chain-instance identity by name so any live
 // Sprite.CurrentAnimation reference keeps playing from the updated frames without resetting.
-[Collection("AnimationChainListSaveStaticState")]
-public class AnimationChainListReloadTests : IDisposable
+public class AnimationChainListReloadTests
 {
-    // In-memory file system: path → XML bytes. Routed through AnimationChainListSave.StreamProvider
+    // In-memory file system: path → XML bytes. Routed through ContentManagerService.StreamProvider
     // so the engine never touches the disk and matches the production WASM/desktop code path
     // (TitleContainer.OpenStream rejects absolute filesystem paths).
     private readonly Dictionary<string, byte[]> _virtualFiles = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Func<string, Stream> _originalProvider;
-
-    public AnimationChainListReloadTests()
-    {
-        _originalProvider = AnimationChainListSave.StreamProvider;
-        AnimationChainListSave.StreamProvider = path =>
-        {
-            if (!_virtualFiles.TryGetValue(path, out var bytes))
-                throw new FileNotFoundException(path);
-            return new MemoryStream(bytes);
-        };
-    }
-
-    public void Dispose()
-    {
-        AnimationChainListSave.StreamProvider = _originalProvider;
-    }
 
     private ContentManagerService MakeContent()
     {
         var svc = new ContentManagerService();
         svc.TextureLoader = _ => null!; // frames tolerate null Texture; we only validate chain structure
+        svc.StreamProvider = path =>
+        {
+            if (!_virtualFiles.TryGetValue(path, out var bytes))
+                throw new FileNotFoundException(path);
+            return new MemoryStream(bytes);
+        };
         return svc;
     }
 
@@ -79,7 +67,7 @@ public class AnimationChainListReloadTests : IDisposable
     private void DeleteFile(string fileName) => _virtualFiles.Remove(fileName);
 
     private AnimationChainList LoadFresh(string path, ContentManagerService content)
-        => AnimationChainListSave.FromFile(path).ToAnimationChainList(content);
+        => content.LoadAnimationChainList(path);
 
     [Fact]
     public void TryReloadFrom_MissingFile_ReturnsFalse()

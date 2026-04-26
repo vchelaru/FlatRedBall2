@@ -49,7 +49,7 @@ public class AnimationChainList : List<AnimationChain>
         AnimationChainList fresh;
         try
         {
-            fresh = AnimationChainListSave.FromFile(path).ToAnimationChainList(content);
+            fresh = content.LoadAnimationChainList(path);
         }
         catch (IOException) { return false; }
         // XmlSerializer.Deserialize wraps parse errors in InvalidOperationException with an

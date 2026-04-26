@@ -4,19 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## `AnimationChainListSave.StreamProvider` is Static Mutable State
-**Priority: Discussion — violates the "no static state" rule.** `AnimationChainListSave.StreamProvider` is `internal static Func<string, Stream>`, defaulting to `XnaTitleContainer.OpenStream`. Two test classes (`AnimationChainListReloadTests`, `AnimationChainListSaveLoadingTests`) mutate it to swap in test stream sources, and on Linux CI 2026-04-25 they raced — xUnit parallelizes test classes, the second class's ctor captured the *first* class's lambda as `_originalProvider`, and `TryReloadFrom_NewChainInSource_AppendedToList` read through the wrong provider and got 1 chain instead of 2. Patched by sharing an xUnit `[Collection("AnimationChainListSaveStaticState")]` so the two classes serialize, but that's a band-aid: the underlying static is the actual smell, and any future caller (test or game code) that mutates the global will hit the same race.
-
-Options:
-- **Pass the stream source as a parameter to `FromFile`** (e.g. `FromFile(string path, Func<string, Stream>? streamProvider = null)`). Default to `XnaTitleContainer.OpenStream`. No global state, no race. Slight ergonomic cost at call sites that want a non-default provider.
-- **Make it an instance dependency on `ContentManagerService`** (the thing that orchestrates content reads). Already passed around in the `FromFile(...).ToAnimationChainList(content)` call chain — would unify the seam.
-- **Status quo + better test discipline.** Cheap but the footgun stays armed; the next contributor adds a third test class that races the same way.
-
-Decide before adding the next .achx-related test class. The collection workaround keeps CI green in the meantime but is invisible — easy to miss when copying a test class as a template.
-
-## Engine-Wide XML Docs Pass
-**Priority: Soon.** Sweep every public type and member in `src/` and bring XML docs up to the project's bar: succinct, adds clarification beyond the name, avoids redundancy, calls out gotchas. Many APIs were added incrementally and either lack docs or have stale ones. XML docs are what IntelliSense surfaces to consumers and will become the API reference verbatim if we go DocFX — quality here is doubly load-bearing. Approach: probably one subsystem at a time (Collision, Rendering, Input, Screens, Entities, Tweening, etc.) so review diffs stay digestible.
-
 ## "Fire and Forget" Entities
 **Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
 

@@ -42,7 +42,7 @@ public class GameScreen : Screen
         Camera.BackgroundColor = new Color(6, 6, 20);
 
         // Load content + configs before spawning — entities read from these in their CustomInitialize.
-        Animations = AnimationChainListSave.FromFile(AnimationsPath).ToAnimationChainList(Engine.Content);
+        Animations = Engine.Content.LoadAnimationChainList(AnimationsPath);
         Config.CopyFrom(GameConfig.FromJson(GameConfigPath));
         PlayerTopDownConfig = TopDownConfig.FromJson(PlayerTopDownPath);
 

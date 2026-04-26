@@ -34,9 +34,7 @@ public class Enemy : Entity
     {
 
         _sprite = new Sprite { Y = 16f };
-        var animations = AnimationChainListSave
-            .FromFile("Content/Animations/EnemyAnimations.achx")
-            .ToAnimationChainList(Engine.Content);
+        var animations = Engine.Content.LoadAnimationChainList("Content/Animations/EnemyAnimations.achx");
         _sprite.AnimationChains = animations;
         Add(_sprite);
 
