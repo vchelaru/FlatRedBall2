@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Content;
 using FlatRedBall2.Diagnostics;
@@ -139,6 +140,11 @@ public class Screen
     /// <para><b>Only call this for entities you instantiated with <c>new</c>.</b> Entities created via
     /// <c>Factory&lt;T&gt;.Create()</c> are registered automatically — calling <c>Register</c> on them
     /// would add them to the update loop twice.</para>
+    /// <para><b>Add renderable children before calling <c>Register</c></b> if you want them on this
+    /// screen's render list. <c>Register</c> walks the entity's existing children and adds any
+    /// <c>IRenderable</c>s to this screen. After registration, <c>entity.Add(...)</c> routes new
+    /// renderables through <c>entity.Engine.CurrentScreen</c> instead — which may not be this screen
+    /// during initialization (e.g. when registering before <c>Engine.CurrentScreen</c> is set).</para>
     /// </summary>
     public void Register(Entity entity)
     {
@@ -731,6 +737,23 @@ public class Screen
                 if (_renderList[i] is Sprite sprite)
                     sprite.AnimateSelf(animDt);
             }
+
+            // 4.5 Fire-and-forget texture-overload lifetimes — tick down and destroy when expired.
+            // Reverse iteration so removals don't shift unscanned indices.
+            for (int i = _fireAndForgetLifetimes.Count - 1; i >= 0; i--)
+            {
+                var (entity, remaining) = _fireAndForgetLifetimes[i];
+                remaining -= frameTime.DeltaSeconds;
+                if (remaining <= 0f)
+                {
+                    _fireAndForgetLifetimes.RemoveAt(i);
+                    entity.Destroy();
+                }
+                else
+                {
+                    _fireAndForgetLifetimes[i] = (entity, remaining);
+                }
+            }
         }
 
         // 5. Screen CustomActivity — always runs so pause menu logic can respond to input
@@ -772,6 +795,54 @@ public class Screen
         }
 
         currentBatch?.End(spriteBatch);
+    }
+
+    // Fire-and-forget timed lifetimes — tracked alongside _entities and ticked in Update.
+    // Parallel-list (rather than a per-entity field) so the texture-overload helper can attach
+    // a duration without touching the Entity API surface or burdening every entity with a timer.
+    private readonly List<(Entity entity, float remaining)> _fireAndForgetLifetimes = new();
+
+    /// <summary>
+    /// Spawns a one-shot, self-destroying entity that plays <paramref name="animationName"/> from
+    /// <paramref name="animations"/> at (<paramref name="x"/>, <paramref name="y"/>) and destroys
+    /// itself when the animation finishes. Returned <see cref="Entity"/> is fully wired into the
+    /// screen — set <c>Velocity</c>, attach to a parent, or <c>Add</c> shapes for collision before
+    /// the next frame.
+    /// <para>
+    /// <b>Plays once</b> regardless of the animation chain's loop authoring — the helper forces
+    /// <see cref="Sprite.IsLooping"/> to <c>false</c> on the spawned sprite. If you want a looping
+    /// effect with timed cleanup, author a real entity instead.
+    /// </para>
+    /// </summary>
+    public Entity CreateFireAndForget(AnimationChainList animations, string animationName, float x, float y)
+    {
+        var entity = new Entity { X = x, Y = y };
+        // Add sprite as a child BEFORE Register so Register's child-walk routes the sprite into
+        // THIS screen's render list. Calling entity.Add(sprite) after Register would route through
+        // entity.Engine.CurrentScreen instead, which may not be this screen during initialization.
+        var sprite = new Sprite { AnimationChains = animations, IsLooping = false };
+        entity.Add(sprite);
+        Register(entity);
+        sprite.PlayAnimation(animationName);
+        sprite.AnimationFinished += () => entity.Destroy();
+        return entity;
+    }
+
+    /// <summary>
+    /// Spawns a one-shot, self-destroying entity that displays <paramref name="texture"/> at
+    /// (<paramref name="x"/>, <paramref name="y"/>) for <paramref name="duration"/> seconds and
+    /// then destroys itself. Returned <see cref="Entity"/> is fully wired into the screen — set
+    /// <c>Velocity</c>, attach to a parent, or <c>Add</c> shapes for collision before the next frame.
+    /// </summary>
+    public Entity CreateFireAndForget(Texture2D texture, float x, float y, float duration)
+    {
+        var entity = new Entity { X = x, Y = y };
+        var sprite = new Sprite { Texture = texture };
+        entity.Add(sprite);
+        Register(entity);
+
+        _fireAndForgetLifetimes.Add((entity, duration));
+        return entity;
     }
 
     // Internal entity registration used by Factory

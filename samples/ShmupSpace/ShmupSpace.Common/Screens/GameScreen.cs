@@ -26,7 +26,6 @@ public class GameScreen : Screen
     private Factory<PlayerShip> _playerFactory = null!;
     private Factory<PlayerBullet> _bulletFactory = null!;
     private Factory<Enemy> _enemyFactory = null!;
-    private Factory<Explosion> _explosionFactory = null!;
 
     private Label _scoreLabel = null!;
     private Label _livesLabel = null!;
@@ -49,7 +48,6 @@ public class GameScreen : Screen
         _playerFactory = new Factory<PlayerShip>(this);
         _bulletFactory = new Factory<PlayerBullet>(this);
         _enemyFactory = new Factory<Enemy>(this);
-        _explosionFactory = new Factory<Explosion>(this);
 
         SpawnPlayer();
 
@@ -167,11 +165,7 @@ public class GameScreen : Screen
     }
 
     private void SpawnExplosion(float x, float y)
-    {
-        var boom = _explosionFactory.Create();
-        boom.X = x;
-        boom.Y = y;
-    }
+        => CreateFireAndForget(Animations, "Explosion", x, y);
 
     private void BuildHud()
     {
