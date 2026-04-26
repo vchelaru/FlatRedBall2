@@ -5,17 +5,24 @@ description: "Entities and Factories in FlatRedBall2. Use when working with Enti
 
 # Entities and Factories in FlatRedBall2
 
-An `Entity` is the base class for all game objects. It owns position, velocity, acceleration, drag, and a list of child shapes for collision and rendering. `Factory<T>` manages creating, tracking, and destroying entity instances from within a Screen.
+`Entity` is the base class for game objects. It owns position, velocity, acceleration, drag, and a list of child shapes for collision and rendering. `Factory<T>` manages creating, tracking, and destroying entity instances from within a `Screen`.
 
-## Creating an Entity Subclass
+## Rules
+
+1. **Always spawn through `Factory<T>`** — never `new MyEntity()`. Bypassing the factory breaks `Engine.GetFactory<T>()` and collision relationships. This applies even when there is only one instance (e.g., one ball in Pong).
+2. **Override `CustomInitialize` for setup, `CustomActivity` for per-frame logic.** Add shape children, create input handlers, and wire references in `CustomInitialize`. The constructor is too early — `Engine` is null until the factory injects it (see `engine-overview`).
+3. **Don't write properties whose only effect happens in `CustomInitialize`.** They look configurable but silently fail when assigned after `Create()` returns. Three fixes by case: expose the child shape directly (forwarding), pass init-only data through `Create(e => e.X = ...)` so it's set before `CustomInitialize` runs, or write a reactive setter for state the gameplay legitimately mutates. See `references/reactive-properties.md` — this is the most common entity-design footgun in FRB2.
+4. **Don't create entities for static walls / floors / ceilings.** Use `TileShapeCollection` instead — see `collision-relationships`.
+
+## Lifecycle Order
+
+1. `Factory<T>.Create()` — allocates the entity, sets `Engine`, calls `AddEntity` on the screen
+2. `CustomInitialize()` — called immediately after; add shape children and initialize input here
+3. Each frame: physics update → collision resolution → `CustomActivity(time)`
+
+## Minimal Entity Example
 
 ```csharp
-using FlatRedBall2;
-using FlatRedBall2.Collision;
-using FlatRedBall2.Input;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Input;
-
 public class Player : Entity
 {
     private KeyboardInput2D _movement = null!;
@@ -45,50 +52,11 @@ public class Player : Entity
 }
 ```
 
-## Lifecycle Order
+`Rectangle` is exposed directly as a public auto-property so callers can write `player.Rectangle.Color = ...` at any time. Do not wrap it in a forwarding property like `Color` or `FillColor` — see `references/reactive-properties.md` for why.
 
-1. `Factory<T>.Create()` — allocates the entity, sets `Engine`, calls `AddEntity` on the screen
-2. `CustomInitialize()` — called immediately after; add shape children and initialize input here
-3. Each frame: physics update → collision resolution → `CustomActivity(time)`
+For shape types and visual properties (`IsVisible`, `Color`, `IsFilled`, etc.), see the `shapes` skill. Shapes default to `IsVisible = false` — always set it explicitly.
 
-## Shape Children
-
-All three shape types can be attached with `Add`:
-
-```csharp
-var rect = new AxisAlignedRectangle { Width = 40, Height = 40, IsVisible = true };
-Add(rect);
-
-var circle = new Circle { Radius = 20, IsVisible = true };
-Add(circle);
-
-var poly = Polygon.CreateRectangle(40, 40);
-poly.IsVisible = true;
-Add(poly);
-```
-
-Shape position is relative to the parent entity's position.
-
-## Excluding a Shape from Default Collision
-
-Pass `isDefaultCollision: false` to attach a **shape** (`AxisAlignedRectangle`, `Circle`, `Polygon`) for rendering/positioning only. It will not participate in `CollidesWith` or any standard collision relationship. This overload requires `ICollidable` — it does **not** exist for `Sprite`. For non-collision renderables like `Sprite`, use plain `Add(child)`:
-
-```csharp
-// Visual range indicator — renders but never collides by default
-var range = new Circle { Radius = 64f, IsFilled = false, IsVisible = true };
-Add(range, isDefaultCollision: false);
-```
-
-Use `SetDefaultCollision` to toggle participation at runtime (idempotent — safe to call multiple times):
-
-```csharp
-SetDefaultCollision(range, true);   // include in default collision
-SetDefaultCollision(range, false);  // exclude from default collision
-```
-
-"Default collision" is the set of shapes checked by standard collision relationships. A shape excluded from default collision can still be targeted explicitly when per-shape collision targeting is supported.
-
-## Using Factory&lt;T&gt; from a Screen
+## Using `Factory<T>` from a Screen
 
 ```csharp
 public class GameScreen : Screen
@@ -104,105 +72,18 @@ public class GameScreen : Screen
 }
 ```
 
-`Factory<T>` implements `IEnumerable<T>`, so you can pass it directly to `AddCollisionRelationship`.
+`Factory<T>` implements `IEnumerable<T>` — pass it directly to `AddCollisionRelationship`.
 
-## Inspecting the Factory
+`Create(Action<T>)` runs the callback after engine injection but before `CustomInitialize`, so init-only fields are guaranteed-set when the entity reads them: `_asteroidFactory.Create(a => a.Size = AsteroidSize.Small)`. Use this instead of "create, then assign" whenever the value is consumed inside `CustomInitialize`. See `references/reactive-properties.md`.
 
 `Factory<T>.Instances` exposes the live list as `IReadOnlyList<T>`:
 
 ```csharp
-int remaining = _enemyFactory.Instances.Count;
 if (_brickFactory.Instances.Count == 0)
     MoveToScreen<NextLevelScreen>();
 ```
 
-## Configuring Entities After Create()
-
-`Create()` returns the entity instance. Set position and shape dimensions after creation:
-
-```csharp
-var wall = _wallFactory.Create();
-wall.X = x; wall.Y = y;
-wall.Rectangle.Width = w;
-wall.Rectangle.Height = h;
-```
-
-## Entity Properties Must Be Reactive (Not Config)
-
-Entity properties that affect shapes or visuals must apply their changes immediately in the setter — not store a value for some future initialization step to read. Since properties are reactive, they can be set at any time: after `CustomInitialize`, after `Factory.Create()`, or mid-game. Timing does not matter.
-
-**Wrong — "configure-then-initialize" pattern:**
-```csharp
-public class Asteroid : Entity
-{
-    public AsteroidSize Size { get; set; }  // does nothing on its own
-
-    public override void CustomInitialize()
-    {
-        // Reads Size to decide radius — but Size wasn't set yet!
-        float radius = Size == AsteroidSize.Small ? 10f : 30f;
-        Add(new Circle { Radius = radius, IsVisible = true });
-    }
-}
-```
-
-**Right — reactive property, works at any time:**
-```csharp
-public class Asteroid : Entity
-{
-    private Circle _shape = null!;
-    private AsteroidSize _size = AsteroidSize.Large;
-
-    public AsteroidSize Size
-    {
-        get => _size;
-        set { _size = value; _shape.Radius = value == AsteroidSize.Small ? 10f : 30f; }
-    }
-
-    public override void CustomInitialize()
-    {
-        _shape = new Circle { Radius = 30f, IsVisible = true };
-        Add(_shape);
-    }
-}
-
-// Caller — timing doesn't matter:
-var asteroid = _asteroidFactory.Create();  // defaults to Large
-asteroid.Size = AsteroidSize.Small;        // immediately resizes the shape
-```
-
-This eliminates any dependency on Factory/CustomInitialize timing. There is no need for a separate `Setup()` method or a `Create(Action<T>)` overload.
-
-## Always Use Factory — Even for Single Instances
-
-Even for a single entity (e.g., one ball in Pong), create it through `Factory<T>`. This keeps lifecycle, collision (`IEnumerable<T>`), and `Engine.GetFactory<T>()` all working consistently.
-
-## Solid-Grid Factories (`IsSolidGrid`)
-
-For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AxisAlignedRectangle` child's `RepositionDirections` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapeCollection` does for tile grids, but for entity factories.
-
-Cell size is inferred from the first entity's body; mismatched sizes throw. `TileMap.CreateEntities` automatically wraps its spawn loop in the factory's grid batch so RD is recomputed once at the end. For hand-authored bulk spawns, wrap the loop in `using (factory.BeginGridBatch()) { … }` — without batching, `Create` can't compute cell indices because `X`/`Y` aren't set until after `Create` returns.
-
-## Spawning Entities from Tiled Object Layers
-
-For designer-placed entities (coins, enemies, spawn points), use `TileMap.CreateEntities` instead of hardcoded positions. See the `levels` skill for details.
-
-## Spawning Entities from Within Another Entity
-
-```csharp
-// Player.cs — spawns a Ball on Space press
-public override void CustomActivity(FrameTime time)
-{
-    if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
-    {
-        var ball = Engine.GetFactory<Ball>().Create();
-        ball.X = X; ball.Y = Y;
-        ball.VelocityY = 300f;
-    }
-}
-```
-
-`GetFactory<T>()` throws `InvalidOperationException` if no factory for `T` exists yet.
+`Engine.GetFactory<T>()` looks up a factory by type — used when spawning from inside another entity. Throws if no factory for `T` exists yet on the screen.
 
 ## Destroying Entities
 
@@ -210,31 +91,22 @@ public override void CustomActivity(FrameTime time)
 enemy.Destroy();   // removes from factory, screen, and clears child shapes
 ```
 
-`factory.Destroy(entity)` is equivalent.
+`factory.Destroy(entity)` is equivalent. **Fields are invalid after `Destroy()`** — don't read state on an entity you just destroyed; use `factory.Instances.Count == 0` to detect when all are gone.
 
 ## Entity.Name
 
-`Entity.Name` is an optional `string?` property for identifying entities in tests and diagnostics. Set it after creation:
+Optional `string?` for identifying entities in tests and diagnostics. `SceneSnapshot.Named("player")` matches case-insensitively. Has no effect on collision, rendering, or lifecycle.
 
-```csharp
-var player = _playerFactory.Create();
-player.Name = "Player";
-```
+## See Also
 
-`SceneSnapshot.Named("player")` uses case-insensitive matching. Name is purely for observability — it has no effect on collision, rendering, or lifecycle.
+- `references/reactive-properties.md` — property-vs-child-shape decision; the most common entity-design footgun
+- `references/patterns.md` — render-only shapes (`isDefaultCollision`), solid-grid factories (`IsSolidGrid`), spawning from within an entity, death effects, particles, configuring after `Create()`
+- `shapes` skill — shape types, visibility, color, render pipeline registration
+- `collision-relationships` skill — `AddCollisionRelationship` over a `Factory<T>`, `TileShapeCollection`
+- `levels` skill — `TileMap.CreateEntities` for designer-placed entities
 
 ## Common Pitfalls
 
-- **Avoid naming fields/constants the same as `Entity` members.** `Acceleration`, `Velocity`, `Drag` already exist on `Entity` — shadowing them causes warnings.
-- **`Engine` is null in the constructor** — see `engine-overview` Key Design Rules. Use `CustomInitialize` instead.
-- **Shapes default `IsVisible = false`** — see `shapes` skill. Always set `IsVisible = true`.
-- **`Add(child)` only auto-registers to the render pipeline if `Engine` is set** — Factory sets `Engine` before `CustomInitialize`, so `Add` works correctly there.
-- **`_movement` must be initialized once, not every frame** — create input objects in `CustomInitialize`.
-- **Always use `Factory<T>`, never `new MyEntity()`** — bypassing Factory breaks `Engine.GetFactory<T>()` and collision relationships.
-- **Don't create entities for static walls/floors/ceilings** — use `TileShapeCollection` instead (see `collision-relationships` skill).
-- **Fields are invalid after `Destroy()`** — `Destroy()` removes the entity immediately. Don't read health or other fields on an entity you just destroyed; use `factory.Instances.Count == 0` to detect when all enemies are gone.
-
-## Reference Files
-
-For advanced patterns (death effects, particles, spawning from entities), see:
-- `references/patterns.md` — Death effects, particle effects, configuring entities after Create()
+- **Naming fields the same as `Entity` members.** `Acceleration`, `Velocity`, `Drag` already exist on `Entity` — shadowing them causes warnings.
+- **Initializing input objects every frame.** Create `KeyboardInput2D` and similar in `CustomInitialize`, not `CustomActivity`.
+- **`Add(child)` before `Engine` is set.** Auto-registration to the render pipeline only happens once `Engine` is set; Factory sets it before `CustomInitialize`, so `Add` works correctly there.

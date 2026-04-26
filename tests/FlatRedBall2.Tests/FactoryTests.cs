@@ -327,4 +327,48 @@ public class FactoryTests
         public static int InitCount;
         public override void CustomInitialize() => InitCount++;
     }
+
+    // Reads InitOnlyValue inside CustomInitialize and stamps it into ObservedValue.
+    // The configure callback on Create must run BEFORE CustomInitialize for ObservedValue
+    // to reflect what the caller passed in.
+    private class ConfigurableEntity : Entity
+    {
+        public int InitOnlyValue { get; set; }
+        public int ObservedValue { get; private set; } = -1;
+        public override void CustomInitialize() => ObservedValue = InitOnlyValue;
+    }
+
+    [Fact]
+    public void Create_WithConfigure_RunsConfigureBeforeCustomInitialize()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<ConfigurableEntity>(screen);
+
+        var entity = factory.Create(e => e.InitOnlyValue = 42);
+
+        entity.ObservedValue.ShouldBe(42);
+    }
+
+    [Fact]
+    public void Create_WithConfigure_RegistersInstance()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<ConfigurableEntity>(screen);
+
+        factory.Create(_ => { });
+
+        factory.Instances.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void Create_WithNullConfigure_Throws()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<ConfigurableEntity>(screen);
+
+        Should.Throw<System.ArgumentNullException>(() => factory.Create(null!));
+    }
 }

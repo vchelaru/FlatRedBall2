@@ -26,7 +26,7 @@ internal interface IFactory
 /// </para>
 /// <para>
 /// Declare one factory per entity type as a field on your <see cref="Screen"/>, construct it in
-/// <see cref="Screen.CustomInitialize"/>, and call <see cref="Create"/> to spawn instances:
+/// <see cref="Screen.CustomInitialize"/>, and call <see cref="Create()"/> to spawn instances:
 /// <code>
 /// private Factory&lt;Player&gt; _playerFactory = null!;
 ///
@@ -117,7 +117,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
 
     /// <summary>
     /// Live list of every entity the factory has created and not yet destroyed. Iterate to apply
-    /// per-frame logic across the entire population (e.g., enemies). Add via <see cref="Create"/>;
+    /// per-frame logic across the entire population (e.g., enemies). Add via <see cref="Create()"/>;
     /// remove via <see cref="Entity.Destroy"/>.
     /// </summary>
     public IReadOnlyList<T> Instances => _instances;
@@ -167,7 +167,23 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// is fully wired into rendering, physics, and (if <see cref="IsSolidGrid"/> is set) the
     /// solid-grid index.
     /// </summary>
-    public T Create()
+    public T Create() => CreateCore(null);
+
+    /// <summary>
+    /// Creates a new <typeparamref name="T"/> and runs <paramref name="configure"/> against it
+    /// <em>before</em> <see cref="Entity.CustomInitialize"/> — so init-only fields the entity
+    /// reads in its initializer (size variant, spawn color, lifetime, etc.) are guaranteed-set
+    /// when the initializer runs. Use this in place of "create, then assign properties" when
+    /// the data is consumed only by <c>CustomInitialize</c> and has no meaningful post-spawn
+    /// reactive behavior.
+    /// </summary>
+    public T Create(Action<T> configure)
+    {
+        if (configure == null) throw new ArgumentNullException(nameof(configure));
+        return CreateCore(configure);
+    }
+
+    private T CreateCore(Action<T>? configure)
     {
         var entity = new T();
         entity.Engine = _screen.Engine;
@@ -182,6 +198,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
         };
         if (_screen.Layer != null)
             entity.Layer = _screen.Layer;
+        configure?.Invoke(entity);
         entity.CustomInitialize();
         if (IsSolidGrid)
         {
