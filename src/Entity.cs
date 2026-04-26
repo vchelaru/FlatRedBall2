@@ -14,7 +14,7 @@ namespace FlatRedBall2;
 /// (shapes, sprites, Gum visuals, sub-entities), and participates in per-frame update
 /// and collision.
 /// <para>
-/// <b>Create via <see cref="Factory{T}.Create"/></b> — the factory injects <see cref="Engine"/>
+/// <b>Create via <see cref="Factory{T}.Create()"/></b> — the factory injects <see cref="Engine"/>
 /// and calls <see cref="CustomInitialize"/> at the correct time. Direct <c>new Entity()</c>
 /// is only safe when followed immediately by <see cref="Screen.Register"/> plus a manual
 /// <see cref="CustomInitialize"/> call.
@@ -425,7 +425,7 @@ public class Entity : ICollidable, IAttachable
     // Lifecycle
 
     /// <summary>
-    /// Called by <see cref="Factory{T}.Create"/> immediately after engine injection.
+    /// Called by <see cref="Factory{T}.Create()"/> immediately after engine injection.
     /// <see cref="Engine"/> and <see cref="Engine"/>.<see cref="FlatRedBallService.CurrentScreen"/>
     /// are both available — use this (not the constructor) to access engine services or add child shapes.
     /// </summary>

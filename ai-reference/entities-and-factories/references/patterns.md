@@ -1,8 +1,8 @@
 # Entity Patterns Reference
 
-## Configuring Entities After Create()
+## Configuring Entities at Spawn
 
-`Create()` returns the entity instance. Set position and shape dimensions after creation:
+Position, velocity, and child shape state set on the returned instance after `Create()` work freely — they don't feed back into `CustomInitialize`:
 
 ```csharp
 private void SpawnWall(float x, float y, float w, float h)
@@ -14,7 +14,13 @@ private void SpawnWall(float x, float y, float w, float h)
 }
 ```
 
-For property design (when to write a property vs expose a child shape), see `reactive-properties.md`.
+When the entity needs a value **inside** `CustomInitialize` (a size variant that determines starting radius, a spawn color used to seed multiple children, a particle's lifetime), pass it via the `Create(Action<T>)` overload — the callback runs before `CustomInitialize`:
+
+```csharp
+var asteroid = _asteroidFactory.Create(a => a.Size = AsteroidSize.Small);
+```
+
+For the full decision tree on property design (forwarding vs init-only vs reactive), see `reactive-properties.md`.
 
 ## Render-Only Shape Children (`isDefaultCollision: false`)
 

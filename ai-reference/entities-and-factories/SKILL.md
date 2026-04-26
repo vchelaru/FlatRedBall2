@@ -11,7 +11,7 @@ description: "Entities and Factories in FlatRedBall2. Use when working with Enti
 
 1. **Always spawn through `Factory<T>`** — never `new MyEntity()`. Bypassing the factory breaks `Engine.GetFactory<T>()` and collision relationships. This applies even when there is only one instance (e.g., one ball in Pong).
 2. **Override `CustomInitialize` for setup, `CustomActivity` for per-frame logic.** Add shape children, create input handlers, and wire references in `CustomInitialize`. The constructor is too early — `Engine` is null until the factory injects it (see `engine-overview`).
-3. **Don't write properties whose only effect happens in `CustomInitialize`.** They look configurable but silently fail when assigned after `Create()` returns. Either expose the underlying child shape directly, or write a setter that re-applies the change immediately. See `references/reactive-properties.md` — this is the most common entity-design footgun in FRB2.
+3. **Don't write properties whose only effect happens in `CustomInitialize`.** They look configurable but silently fail when assigned after `Create()` returns. Three fixes by case: expose the child shape directly (forwarding), pass init-only data through `Create(e => e.X = ...)` so it's set before `CustomInitialize` runs, or write a reactive setter for state the gameplay legitimately mutates. See `references/reactive-properties.md` — this is the most common entity-design footgun in FRB2.
 4. **Don't create entities for static walls / floors / ceilings.** Use `TileShapeCollection` instead — see `collision-relationships`.
 
 ## Lifecycle Order
@@ -73,6 +73,8 @@ public class GameScreen : Screen
 ```
 
 `Factory<T>` implements `IEnumerable<T>` — pass it directly to `AddCollisionRelationship`.
+
+`Create(Action<T>)` runs the callback after engine injection but before `CustomInitialize`, so init-only fields are guaranteed-set when the entity reads them: `_asteroidFactory.Create(a => a.Size = AsteroidSize.Small)`. Use this instead of "create, then assign" whenever the value is consumed inside `CustomInitialize`. See `references/reactive-properties.md`.
 
 `Factory<T>.Instances` exposes the live list as `IReadOnlyList<T>`:
 

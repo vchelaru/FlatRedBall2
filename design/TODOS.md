@@ -26,16 +26,6 @@ Open questions:
 ## AnimationFrame Pivot / Origin Support
 **Priority: Eventual** — `AdobeAnimateAtlasSave` parses `pivotX`/`pivotY` per-SubTexture but discards them because `AnimationFrame` has no pivot field. Adobe Animate exports use pivots to keep a character's anchor (e.g. feet) stable across frames of different sizes. Overlaps semantically with the existing `RelativeX`/`RelativeY`, so pick one model: either have the Adobe importer convert pivot → `RelativeX/Y` at load time (no new field; sprites already obey RelativeX/Y) or add true per-frame pivot. The conversion path is probably simpler. Revisit when the first real Adobe-Animate-authored entity lands.
 
-## Pre-Init vs Reactive-Property Tension
-**Priority: Design discussion** — The `entities-and-factories` skill mandates reactive properties (no configure-then-init). But many init-only fields (spawn color, variant index, starting size) have no meaningful reactive behavior — the property setter after spawn is a no-op unless the author wires it up to whatever the value was used to construct. `AutoEvalTweeningSample` 2026-04-21 hit this: `Pop.FillColor` was used inside `CustomInitialize` to build a `Circle`, and the spawn call site ran `Create()` *before* assigning `FillColor`, so every circle came out white. The fix (reactive property that updates the already-created Circle) works, but the footgun is that *not* writing the reactive version silently fails — no compile error, no runtime exception, just wrong output.
-
-Possible directions:
-- **Factory.Create overload** that takes an `Action<T>` configure callback, invoked before `CustomInitialize`. Entity reads init-only data inside `CustomInitialize` with guaranteed-set values. `_popFactory.Create(p => p.FillColor = color)`.
-- **Lifecycle hook for "after spawn parameters set":** something like `CustomInitializeAfterAssignment` or a two-phase init. Heavier.
-- **Status quo + better skill guidance:** push harder on the reactive rule, call out the "silent wrong output" failure mode.
-
-Decision needed before picking. The Factory.Create overload feels cleanest but adds surface area.
-
 ## Tweening — Vector2 / Color Helpers
 **Priority: Eventual** — Add `Tween` overloads for `Vector2` and `Color` once real sample code shows the two-tweener-per-value pattern getting verbose. Today users compose two float tweens for a position/color change; not painful enough to justify the API surface yet.
 
