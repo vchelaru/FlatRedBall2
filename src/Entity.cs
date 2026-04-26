@@ -476,6 +476,15 @@ public class Entity : ICollidable, IAttachable
     }
 
     /// <summary>
+    /// Cancels every tween currently owned by this entity. Each tween's value is left frozen
+    /// wherever its curve was last sampled — no terminal snap to the target value, no
+    /// <c>Ended</c> invocation. Matches the no-setter-fired semantics of <see cref="FlatRedBall.Glue.StateInterpolation.Tweener.Stop"/>
+    /// and the auto-cleanup that runs during <see cref="Destroy"/>. Safe to call when no tweens
+    /// are active.
+    /// </summary>
+    public void StopAllTweens() => _tweens.Clear();
+
+    /// <summary>
     /// Returns <c>true</c> if any shape attached to this entity (recursively, through child
     /// entities) overlaps <paramref name="other"/>. Shapes excluded from default collision
     /// via <see cref="SetDefaultCollision"/> or <c>isDefaultCollision: false</c> are skipped.

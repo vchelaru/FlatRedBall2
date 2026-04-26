@@ -28,6 +28,15 @@ public interface ICollidable
     float BroadPhaseRadius { get; }
 
     /// <summary>
+    /// Returns whether <paramref name="worldPoint"/> lies inside this shape (boundary inclusive).
+    /// Implemented on primitive shapes (<see cref="AxisAlignedRectangle"/>, <see cref="Circle"/>,
+    /// <see cref="Polygon"/>) for hit-testing — e.g. <c>cursor.IsOver(shape)</c>. The default
+    /// implementation returns <c>false</c>; aggregate types (<see cref="Entity"/>,
+    /// <see cref="TileShapeCollection"/>) are tested via dedicated entry points instead.
+    /// </summary>
+    bool Contains(Vector2 worldPoint) => false;
+
+    /// <summary>
     /// Tests whether this object overlaps <paramref name="other"/>.
     /// </summary>
     /// <remarks>

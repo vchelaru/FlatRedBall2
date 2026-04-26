@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Input;
@@ -185,4 +186,18 @@ public class Cursor : ICursor
 
     /// <inheritdoc/>
     public bool SecondaryDoubleClick => _secondaryDoubleClick;
+
+    /// <inheritdoc/>
+    public bool IsOver(ICollidable shape) => shape.Contains(WorldPosition);
+
+    /// <inheritdoc/>
+    public bool IsOver(Entity entity)
+    {
+        var world = WorldPosition;
+        foreach (var leaf in Entity.GetLeafShapes(entity))
+        {
+            if (leaf.Contains(world)) return true;
+        }
+        return false;
+    }
 }
