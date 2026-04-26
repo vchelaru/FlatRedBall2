@@ -59,6 +59,22 @@ Or follow the distro-specific package instructions at https://learn.microsoft.co
 
 After restarting, run `dotnet --version` to confirm you see `10.x`.
 
+### Visual C++ 2013 Redistributable (Windows only)
+
+The MonoGame content pipeline compiles shaders using `libmojoshader_64.dll`, which depends on the **Visual C++ 2013 Redistributable (x64)**. Without it, the first build that touches a shader fails with:
+
+```
+Unable to load DLL 'libmojoshader_64.dll' or one of its dependencies.
+```
+
+Many dependencies (e.g. Apos.Shapes) ship `.fx` files that trigger this on first build, even before you've added any shaders of your own. Easiest install (one-time):
+
+```
+winget install Microsoft.VCRedist.2013.x64
+```
+
+Or download `vcredist_x64.exe` from https://www.microsoft.com/download/details.aspx?id=40784. macOS and Linux are unaffected.
+
 ## Quick Start
 
 Install the project template once (re-run before each new project to pick up template updates):
@@ -88,11 +104,11 @@ dotnet run
 
 > **Why `cd YourGameName.Desktop`?** `dotnet tool restore` installs the MGCB content pipeline tool, and the tool manifest (`.config/dotnet-tools.json`) only lives in that subdirectory. Running `dotnet tool restore` from the solution root silently does nothing.
 
-A window should open showing a solid black background — that's an empty `GameScreen` running the game loop (the camera's default `BackgroundColor` is black). If you see that, everything works.
+A window should open showing the text "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
 
 ### Next steps
 
-- Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code goes. `CustomInitialize` runs once when the screen starts; `CustomActivity` runs every frame.
+- Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code goes. `CustomInitialize` runs once when the screen starts (it's where the placeholder label is created — delete that block once you start building your own game); `CustomActivity` runs every frame.
 - For complete examples of real games, browse the [`samples/`](samples/) directory of **this repository** (not your project). Each sample is a runnable project demonstrating different engine features.
 - For task-specific guidance (entities, collision, animation, etc.), see [`ai-reference/`](ai-reference/) — Markdown guides written for AI assistants but readable by humans too.
 
