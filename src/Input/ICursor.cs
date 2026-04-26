@@ -1,4 +1,5 @@
 using System.Numerics;
+using FlatRedBall2.Collision;
 
 namespace FlatRedBall2.Input;
 
@@ -72,4 +73,16 @@ public interface ICursor
     /// pause / time-scaling do not affect detection.
     /// </summary>
     System.TimeSpan DoubleClickThreshold { get; set; }
+
+    /// <summary>
+    /// Returns whether <see cref="WorldPosition"/> lies inside <paramref name="shape"/>.
+    /// Convenience wrapper for click-to-target hit-testing.
+    /// </summary>
+    bool IsOver(ICollidable shape) => shape.Contains(WorldPosition);
+
+    /// <summary>
+    /// Returns whether <see cref="WorldPosition"/> lies inside any of <paramref name="entity"/>'s
+    /// default-collision shapes. Sub-entity shapes are included recursively.
+    /// </summary>
+    bool IsOver(Entity entity);
 }

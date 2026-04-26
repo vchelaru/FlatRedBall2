@@ -89,6 +89,14 @@ public class Circle : IAttachable, IRenderable, ICollidable
     }
 
     /// <inheritdoc/>
+    public bool Contains(Vector2 worldPoint)
+    {
+        float dx = worldPoint.X - AbsoluteX;
+        float dy = worldPoint.Y - AbsoluteY;
+        return dx * dx + dy * dy <= Radius * Radius;
+    }
+
+    /// <inheritdoc/>
     public bool CollidesWith(ICollidable other)
         => CollisionDispatcher.GetSeparationVector(this, other) != Vector2.Zero;
 

@@ -113,6 +113,14 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     }
 
     /// <inheritdoc/>
+    public bool Contains(Vector2 worldPoint)
+    {
+        float hw = Width / 2f, hh = Height / 2f;
+        return worldPoint.X >= AbsoluteX - hw && worldPoint.X <= AbsoluteX + hw
+            && worldPoint.Y >= AbsoluteY - hh && worldPoint.Y <= AbsoluteY + hh;
+    }
+
+    /// <inheritdoc/>
     public bool CollidesWith(ICollidable other)
         => CollisionDispatcher.CollidesWith(this, other);
 

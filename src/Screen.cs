@@ -248,6 +248,16 @@ public class Screen
     /// </summary>
     protected virtual bool ShouldAdvanceTweens => true;
 
+    /// <summary>
+    /// Cancels every tween currently owned by this screen. Each tween's value is left frozen
+    /// wherever its curve was last sampled — no terminal snap to the target value, no
+    /// <c>Ended</c> invocation. Matches the no-setter-fired semantics of <see cref="FlatRedBall.Glue.StateInterpolation.Tweener.Stop"/>
+    /// and the auto-cleanup that runs during screen teardown. Does not touch tweens owned by
+    /// individual entities — call <see cref="Entity.StopAllTweens"/> on those. Safe to call
+    /// when no tweens are active.
+    /// </summary>
+    public void StopAllTweens() => _tweens.Clear();
+
     // Pause state
 
     /// <summary>

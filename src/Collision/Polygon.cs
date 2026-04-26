@@ -494,6 +494,35 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     private static float RayCross(Vec2 a, Vec2 b) => a.X * b.Y - a.Y * b.X;
 
     /// <inheritdoc/>
+    /// <remarks>Concave polygons are handled correctly: the test runs against the original
+    /// (possibly concave) outline rather than the convex decomposition.</remarks>
+    public bool Contains(Vector2 worldPoint)
+    {
+        if (_points.Count < 3) return false;
+
+        float angle = AbsoluteRotation.Radians;
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+        var worldPts = ComputeWorldPoints(cos, sin);
+
+        // Standard horizontal-ray crossing test (Jordan curve theorem). Boundary points may
+        // return either result depending on floating-point noise; that's acceptable for cursor
+        // hit-testing and matches the looseness in Circle/AARect's <= boundary check.
+        bool inside = false;
+        for (int i = 0, j = worldPts.Length - 1; i < worldPts.Length; j = i++)
+        {
+            var pi = worldPts[i];
+            var pj = worldPts[j];
+            if (((pi.Y > worldPoint.Y) != (pj.Y > worldPoint.Y)) &&
+                (worldPoint.X < (pj.X - pi.X) * (worldPoint.Y - pi.Y) / (pj.Y - pi.Y) + pi.X))
+            {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    /// <inheritdoc/>
     public bool CollidesWith(ICollidable other)
         => CollisionDispatcher.GetSeparationVector(this, other) != Vector2.Zero;
 
