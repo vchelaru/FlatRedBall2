@@ -45,9 +45,7 @@ public class Player : Entity, IPlatformerEntity
         {
             Y = 16f,
         };
-        var animations = AnimationChainListSave
-            .FromFile("Content/Animations/PlayerAnimations.achx")
-            .ToAnimationChainList(Engine.Content);
+        var animations = Engine.Content.LoadAnimationChainList("Content/Animations/PlayerAnimations.achx");
         _sprite.AnimationChains = animations;
         Add(_sprite);
         _body = new AxisAlignedRectangle

@@ -39,6 +39,13 @@ public class ContentManagerService
     /// </summary>
     internal Func<string, Texture2D> TextureLoader { get; set; }
 
+    // Single I/O seam for every loader that reads bytes through this service: textures, .achx,
+    // Adobe atlas XML, future .tmx / .gum / etc. Production default is TitleContainer.OpenStream
+    // (resolves against the title location on every backend — working dir on DesktopGL,
+    // HTTP fetch on Blazor). Tests swap in an in-memory provider per service instance, so two
+    // tests running in parallel can't trample each other.
+    internal Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
+
     /// <summary>
     /// Per-texture in-place reloader. Given the live tracked texture and a source path,
     /// loads the new file and calls <c>SetData</c> on the existing instance if the
@@ -174,7 +181,7 @@ public class ContentManagerService
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        using var stream = XnaTitleContainer.OpenStream(path);
+        using var stream = StreamProvider(path);
         return Texture2D.FromStream(_graphicsDevice, stream);
     }
 
@@ -182,7 +189,7 @@ public class ContentManagerService
     {
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
-        using var stream = XnaTitleContainer.OpenStream(path);
+        using var stream = StreamProvider(path);
         using var incoming = Texture2D.FromStream(_graphicsDevice, stream);
         if (incoming.Width != existing.Width || incoming.Height != existing.Height)
             return false;

@@ -59,19 +59,18 @@ public class AnimationChainListSave
     [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
-    // Test seam — and the layer that routes .achx reads through TitleContainer instead of File.IO,
-    // so the same code path works on backends without a filesystem (KNI Blazor / WASM).
-    // TitleContainer.OpenStream resolves relative paths against the title location on every
-    // backend: the working directory on DesktopGL, an HTTP fetch on Blazor.
-    internal static Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
-
     /// <summary>
-    /// Deserializes a .achx file from the title container (project content folder).
+    /// Deserializes a .achx file. Production code should prefer
+    /// <c>ContentManagerService.LoadAnimationChainList(path)</c>, which routes the read through
+    /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
+    /// overload exists for tooling and tests that work without a <see cref="ContentManagerService"/>.
     /// </summary>
     /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
-    public static AnimationChainListSave FromFile(string filePath)
+    /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
+    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider = null)
     {
-        using var stream = StreamProvider(filePath);
+        streamProvider ??= XnaTitleContainer.OpenStream;
+        using var stream = streamProvider(filePath);
         var serializer = new XmlSerializer(typeof(AnimationChainListSave));
         var result = (AnimationChainListSave)serializer.Deserialize(stream)!;
         // Store the path as-given so ToAnimationChainList can resolve sibling textures

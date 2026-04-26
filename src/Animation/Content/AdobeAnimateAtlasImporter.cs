@@ -36,14 +36,18 @@ public class AdobeAnimateAtlasSave
     [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
-    // Test seam — and the layer that routes atlas XML reads through TitleContainer instead of
-    // File.IO, so the same code path works on backends without a filesystem (KNI Blazor / WASM).
-    internal static Func<string, Stream> StreamProvider { get; set; } = XnaTitleContainer.OpenStream;
-
-    /// <summary>Deserializes an Adobe Animate TextureAtlas XML file from the title container.</summary>
-    public static AdobeAnimateAtlasSave FromFile(string filePath)
+    /// <summary>
+    /// Deserializes an Adobe Animate TextureAtlas XML file. Production code should prefer
+    /// <c>ContentManagerService.LoadAdobeAnimateAtlas(path, frameRate)</c>, which routes the read
+    /// through the service's stream seam. This overload exists for tooling and tests that work
+    /// without a <see cref="FlatRedBall2.ContentManagerService"/>.
+    /// </summary>
+    /// <param name="filePath">Path to the atlas XML, relative to the title container.</param>
+    /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
+    public static AdobeAnimateAtlasSave FromFile(string filePath, Func<string, Stream>? streamProvider = null)
     {
-        using var stream = StreamProvider(filePath);
+        streamProvider ??= XnaTitleContainer.OpenStream;
+        using var stream = streamProvider(filePath);
         var serializer = new XmlSerializer(typeof(AdobeAnimateAtlasSave));
         var result = (AdobeAnimateAtlasSave)serializer.Deserialize(stream)!;
         // Store the path as-given so ToAnimationChainList can resolve the sibling PNG via
