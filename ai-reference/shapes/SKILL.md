@@ -17,6 +17,8 @@ FlatRedBall2 has three built-in shape types: `AxisAlignedRectangle`, `Circle`, a
 | `Circle` | `Radius` | |
 | `Polygon` | `Points`, `Rotation` | Use factory methods to create |
 
+> **Exposing a shape from an Entity:** make the field a public auto-property (`public Circle Circle { get; private set; }`) and let callers write `entity.Circle.Color = ...` directly. Do not wrap it in a forwarding property like `FillColor` — that pattern silently fails when assigned after `CustomInitialize`. See `entities-and-factories` → `references/reactive-properties.md`.
+
 ## Step 1: Create a Shape
 
 ```csharp

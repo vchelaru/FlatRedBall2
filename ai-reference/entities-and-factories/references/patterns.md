@@ -14,6 +14,52 @@ private void SpawnWall(float x, float y, float w, float h)
 }
 ```
 
+For property design (when to write a property vs expose a child shape), see `reactive-properties.md`.
+
+## Render-Only Shape Children (`isDefaultCollision: false`)
+
+Pass `isDefaultCollision: false` to `Add` to attach a shape (`AxisAlignedRectangle`, `Circle`, `Polygon`) for rendering and positioning only — it will not participate in `CollidesWith` or any standard collision relationship. Useful for visual indicators like attack ranges, sight cones, or HUD-style overlays attached to an entity.
+
+```csharp
+// Visual range indicator — renders but never collides by default
+var range = new Circle { Radius = 64f, IsFilled = false, IsVisible = true };
+Add(range, isDefaultCollision: false);
+```
+
+This overload requires `ICollidable`; it does not exist for `Sprite`. For non-collision renderables like `Sprite`, use plain `Add(child)`.
+
+Toggle participation at runtime with `SetDefaultCollision` (idempotent — safe to call repeatedly):
+
+```csharp
+SetDefaultCollision(range, true);   // include in default collision
+SetDefaultCollision(range, false);  // exclude from default collision
+```
+
+"Default collision" is the set of shapes checked by standard collision relationships. A shape excluded from default collision can still be targeted explicitly when per-shape collision targeting is supported.
+
+## Solid-Grid Factories (`IsSolidGrid`)
+
+For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AxisAlignedRectangle` child's `RepositionDirections` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapeCollection` does for tile grids, but for entity factories.
+
+Cell size is inferred from the first entity's body; mismatched sizes throw. `TileMap.CreateEntities` automatically wraps its spawn loop in the factory's grid batch so RD is recomputed once at the end. For hand-authored bulk spawns, wrap the loop in `using (factory.BeginGridBatch()) { … }` — without batching, `Create` can't compute cell indices because `X`/`Y` aren't set until after `Create` returns.
+
+## Spawning Entities from Within Another Entity
+
+Use `Engine.GetFactory<T>()` to spawn from inside an entity's `CustomActivity`. Throws `InvalidOperationException` if no factory for `T` exists yet on the screen.
+
+```csharp
+// Player.cs — spawns a Ball on Space press
+public override void CustomActivity(FrameTime time)
+{
+    if (Engine.Input.Keyboard.WasKeyPressed(Keys.Space))
+    {
+        var ball = Engine.GetFactory<Ball>().Create();
+        ball.X = X; ball.Y = Y;
+        ball.VelocityY = 300f;
+    }
+}
+```
+
 ## Destroy and Spawn (Death Effects)
 
 When an entity should trigger a visual effect on destruction, destroy it immediately and spawn a separate effect entity at the same position. Do not try to play an effect on the dying entity — once destroyed it is removed from the game.
