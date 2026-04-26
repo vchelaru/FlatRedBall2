@@ -46,7 +46,7 @@ Tweens freeze while `Screen.IsPaused` is true, alongside the rest of the Activit
 - **Setter fires twice on the completing frame.** The upstream `Tweener` fires `PositionChanged` with a near-`to` value, then the wrapper invokes the setter once more with exactly `to` so the final value is precise. Fine for plain assignment (`v => X = v`). If your setter has side effects, guard them.
 - **`PositionChanged` is assigned, not subscribed.** The wrapper wires it with `=`. Additional listeners must use `+=` after `Tween(...)` returns.
 - **`Ended` is an event.** Use `+=`. Fires once, after the final setter call, only if the tween completes (not on `Stop()`).
-- **Vector2 / Color = multiple tweeners.** v1 is float-only. Start two or three tweeners and let each drive one component, or drive one tween and project in the setter (`v => Position = Vector2.Lerp(from, to, v)`).
+- **Vector2 and Color have native overloads.** No need to compose multiple float tweens. `Color` defaults to `ColorTweenMode.Rgb` (channel-wise lerp, matches `Color.Lerp`); pass `ColorTweenMode.Hsv` for shortest-arc hue interpolation when you want a vivid sweep (e.g. red→blue passes through magenta, not gray).
 
 ---
 

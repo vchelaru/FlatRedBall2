@@ -1,7 +1,30 @@
 using System;
 using FlatRedBall.Glue.StateInterpolation;
+using FlatRedBall2.Rendering;
+using Microsoft.Xna.Framework;
 
 namespace FlatRedBall2.Tweening;
+
+/// <summary>
+/// Selects how RGB color channels are interpolated by the <see cref="Color"/> tween overloads.
+/// </summary>
+public enum ColorTweenMode
+{
+    /// <summary>
+    /// Lerp each RGBA channel linearly. Matches <see cref="Color.Lerp(Color, Color, float)"/>.
+    /// Cheapest mode and the natural choice for fades to/from black/white/transparent. Hue
+    /// transitions through desaturated (gray) midtones — fine for similar colors, muddy for
+    /// hue-distant pairs (e.g. red→blue passes through gray, not magenta).
+    /// </summary>
+    Rgb,
+
+    /// <summary>
+    /// Convert endpoints to HSV, lerp saturation/value/alpha linearly, and lerp hue along the
+    /// shortest arc on the hue circle. Use for vivid hue sweeps where you want red→blue to
+    /// pass through magenta rather than through gray.
+    /// </summary>
+    Hsv,
+}
 
 /// <summary>
 /// Entry points for tweening floats on <see cref="Entity"/> and <see cref="Screen"/>.
@@ -143,6 +166,116 @@ public static class TweeningExtensions
         var tweener = CreateBump(setter, restValue, amplitude, duration, curve);
         screen._tweens.Add(tweener, setter, restValue);
         return tweener;
+    }
+
+    /// <summary>
+    /// <see cref="Vector2"/>-valued tween. Drives a single underlying float tweener
+    /// <c>0 → 1</c> and lerps between <paramref name="from"/> and <paramref name="to"/>
+    /// each frame. The setter receives exactly <paramref name="to"/> on natural completion.
+    /// All other semantics — pause behavior, <see cref="Tweener.Stop"/>, lifecycle cleanup —
+    /// match the float overload.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Tweener Tween(
+        this Entity entity,
+        Action<Vector2> setter,
+        Vector2 from,
+        Vector2 to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return entity.Tween(t => setter(Vector2.Lerp(from, to, t)),
+            0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Screen-scoped <see cref="Vector2"/> tween. See the entity overload for semantics.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Tweener Tween(
+        this Screen screen,
+        Action<Vector2> setter,
+        Vector2 from,
+        Vector2 to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return screen.Tween(t => setter(Vector2.Lerp(from, to, t)),
+            0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// <see cref="Color"/>-valued tween. <paramref name="mode"/> selects RGB (default) vs HSV
+    /// blending — see <see cref="ColorTweenMode"/>. The setter receives exactly
+    /// <paramref name="to"/> on natural completion in both modes.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Tweener Tween(
+        this Entity entity,
+        Action<Color> setter,
+        Color from,
+        Color to,
+        TimeSpan duration,
+        ColorTweenMode mode = ColorTweenMode.Rgb,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        var lerp = BuildColorLerp(from, to, mode);
+        return entity.Tween(t => setter(lerp(t)), 0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Screen-scoped <see cref="Color"/> tween. See the entity overload for semantics.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Tweener Tween(
+        this Screen screen,
+        Action<Color> setter,
+        Color from,
+        Color to,
+        TimeSpan duration,
+        ColorTweenMode mode = ColorTweenMode.Rgb,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        var lerp = BuildColorLerp(from, to, mode);
+        return screen.Tween(t => setter(lerp(t)), 0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Builds a <c>t → Color</c> closure for the chosen <see cref="ColorTweenMode"/>. HSV
+    /// converts both endpoints once, up front, so per-frame work is just lerps. Hue uses the
+    /// shortest arc on the hue circle (a red→blue tween crosses magenta, not gray).
+    /// </summary>
+    private static Func<float, Color> BuildColorLerp(Color from, Color to, ColorTweenMode mode)
+    {
+        if (mode == ColorTweenMode.Rgb)
+            return t => Color.Lerp(from, to, t);
+
+        var (h1, s1, v1) = from.ToHsv();
+        var (h2, s2, v2) = to.ToHsv();
+        // Shortest-arc hue: if the two hues are more than 180 degrees apart on the unbroken
+        // [0, 360) circle, shift one by 360 so the linear lerp crosses the short way.
+        if (h2 - h1 > 180f) h1 += 360f;
+        else if (h1 - h2 > 180f) h2 += 360f;
+        float a1 = from.A;
+        float a2 = to.A;
+
+        return t =>
+        {
+            float h = h1 + (h2 - h1) * t;
+            float s = s1 + (s2 - s1) * t;
+            float v = v1 + (v2 - v1) * t;
+            float a = a1 + (a2 - a1) * t;
+            var rgb = Colors.FromHsv(h, s, v);
+            return new Color(rgb.R, rgb.G, rgb.B, (byte)System.Math.Round(a));
+        };
     }
 
     private static Tweener CreateBump(

@@ -43,4 +43,34 @@ public static class Colors
             (byte)System.Math.Round((b + m) * 255f),
             (byte)255);
     }
+
+    /// <summary>
+    /// Converts a <see cref="Color"/> to its HSV representation. Hue is in degrees [0, 360);
+    /// saturation and value are in [0, 1]. Alpha is not represented in HSV — read it from
+    /// <see cref="Color.A"/> separately if needed.
+    /// </summary>
+    /// <remarks>
+    /// Inverse of <see cref="FromHsv"/> up to byte rounding (round-tripping a color may shift
+    /// each channel by at most one byte). Achromatic colors (R == G == B) report a hue of 0.
+    /// </remarks>
+    public static (float hue, float saturation, float value) ToHsv(this Color color)
+    {
+        float r = color.R / 255f;
+        float g = color.G / 255f;
+        float b = color.B / 255f;
+
+        float max = System.Math.Max(r, System.Math.Max(g, b));
+        float min = System.Math.Min(r, System.Math.Min(g, b));
+        float delta = max - min;
+
+        float hue;
+        if (delta == 0f)        hue = 0f;
+        else if (max == r)      hue = 60f * (((g - b) / delta) % 6f);
+        else if (max == g)      hue = 60f * (((b - r) / delta) + 2f);
+        else                    hue = 60f * (((r - g) / delta) + 4f);
+        if (hue < 0f) hue += 360f;
+
+        float saturation = max == 0f ? 0f : delta / max;
+        return (hue, saturation, max);
+    }
 }
