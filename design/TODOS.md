@@ -4,16 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## "Fire and Forget" Entities
-**Priority: Discussion — not starting yet.** Concept placeholder. Short-lived entities spawned purely for visual effect — particles, hit sparks, dust puffs, explosion debris, floating damage numbers, muzzle flashes — that the spawner doesn't want a reference to and doesn't need to query. They exist, play out their animation/tween/lifetime, and self-destruct. Goal: make this pattern ergonomic so gameplay code can say "spawn a poof here" in one line without hand-rolling lifetime bookkeeping every time, and without polluting factories/collision relationships meant for gameplay-relevant entities.
-
-Open questions for the future discussion:
-- Dedicated base class / interface vs. just a convention on top of existing `Entity` + `Timing`?
-- Pooling story (particles are the canonical case where allocation churn matters)?
-- Should these participate in collision at all, or be pure visual?
-- Relationship to a future particle system vs. one-off effect entities — same abstraction or different?
-- Spawn API shape: extension on `Screen`/`Entity`? A `FireAndForgetFactory<T>`? A helper like `Effects.Spawn<T>(x, y)`?
-
 ## Tween from Mid-Curve ("Pulse/Bump" from Rest)
 **Priority: Eventual** — Use case: a circle sits at its resting radius, gets poked, and should "bump" — grow past rest and settle back via elastic-out — without first snapping to a smaller value. Today an elastic-out tween from `rest → rest+10` starts at `rest` and overshoots *above* `rest+10`, not below it. What the user wants is the *tail half* of an elastic curve: as if the animation had already played the wind-up and is catching the second half of the oscillation. Conceptually this is "start a tween at t=0.5 (or some other phase) of its curve," with the visible value beginning exactly at the current rest value. Surfaced by `AutoEvalCollisionEnterExitSample` 2026-04-22 while designing the damage-tile pulse reaction.
 

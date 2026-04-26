@@ -93,6 +93,21 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 
 `factory.Destroy(entity)` is equivalent. **Fields are invalid after `Destroy()`** — don't read state on an entity you just destroyed; use `factory.Instances.Count == 0` to detect when all are gone.
 
+## Fire-and-Forget Effects
+
+For short-lived visual entities the spawner doesn't want to keep a reference to — explosions, hit sparks, dust puffs, falling enemy bodies, damage numbers — skip the subclass and factory entirely. `Screen.CreateFireAndForget` builds and registers a one-shot `Entity` with a `Sprite` child and self-destroys when the animation finishes (or after a duration for the texture overload).
+
+```csharp
+// Plays once and destroys on AnimationFinished — IsLooping is forced to false
+var fx = CreateFireAndForget(_explosionAchx, "Explode", x, y);
+
+// Static texture for `duration` seconds, then destroys
+var num = CreateFireAndForget(_damageTex, x, y, duration: 0.5f);
+num.VelocityY = 60f;
+```
+
+The returned `Entity` is fully wired — set `Velocity`/`Acceleration`, `AttachTo` a parent, or `Add` shapes for collision before the next frame. Use a real `Entity` subclass + `Factory<T>` instead when the effect needs gameplay logic, queryable state, or a looping animation with timed cleanup.
+
 ## Entity.Name
 
 Optional `string?` for identifying entities in tests and diagnostics. `SceneSnapshot.Named("player")` matches case-insensitively. Has no effect on collision, rendering, or lifecycle.
