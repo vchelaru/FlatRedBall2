@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AESettingsSave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <OffsetMultiplier>1</OffsetMultiplier>
+  <AnimationChainSettings />
+  <ExpandedNode>WalkRight</ExpandedNode>
+  <ExpandedNode>WalkLeft</ExpandedNode>
+  <ExpandedNode>FallRight</ExpandedNode>
+  <ExpandedNode>ClimbIdle</ExpandedNode>
+  <ExpandedNode>ClimbMove</ExpandedNode>
+  <UnitType>Pixel</UnitType>
+  <SnapToGrid>true</SnapToGrid>
+  <GridSize>32</GridSize>
+</AESettingsSave>

@@ -1,0 +1,18 @@
+{
+  "movement": {
+    "ground": {
+      "MaxSpeedX": 50,
+      "AccelerationTimeX": 0.1,
+      "DecelerationTimeX": 0.1,
+      "Gravity": 700,
+      "MaxFallSpeed": 800
+    },
+    "air": {
+      "MaxSpeedX": 50,
+      "AccelerationTimeX": 0.1,
+      "DecelerationTimeX": 0.1,
+      "Gravity": 700,
+      "MaxFallSpeed": 800
+    }
+  }
+}
