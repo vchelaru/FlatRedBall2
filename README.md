@@ -98,6 +98,12 @@ Scaffold a new game. Pick a name (we'll use `YourGameName` below) and run from a
 dotnet new frb2-desktop -n YourGameName
 ```
 
+By default the new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs) so an AI assistant can reference them immediately. To start with an empty `Content/` folder instead:
+
+```
+dotnet new frb2-desktop -n YourGameName --IncludeStarterContent false
+```
+
 This creates a `YourGameName/` folder containing two C# projects:
 
 - `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
