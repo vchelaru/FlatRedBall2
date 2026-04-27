@@ -73,6 +73,30 @@ public class EntityTests
     }
 
     [Fact]
+    public void Destroy_FiresDestroyedEvent()
+    {
+        var entity = new Entity();
+        bool fired = false;
+        entity.Destroyed += () => fired = true;
+
+        entity.Destroy();
+
+        fired.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Destroy_DestroyedEvent_FiresAfterCustomDestroy()
+    {
+        var entity = new DestroyTrackingEntity();
+        bool customDestroyRanFirst = false;
+        entity.Destroyed += () => customDestroyRanFirst = entity.WasDestroyed;
+
+        entity.Destroy();
+
+        customDestroyRanFirst.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Destroy_RemovesFromParentsChildren()
     {
         var parent = new Entity();

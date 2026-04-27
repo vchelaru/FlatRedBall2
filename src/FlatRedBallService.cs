@@ -261,6 +261,19 @@ public class FlatRedBallService
 
         CurrentScreen = screen;
         screen.CustomInitialize();
+
+        // Snap every CameraControllingEntity to its target now that CustomInitialize has
+        // wired up Targets. Without this, frame 1's lazy-spawn tick runs against the camera's
+        // default (0, 0) — Screen.Update calls lazy-spawn before any entity CustomActivity,
+        // and CameraControllingEntity's first-frame Immediate snap lives in CustomActivity.
+        // Hard-coupled to the type rather than via a virtual hook because this is the only
+        // entity that needs a post-init lifecycle moment; rule of 3, generalize when a second
+        // case appears.
+        foreach (var entity in screen.Entities)
+        {
+            if (entity is Entities.CameraControllingEntity cam && cam.Targets.Count > 0)
+                cam.ForceToTarget();
+        }
     }
 
     private void ApplyCameraSettingsFrom(DisplaySettings source)

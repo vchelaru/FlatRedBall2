@@ -208,6 +208,150 @@ public class TileMapCreateEntitiesTests
     // Fresh-load repeat — removal is per-load (in-memory), not persisted across reloads
     // ============================================================================================
 
+    // ============================================================================================
+    // Lazy spawn — factory opts in via LazySpawn != Disabled
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_LazyMode_DoesNotSpawnImmediately()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created.Count.ShouldBe(0);
+        factory.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_StillRemovesSourceTilesAtLoad()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        tileMap.CreateEntities("Coin", factory);
+
+        var liveLayer = (TilemapTileLayer)tilemap.Layers[0];
+        liveLayer.GetTile(1, 2).HasValue.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_ManagerSpawnsAtRecordedPosition()
+    {
+        // Tile (1, 2) on a 4x4 16-px map: bottom-left at (16, _y - 48); center at (24, _y - 40).
+        // _y defaults to 0 → world position (24, -40).
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        tileMap.CreateEntities("Coin", factory);
+        // Activation rect that overlaps (24, -40)
+        tileMap.LazySpawnManager.Update(left: 0f, right: 100f, bottom: -100f, top: 100f);
+
+        factory.Count.ShouldBe(1);
+        factory[0].X.ShouldBe(24f);
+        factory[0].Y.ShouldBe(-40f);
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_CustomPropertiesAppliedAtSpawnTime()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            placements: System.Array.Empty<(int, int, int)>());
+
+        var objLayer = new TilemapObjectLayer("Entities");
+        var tileObj = new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16, 16));
+        tileObj.Properties.SetString("Tag", "ruby");
+        objLayer.AddObject(tileObj);
+        tilemap.Layers.Add(objLayer);
+
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<TaggedEntity>(screen);
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        tileMap.CreateEntities("Coin", factory);
+
+        // Before spawn: nothing exists yet, so reflection cannot have run.
+        factory.Count.ShouldBe(0);
+
+        // Activate the rect to spawn.
+        tileMap.LazySpawnManager.Update(-100f, 100f, -100f, 100f);
+
+        factory.Count.ShouldBe(1);
+        factory[0].Tag.ShouldBe("ruby");
+    }
+
+    private class TaggedEntity : Entity
+    {
+        public string? Tag { get; set; }
+    }
+
+    [Fact]
+    public void CreateEntities_ConfigureCallback_RunsAfterTiledPropertiesInEagerMode()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var tileObj = new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16, 16));
+        tileObj.Properties.SetString("Tag", "from-tiled");
+        objLayer.AddObject(tileObj);
+        tilemap.Layers.Add(objLayer);
+
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<TaggedEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory,
+            configure: e => e.Tag = e.Tag + "+configured");
+
+        created.Count.ShouldBe(1);
+        created[0].Tag.ShouldBe("from-tiled+configured");
+    }
+
+    [Fact]
+    public void CreateEntities_ConfigureCallback_RunsAtSpawnTimeInLazyMode()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        int configureCalls = 0;
+        tileMap.CreateEntities("Coin", factory, configure: _ => configureCalls++);
+
+        configureCalls.ShouldBe(0);
+
+        tileMap.LazySpawnManager.Update(-100f, 100f, -100f, 100f);
+
+        configureCalls.ShouldBe(1);
+    }
+
     [Fact]
     public void CreateEntities_FreshLoadAfterRemoval_FindsTilesAgain()
     {

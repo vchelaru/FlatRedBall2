@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Tiled;
 
 namespace FlatRedBall2;
 
@@ -86,6 +87,11 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// Default is <c>false</c> — factories that don't opt in behave exactly as before with zero
     /// overhead.
     /// </para>
+    /// <para>
+    /// <b>Do not combine with <see cref="LazySpawn"/>.</b> Seam-suppression is computed when each
+    /// cell is added; lazy spawn means neighbors don't exist yet at insertion, so the adjacency
+    /// state ends up wrong. Solid-grid factories must populate eagerly.
+    /// </para>
     /// </remarks>
     public bool IsSolidGrid { get; set; }
 
@@ -133,6 +139,33 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// Set to <c>null</c> (default) to disable sorting and broad-phase for this factory.
     /// </summary>
     public Axis? PartitionAxis { get; set; }
+
+    /// <summary>
+    /// Controls SNES-style lazy-spawn behavior when this factory is the target of
+    /// <see cref="Tiled.TileMap.CreateEntities{T}"/>. Default <see cref="LazySpawnMode.Disabled"/>
+    /// preserves the eager-instantiate behavior — every Tiled placement spawns at TMX load.
+    /// <para>
+    /// <see cref="LazySpawnMode.OneShot"/> and <see cref="LazySpawnMode.Reloadable"/> defer spawn
+    /// until the camera's activation rect (camera bounds expanded by <see cref="LazySpawnBuffer"/>)
+    /// reaches the placement. This setting is ignored by direct <see cref="Create()"/> calls — only
+    /// the TileMap-driven spawn path consults it.
+    /// </para>
+    /// <para>
+    /// <b>Do not combine with <see cref="IsSolidGrid"/>.</b> Solid-grid factories precompute
+    /// neighbor seam-suppression at the moment each cell is added; lazy spawn means neighbors
+    /// haven't been created yet when an entity comes in, so adjacency is wrong (interior faces
+    /// stay reposition-active and produce visible seams under collision response). Use lazy
+    /// spawn for enemies, pickups, and one-off props; keep <c>IsSolidGrid</c> factories eager.
+    /// </para>
+    /// </summary>
+    public LazySpawnMode LazySpawn { get; set; } = LazySpawnMode.Disabled;
+
+    /// <summary>
+    /// World-unit margin added to the activation rect on all four sides for lazy-spawn checks.
+    /// Default 0. Use a positive value (e.g. half a tile) to spawn entities slightly before they
+    /// scroll into view. Ignored when <see cref="LazySpawn"/> is <see cref="LazySpawnMode.Disabled"/>.
+    /// </summary>
+    public float LazySpawnBuffer { get; set; }
 
     void IFactory.SortForPartition()
     {

@@ -266,6 +266,14 @@ public class Entity : ICollidable, IAttachable
     // from its owning container without requiring a back-reference to the factory or screen.
     internal Action? _onDestroy;
 
+    /// <summary>
+    /// Raised at the end of <see cref="Destroy"/>, after <see cref="CustomDestroy"/>, child
+    /// teardown, and factory/screen unregistration have completed. The entity is fully torn
+    /// down when this fires — use it as an external observer hook (e.g., a spawn manager that
+    /// needs to re-arm when a tracked entity dies).
+    /// </summary>
+    public event Action? Destroyed;
+
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
@@ -487,6 +495,7 @@ public class Entity : ICollidable, IAttachable
         _children.Clear();
         _shapes.Clear();
         _onDestroy?.Invoke();
+        Destroyed?.Invoke();
     }
 
     /// <summary>

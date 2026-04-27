@@ -31,14 +31,14 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 - **Runtime tile mutation API on `TileShapeCollection`.** `SetTile(col, row, tileIndex?)` and `RemoveTile(col, row)` that update both the rendered tile layer and the collision shapes atomically. Currently unclear whether a partial path exists; audit before designing.
 - Together these enable: `?`→used-block swap, brick break (remove tile + spawn rubble entity), powerup-from-block (spawn entity above the bumped cell).
 
-## Entity Virtualization (Activity Culling)
-**Priority: Soon** — Today every registered entity ticks every frame regardless of camera distance. SMB-style level density (dozens of enemies, item blocks, projectiles spread across a long level) requires off-screen entities to skip activity. Should be a first-class engine concern, not a per-game pattern.
+## Split-Screen Support
+**Priority: Discuss** — `Screen` exposes a single `Camera` today. Local-multiplayer games (couch co-op platformer, versus brawler) need multiple cameras drawing into separate viewports of the same window. This is a cross-cutting concern that touches rendering, lazy-spawn activation rects, input/cursor mapping, and any system that today reads `Screen.Camera` as if there were one.
 
 Sketch:
-- Per-entity `IsActive` (or similar) gate consulted by the engine activity loop.
-- Region-based virtualization: a culling rectangle (typically derived from the camera plus margin) controls activation. Entities outside it skip `CustomActivity` and possibly collision.
-- "Spawn when region enters" pattern for not-yet-instantiated content (Tiled-defined enemies that only come alive once the camera approaches).
-- Open question: opt-in per entity type, or default-on with opt-out for entities that must always tick (camera controllers, music managers, persistent world state).
+- `Screen.Cameras` (list) alongside the existing `Camera` (kept for backward compat — points at `Cameras[0]`).
+- Per-camera `Viewport` rectangle in screen space; render pipeline iterates cameras and re-runs the draw pass per viewport.
+- `LazySpawnManager.Update` — accept the union (or repeated calls) of multiple cameras' world rects so placements activate when *any* camera reaches them.
+- Audit every `Camera.X/Y/Left/Right/...` read in engine code for "which camera?" semantics.
 
 ## Copy Empty Content Templates on FRB2 Template Install
 **Priority: Discuss** — `.claude/templates/` ships starter assets (`AnimationChains/Empty.achx`, `PlatformerAnimations.achx`, `TopDownAnimations.achx`, `Tiled/base.tmx`, `StandardTileset.tsx`, `PlatformerConfig/player.platformer.json`, `TopDownConfig/player.topdown.json`). Today these are AI-discoverable scaffolds inside the engine repo, but a user installing FRB2 templates (`dotnet new install`) gets none of them — every new project starts with a blank Content folder and the AI has to recreate the same files from scratch.
