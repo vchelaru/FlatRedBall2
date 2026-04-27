@@ -13,6 +13,11 @@ namespace FlatRedBall2.Movement;
 /// and the jump fields are read; gravity and slope fields are ignored. While airborne the slope
 /// fields are also ignored (they apply only to grounded motion).
 /// </para>
+/// <para>
+/// Duration fields are <see cref="TimeSpan"/>, matching the engine-wide convention (see
+/// <see cref="TimeManager"/>). Set them with <c>TimeSpan.FromSeconds(0.1)</c> — a bare
+/// <c>0.1f</c> will not compile.
+/// </para>
 /// </summary>
 public class PlatformerValues
 {

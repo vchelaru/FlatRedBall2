@@ -4,6 +4,11 @@ namespace FlatRedBall2.Movement;
 
 /// <summary>
 /// Defines the movement characteristics (speed, acceleration, deceleration, etc.) for top-down entities.
+/// <para>
+/// Duration fields are <see cref="TimeSpan"/>, matching the engine-wide convention (see
+/// <see cref="TimeManager"/>). Set them with <c>TimeSpan.FromSeconds(0.1)</c> — a bare
+/// <c>0.1f</c> will not compile.
+/// </para>
 /// </summary>
 public class TopDownValues
 {
