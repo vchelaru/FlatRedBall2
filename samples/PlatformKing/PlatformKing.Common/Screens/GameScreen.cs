@@ -58,14 +58,20 @@ public class GameScreen : Screen
         // solid grid lets the collision system short-circuit spatial queries.
         _boxFactory.IsSolidGrid = true;
 
+        // Enemies spawn lazily as the camera reaches them and respawn on re-entry after
+        // they've been destroyed (SMW-style). Buffer = 32 px so they're alive a beat before
+        // the player can see them. Boxes stay eager — IsSolidGrid precomputes neighbor
+        // seam-suppression at spawn time, which assumes all cells exist up-front.
+        _enemyFactory.LazySpawn = LazySpawnMode.Reloadable;
+        _enemyFactory.LazySpawnBuffer = 32f;
+
         // Spawn entities from object layers.
         map.CreateEntities("BreakableCollision", _boxFactory);
-        var enemies = map.CreateEntities("EnemyFlag", _enemyFactory, Origin.BottomCenter);
-        foreach (var enemy in enemies)
+        map.CreateEntities("EnemyFlag", _enemyFactory, Origin.BottomCenter, configure: enemy =>
         {
             enemy.SolidCollision = _solid;
             enemy.JumpThroughCollision = _jumpThrough;
-        }
+        });
         map.CreateEntities("Door", _doorFactory, Origin.BottomCenter);
 
         var players = map.CreateEntities("PlayerFlag", _playerFactory, Origin.BottomCenter);
@@ -112,6 +118,12 @@ public class GameScreen : Screen
                 int nextLevel = 1 - LevelIndex;
                 MoveToScreen<GameScreen>(s => s.LevelIndex = nextLevel);
             };
+    }
+
+    public override void CustomActivity(FrameTime time)
+    {
+        Overlay.Text(_enemyFactory.Count.ToString());
+        base.CustomActivity(time);
     }
 
 }

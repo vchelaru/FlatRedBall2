@@ -67,6 +67,15 @@ public class TileMap
     // reflects the new tile data without the caller needing to rewire collision relationships.
     private readonly List<TrackedCollection> _trackedCollections = new();
 
+    /// <summary>
+    /// Owns lazy-spawn records produced by <see cref="CreateEntities{T}"/> when the target
+    /// factory has <see cref="Factory{T}.LazySpawn"/> set to a non-<see cref="LazySpawnMode.Disabled"/>
+    /// value. Tick this each frame with the camera's activation rect (or register the tilemap
+    /// with a <see cref="Screen"/> via <c>Screen.Add(tileMap)</c>, which schedules the tick
+    /// automatically).
+    /// </summary>
+    public LazySpawnManager LazySpawnManager { get; } = new LazySpawnManager();
+
     private readonly record struct TrackedCollection(
         Func<TilemapTileData, bool> Predicate,
         string? LayerName,
@@ -337,12 +346,26 @@ public class TileMap
     /// load re-applies the removal. Pass <c>false</c> to keep the source tile visible (e.g.,
     /// the tile is both a spawn marker and intentional background art).
     /// </param>
-    /// <returns>The created entities.</returns>
+    /// <param name="configure">
+    /// Optional callback invoked on each spawned entity after position assignment and Tiled
+    /// custom-property reflection have run. Use this to wire references the entity needs at
+    /// runtime (collision collections, target references, etc.). With
+    /// <see cref="Factory{T}.LazySpawn"/> set, the callback is replayed each time the placement
+    /// spawns (deferred to camera-reaches-rect; replayed again per re-spawn in
+    /// <see cref="LazySpawnMode.Reloadable"/>) — so each fresh instance gets fresh wiring.
+    /// </param>
+    /// <returns>
+    /// In eager mode (<see cref="Factory{T}.LazySpawn"/> is <see cref="LazySpawnMode.Disabled"/>),
+    /// the entities created during this call. In lazy mode the list is empty — entities don't
+    /// exist yet. Iterate <see cref="Factory{T}.Instances"/> on the factory to find live
+    /// instances at any later moment.
+    /// </returns>
     public IReadOnlyList<T> CreateEntities<T>(
         string className,
         Factory<T> factory,
         Origin origin = Origin.Center,
-        bool removeSourceTiles = true)
+        bool removeSourceTiles = true,
+        Action<T>? configure = null)
         where T : Entity, new()
     {
         if (_tilemap == null)
@@ -360,10 +383,10 @@ public class TileMap
             switch (layer)
             {
                 case TilemapObjectLayer objectLayer:
-                    ScanObjectLayer(objectLayer, className, origin, factory, entityProps, created, removeSourceTiles);
+                    ScanObjectLayer(objectLayer, className, origin, factory, entityProps, created, removeSourceTiles, configure);
                     break;
                 case TilemapTileLayer tileLayer:
-                    ScanTileLayer(tileLayer, className, origin, factory, created, removeSourceTiles);
+                    ScanTileLayer(tileLayer, className, origin, factory, created, removeSourceTiles, configure);
                     break;
             }
         }
@@ -379,10 +402,12 @@ public class TileMap
         Factory<T> factory,
         Dictionary<string, PropertyInfo> entityProps,
         List<T> created,
-        bool removeSourceTiles) where T : Entity, new()
+        bool removeSourceTiles,
+        Action<T>? configure) where T : Entity, new()
     {
         // Collect matches first so we can mutate the layer's object list after iteration.
         List<TilemapTileObject>? toRemove = null;
+        bool lazy = factory.LazySpawn != LazySpawnMode.Disabled;
 
         foreach (var obj in objectLayer.Objects)
         {
@@ -393,12 +418,28 @@ public class TileMap
                 continue;
 
             var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
-            var entity = factory.Create();
-            entity.X = worldX;
-            entity.Y = worldY;
 
-            ApplyCustomProperties(entity, tileObj.Properties, entityProps);
-            created.Add(entity);
+            if (lazy)
+            {
+                // Snapshot the property bag now — the live TilemapProperties is owned by the
+                // tile object, which removeSourceTiles is about to drop. The snapshot keeps the
+                // record self-contained for replay at spawn time.
+                var capturedProps = SnapshotProperties(tileObj.Properties);
+                LazySpawnManager.Add(factory, worldX, worldY, applyAfterInit: e =>
+                {
+                    ApplyCapturedProperties(e, capturedProps, entityProps);
+                    configure?.Invoke(e);
+                });
+            }
+            else
+            {
+                var entity = factory.Create();
+                entity.X = worldX;
+                entity.Y = worldY;
+                ApplyCustomProperties(entity, tileObj.Properties, entityProps);
+                configure?.Invoke(entity);
+                created.Add(entity);
+            }
 
             if (removeSourceTiles)
                 (toRemove ??= new List<TilemapTileObject>()).Add(tileObj);
@@ -415,10 +456,12 @@ public class TileMap
         Origin origin,
         Factory<T> factory,
         List<T> created,
-        bool removeSourceTiles) where T : Entity, new()
+        bool removeSourceTiles,
+        Action<T>? configure) where T : Entity, new()
     {
         int tw = _tileWidth;
         int th = _tileHeight;
+        bool lazy = factory.LazySpawn != LazySpawnMode.Disabled;
 
         for (int row = 0; row < tileLayer.Height; row++)
         {
@@ -441,15 +484,54 @@ public class TileMap
 
                 var (worldX, worldY) = OriginOffset(bottomLeftX, bottomLeftY, tw, th, origin);
 
-                var entity = factory.Create();
-                entity.X = worldX;
-                entity.Y = worldY;
-                // Tile layers have no per-cell custom properties — skip reflection mapping.
-                created.Add(entity);
+                if (lazy)
+                {
+                    LazySpawnManager.Add(factory, worldX, worldY, applyAfterInit: configure);
+                }
+                else
+                {
+                    var entity = factory.Create();
+                    entity.X = worldX;
+                    entity.Y = worldY;
+                    // Tile layers have no per-cell custom properties — skip reflection mapping.
+                    configure?.Invoke(entity);
+                    created.Add(entity);
+                }
 
                 if (removeSourceTiles)
                     tileLayer.SetTile(col, row, null);
             }
+        }
+    }
+
+    private static Dictionary<string, TilemapPropertyValue> SnapshotProperties(TilemapProperties src)
+    {
+        var copy = new Dictionary<string, TilemapPropertyValue>(src.Count);
+        foreach (var kvp in src)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    private static void ApplyCapturedProperties<T>(
+        T entity,
+        Dictionary<string, TilemapPropertyValue> captured,
+        Dictionary<string, PropertyInfo> entityProps) where T : Entity
+    {
+        if (captured.Count == 0) return;
+        foreach (var (name, propInfo) in entityProps)
+        {
+            if (!captured.TryGetValue(name, out var tiledValue))
+                continue;
+            object? converted = propInfo.PropertyType switch
+            {
+                Type t when t == typeof(string) => tiledValue.AsString(),
+                Type t when t == typeof(int) => tiledValue.AsInt(),
+                Type t when t == typeof(float) => tiledValue.AsFloat(),
+                Type t when t == typeof(bool) => tiledValue.AsBool(),
+                _ => null,
+            };
+            if (converted != null)
+                propInfo.SetValue(entity, converted);
         }
     }
 

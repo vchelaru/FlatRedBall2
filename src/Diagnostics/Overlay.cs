@@ -248,9 +248,18 @@ public class Overlay
     /// </returns>
     public Label Text(string text, float worldX, float worldY)
     {
-        var screenPos = _screen.Camera.WorldToScreen(new Vector2(worldX, worldY));
-        float zoom = _screen.Camera.Zoom;
-        return PlaceLabel(text, screenPos.X / zoom, screenPos.Y / zoom);
+        var (canvasX, canvasY) = WorldToCanvas(_screen.Camera, worldX, worldY);
+        return PlaceLabel(text, canvasX, canvasY);
+    }
+
+    // Converts a world-space point to Gum-canvas units (origin top-left, Y+ down) for the
+    // current camera. The canvas spans (0, 0) at Camera.Left/Top to
+    // (OrthogonalWidth/Zoom, OrthogonalHeight/Zoom) at Camera.Right/Bottom — i.e. canvas
+    // units == world units within the visible area, just origin-shifted and Y-flipped.
+    // Internal so tests can verify the math without constructing a Gum Label.
+    internal static (float canvasX, float canvasY) WorldToCanvas(Camera camera, float worldX, float worldY)
+    {
+        return (worldX - camera.Left, camera.Top - worldY);
     }
 
     /// <summary>

@@ -162,13 +162,18 @@ public class Screen
     private readonly Dictionary<GraphicalUiElement, GumRenderable> _gumByVisual = new();
 
     /// <summary>
-    /// Adds all visual layers of a <see cref="TileMap"/> to this screen's render list.
+    /// Adds all visual layers of a <see cref="TileMap"/> to this screen's render list and
+    /// registers the map's <see cref="TileMap.LazySpawnManager"/> for per-frame ticking
+    /// against this screen's camera. Lazy-spawn placements registered before or after this
+    /// call will fire when the camera reaches them.
     /// Individual layer Z values and visibility are respected.
     /// </summary>
     public void Add(TileMap map, Layer? layer = null)
     {
         foreach (var mapLayer in map.Layers)
             Add(mapLayer, layer);
+        if (!_lazySpawnSources.Contains(map))
+            _lazySpawnSources.Add(map);
     }
 
     /// <summary>
@@ -178,9 +183,12 @@ public class Screen
     /// </summary>
     public void Add(TileMapLayer mapLayer, Layer? layer = null)
     {
+        if (mapLayer.Renderable == null) return;
         mapLayer.Renderable.Layer = layer ?? Layer;
         _renderList.Add(mapLayer.Renderable);
     }
+
+    private readonly List<TileMap> _lazySpawnSources = new();
 
     /// <summary>
     /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.
@@ -704,6 +712,14 @@ public class Screen
                 entity.PhysicsUpdate(frameTime);
 
             Camera.PhysicsUpdate(frameTime.DeltaSeconds);
+
+            // 1.25 Lazy-spawn: tick each enrolled tilemap against the current camera rect so
+            //      placements that just scrolled into view spawn their entities BEFORE the
+            //      partition sort and collision pass — entities are visible to broad-phase on
+            //      the same frame they spawn.
+            for (int i = 0; i < _lazySpawnSources.Count; i++)
+                _lazySpawnSources[i].LazySpawnManager.Update(
+                    Camera.Left, Camera.Right, Camera.Bottom, Camera.Top);
 
             // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
             Engine?.SortPartitionedFactories();
