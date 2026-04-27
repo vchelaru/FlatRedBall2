@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "PlatformKing.BlazorGL",
   "resources": {
-    "hash": "sha256-79cTtAEOsrzzCFtJmaWkRKJWby+lFJRT3yv7KMdQVks=",
+    "hash": "sha256-SyrrmYDIvWgrLKnpcBbpeuZ0NGns/ORzowQcC28AdtE=",
     "jsModuleNative": {
       "dotnet.native.js": "sha256-A16ka545FHaB+QXjyJ4exXh7XpBAAIFnX8YkC4xAng8="
     },
@@ -118,10 +118,10 @@
       "System.wasm": "sha256-25KTxVbx+rD8S9iyUye7jmbj1e4TZ5Ca+elup4oegJA=",
       "netstandard.wasm": "sha256-xueTN+aXWMbKSLBhlLAOISIzxlnfK+B1SSvBMZ9iST8=",
       "System.Private.CoreLib.wasm": "sha256-LalTVzqEX8D5AsNjzYB6TgBW5VvkIlmoiWI9zpGz6MA=",
-      "FlatRedBall2.BlazorGL.wasm": "sha256-zrt1EWaKAneTlPjkgmHJMtQFpk31w8mz1kFiaOMzqgs=",
-      "FlatRedBall2.wasm": "sha256-cMH/o/SbX0uPnQTpiTZGRYAe1/p+KqStBi0Zrj0CbhQ=",
-      "PlatformKing.Common.wasm": "sha256-C4hovubhUD+3rmuOR3b6NPqIi2R+oldmNLGLCm2SFtk=",
-      "PlatformKing.BlazorGL.wasm": "sha256-ffEEsqjhFJm5X4v9qbJ2ayl5Ln29ii7Mb2xaVNczSjQ="
+      "FlatRedBall2.BlazorGL.wasm": "sha256-5Nx3V6iPSet4u3iJeBO7SRIQ/3vfxwyg61Nv+TGwnvE=",
+      "FlatRedBall2.wasm": "sha256-k+EphzODMfHisB24pfk+2LEQ8AOAyPSB9j8XRIgcyvE=",
+      "PlatformKing.Common.wasm": "sha256-2KUBNhit6X1aGxBg7/exiFXbskwtlz+ixPq+6zqn3X0=",
+      "PlatformKing.BlazorGL.wasm": "sha256-Xqwdaf3s3wLCNweUFgbkKw8ZfG8lzC96EC0k+1JRcTk="
     }
   },
   "cacheBootResources": true,
