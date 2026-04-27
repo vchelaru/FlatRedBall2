@@ -94,6 +94,8 @@ public static class PlatformerConfigExtensions
         if (slot.ClimbingSpeed.HasValue) values.ClimbingSpeed = slot.ClimbingSpeed.Value;
         if (slot.AccelerationTimeX.HasValue) values.AccelerationTimeX = TimeSpan.FromSeconds(slot.AccelerationTimeX.Value);
         if (slot.DecelerationTimeX.HasValue) values.DecelerationTimeX = TimeSpan.FromSeconds(slot.DecelerationTimeX.Value);
+        if (slot.CoyoteTime.HasValue) values.CoyoteTime = TimeSpan.FromSeconds(slot.CoyoteTime.Value);
+        if (slot.JumpInputBufferDuration.HasValue) values.JumpInputBufferDuration = TimeSpan.FromSeconds(slot.JumpInputBufferDuration.Value);
 
         // Gravity must be applied before SetJumpHeights — SetJumpHeights throws if Gravity is not positive.
         if (slot.Gravity.HasValue) values.Gravity = slot.Gravity.Value;

@@ -386,6 +386,29 @@ public class PlatformerConfigTests
     }
 
     [Fact]
+    public void FromJsonString_CoyoteTimeAndJumpBuffer_ConvertToTimeSpan()
+    {
+        var json = """
+        {
+          "movement": {
+            "ground": {
+              "Gravity": 1500,
+              "CoyoteTime": 0.1,
+              "JumpInputBufferDuration": 0.15
+            }
+          }
+        }
+        """;
+        var config = PlatformerConfig.FromJsonString(json);
+        var behavior = new PlatformerBehavior();
+
+        config.ApplyTo(behavior);
+
+        behavior.GroundMovement!.CoyoteTime.ShouldBe(TimeSpan.FromSeconds(0.1));
+        behavior.GroundMovement.JumpInputBufferDuration.ShouldBe(TimeSpan.FromSeconds(0.15));
+    }
+
+    [Fact]
     public void FromJsonString_UnknownTopLevelKeys_LoadsWithoutError()
     {
         // leftSuffix/rightSuffix/animations are not consumed by the loader but may appear in

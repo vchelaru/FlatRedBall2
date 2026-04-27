@@ -146,4 +146,12 @@ public class MovementSlot
 
     /// <summary>Overrides <see cref="PlatformerValues.CanFallThroughOneWayCollision"/>.</summary>
     public bool? CanFallThroughOneWayCollision { get; set; }
+
+    /// <summary>Overrides <see cref="PlatformerValues.CoyoteTime"/>. Authored as seconds in JSON,
+    /// converted to <see cref="TimeSpan"/> on apply.</summary>
+    public double? CoyoteTime { get; set; }
+
+    /// <summary>Overrides <see cref="PlatformerValues.JumpInputBufferDuration"/>. Authored as
+    /// seconds in JSON, converted to <see cref="TimeSpan"/> on apply.</summary>
+    public double? JumpInputBufferDuration { get; set; }
 }

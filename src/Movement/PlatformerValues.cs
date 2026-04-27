@@ -41,6 +41,8 @@ public class PlatformerValues
         DownhillMaxSpeedSlope = 60f;
         DownhillMaxSpeedMultiplier = 1.5f;
         CanFallThroughOneWayCollision = true;
+        CoyoteTime = TimeSpan.Zero;
+        JumpInputBufferDuration = TimeSpan.Zero;
     }
 
     /// <summary>
@@ -222,4 +224,34 @@ public class PlatformerValues
     /// jump, and airborne Down has no effect on one-way relationships.
     /// </summary>
     public bool CanFallThroughOneWayCollision { get; set; } = true;
+
+    /// <summary>
+    /// How long after walking off a ledge the player can still press jump and have it interpreted
+    /// as a ground jump. Standard platformer-feel forgiveness — without it, a press one frame
+    /// after the ledge edge does nothing. Read from the ground slot
+    /// (<see cref="PlatformerBehavior.GroundMovement"/>, falling back to
+    /// <see cref="PlatformerBehavior.AirMovement"/>) at the moment ground is lost; the climbing
+    /// slot's value is unused. Default <see cref="TimeSpan.Zero"/> preserves the strict
+    /// "must be grounded" check.
+    /// <para>
+    /// <b>Gravity is NOT suspended during the coyote window.</b> The character begins falling
+    /// immediately when ground is lost; only the jump-press *interpretation* window is extended.
+    /// This matches standard platformer convention (Celeste, Hollow Knight) — typical values of
+    /// 80–150ms produce imperceptible fall distance, while a "freeze gravity" implementation
+    /// would read as a visible hover bug.
+    /// </para>
+    /// </summary>
+    public TimeSpan CoyoteTime;
+
+    /// <summary>
+    /// How long before landing a jump press is remembered and consumed on the landing frame.
+    /// Standard platformer-feel forgiveness — without it, a press one frame before landing does
+    /// nothing. Read from the ground slot the entity lands into
+    /// (<see cref="PlatformerBehavior.GroundMovement"/>, falling back to
+    /// <see cref="PlatformerBehavior.AirMovement"/>); the climbing slot's value is unused. A
+    /// buffered press is consumed by the landing-frame ground jump only — it does not also
+    /// trigger an air double-jump in between. Default <see cref="TimeSpan.Zero"/> preserves the
+    /// strict "press exactly on landing frame" check.
+    /// </summary>
+    public TimeSpan JumpInputBufferDuration;
 }
