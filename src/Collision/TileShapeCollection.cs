@@ -481,43 +481,20 @@ public class TileShapeCollection : ICollidable
         tile.RepositionDirections = dirs;
     }
 
-    // Computes SuppressedEdges for the polygon tile at (col, row).
-    // An edge is suppressed if both its vertices lie along a cell boundary
-    // that borders an occupied cell (rect or polygon).
+    // Sets RepositionDirections on the polygon tile at (col, row) based on cardinal
+    // neighbor occupancy. A neighbor on a side blocks push in that direction so SAT
+    // won't shove the mover across the seam into the neighbor.
     private void UpdatePolygonEdges(int col, int row)
     {
         if (!_polyTiles.TryGetValue((col, row), out var poly)) return;
 
-        float cellLeft   = X + col * GridSize;
-        float cellRight  = X + (col + 1) * GridSize;
-        float cellBottom = Y + row * GridSize;
-        float cellTop    = Y + (row + 1) * GridSize;
+        var dirs = RepositionDirections.All;
+        if (_tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row))) dirs &= ~RepositionDirections.Left;
+        if (_tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row))) dirs &= ~RepositionDirections.Right;
+        if (_tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1))) dirs &= ~RepositionDirections.Down;
+        if (_tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1))) dirs &= ~RepositionDirections.Up;
 
-        bool hasLeft  = _tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row));
-        bool hasRight = _tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row));
-        bool hasDown  = _tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1));
-        bool hasUp    = _tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1));
-
-        int suppressed = 0;
-        const float eps = 1e-3f;
-
-        for (int i = 0; i < poly.Points.Count; i++)
-        {
-            // World-space vertex positions (polygon has no rotation in tile grids)
-            float ax = poly.X + poly.Points[i].X;
-            float ay = poly.Y + poly.Points[i].Y;
-            int next = (i + 1) % poly.Points.Count;
-            float bx = poly.X + poly.Points[next].X;
-            float by = poly.Y + poly.Points[next].Y;
-
-            // Check if both vertices lie along a cell boundary
-            if (hasLeft  && MathF.Abs(ax - cellLeft)   < eps && MathF.Abs(bx - cellLeft)   < eps) suppressed |= 1 << i;
-            if (hasRight && MathF.Abs(ax - cellRight)  < eps && MathF.Abs(bx - cellRight)  < eps) suppressed |= 1 << i;
-            if (hasDown  && MathF.Abs(ay - cellBottom) < eps && MathF.Abs(by - cellBottom) < eps) suppressed |= 1 << i;
-            if (hasUp    && MathF.Abs(ay - cellTop)    < eps && MathF.Abs(by - cellTop)    < eps) suppressed |= 1 << i;
-        }
-
-        poly.SuppressedEdges = suppressed;
+        poly.RepositionDirections = dirs;
     }
 
     // Recomputes RepositionDirections for every sub-cell rect in (col, row) by finding, for each
@@ -827,7 +804,7 @@ public class TileShapeCollection : ICollidable
                     if (slopeMode == SlopeCollisionMode.PlatformerFloor && IsFloorLikePolygon(poly))
                         sep = GetHeightmapSeparation(poly, minX, maxX, minY, maxY);
                     else
-                        sep = CollisionDispatcher.GetSeparationVector(shape, poly);
+                        sep = CollisionDispatcher.GetTilePolygonSeparation(shape, poly);
                 }
                 else
                     sep = Vector2.Zero;

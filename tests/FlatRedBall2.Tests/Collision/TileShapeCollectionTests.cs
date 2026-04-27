@@ -384,11 +384,8 @@ public class TileShapeCollectionTests
     }
 
     [Fact]
-    public void AddPolygonTileAtCell_AdjacentRectToRight_SuppressesSharedEdge()
+    public void AddPolygonTileAtCell_AdjacentRectToRight_BlocksRightPushDirection()
     {
-        // Right-triangle slope at cell (0,0): points (-8,-8),(8,-8),(8,8).
-        // Edge 1 connects (8,-8)→(8,8) — the right side, along the right cell boundary.
-        // Rect tile at cell (1,0) makes that edge interior.
         var slope = Polygon.FromPoints(new[]
         {
             new Vector2(-8f, -8f),
@@ -400,13 +397,12 @@ public class TileShapeCollectionTests
         tiles.AddTileAtCell(1, 0);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        // Edge 1 (right side) should be suppressed
-        (poly.SuppressedEdges & (1 << 1)).ShouldNotBe(0,
-            "edge along shared boundary should be suppressed");
+        poly.RepositionDirections.HasFlag(RepositionDirections.Right).ShouldBeFalse(
+            "polygon tile with neighbor on its right should not push movers in +X");
     }
 
     [Fact]
-    public void AddPolygonTileAtCell_NoNeighbor_NoSuppressedEdges()
+    public void AddPolygonTileAtCell_NoNeighbor_AllRepositionDirections()
     {
         var slope = Polygon.FromPoints(new[]
         {
@@ -418,11 +414,12 @@ public class TileShapeCollectionTests
         tiles.AddPolygonTileAtCell(0, 0, slope);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        poly.SuppressedEdges.ShouldBe(0, "lone polygon tile should have no suppressed edges");
+        poly.RepositionDirections.ShouldBe(RepositionDirections.All,
+            "lone polygon tile should allow pushes in every direction");
     }
 
     [Fact]
-    public void RemoveTileAtCell_NeighborRemoved_PolygonEdgeRestored()
+    public void RemoveTileAtCell_NeighborRemoved_PolygonRepositionDirectionsRestored()
     {
         var slope = Polygon.FromPoints(new[]
         {
@@ -436,14 +433,13 @@ public class TileShapeCollectionTests
         tiles.RemoveTileAtCell(1, 0);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        poly.SuppressedEdges.ShouldBe(0,
-            "removing neighbor should restore all polygon edges");
+        poly.RepositionDirections.ShouldBe(RepositionDirections.All,
+            "removing neighbor should restore all polygon push directions");
     }
 
     [Fact]
-    public void AddTileAtCell_NextToExistingPolygon_SuppressesPolygonEdge()
+    public void AddTileAtCell_NextToExistingPolygon_BlocksPolygonPushDirection()
     {
-        // Add polygon first, then add rect neighbor — polygon should update.
         var slope = Polygon.FromPoints(new[]
         {
             new Vector2(-8f, -8f),
@@ -452,13 +448,11 @@ public class TileShapeCollectionTests
         });
         var tiles = new TileShapeCollection { GridSize = 16f };
         tiles.AddPolygonTileAtCell(1, 0, slope);
-        // Edge 0 connects (-8,-8)→(8,-8) — bottom side, along bottom cell boundary.
-        // Adding a rect tile below should suppress it.
         tiles.AddTileAtCell(1, -1);
 
         var poly = tiles.GetPolygonTileAtCell(1, 0)!;
-        (poly.SuppressedEdges & (1 << 0)).ShouldNotBe(0,
-            "bottom edge should be suppressed when neighbor is added below");
+        poly.RepositionDirections.HasFlag(RepositionDirections.Down).ShouldBeFalse(
+            "neighbor below should block downward push from this polygon tile");
     }
 
     // ── AddPolygonTileAtCell ──────────────────────────────────────────────────
@@ -868,6 +862,88 @@ public class TileShapeCollectionTests
         var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 8f, Y = 24f };
 
         tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor).ShouldBe(Vector2.Zero);
+    }
+
+    [Fact]
+    public void GetSeparationFor_Standard_AdjacentSquarePolygonTiles_NoSnagAtSeam()
+    {
+        // Two square polygon tiles at (0,0) and (1,0) form a continuous 32×16 wall.
+        // A 4×8 rect mover sits on top with bottom dipping 4px into the wall and
+        // center X=15 (slightly left of the seam at X=16). Standard SAT against each
+        // polygon individually picks the X axis (overlap=3 vs Y=4) because the
+        // shared interior edge's axis is still live (the opposite outer edge supplies
+        // the same axis even when SuppressedEdges marks the interior edge).
+        // Net effect: a sideways "snag" push at the seam. Expected: pure upward push.
+        var square = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+            new Vector2(-8f,  8f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, square);
+        tiles.AddPolygonTileAtCell(1, 0, square);
+
+        var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 15f, Y = 16f };
+
+        var sep = tiles.GetSeparationFor(rect);
+
+        sep.X.ShouldBe(0f, tolerance: 0.01f,
+            customMessage: "should not snag sideways at the seam between adjacent polygon tiles");
+        sep.Y.ShouldBeGreaterThan(0f, "mover should be pushed up onto the wall surface");
+    }
+
+    [Fact]
+    public void GetSeparationFor_Standard_AdjacentSquarePolygonTiles_CircleMover_NoSnagAtSeam()
+    {
+        // Same wall geometry as the rect-mover test, but a circle mover. Exercises
+        // the filtered SAT path through PolygonVsCircle.
+        var square = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+            new Vector2(-8f,  8f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, square);
+        tiles.AddPolygonTileAtCell(1, 0, square);
+
+        var circle = new Circle { Radius = 3f, X = 15f, Y = 17f };
+
+        var sep = tiles.GetSeparationFor(circle);
+
+        sep.X.ShouldBe(0f, tolerance: 0.01f,
+            customMessage: "circle should not snag sideways at the polygon-tile seam");
+        sep.Y.ShouldBeGreaterThan(0f, "circle should be pushed up onto the wall surface");
+    }
+
+    [Fact]
+    public void GetSeparationFor_Standard_AdjacentSquarePolygonTiles_PolygonMover_NoSnagAtSeam()
+    {
+        // Same wall geometry; mover is a polygon. Exercises the filtered SAT path
+        // through PolygonVsPolygon.
+        var square = Polygon.FromPoints(new[]
+        {
+            new Vector2(-8f, -8f),
+            new Vector2( 8f, -8f),
+            new Vector2( 8f,  8f),
+            new Vector2(-8f,  8f),
+        });
+        var tiles = new TileShapeCollection { GridSize = 16f };
+        tiles.AddPolygonTileAtCell(0, 0, square);
+        tiles.AddPolygonTileAtCell(1, 0, square);
+
+        var moverRect = Polygon.CreateRectangle(4f, 8f);
+        moverRect.X = 15f;
+        moverRect.Y = 16f;
+
+        var sep = tiles.GetSeparationFor(moverRect);
+
+        sep.X.ShouldBe(0f, tolerance: 0.01f,
+            customMessage: "polygon mover should not snag sideways at the polygon-tile seam");
+        sep.Y.ShouldBeGreaterThan(0f, "polygon mover should be pushed up onto the wall surface");
     }
 
     [Fact]

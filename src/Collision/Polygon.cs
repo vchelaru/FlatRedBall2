@@ -37,13 +37,16 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     public IReadOnlyList<Vector2> Points => _points;
 
     /// <summary>
-    /// Bitfield where bit <c>i</c> suppresses edge <c>i</c>'s normal during SAT collision.
-    /// Edge <c>i</c> connects <c>Points[i]</c> to <c>Points[(i+1) % Points.Count]</c>.
-    /// Used by <see cref="TileShapeCollection"/> to eliminate snagging at seams between
-    /// adjacent polygon tiles, analogous to <see cref="AxisAlignedRectangle.RepositionDirections"/>
-    /// for rectangle tiles.
+    /// Cardinal directions in which separation pushes are allowed during SAT collision.
+    /// Set by <see cref="TileShapeCollection"/> based on neighbor occupancy: a polygon
+    /// tile with a neighbor on its right has <see cref="RepositionDirections.Right"/>
+    /// cleared, so SAT will not produce a +X push that would shove the mover into the
+    /// neighbor. Eliminates seam snagging at boundaries between adjacent polygon tiles.
+    /// Per-edge suppression is insufficient because opposite parallel edges share the
+    /// same projection axis — directional filtering on the resulting MTV is the only
+    /// approach that handles concave tile clusters correctly.
     /// </summary>
-    internal int SuppressedEdges { get; set; }
+    internal RepositionDirections RepositionDirections { get; set; } = RepositionDirections.All;
 
     /// <summary>
     /// The convex sub-polygons that tile this polygon's area, in local (unrotated, unpositioned) space.
