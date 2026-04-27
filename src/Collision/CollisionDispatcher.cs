@@ -343,6 +343,174 @@ internal static class CollisionDispatcher
             return new Vector2(0f, lineCenterY < rect.AbsoluteY ? -overlapY : overlapY);
     }
 
+    // Tile-side polygon separation: like GetSeparationVector but filters SAT axes by
+    // the tile's RepositionDirections so an MTV pointing into a neighbor (which would
+    // snag the mover across the seam) is rejected and SAT picks the next-smallest
+    // valid axis. Per-edge suppression is insufficient because opposite parallel
+    // edges share the same axis — only the signed MTV direction is decisive.
+    //
+    // The filtered SAT helpers below (ConvexVsConvexFiltered, ConvexVsAabbPointsFiltered,
+    // ConvexPartVsCircleFiltered) intentionally duplicate the unfiltered variants rather
+    // than threading a `RepositionDirections allowed = All` parameter through the existing
+    // PolygonVsAabb/PolygonVsCircle/PolygonVsPolygon chains. The filter only applies to
+    // tile-side polygons, so adding the parameter to every poly-vs-X path would touch
+    // call sites that don't care about it. If a second consumer of directional filtering
+    // appears, consolidate by threading the parameter and deleting these duplicates.
+    internal static Vector2 GetTilePolygonSeparation(ICollidable shape, Polygon polyTile)
+    {
+        var allowed = polyTile.RepositionDirections;
+        if (allowed == RepositionDirections.All) return GetSeparationVector(shape, polyTile);
+        if (allowed == RepositionDirections.None) return Vector2.Zero;
+
+        return shape switch
+        {
+            AxisAlignedRectangle r => -PolygonVsAabbFiltered(polyTile, r, allowed),
+            Circle c               => -PolygonVsCircleFiltered(polyTile, c, allowed),
+            Polygon p              => PolygonVsPolygonFiltered(p, polyTile, allowed),
+            _                      => Vector2.Zero
+        };
+    }
+
+    private static bool IsAllowedDirection(Vector2 v, RepositionDirections allowed)
+    {
+        if (v.X > 0f && !allowed.HasFlag(RepositionDirections.Right)) return false;
+        if (v.X < 0f && !allowed.HasFlag(RepositionDirections.Left))  return false;
+        if (v.Y > 0f && !allowed.HasFlag(RepositionDirections.Up))    return false;
+        if (v.Y < 0f && !allowed.HasFlag(RepositionDirections.Down))  return false;
+        return true;
+    }
+
+    // Filtered Polygon vs AABB. 'allowed' constrains the shape-side push direction
+    // (not the tile-side MTV direction returned here — they're negations of each other).
+    private static Vector2 PolygonVsAabbFiltered(Polygon poly, AxisAlignedRectangle rect, RepositionDirections allowed)
+    {
+        var rectPoints = GetAabbPoints(rect);
+        Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
+
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
+
+        foreach (var part in GetConvexPartsWorldPoints(poly))
+        {
+            var mtv = ConvexVsAabbPointsFiltered(part, rectPoints, axesRect, allowed);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    private static Vector2 PolygonVsCircleFiltered(Polygon poly, Circle circle, RepositionDirections allowed)
+    {
+        var circleCenter = new Vector2(circle.AbsoluteX, circle.AbsoluteY);
+
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
+
+        foreach (var part in GetConvexPartsWorldPoints(poly))
+        {
+            var mtv = ConvexPartVsCircleFiltered(part, circle, circleCenter, allowed);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    private static Vector2 PolygonVsPolygonFiltered(Polygon mover, Polygon tile, RepositionDirections allowed)
+    {
+        Vector2 bestMtv = Vector2.Zero;
+        float bestMagSq = float.MaxValue;
+
+        foreach (var partMover in GetConvexPartsWorldPoints(mover))
+        foreach (var partTile  in GetConvexPartsWorldPoints(tile))
+        {
+            var mtv = ConvexVsConvexFiltered(partMover, partTile, allowed);
+            if (mtv == Vector2.Zero) continue;
+            float magSq = mtv.LengthSquared();
+            if (magSq < bestMagSq) { bestMagSq = magSq; bestMtv = mtv; }
+        }
+        return bestMtv;
+    }
+
+    // Returned MTV pushes 'a' (the tile-side) — shape-side push is its negation.
+    private static Vector2 ConvexVsAabbPointsFiltered(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect, RepositionDirections allowed)
+    {
+        Vector2 minMtv = Vector2.Zero;
+        float minOverlap = float.MaxValue;
+
+        foreach (var axis in GetAxesFromPoints(part))
+        {
+            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            var candidate = flip ? axis * overlap : -axis * overlap;
+            if (!IsAllowedDirection(-candidate, allowed)) continue;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
+        }
+        foreach (var axis in axesRect)
+        {
+            if (!SatOverlap(part, rectPoints, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            var candidate = flip ? axis * overlap : -axis * overlap;
+            if (!IsAllowedDirection(-candidate, allowed)) continue;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
+        }
+        return minMtv;
+    }
+
+    private static Vector2 ConvexPartVsCircleFiltered(Vector2[] partPoints, Circle circle, Vector2 circleCenter, RepositionDirections allowed)
+    {
+        var axes = new List<Vector2>(GetAxesFromPoints(partPoints));
+        var closest = ClosestPointOnPoly(partPoints, circleCenter);
+        var toCircle = circleCenter - closest;
+        float len = toCircle.Length();
+        if (len > 1e-6f) axes.Add(toCircle / len);
+
+        Vector2 minMtv = Vector2.Zero;
+        float minOverlap = float.MaxValue;
+
+        foreach (var axis in axes)
+        {
+            ProjectPoly(partPoints, axis, out float polyMin, out float polyMax);
+            float circC = Vector2.Dot(circleCenter, axis);
+            float circMin = circC - circle.Radius;
+            float circMax = circC + circle.Radius;
+
+            float overlap = MathF.Min(polyMax, circMax) - MathF.Max(polyMin, circMin);
+            if (overlap <= 0) return Vector2.Zero;
+
+            float polyCenter = (polyMin + polyMax) / 2f;
+            bool flip = polyCenter < circC;
+            var candidate = flip ? -axis * overlap : axis * overlap;
+            // Existing PolygonVsCircle convention: candidate already pushes poly relative to circle;
+            // shape (circle) side is its negation. Match that convention here.
+            if (!IsAllowedDirection(-candidate, allowed)) continue;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
+        }
+        return minMtv;
+    }
+
+    // Returned MTV pushes the mover (first arg). Shape-side push equals MTV directly.
+    private static Vector2 ConvexVsConvexFiltered(Vector2[] mover, Vector2[] tile, RepositionDirections allowed)
+    {
+        Vector2 minMtv = Vector2.Zero;
+        float minOverlap = float.MaxValue;
+
+        foreach (var axis in GetAxesFromPoints(mover))
+        {
+            if (!SatOverlap(mover, tile, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            var candidate = flip ? axis * overlap : -axis * overlap;
+            if (!IsAllowedDirection(candidate, allowed)) continue;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
+        }
+        foreach (var axis in GetAxesFromPoints(tile))
+        {
+            if (!SatOverlap(mover, tile, axis, out float overlap, out bool flip)) return Vector2.Zero;
+            var candidate = flip ? axis * overlap : -axis * overlap;
+            if (!IsAllowedDirection(candidate, allowed)) continue;
+            if (overlap < minOverlap) { minOverlap = overlap; minMtv = candidate; }
+        }
+        return minMtv;
+    }
+
     // Polygon vs Polygon — iterate convex parts of each, return minimum-magnitude MTV.
     private static Vector2 PolygonVsPolygon(Polygon a, Polygon b)
     {

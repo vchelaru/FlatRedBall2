@@ -7,13 +7,6 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 ## AnimationFrame Pivot / Origin Support
 **Priority: Eventual** — `AdobeAnimateAtlasSave` parses `pivotX`/`pivotY` per-SubTexture but discards them because `AnimationFrame` has no pivot field. Adobe Animate exports use pivots to keep a character's anchor (e.g. feet) stable across frames of different sizes. Overlaps semantically with the existing `RelativeX`/`RelativeY`, so pick one model: either have the Adobe importer convert pivot → `RelativeX/Y` at load time (no new field; sprites already obey RelativeX/Y) or add true per-frame pivot. The conversion path is probably simpler. Revisit when the first real Adobe-Animate-authored entity lands.
 
-## Polygon Snagging in Top-Down (Standard mode)
-**Priority: Eventual** — `TileShapeCollection` in `SlopeCollisionMode.Standard` can still snag at seams between adjacent polygon tiles when used for top-down angled walls.
-
-- `Polygon.SuppressedEdges` bitfield exists but isn't wired into SAT correctly (opposite edges share the same axis, so edge-level suppression during SAT doesn't eliminate the axis)
-- Consider a post-process MTV filter analogous to rectangles' `ComputeDirectionalSeparation`, or a different approach entirely
-- Tests removed when we deferred this; re-add when addressed
-
 ## Multi-Backend Support (MonoGame / FNA / KNI) and Native AOT
 **Priority: Eventual** — currently targets MonoGame.Framework.DesktopGL only.
 
