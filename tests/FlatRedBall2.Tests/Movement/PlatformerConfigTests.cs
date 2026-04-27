@@ -13,7 +13,7 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "afterDoubleJump": { "MaxSpeedX": 120, "Gravity": 1500, "minJumpHeight": 32 }
+            "afterDoubleJump": { "maxSpeedX": 120, "gravity": 1500, "minJumpHeight": 32 }
           }
         }
         """;
@@ -31,18 +31,18 @@ public class PlatformerConfigTests
         var firstJson = """
         {
           "movement": {
-            "ground":          { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
-            "air":             { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
-            "afterDoubleJump": { "MaxSpeedX": 160, "Gravity": 1500, "JumpVelocity": 300 },
-            "climbing":        { "MaxSpeedX": 80,  "ClimbingSpeed": 100, "JumpVelocity": 200 }
+            "ground":          { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32 },
+            "air":             { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32 },
+            "afterDoubleJump": { "maxSpeedX": 160, "gravity": 1500, "jumpVelocity": 300 },
+            "climbing":        { "maxSpeedX": 80,  "climbingSpeed": 100, "jumpVelocity": 200 }
           }
         }
         """;
         var secondJson = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
-            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+            "ground": { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 },
+            "air":    { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 }
           }
         }
         """;
@@ -66,16 +66,16 @@ public class PlatformerConfigTests
         var firstJson = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32, "SlopeSnapDistance": 4 },
-            "air":    { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 }
+            "ground": { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32, "slopeSnapDistance": 4 },
+            "air":    { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32 }
           }
         }
         """;
         var secondJson = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
-            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+            "ground": { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 },
+            "air":    { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 }
           }
         }
         """;
@@ -96,16 +96,16 @@ public class PlatformerConfigTests
         var firstJson = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 },
-            "air":    { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 32 }
+            "ground": { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32 },
+            "air":    { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 32 }
           }
         }
         """;
         var secondJson = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 },
-            "air":    { "MaxSpeedX": 40, "Gravity": 200, "minJumpHeight": 12 }
+            "ground": { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 },
+            "air":    { "maxSpeedX": 40, "gravity": 200, "minJumpHeight": 12 }
           }
         }
         """;
@@ -128,8 +128,8 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 48 },
-            "air":    { "MaxSpeedX": 100, "Gravity": 1500 }
+            "ground": { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 48 },
+            "air":    { "maxSpeedX": 100, "gravity": 1500 }
           }
         }
         """;
@@ -149,7 +149,7 @@ public class PlatformerConfigTests
     public void FromJsonString_AccelerationTimeXInSeconds_ConvertsToTimeSpan()
     {
         var json = """
-        { "movement": { "ground": { "Gravity": 1500, "AccelerationTimeX": 0.25, "DecelerationTimeX": 0.5 } } }
+        { "movement": { "ground": { "gravity": 1500, "accelerationTimeX": 0.25, "decelerationTimeX": 0.5 } } }
         """;
         var config = PlatformerConfig.FromJsonString(json);
         var behavior = new PlatformerBehavior();
@@ -166,7 +166,7 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500, "minJumpHeight": 48, "JumpVelocity": 300 }
+            "ground": { "gravity": 1500, "minJumpHeight": 48, "jumpVelocity": 300 }
           }
         }
         """;
@@ -183,7 +183,7 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500, "minJumpHeight": 48, "maxJumpHeight": 96 }
+            "ground": { "gravity": 1500, "minJumpHeight": 48, "maxJumpHeight": 96 }
           }
         }
         """;
@@ -202,7 +202,7 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500, "minJumpHeight": 48 }
+            "ground": { "gravity": 1500, "minJumpHeight": 48 }
           }
         }
         """;
@@ -218,7 +218,7 @@ public class PlatformerConfigTests
     [Fact]
     public void FromJsonString_OmittedFields_FallBackToPlatformerValuesDefaults()
     {
-        var json = """{ "movement": { "ground": { "MaxSpeedX": 160 } } }""";
+        var json = """{ "movement": { "ground": { "maxSpeedX": 160 } } }""";
         var config = PlatformerConfig.FromJsonString(json);
         var behavior = new PlatformerBehavior();
 
@@ -237,10 +237,10 @@ public class PlatformerConfigTests
         {
           "movement": {
             "ground": {
-              "Gravity": 1500,
-              "JumpVelocity": 420,
-              "JumpApplyLength": 0.15,
-              "JumpApplyByButtonHold": true
+              "gravity": 1500,
+              "jumpVelocity": 420,
+              "jumpApplyLength": 0.15,
+              "jumpApplyByButtonHold": true
             }
           }
         }
@@ -267,8 +267,8 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
-            "air":    { "Gravity": 800 }
+            "ground": { "gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
+            "air":    { "gravity": 800 }
           }
         }
         """;
@@ -287,8 +287,8 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
-            "air":    { "Gravity": 800 }
+            "ground": { "gravity": 4400, "minJumpHeight": 24, "maxJumpHeight": 84 },
+            "air":    { "gravity": 800 }
           }
         }
         """;
@@ -311,8 +311,8 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500 },
-            "air":    { "Gravity": 900, "minJumpHeight": 20, "maxJumpHeight": 60 }
+            "ground": { "gravity": 1500 },
+            "air":    { "gravity": 900, "minJumpHeight": 20, "maxJumpHeight": 60 }
           }
         }
         """;
@@ -331,7 +331,7 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500, "minJumpHeight": 48, "maxJumpHeight": 96 }
+            "ground": { "gravity": 1500, "minJumpHeight": 48, "maxJumpHeight": 96 }
           }
         }
         """;
@@ -349,8 +349,8 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground": { "Gravity": 1500, "JumpVelocity": 420, "JumpApplyLength": 0.15 },
-            "air":    { "Gravity": 800 }
+            "ground": { "gravity": 1500, "jumpVelocity": 420, "jumpApplyLength": 0.15 },
+            "air":    { "gravity": 800 }
           }
         }
         """;
@@ -369,9 +369,9 @@ public class PlatformerConfigTests
         var json = """
         {
           "movement": {
-            "ground":   { "MaxSpeedX": 160, "Gravity": 1500, "minJumpHeight": 48 },
-            "air":      { "MaxSpeedX": 100, "Gravity": 1500 },
-            "climbing": { "MaxSpeedX": 80, "ClimbingSpeed": 120 }
+            "ground":   { "maxSpeedX": 160, "gravity": 1500, "minJumpHeight": 48 },
+            "air":      { "maxSpeedX": 100, "gravity": 1500 },
+            "climbing": { "maxSpeedX": 80, "climbingSpeed": 120 }
           }
         }
         """;
@@ -392,9 +392,9 @@ public class PlatformerConfigTests
         {
           "movement": {
             "ground": {
-              "Gravity": 1500,
-              "CoyoteTime": 0.1,
-              "JumpInputBufferDuration": 0.15
+              "gravity": 1500,
+              "coyoteTime": 0.1,
+              "jumpInputBufferDuration": 0.15
             }
           }
         }
@@ -418,7 +418,7 @@ public class PlatformerConfigTests
           "leftSuffix": "Left",
           "rightSuffix": "Right",
           "animations": { "states": { "Idle": "Idle" } },
-          "movement": { "ground": { "MaxSpeedX": 160, "Gravity": 1500 } }
+          "movement": { "ground": { "maxSpeedX": 160, "gravity": 1500 } }
         }
         """;
         var config = PlatformerConfig.FromJsonString(json);

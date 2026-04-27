@@ -13,13 +13,13 @@ public class TopDownConfigTests
         var json = """
         {
           "movement": {
-            "MaxSpeed": 200,
-            "AccelerationTime": 0.4,
-            "DecelerationTime": 0.2,
-            "UpdateDirectionFromInput": false,
-            "UpdateDirectionFromVelocity": true,
-            "IsUsingCustomDeceleration": true,
-            "CustomDecelerationValue": 350
+            "maxSpeed": 200,
+            "accelerationTime": 0.4,
+            "decelerationTime": 0.2,
+            "updateDirectionFromInput": false,
+            "updateDirectionFromVelocity": true,
+            "isUsingCustomDeceleration": true,
+            "customDecelerationValue": 350
           }
         }
         """;
@@ -43,8 +43,8 @@ public class TopDownConfigTests
     {
         // Per-frame context swapping relies on ApplyTo reusing the existing TopDownValues
         // instance, so it allocates nothing on the hot path.
-        var firstJson = """{ "movement": { "MaxSpeed": 200, "AccelerationTime": 0.4 } }""";
-        var secondJson = """{ "movement": { "MaxSpeed": 50,  "AccelerationTime": 0.1 } }""";
+        var firstJson = """{ "movement": { "maxSpeed": 200, "accelerationTime": 0.4 } }""";
+        var secondJson = """{ "movement": { "maxSpeed": 50,  "accelerationTime": 0.1 } }""";
         var behavior = new TopDownBehavior();
         TopDownConfig.FromJsonString(firstJson).ApplyTo(behavior);
         var original = behavior.MovementValues;
@@ -69,7 +69,7 @@ public class TopDownConfigTests
                 DecelerationTime = TimeSpan.FromSeconds(0.5),
             },
         };
-        var json = """{ "movement": { "MaxSpeed": 250 } }""";
+        var json = """{ "movement": { "maxSpeed": 250 } }""";
         var config = TopDownConfig.FromJsonString(json);
 
         config.ApplyTo(behavior);
@@ -83,7 +83,7 @@ public class TopDownConfigTests
     public void ApplyTo_NullMovementValues_CreatesNewInstance()
     {
         var behavior = new TopDownBehavior();
-        var json = """{ "movement": { "MaxSpeed": 175 } }""";
+        var json = """{ "movement": { "maxSpeed": 175 } }""";
         var config = TopDownConfig.FromJsonString(json);
 
         config.ApplyTo(behavior);
@@ -99,7 +99,7 @@ public class TopDownConfigTests
         {
           // top comment
           "movement": {
-            "MaxSpeed": 120, // trailing-line
+            "maxSpeed": 120, // trailing-line
           }
         }
         """;
