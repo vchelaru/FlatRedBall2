@@ -3,20 +3,20 @@ namespace FlatRedBall2.Collision;
 /// <summary>
 /// Restricts a <see cref="CollisionRelationship{A,B}"/> to only resolve overlap when the entity
 /// is being pushed in the configured direction — i.e., it approached from the opposite side.
-/// Used for jump-through platforms (<see cref="Up"/>, aka cloud collision) and Yoshi's-Island
-/// style one-way doors. For <see cref="Up"/>, separation fires only when all three gates pass:
-/// (1) the computed separation vector pushes the entity upward (<c>sep.Y &gt; 0</c>),
-/// (2) the entity is moving downward or stationary (<c>VelocityY &lt;= 0</c>) — so an upward-
-/// moving entity that overlaps deeply enough for SAT to pick the upward exit isn't popped onto
-/// the top, and (3) the entity's <c>LastPosition.Y</c> was at or above where separation would
-/// place it — confirming the entity was actually on top of the platform before sinking in,
-/// rather than starting to fall back from inside after a partial jump-up. Separation X is also
-/// zeroed so a player clipping a platform's side edge is nudged up, never sideways.
+/// Used for jump-through platforms (<see cref="Up"/>, aka cloud collision), ceiling-only barriers
+/// (<see cref="Down"/>), and Yoshi's-Island-style one-way doors (<see cref="Left"/>/<see cref="Right"/>).
+/// Three gates must pass for separation to fire: (1) the computed separation pushes the entity in
+/// the configured direction, (2) the entity is moving in that direction (or stationary) along the
+/// gated axis — so an entity passing through from the wrong side isn't popped out, and (3) the
+/// entity's <c>LastPosition</c> was at or beyond where separation would place it along the gated
+/// axis — confirming it was already on the correct side before sinking in. The off-axis component
+/// of the separation is zeroed so an entity clipping an edge is pushed in the gated direction
+/// only, never sideways.
 /// </summary>
 /// <remarks>
-/// MVP only implements <see cref="None"/> and <see cref="Up"/>. Setting <see cref="Down"/>,
-/// <see cref="Left"/>, or <see cref="Right"/> is allowed but throws
-/// <see cref="System.NotImplementedException"/> on the next collision pass.
+/// Slope-aware <c>LastPosition</c> handling (using polygon tile heightmaps) only applies to
+/// <see cref="Up"/>, since sloped floors are the common case. <see cref="Down"/>/<see cref="Left"/>/<see cref="Right"/>
+/// use a flat positional gate.
 /// </remarks>
 public enum OneWayDirection
 {
