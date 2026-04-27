@@ -47,11 +47,6 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 - Wire the chosen files into the `dotnet new` template's content includes so a fresh project's `Content/` already has them.
 - Open question: do we ship one template that includes all of them, or per-genre templates (platformer/topdown) that include only the matching subset? The latter avoids dead files but multiplies maintenance.
 
-## TopDownValues Time Units: TimeSpan vs float-seconds
-**Priority: Discuss** — `TopDownValues.AccelerationTime` / `DecelerationTime` are `TimeSpan`, but most engine-facing time values (frame deltas, tween durations, delays in many APIs) are `float` seconds. Writing `AccelerationTime = 0.1f` is a natural first attempt and fails to compile, forcing `TimeSpan.FromSeconds(0.1)` at every call site.
-
-Open question: standardize on `float` seconds engine-wide (changes a public field type — breaking, but small surface), keep `TimeSpan` and document/skill-note the gotcha, or expose `float`-seconds setter sugar alongside the `TimeSpan` field. Hit this while building the split-screen sample's `Player.cs`.
-
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
 
