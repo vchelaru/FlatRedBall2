@@ -18,8 +18,10 @@ namespace FlatRedBall2.Animation.Content;
 /// takes a frame rate. SubTextures are grouped into <see cref="AnimationChain"/>s
 /// by stripping the trailing digit block from each name: <c>Eyeball_Idle0000</c>
 /// and <c>Eyeball_Idle0001</c> both belong to chain <c>Eyeball_Idle</c>.
-/// Pivot attributes (<c>pivotX</c>, <c>pivotY</c>) are parsed but not yet applied —
-/// <see cref="AnimationFrame"/> has no per-frame pivot/origin field yet.
+/// Pivot attributes (<c>pivotX</c>, <c>pivotY</c>) are converted into per-frame
+/// <see cref="AnimationFrame.RelativeX"/>/<see cref="AnimationFrame.RelativeY"/> so the pivot
+/// pixel lands at the entity's origin — keeps a multi-size character (e.g. one with a "feet"
+/// pivot) anchored across frames.
 /// </remarks>
 [XmlRoot("TextureAtlas")]
 public class AdobeAnimateAtlasSave
@@ -107,12 +109,26 @@ public class AdobeAnimateAtlasSave
             var chain = new AnimationChain { Name = chainName };
             foreach (var sub in bucket)
             {
+                // Adobe pivot is in source-rect pixels from top-left (Y-down). Sprites render
+                // with the source-rect center as the anchor and world Y+ up, so converting pivot
+                // → RelativeX/Y so the pivot pixel lands at the entity origin:
+                //   RelativeX = srcW/2 - pivotX        (X axes agree)
+                //   RelativeY = pivotY - srcH/2        (Adobe Y-down → world Y-up flips sign)
+                float relativeX = 0f;
+                float relativeY = 0f;
+                if (!float.IsNaN(sub.PivotX))
+                    relativeX = sub.Width / 2f - sub.PivotX;
+                if (!float.IsNaN(sub.PivotY))
+                    relativeY = sub.PivotY - sub.Height / 2f;
+
                 chain.Add(new AnimationFrame
                 {
                     TextureName = ImagePath,
                     Texture = texture,
                     FrameLength = frameLength,
                     SourceRectangle = new Rectangle(sub.X, sub.Y, sub.Width, sub.Height),
+                    RelativeX = relativeX,
+                    RelativeY = relativeY,
                 });
             }
             list.Add(chain);
@@ -147,13 +163,16 @@ public class AdobeAnimateSubTexture
     [XmlAttribute("height")] public int Height;
 
     /// <summary>
-    /// X pivot (origin) for this frame as authored in Adobe Animate, or <see cref="float.NaN"/> if unspecified.
-    /// Parsed but not yet applied — <see cref="AnimationFrame"/> has no per-frame pivot field yet.
+    /// X pivot (origin) for this frame as authored in Adobe Animate, in source-rect pixels from the
+    /// left, or <see cref="float.NaN"/> if unspecified. Converted into <see cref="AnimationFrame.RelativeX"/>
+    /// at <see cref="AdobeAnimateAtlasSave.ToAnimationChainList"/> time.
     /// </summary>
     [XmlIgnore] public float PivotX = float.NaN;
     /// <summary>
-    /// Y pivot (origin) for this frame as authored in Adobe Animate, or <see cref="float.NaN"/> if unspecified.
-    /// Parsed but not yet applied — <see cref="AnimationFrame"/> has no per-frame pivot field yet.
+    /// Y pivot (origin) for this frame as authored in Adobe Animate, in source-rect pixels from the
+    /// top (Y-down), or <see cref="float.NaN"/> if unspecified. Converted into
+    /// <see cref="AnimationFrame.RelativeY"/> at <see cref="AdobeAnimateAtlasSave.ToAnimationChainList"/>
+    /// time, with the sign flip from Adobe's Y-down to FRB2's world Y-up baked in.
     /// </summary>
     [XmlIgnore] public float PivotY = float.NaN;
 

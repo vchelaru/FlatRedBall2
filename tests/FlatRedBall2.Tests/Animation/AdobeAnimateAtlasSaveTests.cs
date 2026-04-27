@@ -74,4 +74,61 @@ public class AdobeAnimateAtlasSaveTests
 
         list[0][0].FrameLength.TotalSeconds.ShouldBe(1.0 / 24.0, tolerance: 0.0001);
     }
+
+    // Pivot conversion: Adobe Animate authors pivot in source-rect pixels from top-left (Y-down).
+    // FRB2 sprites render with their center as the anchor and world Y+ up. Conversion to
+    // RelativeX/Y so the pivot pixel lands at the entity's position:
+    //   RelativeX = srcW/2 - pivotX
+    //   RelativeY = pivotY - srcH/2
+    private const string PivotXml = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<TextureAtlas imagePath=""char.png"">
+    <SubTexture name=""Char0000"" x=""0"" y=""0"" width=""100"" height=""100"" pivotX=""50"" pivotY=""50""/>
+    <SubTexture name=""Char0001"" x=""0"" y=""0"" width=""100"" height=""100"" pivotX=""50"" pivotY=""100""/>
+    <SubTexture name=""Char0002"" x=""0"" y=""0"" width=""100"" height=""100"" pivotX=""0""  pivotY=""0""/>
+    <SubTexture name=""Char0003"" x=""0"" y=""0"" width=""100"" height=""100""/>
+</TextureAtlas>";
+
+    [Fact]
+    public void ToAnimationChainList_CenteredPivot_ProducesZeroOffsets()
+    {
+        var save = Deserialize(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][0].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][0].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_BottomCenterPivot_AnchorsAtFeet()
+    {
+        // Pivot at (50, 100) on a 100x100 frame — typical "feet" anchor for a character.
+        // RelativeX = 50 - 50 = 0; RelativeY = 100 - 50 = 50 (sprite shifts up so feet are at entity origin).
+        var save = Deserialize(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][1].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][1].RelativeY.ShouldBe(50f, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_TopLeftPivot_ShiftsSpriteRightAndDown()
+    {
+        // Pivot at (0, 0) on a 100x100 frame.
+        // RelativeX = 50 - 0 = 50; RelativeY = 0 - 50 = -50.
+        var save = Deserialize(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][2].RelativeX.ShouldBe(50f, tolerance: 0.0001f);
+        list[0][2].RelativeY.ShouldBe(-50f, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_NoPivotAttributes_LeavesOffsetsAtZero()
+    {
+        var save = Deserialize(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][3].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][3].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
+    }
 }
