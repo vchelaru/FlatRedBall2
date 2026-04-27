@@ -269,6 +269,17 @@ public class PlatformerBehavior
     private TimeSpan _jumpStartTime;
     private PlatformerValues? _jumpValues;
     private bool _wasOnGroundLastFrame;
+    // Time of the last ground→air transition that wasn't caused by a deliberate jump (i.e.
+    // walked off a ledge). Compared against the active ground slot's CoyoteTime to decide
+    // whether a late jump press still resolves to a ground jump. Null = not armed.
+    private TimeSpan? _leftGroundTime;
+    // True from the moment a ground jump fires until the entity lands again. Suppresses
+    // coyote-time arming so a second press while airborne can't re-fire as a ground jump.
+    private bool _jumpedSinceLanding;
+    // Time of the last JumpInput WasJustPressed edge while airborne. Compared against the
+    // ground slot's JumpInputBufferDuration on landing to decide whether the buffered press
+    // resolves to a ground jump. Null = no pending buffered press.
+    private TimeSpan? _bufferedJumpPressTime;
     private bool _snappedThisFrame;
     private bool _slopeSampledThisFrame;
     // Monotonically increments each Update. Prefixed onto every diagnostic message so two
@@ -375,6 +386,12 @@ public class PlatformerBehavior
         // isn't positive (the snap adjusted position directly, not via the collision separator).
         if (!_snappedThisFrame)
             IsOnGround = entity.LastReposition.Y > 0;
+
+        // Set inside the airborne jump branch when a ground jump (including a coyote-time
+        // or buffer-resolved jump) fires this frame; consumed by the coyote-arming gate at the
+        // bottom of Update so a same-frame ground jump doesn't immediately clear its own
+        // _jumpedSinceLanding flag.
+        bool groundJumpFiredThisFrame = false;
 
         // B. Horizontal input
         float inputX = MovementInput?.X ?? 0f;
@@ -499,18 +516,54 @@ public class PlatformerBehavior
                 && inputY < -0.5f
                 && current.CanFallThroughOneWayCollision;
 
+            // Coyote/buffer values are read off the ground slot (the slot the entity walked off
+            // of, or the slot it's landing into). Air slot is the fallback when GroundMovement is
+            // null, matching the existing slot-resolution pattern in step B.
+            var groundSlot = GroundMovement ?? AirMovement;
+
+            bool withinCoyote =
+                !IsOnGround
+                && _leftGroundTime.HasValue
+                && groundSlot.CoyoteTime > TimeSpan.Zero
+                && (time.SinceGameStart - _leftGroundTime.Value) <= groundSlot.CoyoteTime;
+
+            bool bufferedPressActive =
+                IsOnGround
+                && _bufferedJumpPressTime.HasValue
+                && groundSlot.JumpInputBufferDuration > TimeSpan.Zero
+                && (time.SinceGameStart - _bufferedJumpPressTime.Value) <= groundSlot.JumpInputBufferDuration;
+
+            bool justPressed = JumpInput?.WasJustPressed == true;
+            groundJumpFiredThisFrame =
+                !dropThroughTriggered
+                && (
+                    (justPressed && (IsOnGround || withinCoyote))
+                    || bufferedPressActive
+                );
+
             if (dropThroughTriggered)
             {
                 _dropThroughFrame = true;
             }
-            else if (JumpInput?.WasJustPressed == true && IsOnGround)
+            else if (groundJumpFiredThisFrame)
             {
-                entity.VelocityY = current.JumpVelocity;
+                // Use the ground slot's jump even on a coyote-fired jump — the player walked
+                // off ground and is logically jumping from it; air slot's jump fields would be
+                // wrong (often zero on games that lock out air-jump).
+                var jumpSlot = IsOnGround ? current : groundSlot;
+                entity.VelocityY = jumpSlot.JumpVelocity;
                 _jumpStartTime = time.SinceGameStart;
-                _jumpValues = current;
+                _jumpValues = jumpSlot;
                 IsApplyingJump = true;
+                // Consume both forgiveness windows so a single press cannot fire twice and a
+                // coyote window cannot reopen for a re-jump.
+                _leftGroundTime = null;
+                _bufferedJumpPressTime = null;
+                _jumpedSinceLanding = true;
             }
-            else if (JumpInput?.WasJustPressed == true && !IsOnGround && !IsApplyingJump)
+            bool airJumpFired = false;
+            if (!groundJumpFiredThisFrame && !dropThroughTriggered
+                && justPressed && !IsOnGround && !IsApplyingJump)
             {
                 var airValues = _activeAirValues ?? AirMovement;
                 if (airValues.JumpVelocity > 0f)
@@ -521,7 +574,18 @@ public class PlatformerBehavior
                     IsApplyingJump = airValues.JumpApplyLength > TimeSpan.Zero;
                     if (_activeAirValues == null && AfterDoubleJump != null)
                         _activeAirValues = AfterDoubleJump;
+                    airJumpFired = true;
                 }
+            }
+
+            // Capture an airborne press for the jump-input buffer. Only meaningful while
+            // airborne; on the ground the press is either consumed by groundJumpFires above or
+            // it's a no-op (drop-through with no platform). A press that already fired an
+            // air-jump this frame is considered consumed — it must not also fire as a ground
+            // jump on landing (double consumption).
+            if (justPressed && !IsOnGround && !groundJumpFiredThisFrame && !airJumpFired)
+            {
+                _bufferedJumpPressTime = time.SinceGameStart;
             }
 
             if (IsApplyingJump && _jumpValues != null)
@@ -557,7 +621,22 @@ public class PlatformerBehavior
             _dropThroughFrame = false;
         }
 
-        // G. Record ground state for next frame's snap gate, and reset per-frame flags.
+        // G. Coyote-time arming. Arms on a ground→air transition unless the player jumped from
+        // this grounded period (tracked by _jumpedSinceLanding). _jumpedSinceLanding clears
+        // when the player is grounded and did NOT fire a ground jump this frame, so the next
+        // grounded period re-arms cleanly. Without it, the post-jump airborne phase would arm
+        // coyote and a second press would re-fire a ground jump.
+        if (IsOnGround && !groundJumpFiredThisFrame)
+        {
+            _leftGroundTime = null;
+            _jumpedSinceLanding = false;
+        }
+        else if (_wasOnGroundLastFrame && !IsOnGround && !_jumpedSinceLanding)
+        {
+            _leftGroundTime = time.SinceGameStart;
+        }
+
+        // H. Record ground state for next frame's snap gate, and reset per-frame flags.
         _wasOnGroundLastFrame = IsOnGround;
         _snappedThisFrame = false;
         _slopeSampledThisFrame = false;

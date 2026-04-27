@@ -1,20 +1,22 @@
 {
   "movement": {
     "ground": {
-      "MaxSpeedX": 40,
-      "AccelerationTimeX": 0.3,
-      "DecelerationTimeX": 0.4,
-      "Gravity": 180,
-      "MaxFallSpeed": 50,
+      "maxSpeedX": 40,
+      "accelerationTimeX": 0.3,
+      "decelerationTimeX": 0.4,
+      "gravity": 180,
+      "maxFallSpeed": 50,
       "minJumpHeight": 12,
-      "maxJumpHeight": 24
+      "maxJumpHeight": 24,
+      "coyoteTime": 0.1,
+      "jumpInputBufferDuration": 0.1
     },
     "air": {
-      "MaxSpeedX": 40,
-      "AccelerationTimeX": 0.3,
-      "DecelerationTimeX": 0.4,
-      "Gravity": 180,
-      "MaxFallSpeed": 50,
+      "maxSpeedX": 40,
+      "accelerationTimeX": 0.3,
+      "decelerationTimeX": 0.4,
+      "gravity": 180,
+      "maxFallSpeed": 50,
       "minJumpHeight": 12,
       "maxJumpHeight": 24
     }

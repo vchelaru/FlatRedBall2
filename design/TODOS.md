@@ -18,3 +18,38 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
+
+## Platformer Feel: Run-Modulated Jump Height
+**Priority: Discuss** — SMB's defining "jump higher when running" is not currently expressible. `JumpVelocity` is constant per slot.
+
+Open question: do we add a `JumpVelocityRunBonus` field that scales with `|VelocityX| / MaxSpeedX`, or is this better solved by exposing a hook so games can set `JumpVelocity` themselves on jump initiation? The former is more discoverable; the latter avoids baking one specific feel curve into the engine.
+
+## Block Bumping: Head-Bump Cell Events + Tile Mutation
+**Priority: Soon** — Mario-style `?` blocks and breakable bricks are not feasible today. Two missing primitives:
+
+- **Cell-resolved head-bump event.** Today `entity.LastReposition.Y < 0` tells you a ceiling was hit, but not *which tile*. Need an event on `CollisionRelationship<Entity, TileShapeCollection>` (or on the TSC side) that fires with `(col, row, tile)` when an entity collides with a tile *from below*. Same shape would generalize to side-hits and stomps if we want.
+- **Runtime tile mutation API on `TileShapeCollection`.** `SetTile(col, row, tileIndex?)` and `RemoveTile(col, row)` that update both the rendered tile layer and the collision shapes atomically. Currently unclear whether a partial path exists; audit before designing.
+- Together these enable: `?`→used-block swap, brick break (remove tile + spawn rubble entity), powerup-from-block (spawn entity above the bumped cell).
+
+## Entity Virtualization (Activity Culling)
+**Priority: Soon** — Today every registered entity ticks every frame regardless of camera distance. SMB-style level density (dozens of enemies, item blocks, projectiles spread across a long level) requires off-screen entities to skip activity. Should be a first-class engine concern, not a per-game pattern.
+
+Sketch:
+- Per-entity `IsActive` (or similar) gate consulted by the engine activity loop.
+- Region-based virtualization: a culling rectangle (typically derived from the camera plus margin) controls activation. Entities outside it skip `CustomActivity` and possibly collision.
+- "Spawn when region enters" pattern for not-yet-instantiated content (Tiled-defined enemies that only come alive once the camera approaches).
+- Open question: opt-in per entity type, or default-on with opt-out for entities that must always tick (camera controllers, music managers, persistent world state).
+
+## Copy Empty Content Templates on FRB2 Template Install
+**Priority: Discuss** — `.claude/templates/` ships starter assets (`AnimationChains/Empty.achx`, `PlatformerAnimations.achx`, `TopDownAnimations.achx`, `Tiled/base.tmx`, `StandardTileset.tsx`, `PlatformerConfig/player.platformer.json`, `TopDownConfig/player.topdown.json`). Today these are AI-discoverable scaffolds inside the engine repo, but a user installing FRB2 templates (`dotnet new install`) gets none of them — every new project starts with a blank Content folder and the AI has to recreate the same files from scratch.
+
+- Decide which files belong in the template package vs only in the engine repo (the .achx + .tmx + JSON config trio is the obvious set; spritesheets are likely too sample-specific).
+- Wire the chosen files into the `dotnet new` template's content includes so a fresh project's `Content/` already has them.
+- Open question: do we ship one template that includes all of them, or per-genre templates (platformer/topdown) that include only the matching subset? The latter avoids dead files but multiplies maintenance.
+
+## Factory Object Pooling
+**Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
+
+- Opt-in pool mode on `Factory<T>`: destroyed instances return to a free list; subsequent `Create()` calls hand them back after a `Reset()` hook on the entity.
+- Decide entity reset contract: does pooling require a `Reset()` virtual on `Entity`, or is the pattern "destroy clears state, CustomInitialize re-initializes"?
+- Interaction with `IsSolidGrid` factory mode and entity-collision-relationship dispatch — pooled entities must not leave dangling references in collision lists.
