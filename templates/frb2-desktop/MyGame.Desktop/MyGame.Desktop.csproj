@@ -17,4 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="..\MyGame.Common\MyGame.Common.csproj" />
   </ItemGroup>
+
+  <!-- Raw runtime-loaded assets (achx, tmx, tsx, json, png). Content.mgcb is handled by MonoGame.Content.Builder.Task. -->
+  <ItemGroup>
+    <Content Include="Content\**\*.*" Exclude="Content\Content.mgcb" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

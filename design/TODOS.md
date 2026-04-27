@@ -40,13 +40,6 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 - **Optional `SplitScreenPreset` enum**: thin sugar over `NormalizedViewport` for halves/quadrants/thirds. Only worth adding if call-site verbosity becomes a real complaint.
 - **Audit `Camera.X/Y/Left/Right/...` reads in engine code** for "which camera?" semantics — anywhere it implicitly assumes `Cameras[0]` and shouldn't (e.g. `_gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom` in `FlatRedBallService.cs`).
 
-## Copy Empty Content Templates on FRB2 Template Install
-**Priority: Discuss** — `.claude/templates/` ships starter assets (`AnimationChains/Empty.achx`, `PlatformerAnimations.achx`, `TopDownAnimations.achx`, `Tiled/base.tmx`, `StandardTileset.tsx`, `PlatformerConfig/player.platformer.json`, `TopDownConfig/player.topdown.json`). Today these are AI-discoverable scaffolds inside the engine repo, but a user installing FRB2 templates (`dotnet new install`) gets none of them — every new project starts with a blank Content folder and the AI has to recreate the same files from scratch.
-
-- Decide which files belong in the template package vs only in the engine repo (the .achx + .tmx + JSON config trio is the obvious set; spritesheets are likely too sample-specific).
-- Wire the chosen files into the `dotnet new` template's content includes so a fresh project's `Content/` already has them.
-- Open question: do we ship one template that includes all of them, or per-genre templates (platformer/topdown) that include only the matching subset? The latter avoids dead files but multiplies maintenance.
-
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
 

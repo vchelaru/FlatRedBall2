@@ -10,5 +10,23 @@
   "tags": {
     "language": "C#",
     "type": "project"
-  }
+  },
+  "symbols": {
+    "IncludeStarterContent": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "true",
+      "description": "Include starter Content assets (animation chains, base TMX, platformer/topdown configs). Pass --IncludeStarterContent false to start with an empty Content folder."
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(!IncludeStarterContent)",
+          "exclude": [ "MyGame.Desktop/Content/*/**" ]
+        }
+      ]
+    }
+  ]
 }

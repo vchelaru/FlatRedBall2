@@ -1,0 +1,78 @@
+{
+  // Slots: "ground" (on ground), "air" (airborne), "afterDoubleJump" (reserved, not yet wired).
+  // Omitted fields fall back to engine defaults. Omitted slots are left untouched on the behavior.
+  //
+  // Gravity note: the jump *trajectory* always runs under the "air" slot's gravity — while the
+  // entity is grounded, collision cancels gravity. Derived jump mode (minJumpHeight/maxJumpHeight)
+  // on the ground slot uses air.gravity for its height math. If no "air" slot is authored, it
+  // falls back to this slot's own gravity. For most games, use the same gravity in both slots.
+  "movement": {
+    "ground": {
+      "maxSpeedX": 150,             // world units/sec
+      "accelerationTimeX": 0.5,     // seconds to reach maxSpeedX from rest (0 = instant)
+      "decelerationTimeX": 0.25,    // seconds to stop from maxSpeedX (0 = instant)
+      "gravity": 700,               // see note above — effectively only matters if no "air" slot
+      "maxFallSpeed": 800,          // terminal velocity (must be > 0)
+
+      // Jump: pick ONE mode per slot. Using both derived and raw in the same slot is an error.
+      //
+      // Derived mode (preferred) — specify desired heights, engine computes the physics:
+      "minJumpHeight": 24,          // tap jump height (world units). Required for derived mode.
+      "maxJumpHeight": 64,          // hold jump height. Optional — omit for fixed-height jump.
+                                    // Must be >= minJumpHeight. Cannot specify without minJumpHeight.
+      //
+      // Raw mode (escape hatch) — set physics directly:
+      // "jumpVelocity": 300,       // upward velocity on jump press
+      // "jumpApplyLength": 0.15,   // seconds to sustain jump velocity
+      // "jumpApplyByButtonHold": true  // if true, releasing early cuts the jump short
+
+      // Input forgiveness (both default 0 = disabled; ~0.1s is a Celeste-typical baseline).
+      // Gravity is NOT suspended during the coyote window — only the jump-press *interpretation*
+      // is extended. Read off the ground slot at jump time (GroundMovement ?? AirMovement).
+      "coyoteTime": 0.1,            // seconds after walking off a ledge during which a jump
+                                    // press still fires the ground jump. Does not arm after a
+                                    // deliberate jump.
+      "jumpInputBufferDuration": 0.1 // seconds before landing during which a jump press is
+                                     // remembered and consumed on the landing frame.
+
+      // Slope tuning (all optional, defaults shown):
+      // "slopeSnapDistance": 8,            // max downward snap distance (0 disables). Also gated
+                                             // on "prior surface was a slope" — flat-to-flat cliff
+                                             // drops fall ballistically regardless of this value.
+      // "slopeSnapMaxAngleDegrees": 60,    // surfaces steeper than this won't snap
+      // "uphillFullSpeedSlope": 0,         // degrees below which uphill = full speed
+      // "uphillStopSpeedSlope": 60,        // degrees at which uphill speed = 0
+      // "downhillFullSpeedSlope": 0,       // degrees below which downhill = normal speed
+      // "downhillMaxSpeedSlope": 60,       // degrees at which full downhill multiplier applies
+      // "downhillMaxSpeedMultiplier": 1.5, // peak downhill speed boost (1 = disabled)
+
+      // "canFallThroughOneWayCollision": true  // false disables Down+Jump drop-through
+    },
+    "air": {
+      "maxSpeedX": 150,
+      "accelerationTimeX": 0.5,
+      "decelerationTimeX": 0.25,
+      "gravity": 700,
+      "maxFallSpeed": 800,
+      "minJumpHeight": 24,
+      "maxJumpHeight": 64
+    }
+    // Optional "climbing" slot — populates PlatformerBehavior.ClimbingMovement. Game code sets
+    // IsClimbing to enter; the engine drives vertical speed from input, suppresses gravity, and
+    // on a jump press clears IsClimbing and applies the climbing slot's jumpVelocity (same
+    // shape as a ground jump, sustain included).
+    //
+    // Consumed: maxSpeedX, accelerationTimeX, decelerationTimeX, climbingSpeed,
+    //           jumpVelocity, jumpApplyLength, jumpApplyByButtonHold.
+    // Ignored:  gravity, maxFallSpeed, slope fields, canFallThroughOneWayCollision.
+    // , "climbing": {
+    //   "maxSpeedX": 80,             // horizontal speed while on a ladder (usually slower than ground)
+    //   "climbingSpeed": 100,        // vertical speed at full |input.Y|
+    //   "jumpVelocity": 200          // upward velocity on jump-off. AUTHOR THIS — defaults to 0,
+    //                                // which makes jump-off drop the player straight down with no
+    //                                // upward velocity. Engine does not fall back to air.jumpVelocity.
+    //   // "jumpApplyLength": 0.1,   // optional — sustain length, same semantics as ground jump
+    //   // "jumpApplyByButtonHold": true
+    // }
+  }
+}
