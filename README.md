@@ -199,7 +199,7 @@ See the `samples/` directory for complete working examples.
 | Sample | Description | Play |
 |--------|-------------|------|
 | [ShmupSpace](samples/ShmupSpace/) | Shoot-em-up | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/ShmupSpace/) |
-| [PlatformKing](samples/PlatformKing/) | Platformer | Source only |
+| [PlatformKing](samples/PlatformKing/) | Platformer | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/PlatformKing/) |
 
 ## Working with AI Assistants
 
