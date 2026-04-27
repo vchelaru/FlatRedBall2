@@ -142,7 +142,7 @@ AddCollisionRelationship(_ballFactory, solidTiles)
 
 ### OneWayDirection (jump-through / cloud platforms)
 
-`relationship.OneWayDirection` restricts a relationship so separation only fires when the entity is being pushed in the configured direction. MVP implements `None` (default) and `Up`; `Down`/`Left`/`Right` throw `NotImplementedException` on the next collision pass.
+`relationship.OneWayDirection` restricts a relationship so separation only fires when the entity is being pushed in the configured direction. All four directions (`Up`/`Down`/`Left`/`Right`) plus `None` (default) are supported — `Up` for jump-through floors, `Down` for ceiling-only barriers, `Left`/`Right` for one-way doors.
 
 ```csharp
 var cloudTiles = new TileShapeCollection { GridSize = 16f };
@@ -154,12 +154,12 @@ playerVsClouds.AllowDropThrough = true; // opt in to Down+Jump drop-through for 
 playerVsClouds.BounceFirstOnCollision(elasticity: 0f);
 ```
 
-Semantics for `Up` — three gates, all must pass:
-- `sep.Y > 0` (separation pushes upward — skip otherwise, no `CollisionOccurred`).
-- `VelocityY <= 0` (entity is falling or stationary — an upward-moving entity passes through even when SAT would push it onto the top).
-- `LastPosition.Y` was at or above the post-separation Y (entity was cleanly on top last frame, not peaking inside the tile from below). On sloped tiles this is slope-aware: the surface-Y delta between `LastPosition.X` and current `X` is folded in, so uphill walking passes.
+Semantics — three gates, all must pass:
+- Separation has the correct sign on the gated axis (e.g. `sep.Y > 0` for `Up`, `sep.X < 0` for `Left`).
+- Velocity on the gated axis matches the push direction or is zero (e.g. `VelocityY <= 0` for `Up` — an upward-moving entity passes through even when SAT would push it onto the top).
+- `LastPosition` on the gated axis was at or beyond the post-separation position (entity was cleanly on the correct side last frame, not peaking inside from the wrong side). For `Up` on sloped tiles this is slope-aware (surface-Y delta between `LastPosition.X` and current `X` is folded in so uphill walking passes); other directions use a flat gate.
 
-The X component of the separation is zeroed before applying — an entity clipping a cloud's side edge is lifted straight up, never shoved sideways. This matches FRB1 cloud behavior.
+The off-axis component of the separation is zeroed before applying — an entity clipping a platform's edge is pushed in the gated direction only, never sideways. This matches FRB1 cloud behavior.
 
 ### Sloped cloud platforms (polygon jump-through tiles)
 

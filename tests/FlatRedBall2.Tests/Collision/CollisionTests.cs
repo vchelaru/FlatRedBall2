@@ -274,45 +274,228 @@ public class CollisionTests
     }
 
     [Fact]
-    public void OneWayDown_WhenRun_ThrowsNotImplemented()
+    public void OneWayDown_AOverlapsBFromBelow_Separates()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 10f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        // Ceiling-only barrier: A approaches B from below moving upward, gets pushed back down.
+        // SAT picks Y axis (vertical-dominant overlap) and produces sep.Y < 0.
+        var a = new OneWayTestPlayer { X = 0f, Y = -25f, VelocityY = 50f };
+        a.LastPosition = new System.Numerics.Vector2(0f, -33f); // was below resolved Y last frame
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Down,
         };
         rel.MoveFirstOnCollision();
 
-        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+        rel.RunCollisions();
+
+        a.Y.ShouldBeLessThan(-25f); // pushed down
+        a.CollidesWith(b).ShouldBeFalse();
     }
 
     [Fact]
-    public void OneWayLeft_WhenRun_ThrowsNotImplemented()
+    public void OneWayDown_AOverlapsBFromAbove_DoesNotSeparate()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        // A above B — sep.Y would be positive (push up). Down gate rejects.
+        var a = new OneWayTestPlayer { X = 0f, Y = 25f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Down,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.Y.ShouldBe(25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayDown_FromBelow_MovingDownward_DoesNotSeparate()
+    {
+        // Velocity gate: an entity below the ceiling but already falling shouldn't be pulled down further.
+        var a = new OneWayTestPlayer { X = 0f, Y = -25f, VelocityY = -200f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Down,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.Y.ShouldBe(-25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayDown_SeparationHasYComponent_NoXDisplacementApplied()
+    {
+        // Vertical-dominant overlap: SAT returns a pure-Y sep. X must not move (sep.X zeroed).
+        var a = new OneWayTestPlayer { X = 5f, Y = -20f, VelocityY = 50f };
+        a.LastPosition = new System.Numerics.Vector2(5f, -33f);
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Down,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(5f);
+        a.Y.ShouldBeLessThan(-20f);
+    }
+
+    [Fact]
+    public void OneWayLeft_AOverlapsBFromLeft_Separates()
+    {
+        // One-way door blocking rightward motion. A approaches from the left moving right;
+        // SAT picks X axis (horizontal-dominant overlap) with sep.X < 0 (push A back left).
+        var a = new OneWayTestPlayer { X = -25f, Y = 0f, VelocityX = 50f };
+        a.LastPosition = new System.Numerics.Vector2(-33f, 0f);
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Left,
         };
         rel.MoveFirstOnCollision();
 
-        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+        rel.RunCollisions();
+
+        a.X.ShouldBeLessThan(-25f); // pushed left
+        a.CollidesWith(b).ShouldBeFalse();
     }
 
     [Fact]
-    public void OneWayRight_WhenRun_ThrowsNotImplemented()
+    public void OneWayLeft_AOverlapsBFromRight_DoesNotSeparate()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        // A on the right side — sep.X would be positive (push right). Left gate rejects.
+        var a = new OneWayTestPlayer { X = 25f, Y = 0f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Left,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayLeft_FromLeft_MovingLeftward_DoesNotSeparate()
+    {
+        // Velocity gate: an entity already moving left shouldn't be pushed further left through the door.
+        var a = new OneWayTestPlayer { X = -25f, Y = 0f, VelocityX = -200f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Left,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(-25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayLeft_SeparationHasXComponent_NoYDisplacementApplied()
+    {
+        var a = new OneWayTestPlayer { X = -20f, Y = 5f, VelocityX = 50f };
+        a.LastPosition = new System.Numerics.Vector2(-33f, 5f);
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Left,
+        };
+        rel.MoveFirstOnCollision();
+
+        rel.RunCollisions();
+
+        a.Y.ShouldBe(5f);
+        a.X.ShouldBeLessThan(-20f);
+    }
+
+    [Fact]
+    public void OneWayRight_AOverlapsBFromRight_Separates()
+    {
+        // Mirror of Left: blocks leftward motion. A approaches from the right moving left.
+        var a = new OneWayTestPlayer { X = 25f, Y = 0f, VelocityX = -50f };
+        a.LastPosition = new System.Numerics.Vector2(33f, 0f);
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Right,
         };
         rel.MoveFirstOnCollision();
 
-        Should.Throw<NotImplementedException>(() => rel.RunCollisions());
+        rel.RunCollisions();
+
+        a.X.ShouldBeGreaterThan(25f); // pushed right
+        a.CollidesWith(b).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayRight_AOverlapsBFromLeft_DoesNotSeparate()
+    {
+        var a = new OneWayTestPlayer { X = -25f, Y = 0f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Right,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(-25f);
+        fired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OneWayRight_FromRight_MovingRightward_DoesNotSeparate()
+    {
+        var a = new OneWayTestPlayer { X = 25f, Y = 0f, VelocityX = 200f };
+        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        {
+            OneWayDirection = OneWayDirection.Right,
+        };
+        rel.MoveFirstOnCollision();
+        bool fired = false;
+        rel.CollisionOccurred += (_, _) => fired = true;
+
+        rel.RunCollisions();
+
+        a.X.ShouldBe(25f);
+        fired.ShouldBeFalse();
     }
 
     [Fact]

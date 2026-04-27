@@ -91,9 +91,8 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// For sloped cloud platforms (polygon tiles in a <see cref="TileShapeCollection"/>) also set
     /// <see cref="SlopeMode"/> to <see cref="SlopeCollisionMode.PlatformerFloor"/> — otherwise
     /// SAT is used, the surface-Y delta isn't computed, and uphill walking will fall through.
-    /// Only <see cref="OneWayDirection.None"/> and <see cref="OneWayDirection.Up"/> are
-    /// implemented. Setting Down/Left/Right is allowed but will throw
-    /// <see cref="NotImplementedException"/> on the next collision pass.
+    /// All four directions (Up/Down/Left/Right) are implemented; the slope-aware LastPosition
+    /// adjustment via the polygon heightmap is Up-only. Down/Left/Right use a flat positional gate.
     /// </remarks>
     public OneWayDirection OneWayDirection { get; set; } = OneWayDirection.None;
 
@@ -716,10 +715,35 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 sep = new Vector2(0f, sep.Y);
                 return true;
             case OneWayDirection.Down:
+                if (sep.Y >= 0f) return false;
+                if (a is Entity eaDown)
+                {
+                    if (eaDown.VelocityY < 0f) return false;
+                    const float epsilon = 0.001f;
+                    if (eaDown.LastPosition.Y > eaDown.Position.Y + sep.Y + epsilon) return false;
+                }
+                sep = new Vector2(0f, sep.Y);
+                return true;
             case OneWayDirection.Left:
+                if (sep.X >= 0f) return false;
+                if (a is Entity eaLeft)
+                {
+                    if (eaLeft.VelocityX < 0f) return false;
+                    const float epsilon = 0.001f;
+                    if (eaLeft.LastPosition.X > eaLeft.Position.X + sep.X + epsilon) return false;
+                }
+                sep = new Vector2(sep.X, 0f);
+                return true;
             case OneWayDirection.Right:
-                throw new NotImplementedException(
-                    $"OneWayDirection.{OneWayDirection} is not yet implemented — see design/TODOS.md");
+                if (sep.X <= 0f) return false;
+                if (a is Entity eaRight)
+                {
+                    if (eaRight.VelocityX > 0f) return false;
+                    const float epsilon = 0.001f;
+                    if (eaRight.LastPosition.X < eaRight.Position.X + sep.X - epsilon) return false;
+                }
+                sep = new Vector2(sep.X, 0f);
+                return true;
             default:
                 return true;
         }
