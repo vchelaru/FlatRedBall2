@@ -89,4 +89,39 @@ public class CameraControllingEntityTests
         result.X.ShouldBe(0f, tolerance: 0.01f);
         result.Y.ShouldBe(0f, tolerance: 0.01f);
     }
+
+    [Fact]
+    public void Engine_AfterStart_CameraSnapsToTarget_BeforeFirstUpdate()
+    {
+        // Camera must be positioned on the target by the time Screen.CustomInitialize returns,
+        // so frame 1's lazy-spawn tick (which runs in Screen.Update before any CustomActivity)
+        // sees the snapped camera, not the default (0, 0). Without this, lazy-spawn placements
+        // near the map center spawn on frame 1 even when the player is on the edge of the map.
+        var engine = new FlatRedBallService();
+        engine.Start<CamSnapScreen>();
+
+        engine.CurrentScreen.Camera.X.ShouldBe(500f);
+        engine.CurrentScreen.Camera.Y.ShouldBe(-300f);
+    }
+
+    private class CamSnapScreen : Screen
+    {
+        public override void CustomInitialize()
+        {
+            // Without a GraphicsDevice the camera's viewport defaults to (0,0); SnapToPixel's
+            // Camera.PixelsPerUnit math would produce NaN. Set a viewport explicitly so the
+            // pixel-snap arithmetic resolves to a finite value.
+            Camera.SetViewport(new Viewport(0, 0, 1280, 720));
+
+            var playerFactory = new Factory<Entity>(this);
+            var player = playerFactory.Create();
+            player.X = 500f;
+            player.Y = -300f;
+
+            var camFactory = new Factory<CameraControllingEntity>(this);
+            var cam = camFactory.Create();
+            cam.Target = player;
+            // Note: no manual ForceToTarget here — the engine should snap automatically.
+        }
+    }
 }
