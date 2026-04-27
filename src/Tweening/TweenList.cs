@@ -24,7 +24,17 @@ internal sealed class TweenList
     /// stopped via <see cref="Tweener.Stop"/>).
     /// </summary>
     public void Add(Tweener tweener, Action<float> setter, float to)
-        => _entries.Add(new TweenEntry(tweener, setter, to));
+        => _entries.Add(new TweenEntry(tweener, setter, to, null));
+
+    /// <summary>
+    /// Begins tracking <paramref name="tweener"/> with a completion callback.
+    /// <paramref name="onFinished"/> is invoked with <c>true</c> on natural completion (after the
+    /// terminal-snap setter call) and with <c>false</c> when the tween is canceled — either by
+    /// external <see cref="Tweener.Stop"/> before the next <see cref="Update"/>, or by
+    /// <see cref="Clear"/> (entity destroy / screen teardown).
+    /// </summary>
+    public void Add(Tweener tweener, Action<float> setter, float to, Action<bool>? onFinished)
+        => _entries.Add(new TweenEntry(tweener, setter, to, onFinished));
 
     /// <summary>
     /// Advances every tracked tween by <paramref name="dt"/> seconds. Tweens that complete
@@ -41,10 +51,17 @@ internal sealed class TweenList
             entry.Tweener.Update(dt);
             if (!entry.Tweener.Running)
             {
-                // Ran to completion this frame → snap setter to exact `to`.
-                // Already stopped before Update (Stop() called externally) → do nothing.
+                // Ran to completion this frame → snap setter to exact `to`, fire OnFinished(true).
+                // Already stopped before Update (Stop() called externally) → fire OnFinished(false).
                 if (wasRunningBefore)
+                {
                     entry.Setter(entry.To);
+                    entry.OnFinished?.Invoke(true);
+                }
+                else
+                {
+                    entry.OnFinished?.Invoke(false);
+                }
                 _entries.RemoveAt(i);
             }
         }
@@ -52,9 +69,18 @@ internal sealed class TweenList
 
     /// <summary>
     /// Drops all tracked tweens without invoking their setters. Called by
-    /// <see cref="Entity.Destroy"/> and <see cref="Screen"/> teardown.
+    /// <see cref="Entity.Destroy"/> and <see cref="Screen"/> teardown. Each entry's
+    /// <c>OnFinished</c> callback is invoked with <c>false</c> so awaiters of
+    /// <c>TweenAsync</c> observe a cancellation.
     /// </summary>
-    public void Clear() => _entries.Clear();
+    public void Clear()
+    {
+        // Snapshot before invoking callbacks — a callback could (in theory) re-enter this list.
+        for (int i = 0; i < _entries.Count; i++)
+            _entries[i].OnFinished?.Invoke(false);
+        _entries.Clear();
+    }
 
-    private readonly record struct TweenEntry(Tweener Tweener, Action<float> Setter, float To);
+    private readonly record struct TweenEntry(
+        Tweener Tweener, Action<float> Setter, float To, Action<bool>? OnFinished);
 }
