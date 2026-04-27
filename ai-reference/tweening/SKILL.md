@@ -47,6 +47,7 @@ Tweens freeze while `Screen.IsPaused` is true, alongside the rest of the Activit
 - **`PositionChanged` is assigned, not subscribed.** The wrapper wires it with `=`. Additional listeners must use `+=` after `Tween(...)` returns.
 - **`Ended` is an event.** Use `+=`. Fires once, after the final setter call, only if the tween completes (not on `Stop()`).
 - **Vector2 and Color have native overloads.** No need to compose multiple float tweens. `Color` defaults to `ColorTweenMode.Rgb` (channel-wise lerp, matches `Color.Lerp`); pass `ColorTweenMode.Hsv` for shortest-arc hue interpolation when you want a vivid sweep (e.g. red→blue passes through magenta, not gray).
+- **`TweenAsync` for chaining.** Each `Tween` overload has a `TweenAsync` twin returning `Task` that completes after the terminal-snap setter call. Use `await this.TweenAsync(...)` to sequence tweens without duplicating the duration in `Engine.Time.Delay`. Cancellation: entity/screen destroy throws `TaskCanceledException`; fire-and-forget (`_ = TweenAsync(...)`) silently swallows it.
 
 ---
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using FlatRedBall.Glue.StateInterpolation;
 using FlatRedBall2.Rendering;
 using Microsoft.Xna.Framework;
@@ -276,6 +277,144 @@ public static class TweeningExtensions
             var rgb = Colors.FromHsv(h, s, v);
             return new Color(rgb.R, rgb.G, rgb.B, (byte)System.Math.Round(a));
         };
+    }
+
+    /// <summary>
+    /// Awaitable variant of <see cref="Tween(Entity, Action{float}, float, float, TimeSpan, InterpolationType, Easing)"/>.
+    /// The returned <see cref="Task"/> completes when the tween finishes naturally — after the
+    /// terminal-snap setter call has run, so the awaiter observes the exact <paramref name="to"/>
+    /// value. Use this to chain tweens (<c>await this.TweenAsync(...); await this.TweenAsync(...);</c>)
+    /// without manually duplicating the duration in <c>Engine.Time.Delay</c>.
+    /// <para>
+    /// <b>Cancellation</b> — if the entity is destroyed (or <see cref="Entity.StopAllTweens"/> is
+    /// called) before the tween completes, the task is canceled and <c>await</c> throws
+    /// <see cref="TaskCanceledException"/>. For fire-and-forget call sites (<c>_ = TweenAsync(...)</c>),
+    /// the unobserved exception is swallowed silently — which is the intended behavior.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Entity entity,
+        Action<float> setter,
+        float from,
+        float to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return TweenAsyncCore(entity._tweens, setter, from, to, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Screen-scoped equivalent of
+    /// <see cref="TweenAsync(Entity, Action{float}, float, float, TimeSpan, InterpolationType, Easing)"/>.
+    /// Cancellation fires when the screen is destroyed or <see cref="Screen.StopAllTweens"/> is called.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Screen screen,
+        Action<float> setter,
+        float from,
+        float to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return TweenAsyncCore(screen._tweens, setter, from, to, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Awaitable <see cref="Vector2"/>-valued tween. See the float overload for cancellation semantics.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Entity entity,
+        Action<Vector2> setter,
+        Vector2 from,
+        Vector2 to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return TweenAsyncCore(entity._tweens, t => setter(Vector2.Lerp(from, to, t)),
+            0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Screen-scoped awaitable <see cref="Vector2"/> tween.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Screen screen,
+        Action<Vector2> setter,
+        Vector2 from,
+        Vector2 to,
+        TimeSpan duration,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        return TweenAsyncCore(screen._tweens, t => setter(Vector2.Lerp(from, to, t)),
+            0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Awaitable <see cref="Color"/>-valued tween. See the float overload for cancellation semantics
+    /// and <see cref="ColorTweenMode"/> for blending modes.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Entity entity,
+        Action<Color> setter,
+        Color from,
+        Color to,
+        TimeSpan duration,
+        ColorTweenMode mode = ColorTweenMode.Rgb,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        var lerp = BuildColorLerp(from, to, mode);
+        return TweenAsyncCore(entity._tweens, t => setter(lerp(t)), 0f, 1f, duration, type, easing);
+    }
+
+    /// <summary>
+    /// Screen-scoped awaitable <see cref="Color"/> tween.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="setter"/> is <c>null</c>.</exception>
+    public static Task TweenAsync(
+        this Screen screen,
+        Action<Color> setter,
+        Color from,
+        Color to,
+        TimeSpan duration,
+        ColorTweenMode mode = ColorTweenMode.Rgb,
+        InterpolationType type = InterpolationType.Linear,
+        Easing easing = Easing.InOut)
+    {
+        if (setter == null) throw new ArgumentNullException(nameof(setter));
+        var lerp = BuildColorLerp(from, to, mode);
+        return TweenAsyncCore(screen._tweens, t => setter(lerp(t)), 0f, 1f, duration, type, easing);
+    }
+
+    private static Task TweenAsyncCore(
+        TweenList list, Action<float> setter, float from, float to, TimeSpan duration,
+        InterpolationType type, Easing easing)
+    {
+        // RunContinuationsAsynchronously matches TimeManager.Delay — keeps the awaiter's
+        // continuation off the engine's update stack so a long await chain can't unwind
+        // through tween advancement.
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tweener = CreateRunning(setter, from, to, duration, type, easing);
+        list.Add(tweener, setter, to, completed =>
+        {
+            if (completed) tcs.TrySetResult();
+            else tcs.TrySetCanceled();
+        });
+        return tcs.Task;
     }
 
     private static Tweener CreateBump(
