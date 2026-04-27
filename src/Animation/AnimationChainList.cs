@@ -16,6 +16,30 @@ public class AnimationChainList : List<AnimationChain>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// When <c>true</c> (default), a frame that names a shape not present on the entity will
+    /// auto-create that shape and attach it. When <c>false</c>, the missing shape throws —
+    /// useful for typo-detection in tightly-authored projects.
+    /// </summary>
+    public bool CreateMissingShapes { get; set; } = true;
+
+    /// <summary>
+    /// All shape names referenced by any frame of any chain in this list. The ownership set the
+    /// sprite reconciles against — names in the set get hidden when absent from the current
+    /// frame; names outside the set are never touched. Recomputed on each call (typically called
+    /// once per chainlist assignment).
+    /// </summary>
+    public HashSet<string> GetOwnedShapeNames()
+    {
+        var names = new HashSet<string>();
+        foreach (var chain in this)
+            foreach (var frame in chain)
+                foreach (var shape in frame.Shapes)
+                    if (!string.IsNullOrEmpty(shape.Name))
+                        names.Add(shape.Name);
+        return names;
+    }
+
+    /// <summary>
     /// Returns the chain whose <see cref="AnimationChain.Name"/> matches <paramref name="name"/>,
     /// or <c>null</c> if no chain with that name exists. Linear scan — O(n) in the chain count;
     /// fine for typical animation lists (rarely more than a handful of chains per entity).

@@ -154,6 +154,8 @@ public class AnimationChainListSave
                         frame.SourceRectangle = new Rectangle(left, top, width, height);
                 }
 
+                AppendShapes(frame, frameSave.ShapeCollectionSave);
+
                 chain.Add(frame);
             }
 
@@ -161,5 +163,57 @@ public class AnimationChainListSave
         }
 
         return list;
+    }
+
+    private static void AppendShapes(FlatRedBall2.Animation.AnimationFrame frame, ShapeCollectionSave? shapes)
+    {
+        if (shapes == null) return;
+
+        foreach (var rect in shapes.AxisAlignedRectangleSaves)
+        {
+            ValidateName(rect.Name, "AxisAlignedRectangleSave");
+            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationRectangleFrame
+            {
+                Name = rect.Name,
+                RelativeX = rect.X,
+                RelativeY = rect.Y,
+                Width = rect.ScaleX * 2f,
+                Height = rect.ScaleY * 2f,
+            });
+        }
+
+        foreach (var circle in shapes.CircleSaves)
+        {
+            ValidateName(circle.Name, "CircleSave");
+            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationCircleFrame
+            {
+                Name = circle.Name,
+                RelativeX = circle.X,
+                RelativeY = circle.Y,
+                Radius = circle.Radius,
+            });
+        }
+
+        foreach (var poly in shapes.PolygonSaves)
+        {
+            ValidateName(poly.Name, "PolygonSave");
+            var points = new System.Numerics.Vector2[poly.Points.Count];
+            for (int i = 0; i < poly.Points.Count; i++)
+                points[i] = new System.Numerics.Vector2(poly.Points[i].X, poly.Points[i].Y);
+            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationPolygonFrame
+            {
+                Name = poly.Name,
+                RelativeX = poly.X,
+                RelativeY = poly.Y,
+                Points = points,
+            });
+        }
+    }
+
+    private static void ValidateName(string name, string elementType)
+    {
+        if (string.IsNullOrEmpty(name))
+            throw new System.InvalidOperationException(
+                $"{elementType} in .achx ShapeCollectionSave is missing a Name. Per-frame shapes must have non-empty unique names.");
     }
 }
