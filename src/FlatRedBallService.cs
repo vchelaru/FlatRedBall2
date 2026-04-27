@@ -254,8 +254,10 @@ public class FlatRedBallService
             screen.ContentManager.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
 
             var bounds = _game.Window.ClientBounds;
-            ApplyCameraSettings(screen.Camera, bounds.Width, bounds.Height);
+            for (int i = 0; i < screen.Cameras.Count; i++)
+                ApplyCameraSettings(screen.Cameras[i], bounds.Width, bounds.Height);
         }
+        // TODO (split-screen): cursor/picking still routes through Cameras[0]; per-viewport picking is deferred.
         Input.SetCamera(screen.Camera);
         Time.ResetScreen();
 
@@ -456,7 +458,8 @@ public class FlatRedBallService
     private void HandleClientSizeChanged(object? sender, EventArgs e)
     {
         var bounds = _game!.Window.ClientBounds;
-        ApplyClientSizeChange(bounds.Width, bounds.Height, _game!.Window.AllowUserResizing, CurrentScreen.Camera);
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+            ApplyClientSizeChange(bounds.Width, bounds.Height, _game!.Window.AllowUserResizing, CurrentScreen.Cameras[i]);
     }
 
     /// <summary>
@@ -487,8 +490,19 @@ public class FlatRedBallService
     private void UpdateCameraViewportAndExtents(Camera camera, int windowWidth, int windowHeight)
     {
         var ds = DisplaySettings;
-        var dest = ds.ComputeDestinationViewport(windowWidth, windowHeight);
-        camera.SetViewport(dest);
+        var hostRect = ds.ComputeDestinationViewport(windowWidth, windowHeight);
+
+        // Sub-viewport (split-screen / picture-in-picture): apply normalized rect, derive orthoW
+        // from the resulting pixel aspect with orthoH pinned to the design height. Single-camera
+        // games with NormalizedViewport at its default (full host rect) fall through to the
+        // existing ResizeMode/DominantAxis logic below so their behavior is unchanged.
+        if (camera.NormalizedViewport != Rendering.NormalizedRectangle.FullViewport)
+        {
+            camera.ApplyToHostRect(hostRect, ds.ResolutionHeight);
+            return;
+        }
+
+        camera.SetViewport(hostRect);
 
         int orthoW, orthoH;
 
@@ -497,8 +511,8 @@ public class FlatRedBallService
             // Pixels-per-world-unit fixed by Zoom: orthogonal extents track the viewport pixel size,
             // so a larger window reveals more world. Aspect is enforced by the viewport itself under
             // Locked, or by the window itself under Free.
-            orthoW = dest.Width;
-            orthoH = dest.Height;
+            orthoW = hostRect.Width;
+            orthoH = hostRect.Height;
         }
         else // StretchVisibleArea
         {
@@ -507,7 +521,7 @@ public class FlatRedBallService
             // Under Locked, the viewport's aspect equals the effective ratio (resolution-derived or
             // explicit FixedAspectRatio). Under Free, the viewport's aspect equals the window's, and
             // the non-dominant world extent grows or shrinks with the window.
-            float vpAspect = dest.Height > 0 ? dest.Width / (float)dest.Height : ds.GetEffectiveAspectRatio();
+            float vpAspect = hostRect.Height > 0 ? hostRect.Width / (float)hostRect.Height : ds.GetEffectiveAspectRatio();
             if (ds.DominantAxis == DominantAxis.Height)
             {
                 orthoH = ds.ResolutionHeight;
@@ -666,13 +680,14 @@ public class FlatRedBallService
     }
 
     /// <summary>
-    /// Per-frame engine draw. Call from <c>Game.Draw</c>. The engine handles all back-buffer clearing:
-    /// under <see cref="Rendering.AspectPolicy.Locked"/> it first fills the full back buffer with
-    /// <see cref="DisplaySettings"/>.<c>LetterboxColor</c> to paint pillarbox/letterbox bars, then paints
-    /// the camera viewport with <see cref="Camera.BackgroundColor"/>. Under
-    /// <see cref="Rendering.AspectPolicy.Free"/> the camera viewport is the full back buffer so a single
-    /// clear suffices. Sorts the renderable list by Layer/Z and dispatches to each renderable's
-    /// <see cref="IRenderBatch"/>.
+    /// Per-frame engine draw. Call from <c>Game.Draw</c>. Clears the full back buffer once
+    /// (with <see cref="DisplaySettings"/>.<c>LetterboxColor</c> under
+    /// <see cref="Rendering.AspectPolicy.Locked"/>, or with the first camera's
+    /// <see cref="Camera.BackgroundColor"/> under <see cref="Rendering.AspectPolicy.Free"/>),
+    /// then iterates <see cref="Screen.Cameras"/> and runs the screen's draw pass once per camera —
+    /// each pass sets <see cref="GraphicsDevice.Viewport"/> to that camera's pixel viewport and
+    /// uses its transform. Single-camera games pay no extra cost; split-screen games get one pass
+    /// per player.
     /// </summary>
     public void Draw()
     {
@@ -681,33 +696,38 @@ public class FlatRedBallService
         RenderDiagnostics.BeginFrame();
 
         var gd = _spriteBatch.GraphicsDevice;
-
-        var camera = CurrentScreen.Camera;
         var pp = gd.PresentationParameters;
+        var primaryCamera = CurrentScreen.Camera;
 
-        if (DisplaySettings.AspectPolicy == Rendering.AspectPolicy.Locked)
+        // Recompute every camera's pixel viewport from the current window dimensions. This picks up
+        // NormalizedViewport changes made in CustomInitialize (after ApplyCameraSettings already ran)
+        // and cameras added to Cameras at any point during the screen's lifetime, and keeps splits
+        // correct on window resize without per-camera ClientSizeChanged plumbing.
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+            UpdateCameraViewportAndExtents(CurrentScreen.Cameras[i], pp.BackBufferWidth, pp.BackBufferHeight);
+
+        // Single full-window clear: letterbox color under Locked (gutter color stays in place even
+        // when cameras don't cover the locked rect), or the primary camera's BackgroundColor under
+        // Free where the cameras are expected to cover the whole window.
+        gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+        gd.Clear(DisplaySettings.AspectPolicy == Rendering.AspectPolicy.Locked
+            ? DisplaySettings.LetterboxColor
+            : primaryCamera.BackgroundColor);
+
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
         {
-            // 1) Paint the letterbox/pillarbox bars by clearing the entire back buffer.
-            gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
-            gd.Clear(DisplaySettings.LetterboxColor);
+            var camera = CurrentScreen.Cameras[i];
 
-            // 2) Set the camera viewport, then paint Camera.BackgroundColor INSIDE it via a SpriteBatch
-            //    quad. GraphicsDevice.Clear is not reliably viewport-respecting across backends, but
-            //    a SpriteBatch.Draw is — it runs through the rasterizer with the active viewport.
+            // Paint each camera's BackgroundColor INSIDE its viewport via a SpriteBatch quad.
+            // GraphicsDevice.Clear is not reliably viewport-respecting across backends; SpriteBatch.Draw
+            // runs through the rasterizer with the active viewport.
             gd.Viewport = camera.Viewport;
             _spriteBatch.Begin();
             _spriteBatch.Draw(_whitePixel, new Rectangle(0, 0, camera.Viewport.Width, camera.Viewport.Height), camera.BackgroundColor);
             _spriteBatch.End();
-        }
-        else
-        {
-            // Free policy: viewport == full window, so a single full-buffer clear suffices.
-            gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
-            gd.Clear(camera.BackgroundColor);
-            gd.Viewport = camera.Viewport;
-        }
 
-        CurrentScreen.Draw(_spriteBatch, RenderDiagnostics);
+            CurrentScreen.Draw(_spriteBatch, RenderDiagnostics, camera);
+        }
 
 #if DEBUG
         _automationMode?.FlushStepResponse(Time.CurrentFrame);

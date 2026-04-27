@@ -49,6 +49,19 @@ public class Camera
     /// <summary>World units visible vertically at <see cref="Zoom"/> = 1. Managed by the engine from <see cref="DisplaySettings"/>; use <see cref="Zoom"/> for runtime zoom.</summary>
     public int OrthogonalHeight { get; internal set; } = 720;
 
+    /// <summary>
+    /// This camera's region inside the engine's host viewport, expressed as fractions of the
+    /// host rect (0..1). Defaults to the full host rect. Set to <c>(0, 0, 0.5f, 1f)</c> for a
+    /// left-half split-screen player, etc. The engine recomputes <see cref="Viewport"/> from
+    /// this each frame, so resizing the window keeps the split clean automatically.
+    /// <para>
+    /// Aspect note: each camera's <see cref="OrthogonalWidth"/> is derived from its viewport's
+    /// pixel aspect ratio. If you want a specific world aspect, pick normalized coordinates
+    /// that produce that pixel aspect — there is no per-camera letterbox.
+    /// </para>
+    /// </summary>
+    public NormalizedRectangle NormalizedViewport { get; set; } = NormalizedRectangle.FullViewport;
+
     /// <summary>World-space X coordinate of the left edge of the visible area. Accounts for <see cref="Zoom"/>.</summary>
     public float Left => X - OrthogonalWidth / (2f * Zoom);
 
@@ -83,6 +96,24 @@ public class Camera
     internal Viewport Viewport => _viewport;
 
     internal void SetViewport(Viewport viewport) => _viewport = viewport;
+
+    /// <summary>
+    /// Resolves <see cref="NormalizedViewport"/> against <paramref name="hostRect"/> to produce
+    /// this camera's pixel <see cref="Viewport"/>, then sets <see cref="OrthogonalHeight"/> from
+    /// <paramref name="orthogonalHeight"/> and derives <see cref="OrthogonalWidth"/> from the
+    /// resulting pixel aspect. Called by the engine each frame and on resize.
+    /// </summary>
+    internal void ApplyToHostRect(Viewport hostRect, int orthogonalHeight)
+    {
+        int x = hostRect.X + (int)(NormalizedViewport.X * hostRect.Width);
+        int y = hostRect.Y + (int)(NormalizedViewport.Y * hostRect.Height);
+        int w = (int)(NormalizedViewport.Width * hostRect.Width);
+        int h = (int)(NormalizedViewport.Height * hostRect.Height);
+        _viewport = new Viewport(x, y, w, h);
+
+        OrthogonalHeight = orthogonalHeight;
+        OrthogonalWidth = h > 0 ? (int)(orthogonalHeight * (w / (float)h)) : orthogonalHeight;
+    }
 
     internal void PhysicsUpdate(float dt)
     {
