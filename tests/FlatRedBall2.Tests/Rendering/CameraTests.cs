@@ -16,6 +16,40 @@ public class CameraTests
     }
 
     [Fact]
+    public void NormalizedViewport_Default_IsFullHostRect()
+    {
+        var camera = new Camera();
+
+        camera.NormalizedViewport.ShouldBe(new NormalizedRectangle(0f, 0f, 1f, 1f));
+    }
+
+    [Fact]
+    public void NormalizedViewport_HalfWidthRightHalf_PixelViewportIsRightHalfOfHostRect()
+    {
+        // Right-half split for player 2: normalized (0.5, 0, 0.5, 1) inside a 1280x720 host rect at (0,0).
+        var camera = new Camera { NormalizedViewport = new NormalizedRectangle(0.5f, 0f, 0.5f, 1f) };
+
+        camera.ApplyToHostRect(new Viewport(0, 0, 1280, 720), orthogonalHeight: 720);
+
+        camera.Viewport.X.ShouldBe(640);
+        camera.Viewport.Y.ShouldBe(0);
+        camera.Viewport.Width.ShouldBe(640);
+        camera.Viewport.Height.ShouldBe(720);
+    }
+
+    [Fact]
+    public void ApplyToHostRect_HalfWidthViewport_DerivesOrthogonalWidthFromPixelAspect()
+    {
+        // Half-width viewport at design height 720 -> pixel 640x720 -> aspect 640/720 -> orthoW = 720 * (640/720) = 640.
+        var camera = new Camera { NormalizedViewport = new NormalizedRectangle(0f, 0f, 0.5f, 1f) };
+
+        camera.ApplyToHostRect(new Viewport(0, 0, 1280, 720), orthogonalHeight: 720);
+
+        camera.OrthogonalHeight.ShouldBe(720);
+        camera.OrthogonalWidth.ShouldBe(640);
+    }
+
+    [Fact]
     public void Zoom_Default_IsOne()
     {
         var camera = new Camera();

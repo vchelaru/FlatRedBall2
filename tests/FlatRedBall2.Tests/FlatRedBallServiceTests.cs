@@ -8,6 +8,26 @@ namespace FlatRedBall2.Tests;
 public class FlatRedBallServiceTests
 {
     [Fact]
+    public void ApplyClientSizeChange_NormalizedRightHalf_ProducesRightHalfPixelViewportAndDerivedOrthoWidth()
+    {
+        // Player-2 split-screen camera occupies right half of a 1280x720 free-aspect window.
+        // Pixel viewport = (640, 0, 640, 720); orthoH stays at design (720); orthoW derives from pixel aspect = 640.
+        var engine = new FlatRedBallService();
+        engine.DisplaySettings.AspectPolicy = AspectPolicy.Free;
+        engine.DisplaySettings.ResolutionWidth = 1280;
+        engine.DisplaySettings.ResolutionHeight = 720;
+        var camera = new Camera { NormalizedViewport = new NormalizedRectangle(0.5f, 0f, 0.5f, 1f) };
+
+        engine.ApplyClientSizeChange(1280, 720, allowUserResizing: true, camera);
+
+        camera.Viewport.X.ShouldBe(640);
+        camera.Viewport.Width.ShouldBe(640);
+        camera.Viewport.Height.ShouldBe(720);
+        camera.OrthogonalHeight.ShouldBe(720);
+        camera.OrthogonalWidth.ShouldBe(640);
+    }
+
+    [Fact]
     public void ApplyClientSizeChange_AllowUserResizingFalse_LeavesCameraViewportUnchanged()
     {
         // Repro for KNI BlazorGL fixed-size canvas: when AllowUserResizing is false, browser-window

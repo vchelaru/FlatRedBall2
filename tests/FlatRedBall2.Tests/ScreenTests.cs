@@ -22,6 +22,30 @@ public class ScreenTests
     }
 
     [Fact]
+    public void Cameras_Default_ContainsTheSameCameraAsCameraProperty()
+    {
+        var screen = new TestScreen();
+
+        screen.Cameras.Count.ShouldBe(1);
+        screen.Cameras[0].ShouldBeSameAs(screen.Camera);
+    }
+
+    [Fact]
+    public void Cameras_TwoCameras_PhysicsUpdatesBothIndependently()
+    {
+        // Each added camera must be integrated by Update — proves the multi-camera physics path.
+        var screen = new TestScreen();
+        var second = new FlatRedBall2.Rendering.Camera { VelocityX = 100f };
+        screen.Cameras.Add(second);
+        screen.Camera.VelocityX = 50f;
+
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f), TimeSpan.Zero, TimeSpan.Zero));
+
+        screen.Camera.X.ShouldBe(50f, tolerance: 0.001f);
+        second.X.ShouldBe(100f, tolerance: 0.001f);
+    }
+
+    [Fact]
     public void Overlay_DrawRepositionDirections_Factory_EmitsOneArrowPerSetBit()
     {
         var engine = new FlatRedBallService();

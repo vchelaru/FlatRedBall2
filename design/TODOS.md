@@ -31,14 +31,14 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 - **Runtime tile mutation API on `TileShapeCollection`.** `SetTile(col, row, tileIndex?)` and `RemoveTile(col, row)` that update both the rendered tile layer and the collision shapes atomically. Currently unclear whether a partial path exists; audit before designing.
 - Together these enable: `?`→used-block swap, brick break (remove tile + spawn rubble entity), powerup-from-block (spawn entity above the bumped cell).
 
-## Split-Screen Support
-**Priority: Discuss** — `Screen` exposes a single `Camera` today. Local-multiplayer games (couch co-op platformer, versus brawler) need multiple cameras drawing into separate viewports of the same window. This is a cross-cutting concern that touches rendering, lazy-spawn activation rects, input/cursor mapping, and any system that today reads `Screen.Camera` as if there were one.
+## Split-Screen Support — Remaining Work
+**Priority: Soon** — Rendering pipeline landed: `Screen.Cameras`, `Camera.NormalizedViewport`, per-camera draw pass. `Camera` still points at `Cameras[0]` for back-compat. Outstanding cross-cutting work:
 
-Sketch:
-- `Screen.Cameras` (list) alongside the existing `Camera` (kept for backward compat — points at `Cameras[0]`).
-- Per-camera `Viewport` rectangle in screen space; render pipeline iterates cameras and re-runs the draw pass per viewport.
-- `LazySpawnManager.Update` — accept the union (or repeated calls) of multiple cameras' world rects so placements activate when *any* camera reaches them.
-- Audit every `Camera.X/Y/Left/Right/...` read in engine code for "which camera?" semantics.
+- **LazySpawnManager**: only `Cameras[0]`'s world rect drives activation today. Multi-camera union (or repeated per-camera ticks with the existing OneShot dedup) so placements activate when *any* camera reaches them.
+- **Cursor / `InputManager.SetCamera`**: bound to `Cameras[0]`. Per-viewport picking (cursor world position routed to the camera whose viewport contains the cursor's screen position) for split-screen menus or mouse-driven games.
+- **Gum / UI**: HUD overlays are drawn once with `Cameras[0]`'s transform. Per-camera UI overlays for split-screen (e.g. each player's HUD inside their own viewport).
+- **Optional `SplitScreenPreset` enum**: thin sugar over `NormalizedViewport` for halves/quadrants/thirds. Only worth adding if call-site verbosity becomes a real complaint.
+- **Audit `Camera.X/Y/Left/Right/...` reads in engine code** for "which camera?" semantics — anywhere it implicitly assumes `Cameras[0]` and shouldn't (e.g. `_gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom` in `FlatRedBallService.cs`).
 
 ## Copy Empty Content Templates on FRB2 Template Install
 **Priority: Discuss** — `.claude/templates/` ships starter assets (`AnimationChains/Empty.achx`, `PlatformerAnimations.achx`, `TopDownAnimations.achx`, `Tiled/base.tmx`, `StandardTileset.tsx`, `PlatformerConfig/player.platformer.json`, `TopDownConfig/player.topdown.json`). Today these are AI-discoverable scaffolds inside the engine repo, but a user installing FRB2 templates (`dotnet new install`) gets none of them — every new project starts with a blank Content folder and the AI has to recreate the same files from scratch.
@@ -46,6 +46,11 @@ Sketch:
 - Decide which files belong in the template package vs only in the engine repo (the .achx + .tmx + JSON config trio is the obvious set; spritesheets are likely too sample-specific).
 - Wire the chosen files into the `dotnet new` template's content includes so a fresh project's `Content/` already has them.
 - Open question: do we ship one template that includes all of them, or per-genre templates (platformer/topdown) that include only the matching subset? The latter avoids dead files but multiplies maintenance.
+
+## TopDownValues Time Units: TimeSpan vs float-seconds
+**Priority: Discuss** — `TopDownValues.AccelerationTime` / `DecelerationTime` are `TimeSpan`, but most engine-facing time values (frame deltas, tween durations, delays in many APIs) are `float` seconds. Writing `AccelerationTime = 0.1f` is a natural first attempt and fails to compile, forcing `TimeSpan.FromSeconds(0.1)` at every call site.
+
+Open question: standardize on `float` seconds engine-wide (changes a public field type — breaking, but small surface), keep `TimeSpan` and document/skill-note the gotcha, or expose `float`-seconds setter sugar alongside the `TimeSpan` field. Hit this while building the split-screen sample's `Player.cs`.
 
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.

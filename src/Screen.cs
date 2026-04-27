@@ -46,8 +46,16 @@ public class Screen
     /// </summary>
     public CancellationToken Token => _cts.Token;
 
-    /// <summary>The camera that defines this screen's view into the world. Modify position/zoom each frame; the engine applies the transform during <see cref="FlatRedBallService.Draw"/>.</summary>
-    public Camera Camera { get; } = new Camera();
+    /// <summary>
+    /// All cameras on this screen, in draw order. The engine creates one camera by default;
+    /// add more for split-screen / multi-viewport rendering by setting each new camera's
+    /// <see cref="Camera.NormalizedViewport"/>. Each camera's transform is applied to a separate
+    /// draw pass per frame.
+    /// </summary>
+    public IList<Camera> Cameras { get; } = new List<Camera> { new Camera() };
+
+    /// <summary>The first camera on this screen — the default for single-camera games. Shortcut for <c>Cameras[0]</c>.</summary>
+    public Camera Camera => Cameras[0];
     /// <summary>This screen's content loader. Unloaded automatically on screen transition.</summary>
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
     /// <summary>The engine that owns this screen. Injected before <see cref="CustomInitialize"/>.</summary>
@@ -711,12 +719,15 @@ public class Screen
             foreach (var entity in _entities)
                 entity.PhysicsUpdate(frameTime);
 
-            Camera.PhysicsUpdate(frameTime.DeltaSeconds);
+            for (int i = 0; i < Cameras.Count; i++)
+                Cameras[i].PhysicsUpdate(frameTime.DeltaSeconds);
 
             // 1.25 Lazy-spawn: tick each enrolled tilemap against the current camera rect so
             //      placements that just scrolled into view spawn their entities BEFORE the
             //      partition sort and collision pass — entities are visible to broad-phase on
             //      the same frame they spawn.
+            // TODO (split-screen): only Cameras[0] is consulted; multi-camera union is deferred
+            //      (see design/TODOS.md "Split-Screen Support").
             for (int i = 0; i < _lazySpawnSources.Count; i++)
                 _lazySpawnSources[i].LazySpawnManager.Update(
                     Camera.Left, Camera.Right, Camera.Bottom, Camera.Top);
@@ -786,11 +797,11 @@ public class Screen
         CustomActivity(frameTime);
     }
 
-    // Internal draw — called by FlatRedBallService. The engine has already cleared the back buffer
-    // (LetterboxColor full-buffer + BackgroundColor inside the camera viewport under Locked, or a
-    // single BackgroundColor clear under Free), so do not call GraphicsDevice.Clear here — it would
-    // ignore the viewport on MonoGame's OpenGL backend and wipe out the letterbox bars.
-    internal void Draw(SpriteBatch spriteBatch, RenderDiagnostics diagnostics)
+    // Internal draw — called by FlatRedBallService once per camera in Screen.Cameras. The engine
+    // has already cleared the back buffer (LetterboxColor or BackgroundColor) and painted the
+    // active camera's BackgroundColor inside its viewport, so do not call GraphicsDevice.Clear
+    // here — it would ignore the viewport on MonoGame's OpenGL backend and wipe out gutters.
+    internal void Draw(SpriteBatch spriteBatch, RenderDiagnostics diagnostics, Camera activeCamera)
     {
         SortRenderList();
 
@@ -812,11 +823,11 @@ public class Screen
                         previousRenderable?.Name ?? string.Empty, renderable.Name ?? string.Empty);
                 }
                 currentBatch?.End(spriteBatch);
-                batch.Begin(spriteBatch, Camera);
+                batch.Begin(spriteBatch, activeCamera);
                 currentBatch = batch;
             }
 
-            renderable.Draw(spriteBatch, Camera);
+            renderable.Draw(spriteBatch, activeCamera);
             previousRenderable = renderable;
         }
 
