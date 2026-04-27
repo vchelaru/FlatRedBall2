@@ -182,7 +182,9 @@ public class ContentManagerService
         if (_graphicsDevice == null)
             throw new InvalidOperationException("ContentManagerService not initialized.");
         using var stream = StreamProvider(path);
-        return Texture2D.FromStream(_graphicsDevice, stream);
+        var texture = Texture2D.FromStream(_graphicsDevice, stream);
+        PremultiplyIfNeeded(texture);
+        return texture;
     }
 
     private bool DefaultTextureReloader(Texture2D existing, string path)
@@ -195,8 +197,40 @@ public class ContentManagerService
             return false;
         var buffer = new Color[incoming.Width * incoming.Height];
         incoming.GetData(buffer);
+        if (OperatingSystem.IsBrowser())
+            PremultiplyAlpha(buffer);
         existing.SetData(buffer);
         return true;
+    }
+
+    // KNI BlazorGL's Texture2D.FromStream returns raw unpremultiplied RGBA (browser image
+    // decode), but the engine renders with BlendState.AlphaBlend which expects premultiplied
+    // alpha — without this pass, antialiased PNG edges blend their full RGB and show as a
+    // light halo. DesktopGL's FromStream already premultiplies internally, so we'd
+    // double-premultiply and darken edges if we did this unconditionally.
+    private static void PremultiplyIfNeeded(Texture2D texture)
+    {
+        if (!OperatingSystem.IsBrowser())
+            return;
+        var buffer = new Color[texture.Width * texture.Height];
+        texture.GetData(buffer);
+        PremultiplyAlpha(buffer);
+        texture.SetData(buffer);
+    }
+
+    private static void PremultiplyAlpha(Color[] buffer)
+    {
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            var c = buffer[i];
+            if (c.A == 255) continue;
+            if (c.A == 0) { buffer[i] = new Color(0, 0, 0, 0); continue; }
+            buffer[i] = new Color(
+                (byte)(c.R * c.A / 255),
+                (byte)(c.G * c.A / 255),
+                (byte)(c.B * c.A / 255),
+                c.A);
+        }
     }
 
     /// <summary>

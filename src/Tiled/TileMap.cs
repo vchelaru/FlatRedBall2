@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
 using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
+using MonoGame.Extended.Content;
 using MonoGame.Extended.Tilemaps;
 using MonoGame.Extended.Tilemaps.Rendering;
 using MonoGame.Extended.Tilemaps.Tiled;
@@ -54,7 +55,9 @@ public class TileMap
         // the directory portion of the TMX path so child references resolve relative to the
         // TMX, matching ParseFromFile's behavior.
         string basePath = System.IO.Path.GetDirectoryName(tmxPath) ?? string.Empty;
-        var parser = new TiledTmxParser();
+        var parser = new TiledTmxParser(
+            baseDirectory: basePath,
+            resourceResolver: ExternalResourceResolvers.OpenTitleContainerStream);
         using var stream = XnaTitleContainer.OpenStream(tmxPath);
         return parser.ParseFromStream(stream, graphicsDevice, basePath);
     }
