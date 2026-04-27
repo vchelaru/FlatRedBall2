@@ -46,4 +46,7 @@ public class AnimationFrameSave
     public float RelativeY;
     /// <summary>Used by XmlSerializer to optionally omit <see cref="RelativeY"/>.</summary>
     public bool ShouldSerializeRelativeY() => RelativeY != 0f;
+
+    /// <summary>Per-frame shape definitions. Empty by default.</summary>
+    public ShapeCollectionSave? ShapeCollectionSave;
 }

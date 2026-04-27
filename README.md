@@ -4,6 +4,15 @@
 
 FlatRedBall2 is the next generation of [FlatRedBall](https://github.com/vchelaru/FlatRedBall)  — a 2D game engine with 20+ years of iteration behind it, rebuilt from the ground up on modern .NET. It runs on two backends: [MonoGame](https://monogame.net) for desktop and [KNI](https://github.com/kniEngine/kni) for browser (via Blazor WASM), sharing a single codebase.
 
+## Samples
+
+Each sample is a complete runnable game built on the engine — open the source to see real usage patterns.
+
+| Sample | Description | Play |
+|--------|-------------|------|
+| [ShmupSpace](samples/ShmupSpace/) | Shoot-em-up | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/ShmupSpace/) |
+| [PlatformKing](samples/PlatformKing/) | Platformer | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/PlatformKing/) |
+
 ## Features
 
 - **Screens & Entities** — structured game object model with lifecycle hooks (`CustomInitialize`, `CustomActivity`, `CustomDestroy`)
@@ -193,13 +202,6 @@ public class GameScreen : Screen
 ```
 
 See the `samples/` directory for complete working examples.
-
-## Samples
-
-| Sample | Description | Play |
-|--------|-------------|------|
-| [ShmupSpace](samples/ShmupSpace/) | Shoot-em-up | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/ShmupSpace/) |
-| [PlatformKing](samples/PlatformKing/) | Platformer | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/PlatformKing/) |
 
 ## Working with AI Assistants
 

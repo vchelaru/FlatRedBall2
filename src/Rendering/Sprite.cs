@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Animation;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Math;
 using FlatRedBall2.Rendering.Batches;
 
@@ -224,6 +226,14 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// The collection of named animation chains available to this sprite.
     /// Assign before calling <see cref="PlayAnimation(string)"/>.
+    /// <para>
+    /// Per-frame <c>RelativeX</c>/<c>RelativeY</c> offsets and per-frame shapes both require the
+    /// sprite to be attached to a parent <see cref="Entity"/>. Offsets are applied to the sprite's
+    /// position, which is interpreted relative to its parent; without a parent the offsets become
+    /// absolute world coordinates and snap the sprite around between frames. Shape reconciliation
+    /// looks up and creates shapes on the parent — without a parent it is silently a no-op
+    /// (though name-validation errors still surface).
+    /// </para>
     /// </summary>
     public AnimationChainList? AnimationChains
     {
@@ -360,12 +370,6 @@ public class Sprite : IRenderable, IAttachable
         ApplyCurrentFrame();
     }
 
-    /// <summary>
-    /// Applies the current frame to render state. This updates <see cref="Texture"/>,
-    /// <see cref="SourceRectangle"/>, flip flags, and relative offsets. When
-    /// <see cref="TextureScale"/> is non-null, width/height are recalculated from the frame's
-    /// source rectangle.
-    /// </summary>
     private void ApplyCurrentFrame()
     {
         if (_animationChains == null || _currentChainIndex < 0) return;
@@ -380,6 +384,168 @@ public class Sprite : IRenderable, IAttachable
         X = frame.RelativeX;
         Y = frame.RelativeY;
         RecalculateDimensions();
+
+        ReconcileShapes(frame);
+    }
+
+    private void ReconcileShapes(AnimationFrame frame)
+    {
+        if (_animationChains == null) return;
+
+        // Validate frame shape entries before short-circuiting on missing parent or empty owned
+        // set — empty/duplicate names are programmer errors that should surface even without
+        // a parent entity attached.
+        Dictionary<string, AnimationShapeFrame>? frameShapes = null;
+        for (int i = 0; i < frame.Shapes.Count; i++)
+        {
+            var s = frame.Shapes[i];
+            if (string.IsNullOrEmpty(s.Name))
+                throw new InvalidOperationException(
+                    "AnimationFrame contains a shape with an empty Name. Names are required for per-frame shape reconciliation.");
+            frameShapes ??= new Dictionary<string, AnimationShapeFrame>();
+            if (frameShapes.ContainsKey(s.Name))
+                throw new InvalidOperationException(
+                    $"AnimationFrame contains duplicate shape name '{s.Name}'. Names must be unique within a frame.");
+            frameShapes[s.Name] = s;
+        }
+
+        if (Parent == null) return;
+
+        var ownedNames = _animationChains.GetOwnedShapeNames();
+        if (ownedNames.Count == 0) return;
+
+        foreach (var name in ownedNames)
+        {
+            AnimationShapeFrame? entry = null;
+            frameShapes?.TryGetValue(name, out entry);
+            if (entry != null)
+                ApplyShapeEntry(name, entry);
+            else
+                HideShapeIfPresent(name);
+        }
+    }
+
+    private void ApplyShapeEntry(string name, AnimationShapeFrame entry)
+    {
+        var existing = Parent!.FindShapeByName(name);
+        switch (entry)
+        {
+            case AnimationRectangleFrame rect:
+            {
+                if (existing == null)
+                {
+                    if (!_animationChains!.CreateMissingShapes)
+                        throw new InvalidOperationException(
+                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
+                    var r = new AxisAlignedRectangle { Name = name };
+                    ApplyRectangle(r, rect);
+                    Parent.Add(r);
+                }
+                else if (existing is AxisAlignedRectangle r)
+                {
+                    ApplyRectangle(r, rect);
+                    Parent.SetDefaultCollision(r, true);
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Animation frame says '{name}' is a Rectangle but entity has it as {existing.GetType().Name}.");
+                }
+                break;
+            }
+            case AnimationCircleFrame circle:
+            {
+                if (existing == null)
+                {
+                    if (!_animationChains!.CreateMissingShapes)
+                        throw new InvalidOperationException(
+                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
+                    var c = new Circle { Name = name };
+                    ApplyCircle(c, circle);
+                    Parent.Add(c);
+                }
+                else if (existing is Circle c)
+                {
+                    ApplyCircle(c, circle);
+                    Parent.SetDefaultCollision(c, true);
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Animation frame says '{name}' is a Circle but entity has it as {existing.GetType().Name}.");
+                }
+                break;
+            }
+            case AnimationPolygonFrame poly:
+            {
+                if (existing == null)
+                {
+                    if (!_animationChains!.CreateMissingShapes)
+                        throw new InvalidOperationException(
+                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
+                    var p = new Polygon { Name = name };
+                    ApplyPolygon(p, poly);
+                    Parent.Add(p);
+                }
+                else if (existing is Polygon p)
+                {
+                    ApplyPolygon(p, poly);
+                    Parent.SetDefaultCollision(p, true);
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Animation frame says '{name}' is a Polygon but entity has it as {existing.GetType().Name}.");
+                }
+                break;
+            }
+        }
+    }
+
+    private void HideShapeIfPresent(string name)
+    {
+        var existing = Parent!.FindShapeByName(name);
+        if (existing == null) return;
+        switch (existing)
+        {
+            case AxisAlignedRectangle r:
+                r.IsVisible = false;
+                Parent.SetDefaultCollision(r, false);
+                break;
+            case Circle c:
+                c.IsVisible = false;
+                Parent.SetDefaultCollision(c, false);
+                break;
+            case Polygon p:
+                p.IsVisible = false;
+                Parent.SetDefaultCollision(p, false);
+                break;
+        }
+    }
+
+    private static void ApplyRectangle(AxisAlignedRectangle r, AnimationRectangleFrame entry)
+    {
+        r.Width = entry.Width;
+        r.Height = entry.Height;
+        r.X = entry.RelativeX;
+        r.Y = entry.RelativeY;
+        r.IsVisible = true;
+    }
+
+    private static void ApplyCircle(Circle c, AnimationCircleFrame entry)
+    {
+        c.Radius = entry.Radius;
+        c.X = entry.RelativeX;
+        c.Y = entry.RelativeY;
+        c.IsVisible = true;
+    }
+
+    private static void ApplyPolygon(Polygon p, AnimationPolygonFrame entry)
+    {
+        p.SetPoints(entry.Points);
+        p.X = entry.RelativeX;
+        p.Y = entry.RelativeY;
+        p.IsVisible = true;
     }
 
     /// <inheritdoc/>

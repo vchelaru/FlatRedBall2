@@ -269,6 +269,20 @@ public class Entity : ICollidable, IAttachable
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;
 
+    // Used by Sprite.ApplyCurrentFrame to reconcile per-frame shapes against the entity's
+    // attached shapes by name. Walks _children rather than _shapes so we still find a shape
+    // that has been removed from default collision (i.e. previously hidden by the animation).
+    internal IAttachable? FindShapeByName(string name)
+    {
+        foreach (var child in _children)
+        {
+            if (child is FlatRedBall2.Collision.AxisAlignedRectangle r && r.Name == name) return r;
+            if (child is FlatRedBall2.Collision.Circle c && c.Name == name) return c;
+            if (child is FlatRedBall2.Collision.Polygon p && p.Name == name) return p;
+        }
+        return null;
+    }
+
     // Tween list — advanced by Screen.Update each frame, cleared on Destroy.
     internal readonly Tweening.TweenList _tweens = new();
 

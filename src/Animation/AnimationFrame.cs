@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -43,4 +44,12 @@ public class AnimationFrame
     /// Replaces the sprite's Y each frame switch.
     /// </summary>
     public float RelativeY;
+
+    /// <summary>
+    /// Per-frame shape definitions reconciled against the parent entity at frame switch time.
+    /// Each entry must have a non-empty unique <see cref="AnimationShapeFrame.Name"/>. See
+    /// <see cref="AnimationChainList"/> for the ownership rule that decides which entity shapes
+    /// the animation system is allowed to touch.
+    /// </summary>
+    public List<AnimationShapeFrame> Shapes { get; } = new();
 }
