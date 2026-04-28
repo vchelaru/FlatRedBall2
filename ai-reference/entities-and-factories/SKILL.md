@@ -93,6 +93,24 @@ enemy.Destroy();   // removes from factory, screen, and clears child shapes
 
 `factory.Destroy(entity)` is equivalent. **Fields are invalid after `Destroy()`** — don't read state on an entity you just destroyed; use `factory.Instances.Count == 0` to detect when all are gone.
 
+## Object Pooling for High-Churn Entities
+
+Bullets, particles, score popups — entities that spawn and die many times per second — generate avoidable GC pressure. Opt the factory into pooling:
+
+```csharp
+_bulletFactory = new Factory<Bullet>(this).EnablePooling().Prewarm(32);
+```
+
+With pooling on, `Destroy()` returns the instance to a free list instead of tearing it down; the next `Create()` reuses it. `EnablePooling()` must be called before the factory has produced any live instance — throws otherwise.
+
+**Contract:**
+- `CustomInitialize` runs exactly once per instance, on first `Create()`. Shape children allocated there are reused across every recycle — the whole point.
+- `CustomDestroy` does **not** run when a pooled entity is destroyed. Use it only for one-time teardown of resources allocated in `CustomInitialize`.
+- The engine resets per-life state automatically on recycle: `Position`, `Velocity`, `Acceleration`, `Rotation`, `RotationVelocity`, `Drag`, `Z`, `IsVisible`.
+- Override `protected void Reset()` to clear **entity-specific dynamic state** the entity itself mutates over its life — lifetime accumulators, health, mode flags, internal state-machine cursors. Forgetting to reset these is the pooling footgun: stale state bleeds into the next life and is hard to diagnose.
+
+Skip pooling for entities that exist as singletons or near-singletons (player, level boss, HUD-anchored UI). The opt-in API exists so the default path stays predictable.
+
 ## Fire-and-Forget Effects
 
 For short-lived visual entities the spawner doesn't want to keep a reference to — explosions, hit sparks, dust puffs, falling enemy bodies, damage numbers — skip the subclass and factory entirely. `Screen.CreateFireAndForget` builds and registers a one-shot `Entity` with a `Sprite` child and self-destroys when the animation finishes (or after a duration for the texture overload).

@@ -328,6 +328,137 @@ public class FactoryTests
         public override void CustomInitialize() => InitCount++;
     }
 
+    private class PoolableBullet : Entity
+    {
+        public AxisAlignedRectangle Body { get; private set; } = null!;
+        public int InitCount;
+        public int ResetCount;
+        public int CustomDestroyCount;
+        public int Lifetime;
+        public override void CustomInitialize()
+        {
+            InitCount++;
+            Body = new AxisAlignedRectangle { Width = 4, Height = 2 };
+            Add(Body);
+        }
+        protected override void Reset()
+        {
+            ResetCount++;
+            Lifetime = 0;
+        }
+        public override void CustomDestroy() => CustomDestroyCount++;
+    }
+
+    [Fact]
+    public void Create_AfterDestroyOnPooledFactory_ResetsEngineState()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+
+        var first = factory.Create();
+        first.X = 100; first.Y = 50; first.VelocityX = 200;
+        first.Destroy();
+
+        var second = factory.Create();
+
+        second.ShouldBeSameAs(first);
+        second.X.ShouldBe(0);
+        second.Y.ShouldBe(0);
+        second.VelocityX.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Create_AfterDestroyOnPooledFactory_ReturnsSameInstance()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+
+        var first = factory.Create();
+        first.Destroy();
+        var second = factory.Create();
+
+        second.ShouldBeSameAs(first);
+        factory.Instances.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void CustomDestroy_OnPooledFactoryDestroy_DoesNotRun()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+
+        var entity = factory.Create();
+        entity.Destroy();
+
+        entity.CustomDestroyCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void CustomInitialize_OnPooledFactory_RunsOncePerInstance()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+
+        var entity = factory.Create();
+        entity.Destroy();
+        factory.Create();
+        entity.Destroy();
+        factory.Create();
+
+        entity.InitCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void EnablePooling_AfterFirstCreate_Throws()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen);
+        factory.Create();
+
+        Should.Throw<System.InvalidOperationException>(() => factory.EnablePooling());
+    }
+
+    [Fact]
+    public void Prewarm_OnPooledFactory_DoesNotAddToInstances()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling().Prewarm(3);
+
+        factory.Instances.ShouldBeEmpty();
+
+        // Three Creates after prewarm should reuse those instances rather than allocating new ones.
+        var a = factory.Create();
+        var b = factory.Create();
+        var c = factory.Create();
+        a.InitCount.ShouldBe(1);
+        b.InitCount.ShouldBe(1);
+        c.InitCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Reset_OnPooledFactoryRecycle_RunsOnceNotOnFirstCreate()
+    {
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<PoolableBullet>(screen).EnablePooling();
+
+        var entity = factory.Create();
+        entity.ResetCount.ShouldBe(0); // not called on first create
+
+        entity.Lifetime = 99;
+        entity.Destroy();
+        factory.Create();
+
+        entity.ResetCount.ShouldBe(1);
+        entity.Lifetime.ShouldBe(0);
+    }
+
     // Reads InitOnlyValue inside CustomInitialize and stamps it into ObservedValue.
     // The configure callback on Create must run BEFORE CustomInitialize for ObservedValue
     // to reflect what the caller passed in.
