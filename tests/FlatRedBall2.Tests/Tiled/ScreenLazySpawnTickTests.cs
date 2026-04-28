@@ -1,4 +1,5 @@
 using System;
+using FlatRedBall2.Rendering;
 using FlatRedBall2.Tiled;
 using MonoGame.Extended.Tilemaps;
 using Shouldly;
@@ -51,6 +52,27 @@ public class ScreenLazySpawnTickTests
 
         // Camera default at origin, OrthogonalWidth/Height 1280x720 — the placeholder at world
         // (24, -40) (center of cell col=1,row=2 with origin Y=0) is well within the camera rect.
+        screen.Update(Frame(1f / 60f));
+
+        factory.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void TwoCameras_PlacementVisibleOnlyToSecondCamera_Spawns()
+    {
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<Marker>(screen) { LazySpawn = LazySpawnMode.OneShot };
+
+        var tileMap = new TileMap(BuildTilemap());
+        tileMap.CreateEntities("Coin", factory);
+        screen.Add(tileMap);
+
+        // Move primary camera far away — placement (24, -40) is invisible to it.
+        screen.Cameras[0].X = 10000f;
+        // Add second camera centered on the placement.
+        var second = new Camera { X = 24f, Y = -40f };
+        screen.Cameras.Add(second);
+
         screen.Update(Frame(1f / 60f));
 
         factory.Count.ShouldBe(1);

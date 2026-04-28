@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
@@ -14,8 +15,11 @@ namespace FlatRedBall2.Input;
 /// rather than constructing this directly.
 /// </summary>
 /// <remarks>
-/// <see cref="WorldPosition"/> requires a <see cref="Camera"/> reference (injected by the engine via
-/// <c>InputManager.SetCamera</c>); until one is set, world coordinates fall back to screen coordinates.
+/// <see cref="WorldPosition"/> requires <see cref="Camera"/>s to be registered (injected by the
+/// engine via <c>InputManager.SetCameras</c>); until at least one is set, world coordinates fall
+/// back to screen coordinates. With multiple cameras (split-screen), the cursor sticks to whichever
+/// camera's viewport contains the cursor's pixel position; if the cursor enters a letterbox gap,
+/// the previous active camera continues to be used.
 /// On platforms without a touch panel (most desktop runs), touch polling is permanently disabled
 /// after the first failure and the cursor reports mouse state only.
 /// </remarks>
@@ -23,7 +27,8 @@ public class Cursor : ICursor
 {
     private MouseState _currentMouse;
     private MouseState _previousMouse;
-    private Camera? _camera;
+    private IReadOnlyList<Camera>? _cameras;
+    private Camera? _activeCamera;
 
     private bool _touchActive;
     private bool _touchActivePrev;
@@ -46,7 +51,11 @@ public class Cursor : ICursor
     /// <inheritdoc/>
     public TimeSpan DoubleClickThreshold { get; set; } = TimeSpan.FromMilliseconds(250);
 
-    internal void SetCamera(Camera camera) => _camera = camera;
+    internal void SetCameras(IReadOnlyList<Camera> cameras)
+    {
+        _cameras = cameras;
+        _activeCamera = null;
+    }
 
     // Called once per frame by InputManager before entity/screen logic runs.
     internal void Update(TimeSpan realTimeSinceStart) => Update(Mouse.GetState(), realTimeSinceStart);
@@ -63,7 +72,36 @@ public class Cursor : ICursor
         if (_touchAvailable)
             UpdateTouch();
 
+        UpdateActiveCamera();
         UpdateDoubleClicks(realTimeSinceStart);
+    }
+
+    // Sticky pick: keep the previously-chosen camera when the cursor leaves all viewports
+    // (e.g., a letterbox gap between split-screen viewports). On first registration with no
+    // hit yet, default to _cameras[0] so a freshly-set-up cursor has a sensible camera.
+    private void UpdateActiveCamera()
+    {
+        if (_cameras == null || _cameras.Count == 0)
+        {
+            _activeCamera = null;
+            return;
+        }
+
+        var screen = ScreenPosition;
+        int sx = (int)screen.X;
+        int sy = (int)screen.Y;
+        for (int i = 0; i < _cameras.Count; i++)
+        {
+            var vp = _cameras[i].Viewport;
+            if (sx >= vp.X && sx < vp.X + vp.Width &&
+                sy >= vp.Y && sy < vp.Y + vp.Height)
+            {
+                _activeCamera = _cameras[i];
+                return;
+            }
+        }
+
+        _activeCamera ??= _cameras[0];
     }
 
     private void UpdateDoubleClicks(TimeSpan now)
@@ -128,11 +166,22 @@ public class Cursor : ICursor
     /// <inheritdoc/>
     /// <remarks>
     /// Falls back to <see cref="ScreenPosition"/> if no <see cref="Camera"/> has been registered yet
-    /// (e.g. very early in startup before the first screen is loaded).
+    /// (e.g. very early in startup before the first screen is loaded). With split-screen, picks
+    /// whichever camera's viewport currently contains the cursor; sticky in letterbox gaps.
+    /// Use <see cref="GetWorldPosition(Camera)"/> to project through a specific camera regardless
+    /// of cursor location.
     /// </remarks>
-    public Vector2 WorldPosition => _camera != null
-        ? _camera.ScreenToWorld(ScreenPosition)
+    public Vector2 WorldPosition => _activeCamera != null
+        ? GetWorldPosition(_activeCamera)
         : ScreenPosition;
+
+    /// <inheritdoc/>
+    public Vector2 GetWorldPosition(Camera camera)
+    {
+        var vp = camera.Viewport;
+        var local = ScreenPosition - new Vector2(vp.X, vp.Y);
+        return camera.ScreenToWorld(local);
+    }
 
     /// <inheritdoc/>
     /// <remarks>True whenever a touch is active or the left mouse button is held.</remarks>
@@ -191,9 +240,23 @@ public class Cursor : ICursor
     public bool IsOver(ICollidable shape) => shape.Contains(WorldPosition);
 
     /// <inheritdoc/>
+    public bool IsOver(ICollidable shape, Camera camera) => shape.Contains(GetWorldPosition(camera));
+
+    /// <inheritdoc/>
     public bool IsOver(Entity entity)
     {
         var world = WorldPosition;
+        foreach (var leaf in Entity.GetLeafShapes(entity))
+        {
+            if (leaf.Contains(world)) return true;
+        }
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool IsOver(Entity entity, Camera camera)
+    {
+        var world = GetWorldPosition(camera);
         foreach (var leaf in Entity.GetLeafShapes(entity))
         {
             if (leaf.Contains(world)) return true;

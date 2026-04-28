@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FlatRedBall2.Rendering;
 using Microsoft.Xna.Framework.Input;
 
@@ -41,7 +42,7 @@ public class InputManager
         return _gamepads[index];
     }
 
-    internal void SetCamera(Camera camera) => _cursor.SetCamera(camera);
+    internal void SetCameras(IReadOnlyList<Camera> cameras) => _cursor.SetCameras(cameras);
 
     internal void InjectKey(Keys key, bool down) => _keyboard.InjectKey(key, down);
     internal void InjectGamepadButton(int playerIndex, Buttons button, bool down) => _gamepads[playerIndex].InjectButton(button, down);

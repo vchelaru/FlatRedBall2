@@ -1,3 +1,4 @@
+using System;
 using FlatRedBall2.Tiled;
 using Shouldly;
 using Xunit;
@@ -151,6 +152,119 @@ public class LazySpawnManagerTests
 
         factory.Count.ShouldBe(1);
         factory[0].Tag.ShouldBe("hi");
+    }
+
+    [Fact]
+    public void MultiRect_Spawns_WhenAnyRectCoversPlacement()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.OneShot);
+        manager.Add(factory, worldX: 500f, worldY: 50f, applyAfterInit: null);
+
+        // First rect doesn't cover (500,50); second rect does. Placement should spawn.
+        ReadOnlySpan<ActivationRect> rects =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(450f, 550f, 0f, 100f),
+        ];
+        manager.Update(rects);
+
+        factory.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void MultiRect_DoesNotSpawn_WhenNoRectCoversPlacement()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.OneShot);
+        manager.Add(factory, worldX: 1000f, worldY: 50f, applyAfterInit: null);
+
+        ReadOnlySpan<ActivationRect> rects =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(450f, 550f, 0f, 100f),
+        ];
+        manager.Update(rects);
+
+        factory.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Reloadable_StaysAwaitingRectExit_WhenOneRectStillCovers()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.Reloadable);
+        manager.Add(factory, 50f, 50f, null);
+
+        // Both rects cover (50,50) — spawn.
+        ReadOnlySpan<ActivationRect> bothCover =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(0f, 100f, 0f, 100f),
+        ];
+        manager.Update(bothCover);
+        factory[0].Destroy();
+
+        // First rect leaves but second still covers — record stays in AwaitingRectExit, no respawn.
+        ReadOnlySpan<ActivationRect> oneStillCovers =
+        [
+            new ActivationRect(500f, 600f, 0f, 100f),
+            new ActivationRect(0f, 100f, 0f, 100f),
+        ];
+        manager.Update(oneStillCovers);
+
+        factory.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Reloadable_ReArms_OnlyWhenAllRectsLeave()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.Reloadable);
+        manager.Add(factory, 50f, 50f, null);
+
+        ReadOnlySpan<ActivationRect> bothCover =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(0f, 100f, 0f, 100f),
+        ];
+        manager.Update(bothCover);
+        factory[0].Destroy();
+
+        // All rects leave — record re-arms (no spawn this tick because rects don't cover).
+        ReadOnlySpan<ActivationRect> allLeft =
+        [
+            new ActivationRect(500f, 600f, 0f, 100f),
+            new ActivationRect(700f, 800f, 0f, 100f),
+        ];
+        manager.Update(allLeft);
+        factory.Count.ShouldBe(0);
+
+        // A rect re-enters — spawn.
+        manager.Update(bothCover);
+        factory.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void OneShot_OnlyFiresOnce_EvenWithSecondRectArrivingLater()
+    {
+        var (factory, manager) = Setup(LazySpawnMode.OneShot);
+        manager.Add(factory, 50f, 50f, null);
+
+        ReadOnlySpan<ActivationRect> firstCovers =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(500f, 600f, 0f, 100f),
+        ];
+        manager.Update(firstCovers);
+        factory.Count.ShouldBe(1);
+        factory[0].Destroy();
+
+        // Second rect now also covers — Consumed state must hold.
+        ReadOnlySpan<ActivationRect> bothCover =
+        [
+            new ActivationRect(0f, 100f, 0f, 100f),
+            new ActivationRect(40f, 60f, 40f, 60f),
+        ];
+        manager.Update(bothCover);
+
+        factory.Count.ShouldBe(0);
     }
 
     [Fact]
