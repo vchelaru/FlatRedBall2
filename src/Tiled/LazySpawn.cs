@@ -31,9 +31,16 @@ public enum LazySpawnMode
 }
 
 /// <summary>
+/// Activation rectangle in world space — typically a camera's visible bounds. Multiple rects
+/// may be passed to <see cref="LazySpawnManager.Update(ReadOnlySpan{ActivationRect})"/> for
+/// split-screen; a placement is "covered" if any rect contains it.
+/// </summary>
+public readonly record struct ActivationRect(float Left, float Right, float Bottom, float Top);
+
+/// <summary>
 /// Tracks <see cref="LazySpawnRecord{T}"/>s for a <see cref="TileMap"/> and ticks them each
-/// frame against an activation rect. Records are inert until added; the manager performs no
-/// allocation on the per-frame hotpath.
+/// frame against one or more activation rects. Records are inert until added; the manager
+/// performs no allocation on the per-frame hotpath.
 /// </summary>
 public sealed class LazySpawnManager
 {
@@ -51,19 +58,31 @@ public sealed class LazySpawnManager
     }
 
     /// <summary>
-    /// Advances every record's state machine against the activation rect (camera bounds; each
-    /// record expands by its factory's <see cref="Factory{T}.LazySpawnBuffer"/>).
+    /// Advances every record's state machine against one or more activation rects (typically
+    /// per-camera bounds for split-screen). A record is "inside" if it falls within any rect
+    /// after that rect is expanded by the factory's <see cref="Factory{T}.LazySpawnBuffer"/>.
+    /// Reloadable records re-arm only once every rect has left.
+    /// </summary>
+    public void Update(ReadOnlySpan<ActivationRect> rects)
+    {
+        for (int i = 0; i < _records.Count; i++)
+            _records[i].Tick(rects);
+    }
+
+    /// <summary>
+    /// Single-rect convenience overload. Equivalent to passing a one-element span; intended for
+    /// single-camera callers and tests.
     /// </summary>
     public void Update(float left, float right, float bottom, float top)
     {
-        for (int i = 0; i < _records.Count; i++)
-            _records[i].Tick(left, right, bottom, top);
+        ReadOnlySpan<ActivationRect> rects = [new ActivationRect(left, right, bottom, top)];
+        Update(rects);
     }
 }
 
 internal interface ILazySpawnRecord
 {
-    void Tick(float left, float right, float bottom, float top);
+    void Tick(ReadOnlySpan<ActivationRect> rects);
 }
 
 internal enum LazySpawnRecordState
@@ -91,14 +110,22 @@ internal sealed class LazySpawnRecord<T> : ILazySpawnRecord where T : Entity, ne
         _applyAfterInit = applyAfterInit;
     }
 
-    public void Tick(float left, float right, float bottom, float top)
+    public void Tick(ReadOnlySpan<ActivationRect> rects)
     {
         if (_state == LazySpawnRecordState.Consumed) return;
 
         float buf = _factory.LazySpawnBuffer;
-        bool inside =
-            _worldX >= left - buf && _worldX <= right + buf &&
-            _worldY >= bottom - buf && _worldY <= top + buf;
+        bool inside = false;
+        for (int i = 0; i < rects.Length; i++)
+        {
+            var r = rects[i];
+            if (_worldX >= r.Left - buf && _worldX <= r.Right + buf &&
+                _worldY >= r.Bottom - buf && _worldY <= r.Top + buf)
+            {
+                inside = true;
+                break;
+            }
+        }
         _rectInsideLastTick = inside;
 
         switch (_state)

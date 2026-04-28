@@ -228,6 +228,7 @@ public class Screen
     }
 
     private readonly List<TileMap> _lazySpawnSources = new();
+    private ActivationRect[]? _lazySpawnRectBuffer;
 
     /// <summary>
     /// Adds a Gum Forms control to this screen's primary camera HUD. Equivalent to
@@ -257,9 +258,10 @@ public class Screen
     // ---------- Overlay (full-window, shared across cameras) ----------
 
     private GraphicalUiElement? _overlayRoot;
-    private float _lastOverlayCanvasWidth = float.NaN;
-    private float _lastOverlayCanvasHeight = float.NaN;
 
+    // OverlayRoot.Width/Height are set by FlatRedBallService.Draw each frame to back-buffer dims.
+    // Gum's Width/Height setters gate on equality and trigger their own UpdateLayout when changed,
+    // so no explicit UpdateLayout call or external gating is needed here.
     /// <summary>
     /// Lazily-created Gum root for the screen-level overlay. Visuals added via
     /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/> are parented here and laid out
@@ -267,24 +269,6 @@ public class Screen
     /// Use this for pause menus, title cards, and other UI that should not be split per viewport.
     /// </summary>
     public GraphicalUiElement OverlayRoot => _overlayRoot ??= new ContainerRuntime();
-
-    /// <summary>Test-only counter incremented every time the overlay's canvas dims change and a layout pass runs.</summary>
-    internal int OverlayLayoutCallCount { get; private set; }
-
-    /// <summary>
-    /// Calls <c>UpdateLayout</c> on <see cref="OverlayRoot"/> only when the supplied canvas dims
-    /// differ from those used on the previous call. Same gating discipline as
-    /// <see cref="Camera.EnsureHudLayout"/>.
-    /// </summary>
-    internal void EnsureOverlayLayout(float canvasWidth, float canvasHeight)
-    {
-        if (canvasWidth == _lastOverlayCanvasWidth && canvasHeight == _lastOverlayCanvasHeight)
-            return;
-        _lastOverlayCanvasWidth = canvasWidth;
-        _lastOverlayCanvasHeight = canvasHeight;
-        OverlayRoot.UpdateLayout();
-        OverlayLayoutCallCount++;
-    }
 
     /// <summary>
     /// Adds a Gum visual to the screen-level overlay layer, drawn full-window after every
@@ -819,15 +803,20 @@ public class Screen
             for (int i = 0; i < Cameras.Count; i++)
                 Cameras[i].PhysicsUpdate(frameTime.DeltaSeconds);
 
-            // 1.25 Lazy-spawn: tick each enrolled tilemap against the current camera rect so
-            //      placements that just scrolled into view spawn their entities BEFORE the
-            //      partition sort and collision pass — entities are visible to broad-phase on
-            //      the same frame they spawn.
-            // TODO (split-screen): only Cameras[0] is consulted; multi-camera union is deferred
-            //      (see design/TODOS.md "Split-Screen Support").
+            // 1.25 Lazy-spawn: tick each enrolled tilemap against every camera's rect so
+            //      placements that just scrolled into view (on any camera, for split-screen)
+            //      spawn their entities BEFORE the partition sort and collision pass —
+            //      entities are visible to broad-phase on the same frame they spawn.
+            if (_lazySpawnRectBuffer is null || _lazySpawnRectBuffer.Length < Cameras.Count)
+                _lazySpawnRectBuffer = new ActivationRect[Cameras.Count];
+            for (int c = 0; c < Cameras.Count; c++)
+            {
+                var cam = Cameras[c];
+                _lazySpawnRectBuffer[c] = new ActivationRect(cam.Left, cam.Right, cam.Bottom, cam.Top);
+            }
+            var lazySpawnRects = _lazySpawnRectBuffer.AsSpan(0, Cameras.Count);
             for (int i = 0; i < _lazySpawnSources.Count; i++)
-                _lazySpawnSources[i].LazySpawnManager.Update(
-                    Camera.Left, Camera.Right, Camera.Bottom, Camera.Top);
+                _lazySpawnSources[i].LazySpawnManager.Update(lazySpawnRects);
 
             // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
             Engine?.SortPartitionedFactories();
@@ -940,7 +929,7 @@ public class Screen
     // Internal overlay draw — invoked once per frame by FlatRedBallService AFTER the per-camera
     // loop. Walks _gumRenderables (not _renderList) since overlays are independent of layer/Z
     // sort against world-space content; their order among themselves matches insertion order.
-    internal void DrawOverlay(SpriteBatch spriteBatch, RenderDiagnostics diagnostics, Camera primaryCamera)
+    internal void DrawOverlay(SpriteBatch spriteBatch, RenderDiagnostics diagnostics, Camera overlayCamera)
     {
         IRenderBatch? currentBatch = null;
         foreach (var renderable in _gumRenderables)
@@ -950,10 +939,10 @@ public class Screen
             if (batch != currentBatch)
             {
                 currentBatch?.End(spriteBatch);
-                batch.Begin(spriteBatch, primaryCamera);
+                batch.Begin(spriteBatch, overlayCamera);
                 currentBatch = batch;
             }
-            renderable.Draw(spriteBatch, primaryCamera);
+            renderable.Draw(spriteBatch, overlayCamera);
         }
         currentBatch?.End(spriteBatch);
     }

@@ -31,14 +31,6 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 - **Runtime tile mutation API on `TileShapeCollection`.** `SetTile(col, row, tileIndex?)` and `RemoveTile(col, row)` that update both the rendered tile layer and the collision shapes atomically. Currently unclear whether a partial path exists; audit before designing.
 - Together these enable: `?`→used-block swap, brick break (remove tile + spawn rubble entity), powerup-from-block (spawn entity above the bumped cell).
 
-## Split-Screen Support — Remaining Work
-**Priority: Soon** — Rendering pipeline landed: `Screen.Cameras`, `Camera.NormalizedViewport`, per-camera draw pass. `Camera` still points at `Cameras[0]` for back-compat. Outstanding cross-cutting work:
-
-- **LazySpawnManager**: only `Cameras[0]`'s world rect drives activation today. Multi-camera union (or repeated per-camera ticks with the existing OneShot dedup) so placements activate when *any* camera reaches them.
-- **Cursor / `InputManager.SetCamera`**: bound to `Cameras[0]`. Per-viewport picking (cursor world position routed to the camera whose viewport contains the cursor's screen position) for split-screen menus or mouse-driven games.
-- **Optional `SplitScreenPreset` enum**: thin sugar over `NormalizedViewport` for halves/quadrants/thirds. Only worth adding if call-site verbosity becomes a real complaint.
-- **Audit `Camera.X/Y/Left/Right/...` reads in engine code** for "which camera?" semantics — anywhere it implicitly assumes `Cameras[0]` and shouldn't (e.g. `_gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom` in `FlatRedBallService.cs`).
-
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
 

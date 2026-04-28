@@ -45,6 +45,11 @@ public class FlatRedBallService
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
+    // Overlay is full-window screen-space UI that must NOT inherit any specific camera's Zoom.
+    // We use a dedicated pixel-space camera (Zoom=1, OrthoSize=back-buffer pixels) so
+    // PixelsPerUnit==1 — the Gum batch's scale matrix becomes identity, and OverlayRoot's
+    // pixel-sized canvas renders 1:1.
+    private readonly Camera _overlayCamera = new Camera();
 
     /// <summary>
     /// Constructs an engine instance and auto-detects <see cref="SourceContentRoot"/>. Most
@@ -123,7 +128,10 @@ public class FlatRedBallService
 
         var bounds = game.Window.ClientBounds;
         ApplyCameraSettings(Camera, bounds.Width, bounds.Height);
-        Input.SetCamera(Camera);
+        // Screen.Cameras is typed IList<Camera> for game-code mutation; this cast is safe because the
+        // backing instance is Collection<Camera>, which implements both IList<T> and IReadOnlyList<T>.
+        // If Screen.Cameras' backing type ever changes, this cast must be revisited.
+        Input.SetCameras((IReadOnlyList<Rendering.Camera>)CurrentScreen.Cameras);
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
 
@@ -255,8 +263,8 @@ public class FlatRedBallService
             for (int i = 0; i < screen.Cameras.Count; i++)
                 ApplyCameraSettings(screen.Cameras[i], bounds.Width, bounds.Height);
         }
-        // TODO (split-screen): cursor/picking still routes through Cameras[0]; per-viewport picking is deferred.
-        Input.SetCamera(screen.Camera);
+        // See cast note in Initialize: Screen.Cameras' backing Collection<Camera> implements IReadOnlyList<T>.
+        Input.SetCameras((IReadOnlyList<Rendering.Camera>)screen.Cameras);
         Time.ResetScreen();
 
         CurrentScreen = screen;
@@ -637,14 +645,15 @@ public class FlatRedBallService
             Audio.Update();
             CurrentScreen.Overlay.BeginFrame();
 
-            // Build the input/animation update list: legacy global root, every camera's HudRoot
-            // (for split-screen HUDs), and the screen-level overlay root. UpdateLayout is NOT
-            // called here — layout is the Draw loop's responsibility, gated per-root on canvas
-            // dim changes (Camera.EnsureHudLayout / Screen.EnsureOverlayLayout).
+            // Build the input/animation update list: legacy global root, every camera's UiRoot
+            // (for split-screen UI), and the screen-level overlay root. UpdateLayout is NOT
+            // called here — layout is the Draw loop's responsibility (it sets each root's
+            // Width/Height each frame; Gum gates internally on equality and triggers its own
+            // UpdateLayout when dims change).
             _gumUpdateList.Clear();
             _gumUpdateList.Add(_gum.Root);
             for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
-                _gumUpdateList.Add(CurrentScreen.Cameras[i].HudRoot);
+                _gumUpdateList.Add(CurrentScreen.Cameras[i].UiRoot);
             _gumUpdateList.Add(CurrentScreen.OverlayRoot);
 
             _gum.Update(gameTime, _gumUpdateList);
@@ -706,13 +715,14 @@ public class FlatRedBallService
             _spriteBatch.Draw(_whitePixel, new Rectangle(0, 0, camera.Viewport.Width, camera.Viewport.Height), camera.BackgroundColor);
             _spriteBatch.End();
 
-            // Set the Gum canvas to THIS camera's visible world extents and lay out its HUD root
-            // only if dims changed since the last frame. Single layout pass per resize, never per frame.
-            float canvasW = camera.OrthogonalWidth / camera.Zoom;
-            float canvasH = camera.OrthogonalHeight / camera.Zoom;
-            _gum.CanvasWidth = canvasW;
-            _gum.CanvasHeight = canvasH;
-            camera.EnsureHudLayout(canvasW, canvasH);
+            // Set this camera's UI root to its visible world extents. We do NOT touch
+            // _gum.CanvasWidth/Height: the Gum global is only consulted to lay out elements that
+            // have no parent, and FlatRedBall2 always parents UI under a UiRoot or OverlayRoot,
+            // so children resolve against the immediate parent — the global is never read on our
+            // code paths. Gum's Width/Height setters gate on equality and trigger their own
+            // UpdateLayout when changed; no explicit gating needed here.
+            camera.UiRoot.Width  = camera.OrthogonalWidth  / camera.Zoom;
+            camera.UiRoot.Height = camera.OrthogonalHeight / camera.Zoom;
 
             CurrentScreen.Draw(_spriteBatch, RenderDiagnostics, camera);
         }
@@ -722,11 +732,18 @@ public class FlatRedBallService
         // are on the screen — so pause menus and title cards span the whole window in split-screen.
         if (CurrentScreen.GumRenderables.Count > 0)
         {
-            gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
-            _gum.CanvasWidth = pp.BackBufferWidth;
-            _gum.CanvasHeight = pp.BackBufferHeight;
-            CurrentScreen.EnsureOverlayLayout(pp.BackBufferWidth, pp.BackBufferHeight);
-            CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, primaryCamera);
+            var fullWindow = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+            gd.Viewport = fullWindow;
+            // Configure the overlay camera as a 1:1 pixel-space camera spanning the full back buffer.
+            // ApplyToHostRect with NormalizedViewport=FullViewport and orthoH=BackBufferHeight gives
+            // OrthogonalWidth=BackBufferWidth (derived from pixel aspect), and with Zoom=1 (default)
+            // PixelsPerUnit = BackBufferHeight/BackBufferHeight*1 = 1. The Gum batch's world-to-screen
+            // scale matrix becomes identity, so OverlayRoot's pixel-sized canvas renders 1:1
+            // regardless of any in-world camera's Zoom.
+            _overlayCamera.ApplyToHostRect(fullWindow, pp.BackBufferHeight);
+            CurrentScreen.OverlayRoot.Width  = pp.BackBufferWidth;
+            CurrentScreen.OverlayRoot.Height = pp.BackBufferHeight;
+            CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, _overlayCamera);
         }
 
 #if DEBUG

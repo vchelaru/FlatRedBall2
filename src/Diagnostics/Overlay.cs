@@ -40,6 +40,16 @@ namespace FlatRedBall2.Diagnostics;
 /// Shape methods return the underlying object for optional same-frame configuration (e.g.,
 /// <c>IsFilled = true</c> or a custom <c>Z</c>).
 /// </para>
+/// <para>
+/// <b>Single-camera assumption.</b> World-anchored text (<see cref="Text(string, float, float)"/>,
+/// <see cref="Text(string)"/>) and its <see cref="TextBackground"/> are placed in
+/// <c>Cameras[0]</c>'s HUD and positioned against <c>Cameras[0]</c>'s view. In split-screen they
+/// only appear inside <c>Cameras[0]</c>'s viewport — there is no built-in way to target a
+/// secondary camera's view. Shape methods (Circle/Rectangle/Line/Polygon/Arrow/Sprite) are
+/// world-space and render in every camera's draw pass, so those work fine in split-screen.
+/// Debug overlay × split-screen is intentionally not optimized — overlay is a debug tool and
+/// split-screen is uncommon, so the intersection is left simple.
+/// </para>
 /// </remarks>
 public class Overlay
 {
@@ -242,6 +252,10 @@ public class Overlay
     /// For fixed screen-position text (HUD, diagnostics), use
     /// <see cref="TextScreen(string, float, float)"/> instead.
     /// </summary>
+    /// <remarks>
+    /// In split-screen, the label is placed in <c>Cameras[0]</c>'s HUD and only renders inside
+    /// that camera's viewport. See the <see cref="Overlay"/> class remarks.
+    /// </remarks>
     /// <returns>
     /// The underlying Gum <see cref="Label"/> for optional same-frame configuration.
     /// Pass this to <see cref="TextBackground"/> to draw a colored backing rectangle.

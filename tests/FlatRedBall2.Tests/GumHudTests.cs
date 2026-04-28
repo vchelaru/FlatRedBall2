@@ -14,18 +14,18 @@ public class GumHudTests
     private class TestScreen : Screen { }
 
     [Fact]
-    public void Add_GraphicalUiElement_SingleCameraScreen_VisualParentedToCamerasZeroHudRoot()
+    public void Add_GraphicalUiElement_SingleCameraScreen_VisualParentedToCamerasZeroUiRoot()
     {
         var screen = new TestScreen();
         var visual = new ContainerRuntime();
 
         screen.Add(visual);
 
-        screen.Cameras[0].HudRoot.Children.ShouldContain(visual);
+        screen.Cameras[0].UiRoot.Children.ShouldContain(visual);
     }
 
     [Fact]
-    public void CameraAdd_TwoCameras_VisualsParentedToOwningCameraHudRoot()
+    public void CameraAdd_TwoCameras_VisualsParentedToOwningCameraUiRoot()
     {
         var screen = new TestScreen();
         var second = new Camera();
@@ -36,10 +36,10 @@ public class GumHudTests
         screen.Cameras[0].Add(a);
         second.Add(b);
 
-        screen.Cameras[0].HudRoot.Children.ShouldContain(a);
-        screen.Cameras[0].HudRoot.Children.ShouldNotContain(b);
-        second.HudRoot.Children.ShouldContain(b);
-        second.HudRoot.Children.ShouldNotContain(a);
+        screen.Cameras[0].UiRoot.Children.ShouldContain(a);
+        screen.Cameras[0].UiRoot.Children.ShouldNotContain(b);
+        second.UiRoot.Children.ShouldContain(b);
+        second.UiRoot.Children.ShouldNotContain(a);
     }
 
     [Fact]
@@ -74,38 +74,4 @@ public class GumHudTests
         renderable.ShouldDrawForCamera(screen.Cameras[0]).ShouldBeFalse();
     }
 
-    [Fact]
-    public void HudRoot_CanvasDimsUnchanged_NoLayoutCalls()
-    {
-        // EnsureLayout is the gated layout entry point — it must no-op when canvas dims
-        // haven't changed since the last call.
-        var screen = new TestScreen();
-        var camera = screen.Cameras[0];
-        camera.EnsureHudLayout(800f, 600f);
-        int before = camera.HudLayoutCallCount;
-
-        camera.EnsureHudLayout(800f, 600f);
-        camera.EnsureHudLayout(800f, 600f);
-
-        camera.HudLayoutCallCount.ShouldBe(before);
-    }
-
-    [Fact]
-    public void HudRoot_CanvasDimsChanged_OnlyResizingCameraRelaysOut()
-    {
-        var screen = new TestScreen();
-        var second = new Camera();
-        screen.Cameras.Add(second);
-        screen.Cameras[0].EnsureHudLayout(800f, 600f);
-        second.EnsureHudLayout(800f, 600f);
-        int firstBefore = screen.Cameras[0].HudLayoutCallCount;
-        int secondBefore = second.HudLayoutCallCount;
-
-        // Only camera[0]'s canvas changes.
-        screen.Cameras[0].EnsureHudLayout(1024f, 768f);
-        second.EnsureHudLayout(800f, 600f);
-
-        screen.Cameras[0].HudLayoutCallCount.ShouldBe(firstBefore + 1);
-        second.HudLayoutCallCount.ShouldBe(secondBefore);
-    }
 }

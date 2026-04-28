@@ -1,5 +1,6 @@
 using System.Numerics;
 using FlatRedBall2.Collision;
+using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2.Input;
 
@@ -12,8 +13,18 @@ public interface ICursor
     /// <summary>
     /// Cursor position in world space (Y+ up). Coordinates match entity X/Y directly — use this
     /// for click-to-move, entity targeting, and world-space hit detection.
+    /// In split-screen, this auto-picks whichever camera's viewport currently contains the cursor
+    /// (sticky in letterbox gaps). Use <see cref="GetWorldPosition(Camera)"/> to force projection
+    /// through a specific camera.
     /// </summary>
     Vector2 WorldPosition { get; }
+
+    /// <summary>
+    /// Projects <see cref="ScreenPosition"/> through <paramref name="camera"/>, regardless of
+    /// which viewport the cursor is currently in. Useful for HUD-style picking where a click
+    /// should always resolve through one player's view.
+    /// </summary>
+    Vector2 GetWorldPosition(Camera camera);
 
     /// <summary>Cursor position in screen pixels, top-left origin. Use for HUD hit-testing.</summary>
     Vector2 ScreenPosition { get; }
@@ -85,4 +96,16 @@ public interface ICursor
     /// default-collision shapes. Sub-entity shapes are included recursively.
     /// </summary>
     bool IsOver(Entity entity);
+
+    /// <summary>
+    /// Like <see cref="IsOver(ICollidable)"/> but projects through <paramref name="camera"/>
+    /// rather than the auto-picked active camera.
+    /// </summary>
+    bool IsOver(ICollidable shape, Camera camera) => shape.Contains(GetWorldPosition(camera));
+
+    /// <summary>
+    /// Like <see cref="IsOver(Entity)"/> but projects through <paramref name="camera"/>
+    /// rather than the auto-picked active camera.
+    /// </summary>
+    bool IsOver(Entity entity, Camera camera);
 }
