@@ -19,10 +19,13 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
 
-## Platformer Feel: Run-Modulated Jump Height
-**Priority: Discuss** — SMB's defining "jump higher when running" is not currently expressible. `JumpVelocity` is constant per slot.
+## CollisionRelationship list-type tightening
+**Priority: Soon** — `CollisionRelationship<A, B>` stores its operand collections as `IEnumerable<A>` / `IEnumerable<B>` (`src/Collision/CollisionRelationship.cs:36-37`).
 
-Open question: do we add a `JumpVelocityRunBonus` field that scales with `|VelocityX| / MaxSpeedX`, or is this better solved by exposing a hook so games can set `JumpVelocity` themselves on jump initiation? The former is more discoverable; the latter avoids baking one specific feel curve into the engine.
+- Pair-iteration path at `RunCollisions` `foreach (var a in _listA) foreach (var b in _listB)` boxes the struct enumerators of the underlying `List<T>`/`Factory<T>` to `IEnumerator<T>` — two enumerator allocations per relationship per frame.
+- The same-list path already runtime-casts to `IReadOnlyList<A>` to recover indexed iteration, proving the runtime objects support it.
+- Tighten the field types (and the `Screen.AddCollisionRelationship<A,B>` overloads) to `IReadOnlyList<A>` / `IReadOnlyList<B>`. Callers in the engine + samples already pass `Factory<T>` or `List<T>`; non-breaking for the common case.
+- Also unlocks indexed access for a partition-aware broad phase (drop-in at index k for sort-and-sweep).
 
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.

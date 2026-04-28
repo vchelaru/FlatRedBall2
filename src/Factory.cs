@@ -44,6 +44,10 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     private readonly Screen _screen;
     private readonly List<T> _instances = new();
 
+    // Pooling state — only populated while pooling is enabled.
+    private bool _poolingEnabled;
+    private Stack<T>? _freeList;
+
     // IsSolidGrid state — only populated while IsSolidGrid = true.
     private readonly Dictionary<(int col, int row), T> _grid = new();
     private readonly Dictionary<T, (int col, int row)> _entityCells = new();
@@ -61,6 +65,50 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     {
         _screen = screen;
         screen.Engine.RegisterFactory(this);
+    }
+
+    /// <summary>
+    /// Enables object pooling on this factory. When enabled, calling <see cref="Entity.Destroy"/>
+    /// on a created instance returns it to a free list instead of tearing it down; the next
+    /// <see cref="Create()"/> reuses that instance. <see cref="Entity.CustomInitialize"/> runs
+    /// exactly once per instance (on first creation); on every subsequent recycle the engine
+    /// resets per-life state and the entity's <see cref="Entity.Reset"/> override is called.
+    /// <see cref="Entity.CustomDestroy"/> does <b>not</b> run on pooled destroys.
+    /// </summary>
+    /// <remarks>
+    /// Must be called before the factory has produced any live instances; otherwise throws
+    /// <see cref="InvalidOperationException"/>. Returns <c>this</c> for fluent chaining with
+    /// <see cref="Prewarm(int)"/>.
+    /// </remarks>
+    public Factory<T> EnablePooling()
+    {
+        if (_instances.Count > 0)
+            throw new InvalidOperationException(
+                $"Factory<{typeof(T).Name}>.EnablePooling must be called before any Create() call.");
+        if (_poolingEnabled) return this;
+        _poolingEnabled = true;
+        _freeList = new Stack<T>();
+        return this;
+    }
+
+    /// <summary>
+    /// Pre-allocates <paramref name="count"/> instances and returns them to the pool's free list,
+    /// so the first <paramref name="count"/> <see cref="Create()"/> calls reuse those instances
+    /// instead of allocating. Each pre-warmed instance has <see cref="Entity.CustomInitialize"/>
+    /// called once during prewarm. Requires <see cref="EnablePooling"/> first.
+    /// </summary>
+    public Factory<T> Prewarm(int count)
+    {
+        if (!_poolingEnabled)
+            throw new InvalidOperationException(
+                $"Factory<{typeof(T).Name}>.Prewarm requires EnablePooling() first.");
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+        for (int i = 0; i < count; i++)
+        {
+            var instance = Create();
+            instance.Destroy();
+        }
+        return this;
     }
 
     /// <summary>
@@ -218,8 +266,30 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
 
     private T CreateCore(Action<T>? configure)
     {
+        if (_poolingEnabled && _freeList!.Count > 0)
+        {
+            var recycled = _freeList.Pop();
+            _screen.AddEntity(recycled);
+            _instances.Add(recycled);
+            recycled.AttachRenderablesToScreen();
+            recycled.ResetEngineState();
+            if (_screen.Layer != null)
+                recycled.Layer = _screen.Layer;
+            configure?.Invoke(recycled);
+            recycled.InvokeResetForPool();
+            if (IsSolidGrid)
+            {
+                _gridMembers.Add(recycled);
+                if (_batchDepth == 0)
+                    IndexEntity(recycled);
+            }
+            return recycled;
+        }
+
         var entity = new T();
         entity.Engine = _screen.Engine;
+        if (_poolingEnabled)
+            entity._isPooled = true;
         _screen.AddEntity(entity);
         _instances.Add(entity);
         entity._onDestroy = () =>
@@ -228,6 +298,11 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
             _screen.RemoveEntity(entity);
             if (IsSolidGrid && _gridMembers.Remove(entity))
                 OnGridEntityDestroyed(entity);
+            if (_poolingEnabled)
+            {
+                entity.DetachRenderablesFromScreen();
+                _freeList!.Push(entity);
+            }
         };
         if (_screen.Layer != null)
             entity.Layer = _screen.Layer;

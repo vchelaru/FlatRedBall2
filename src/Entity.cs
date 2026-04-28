@@ -29,7 +29,11 @@ namespace FlatRedBall2;
 /// <para>
 /// <b>Lifecycle:</b> <see cref="CustomInitialize"/> → per-frame <see cref="CustomActivity"/> →
 /// <see cref="Destroy"/> calls <see cref="CustomDestroy"/> and recursively destroys all
-/// attached children.
+/// attached children. When the owning factory has pooling enabled
+/// (<see cref="Factory{T}.EnablePooling"/>), <see cref="Destroy"/> instead returns the entity
+/// to the factory's free list: <see cref="CustomDestroy"/> is skipped, attached children and
+/// shapes are preserved, and the next <see cref="Factory{T}.Create()"/> recycles this instance
+/// after resetting engine-owned state and invoking <see cref="Reset"/>.
 /// </para>
 /// </summary>
 public class Entity : ICollidable, IAttachable
@@ -266,6 +270,11 @@ public class Entity : ICollidable, IAttachable
     // from its owning container without requiring a back-reference to the factory or screen.
     internal Action? _onDestroy;
 
+    // Set by Factory<T> when the owning factory has pooling enabled. When true, Destroy() routes
+    // to the pool path (_onDestroy is the factory's pool-return hook) without tearing down
+    // children, shapes, or Gum visuals — those are reused on recycle.
+    internal bool _isPooled;
+
     /// <summary>
     /// Raised at the end of <see cref="Destroy"/>, after <see cref="CustomDestroy"/>, child
     /// teardown, and factory/screen unregistration have completed. The entity is fully torn
@@ -468,9 +477,26 @@ public class Entity : ICollidable, IAttachable
     /// <summary>
     /// Override to release game-specific resources when this entity is destroyed. Called by
     /// <see cref="Destroy"/> before children are torn down, while engine services, tweens,
-    /// and attached shapes are still valid.
+    /// and attached shapes are still valid. <b>Not</b> called when the entity is returned to a
+    /// pool via <see cref="Factory{T}.EnablePooling"/> — the entity is reused rather than torn down.
     /// </summary>
     public virtual void CustomDestroy() { }
+
+    /// <summary>
+    /// Override to clear per-life dynamic state (lifetime accumulators, mode flags, health) when
+    /// this entity is recycled from a pooled <see cref="Factory{T}"/>. Called per-recycle in place
+    /// of <see cref="CustomInitialize"/>; the engine has already reset <see cref="Position"/>,
+    /// <see cref="Velocity"/>, <see cref="Acceleration"/>, <see cref="Rotation"/>,
+    /// <see cref="RotationVelocity"/>, <see cref="Drag"/>, <see cref="IsVisible"/>, and re-attached
+    /// renderables to the screen. Not called on the first <see cref="Factory{T}.Create()"/> for an
+    /// instance — that path runs <see cref="CustomInitialize"/> exactly once. Has no effect on
+    /// non-pooled factories.
+    /// </summary>
+    protected virtual void Reset() { }
+
+    // Internal accessor — Factory<T> calls this on pool recycle. Cannot call protected Reset
+    // directly from outside the inheritance chain.
+    internal void InvokeResetForPool() => Reset();
 
     /// <summary>
     /// Removes this entity from the game. Safe to call at any time, including from inside a
@@ -481,9 +507,30 @@ public class Entity : ICollidable, IAttachable
     /// all attached children are destroyed recursively, shape/child lists clear, and finally
     /// the factory/screen registration is released.
     /// </para>
+    /// <para>
+    /// <b>Pooled factories</b> (<see cref="Factory{T}.EnablePooling"/>): the entity is returned
+    /// to the factory's free list instead. <see cref="CustomDestroy"/> does not run, child
+    /// shapes / sprites / Gum visuals / tweens are preserved for reuse, and the
+    /// <see cref="Destroyed"/> event does not fire. The entity does still detach from any
+    /// <see cref="Parent"/> — pooled entities are returned in a root state, ready for the next
+    /// <see cref="Factory{T}.Create()"/>.
+    /// </para>
     /// </summary>
     public void Destroy()
     {
+        if (_isPooled)
+        {
+            // Pool-destroy: detach from any parent so the recycled instance is a root, then let
+            // the factory's _onDestroy detach renderables from the screen and push onto the free
+            // list. Children, shapes, Gum visuals, tweens, and event subscribers are all preserved
+            // for reuse on the next Create(). CustomDestroy and Destroyed deliberately do not fire.
+            // Detaching from Parent matters when a pooled entity was attached as a child of another
+            // entity: without this, the parent's _children list would still reference us, and a
+            // later parent.Destroy() would re-route through here and double-push to the free list.
+            Parent?.Remove(this);
+            _onDestroy?.Invoke();
+            return;
+        }
         CustomDestroy();
         _tweens.Clear();
         foreach (var visual in _gumChildren)
@@ -496,6 +543,57 @@ public class Entity : ICollidable, IAttachable
         _shapes.Clear();
         _onDestroy?.Invoke();
         Destroyed?.Invoke();
+    }
+
+    // Resets engine-owned per-life state. Called by Factory<T> on pool recycle before the user's
+    // Reset() override and the caller's configure callback.
+    internal void ResetEngineState()
+    {
+        Position = Vector2.Zero;
+        Velocity = Vector2.Zero;
+        Acceleration = Vector2.Zero;
+        Rotation = default;
+        RotationVelocity = default;
+        Drag = 0f;
+        Z = 0f;
+        IsVisible = true;
+        LastReposition = Vector2.Zero;
+        LastPosition = Vector2.Zero;
+    }
+
+    // Detaches every renderable in this entity's subtree from the screen's render list (and Gum
+    // visuals from the screen's Gum layer). Called by Factory<T> on pool destroy. Leaves
+    // _children/_shapes/_gumChildren intact so the same renderables can be re-registered on recycle.
+    internal void DetachRenderablesFromScreen()
+    {
+        var screen = _engine?.CurrentScreen;
+        if (screen == null) return;
+        foreach (var visual in _gumChildren)
+            screen.Remove(visual);
+        foreach (var child in _children)
+        {
+            if (child is IRenderable renderable)
+                screen.Remove(renderable);
+            if (child is Entity sub)
+                sub.DetachRenderablesFromScreen();
+        }
+    }
+
+    // Re-registers every renderable in this entity's subtree with the screen. Mirror of
+    // DetachRenderablesFromScreen; called by Factory<T> on pool recycle.
+    internal void AttachRenderablesToScreen()
+    {
+        var screen = _engine?.CurrentScreen;
+        if (screen == null) return;
+        foreach (var visual in _gumChildren)
+            screen.AddGumForEntity(visual, this, Layer);
+        foreach (var child in _children)
+        {
+            if (child is IRenderable renderable)
+                screen.Add(renderable, renderable.Layer);
+            if (child is Entity sub)
+                sub.AttachRenderablesToScreen();
+        }
     }
 
     /// <summary>
