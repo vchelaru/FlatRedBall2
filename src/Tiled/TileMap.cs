@@ -109,7 +109,7 @@ public class TileMap
             if (layer is TilemapTileLayer tileLayer)
             {
                 var renderable = new TileMapLayerRenderable(_renderer, tileLayer);
-                var mapLayer = new TileMapLayer(tileLayer.Name, renderable);
+                var mapLayer = new TileMapLayer(tileLayer.Name, renderable, tileLayer, _tilemap.Tilesets);
                 _layers.Add(mapLayer);
                 _layersByName[tileLayer.Name] = mapLayer;
             }
@@ -144,7 +144,7 @@ public class TileMap
         {
             if (layer is TilemapTileLayer tileLayer)
             {
-                var mapLayer = new TileMapLayer(tileLayer.Name);
+                var mapLayer = new TileMapLayer(tileLayer.Name, tileLayer, _tilemap.Tilesets);
                 _layers.Add(mapLayer);
                 _layersByName[tileLayer.Name] = mapLayer;
             }

@@ -24,13 +24,6 @@ Open questions:
 
 Open question: do we add a `JumpVelocityRunBonus` field that scales with `|VelocityX| / MaxSpeedX`, or is this better solved by exposing a hook so games can set `JumpVelocity` themselves on jump initiation? The former is more discoverable; the latter avoids baking one specific feel curve into the engine.
 
-## Block Bumping: Head-Bump Cell Events + Tile Mutation
-**Priority: Soon** — Mario-style `?` blocks and breakable bricks are not feasible today. Two missing primitives:
-
-- **Cell-resolved head-bump event.** Today `entity.LastReposition.Y < 0` tells you a ceiling was hit, but not *which tile*. Need an event on `CollisionRelationship<Entity, TileShapeCollection>` (or on the TSC side) that fires with `(col, row, tile)` when an entity collides with a tile *from below*. Same shape would generalize to side-hits and stomps if we want.
-- **Runtime tile mutation API on `TileShapeCollection`.** `SetTile(col, row, tileIndex?)` and `RemoveTile(col, row)` that update both the rendered tile layer and the collision shapes atomically. Currently unclear whether a partial path exists; audit before designing.
-- Together these enable: `?`→used-block swap, brick break (remove tile + spawn rubble entity), powerup-from-block (spawn entity above the bumped cell).
-
 ## Factory Object Pooling
 **Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
 
