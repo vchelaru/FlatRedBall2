@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
@@ -12,6 +13,7 @@ using FlatRedBall2.UI;
 using FlatRedBall2.Rendering;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
+using MonoGameGum.GueDeriving;
 
 namespace FlatRedBall2;
 
@@ -50,12 +52,35 @@ public class Screen
     /// All cameras on this screen, in draw order. The engine creates one camera by default;
     /// add more for split-screen / multi-viewport rendering by setting each new camera's
     /// <see cref="Camera.NormalizedViewport"/>. Each camera's transform is applied to a separate
-    /// draw pass per frame.
+    /// draw pass per frame. Cameras inserted into this list have their <c>Screen</c> back-reference
+    /// set automatically so <see cref="Camera.Add(Gum.Wireframe.GraphicalUiElement, Layer?)"/> works
+    /// without further wiring.
     /// </summary>
-    public IList<Camera> Cameras { get; } = new List<Camera> { new Camera() };
+    public IList<Camera> Cameras { get; }
 
     /// <summary>The first camera on this screen — the default for single-camera games. Shortcut for <c>Cameras[0]</c>.</summary>
     public Camera Camera => Cameras[0];
+
+    private sealed class CameraList : Collection<Camera>
+    {
+        private readonly Screen _screen;
+        public CameraList(Screen screen) { _screen = screen; }
+        protected override void InsertItem(int index, Camera item)
+        {
+            item.Screen = _screen;
+            base.InsertItem(index, item);
+        }
+        protected override void SetItem(int index, Camera item)
+        {
+            item.Screen = _screen;
+            base.SetItem(index, item);
+        }
+        protected override void RemoveItem(int index)
+        {
+            if (this[index].Screen == _screen) this[index].Screen = null;
+            base.RemoveItem(index);
+        }
+    }
     /// <summary>This screen's content loader. Unloaded automatically on screen transition.</summary>
     public ContentManagerService ContentManager { get; } = new ContentManagerService();
     /// <summary>The engine that owns this screen. Injected before <see cref="CustomInitialize"/>.</summary>
@@ -68,7 +93,13 @@ public class Screen
     public Overlay Overlay { get; }
 
     /// <summary>Constructs a new screen and its <see cref="Overlay"/>. Engine injection happens later, before <see cref="CustomInitialize"/>.</summary>
-    public Screen() => Overlay = new Overlay(this);
+    public Screen()
+    {
+        Overlay = new Overlay(this);
+        var cams = new CameraList(this);
+        cams.Add(new Camera());
+        Cameras = cams;
+    }
 
     /// <summary>
     /// Custom rendering layers owned by this screen. Add to this list to introduce additional
@@ -199,25 +230,89 @@ public class Screen
     private readonly List<TileMap> _lazySpawnSources = new();
 
     /// <summary>
-    /// Adds a Gum Forms control to this screen. Registered for rendering and input updates.
+    /// Adds a Gum Forms control to this screen's primary camera HUD. Equivalent to
+    /// <c>Cameras[0].Add(element, layer)</c>; for split-screen, call <see cref="Camera.Add(FrameworkElement, Layer?)"/>
+    /// directly on the desired camera.
     /// </summary>
     public void Add(FrameworkElement element, Layer? layer = null)
-        => AddGumVisual(element.Visual, layer ?? Layer);
+        => Cameras[0].Add(element, layer ?? Layer);
 
     /// <summary>
-    /// Adds a Gum visual element to this screen. Registered for rendering and input updates.
-    /// Prefer <see cref="Add(FrameworkElement, Layer?)"/> when a Forms control is available.
+    /// Adds a Gum visual element to this screen's primary camera HUD. Equivalent to
+    /// <c>Cameras[0].Add(visual, layer)</c>. For split-screen, call <see cref="Camera.Add(GraphicalUiElement, Layer?)"/>
+    /// directly on the desired camera; for full-window UI shared across all cameras, use
+    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.
     /// </summary>
     public void Add(GraphicalUiElement visual, Layer? layer = null)
-        => AddGumVisual(visual, layer ?? Layer);
+        => Cameras[0].Add(visual, layer ?? Layer);
 
     /// <summary>Removes a Gum element previously added with <see cref="Add(FrameworkElement, Layer?)"/>.</summary>
     public void Remove(FrameworkElement element)
-        => RemoveGumVisual(element.Visual);
+        => Cameras[0].Remove(element);
 
     /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
     public void Remove(GraphicalUiElement visual)
-        => RemoveGumVisual(visual);
+        => Cameras[0].Remove(visual);
+
+    // ---------- Overlay (full-window, shared across cameras) ----------
+
+    private GraphicalUiElement? _overlayRoot;
+    private float _lastOverlayCanvasWidth = float.NaN;
+    private float _lastOverlayCanvasHeight = float.NaN;
+
+    /// <summary>
+    /// Lazily-created Gum root for the screen-level overlay. Visuals added via
+    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/> are parented here and laid out
+    /// against the full back-buffer dimensions, drawn in a single pass after the per-camera loop.
+    /// Use this for pause menus, title cards, and other UI that should not be split per viewport.
+    /// </summary>
+    public GraphicalUiElement OverlayRoot => _overlayRoot ??= new ContainerRuntime();
+
+    /// <summary>Test-only counter incremented every time the overlay's canvas dims change and a layout pass runs.</summary>
+    internal int OverlayLayoutCallCount { get; private set; }
+
+    /// <summary>
+    /// Calls <c>UpdateLayout</c> on <see cref="OverlayRoot"/> only when the supplied canvas dims
+    /// differ from those used on the previous call. Same gating discipline as
+    /// <see cref="Camera.EnsureHudLayout"/>.
+    /// </summary>
+    internal void EnsureOverlayLayout(float canvasWidth, float canvasHeight)
+    {
+        if (canvasWidth == _lastOverlayCanvasWidth && canvasHeight == _lastOverlayCanvasHeight)
+            return;
+        _lastOverlayCanvasWidth = canvasWidth;
+        _lastOverlayCanvasHeight = canvasHeight;
+        OverlayRoot.UpdateLayout();
+        OverlayLayoutCallCount++;
+    }
+
+    /// <summary>
+    /// Adds a Gum visual to the screen-level overlay layer, drawn full-window after every
+    /// camera's draw pass. Use for pause menus, dialog boxes, and other UI that must span
+    /// the entire window in split-screen.
+    /// </summary>
+    public void AddOverlay(GraphicalUiElement visual, Layer? layer = null)
+    {
+        OverlayRoot.Children.Add(visual);
+        var renderable = new GumRenderable(visual) { Layer = layer ?? Layer, IsOverlay = true };
+        _gumRenderables.Add(renderable);
+        _gumByVisual[visual] = renderable;
+        _renderList.Add(renderable);
+    }
+
+    /// <summary>Adds a Gum Forms control to the screen-level overlay layer. See <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.</summary>
+    public void AddOverlay(FrameworkElement element, Layer? layer = null)
+        => AddOverlay(element.Visual, layer);
+
+    /// <summary>Removes a visual previously added with <see cref="AddOverlay(GraphicalUiElement, Layer?)"/>.</summary>
+    public void RemoveOverlay(GraphicalUiElement visual)
+    {
+        OverlayRoot.Children.Remove(visual);
+        RemoveGumVisualInternal(visual);
+    }
+
+    /// <summary>Removes a Forms control previously added with <see cref="AddOverlay(FrameworkElement, Layer?)"/>.</summary>
+    public void RemoveOverlay(FrameworkElement element) => RemoveOverlay(element.Visual);
 
     internal void AddGumForEntity(GraphicalUiElement visual, Entity worldParent, Layer? layer)
     {
@@ -227,15 +322,17 @@ public class Screen
         _renderList.Add(renderable);
     }
 
-    private void AddGumVisual(GraphicalUiElement visual, Layer? layer)
+    internal void AddGumForCamera(GraphicalUiElement visual, Camera owningCamera, Layer? layer)
     {
-        var renderable = new GumRenderable(visual) { Layer = layer };
+        var renderable = new GumRenderable(visual) { OwningCamera = owningCamera, Layer = layer ?? Layer };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
         _renderList.Add(renderable);
     }
 
-    private void RemoveGumVisual(GraphicalUiElement visual)
+    internal void RemoveGumForCamera(GraphicalUiElement visual) => RemoveGumVisualInternal(visual);
+
+    private void RemoveGumVisualInternal(GraphicalUiElement visual)
     {
         if (_gumByVisual.TryGetValue(visual, out var renderable))
         {
@@ -814,6 +911,12 @@ public class Screen
                 && !attachable.Parent.IsAbsoluteVisible)
                 continue;
 
+            // Per-camera HUD ownership: a GumRenderable bound to one camera (or marked as overlay)
+            // must not be drawn under any other camera's transform. Overlay renderables are drawn
+            // in a separate post-camera pass by FlatRedBallService.
+            if (renderable is GumRenderable gum && !gum.ShouldDrawForCamera(activeCamera))
+                continue;
+
             var batch = renderable.Batch;
             if (batch != currentBatch)
             {
@@ -831,6 +934,27 @@ public class Screen
             previousRenderable = renderable;
         }
 
+        currentBatch?.End(spriteBatch);
+    }
+
+    // Internal overlay draw — invoked once per frame by FlatRedBallService AFTER the per-camera
+    // loop. Walks _gumRenderables (not _renderList) since overlays are independent of layer/Z
+    // sort against world-space content; their order among themselves matches insertion order.
+    internal void DrawOverlay(SpriteBatch spriteBatch, RenderDiagnostics diagnostics, Camera primaryCamera)
+    {
+        IRenderBatch? currentBatch = null;
+        foreach (var renderable in _gumRenderables)
+        {
+            if (!renderable.IsOverlay) continue;
+            var batch = renderable.Batch;
+            if (batch != currentBatch)
+            {
+                currentBatch?.End(spriteBatch);
+                batch.Begin(spriteBatch, primaryCamera);
+                currentBatch = batch;
+            }
+            renderable.Draw(spriteBatch, primaryCamera);
+        }
         currentBatch?.End(spriteBatch);
     }
 

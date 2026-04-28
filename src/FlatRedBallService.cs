@@ -43,8 +43,6 @@ public class FlatRedBallService
     private Type? _lastScreenType;
     private Action<Screen>? _lastScreenConfigure;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();
-    private float _lastGumCanvasWidth;
-    private float _lastGumCanvasHeight;
     private readonly GameSynchronizationContext _syncContext = new();
     private readonly GumService _gum = new GumService();
 
@@ -639,33 +637,15 @@ public class FlatRedBallService
             Audio.Update();
             CurrentScreen.Overlay.BeginFrame();
 
-            // Keep the Gum canvas in sync with the camera's visible world extents so that UI layout
-            // (percent-of-parent, anchoring, XUnits like PixelsFromCenterX) uses design units rather
-            // than raw viewport pixels — and so Gum follows the same effective scale as the game
-            // world, regardless of whether that scale comes from Camera.Zoom or from the
-            // window-vs-resolution ratio.
-            var camera = CurrentScreen.Camera;
-            _gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom;
-            _gum.CanvasHeight = camera.OrthogonalHeight / camera.Zoom;
-
-            // Route input events (click, hover, etc.) to all active Gum elements.
-            // _gum.Root covers anything added via AddToRoot();
-            // screen GumRenderables cover elements added via screen.Add().
+            // Build the input/animation update list: legacy global root, every camera's HudRoot
+            // (for split-screen HUDs), and the screen-level overlay root. UpdateLayout is NOT
+            // called here — layout is the Draw loop's responsibility, gated per-root on canvas
+            // dim changes (Camera.EnsureHudLayout / Screen.EnsureOverlayLayout).
             _gumUpdateList.Clear();
             _gumUpdateList.Add(_gum.Root);
-            foreach (var r in CurrentScreen.GumRenderables)
-                _gumUpdateList.Add(r.Visual);
-
-            // If the canvas size changed, force a layout pass on every top-level element
-            // so that percent-of-parent sizes, anchors, and center-based positions recompute
-            // against the new canvas dimensions.
-            if (_gum.CanvasWidth != _lastGumCanvasWidth || _gum.CanvasHeight != _lastGumCanvasHeight)
-            {
-                _lastGumCanvasWidth = _gum.CanvasWidth;
-                _lastGumCanvasHeight = _gum.CanvasHeight;
-                foreach (var element in _gumUpdateList)
-                    element.UpdateLayout();
-            }
+            for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+                _gumUpdateList.Add(CurrentScreen.Cameras[i].HudRoot);
+            _gumUpdateList.Add(CurrentScreen.OverlayRoot);
 
             _gum.Update(gameTime, _gumUpdateList);
         }
@@ -726,7 +706,27 @@ public class FlatRedBallService
             _spriteBatch.Draw(_whitePixel, new Rectangle(0, 0, camera.Viewport.Width, camera.Viewport.Height), camera.BackgroundColor);
             _spriteBatch.End();
 
+            // Set the Gum canvas to THIS camera's visible world extents and lay out its HUD root
+            // only if dims changed since the last frame. Single layout pass per resize, never per frame.
+            float canvasW = camera.OrthogonalWidth / camera.Zoom;
+            float canvasH = camera.OrthogonalHeight / camera.Zoom;
+            _gum.CanvasWidth = canvasW;
+            _gum.CanvasHeight = canvasH;
+            camera.EnsureHudLayout(canvasW, canvasH);
+
             CurrentScreen.Draw(_spriteBatch, RenderDiagnostics, camera);
+        }
+
+        // Post-camera overlay pass: full back-buffer viewport, full-window canvas. The screen's
+        // OverlayRoot lays out against these dims and draws once, regardless of how many cameras
+        // are on the screen — so pause menus and title cards span the whole window in split-screen.
+        if (CurrentScreen.GumRenderables.Count > 0)
+        {
+            gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+            _gum.CanvasWidth = pp.BackBufferWidth;
+            _gum.CanvasHeight = pp.BackBufferHeight;
+            CurrentScreen.EnsureOverlayLayout(pp.BackBufferWidth, pp.BackBufferHeight);
+            CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, primaryCamera);
         }
 
 #if DEBUG
