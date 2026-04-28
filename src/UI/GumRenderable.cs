@@ -27,6 +27,28 @@ public class GumRenderable : IRenderable, IAttachable
         Visual = visual;
     }
 
+    /// <summary>
+    /// When non-null, this renderable belongs to a specific camera's HUD and is drawn only on
+    /// that camera's pass. When null, it is either world-space (parented via <see cref="Parent"/>)
+    /// or — combined with <see cref="IsOverlay"/> — a screen-level overlay drawn after the camera loop.
+    /// </summary>
+    internal Camera? OwningCamera { get; set; }
+
+    /// <summary>When true, this renderable is drawn only in the post-camera-loop overlay pass.</summary>
+    internal bool IsOverlay { get; set; }
+
+    /// <summary>
+    /// True when this renderable should draw for <paramref name="activeCamera"/>'s pass:
+    /// world-space (no owner, not overlay), or HUD owned by exactly this camera.
+    /// Overlay renderables always return false — they are handled by the post-camera pass.
+    /// </summary>
+    internal bool ShouldDrawForCamera(Camera activeCamera)
+    {
+        if (IsOverlay) return false;
+        if (OwningCamera == null) return true;
+        return ReferenceEquals(OwningCamera, activeCamera);
+    }
+
     // IAttachable
     /// <summary>
     /// When set, the visual is positioned in world space at this entity's location each frame.

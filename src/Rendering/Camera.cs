@@ -1,5 +1,8 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Gum.Forms.Controls;
+using Gum.Wireframe;
+using MonoGameGum.GueDeriving;
 using NumericsVector2 = System.Numerics.Vector2;
 
 namespace FlatRedBall2.Rendering;
@@ -96,6 +99,73 @@ public class Camera
     internal Viewport Viewport => _viewport;
 
     internal void SetViewport(Viewport viewport) => _viewport = viewport;
+
+    // ---------- HUD root (per-camera Gum tree) ----------
+
+    private GraphicalUiElement? _hudRoot;
+    private float _lastHudCanvasWidth = float.NaN;
+    private float _lastHudCanvasHeight = float.NaN;
+
+    /// <summary>
+    /// This camera's lazily-created Gum root. Visuals added via <see cref="Add(GraphicalUiElement, FlatRedBall2.Rendering.Layer?)"/>
+    /// are parented under this element and laid out against the camera's own canvas dimensions —
+    /// each split-screen viewport gets its own design-space anchor frame instead of sharing
+    /// <c>Cameras[0]</c>'s.
+    /// </summary>
+    public GraphicalUiElement HudRoot => _hudRoot ??= new ContainerRuntime();
+
+    /// <summary>
+    /// The screen this camera is associated with. Set by <see cref="Screen"/> when this camera is
+    /// part of <see cref="Screen.Cameras"/>; required by <see cref="Add(GraphicalUiElement, FlatRedBall2.Rendering.Layer?)"/>
+    /// to register the GumRenderable on the correct render list.
+    /// </summary>
+    internal FlatRedBall2.Screen? Screen { get; set; }
+
+    /// <summary>Test-only counter incremented every time <see cref="EnsureHudLayout"/> performs a real layout pass.</summary>
+    internal int HudLayoutCallCount { get; private set; }
+
+    /// <summary>
+    /// Calls <c>UpdateLayout</c> on <see cref="HudRoot"/> only when the supplied canvas dims differ
+    /// from the dims used on the previous call. The single gated entry point for HUD layout —
+    /// callers must not call <c>UpdateLayout</c> directly on <see cref="HudRoot"/>.
+    /// </summary>
+    internal void EnsureHudLayout(float canvasWidth, float canvasHeight)
+    {
+        if (canvasWidth == _lastHudCanvasWidth && canvasHeight == _lastHudCanvasHeight)
+            return;
+        _lastHudCanvasWidth = canvasWidth;
+        _lastHudCanvasHeight = canvasHeight;
+        HudRoot.UpdateLayout();
+        HudLayoutCallCount++;
+    }
+
+    /// <summary>
+    /// Adds <paramref name="visual"/> to this camera's HUD. The visual is parented under
+    /// <see cref="HudRoot"/> (so its layout is computed against this camera's canvas dimensions)
+    /// and registered on <see cref="Screen"/>'s render list with this camera as the owner —
+    /// only this camera's draw pass will render it.
+    /// </summary>
+    public void Add(GraphicalUiElement visual, Layer? layer = null)
+    {
+        if (Screen == null)
+            throw new System.InvalidOperationException(
+                "Camera.Add requires the camera to be part of a Screen. Add the camera to Screen.Cameras first.");
+        HudRoot.Children.Add(visual);
+        Screen.AddGumForCamera(visual, this, layer);
+    }
+
+    /// <summary>Adds a Gum Forms control to this camera's HUD. See <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
+    public void Add(FrameworkElement element, Layer? layer = null) => Add(element.Visual, layer);
+
+    /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
+    public void Remove(GraphicalUiElement visual)
+    {
+        HudRoot.Children.Remove(visual);
+        Screen?.RemoveGumForCamera(visual);
+    }
+
+    /// <summary>Removes a Gum Forms control previously added with <see cref="Add(FrameworkElement, Layer?)"/>.</summary>
+    public void Remove(FrameworkElement element) => Remove(element.Visual);
 
     /// <summary>
     /// Resolves <see cref="NormalizedViewport"/> against <paramref name="hostRect"/> to produce

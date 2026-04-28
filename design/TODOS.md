@@ -36,7 +36,6 @@ Open question: do we add a `JumpVelocityRunBonus` field that scales with `|Veloc
 
 - **LazySpawnManager**: only `Cameras[0]`'s world rect drives activation today. Multi-camera union (or repeated per-camera ticks with the existing OneShot dedup) so placements activate when *any* camera reaches them.
 - **Cursor / `InputManager.SetCamera`**: bound to `Cameras[0]`. Per-viewport picking (cursor world position routed to the camera whose viewport contains the cursor's screen position) for split-screen menus or mouse-driven games.
-- **Gum / UI**: HUD overlays are drawn once with `Cameras[0]`'s transform. Per-camera UI overlays for split-screen (e.g. each player's HUD inside their own viewport).
 - **Optional `SplitScreenPreset` enum**: thin sugar over `NormalizedViewport` for halves/quadrants/thirds. Only worth adding if call-site verbosity becomes a real complaint.
 - **Audit `Camera.X/Y/Left/Right/...` reads in engine code** for "which camera?" semantics — anywhere it implicitly assumes `Cameras[0]` and shouldn't (e.g. `_gum.CanvasWidth = camera.OrthogonalWidth / camera.Zoom` in `FlatRedBallService.cs`).
 
