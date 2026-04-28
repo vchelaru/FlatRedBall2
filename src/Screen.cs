@@ -728,7 +728,7 @@ public class Screen
     /// Registers a collision relationship between a single entity and a group of entities.
     /// </summary>
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
-        IEnumerable<A> listA, IEnumerable<B> listB)
+        IReadOnlyList<A> listA, IReadOnlyList<B> listB)
         where A : ICollidable
         where B : ICollidable
     {
@@ -741,11 +741,11 @@ public class Screen
     /// Registers a collision relationship between a single entity and a group of entities.
     /// </summary>
     public CollisionRelationship<A, B> AddCollisionRelationship<A, B>(
-        A single, IEnumerable<B> list)
+        A single, IReadOnlyList<B> list)
         where A : ICollidable
         where B : ICollidable
     {
-        var rel = new CollisionRelationship<A, B>(SingleEnumerable(single), list);
+        var rel = new CollisionRelationship<A, B>(new[] { single }, list);
         _collisionRelationships.Add(rel);
         return rel;
     }
@@ -755,7 +755,7 @@ public class Screen
     /// is tested each frame. Equivalent to passing the same list for both arguments, but
     /// clearer at the call site.
     /// </summary>
-    public CollisionRelationship<A, A> AddCollisionRelationship<A>(IEnumerable<A> list)
+    public CollisionRelationship<A, A> AddCollisionRelationship<A>(IReadOnlyList<A> list)
         where A : ICollidable
     {
         var rel = new CollisionRelationship<A, A>(list, list);
@@ -767,11 +767,11 @@ public class Screen
     /// Registers a collision relationship between a group of entities and static geometry.
     /// </summary>
     public CollisionRelationship<A, TGeometry> AddCollisionRelationship<A, TGeometry>(
-        IEnumerable<A> entities, TGeometry staticGeometry)
+        IReadOnlyList<A> entities, TGeometry staticGeometry)
         where A : ICollidable
         where TGeometry : ICollidable
     {
-        var rel = new CollisionRelationship<A, TGeometry>(entities, SingleEnumerable(staticGeometry));
+        var rel = new CollisionRelationship<A, TGeometry>(entities, new[] { staticGeometry });
         _collisionRelationships.Add(rel);
         return rel;
     }
@@ -783,10 +783,10 @@ public class Screen
     /// <code>AddCollisionRelationship(_playerFactory, _tiles).MoveFirstOnCollision();</code>
     /// </summary>
     public CollisionRelationship<A, Collision.TileShapeCollection> AddCollisionRelationship<A>(
-        IEnumerable<A> entities, Collision.TileShapeCollection tiles)
+        IReadOnlyList<A> entities, Collision.TileShapeCollection tiles)
         where A : ICollidable
     {
-        var rel = new CollisionRelationship<A, Collision.TileShapeCollection>(entities, SingleEnumerable(tiles));
+        var rel = new CollisionRelationship<A, Collision.TileShapeCollection>(entities, new[] { tiles });
         _collisionRelationships.Add(rel);
         return rel;
     }
@@ -794,19 +794,35 @@ public class Screen
     // Internal update — called by FlatRedBallService
     internal void Update(FrameTime frameTime)
     {
+        var engine = Engine;
+        // Reset per-phase fields; UpdateTotalMs / DrawTotalMs / FrameTotalMs are owned by FlatRedBallService.
+        if (engine != null)
+        {
+            engine._frameProfile.PhysicsMs = 0;
+            engine._frameProfile.PartitionSortMs = 0;
+            engine._frameProfile.LazySpawnMs = 0;
+            engine._frameProfile.CollisionMs = 0;
+            engine._frameProfile.ActivityMs = 0;
+            engine._frameProfile.TweenMs = 0;
+        }
+
         if (!IsPaused)
         {
             // 1. Physics pass
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var entity in _entities)
                 entity.PhysicsUpdate(frameTime);
 
             for (int i = 0; i < Cameras.Count; i++)
                 Cameras[i].PhysicsUpdate(frameTime.DeltaSeconds);
+            if (engine != null)
+                engine._frameProfile.PhysicsMs = ProfilingClock.Ms(t0, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 1.25 Lazy-spawn: tick each enrolled tilemap against every camera's rect so
             //      placements that just scrolled into view (on any camera, for split-screen)
             //      spawn their entities BEFORE the partition sort and collision pass —
             //      entities are visible to broad-phase on the same frame they spawn.
+            long t1 = System.Diagnostics.Stopwatch.GetTimestamp();
             if (_lazySpawnRectBuffer is null || _lazySpawnRectBuffer.Length < Cameras.Count)
                 _lazySpawnRectBuffer = new ActivationRect[Cameras.Count];
             for (int c = 0; c < Cameras.Count; c++)
@@ -817,13 +833,21 @@ public class Screen
             var lazySpawnRects = _lazySpawnRectBuffer.AsSpan(0, Cameras.Count);
             for (int i = 0; i < _lazySpawnSources.Count; i++)
                 _lazySpawnSources[i].LazySpawnManager.Update(lazySpawnRects);
+            if (engine != null)
+                engine._frameProfile.LazySpawnMs = ProfilingClock.Ms(t1, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
+            long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
             Engine?.SortPartitionedFactories();
+            if (engine != null)
+                engine._frameProfile.PartitionSortMs = ProfilingClock.Ms(t2, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 2. Collision phase
+            long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var rel in _collisionRelationships)
                 rel.RunCollisions();
+            if (engine != null)
+                engine._frameProfile.CollisionMs = ProfilingClock.Ms(t3, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // Loops 2.5, 3, 4 fire user callbacks (tween Ended, CustomActivity, AnimationFinished)
             // that may Destroy entities — mutating _entities and _renderList. Reverse-for with a
@@ -832,6 +856,7 @@ public class Screen
 
             // 2.5 Tween advancement — entity tweens before CustomActivity so setter-driven
             //     state is visible to user code; screen tweens just before screen CustomActivity.
+            long t4 = System.Diagnostics.Stopwatch.GetTimestamp();
             if (ShouldAdvanceTweens)
             {
                 float dt = frameTime.DeltaSeconds;
@@ -844,8 +869,11 @@ public class Screen
                 }
                 _tweens.Update(dt);
             }
+            if (engine != null)
+                engine._frameProfile.TweenMs = ProfilingClock.Ms(t4, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
+            long t5 = System.Diagnostics.Stopwatch.GetTimestamp();
             for (int i = _entities.Count - 1; i >= 0; i--)
             {
                 if (i >= _entities.Count) continue;
@@ -877,10 +905,15 @@ public class Screen
                     _fireAndForgetLifetimes[i] = (entity, remaining);
                 }
             }
+            if (engine != null)
+                engine._frameProfile.ActivityMs = ProfilingClock.Ms(t5, System.Diagnostics.Stopwatch.GetTimestamp());
         }
 
         // 5. Screen CustomActivity — always runs so pause menu logic can respond to input
+        long t6 = System.Diagnostics.Stopwatch.GetTimestamp();
         CustomActivity(frameTime);
+        if (engine != null)
+            engine._frameProfile.ActivityMs += ProfilingClock.Ms(t6, System.Diagnostics.Stopwatch.GetTimestamp());
     }
 
     // Internal draw — called by FlatRedBallService once per camera in Screen.Cameras. The engine
@@ -1039,8 +1072,4 @@ public class Screen
     private static float GetParentY(IRenderable renderable) =>
         renderable is IAttachable a ? (a.Parent?.AbsoluteY ?? a.AbsoluteY) : 0f;
 
-    private static IEnumerable<T> SingleEnumerable<T>(T item)
-    {
-        yield return item;
-    }
 }

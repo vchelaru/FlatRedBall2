@@ -153,6 +153,59 @@ public class SweepAndPruneTests
     }
 
     [Fact]
+    public void PartitionAxis_DenseClusterOf30Balls_CoversSameUniquePairsAsNaive()
+    {
+        // Lock in the partitioning correctness contract: at scale, with PartitionAxis set the
+        // sweep must report the SAME set of overlapping pairs that the naive O(n²) path reports.
+        // Any miss → balls overlap visibly without separation; any spurious hit → wasted work.
+        // 30 balls placed in a 6×5 grid spaced 1.2*radius apart so neighbors overlap but distant
+        // pairs don't. Position-based, not random, so the test is deterministic.
+        const int Cols = 6;
+        const int Rows = 5;
+        const float Radius = 16f;
+        const float Spacing = 1.2f * Radius;
+
+        var pairsNaive = RunAndCollectPairs(partitionAxis: null);
+        var pairsSwept = RunAndCollectPairs(partitionAxis: Axis.X);
+
+        pairsSwept.Count.ShouldBe(pairsNaive.Count);
+        foreach (var pair in pairsNaive)
+            pairsSwept.ShouldContain(pair);
+
+        HashSet<(int, int)> RunAndCollectPairs(Axis? partitionAxis)
+        {
+            var (factory, _) = CreateFactory();
+            factory.PartitionAxis = partitionAxis;
+
+            var balls = new List<BallEntity>();
+            for (int row = 0; row < Rows; row++)
+                for (int col = 0; col < Cols; col++)
+                {
+                    var ball = factory.Create();
+                    ball.X = col * Spacing;
+                    ball.Y = row * Spacing;
+                    balls.Add(ball);
+                }
+            // Tag each ball with its grid index by Name so the (a,b) pair set is stable.
+            for (int i = 0; i < balls.Count; i++) balls[i].Name = i.ToString();
+
+            if (partitionAxis != null) ((IFactory)factory).SortForPartition();
+
+            var rel = new CollisionRelationship<BallEntity, BallEntity>(factory, factory);
+            var pairs = new HashSet<(int, int)>();
+            rel.CollisionOccurred += (a, b) =>
+            {
+                int ai = int.Parse(a.Name!);
+                int bi = int.Parse(b.Name!);
+                // Normalize so the pair set doesn't depend on which side fired first.
+                pairs.Add(ai < bi ? (ai, bi) : (bi, ai));
+            };
+            rel.RunCollisions();
+            return pairs;
+        }
+    }
+
+    [Fact]
     public void NullPartitionAxis_OnOneFactory_FallsBackToFullCheck()
     {
         // factoryA has an axis set, factoryB does not — no sweep.

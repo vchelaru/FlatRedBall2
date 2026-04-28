@@ -16,7 +16,7 @@ namespace FlatRedBall2.Collision;
 /// <remarks>
 /// <para>
 /// Created by
-/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IEnumerable{A}, System.Collections.Generic.IEnumerable{B})"/>
+/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IReadOnlyList{A}, System.Collections.Generic.IReadOnlyList{B})"/>
 /// — game code does not construct these directly. Once added, the screen calls
 /// <c>RunCollisions</c> on each registered relationship every frame.
 /// </para>
@@ -33,11 +33,8 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     where A : ICollidable
     where B : ICollidable
 {
-    private readonly IEnumerable<A> _listA;
-    private readonly IEnumerable<B> _listB;
-
-    // Reused snapshot for same-list (self) collision — populated once per frame, zero allocation after warmup.
-    private List<A>? _selfSnapshot;
+    private readonly IReadOnlyList<A> _listA;
+    private readonly IReadOnlyList<B> _listB;
 
     private bool _moveFirst;
     private bool _moveSecond;
@@ -194,7 +191,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // firing Ended once per unique pair.
     private HashSet<(A, B)>? _scratchDestroyedPairs;
 
-    internal CollisionRelationship(IEnumerable<A> listA, IEnumerable<B> listB)
+    internal CollisionRelationship(IReadOnlyList<A> listA, IReadOnlyList<B> listB)
     {
         _listA = listA;
         _listB = listB;
@@ -388,9 +385,14 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 RunCrossListCollisionsSweep(axisA.Value);
             else
             {
-                foreach (var a in _listA)
-                    foreach (var b in _listB)
-                        RunPair(a, b);
+                // Indexed iteration — iterating the IReadOnlyList<T>-typed fields via foreach would
+                // dispatch through IEnumerable<T>.GetEnumerator() and box the underlying struct
+                // enumerators, allocating once per operand per frame.
+                int countA = _listA.Count;
+                int countB = _listB.Count;
+                for (int i = 0; i < countA; i++)
+                    for (int j = 0; j < countB; j++)
+                        RunPair(_listA[i], _listB[j]);
             }
         }
 
@@ -430,27 +432,16 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Called when _listA and _listB are the same reference (self/intra-list collision).
     // Iterates unique unordered pairs (i < j) so each pair is processed exactly once.
-    // Uses IReadOnlyList<A> indexed access (e.g. Factory<T>) to avoid GetEnumerator allocation;
-    // falls back to foreach for other IEnumerable types.
     // The cast (B)(object)b is safe: A == B is guaranteed when both lists share a reference.
     private void RunSameListCollisions()
     {
-        _selfSnapshot ??= new List<A>();
-        _selfSnapshot.Clear();
-
-        if (_listA is IReadOnlyList<A> indexed)
-            for (int i = 0; i < indexed.Count; i++)
-                _selfSnapshot.Add(indexed[i]);
-        else
-            foreach (var item in _listA)
-                _selfSnapshot.Add(item);
-
-        for (int i = 0; i < _selfSnapshot.Count; i++)
+        int count = _listA.Count;
+        for (int i = 0; i < count; i++)
         {
-            for (int j = i + 1; j < _selfSnapshot.Count; j++)
+            for (int j = i + 1; j < count; j++)
             {
-                var a = _selfSnapshot[i];
-                var b = _selfSnapshot[j];
+                var a = _listA[i];
+                var b = _listA[j];
                 var effectiveA = GetEffectiveA(a);
                 var effectiveB = GetEffectiveB((B)(object)b);
                 DeepCollisionCount++;
@@ -494,11 +485,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         TryOfferGroundSnap(a, b);
     }
 
-    // Both lists are already sorted by their respective factories. Uses indexed access where available.
+    // Both lists are already sorted by their respective factories.
     private void RunCrossListCollisionsSweep(Axis axis)
     {
-        var listA = _listA as IReadOnlyList<A> ?? new List<A>(_listA);
-        var listB = _listB as IReadOnlyList<B> ?? new List<B>(_listB);
+        var listA = _listA;
+        var listB = _listB;
 
         int startB = 0;
 
@@ -552,7 +543,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // List is already sorted by factory. Iterates unique unordered pairs (i < j).
     private void RunSameListCollisionsSweep(Axis axis)
     {
-        var list = _listA as IReadOnlyList<A> ?? new List<A>(_listA);
+        var list = _listA;
 
         for (int i = 0; i < list.Count; i++)
         {

@@ -19,17 +19,12 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
 
-## CollisionRelationship list-type tightening
-**Priority: Soon** — `CollisionRelationship<A, B>` stores its operand collections as `IEnumerable<A>` / `IEnumerable<B>` (`src/Collision/CollisionRelationship.cs:36-37`).
+## TileShapeCollection.AddRectangleBorder convenience
+**Priority: Soon** — building an arena/play-field wall ring (every game with bounded play area: arcade brawler, bumper-ball arena, top-down shooter map edges) currently takes ~12 lines of cell-loop boilerplate per side. The `AutoEvalBallPartitionSample` had to write:
 
-- Pair-iteration path at `RunCollisions` `foreach (var a in _listA) foreach (var b in _listB)` boxes the struct enumerators of the underlying `List<T>`/`Factory<T>` to `IEnumerator<T>` — two enumerator allocations per relationship per frame.
-- The same-list path already runtime-casts to `IReadOnlyList<A>` to recover indexed iteration, proving the runtime objects support it.
-- Tighten the field types (and the `Screen.AddCollisionRelationship<A,B>` overloads) to `IReadOnlyList<A>` / `IReadOnlyList<B>`. Callers in the engine + samples already pass `Factory<T>` or `List<T>`; non-breaking for the common case.
-- Also unlocks indexed access for a partition-aware broad phase (drop-in at index k for sort-and-sweep).
+```csharp
+for (int c = 0; c < cols; c++) { tiles.AddTileAtCell(c, 0); tiles.AddTileAtCell(c, rows - 1); }
+for (int r = 1; r < rows - 1; r++) { tiles.AddTileAtCell(0, r); tiles.AddTileAtCell(cols - 1, r); }
+```
 
-## Factory Object Pooling
-**Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
-
-- Opt-in pool mode on `Factory<T>`: destroyed instances return to a free list; subsequent `Create()` calls hand them back after a `Reset()` hook on the entity.
-- Decide entity reset contract: does pooling require a `Reset()` virtual on `Entity`, or is the pattern "destroy clears state, CustomInitialize re-initializes"?
-- Interaction with `IsSolidGrid` factory mode and entity-collision-relationship dispatch — pooled entities must not leave dangling references in collision lists.
+Add `TileShapeCollection.AddRectangleBorder(int colMin, int rowMin, int colMax, int rowMax)` (or a thickness-parameterized variant) so a one-liner replaces the four-loop dance. Skip if the natural pattern in actual games is to source walls from a TMX file — if Tiled is the canonical authoring path for level edges, the code-only convenience is a sharp tool for sample/test code only and may not earn its keep.

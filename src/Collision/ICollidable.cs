@@ -10,7 +10,7 @@ namespace FlatRedBall2.Collision;
 /// </summary>
 /// <remarks>
 /// Most game code interacts with collision via
-/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IEnumerable{A}, System.Collections.Generic.IEnumerable{B})"/>
+/// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IReadOnlyList{A}, System.Collections.Generic.IReadOnlyList{B})"/>
 /// or <see cref="Entity.CollidesWith"/> rather than calling these methods directly. The
 /// per-shape methods exist for advanced/manual collision flows.
 /// </remarks>
