@@ -302,6 +302,34 @@ public class FactoryTests
     }
 
     [Fact]
+    public void IsSolidGrid_PooledFactory_RecycledBrickReindexesAtNewCell()
+    {
+        // Pooling preserves the body across recycles; the grid index must follow the new position.
+        var screen = new TestScreen();
+        screen.Engine = new FlatRedBallService();
+        var factory = new Factory<GridBrick>(screen) { IsSolidGrid = true }.EnablePooling();
+
+        GridBrick a, b;
+        using (factory.BeginGridBatch())
+        {
+            a = factory.Create(); a.X = 0;  a.Y = 0;
+            b = factory.Create(); b.X = 16; b.Y = 0;
+        }
+        b.Destroy(); // returns to free list, grid cleanup runs
+
+        GridBrick c;
+        using (factory.BeginGridBatch())
+        {
+            c = factory.Create(); c.X = 32; c.Y = 0; // recycle of b at a non-adjacent cell
+        }
+
+        c.ShouldBeSameAs(b);
+        // a at col 0, c at col 2 — no adjacency, all faces restored.
+        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+        c.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+    }
+
+    [Fact]
     public void IsSolidGrid_Row3_MiddleHasBothSideFacesSuppressed()
     {
         var screen = new TestScreen();

@@ -29,7 +29,11 @@ namespace FlatRedBall2;
 /// <para>
 /// <b>Lifecycle:</b> <see cref="CustomInitialize"/> → per-frame <see cref="CustomActivity"/> →
 /// <see cref="Destroy"/> calls <see cref="CustomDestroy"/> and recursively destroys all
-/// attached children.
+/// attached children. When the owning factory has pooling enabled
+/// (<see cref="Factory{T}.EnablePooling"/>), <see cref="Destroy"/> instead returns the entity
+/// to the factory's free list: <see cref="CustomDestroy"/> is skipped, attached children and
+/// shapes are preserved, and the next <see cref="Factory{T}.Create()"/> recycles this instance
+/// after resetting engine-owned state and invoking <see cref="Reset"/>.
 /// </para>
 /// </summary>
 public class Entity : ICollidable, IAttachable
@@ -503,14 +507,27 @@ public class Entity : ICollidable, IAttachable
     /// all attached children are destroyed recursively, shape/child lists clear, and finally
     /// the factory/screen registration is released.
     /// </para>
+    /// <para>
+    /// <b>Pooled factories</b> (<see cref="Factory{T}.EnablePooling"/>): the entity is returned
+    /// to the factory's free list instead. <see cref="CustomDestroy"/> does not run, child
+    /// shapes / sprites / Gum visuals / tweens are preserved for reuse, and the
+    /// <see cref="Destroyed"/> event does not fire. The entity does still detach from any
+    /// <see cref="Parent"/> — pooled entities are returned in a root state, ready for the next
+    /// <see cref="Factory{T}.Create()"/>.
+    /// </para>
     /// </summary>
     public void Destroy()
     {
         if (_isPooled)
         {
-            // Pool-destroy: factory's _onDestroy detaches renderables and pushes onto the free list.
-            // Children, shapes, Gum visuals, tweens, and event subscribers are all preserved for
-            // reuse on the next Create(). CustomDestroy and Destroyed deliberately do not fire.
+            // Pool-destroy: detach from any parent so the recycled instance is a root, then let
+            // the factory's _onDestroy detach renderables from the screen and push onto the free
+            // list. Children, shapes, Gum visuals, tweens, and event subscribers are all preserved
+            // for reuse on the next Create(). CustomDestroy and Destroyed deliberately do not fire.
+            // Detaching from Parent matters when a pooled entity was attached as a child of another
+            // entity: without this, the parent's _children list would still reference us, and a
+            // later parent.Destroy() would re-route through here and double-push to the free list.
+            Parent?.Remove(this);
             _onDestroy?.Invoke();
             return;
         }
