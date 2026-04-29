@@ -47,6 +47,8 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private float _bounceMassB = 1f;
     private float _bounceElasticity = 1f;
 
+    private bool _sweepForward = true;
+
     private Func<A, ICollidable>? _firstShapeSelector;
     private Func<B, ICollidable>? _secondShapeSelector;
 
@@ -368,14 +370,16 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     internal void RunCollisions()
     {
         DeepCollisionCount = 0;
+        bool forward = _sweepForward;
+        _sweepForward = !_sweepForward;
 
         if (ReferenceEquals(_listA, _listB))
         {
             var axis = (_listA is IFactory fa) ? fa.PartitionAxis : null;
             if (axis != null)
-                RunSameListCollisionsSweep(axis.Value);
+                RunSameListCollisionsSweep(axis.Value, forward);
             else
-                RunSameListCollisions();
+                RunSameListCollisions(forward);
         }
         else
         {
@@ -433,32 +437,40 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // Called when _listA and _listB are the same reference (self/intra-list collision).
     // Iterates unique unordered pairs (i < j) so each pair is processed exactly once.
     // The cast (B)(object)b is safe: A == B is guaranteed when both lists share a reference.
-    private void RunSameListCollisions()
+    private void RunSameListCollisions(bool forward)
     {
         int count = _listA.Count;
-        for (int i = 0; i < count; i++)
+        if (forward)
         {
-            for (int j = i + 1; j < count; j++)
-            {
-                var a = _listA[i];
-                var b = _listA[j];
-                var effectiveA = GetEffectiveA(a);
-                var effectiveB = GetEffectiveB((B)(object)b);
-                DeepCollisionCount++;
-                if (!CheckCollision(effectiveA, effectiveB)) continue;
+            for (int i = 0; i < count; i++)
+                for (int j = i + 1; j < count; j++)
+                    RunSameListPair(_listA[i], _listA[j]);
+        }
+        else
+        {
+            for (int i = count - 1; i >= 0; i--)
+                for (int j = i - 1; j >= 0; j--)
+                    RunSameListPair(_listA[i], _listA[j]);
+        }
+    }
 
-                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
-                if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
-                ApplyResponse(a, (B)(object)b, sep, axisAligned);
-                TryTransferPlatformVelocity(a, (B)(object)b, sep);
-                RecordContact(a, (B)(object)b);
-                CollisionOccurred?.Invoke(a, (B)(object)b);
-                if (AllowDuplicatePairs)
-                {
-                    RecordContact(b, (B)(object)a);
-                    CollisionOccurred?.Invoke(b, (B)(object)a);
-                }
-            }
+    private void RunSameListPair(A a, A b)
+    {
+        var effectiveA = GetEffectiveA(a);
+        var effectiveB = GetEffectiveB((B)(object)b);
+        DeepCollisionCount++;
+        if (!CheckCollision(effectiveA, effectiveB)) return;
+
+        var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
+        if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) return;
+        ApplyResponse(a, (B)(object)b, sep, axisAligned);
+        TryTransferPlatformVelocity(a, (B)(object)b, sep);
+        RecordContact(a, (B)(object)b);
+        CollisionOccurred?.Invoke(a, (B)(object)b);
+        if (AllowDuplicatePairs)
+        {
+            RecordContact(b, (B)(object)a);
+            CollisionOccurred?.Invoke(b, (B)(object)a);
         }
     }
 
@@ -540,39 +552,51 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
     }
 
-    // List is already sorted by factory. Iterates unique unordered pairs (i < j).
-    private void RunSameListCollisionsSweep(Axis axis)
+    // List is already sorted ascending by factory. Alternates sweep direction each frame
+    // to cancel the bias where the leftmost entity is always pushed left first.
+    private void RunSameListCollisionsSweep(Axis axis, bool forward)
     {
         var list = _listA;
 
-        for (int i = 0; i < list.Count; i++)
+        if (forward)
         {
-            var a = list[i];
-            var effectiveA = GetEffectiveA(a);
-            float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
-            float aRight = aPos + effectiveA.BroadPhaseRadius;
-
-            for (int j = i + 1; j < list.Count; j++)
+            for (int i = 0; i < list.Count; i++)
             {
-                var b = list[j];
-                var effectiveB = GetEffectiveB((B)(object)b);
-                float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
-                float bLeft = bPos - effectiveB.BroadPhaseRadius;
-                if (bLeft > aRight) break;
+                var a = list[i];
+                var effectiveA = GetEffectiveA(a);
+                float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
+                float aRight = aPos + effectiveA.BroadPhaseRadius;
 
-                DeepCollisionCount++;
-                if (!CheckCollision(effectiveA, effectiveB)) continue;
-
-                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
-                if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) continue;
-                ApplyResponse(a, (B)(object)b, sep, axisAligned);
-                TryTransferPlatformVelocity(a, (B)(object)b, sep);
-                RecordContact(a, (B)(object)b);
-                CollisionOccurred?.Invoke(a, (B)(object)b);
-                if (AllowDuplicatePairs)
+                for (int j = i + 1; j < list.Count; j++)
                 {
-                    RecordContact(b, (B)(object)a);
-                    CollisionOccurred?.Invoke(b, (B)(object)a);
+                    var b = list[j];
+                    var effectiveB = GetEffectiveB((B)(object)b);
+                    float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
+                    float bLeft = bPos - effectiveB.BroadPhaseRadius;
+                    if (bLeft > aRight) break;
+
+                    RunSameListPair(a, b);
+                }
+            }
+        }
+        else
+        {
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                var a = list[i];
+                var effectiveA = GetEffectiveA(a);
+                float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
+                float aLeft = aPos - effectiveA.BroadPhaseRadius;
+
+                for (int j = i - 1; j >= 0; j--)
+                {
+                    var b = list[j];
+                    var effectiveB = GetEffectiveB((B)(object)b);
+                    float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
+                    float bRight = bPos + effectiveB.BroadPhaseRadius;
+                    if (bRight < aLeft) break;
+
+                    RunSameListPair(a, b);
                 }
             }
         }
