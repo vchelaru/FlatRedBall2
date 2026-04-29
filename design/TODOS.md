@@ -45,12 +45,12 @@ Cheap fix: alternate sweep direction every other frame (`i = N-1` down to `0`, `
 
 Only meaningful in scenes with hundreds of densely-packed dynamic bodies — bullet swarms, particle piles, the ball-partition stress test. Most game scenes won't notice.
 
-## TileShapeCollection.AddRectangleBorder convenience
-**Priority: Soon** — building an arena/play-field wall ring (every game with bounded play area: arcade brawler, bumper-ball arena, top-down shooter map edges) currently takes ~12 lines of cell-loop boilerplate per side. The `AutoEvalBallPartitionSample` had to write:
+## Naming audit and rename pass
+**Priority: Soon** — Several types carry FRB1 naming baggage that doesn't fit FRB2's leaner API. Do a single coordinated rename pass to avoid churn from piecemeal renames.
 
-```csharp
-for (int c = 0; c < cols; c++) { tiles.AddTileAtCell(c, 0); tiles.AddTileAtCell(c, rows - 1); }
-for (int r = 1; r < rows - 1; r++) { tiles.AddTileAtCell(0, r); tiles.AddTileAtCell(cols - 1, r); }
-```
+Known candidates:
+- `TileShapeCollection` → `TileShapes` — "Collection" suffix is redundant
+- (Audit the rest of the public API for similar verbose/legacy names)
 
-Add `TileShapeCollection.AddRectangleBorder(int colMin, int rowMin, int colMax, int rowMax)` (or a thickness-parameterized variant) so a one-liner replaces the four-loop dance. Skip if the natural pattern in actual games is to source walls from a TMX file — if Tiled is the canonical authoring path for level edges, the code-only convenience is a sharp tool for sample/test code only and may not earn its keep.
+Do this as one branch so all renames land together and skill files, XML docs, samples, and tests update in lockstep.
+

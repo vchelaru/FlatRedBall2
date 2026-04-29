@@ -109,6 +109,7 @@ Collision runs after physics and before `CustomActivity` — by the time game lo
 ```csharp
 var tiles = new TileShapeCollection { GridSize = 16f };
 tiles.AddTileAtCell(col, row);   // or AddTileAtWorld(x, y)
+tiles.AddRectangleBorder(0, 0, cols - 1, rows - 1); // perimeter wall ring in one call
 
 // TileShapeCollection has a dedicated overload — no explicit type arguments needed
 AddCollisionRelationship(_playerFactory, tiles)

@@ -30,6 +30,74 @@ public class TileShapeCollectionTests
         tiles.GetCellWorldPosition(-1, -1).ShouldBe(new Vector2(-8f, -8f));
     }
 
+    // ── AddRectangleBorder ─────────────────────────────────────────────────
+
+    [Fact]
+    public void AddRectangleBorder_3x3_AddsPerimeterTilesOnly()
+    {
+        int colMin = 0, rowMin = 0, colMax = 2, rowMax = 2;
+        var tiles = new TileShapeCollection { GridSize = 16f };
+
+        tiles.AddRectangleBorder(colMin, rowMin, colMax, rowMax);
+
+        // All 8 perimeter cells should be filled
+        tiles.GetTileAtCell(0, 0).ShouldNotBeNull();
+        tiles.GetTileAtCell(1, 0).ShouldNotBeNull();
+        tiles.GetTileAtCell(2, 0).ShouldNotBeNull();
+        tiles.GetTileAtCell(0, 1).ShouldNotBeNull();
+        tiles.GetTileAtCell(2, 1).ShouldNotBeNull();
+        tiles.GetTileAtCell(0, 2).ShouldNotBeNull();
+        tiles.GetTileAtCell(1, 2).ShouldNotBeNull();
+        tiles.GetTileAtCell(2, 2).ShouldNotBeNull();
+
+        // Interior cell should be empty
+        tiles.GetTileAtCell(1, 1).ShouldBeNull();
+    }
+
+    [Fact]
+    public void AddRectangleBorder_1x1_AddsSingleTile()
+    {
+        var tiles = new TileShapeCollection { GridSize = 16f };
+
+        tiles.AddRectangleBorder(5, 3, 5, 3);
+
+        tiles.GetTileAtCell(5, 3).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void AddRectangleBorder_SingleRow_FillsEntireRow()
+    {
+        int colMin = 0, colMax = 4, row = 2;
+        var tiles = new TileShapeCollection { GridSize = 16f };
+
+        tiles.AddRectangleBorder(colMin, row, colMax, row);
+
+        for (int c = colMin; c <= colMax; c++)
+            tiles.GetTileAtCell(c, row).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void AddRectangleBorder_RepositionDirections_InnerFacesSuppressed()
+    {
+        // A 5x5 border: corner tiles should have two exposed faces,
+        // edge-middle tiles should have three exposed faces (inner face suppressed).
+        var tiles = new TileShapeCollection { GridSize = 16f };
+
+        tiles.AddRectangleBorder(0, 0, 4, 4);
+
+        // Bottom-left corner: neighbors to right (1,0) and above (0,1)
+        var corner = tiles.GetTileAtCell(0, 0)!;
+        corner.RepositionDirections.ShouldBe(
+            RepositionDirections.Left | RepositionDirections.Down);
+
+        // Bottom edge middle (2,0): neighbors left (1,0), right (3,0), and above? No — (2,1) is interior, empty.
+        // Wait, for a 5x5 border, row 0 has all cols filled. Row 1 has only col 0 and col 4.
+        // So (2,0) neighbors: (1,0) filled, (3,0) filled, (2,1) empty, (2,-1) empty.
+        var bottomMid = tiles.GetTileAtCell(2, 0)!;
+        bottomMid.RepositionDirections.ShouldBe(
+            RepositionDirections.Up | RepositionDirections.Down);
+    }
+
     // ── AddTileAtCell ────────────────────────────────────────────────────────
 
     [Fact]

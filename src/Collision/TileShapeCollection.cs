@@ -426,6 +426,27 @@ public class TileShapeCollection : ICollidable
             ? list
             : Array.Empty<AxisAlignedRectangle>();
 
+    /// <summary>
+    /// Adds solid tiles along the perimeter of the rectangle defined by
+    /// (<paramref name="colMin"/>, <paramref name="rowMin"/>) to
+    /// (<paramref name="colMax"/>, <paramref name="rowMax"/>), inclusive.
+    /// Interior cells are left empty. Existing tiles at border positions are
+    /// skipped (same as <see cref="AddTileAtCell"/>).
+    /// </summary>
+    public void AddRectangleBorder(int colMin, int rowMin, int colMax, int rowMax)
+    {
+        for (int c = colMin; c <= colMax; c++)
+        {
+            AddTileAtCell(c, rowMin);
+            AddTileAtCell(c, rowMax);
+        }
+        for (int r = rowMin + 1; r < rowMax; r++)
+        {
+            AddTileAtCell(colMin, r);
+            AddTileAtCell(colMax, r);
+        }
+    }
+
     private (int col, int row) WorldToCell(float x, float y) =>
         ((int)MathF.Floor((x - X) / GridSize), (int)MathF.Floor((y - Y) / GridSize));
 
