@@ -147,4 +147,50 @@ public class CursorMultiCameraTests
         cursor.Update(MouseAt(960, 360), TimeSpan.Zero);
         cursor.WorldPosition.X.ShouldBe(1000f, tolerance: 1f);
     }
+
+    [Fact]
+    public void IsInWindow_CursorInsideViewport_ReturnsTrue()
+    {
+        var cam = MakeCamera(0f, 0f, new NormalizedRectangle(0f, 0f, 1f, 1f));
+        var cursor = new Cursor();
+        cursor.SetCameras(new List<Camera> { cam });
+
+        cursor.Update(MouseAt(640, 360), TimeSpan.Zero);
+
+        cursor.IsInWindow.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsInWindow_CursorAboveWindow_ReturnsFalse()
+    {
+        var cam = MakeCamera(0f, 0f, new NormalizedRectangle(0f, 0f, 1f, 1f));
+        var cursor = new Cursor();
+        cursor.SetCameras(new List<Camera> { cam });
+
+        cursor.Update(MouseAt(640, -10), TimeSpan.Zero);
+
+        cursor.IsInWindow.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsInWindow_CursorBeyondRightEdge_ReturnsFalse()
+    {
+        var cam = MakeCamera(0f, 0f, new NormalizedRectangle(0f, 0f, 1f, 1f));
+        var cursor = new Cursor();
+        cursor.SetCameras(new List<Camera> { cam });
+
+        cursor.Update(MouseAt(HostWidth + 10, 360), TimeSpan.Zero);
+
+        cursor.IsInWindow.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsInWindow_NoCamerasRegistered_ReturnsFalse()
+    {
+        var cursor = new Cursor();
+
+        cursor.Update(MouseAt(640, 360), TimeSpan.Zero);
+
+        cursor.IsInWindow.ShouldBeFalse();
+    }
 }

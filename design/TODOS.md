@@ -19,13 +19,6 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
 
-## CollisionRelationship per-pair inner-loop optimization
-**Priority: Soon** — `AutoEvalBallPartitionSample` profiling shows ~150ns/check in Release for circle-vs-circle ball pairs. The broad-phase prunes correctly (50k checks against a 1.9M naive baseline); the cost is per-check overhead. Concrete optimization candidates:
-
-- **Inline the common Circle-vs-Circle case** in `CollisionDispatcher.GetSeparationVector`. The type-pair `switch` does runtime `is` checks on every call; for the dominant case (entity with one circle child vs. another), a fast path that skips the leaf-shape walk and the dispatch table is worthwhile.
-
-Validate before/after with the `FrameProfile.CollisionMs` reading in the sample at a fixed ball count (say, 500).
-
 ## Rename `ai-reference/` to `frb-skills/`
 **Priority: Soon** — The directory name `ai-reference` collides with the collision system terminology in conversation (AI = artificial intelligence vs. the directory). Rename to `frb-skills/` for clarity. Update CLAUDE.md, symlinks under `.claude/skills/`, and any references in skill files.
 

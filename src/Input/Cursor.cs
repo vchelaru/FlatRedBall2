@@ -29,6 +29,7 @@ public class Cursor : ICursor
     private MouseState _previousMouse;
     private IReadOnlyList<Camera>? _cameras;
     private Camera? _activeCamera;
+    private bool _isInWindow;
 
     private bool _touchActive;
     private bool _touchActivePrev;
@@ -84,6 +85,7 @@ public class Cursor : ICursor
         if (_cameras == null || _cameras.Count == 0)
         {
             _activeCamera = null;
+            _isInWindow = false;
             return;
         }
 
@@ -97,10 +99,12 @@ public class Cursor : ICursor
                 sy >= vp.Y && sy < vp.Y + vp.Height)
             {
                 _activeCamera = _cameras[i];
+                _isInWindow = true;
                 return;
             }
         }
 
+        _isInWindow = false;
         _activeCamera ??= _cameras[0];
     }
 
@@ -162,6 +166,9 @@ public class Cursor : ICursor
     public Vector2 ScreenPosition => _touchActive
         ? _touchScreenPos
         : new Vector2(_currentMouse.X, _currentMouse.Y);
+
+    /// <inheritdoc/>
+    public bool IsInWindow => _isInWindow;
 
     /// <inheritdoc/>
     /// <remarks>

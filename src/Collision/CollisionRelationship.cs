@@ -459,9 +459,8 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var effectiveA = GetEffectiveA(a);
         var effectiveB = GetEffectiveB((B)(object)b);
         DeepCollisionCount++;
-        if (!CheckCollision(effectiveA, effectiveB)) return;
-
         var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
+        if (sep == Vector2.Zero) return;
         if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) return;
         ApplyResponse(a, (B)(object)b, sep, axisAligned);
         TryTransferPlatformVelocity(a, (B)(object)b, sep);
@@ -479,12 +478,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var effectiveA = GetEffectiveA(a);
         var effectiveB = GetEffectiveB(b);
         DeepCollisionCount++;
-        if (!CheckCollision(effectiveA, effectiveB))
+        var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
+        if (sep == Vector2.Zero)
         {
             TryOfferGroundSnap(a, b);
             return;
         }
-        var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
         if (!TryApplyOneWayGate(a, b, ref sep))
         {
             TryOfferGroundSnap(a, b);
@@ -532,12 +531,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 if (bLeft > aRight) break; // too far; all remaining are also too far
 
                 DeepCollisionCount++;
-                if (!CheckCollision(effectiveA, effectiveB))
+                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
+                if (sep == Vector2.Zero)
                 {
                     TryOfferGroundSnap(a, b);
                     continue;
                 }
-                var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
                 if (!TryApplyOneWayGate(a, b, ref sep))
                 {
                     TryOfferGroundSnap(a, b);
@@ -635,24 +634,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private ICollidable GetEffectiveA(A a) => _firstShapeSelector != null ? _firstShapeSelector(a) : a;
     private ICollidable GetEffectiveB(B b) => _secondShapeSelector != null ? _secondShapeSelector(b) : b;
 
-    // Checks collision using CollisionDispatcher.CollidesWith so Line intersections are handled.
-    // Iterates leaf shape pairs so any combination of leaf shapes, entities, and
-    // TileShapess is dispatched correctly — including selected-shape vs entity cases.
-    private bool CheckCollision(ICollidable a, ICollidable b)
+    private static ICollidable? GetSingleLeafShape(ICollidable collidable)
     {
-        if (b is TileShapes tsc)
-        {
-            foreach (var leafA in Entity.GetLeafShapes(a))
-                if (tsc.GetSeparationFor(leafA, SlopeMode) != Vector2.Zero)
-                    return true;
-            return false;
-        }
-
-        foreach (var leafA in Entity.GetLeafShapes(a))
-            foreach (var leafB in Entity.GetLeafShapes(b))
-                if (CollisionDispatcher.CollidesWith(leafA, leafB))
-                    return true;
-        return false;
+        if (collidable is not Entity entity) return collidable;
+        if (entity.Shapes.Count != 1) return null;
+        var only = entity.Shapes[0];
+        return only is Entity ? null : only;
     }
 
     // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
@@ -675,6 +662,16 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
 
         axisAlignedAggregate = false;
+
+        var singleA = GetSingleLeafShape(a);
+        var singleB = GetSingleLeafShape(b);
+        if (singleA != null && singleB != null)
+        {
+            if (singleA is Circle ca && singleB is Circle cb)
+                return CollisionDispatcher.CircleVsCircle(ca, cb);
+            return CollisionDispatcher.GetSeparationVector(singleA, singleB);
+        }
+
         foreach (var leafA in Entity.GetLeafShapes(a))
             foreach (var leafB in Entity.GetLeafShapes(b))
             {
