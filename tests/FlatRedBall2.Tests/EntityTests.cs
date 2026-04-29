@@ -235,6 +235,49 @@ public class EntityTests
         child.IsAbsoluteVisible.ShouldBeFalse();
     }
 
+    [Fact]
+    public void BroadPhaseRadius_SingleCircle_EqualsCircleRadius()
+    {
+        float expectedRadius = 16f;
+        var entity = new Entity();
+        entity.Add(new Circle { Radius = expectedRadius });
+
+        entity.BroadPhaseRadius.ShouldBe(expectedRadius);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterRemovingShape_UpdatesToRemainingShape()
+    {
+        float smallRadius = 8f;
+        float largeRadius = 32f;
+        var entity = new Entity();
+        var small = new Circle { Radius = smallRadius };
+        var large = new Circle { Radius = largeRadius };
+        entity.Add(small);
+        entity.Add(large);
+
+        entity.BroadPhaseRadius.ShouldBe(largeRadius);
+
+        entity.Remove(large);
+
+        entity.BroadPhaseRadius.ShouldBe(smallRadius);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterSetDefaultCollisionFalse_ExcludesShape()
+    {
+        float radius = 16f;
+        var entity = new Entity();
+        var circle = new Circle { Radius = radius };
+        entity.Add(circle);
+
+        entity.BroadPhaseRadius.ShouldBe(radius);
+
+        entity.SetDefaultCollision(circle, false);
+
+        entity.BroadPhaseRadius.ShouldBe(0f);
+    }
+
     private class DestroyTrackingEntity : Entity
     {
         public bool WasDestroyed { get; private set; }
