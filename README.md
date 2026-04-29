@@ -86,6 +86,15 @@ winget install Microsoft.VCRedist.2013.x64
 
 Or download `vcredist_x64.exe` from https://www.microsoft.com/download/details.aspx?id=40784. macOS and Linux are unaffected.
 
+### Wine (macOS and Linux only)
+
+The MonoGame content pipeline uses Windows-only tools for shader (`.fx`) compilation. On macOS and Linux, **Wine** must be installed for this to work. Without it, any build that compiles a shader will fail.
+
+Follow the MonoGame setup guide for your platform:
+https://docs.monogame.net/articles/tutorials/building_2d_games/02_getting_started/index.html?tabs=macos#setup-wine-for-effect-compilation-macos-and-linux-only
+
+> **KNI backend:** Shader compilation is not supported on macOS or Linux when using the KNI backend. KNI projects must have their shaders compiled on Windows.
+
 ## Quick Start
 
 Install the project template once (re-run before each new project to pick up template updates):
