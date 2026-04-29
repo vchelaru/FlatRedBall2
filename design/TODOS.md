@@ -4,11 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## Native AOT
-**Priority: Eventual** — `<IsAotCompatible>true</IsAotCompatible>` is on `FlatRedBall2.csproj`; AOT analyzers run at build time. Zero warnings remain — the engine library is analyzer-clean.
-
-**Next step (phase 2):** `<PublishAot>true</PublishAot>` on a sample executable, `dotnet publish -c Release -r win-x64`, then exercise tilemap load and animation loading at runtime to confirm no reflection paths break.
-
 ## Documentation Site
 **Priority: Soon** — Stand up a public docs site for FlatRedBall2. Today all guidance lives in skill files (AI-facing, in-repo) and inline XML docs; a human-facing site is the missing third leg.
 
