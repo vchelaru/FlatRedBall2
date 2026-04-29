@@ -8,10 +8,10 @@ using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 
 namespace FlatRedBall2.Tests.Tiled;
 
-public class TileMapCollisionGeneratorTests
+public class TileMapCollisionsTests
 {
     // Builds a minimal MonoGame.Extended Tilemap with a single tileset whose tiles have the
-    // given TilemapTileData entries. The texture is null — safe because TileMapCollisionGenerator
+    // given TilemapTileData entries. The texture is null — safe because TileMapCollisions
     // only reads Class, Properties, and CollisionObjects.
     private static MonoGame.Extended.Tilemaps.Tilemap BuildTilemap(
         int widthTiles, int heightTiles, int tileSize,
@@ -119,7 +119,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
 
         var layer = (TilemapTileLayer)tilemap.Layers[0];
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         coll.GetTileAtCell(0, 0).ShouldNotBeNull();
         coll.GetPolygonTileAtCell(0, 0).ShouldBeNull();
@@ -142,7 +142,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
 
         var layer = (TilemapTileLayer)tilemap.Layers[0];
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         coll.GetTileAtCell(0, 0).ShouldBeNull();
         var emitted = coll.GetPolygonTileAtCell(0, 0);
@@ -172,7 +172,7 @@ public class TileMapCollisionGeneratorTests
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
         Should.Throw<System.InvalidOperationException>(
-            () => TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid"));
+            () => TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid"));
     }
 
     [Fact]
@@ -196,7 +196,7 @@ public class TileMapCollisionGeneratorTests
             ]);
 
         var layer = (TilemapTileLayer)tilemap.Layers[0];
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         coll.GetTileAtCell(0, 1).ShouldNotBeNull();
         coll.GetPolygonTileAtCell(0, 1).ShouldBeNull();
@@ -232,7 +232,7 @@ public class TileMapCollisionGeneratorTests
             tileDataEntries: [MakePolygonTile(0, "Solid", new XnaVec2(0, 0), BaseTriangle)],
             placements: [(0, 0, 0, flip)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
         return coll.GetPolygonTileAtCell(0, 0)!;
     }
 
@@ -301,7 +301,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         coll.GetTileAtCell(0, 0).ShouldBeNull();
         coll.GetPolygonTileAtCell(0, 0).ShouldBeNull();
@@ -328,7 +328,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         coll.GetTileAtCell(0, 0).ShouldBeNull();
         coll.GetPolygonTileAtCell(0, 0).ShouldNotBeNull();
@@ -348,7 +348,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         var rects = coll.GetRectangleTilesAtCell(0, 0);
         rects.Count.ShouldBe(2);
@@ -372,7 +372,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0, TilemapTileFlipFlags.FlipHorizontally)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         var rects = coll.GetRectangleTilesAtCell(0, 0);
         rects.Count.ShouldBe(1);
@@ -392,7 +392,7 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         var rects = coll.GetRectangleTilesAtCell(0, 0);
         rects.Count.ShouldBe(1);
@@ -407,22 +407,22 @@ public class TileMapCollisionGeneratorTests
     {
         // Author-side bottom-half rects (0,8,16,8) on the same tile; place two side-by-side.
         // After generation the two sub-cell rects form a continuous curb — their shared inner
-        // faces must be suppressed via RepositionDirections so a mover sliding along the top
+        // faces must be suppressed via SolidSides so a mover sliding along the top
         // doesn't snag at x=16.
         var tilemap = BuildTilemap(2, 1, 16,
             tileDataEntries: [MakeRectObjectTile(0, "Solid", (0f, 8f, 16f, 8f))],
             placements: [(0, 0, 0), (1, 0, 0)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         var leftRect  = coll.GetRectangleTilesAtCell(0, 0)[0];
         var rightRect = coll.GetRectangleTilesAtCell(1, 0)[0];
 
-        leftRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
-        rightRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        leftRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
+        rightRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
     [Fact]
@@ -448,10 +448,10 @@ public class TileMapCollisionGeneratorTests
             placements: [(0, 0, 0), (1, 0, 1)]);
         var layer = (TilemapTileLayer)tilemap.Layers[0];
 
-        var coll = TileMapCollisionGenerator.GenerateFromClass(tilemap, layer, "Solid");
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, layer, "Solid");
 
         var rect = coll.GetRectangleTilesAtCell(1, 0)[0];
-        rect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        rect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 }

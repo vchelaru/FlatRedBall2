@@ -24,9 +24,9 @@ file sealed class FakePressableInput : IPressableInput
     public bool WasJustReleased { get; set; }
 }
 
-// --- Multiple1DInputs / I1DInput.Or ---
+// --- Combined1DInput / I1DInput.Or ---
 
-public class Multiple1DInputsTests
+public class Combined1DInputTests
 {
     [Fact]
     public void Or_ReturnsDominantValue_WhenFirstIsLarger()
@@ -79,9 +79,9 @@ public class Multiple1DInputsTests
     }
 }
 
-// --- Multiple2DInputs / I2DInput.Or ---
+// --- Combined2DInput / I2DInput.Or ---
 
-public class Multiple2DInputsTests
+public class Combined2DInputTests
 {
     [Fact]
     public void Or_ReturnsDominantX_WhenFirstIsLarger()
@@ -138,9 +138,9 @@ public class Multiple2DInputsTests
     }
 }
 
-// --- OrPressableInput / IPressableInput.Or ---
+// --- AnyPressableInput / IPressableInput.Or ---
 
-public class OrPressableInputTests
+public class AnyPressableInputTests
 {
     [Fact]
     public void IsDown_True_WhenAnyIsDown()

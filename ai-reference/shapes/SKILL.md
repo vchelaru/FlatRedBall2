@@ -1,19 +1,19 @@
 ---
 name: shapes
-description: "Working with Shapes in FlatRedBall2. Use when working with AxisAlignedRectangle, Circle, Polygon, TileShapeCollection, shape creation, visibility, color, IsFilled, OutlineThickness, or visual properties of shapes. Also covers RepositionDirections for one-way platforms and tile grids. Trigger on any shape-related question."
+description: "Working with Shapes in FlatRedBall2. Use when working with AARect, Circle, Polygon, TileShapes, shape creation, visibility, color, IsFilled, OutlineThickness, or visual properties of shapes. Also covers SolidSides for one-way platforms and tile grids. Trigger on any shape-related question."
 ---
 
 # Working with Shapes in FlatRedBall2
 
-All shape types and `TileShapeCollection` are in the `FlatRedBall2.Collision` namespace — add `using FlatRedBall2.Collision;` in any file that uses them.
+All shape types and `TileShapes` are in the `FlatRedBall2.Collision` namespace — add `using FlatRedBall2.Collision;` in any file that uses them.
 
-FlatRedBall2 has three built-in shape types: `AxisAlignedRectangle`, `Circle`, and `Polygon`. All shapes implement both `IRenderable` and `ICollidable`, so they handle both drawing and collision.
+FlatRedBall2 has three built-in shape types: `AARect`, `Circle`, and `Polygon`. All shapes implement both `IRenderable` and `ICollidable`, so they handle both drawing and collision.
 
 ## Shape Types
 
 | Type | Key Properties | Notes |
 |------|---------------|-------|
-| `AxisAlignedRectangle` | `Width`, `Height` | Cannot rotate |
+| `AARect` | `Width`, `Height` | Cannot rotate |
 | `Circle` | `Radius` | |
 | `Polygon` | `Points`, `Rotation` | Use factory methods to create |
 
@@ -22,7 +22,7 @@ FlatRedBall2 has three built-in shape types: `AxisAlignedRectangle`, `Circle`, a
 ## Step 1: Create a Shape
 
 ```csharp
-var rect = new AxisAlignedRectangle { X = 0, Y = 0, Width = 64, Height = 64 };
+var rect = new AARect { X = 0, Y = 0, Width = 64, Height = 64 };
 var circle = new Circle { X = 100, Y = 0, Radius = 32 };
 
 // Polygon factory methods:
@@ -53,7 +53,7 @@ Add(rect);
 ## Visual Properties
 
 ```csharp
-var rect = new AxisAlignedRectangle
+var rect = new AARect
 {
     Color = new Color(220, 60, 60, 200),   // RGBA
     IsFilled = false,                       // true = solid fill, false = outline
@@ -77,46 +77,46 @@ For shapes added directly to the screen (not via `entity.Add`), also call `Remov
 - **Shape is invisible** — forgot `IsVisible = true`. Default is `false`.
 - **Shape is not drawn** — forgot `Add(shape)` on screen, or `entity.Add(shape)` before entity was registered.
 - **Shape position looks wrong** — Y+ is up (see `physics-and-movement`). In platformers, entity origin = feet, so offset shapes upward by `Height/2` (see `platformer-movement` skill).
-- **Polygon not rotating** — use `Polygon`, not `AxisAlignedRectangle`.
+- **Polygon not rotating** — use `Polygon`, not `AARect`.
 
-## TileShapeCollection
+## TileShapes
 
-`TileShapeCollection` is a grid-based static collision structure for tile maps. Set `X`, `Y`, and `GridSize` before adding tiles — positions are computed at insertion time and not updated if those properties change later.
+`TileShapes` is a grid-based static collision structure for tile maps. Set `X`, `Y`, and `GridSize` before adding tiles — positions are computed at insertion time and not updated if those properties change later.
 
 ```csharp
-var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 16f };
+var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 16f };
 
 // X, Y are the world position of the bottom-left corner of cell (0, 0)
 tiles.AddTileAtCell(int col, int row);      // by grid index
 tiles.AddTileAtWorld(float x, float y);    // snapped to nearest cell
 
 tiles.RemoveTileAtCell(col, row);
-tiles.GetTileAtCell(col, row);             // returns AxisAlignedRectangle? for inspection
+tiles.GetTileAtCell(col, row);             // returns AARect? for inspection
 
 tiles.IsVisible = true;                      // debug visualization
 ```
 
-`RepositionDirections` are maintained automatically on every add/remove — interior shared edges between adjacent tiles are cleared to prevent seam snagging. No manual refresh needed.
+`SolidSides` are maintained automatically on every add/remove — interior shared edges between adjacent tiles are cleared to prevent seam snagging. No manual refresh needed.
 
 Integrates with `AddCollisionRelationship` — see `collision-relationships` skill.
 
-## RepositionDirections (AxisAlignedRectangle only)
+## SolidSides (AARect only)
 
-Controls which sides of a rectangle act as solid collision surfaces. Use for one-way platforms (`RepositionDirections.Up` = only top is solid) and removing interior sides from adjacent tiles to prevent seam snagging.
+Controls which sides of a rectangle act as solid collision surfaces. Use for one-way platforms (`SolidSides.Up` = only top is solid) and removing interior sides from adjacent tiles to prevent seam snagging.
 
-Default is `RepositionDirections.All`. Values combine with `|` and `&= ~`.
+Default is `SolidSides.All`. Values combine with `|` and `&= ~`.
 
 For detailed usage and dynamic tile grids, see:
 - `references/reposition-directions.md` — Full examples, dynamic grids, Gum naming conflict workaround
 
 ### Debug overlay
 
-`Overlay.DrawRepositionDirections` visualizes RD state on the set of rectangles you ask about: each active face shows a small green triangle inside the rect pointing toward that face; suppressed faces show nothing. Pass a `Factory<T>` to inspect every entity's first `AxisAlignedRectangle` child, or a `TileShapeCollection` to inspect every tile. There is no parameterless overload — the caller always specifies what to see.
+`Overlay.DrawSolidSides` visualizes RD state on the set of rectangles you ask about: each active face shows a small green triangle inside the rect pointing toward that face; suppressed faces show nothing. Pass a `Factory<T>` to inspect every entity's first `AARect` child, or a `TileShapes` to inspect every tile. There is no parameterless overload — the caller always specifies what to see.
 
 ```csharp
 public override void CustomActivity(FrameTime time)
 {
-    Overlay.DrawRepositionDirections(_brickFactory);
-    Overlay.DrawRepositionDirections(_solidTiles);
+    Overlay.DrawSolidSides(_brickFactory);
+    Overlay.DrawSolidSides(_solidTiles);
 }
 ```

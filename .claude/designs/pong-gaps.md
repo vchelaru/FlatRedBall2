@@ -62,7 +62,7 @@ Work through each gap before implementing Pong. For each item: decide the fix, m
 
 ## 6. Content / Asset Loading
 
-**Problem:** No skill covers `ContentManagerService.Load<T>()`, the `.mgcb` pipeline, or adding a `SpriteFont`. The `Content/Content.mgcb` file exists but is empty with no guidance.
+**Problem:** No skill covers `ContentLoader.Load<T>()`, the `.mgcb` pipeline, or adding a `SpriteFont`. The `Content/Content.mgcb` file exists but is empty with no guidance.
 
 **Options:**
 - A) Add a `content-and-assets.md` skill

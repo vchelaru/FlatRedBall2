@@ -8,7 +8,7 @@ namespace ShmupSpace.Entities;
 public class Enemy : Entity
 {
     private Sprite _sprite = null!;
-    private AxisAlignedRectangle _body = null!;
+    private AARect _body = null!;
 
     private float _zigTimer;
 
@@ -20,7 +20,7 @@ public class Enemy : Entity
         Add(_sprite);
         _sprite.PlayAnimation("EnemyClam");
 
-        _body = new AxisAlignedRectangle
+        _body = new AARect
         {
             Width = 14f,
             Height = 14f,

@@ -74,12 +74,12 @@ public class TileMap
     /// with a <see cref="Screen"/> via <c>Screen.Add(tileMap)</c>, which schedules the tick
     /// automatically).
     /// </summary>
-    public LazySpawnManager LazySpawnManager { get; } = new LazySpawnManager();
+    public LazySpawner LazySpawner { get; } = new LazySpawner();
 
     private readonly record struct TrackedCollection(
         Func<TilemapTileData, bool> Predicate,
         string? LayerName,
-        TileShapeCollection Collection);
+        TileShapes Collection);
 
     /// <summary>
     /// Loads a TMX file and positions the map in world space.
@@ -257,7 +257,7 @@ public class TileMap
         _layersByName.TryGetValue(name, out layer!);
 
     /// <summary>
-    /// Generates a <see cref="TileShapeCollection"/> from tiles whose
+    /// Generates a <see cref="TileShapes"/> from tiles whose
     /// <see cref="TilemapTileData.Class"/> matches <paramref name="className"/>.
     /// </summary>
     /// <param name="className">The tile class to match (case-insensitive).</param>
@@ -265,14 +265,14 @@ public class TileMap
     /// If specified, restricts the search to this layer. If <c>null</c> (default),
     /// scans all tile layers.
     /// </param>
-    public TileShapeCollection GenerateCollisionFromClass(string className, string? layerName = null)
+    public TileShapes GenerateCollisionFromClass(string className, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
             string.Equals(td.Class, className, StringComparison.OrdinalIgnoreCase);
 
-        TileShapeCollection tsc = layerName != null
-            ? TileMapCollisionGenerator.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
-            : TileMapCollisionGenerator.GenerateFromClass(_tilemap, className, _x, _y);
+        TileShapes tsc = layerName != null
+            ? TileMapCollisions.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
+            : TileMapCollisions.GenerateFromClass(_tilemap, className, _x, _y);
 
         tsc.Name = className;
 
@@ -281,7 +281,7 @@ public class TileMap
     }
 
     /// <summary>
-    /// Generates a <see cref="TileShapeCollection"/> from tiles that have a custom
+    /// Generates a <see cref="TileShapes"/> from tiles that have a custom
     /// property named <paramref name="propertyName"/>.
     /// </summary>
     /// <param name="propertyName">The custom property to match (presence only, value ignored).</param>
@@ -289,14 +289,14 @@ public class TileMap
     /// If specified, restricts the search to this layer. If <c>null</c> (default),
     /// scans all tile layers.
     /// </param>
-    public TileShapeCollection GenerateCollisionFromProperty(string propertyName, string? layerName = null)
+    public TileShapes GenerateCollisionFromProperty(string propertyName, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
             td.Properties.TryGetValue(propertyName, out _);
 
-        TileShapeCollection tsc = layerName != null
-            ? TileMapCollisionGenerator.GenerateFromProperty(_tilemap, GetInternalLayer(layerName), propertyName, _x, _y)
-            : TileMapCollisionGenerator.GenerateFromProperty(_tilemap, propertyName, _x, _y);
+        TileShapes tsc = layerName != null
+            ? TileMapCollisions.GenerateFromProperty(_tilemap, GetInternalLayer(layerName), propertyName, _x, _y)
+            : TileMapCollisions.GenerateFromProperty(_tilemap, propertyName, _x, _y);
 
         _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
         return tsc;
@@ -375,7 +375,7 @@ public class TileMap
         var entityProps = BuildPropertyMap<T>();
 
         // Batch grid updates across the whole scan when the factory is an IsSolidGrid — a row of
-        // painted bricks should recompute RepositionDirections once at the end, not per-tile.
+        // painted bricks should recompute SolidSides once at the end, not per-tile.
         IDisposable? batch = factory.IsSolidGrid ? factory.BeginGridBatch() : null;
 
         foreach (var layer in _tilemap.Layers)
@@ -425,7 +425,7 @@ public class TileMap
                 // tile object, which removeSourceTiles is about to drop. The snapshot keeps the
                 // record self-contained for replay at spawn time.
                 var capturedProps = SnapshotProperties(tileObj.Properties);
-                LazySpawnManager.Add(factory, worldX, worldY, applyAfterInit: e =>
+                LazySpawner.Add(factory, worldX, worldY, applyAfterInit: e =>
                 {
                     ApplyCapturedProperties(e, capturedProps, entityProps);
                     configure?.Invoke(e);
@@ -486,7 +486,7 @@ public class TileMap
 
                 if (lazy)
                 {
-                    LazySpawnManager.Add(factory, worldX, worldY, applyAfterInit: configure);
+                    LazySpawner.Add(factory, worldX, worldY, applyAfterInit: configure);
                 }
                 else
                 {
@@ -631,9 +631,9 @@ public class TileMap
     /// </summary>
     /// <remarks>
     /// In-place reload preserves all entity state, camera position, and live
-    /// <see cref="TileShapeCollection"/> references — collision relationships keep working
+    /// <see cref="TileShapes"/> references — collision relationships keep working
     /// without reattachment. Hand-authored mutations made directly to a generated
-    /// <see cref="TileShapeCollection"/> after <see cref="GenerateCollisionFromClass"/>
+    /// <see cref="TileShapes"/> after <see cref="GenerateCollisionFromClass"/>
     /// (e.g. extra <c>AddPolygonTileAtCell</c> calls) are wiped: the engine rebuilds each
     /// tracked collection from the new tile data. Put augmentations in
     /// <c>CustomInitialize</c> if you need them to survive a full restart.
@@ -683,10 +683,10 @@ public class TileMap
         {
             tracked.Collection.Clear();
             if (tracked.LayerName != null)
-                TileMapCollisionGenerator.RegenerateInto(
+                TileMapCollisions.RegenerateInto(
                     _tilemap, GetInternalLayer(tracked.LayerName), tracked.Predicate, tracked.Collection);
             else
-                TileMapCollisionGenerator.RegenerateInto(
+                TileMapCollisions.RegenerateInto(
                     _tilemap, tracked.Predicate, tracked.Collection);
         }
 

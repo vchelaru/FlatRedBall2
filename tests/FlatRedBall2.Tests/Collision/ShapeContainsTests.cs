@@ -10,21 +10,21 @@ public class ShapeContainsTests
     [Fact]
     public void Contains_AARectAtOrigin_PointInside_ReturnsTrue()
     {
-        var rect = new AxisAlignedRectangle { Width = 20f, Height = 10f };
+        var rect = new AARect { Width = 20f, Height = 10f };
         rect.Contains(new Vector2(5f, -3f)).ShouldBeTrue();
     }
 
     [Fact]
     public void Contains_AARectAtOrigin_PointOnBoundary_ReturnsTrue()
     {
-        var rect = new AxisAlignedRectangle { Width = 20f, Height = 10f };
+        var rect = new AARect { Width = 20f, Height = 10f };
         rect.Contains(new Vector2(10f, 5f)).ShouldBeTrue();
     }
 
     [Fact]
     public void Contains_AARectAtOrigin_PointOutside_ReturnsFalse()
     {
-        var rect = new AxisAlignedRectangle { Width = 20f, Height = 10f };
+        var rect = new AARect { Width = 20f, Height = 10f };
         rect.Contains(new Vector2(11f, 0f)).ShouldBeFalse();
     }
 
@@ -32,14 +32,14 @@ public class ShapeContainsTests
     public void Contains_AARectOffset_PointInside_ReturnsTrue()
     {
         // Rect centered at (100, 200), 20x10. World point (105, 198) is inside.
-        var rect = new AxisAlignedRectangle { X = 100f, Y = 200f, Width = 20f, Height = 10f };
+        var rect = new AARect { X = 100f, Y = 200f, Width = 20f, Height = 10f };
         rect.Contains(new Vector2(105f, 198f)).ShouldBeTrue();
     }
 
     [Fact]
     public void Contains_AARectOffset_PointOutside_ReturnsFalse()
     {
-        var rect = new AxisAlignedRectangle { X = 100f, Y = 200f, Width = 20f, Height = 10f };
+        var rect = new AARect { X = 100f, Y = 200f, Width = 20f, Height = 10f };
         rect.Contains(new Vector2(50f, 200f)).ShouldBeFalse();
     }
 

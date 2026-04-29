@@ -23,8 +23,8 @@ public abstract class AnimationShapeFrame
     public float RelativeY { get; set; }
 }
 
-/// <summary>Per-frame definition for an <see cref="FlatRedBall2.Collision.AxisAlignedRectangle"/>.</summary>
-public class AnimationRectangleFrame : AnimationShapeFrame
+/// <summary>Per-frame definition for an <see cref="FlatRedBall2.Collision.AARect"/>.</summary>
+public class AnimationAARectFrame : AnimationShapeFrame
 {
     /// <summary>Width in world units.</summary>
     public float Width { get; set; } = 32f;

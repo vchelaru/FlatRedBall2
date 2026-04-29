@@ -170,7 +170,7 @@ public class PlatformerValues
     /// seams but small enough not to reach onto a one-tile-lower step even if the slope gate were
     /// absent. Requires <see cref="PlatformerBehavior.CollisionShape"/> to be set and at least one
     /// collision relationship in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/>
-    /// mode — each such relationship contributes its <see cref="FlatRedBall2.Collision.TileShapeCollection"/> as a snap
+    /// mode — each such relationship contributes its <see cref="FlatRedBall2.Collision.TileShapes"/> as a snap
     /// probe target.
     /// </summary>
     public float SlopeSnapDistance { get; set; } = 8f;

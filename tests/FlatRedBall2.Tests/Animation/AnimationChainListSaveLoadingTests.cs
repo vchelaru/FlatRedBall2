@@ -46,11 +46,11 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Attack</Name>" +
             "    <Frame><TextureName>a.png</TextureName><FrameLength>0.1</FrameLength>" +
-            "      <ShapeCollectionSave>" +
-            "        <AxisAlignedRectangleSaves>" +
-            "          <AxisAlignedRectangleSave><Name>Sword</Name><X>5</X><Y>0</Y><ScaleX>15</ScaleX><ScaleY>5</ScaleY></AxisAlignedRectangleSave>" +
-            "        </AxisAlignedRectangleSaves>" +
-            "      </ShapeCollectionSave>" +
+            "      <ShapesSave>" +
+            "        <AARectSaves>" +
+            "          <AARectSave><Name>Sword</Name><X>5</X><Y>0</Y><ScaleX>15</ScaleX><ScaleY>5</ScaleY></AARectSave>" +
+            "        </AARectSaves>" +
+            "      </ShapesSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";
@@ -58,9 +58,9 @@ public class AnimationChainListSaveLoadingTests
         var save = AnimationChainListSave.FromFile("any.achx",
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
-        save.AnimationChains[0].Frames[0].ShapeCollectionSave.ShouldNotBeNull();
-        save.AnimationChains[0].Frames[0].ShapeCollectionSave!.AxisAlignedRectangleSaves.Count.ShouldBe(1);
-        save.AnimationChains[0].Frames[0].ShapeCollectionSave!.AxisAlignedRectangleSaves[0].Name.ShouldBe("Sword");
+        save.AnimationChains[0].Frames[0].ShapesSave.ShouldNotBeNull();
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.Count.ShouldBe(1);
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves[0].Name.ShouldBe("Sword");
     }
 
     [Fact]
@@ -72,11 +72,11 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Attack</Name>" +
             "    <Frame><FrameLength>0.1</FrameLength>" +
-            "      <ShapeCollectionSave>" +
-            "        <AxisAlignedRectangleSaves>" +
-            "          <AxisAlignedRectangleSave><Name></Name><ScaleX>5</ScaleX><ScaleY>5</ScaleY></AxisAlignedRectangleSave>" +
-            "        </AxisAlignedRectangleSaves>" +
-            "      </ShapeCollectionSave>" +
+            "      <ShapesSave>" +
+            "        <AARectSaves>" +
+            "          <AARectSave><Name></Name><ScaleX>5</ScaleX><ScaleY>5</ScaleY></AARectSave>" +
+            "        </AARectSaves>" +
+            "      </ShapesSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";
@@ -84,7 +84,7 @@ public class AnimationChainListSaveLoadingTests
         var save = AnimationChainListSave.FromFile("any.achx",
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
-        // ContentManagerService is null because no textures are referenced; the empty Name
+        // ContentLoader is null because no textures are referenced; the empty Name
         // check fires before texture loading.
         Should.Throw<InvalidOperationException>(() => save.ToAnimationChainList(null!));
     }

@@ -26,7 +26,7 @@ namespace FlatRedBall2.Movement;
 /// <para>
 /// <b>Implement <see cref="IPlatformerEntity"/></b> on the owning entity so collision relationships
 /// in <see cref="FlatRedBall2.Collision.SlopeCollisionMode.PlatformerFloor"/> mode discover this
-/// behavior automatically and contribute their <see cref="TileShapeCollection"/> as a snap target.
+/// behavior automatically and contribute their <see cref="TileShapes"/> as a snap target.
 /// </para>
 /// </summary>
 public class PlatformerBehavior
@@ -89,14 +89,14 @@ public class PlatformerBehavior
     /// sets <see cref="IsClimbing"/>, and re-pins X every frame so horizontal input does not drift
     /// the entity off the ladder. Leave null to disable.
     /// </summary>
-    public TileShapeCollection? Ladders { get; set; }
+    public TileShapes? Ladders { get; set; }
 
     /// <summary>
     /// 2D fence climb surfaces (SMW-style). When assigned, overlapping + Up/Down enters the
     /// climbing state with X preserved; horizontal input remains active for L/R traversal across
     /// the fence. Leave null to disable.
     /// </summary>
-    public TileShapeCollection? Fences { get; set; }
+    public TileShapes? Fences { get; set; }
 
     /// <summary>
     /// Threshold on <see cref="MovementInput"/>.Y for triggering ladder/fence enter/exit.
@@ -114,7 +114,7 @@ public class PlatformerBehavior
     /// the edge before letting go); a wider rect gives a generous grab. Parent it to the entity
     /// so it follows the body — the scan reads <c>AbsoluteX</c>/<c>AbsoluteY</c>.
     /// </summary>
-    public AxisAlignedRectangle? ClimbingShape { get; set; }
+    public AARect? ClimbingShape { get; set; }
 
     /// <summary>
     /// Movement values applied after the first air jump. When non-null, the first air jump
@@ -153,7 +153,7 @@ public class PlatformerBehavior
     // without the cache, the overshoot frame computes TopOfLadderY = null, the clamp doesn't
     // fire, and the entity sails past the top. Set on enter and refreshed each frame overlap
     // is found; cleared on exit.
-    private TileShapeCollection? _activeClimbSurface;
+    private TileShapes? _activeClimbSurface;
     private int _activeClimbCol;
 
     /// <summary>
@@ -179,7 +179,7 @@ public class PlatformerBehavior
     /// <see cref="SlopeCollisionMode.PlatformerFloor"/> tries to contribute a snap target while
     /// this is null, <see cref="ConsiderSnappingTo"/> throws.
     /// </summary>
-    public AxisAlignedRectangle? CollisionShape { get; set; }
+    public AARect? CollisionShape { get; set; }
 
     /// <summary>
     /// Optional diagnostic hook invoked once per <see cref="ConsiderSnappingTo"/> call describing
@@ -316,7 +316,7 @@ public class PlatformerBehavior
             {
                 throw new InvalidOperationException(
                     "PlatformerBehavior needs CollisionShape set to resolve body overlap against " +
-                    "Ladders/Fences. Assign the entity's AxisAlignedRectangle to CollisionShape " +
+                    "Ladders/Fences. Assign the entity's AARect to CollisionShape " +
                     "before entering the activity loop.");
             }
 
@@ -723,7 +723,7 @@ public class PlatformerBehavior
     private bool ShouldEnterFence(float inputY)
         => inputY > DirectionalInputThreshold || inputY < -DirectionalInputThreshold;
 
-    private void EnterLadder(Entity entity, TileShapeCollection surface, int col)
+    private void EnterLadder(Entity entity, TileShapes surface, int col)
     {
         IsClimbing = true;
         entity.VelocityY = 0f;
@@ -747,7 +747,7 @@ public class PlatformerBehavior
     // when multiple overlap. Using the player's *center* column via GetCellAt alone produces an
     // off-by-one snap when the player approaches a ladder from the side — the body overlaps the
     // ladder but X floors to the adjacent empty column.
-    private int? FindOverlappingColumn(TileShapeCollection? surface, Entity entity)
+    private int? FindOverlappingColumn(TileShapes? surface, Entity entity)
     {
         if (surface == null) return null;
 
@@ -784,7 +784,7 @@ public class PlatformerBehavior
     // Top-of-column Y: find the top edge of the contiguous climb-tile segment in this column.
     // Scans up from feet first (handles "feet at or below the ladder"), then down if nothing was
     // found above (handles physics-overshoot frames where feet just went past the top).
-    private float? ComputeTopOfColumnY(TileShapeCollection surface, int col)
+    private float? ComputeTopOfColumnY(TileShapes surface, int col)
     {
         var body = ClimbingShape ?? CollisionShape!;
         float bodyBottomY = body.AbsoluteY - body.Height / 2f;
@@ -880,7 +880,7 @@ public class PlatformerBehavior
     /// while the active values' <see cref="PlatformerValues.SlopeSnapDistance"/> is &gt; 0 — a
     /// wiring error we surface loudly rather than silently skip.
     /// </remarks>
-    internal void ConsiderSnappingTo(Entity entity, TileShapeCollection target)
+    internal void ConsiderSnappingTo(Entity entity, TileShapes target)
     {
         if (_snappedThisFrame) { Diag("skip: already snapped this frame"); return; }
 
@@ -939,7 +939,7 @@ public class PlatformerBehavior
     /// No-ops when airborne, after the first successful sample within a frame, or when
     /// <see cref="CollisionShape"/> is null.
     /// </summary>
-    internal void ContributeSlopeProbe(Entity entity, TileShapeCollection target)
+    internal void ContributeSlopeProbe(Entity entity, TileShapes target)
     {
         if (_slopeSampledThisFrame) return;
         if (CollisionShape == null) return;
@@ -983,7 +983,7 @@ public class PlatformerBehavior
         OnSnapDiagnostic($"[f{_frameIndex}] skip: surface too steep (normal.Y={ny:F2} < {threshold:F2})");
     }
     private void DiagSnapped(float yBefore, float yAfter, Vector2 start, Vector2 end,
-        Vector2 hit, Vector2 normal, TileShapeCollection target, ICollidable? hitShape)
+        Vector2 hit, Vector2 normal, TileShapes target, ICollidable? hitShape)
     {
         if (OnSnapDiagnostic == null) return;
         string shapeLabel = ClassifyHitShape(target, hitShape);
@@ -997,18 +997,18 @@ public class PlatformerBehavior
             $"shape={shapeLabel} normal=({normal.X:F2},{normal.Y:F2})");
     }
 
-    private static string ClassifyHitShape(TileShapeCollection target, ICollidable? hitShape)
+    private static string ClassifyHitShape(TileShapes target, ICollidable? hitShape)
     {
         if (hitShape == null) return "null";
         if (hitShape is Polygon) return "Polygon";
-        if (hitShape is AxisAlignedRectangle rect)
+        if (hitShape is AARect rect)
         {
             // Distinguish full-cell tiles (stored in _tiles) from sub-cell rects by reference
             // equality — reflection-free access via the GetTileAtCell helper.
             var (col, row) = target.GetCellAt(new Vector2(rect.AbsoluteX, rect.AbsoluteY));
             var cellTile = target.GetTileAtCell(col, row);
-            if (ReferenceEquals(cellTile, rect)) return "AxisAlignedRectangle(full-cell)";
-            return "AxisAlignedRectangle(sub-cell)";
+            if (ReferenceEquals(cellTile, rect)) return "AARect(full-cell)";
+            return "AARect(sub-cell)";
         }
         return hitShape.GetType().Name;
     }

@@ -14,7 +14,7 @@ public class PlatformerBehaviorClimbingTests
     private static FrameTime Frame(float dt = 1f / 60f, float total = 0f)
         => new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.FromSeconds(total));
 
-    private static PlatformerBehavior MakePlatformer(AxisAlignedRectangle body, I2DInput? input = null)
+    private static PlatformerBehavior MakePlatformer(AARect body, I2DInput? input = null)
     {
         var climb = new PlatformerValues { MaxSpeedX = 80f, ClimbingSpeed = 100f, JumpVelocity = 200f };
         var air = new PlatformerValues { MaxSpeedX = 120f, Gravity = 700f, MaxFallSpeed = 800f };
@@ -27,18 +27,18 @@ public class PlatformerBehaviorClimbingTests
         };
     }
 
-    private static (Entity entity, AxisAlignedRectangle body) MakeEntity(float x, float y)
+    private static (Entity entity, AARect body) MakeEntity(float x, float y)
     {
         var entity = new Entity { X = x, Y = y };
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         entity.Add(body);
         return (entity, body);
     }
 
-    private static TileShapeCollection LadderColumn(float cellCenterX, float bottomY, int heightCells)
+    private static TileShapes LadderColumn(float cellCenterX, float bottomY, int heightCells)
     {
         // GridSize=16, column centered on cellCenterX, stack of tiles starting at bottomY.
-        var tsc = new TileShapeCollection { GridSize = 16f, X = cellCenterX - 8f, Y = bottomY };
+        var tsc = new TileShapes { GridSize = 16f, X = cellCenterX - 8f, Y = bottomY };
         for (int r = 0; r < heightCells; r++) tsc.AddTileAtCell(0, r);
         return tsc;
     }
@@ -292,8 +292,8 @@ public class PlatformerBehaviorClimbingTests
         // must use the climb shape's bottom offset, not assume the body bottom is at entity.Y.
         var ladder = LadderColumn(100f, 0f, 5);
         var entity = new Entity { X = 100f, Y = 8f };
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
-        var climbProbe = new AxisAlignedRectangle { Width = 4f, Height = 10f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
+        var climbProbe = new AARect { Width = 4f, Height = 10f, Y = 10f };
         entity.Add(body);
         entity.Add(climbProbe);
 

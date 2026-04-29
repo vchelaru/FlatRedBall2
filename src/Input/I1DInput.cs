@@ -18,7 +18,7 @@ public interface I1DInput
 /// Combines multiple <see cref="I1DInput"/> instances into one. Returns whichever input has the
 /// largest absolute value. Typically created via <see cref="I1DInputExtensions.Or"/>.
 /// </summary>
-public class Multiple1DInputs : I1DInput
+public class Combined1DInput : I1DInput
 {
     /// <summary>
     /// The list of inputs being combined. Add inputs directly or use the fluent
@@ -49,25 +49,25 @@ public class Multiple1DInputs : I1DInput
 public static class I1DInputExtensions
 {
     /// <summary>
-    /// Returns a <see cref="Multiple1DInputs"/> that combines this input with <paramref name="other"/>,
+    /// Returns a <see cref="Combined1DInput"/> that combines this input with <paramref name="other"/>,
     /// returning whichever has the larger absolute value. Calling Or on an existing
-    /// <see cref="Multiple1DInputs"/> adds to it in place rather than wrapping it.
+    /// <see cref="Combined1DInput"/> adds to it in place rather than wrapping it.
     /// </summary>
     /// <remarks>
-    /// If <paramref name="thisInput"/> is already a <see cref="Multiple1DInputs"/>, it is mutated
+    /// If <paramref name="thisInput"/> is already a <see cref="Combined1DInput"/>, it is mutated
     /// and returned — not wrapped. This enables fluent chaining (<c>a.Or(b).Or(c)</c>) without extra
     /// allocations, but means stored intermediate results will also reflect the added input.
     /// </remarks>
-    public static Multiple1DInputs Or(this I1DInput thisInput, I1DInput other)
+    public static Combined1DInput Or(this I1DInput thisInput, I1DInput other)
     {
-        Multiple1DInputs result;
-        if (thisInput is Multiple1DInputs multi)
+        Combined1DInput result;
+        if (thisInput is Combined1DInput multi)
         {
             result = multi;
         }
         else
         {
-            result = new Multiple1DInputs();
+            result = new Combined1DInput();
             result.Inputs.Add(thisInput);
         }
         result.Inputs.Add(other);

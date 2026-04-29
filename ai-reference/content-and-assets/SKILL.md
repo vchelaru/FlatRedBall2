@@ -1,6 +1,6 @@
 ---
 name: content-and-assets
-description: "Content and Assets in FlatRedBall2. Use when working with loading textures, fonts, sprites, content pipeline, .mgcb setup, or ContentManagerService. Also trigger when the user asks about displaying text (use Gum Labels) or graphics without custom art (use Shapes)."
+description: "Content and Assets in FlatRedBall2. Use when working with loading textures, fonts, sprites, content pipeline, .mgcb setup, or ContentLoader. Also trigger when the user asks about displaying text (use Gum Labels) or graphics without custom art (use Shapes)."
 ---
 
 # Content and Assets in FlatRedBall2
@@ -9,7 +9,7 @@ description: "Content and Assets in FlatRedBall2. Use when working with loading 
 
 | Need | Use | Content files required? |
 |------|-----|------------------------|
-| Simple geometry (paddles, walls, bullets) | Shapes (`AxisAlignedRectangle`, `Circle`, `Polygon`) | No |
+| Simple geometry (paddles, walls, bullets) | Shapes (`AARect`, `Circle`, `Polygon`) | No |
 | Textured game objects (ships, characters) | `Sprite` with `Texture2D` | Yes (`.mgcb` pipeline) |
 | On-screen text (scores, labels, menus) | Gum `Label` or `TextRuntime` | No (default font auto-loaded) |
 
@@ -22,7 +22,7 @@ Gum's default font is loaded automatically — no `.mgcb` setup required. See th
 Shapes require no content files and are ready to use immediately.
 
 ```csharp
-var rect = new AxisAlignedRectangle { Width = 20, Height = 120, Color = Color.White, IsVisible = true };
+var rect = new AARect { Width = 20, Height = 120, Color = Color.White, IsVisible = true };
 Add(rect);
 ```
 
@@ -161,4 +161,4 @@ var tex = Engine.Content.Load<Texture2D>("mysprite");  // no extension
 - **`TextureScale` wins over explicit `Width`/`Height`** — If you set `Width` and it doesn't take effect, check that `TextureScale` is `null`.
 - **Content not found at runtime** — Verify the asset name matches the `.mgcb` entry (case-sensitive on Linux), and that `Content.RootDirectory = "Content"` is set in `Game1`.
 - **For sprite animation**, see the `animation` skill — `Sprite.PlayAnimation`, `AnimationChainListSave`, and `.achx` loading are fully implemented.
-- **Each screen gets its own ContentManager** — assets are unloaded when the screen transitions. Re-load textures in each screen's `CustomInitialize` if needed.
+- **Each screen gets its own ContentLoader** — assets are unloaded when the screen transitions. Re-load textures in each screen's `CustomInitialize` if needed.

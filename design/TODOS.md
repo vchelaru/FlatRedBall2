@@ -45,12 +45,4 @@ Cheap fix: alternate sweep direction every other frame (`i = N-1` down to `0`, `
 
 Only meaningful in scenes with hundreds of densely-packed dynamic bodies — bullet swarms, particle piles, the ball-partition stress test. Most game scenes won't notice.
 
-## Naming audit and rename pass
-**Priority: Soon** — Several types carry FRB1 naming baggage that doesn't fit FRB2's leaner API. Do a single coordinated rename pass to avoid churn from piecemeal renames.
-
-Known candidates:
-- `TileShapeCollection` → `TileShapes` — "Collection" suffix is redundant
-- (Audit the rest of the public API for similar verbose/legacy names)
-
-Do this as one branch so all renames land together and skill files, XML docs, samples, and tests update in lockstep.
 

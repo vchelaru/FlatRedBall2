@@ -130,7 +130,7 @@ public class RenderListTests
         screen.Layers.Add(layer2);
 
         var entity = new Entity();
-        var rect = new AxisAlignedRectangle { Layer = layer1 };
+        var rect = new AARect { Layer = layer1 };
         entity.Add(rect);
 
         entity.Layer = layer2;
@@ -149,7 +149,7 @@ public class RenderListTests
 
         var parent = new Entity();
         var child = new Entity();
-        var rect = new AxisAlignedRectangle { Layer = layer1 };
+        var rect = new AARect { Layer = layer1 };
         child.Add(rect);
         parent.Add(child);
 

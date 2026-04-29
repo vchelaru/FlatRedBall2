@@ -137,7 +137,7 @@ In platformers, an entity's Y position represents **the feet** (the bottom of th
 
 ```csharp
 // For a 12×28 collision box, offset Y by half the height so the bottom sits at the entity's feet
-var collisionBox = new AxisAlignedRectangle
+var collisionBox = new AARect
 {
     Width = 12,
     Height = 28,
@@ -152,7 +152,7 @@ The same applies to sprites — the `.achx` template uses `<RelativeY>16</Relati
 
 ## Collision Setup
 
-Use `BounceFirstOnCollision(elasticity: 0f)` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapeCollection` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):
+Use `BounceFirstOnCollision(elasticity: 0f)` — **not** `MoveFirstOnCollision`. The solid side can be a `TileShapes` (for static level geometry) or an entity factory (for moving platforms, destructible blocks, etc.):
 
 ```csharp
 // Against static tile geometry (preferred for level walls/floors)
@@ -172,11 +172,11 @@ ceiling leaves the player with upward velocity and they float against it.
 `MoveFirstOnCollision` only repositions — it never touches velocity, which is wrong for
 platformer collision.
 
-**Entity solids arranged in a grid (brick rows, crate stacks, destructible walls) must set `factory.IsSolidGrid = true`** — otherwise the player snags on seams between adjacent entities (each body resolves separation independently). See `entities-and-factories`. Use `Overlay.DrawRepositionDirections(factory)` in `CustomActivity` to visualize.
+**Entity solids arranged in a grid (brick rows, crate stacks, destructible walls) must set `factory.IsSolidGrid = true`** — otherwise the player snags on seams between adjacent entities (each body resolves separation independently). See `entities-and-factories`. Use `Overlay.DrawSolidSides(factory)` in `CustomActivity` to visualize.
 
 ## Slopes and Ramps
 
-Set `SlopeMode = SlopeCollisionMode.PlatformerFloor` on the **player's collision relationship** (not on the `TileShapeCollection`) to enable slope collision for polygon tiles. In this mode:
+Set `SlopeMode = SlopeCollisionMode.PlatformerFloor` on the **player's collision relationship** (not on the `TileShapes`) to enable slope collision for polygon tiles. In this mode:
 
 - **Polygon tiles push vertically only** (heightmap-based). The polygon's surface Y at the player's center X determines the push. No horizontal component means no snagging at slope seams.
 - **Rect tiles next to polygon tiles** get their shared face suppressed automatically (like adjacent rects already do).
@@ -208,8 +208,8 @@ Players who run off a downslope or off the top of an up-ramp onto lower flat gro
 
 Wiring checklist — all three conditions must hold for snap to fire:
 1. The player entity implements `IPlatformerEntity` (exposes `Platformer => _platformer`)
-2. A `CollisionRelationship` between the player and a `TileShapeCollection` has `SlopeMode = SlopeCollisionMode.PlatformerFloor` — each such relationship automatically contributes its collection as a snap probe target
-3. `PlatformerBehavior.CollisionShape` is set to the player's collision `AxisAlignedRectangle`, and `PlatformerValues.SlopeSnapDistance > 0` on the active values set (default `8f`), and the entity was on a sloped surface last frame (`CurrentSlope != 0`)
+2. A `CollisionRelationship` between the player and a `TileShapes` has `SlopeMode = SlopeCollisionMode.PlatformerFloor` — each such relationship automatically contributes its collection as a snap probe target
+3. `PlatformerBehavior.CollisionShape` is set to the player's collision `AARect`, and `PlatformerValues.SlopeSnapDistance > 0` on the active values set (default `8f`), and the entity was on a sloped surface last frame (`CurrentSlope != 0`)
 
 ```csharp
 public class Player : Entity, IPlatformerEntity
@@ -288,7 +288,7 @@ When using acceleration, the adjusted max speed drives `AccelerationTimeX` magni
 Standing on another `Entity` with non-zero `VelocityX` automatically transfers that horizontal
 velocity to the platformer entity for the frame — the player rides the platform with no input,
 and a jump carries the platform's momentum into the air. No opt-in needed: any bounce
-relationship between an `IPlatformerEntity` and a regular `Entity` (not a `TileShapeCollection`)
+relationship between an `IPlatformerEntity` and a regular `Entity` (not a `TileShapes`)
 gets this behavior whenever the separation pushes the platformer upward.
 
 ```csharp
@@ -304,7 +304,7 @@ moving level geometry should be authored as entities.
 
 ## One-Way Platforms and Drop-Through
 
-Jump-through (cloud) platforms are configured on the **collision relationship**, not the behavior — set `relationship.OneWayDirection = OneWayDirection.Up` and `relationship.AllowDropThrough = true`. The second flag is required for drop-through to bypass the relationship; leaving it `false` makes the barrier hard (e.g. Yoshi's Island ratchet doors — always blocks, Down+Jump has no effect on it). See the `collision-relationships` skill for the relationship-level semantics.
+Jump-through (cloud) platforms are configured on the **collision relationship**, not the behavior — set `relationship.OneWayDirection = OneWayDirection.Up` and `relationship.CanDropThrough = true`. The second flag is required for drop-through to bypass the relationship; leaving it `false` makes the barrier hard (e.g. Yoshi's Island ratchet doors — always blocks, Down+Jump has no effect on it). See the `collision-relationships` skill for the relationship-level semantics.
 
 Drop-through is handled by the behavior. Set `PlatformerValues.CanFallThroughOneWayCollision = true` (default) to enable; `false` makes Down+Jump perform a normal jump and airborne Down has no effect.
 
@@ -312,7 +312,7 @@ Triggers:
 - **Grounded Down+Jump** — suppresses one-way collision for one frame and skips the regular jump. After that frame, the entity's `LastPosition` is below the surface, so the one-way gate's positional check naturally prevents re-landing.
 - **Airborne Down held** (`MovementInput.Y < -0.5`) — continuous suppression while falling, so the player can ride a downward arc through stacked clouds.
 
-`PlatformerBehavior.IsSuppressingOneWayCollision` reflects the combined state; the one-way gate on each relationship reads it via the player's `IPlatformerEntity.Platformer`, **but only when the relationship has `AllowDropThrough = true`**. Relationships with `AllowDropThrough = false` (the default) ignore the suppression flag so hard one-way barriers remain impassable.
+`PlatformerBehavior.IsSuppressingOneWayCollision` reflects the combined state; the one-way gate on each relationship reads it via the player's `IPlatformerEntity.Platformer`, **but only when the relationship has `CanDropThrough = true`**. Relationships with `CanDropThrough = false` (the default) ignore the suppression flag so hard one-way barriers remain impassable.
 
 ## Climbing Ladders (and SMW-Style Fences)
 
@@ -340,21 +340,21 @@ Climbing is a **fourth movement slot** alongside `GroundMovement`, `AirMovement`
 
 ### Assign `Ladders` / `Fences` on `PlatformerBehavior` — the canonical pattern
 
-Climbing is configuration on `PlatformerBehavior` itself: assign one or both `TileShapeCollection` surfaces to the `Ladders` and `Fences` properties, and `Update` handles the rest — body-range column detection, enter/exit triggers, ladder X-snap + re-pin, fence 2D traversal, and per-frame `TopOfLadderY` tracking. There is one `Update` call whether or not climbing is used.
+Climbing is configuration on `PlatformerBehavior` itself: assign one or both `TileShapes` surfaces to the `Ladders` and `Fences` properties, and `Update` handles the rest — body-range column detection, enter/exit triggers, ladder X-snap + re-pin, fence 2D traversal, and per-frame `TopOfLadderY` tracking. There is one `Update` call whether or not climbing is used.
 
 ```csharp
 public class Player : Entity, IPlatformerEntity
 {
     private readonly PlatformerBehavior _platformer = new();
-    private AxisAlignedRectangle _body = null!;
+    private AARect _body = null!;
 
     public PlatformerBehavior Platformer => _platformer;
-    public TileShapeCollection? Ladders { get => _platformer.Ladders; set => _platformer.Ladders = value; }
-    public TileShapeCollection? Fences  { get => _platformer.Fences;  set => _platformer.Fences  = value; }
+    public TileShapes? Ladders { get => _platformer.Ladders; set => _platformer.Ladders = value; }
+    public TileShapes? Fences  { get => _platformer.Fences;  set => _platformer.Fences  = value; }
 
     public override void CustomInitialize()
     {
-        _body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        _body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         Add(_body);
 
         PlatformerConfig.FromJson("Content/player.platformer.json").ApplyTo(_platformer);
@@ -399,11 +399,11 @@ If the built-in triggers don't fit (e.g. a "climb only on button press" scheme, 
 ### Gotchas
 
 - **`CollisionShape` is required when `Ladders` or `Fences` is assigned.** Used for body-range column detection. Throws `InvalidOperationException` on first `Update` if null and any surface is assigned.
-- **Optional `ClimbingShape` decouples climb feel from physical body.** Assign a separate `AxisAlignedRectangle` (parented to the entity) to `PlatformerBehavior.ClimbingShape` to use it for ladder/fence overlap instead of `CollisionShape`. A narrow rect at the body center gives Mario-style "must be centered on the ladder" detection (player can hang over the edge before grabbing/letting go); a wider rect gives a generous grab. Leave null to use `CollisionShape` (default — fine for most games).
+- **Optional `ClimbingShape` decouples climb feel from physical body.** Assign a separate `AARect` (parented to the entity) to `PlatformerBehavior.ClimbingShape` to use it for ladder/fence overlap instead of `CollisionShape`. A narrow rect at the body center gives Mario-style "must be centered on the ladder" detection (player can hang over the edge before grabbing/letting go); a wider rect gives a generous grab. Leave null to use `CollisionShape` (default — fine for most games).
 - **Always author `JumpVelocity` on the climbing slot.** Defaults to 0 and "field omitted" is indistinguishable from "explicit 0" once parsed. A climbing slot without `JumpVelocity` makes jump-off look broken — the player presses jump, leaves the ladder, and drops straight down. The engine does not fall back to `AirMovement.JumpVelocity`.
 - **`ClimbingMovement` null while `IsClimbing == true` throws** — loud-failure pattern. `PlatformerConfig.FromJson` assigns it when the `climbing` slot is present; if you're driving state manually, assign before setting `IsClimbing = true`.
 - **No `CollisionRelationship` between player and ladders/fences.** Overlap is polled directly. Adding a relationship causes double-handling and physical separation (which fights the climb).
-- **Collision relationships with solids still run.** If ladder-adjacent walls or one-way platforms should be passable while climbing (e.g., climbing up through a jump-through platform a ladder passes through), the game must skip those relationships or rely on `AllowDropThrough` behavior while `IsClimbing` — climbing does not auto-suppress them.
+- **Collision relationships with solids still run.** If ladder-adjacent walls or one-way platforms should be passable while climbing (e.g., climbing up through a jump-through platform a ladder passes through), the game must skip those relationships or rely on `CanDropThrough` behavior while `IsClimbing` — climbing does not auto-suppress them.
 - **`IPlatformerEntity` is not required purely for climbing.** The climbing path uses no collision relationship — direct overlap polling. Implement `IPlatformerEntity` only if the player also needs ground-snap slopes.
 
 ## Platformer Animations (User Code, Not Engine-Managed)

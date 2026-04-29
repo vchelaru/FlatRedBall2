@@ -426,25 +426,25 @@ public class PlatformerBehaviorTests
             SlopeSnapMaxAngleDegrees = maxAngleDegrees,
         };
 
-    private static TileShapeCollection MakeTiles(int gridSize = 16)
+    private static TileShapes MakeTiles(int gridSize = 16)
         => new() { GridSize = gridSize };
 
     // Creates a collision shape attached to the entity such that the shape's bottom edge
     // (feet) is at entity.Y. Shape height is 2 with a +1 Y offset, so AbsoluteY = entity.Y + 1,
     // and feet = AbsoluteY - Height/2 = entity.Y.
-    private static AxisAlignedRectangle AttachFeetShape(Entity entity)
+    private static AARect AttachFeetShape(Entity entity)
     {
-        var shape = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = 1f };
+        var shape = new AARect { Width = 2f, Height = 2f, Y = 1f };
         entity.Add(shape);
         return shape;
     }
 
     // Builds a relationship with SlopeMode = PlatformerFloor so RunCollisions invokes
     // ConsiderSnappingTo on player.Platformer.
-    private static CollisionRelationship<PlayerEntity, TileShapeCollection> MakePlatformerRelationship(
-        PlayerEntity player, TileShapeCollection tiles)
+    private static CollisionRelationship<PlayerEntity, TileShapes> MakePlatformerRelationship(
+        PlayerEntity player, TileShapes tiles)
     {
-        var rel = new CollisionRelationship<PlayerEntity, TileShapeCollection>(
+        var rel = new CollisionRelationship<PlayerEntity, TileShapes>(
             new[] { player }, new[] { tiles })
         {
             SlopeMode = SlopeCollisionMode.PlatformerFloor,
@@ -713,7 +713,7 @@ public class PlatformerBehaviorTests
         tiles.AddTileAtCell(0, 0);
         var entity = new Entity { X = 8f, Y = 20f };
         AttachFeetShape(entity); // so collision has something to compare
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { entity }, new[] { tiles })
         {
             SlopeMode = SlopeCollisionMode.PlatformerFloor,
@@ -788,7 +788,7 @@ public class PlatformerBehaviorTests
 
         messages.Count.ShouldBe(1);
         messages[0].ShouldContain("snap: entityY=");
-        messages[0].ShouldContain("shape=AxisAlignedRectangle");
+        messages[0].ShouldContain("shape=AARect");
         messages[0].ShouldContain("cell=(col=0,row=0)");
         messages[0].ShouldContain("probe=(");
     }
@@ -903,11 +903,11 @@ public class PlatformerBehaviorTests
         player.Behavior.GroundMovement = values;
         player.Behavior.CollisionShape = AttachFeetShape(player);
 
-        var rel = new CollisionRelationship<PlayerEntity, TileShapeCollection>(
+        var rel = new CollisionRelationship<PlayerEntity, TileShapes>(
             new[] { player }, new[] { tiles })
         {
             OneWayDirection = OneWayDirection.Up,
-            AllowDropThrough = true,
+            CanDropThrough = true,
         };
         rel.MoveFirstOnCollision();
 
@@ -1368,7 +1368,7 @@ public class PlatformerBehaviorTests
     [Fact]
     public void ContributeSlopeProbe_On45DegSlope_PopulatesCurrentSlope()
     {
-        var tiles = new FlatRedBall2.Collision.TileShapeCollection { GridSize = 16f };
+        var tiles = new FlatRedBall2.Collision.TileShapes { GridSize = 16f };
         var slope = FlatRedBall2.Collision.Polygon.FromPoints(new[]
         {
             new Vector2(-8f, -8f),
@@ -1378,7 +1378,7 @@ public class PlatformerBehaviorTests
         tiles.AddPolygonTileAtCell(0, 0, slope);
 
         // Cell (0,0) spans world X [0..16], Y [0..16]. Surface at X=12 is Y=12.
-        var collisionShape = new FlatRedBall2.Collision.AxisAlignedRectangle
+        var collisionShape = new FlatRedBall2.Collision.AARect
         { Width = 8f, Height = 8f, X = 12f, Y = 12f + 4f };
         var behavior = new PlatformerBehavior
         {

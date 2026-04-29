@@ -6,14 +6,14 @@ using Xunit;
 
 namespace FlatRedBall2.Tests.Collision;
 
-public class TileShapeCollectionTests
+public class TileShapesTests
 {
     // ── GetCellWorldPosition ─────────────────────────────────────────────────
 
     [Fact]
     public void GetCellWorldPosition_ReturnsCellCenter_InverseOfGetCellAt()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f, X = 100f, Y = -50f };
+        var tiles = new TileShapes { GridSize = 16f, X = 100f, Y = -50f };
 
         // Cell (2, 3): bottom-left at (100 + 32, -50 + 48) = (132, -2); center = (140, 6)
         tiles.GetCellWorldPosition(2, 3).ShouldBe(new Vector2(140f, 6f));
@@ -26,7 +26,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void GetCellWorldPosition_NegativeCells_OK()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.GetCellWorldPosition(-1, -1).ShouldBe(new Vector2(-8f, -8f));
     }
 
@@ -36,7 +36,7 @@ public class TileShapeCollectionTests
     public void AddRectangleBorder_3x3_AddsPerimeterTilesOnly()
     {
         int colMin = 0, rowMin = 0, colMax = 2, rowMax = 2;
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
 
         tiles.AddRectangleBorder(colMin, rowMin, colMax, rowMax);
 
@@ -57,7 +57,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void AddRectangleBorder_1x1_AddsSingleTile()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
 
         tiles.AddRectangleBorder(5, 3, 5, 3);
 
@@ -68,7 +68,7 @@ public class TileShapeCollectionTests
     public void AddRectangleBorder_SingleRow_FillsEntireRow()
     {
         int colMin = 0, colMax = 4, row = 2;
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
 
         tiles.AddRectangleBorder(colMin, row, colMax, row);
 
@@ -77,52 +77,52 @@ public class TileShapeCollectionTests
     }
 
     [Fact]
-    public void AddRectangleBorder_RepositionDirections_InnerFacesSuppressed()
+    public void AddRectangleBorder_SolidSides_InnerFacesSuppressed()
     {
         // A 5x5 border: corner tiles should have two exposed faces,
         // edge-middle tiles should have three exposed faces (inner face suppressed).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
 
         tiles.AddRectangleBorder(0, 0, 4, 4);
 
         // Bottom-left corner: neighbors to right (1,0) and above (0,1)
         var corner = tiles.GetTileAtCell(0, 0)!;
-        corner.RepositionDirections.ShouldBe(
-            RepositionDirections.Left | RepositionDirections.Down);
+        corner.SolidSides.ShouldBe(
+            SolidSides.Left | SolidSides.Down);
 
         // Bottom edge middle (2,0): neighbors left (1,0), right (3,0), and above? No — (2,1) is interior, empty.
         // Wait, for a 5x5 border, row 0 has all cols filled. Row 1 has only col 0 and col 4.
         // So (2,0) neighbors: (1,0) filled, (3,0) filled, (2,1) empty, (2,-1) empty.
         var bottomMid = tiles.GetTileAtCell(2, 0)!;
-        bottomMid.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down);
+        bottomMid.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down);
     }
 
     // ── AddTileAtCell ────────────────────────────────────────────────────────
 
     [Fact]
-    public void AddTileAtCell_LoneTile_HasAllRepositionDirections()
+    public void AddTileAtCell_LoneTile_HasAllSolidSides()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
-        tiles.GetTileAtCell(0, 0)!.RepositionDirections.ShouldBe(RepositionDirections.All);
+        tiles.GetTileAtCell(0, 0)!.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
     public void AddTileAtCell_AdjacentHorizontal_InnerEdgesRemoved()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(1, 0);
 
         // Left tile: right edge is shared — no Right reposition
-        tiles.GetTileAtCell(0, 0)!.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        tiles.GetTileAtCell(0, 0)!.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
 
         // Right tile: left edge is shared — no Left reposition
-        tiles.GetTileAtCell(1, 0)!.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        tiles.GetTileAtCell(1, 0)!.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
     // ── GetSeparationFor — opposite-direction Y accumulation ─────────────────
@@ -137,13 +137,13 @@ public class TileShapeCollectionTests
         // sep.Y is negative, the one-way gate's first check (sep.Y <= 0) rejects the
         // collision, and the player falls through.
         // Fix: an established Y push direction must not be overridden by an opposite push.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // bottom: Y=[0,16], top at y=16
         tiles.AddTileAtCell(0, 2); // upper: Y=[32,48], bottom at y=32 (one-cell gap at row 1)
 
         // Body: bottom=14 (2 units inside lower tile), top=38 (6 units inside upper tile).
         var entity = new Entity { X = 8f, Y = 14f };
-        var shape = new AxisAlignedRectangle { Width = 12f, Height = 24f, Y = 12f };
+        var shape = new AARect { Width = 12f, Height = 24f, Y = 12f };
         entity.Add(shape);
 
         var sep = tiles.GetSeparationFor(shape);
@@ -158,7 +158,7 @@ public class TileShapeCollectionTests
     {
         // Cell (2, 3) with GridSize=16 and origin at (100, 200)
         // Center X = 100 + 2*16 + 8 = 140, Center Y = 200 + 3*16 + 8 = 256
-        var tiles = new TileShapeCollection { X = 100f, Y = 200f, GridSize = 16f };
+        var tiles = new TileShapes { X = 100f, Y = 200f, GridSize = 16f };
         tiles.AddTileAtCell(2, 3);
 
         var tile = tiles.GetTileAtCell(2, 3)!;
@@ -171,7 +171,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void AddTileAtWorld_PositionInsideCell_AddsTileAtThatCell()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtWorld(20f, 5f); // falls in cell (1, 0)
 
         tiles.GetTileAtCell(1, 0).ShouldNotBeNull();
@@ -183,7 +183,7 @@ public class TileShapeCollectionTests
     public void Raycast_HorizontalRay_HitsLeftFaceOfTile()
     {
         // Tile at cell (2, 0): occupies world X=[32,48], left face at X=32
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(2, 0);
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(64f, 8f),
@@ -199,7 +199,7 @@ public class TileShapeCollectionTests
     public void Raycast_MultipleHits_ReturnsClosest()
     {
         // Two tiles; ray should stop at the nearer one (cell 1, left face at X=16)
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(1, 0);
         tiles.AddTileAtCell(3, 0);
 
@@ -213,7 +213,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void Raycast_NoTileOnPath_ReturnsFalse()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 5); // far off the ray path
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(64f, 8f),
@@ -227,13 +227,13 @@ public class TileShapeCollectionTests
     [Fact]
     public void RemoveTileAtCell_AdjacentTile_NeighborRegainsRepositionDirection()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(1, 0);
         tiles.RemoveTileAtCell(1, 0);
 
         // After removing the right neighbor, (0,0) should have All directions again
-        tiles.GetTileAtCell(0, 0)!.RepositionDirections.ShouldBe(RepositionDirections.All);
+        tiles.GetTileAtCell(0, 0)!.SolidSides.ShouldBe(SolidSides.All);
     }
 
     // ── Clear ──────────────────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void Clear_RemovesAllTiles_AllowsGridPropertyChanges()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddPolygonTileAtCell(1, 0, SquarePrototype());
 
@@ -260,10 +260,10 @@ public class TileShapeCollectionTests
     [Fact]
     public void CollidesWith_ShapeOverlappingTile_ReturnsTrue()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // tile center at (8, 8), spans [0..16] x [0..16]
 
-        var rect = new AxisAlignedRectangle { Width = 16f, Height = 16f, X = 12f, Y = 8f };
+        var rect = new AARect { Width = 16f, Height = 16f, X = 12f, Y = 8f };
 
         tiles.CollidesWith(rect).ShouldBeTrue();
     }
@@ -271,10 +271,10 @@ public class TileShapeCollectionTests
     [Fact]
     public void CollidesWith_ShapeNotOverlappingTile_ReturnsFalse()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // tile spans [0..16] x [0..16]
 
-        var rect = new AxisAlignedRectangle { Width = 16f, Height = 16f, X = 100f, Y = 100f };
+        var rect = new AARect { Width = 16f, Height = 16f, X = 100f, Y = 100f };
 
         tiles.CollidesWith(rect).ShouldBeFalse();
     }
@@ -285,13 +285,13 @@ public class TileShapeCollectionTests
         // Bug: GetSeparationFor accumulates separation vectors. When the shape is fully
         // surrounded, opposing tiles cancel each other to Vector2.Zero → CollidesWith
         // returned false even though the shape clearly overlaps the tile collection.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         for (int c = -1; c <= 1; c++)
             for (int r = -1; r <= 1; r++)
                 tiles.AddTileAtCell(c, r); // 3×3 block; center tile at cell (0,0)
 
         // Small shape sitting fully inside the center cell (0,0): world [0..16]×[0..16]
-        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+        var rect = new AARect { Width = 4f, Height = 4f, X = 8f, Y = 8f };
 
         tiles.CollidesWith(rect).ShouldBeTrue();
     }
@@ -300,15 +300,15 @@ public class TileShapeCollectionTests
     public void CollidesWith_RectCallerFullySurroundedByTiles_ReturnsTrue()
     {
         // The actual game-code path: rect.CollidesWith(tileShapeCollection).
-        // AxisAlignedRectangle.CollidesWith delegates to CollisionDispatcher.GetSeparationVector,
-        // which calls TileShapeCollection.GetSeparationFor — same zero-cancellation bug as above
+        // AARect.CollidesWith delegates to CollisionDispatcher.GetSeparationVector,
+        // which calls TileShapes.GetSeparationFor — same zero-cancellation bug as above
         // but exercised from the other direction.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         for (int c = -1; c <= 1; c++)
             for (int r = -1; r <= 1; r++)
                 tiles.AddTileAtCell(c, r);
 
-        var rect = new AxisAlignedRectangle { Width = 4f, Height = 4f, X = 8f, Y = 8f };
+        var rect = new AARect { Width = 4f, Height = 4f, X = 8f, Y = 8f };
 
         rect.CollidesWith(tiles).ShouldBeTrue();
     }
@@ -320,10 +320,10 @@ public class TileShapeCollectionTests
     {
         // Tile at (0,0): center=(8,8), right edge at X=16
         // Shape overlaps from the right side: its left edge is at 14, center at 22
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
-        var rect = new AxisAlignedRectangle { Width = 16f, Height = 8f, X = 22f, Y = 8f };
+        var rect = new AARect { Width = 16f, Height = 8f, X = 22f, Y = 8f };
 
         var sep = tiles.GetSeparationFor(rect);
         sep.X.ShouldBeGreaterThan(0f); // pushed rightward (+X) out of the tile
@@ -342,20 +342,20 @@ public class TileShapeCollectionTests
         // bottom-right corner barely clips the diag tile's top-left corner, the player center is
         // to the LEFT of the diag tile center — a rightward push would be wrong and cause
         // the player to teleport through the wall.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 1); // wall-L
         tiles.AddTileAtCell(1, 1); // wall-R
         tiles.AddTileAtCell(0, 0); // floor
         tiles.AddTileAtCell(1, 0); // diag — Down|Right (tiles above and to left suppress Up and Left)
 
         // Verify the diag tile has Down|Right (the scenario precondition)
-        tiles.GetTileAtCell(1, 0)!.RepositionDirections.ShouldBe(
-            RepositionDirections.Down | RepositionDirections.Right);
+        tiles.GetTileAtCell(1, 0)!.SolidSides.ShouldBe(
+            SolidSides.Down | SolidSides.Right);
 
         // Player: 14x14, center just to the left of the wall, sitting on the floor.
         // Right edge at X=17 barely clips diag tile left edge at X=16.
         // Player center X=10, diag tile center X=24 → player center is to the LEFT.
-        var player = new AxisAlignedRectangle { Width = 14f, Height = 14f, X = 10f, Y = 23f };
+        var player = new AARect { Width = 14f, Height = 14f, X = 10f, Y = 23f };
 
         var sep = tiles.GetSeparationFor(player);
 
@@ -368,12 +368,12 @@ public class TileShapeCollectionTests
     {
         // Two tiles side by side: (0,0) at center=(8,8) and (1,0) at center=(24,8); top edge = 16.
         // Shape spans both tiles with bottom at Y=14, overlapping the top face by 2 px.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(1, 0);
 
         // Width=24, Height=8, Y=18 → minY=14, maxY=22; bottom overlaps tile top (16) by 2 px
-        var rect = new AxisAlignedRectangle { Width = 24f, Height = 8f, X = 16f, Y = 18f };
+        var rect = new AARect { Width = 24f, Height = 8f, X = 16f, Y = 18f };
         float expectedSep = 2f;
 
         var sep = tiles.GetSeparationFor(rect);
@@ -386,7 +386,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void GridSize_SetAfterTilesAdded_Throws()
     {
-        var tiles = new TileShapeCollection();
+        var tiles = new TileShapes();
         tiles.AddTileAtCell(0, 0);
 
         Should.Throw<InvalidOperationException>(() => tiles.GridSize = 32f);
@@ -398,7 +398,7 @@ public class TileShapeCollectionTests
     public void X_SetAfterTilesAdded_ShiftsTiles()
     {
         // Cell (0,0) with GridSize=16: tile center starts at (8, 8)
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         tiles.X = 100f;
@@ -409,7 +409,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void Y_SetAfterTilesAdded_ShiftsTiles()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         tiles.Y = 50f;
@@ -420,7 +420,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void X_SetAfterTilesAdded_ShiftsPolygonTiles()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
 
         tiles.X = 100f;
@@ -441,13 +441,13 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddPolygonTileAtCell(1, 0, slope);
 
         var rect = tiles.GetTileAtCell(0, 0)!;
-        rect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left,
+        rect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left,
             "rect adjacent to polygon should suppress the shared direction");
     }
 
@@ -460,17 +460,17 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
         tiles.AddTileAtCell(1, 0);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        poly.RepositionDirections.HasFlag(RepositionDirections.Right).ShouldBeFalse(
+        poly.SolidSides.HasFlag(SolidSides.Right).ShouldBeFalse(
             "polygon tile with neighbor on its right should not push movers in +X");
     }
 
     [Fact]
-    public void AddPolygonTileAtCell_NoNeighbor_AllRepositionDirections()
+    public void AddPolygonTileAtCell_NoNeighbor_AllSolidSides()
     {
         var slope = Polygon.FromPoints(new[]
         {
@@ -478,16 +478,16 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        poly.RepositionDirections.ShouldBe(RepositionDirections.All,
+        poly.SolidSides.ShouldBe(SolidSides.All,
             "lone polygon tile should allow pushes in every direction");
     }
 
     [Fact]
-    public void RemoveTileAtCell_NeighborRemoved_PolygonRepositionDirectionsRestored()
+    public void RemoveTileAtCell_NeighborRemoved_PolygonSolidSidesRestored()
     {
         var slope = Polygon.FromPoints(new[]
         {
@@ -495,13 +495,13 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
         tiles.AddTileAtCell(1, 0);
         tiles.RemoveTileAtCell(1, 0);
 
         var poly = tiles.GetPolygonTileAtCell(0, 0)!;
-        poly.RepositionDirections.ShouldBe(RepositionDirections.All,
+        poly.SolidSides.ShouldBe(SolidSides.All,
             "removing neighbor should restore all polygon push directions");
     }
 
@@ -514,12 +514,12 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2(-8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(1, 0, slope);
         tiles.AddTileAtCell(1, -1);
 
         var poly = tiles.GetPolygonTileAtCell(1, 0)!;
-        poly.RepositionDirections.HasFlag(RepositionDirections.Down).ShouldBeFalse(
+        poly.SolidSides.HasFlag(SolidSides.Down).ShouldBeFalse(
             "neighbor below should block downward push from this polygon tile");
     }
 
@@ -536,7 +536,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void AddPolygonTileAtCell_GetPolygonTileAtCell_ReturnsTile()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(2, 3, SquarePrototype());
 
         tiles.GetPolygonTileAtCell(2, 3).ShouldNotBeNull();
@@ -546,7 +546,7 @@ public class TileShapeCollectionTests
     public void AddPolygonTileAtCell_TilePositionedAtCellCenter()
     {
         // Cell (2,3) center = (2*16+8, 3*16+8) = (40, 56)
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(2, 3, SquarePrototype());
 
         var poly = tiles.GetPolygonTileAtCell(2, 3)!;
@@ -557,7 +557,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void AddPolygonTileAtCell_DoesNotOverwriteExistingRectTile()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype()); // same cell — should be ignored
 
@@ -568,7 +568,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void AddPolygonTileAtCell_DuplicatePolygonCell_Throws()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
 
         Should.Throw<InvalidOperationException>(
@@ -578,7 +578,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void RemovePolygonTileAtCell_RemovedTileNoLongerReturned()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(1, 1, SquarePrototype());
         tiles.RemovePolygonTileAtCell(1, 1);
 
@@ -593,10 +593,10 @@ public class TileShapeCollectionTests
         // Square polygon tile at cell (0,0): world points form a 16×16 square centered at (8,8).
         // Rect overlaps from the right: center X=22, left edge at 14 → 2 px overlap on X.
         // Y overlap is much larger (8 px) so SAT picks X as the minimum axis.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
 
-        var rect = new AxisAlignedRectangle { Width = 16f, Height = 8f, X = 22f, Y = 8f };
+        var rect = new AARect { Width = 16f, Height = 8f, X = 22f, Y = 8f };
 
         var sep = tiles.GetSeparationFor(rect);
         sep.X.ShouldBeGreaterThan(0f); // pushed rightward out of the polygon
@@ -606,10 +606,10 @@ public class TileShapeCollectionTests
     [Fact]
     public void GetSeparationFor_PolygonTile_NoOverlap_ReturnsZero()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
 
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 100f, Y = 100f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 100f, Y = 100f };
 
         tiles.GetSeparationFor(rect).ShouldBe(Vector2.Zero);
     }
@@ -617,11 +617,11 @@ public class TileShapeCollectionTests
     [Fact]
     public void GetSeparationFor_RemovedPolygonTile_ReturnsZero()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
         tiles.RemovePolygonTileAtCell(0, 0);
 
-        var rect = new AxisAlignedRectangle { Width = 16f, Height = 8f, X = 22f, Y = 8f };
+        var rect = new AARect { Width = 16f, Height = 8f, X = 22f, Y = 8f };
 
         tiles.GetSeparationFor(rect).ShouldBe(Vector2.Zero);
     }
@@ -631,7 +631,7 @@ public class TileShapeCollectionTests
     {
         // Square polygon tile at cell (0,0): covers [0..16] x [0..16].
         // Circle at X=18, Y=8, radius=6 — left edge at X=12, overlapping by 4px on X axis.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, SquarePrototype());
 
         var circle = new Circle { Radius = 6f, X = 18f, Y = 8f };
@@ -648,7 +648,7 @@ public class TileShapeCollectionTests
     {
         // Square polygon tile at cell (2,0): center at (40,8), left edge at X=32.
         // Ray travels right from X=10 at Y=8 — should hit the polygon's left edge at (32,8).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(2, 0, SquarePrototype());
 
         bool hit = tiles.Raycast(new Vector2(10f, 8f), new Vector2(80f, 8f),
@@ -672,7 +672,7 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f), // world (32,0)
             new Vector2(-8f,  8f), // world (16,16)
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(1, 0, prototype);
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(40f, 8f), out Vector2 hitPoint, out _);
@@ -685,7 +685,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void Raycast_HitShapeOverload_FullCellTile_ReturnsThatRect()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(2, 0);
         var expected = tiles.GetTileAtCell(2, 0);
 
@@ -699,7 +699,7 @@ public class TileShapeCollectionTests
     [Fact]
     public void Raycast_HitShapeOverload_PolygonTile_ReturnsPolygonInstance()
     {
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(2, 0, SquarePrototype());
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(80f, 8f),
@@ -713,7 +713,7 @@ public class TileShapeCollectionTests
     public void Raycast_PolygonTile_RayDoesNotReachCell_ReturnsFalse()
     {
         // Polygon tile at cell (5,0) — ray stops well before it.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(5, 0, SquarePrototype());
 
         bool hit = tiles.Raycast(new Vector2(0f, 8f), new Vector2(40f, 8f), out _, out _);
@@ -734,7 +734,7 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f), // world (16,0)
             new Vector2( 8f,  8f), // world (16,16)
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
 
         bool hit = tiles.Raycast(new Vector2(12f, 15f), new Vector2(12f, -1f),
@@ -761,7 +761,7 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f), // world (16,16)
             new Vector2( 8f,  8f), // world (16,32)
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 1, slope);
         tiles.AddTileAtCell(0, 0); // full-cell rect at y∈[0,16] — the "wrong" thing to hit
 
@@ -779,7 +779,7 @@ public class TileShapeCollectionTests
     public void Raycast_DownwardRay_HitsSubCellRect()
     {
         // Cell (0,0) contains a 16x8 bottom-half rect — top face at y=8.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
 
         bool hit = tiles.Raycast(new Vector2(8f, 20f), new Vector2(8f, -4f),
@@ -795,7 +795,7 @@ public class TileShapeCollectionTests
     {
         // Cell (0,0): polygon bottom half (top y=8) AND sub-cell rect filling top quarter
         // (y=[12,16], top face at y=16). A downward ray from above hits the rect (y=16) first.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         var bottomHalf = Polygon.FromPoints(new[]
         {
             new Vector2(-8f, -8f),
@@ -818,7 +818,7 @@ public class TileShapeCollectionTests
     {
         // Two rects in cell (0,0): lower (top y=4) and upper (top y=12).
         // Downward ray hits the upper one first.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, 0f, -6f, 16f, 4f); // top y=4
         tiles.AddRectangleTileAtCell(0, 0, 0f,  2f, 16f, 4f); // top y=12
 
@@ -835,7 +835,7 @@ public class TileShapeCollectionTests
         // Cell (0,0) has a sub-cell rect only in its left half (x=[0,8]).
         // Cell (1,0) has a full tile. A downward ray at x=12 should skip the rect and
         // continue — ultimately not hitting anything directly below in its column.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, -4f, 0f, 8f, 16f); // left half of cell (0,0)
         tiles.AddTileAtCell(2, 0); // a separate tile, not under the ray
 
@@ -866,10 +866,10 @@ public class TileShapeCollectionTests
         // Surface height at X=12: lerp from 0 to 16 over [0..16] → 12.
         // Rect bottom is 6 < 12 → push up by 6.
         float expectedSepY = 6f;
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 12f, Y = 10f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 12f, Y = 10f };
 
         var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
@@ -906,12 +906,12 @@ public class TileShapeCollectionTests
         // Player at X=20 (inside slope cell), bottom at Y=2 (center Y=6, height=8).
         // Slope at cell (1,0): surface at X=20 → lerp (20-16)/(32-16) * 16 = 4.
         // Player bottom=2 < 4 → push up by 2. No X push. No snagging.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddPolygonTileAtCell(1, 0, UpRightSlope());
 
         // Player overlapping the slope tile near the seam with the rect tile.
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 20f, Y = 6f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 20f, Y = 6f };
 
         var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
@@ -923,11 +923,11 @@ public class TileShapeCollectionTests
     public void GetSeparationFor_PlatformerFloor_NoOverlap_ReturnsZero()
     {
         // Rect above the slope surface — no separation needed.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         // Slope at cell (0,0): surface at X=8 → 8. Rect bottom at Y=20 → well above.
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 8f, Y = 24f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 8f, Y = 24f };
 
         tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor).ShouldBe(Vector2.Zero);
     }
@@ -949,11 +949,11 @@ public class TileShapeCollectionTests
             new Vector2( 8f,  8f),
             new Vector2(-8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, square);
         tiles.AddPolygonTileAtCell(1, 0, square);
 
-        var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 15f, Y = 16f };
+        var rect = new AARect { Width = 4f, Height = 8f, X = 15f, Y = 16f };
 
         var sep = tiles.GetSeparationFor(rect);
 
@@ -974,7 +974,7 @@ public class TileShapeCollectionTests
             new Vector2( 8f,  8f),
             new Vector2(-8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, square);
         tiles.AddPolygonTileAtCell(1, 0, square);
 
@@ -999,7 +999,7 @@ public class TileShapeCollectionTests
             new Vector2( 8f,  8f),
             new Vector2(-8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, square);
         tiles.AddPolygonTileAtCell(1, 0, square);
 
@@ -1018,11 +1018,11 @@ public class TileShapeCollectionTests
     public void GetSeparationFor_Standard_SlopeRamp_UsesSat()
     {
         // Default Standard mode: polygon tiles use SAT, which may have X component.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         // Same geometry as the PlatformerFloor test — SAT should produce a non-zero MTV.
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 12f, Y = 10f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 12f, Y = 10f };
 
         var sep = tiles.GetSeparationFor(rect);
         sep.ShouldNotBe(Vector2.Zero, "Standard mode should use SAT and produce separation");
@@ -1031,12 +1031,12 @@ public class TileShapeCollectionTests
     // ── PlatformerFloor — preferential landing (velocity-based) ────────────
 
     // Helper: creates an Entity with a child collision box, positioned and with velocity set.
-    private static AxisAlignedRectangle MakePlayerBox(
+    private static AARect MakePlayerBox(
         float x, float y, float width, float height, float velocityY)
     {
         var entity = new Entity();
         entity.VelocityY = velocityY;
-        var box = new AxisAlignedRectangle { Width = width, Height = height };
+        var box = new AARect { Width = width, Height = height };
         entity.Add(box);
         entity.X = x;
         entity.Y = y;
@@ -1052,7 +1052,7 @@ public class TileShapeCollectionTests
         // would strip vertical. With velocity check, lastBottom = 13 - (-500/60) =
         // 13 + 8.33 = 21.33 > rectTop(16) → was above → landing fires.
         // Platform at cell (5, 0): spans [80..96] x [0..16].
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(5, 0);
 
         // Player center X=78, bottom at Y=13. Spans [72..84] x [13..37].
@@ -1071,7 +1071,7 @@ public class TileShapeCollectionTests
     {
         // Player walks into wall (VelocityY = 0). Same geometry as landing test but
         // not falling → should push horizontally, not snap up.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         var box = MakePlayerBox(19f, 22f, 12f, 24f, velocityY: 0f);
@@ -1097,7 +1097,7 @@ public class TileShapeCollectionTests
         // Standard: X(4) < Y(14 or 10) → push left. Correct without PlatformerFloor.
         // With VelocityY=-15, lastBottom ≈ 6+0.25 = 6.25 < wall top (32) → not above.
         // So PlatformerFloor landing should NOT fire → horizontal push preserved.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(3, 0);
         tiles.AddTileAtCell(3, 1);
 
@@ -1119,7 +1119,7 @@ public class TileShapeCollectionTests
         // Setup: single column of 2 stacked tiles (neighbor on right to suppress Right
         // of the lower tile). Lower tile (0, 0) has Up suppressed by (0, 1).
         // Player barely overlaps (0, 0) from the right, slightly below its top.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(0, 1);
 
@@ -1147,7 +1147,7 @@ public class TileShapeCollectionTests
     {
         // Player standing on a wide ground area. Box has sunk slightly into the ground
         // due to gravity. Standard AABB picks horizontal (smaller overlap) but with
-        // RepositionDirections only Up allowed, falls through to push Up — correctly
+        // SolidSides only Up allowed, falls through to push Up — correctly
         // restoring the player to the ground surface.
         //
         // Wall-press suppression must NOT strip this vertical push just because the
@@ -1156,7 +1156,7 @@ public class TileShapeCollectionTests
         // Ground at row 2, cols 0-5. Player at col 2-3 area.
         // Tile (2,2): [32..48] x [32..48]. Player at X=42, box [36..48].
         // Player sunk slightly: box Y [32..56] (row 2 bottom to above).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         for (int c = 0; c < 6; c++)
         {
             tiles.AddTileAtCell(c, 0);
@@ -1180,7 +1180,7 @@ public class TileShapeCollectionTests
         // VelocityX > 0 (holding right), VelocityY < 0 (gravity while in gap).
         // Ground: cols 0-4 row 0. Gap: cols 5-6. Wall: col 7 rows 0-2.
         // Player fell slightly below ground level, right edge clips wall.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         for (int c = 0; c < 5; c++) tiles.AddTileAtCell(c, 0);
         tiles.AddTileAtCell(7, 0);
         tiles.AddTileAtCell(7, 1);
@@ -1209,7 +1209,7 @@ public class TileShapeCollectionTests
         // Pit wall at col 5, rows 0-2. Player to the left, falling along the face.
         // Player center X=78, spans [72..84]. Wall [80..96].
         // Player was to the LEFT of the wall last frame AND this frame.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(5, 0);
         tiles.AddTileAtCell(5, 1);
         tiles.AddTileAtCell(5, 2);
@@ -1240,10 +1240,10 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  0f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, shallow);
 
-        var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 8f, Y = 4f };
+        var rect = new AARect { Width = 4f, Height = 8f, X = 8f, Y = 4f };
 
         var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
@@ -1261,12 +1261,12 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
         tiles.AddPolygonTileAtCell(1, 1, slope);
 
         // Rect near seam (X=15, just inside cell 0's top-right). Surface should be ~15.
-        var rect = new AxisAlignedRectangle { Width = 4f, Height = 8f, X = 15f, Y = 12f };
+        var rect = new AARect { Width = 4f, Height = 8f, X = 15f, Y = 12f };
 
         var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
@@ -1290,7 +1290,7 @@ public class TileShapeCollectionTests
         // upper half of the cell; open space is below. Heightmap separation (which assumes
         // a floor surface) would push the player UP into/through the ceiling — wrong.
         // Fix: ceiling-like polygons should fall back to SAT, which pushes down/horizontal.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, CeilingSlope());
 
         // Cell (0,0) spans [0..16] x [0..16]. Ceiling polygon occupies upper region —
@@ -1299,7 +1299,7 @@ public class TileShapeCollectionTests
         // Top of player (Y=6) pokes into the ceiling's lower tip. A floor-style heightmap
         // push would shove the player up to surfaceY=16 (teleport). SAT pushes along the
         // hypotenuse's outward normal, away from the ceiling (down/left).
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 8f, Y = 2f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 8f, Y = 2f };
 
         var sep = tiles.GetSeparationFor(rect, SlopeCollisionMode.PlatformerFloor);
 
@@ -1311,10 +1311,10 @@ public class TileShapeCollectionTests
     {
         // Player standing at the right edge of a platform, center X slightly past rect edge.
         // No adjacent slope tile. Should still push up (not suppressed).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
-        var player = new AxisAlignedRectangle { Width = 12f, Height = 24f, X = 17f, Y = 27f };
+        var player = new AARect { Width = 12f, Height = 24f, X = 17f, Y = 27f };
 
         var sep = tiles.GetSeparationFor(player, SlopeCollisionMode.PlatformerFloor);
 
@@ -1326,17 +1326,17 @@ public class TileShapeCollectionTests
     [Fact]
     public void RunCollisions_RelationshipSlopeModePlatformerFloor_PushesPlayerUpSlope()
     {
-        // Player entity vs. a TileShapeCollection containing one floor slope polygon.
+        // Player entity vs. a TileShapes containing one floor slope polygon.
         // Relationship.SlopeMode = PlatformerFloor → heightmap path → vertical push only.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         var player = new Entity();
-        var box = new AxisAlignedRectangle { Width = 8f, Height = 8f };
+        var box = new AARect { Width = 8f, Height = 8f };
         player.Add(box);
         player.X = 12f; player.Y = 10f; // matches SlopeRamp_PushesUpVertically geometry
 
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { player }, new[] { tiles });
         rel.SlopeMode = SlopeCollisionMode.PlatformerFloor;
         rel.MoveFirstOnCollision();
@@ -1350,9 +1350,9 @@ public class TileShapeCollectionTests
     [Fact]
     public void RunCollisions_RelationshipSlopeModeStandard_UsesSatOnSameSlopeTiles()
     {
-        // Same TileShapeCollection as above but relationship has default Standard mode →
+        // Same TileShapes as above but relationship has default Standard mode →
         // SAT separation with a non-zero X component (proves the collection isn't globally biased).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         var ball = new Entity();
@@ -1360,7 +1360,7 @@ public class TileShapeCollectionTests
         ball.Add(circle);
         ball.X = 12f; ball.Y = 10f;
 
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { ball }, new[] { tiles });
         // No SlopeMode set → defaults to Standard.
         rel.MoveFirstOnCollision();
@@ -1377,10 +1377,10 @@ public class TileShapeCollectionTests
     {
         // Calling the ICollidable-level GetSeparationVector on the collection (no relationship)
         // must use Standard mode — the safe symmetric default.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
-        var rect = new AxisAlignedRectangle { Width = 8f, Height = 8f, X = 12f, Y = 10f };
+        var rect = new AARect { Width = 8f, Height = 8f, X = 12f, Y = 10f };
 
         var sep = tiles.GetSeparationVector(rect);
 
@@ -1397,17 +1397,17 @@ public class TileShapeCollectionTests
         // Two 16x8 bottom-half sub-cell rects in cells (0,0) and (1,0) form a continuous curb.
         // Cell (0,0) center is (8, 8); bottom-half rect center is (8, 4). Cell (1,0) bottom-half center (24, 4).
         // Shared face: x=16, y in [0,8]. Left rect's Right face and right rect's Left face should be cleared.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
         tiles.AddRectangleTileAtCell(1, 0, 0f, -4f, 16f, 8f);
 
         var leftRect  = tiles.GetRectangleTilesAtCell(0, 0)[0];
         var rightRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
 
-        leftRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
-        rightRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        leftRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
+        rightRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
     [Fact]
@@ -1416,14 +1416,14 @@ public class TileShapeCollectionTests
         // Sub-cell bottom-half rect at (0,0): faces left=0, right=16, bottom=0, top=8.
         // Full-cell tile at (1,0): faces left=16, right=32, bottom=0, top=16.
         // Shared face: x=16, y in [0,8] ⊂ [0,16]. Sub-cell rect's Right should be cleared.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
         tiles.AddTileAtCell(1, 0);
 
         var subRect = tiles.GetRectangleTilesAtCell(0, 0)[0];
 
-        subRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        subRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
     }
 
     [Fact]
@@ -1432,15 +1432,15 @@ public class TileShapeCollectionTests
         // Bottom-half in (0,0): y ∈ [0,8], right face at x=16. Top-half in (1,0): y ∈ [8,16],
         // left face at x=16. Opposite faces are aligned on x but their y-ranges touch only at a
         // single point (y=8), which is zero overlap — must NOT suppress.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f); // bottom-half in (0,0)
         tiles.AddRectangleTileAtCell(1, 0, 0f,  4f, 16f, 8f); // top-half in (1,0)
 
         var leftRect  = tiles.GetRectangleTilesAtCell(0, 0)[0];
         var rightRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
 
-        leftRect.RepositionDirections.ShouldBe(RepositionDirections.All);
-        rightRect.RepositionDirections.ShouldBe(RepositionDirections.All);
+        leftRect.SolidSides.ShouldBe(SolidSides.All);
+        rightRect.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -1450,17 +1450,17 @@ public class TileShapeCollectionTests
         // Bottom-half sub-cell rect at (0,1) center=(8,20), so bottom=16, x in [0,16].
         // Rect's bottom face fully covers the full-cell's top face → both must be suppressed
         // at the seam so a mover crossing from off-the-square onto the flat rect sees a clean surface.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f);
 
         var square  = tiles.GetTileAtCell(0, 0)!;
         var subRect = tiles.GetRectangleTilesAtCell(0, 1)[0];
 
-        square.RepositionDirections.ShouldBe(
-            RepositionDirections.Left | RepositionDirections.Right | RepositionDirections.Down);
-        subRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+        square.SolidSides.ShouldBe(
+            SolidSides.Left | SolidSides.Right | SolidSides.Down);
+        subRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Left | SolidSides.Right);
     }
 
     [Fact]
@@ -1470,16 +1470,16 @@ public class TileShapeCollectionTests
         // Sub-cell bottom-half rect at (0,0) center=(8,4), right face x=16, y in [0,8].
         // Rect only covers bottom half of the wall's left face — wall's Left must stay live
         // (regression guard: a tall wall next to a short spike should still repo movers off the wall).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(1, 0);
         tiles.AddRectangleTileAtCell(0, 0, 0f, -4f, 16f, 8f);
 
         var wall    = tiles.GetTileAtCell(1, 0)!;
         var subRect = tiles.GetRectangleTilesAtCell(0, 0)[0];
 
-        wall.RepositionDirections.ShouldBe(RepositionDirections.All);
-        subRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
+        wall.SolidSides.ShouldBe(SolidSides.All);
+        subRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
     }
 
     [Fact]
@@ -1487,17 +1487,17 @@ public class TileShapeCollectionTests
     {
         // Full-cell tile at (0,0): right face x=16, y in [0,16].
         // Left-half sub-cell rect at (1,0) center=(20,8), left face x=16, y in [0,16] → full coverage.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddRectangleTileAtCell(1, 0, -4f, 0f, 8f, 16f);
 
         var square  = tiles.GetTileAtCell(0, 0)!;
         var subRect = tiles.GetRectangleTilesAtCell(1, 0)[0];
 
-        square.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Left);
-        subRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        square.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Left);
+        subRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
     [Fact]
@@ -1513,13 +1513,13 @@ public class TileShapeCollectionTests
             new Vector2( 8f, -8f),
             new Vector2( 8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, slope);
         tiles.AddRectangleTileAtCell(1, 0, 0f, -4f, 16f, 8f);
 
         var rect = tiles.GetRectangleTilesAtCell(1, 0)[0];
-        rect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Down | RepositionDirections.Right);
+        rect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Down | SolidSides.Right);
     }
 
     [Fact]
@@ -1536,12 +1536,12 @@ public class TileShapeCollectionTests
             new Vector2( 8f,  0f),
             new Vector2(-8f,  0f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, poly);
         tiles.AddRectangleTileAtCell(1, 0, 0f, 4f, 16f, 8f); // top-half rect in cell (1,0)
 
         var rect = tiles.GetRectangleTilesAtCell(1, 0)[0];
-        rect.RepositionDirections.ShouldBe(RepositionDirections.All);
+        rect.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -1558,13 +1558,13 @@ public class TileShapeCollectionTests
             new Vector2( 8f,  8f),
             new Vector2(-8f,  8f),
         });
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, poly);
         tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f); // bottom-half rect in cell (0,1)
 
         var rect = tiles.GetRectangleTilesAtCell(0, 1)[0];
-        rect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+        rect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Left | SolidSides.Right);
     }
 
     [Fact]
@@ -1573,17 +1573,17 @@ public class TileShapeCollectionTests
         // Same geometry as FlatRectOnTopOfFullCell but sub-cell rect added first.
         // When the full-cell tile is added, adjacency pass must see the pre-existing sub-cell rect
         // and clear the full-cell's Up bit.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddRectangleTileAtCell(0, 1, 0f, -4f, 16f, 8f);
         tiles.AddTileAtCell(0, 0);
 
         var square  = tiles.GetTileAtCell(0, 0)!;
         var subRect = tiles.GetRectangleTilesAtCell(0, 1)[0];
 
-        square.RepositionDirections.ShouldBe(
-            RepositionDirections.Left | RepositionDirections.Right | RepositionDirections.Down);
-        subRect.RepositionDirections.ShouldBe(
-            RepositionDirections.Up | RepositionDirections.Left | RepositionDirections.Right);
+        square.SolidSides.ShouldBe(
+            SolidSides.Left | SolidSides.Right | SolidSides.Down);
+        subRect.SolidSides.ShouldBe(
+            SolidSides.Up | SolidSides.Left | SolidSides.Right);
     }
 
 }

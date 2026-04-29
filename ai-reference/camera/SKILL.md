@@ -37,7 +37,7 @@ wall.Y = -Camera.OrthogonalHeight / 2f;  // bottom of screen
 
 Prefer `Camera.Left`/`Right`/`Top`/`Bottom` for edges — they account for `Zoom` and camera position.
 
-> **Screen-edge boundaries** (keeping entities in bounds) are a collision concern, not a camera concern — use wall entities or `TileShapeCollection`. See the `collision-relationships` and `shapes` skills.
+> **Screen-edge boundaries** (keeping entities in bounds) are a collision concern, not a camera concern — use wall entities or `TileShapes`. See the `collision-relationships` and `shapes` skills.
 
 ## DisplaySettings — Resolution, Aspect, Zoom
 

@@ -215,7 +215,7 @@ public class TileMapReloadTests
     // The TSC must reflect the new tile data; the live TilemapTileLayer must hold the new tile.
     // ============================================================================================
 
-    // TileShapeCollection cells use Y-up: TMX (col, row) maps to TSC (col, height-1-row).
+    // TileShapes cells use Y-up: TMX (col, row) maps to TSC (col, height-1-row).
     // With a height-4 map: TMX (0,0) -> TSC (0,3); TMX (1,1) -> TSC (1,2); TMX (2,2) -> TSC (2,1).
     private const int H = 4;
     private static (int col, int row) Tsc(int col, int tmxRow) => (col, H - 1 - tmxRow);

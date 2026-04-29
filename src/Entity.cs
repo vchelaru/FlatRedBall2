@@ -302,7 +302,7 @@ public class Entity : ICollidable, IAttachable
     {
         foreach (var child in _children)
         {
-            if (child is FlatRedBall2.Collision.AxisAlignedRectangle r && r.Name == name) return r;
+            if (child is FlatRedBall2.Collision.AARect r && r.Name == name) return r;
             if (child is FlatRedBall2.Collision.Circle c && c.Name == name) return c;
             if (child is FlatRedBall2.Collision.Polygon p && p.Name == name) return p;
         }
@@ -739,7 +739,7 @@ public class Entity : ICollidable, IAttachable
         }
         else
         {
-            // Static geometry (e.g. TileShapeCollection) — treat other as immovable with zero velocity.
+            // Static geometry (e.g. TileShapes) — treat other as immovable with zero velocity.
             float totalMass = thisMass + otherMass;
             if (totalMass == 0) return;
 
@@ -753,8 +753,8 @@ public class Entity : ICollidable, IAttachable
         }
     }
 
-    // Helper for the TileShapeCollection per-axis decomposition path above.
-    // TileShapeCollection is static geometry, so this mirrors the non-Entity branch
+    // Helper for the TileShapes per-axis decomposition path above.
+    // TileShapes is static geometry, so this mirrors the non-Entity branch
     // of AdjustVelocityFromSeparation but against a pre-chosen axis-aligned normal.
     private void ApplyOneSidedAxisImpulse(Vector2 normal, float thisMass, float otherMass, float elasticity)
     {
@@ -769,7 +769,7 @@ public class Entity : ICollidable, IAttachable
         Velocity += impulse * thisRatio * normal;
     }
 
-    // Recursively yields the primitive shapes (Circle, AxisAlignedRectangle, Polygon) reachable
+    // Recursively yields the primitive shapes (Circle, AARect, Polygon) reachable
     // from this collidable. Child entities are transparent containers — their shapes are yielded
     // in-place rather than the child entity itself, so CollisionDispatcher always receives
     // concrete shape types it can handle.

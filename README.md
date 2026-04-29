@@ -17,7 +17,7 @@ Each sample is a complete runnable game built on the engine — open the source 
 
 - **Screens & Entities** — structured game object model with lifecycle hooks (`CustomInitialize`, `CustomActivity`, `CustomDestroy`)
 - **Collision relationships** — declarative move/bounce collision between entity groups; one call to wire up an entire system
-- **Shapes & physics** — built-in `AxisAlignedRectangle`, `Circle`, and `Polygon` with kinematic physics
+- **Shapes & physics** — built-in `AARect`, `Circle`, and `Polygon` with kinematic physics
 - **Platformer & top-down movement** — first-class built-in behaviors; no custom physics code required
 - **Gum UI integration** — full [MonoGame Gum](https://github.com/vchelaru/Gum) support for menus, HUDs, and in-game UI
 - **Input system** — keyboard, gamepad, and input interfaces for action binding

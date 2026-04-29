@@ -17,7 +17,7 @@ public class PlatformerConfig
 {
     /// <summary>The movement-slot bag. Null when the file omits the <c>movement</c> object —
     /// <see cref="PlatformerConfigExtensions.ApplyTo"/> short-circuits in that case.</summary>
-    public MovementConfig? Movement { get; set; }
+    public PlatformerMovementConfig? Movement { get; set; }
 
     /// <summary>Loads a <see cref="PlatformerConfig"/> from the JSON file at <paramref name="path"/>.
     /// The path is resolved through <c>TitleContainer</c> so it works on both desktop and web
@@ -50,7 +50,7 @@ public class PlatformerConfig
 /// Bag of movement slots authored in JSON. Each slot is optional; omitted slots leave the
 /// behavior's existing values untouched when applied.
 /// </summary>
-public class MovementConfig
+public class PlatformerMovementConfig
 {
     /// <summary>Populates <see cref="PlatformerBehavior.GroundMovement"/> when present.</summary>
     public MovementSlot? Ground { get; set; }

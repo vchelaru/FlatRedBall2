@@ -10,11 +10,11 @@ using XnaColor = Microsoft.Xna.Framework.Color;
 
 // Aliases to avoid method-vs-type name ambiguity within this file.
 using CircleShape = FlatRedBall2.Collision.Circle;
-using RectShape = FlatRedBall2.Collision.AxisAlignedRectangle;
+using RectShape = FlatRedBall2.Collision.AARect;
 using LineShape = FlatRedBall2.Collision.Line;
 using PolyShape = FlatRedBall2.Collision.Polygon;
 using SpriteShape = FlatRedBall2.Rendering.Sprite;
-using RepositionDirections = FlatRedBall2.Collision.RepositionDirections;
+using SolidSides = FlatRedBall2.Collision.SolidSides;
 
 namespace FlatRedBall2.Diagnostics;
 
@@ -356,46 +356,46 @@ public class Overlay
     }
 
     /// <summary>
-    /// Draws the four edges of each entity's first <see cref="AxisAlignedRectangle"/> child
+    /// Draws the four edges of each entity's first <see cref="AARect"/> child
     /// for every instance tracked by <paramref name="factory"/>. Each edge is green when its
-    /// <see cref="RepositionDirections"/> bit is set (solid collision surface) and dim red when
+    /// <see cref="SolidSides"/> bit is set (solid collision surface) and dim red when
     /// cleared (suppressed / pass-through). Call from <c>CustomActivity</c> each frame while
     /// diagnosing one-way platforms or <c>IsSolidGrid</c> seam issues. Entities without an
-    /// <see cref="AxisAlignedRectangle"/> child are silently skipped.
+    /// <see cref="AARect"/> child are silently skipped.
     /// </summary>
-    public void DrawRepositionDirections<T>(Factory<T> factory) where T : Entity, new()
+    public void DrawSolidSides<T>(Factory<T> factory) where T : Entity, new()
     {
         foreach (var entity in factory.Instances)
         {
             var body = FindBody(entity);
-            if (body != null) DrawRectRepositionDirections(body);
+            if (body != null) DrawRectSolidSides(body);
         }
     }
 
     /// <summary>
-    /// Draws the four edges of every <see cref="AxisAlignedRectangle"/> tile in
-    /// <paramref name="tiles"/>. Each edge is green when its <see cref="RepositionDirections"/>
+    /// Draws the four edges of every <see cref="AARect"/> tile in
+    /// <paramref name="tiles"/>. Each edge is green when its <see cref="SolidSides"/>
     /// bit is set (solid collision surface) and dim red when cleared (suppressed, which is how
-    /// <see cref="TileShapeCollection"/> prevents seam snagging between adjacent tiles). Call
+    /// <see cref="TileShapes"/> prevents seam snagging between adjacent tiles). Call
     /// from <c>CustomActivity</c> each frame while diagnosing tile-grid collision issues.
     /// </summary>
-    public void DrawRepositionDirections(TileShapeCollection tiles)
+    public void DrawSolidSides(TileShapes tiles)
     {
         foreach (var renderable in tiles.AllTiles)
         {
             if (renderable is RectShape rect)
-                DrawRectRepositionDirections(rect);
+                DrawRectSolidSides(rect);
         }
     }
 
-    private static AxisAlignedRectangle? FindBody(Entity entity)
+    private static AARect? FindBody(Entity entity)
     {
         foreach (var child in entity.Children)
-            if (child is AxisAlignedRectangle rect) return rect;
+            if (child is AARect rect) return rect;
         return null;
     }
 
-    private void DrawRectRepositionDirections(RectShape rect)
+    private void DrawRectSolidSides(RectShape rect)
     {
         var color = new XnaColor(60, 220, 60);
         float cx = rect.AbsoluteX;
@@ -415,20 +415,20 @@ public class Overlay
         float baseHalfX = halfW * 0.28f;
         float baseHalfY = halfH * 0.28f;
 
-        var rd = rect.RepositionDirections;
-        if ((rd & RepositionDirections.Up) != 0)
+        var rd = rect.SolidSides;
+        if ((rd & SolidSides.Up) != 0)
             Triangle(cx, faceT,
                      cx - baseHalfX, faceT - depthY,
                      cx + baseHalfX, faceT - depthY, color);
-        if ((rd & RepositionDirections.Down) != 0)
+        if ((rd & SolidSides.Down) != 0)
             Triangle(cx, faceB,
                      cx - baseHalfX, faceB + depthY,
                      cx + baseHalfX, faceB + depthY, color);
-        if ((rd & RepositionDirections.Left) != 0)
+        if ((rd & SolidSides.Left) != 0)
             Triangle(faceL, cy,
                      faceL + depthX, cy - baseHalfY,
                      faceL + depthX, cy + baseHalfY, color);
-        if ((rd & RepositionDirections.Right) != 0)
+        if ((rd & SolidSides.Right) != 0)
             Triangle(faceR, cy,
                      faceR - depthX, cy - baseHalfY,
                      faceR - depthX, cy + baseHalfY, color);

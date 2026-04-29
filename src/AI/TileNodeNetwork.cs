@@ -24,7 +24,7 @@ public enum DirectionalType
 /// <list type="number">
 /// <item>Construct with the grid origin, spacing, dimensions, and link mode.</item>
 /// <item>Call <see cref="FillCompletely"/> or <see cref="AddAndLinkNode(int,int)"/> to populate walkable tiles.</item>
-/// <item>Optionally call <see cref="RemoveNodesOverlapping(AxisAlignedRectangle)"/> to carve out walls, then <see cref="EliminateCutCorners"/> for clean diagonal movement.</item>
+/// <item>Optionally call <see cref="RemoveNodesOverlapping(AARect)"/> to carve out walls, then <see cref="EliminateCutCorners"/> for clean diagonal movement.</item>
 /// <item>Call <see cref="GetPath(TileNode,TileNode)"/> to find paths.</item>
 /// </list>
 /// </remarks>
@@ -56,19 +56,19 @@ public class TileNodeNetwork
     /// </summary>
     /// <param name="xOrigin">
     /// World X of the center of the first (leftmost) tile column. When aligning with a
-    /// <see cref="FlatRedBall2.Collision.TileShapeCollection"/> whose <c>X</c> is the left edge of the grid,
+    /// <see cref="FlatRedBall2.Collision.TileShapes"/> whose <c>X</c> is the left edge of the grid,
     /// pass <c>tileShapeCollection.X + gridSpacing / 2</c>. With the standard 16-unit grid this is
     /// <c>tileShapeCollection.X + 8</c>, placing the first node at world X = 8 and each subsequent
     /// column 16 units to the right.
     /// </param>
     /// <param name="yOrigin">
     /// World Y of the center of the bottom tile row. When aligning with a
-    /// <see cref="FlatRedBall2.Collision.TileShapeCollection"/> whose <c>Y</c> is the bottom edge of the grid,
+    /// <see cref="FlatRedBall2.Collision.TileShapes"/> whose <c>Y</c> is the bottom edge of the grid,
     /// pass <c>tileShapeCollection.Y + gridSpacing / 2</c>. With the standard 16-unit grid this is
     /// <c>tileShapeCollection.Y + 8</c>.
     /// </param>
     /// <param name="gridSpacing">
-    /// Distance between adjacent tile centers. Should match <see cref="FlatRedBall2.Collision.TileShapeCollection.GridSize"/>.
+    /// Distance between adjacent tile centers. Should match <see cref="FlatRedBall2.Collision.TileShapes.GridSize"/>.
     /// The standard value for FlatRedBall2 games is 16.
     /// </param>
     /// <param name="xCount">Number of tile columns.</param>
@@ -143,10 +143,10 @@ public class TileNodeNetwork
     /// may be removed even if its center is not strictly inside the rectangle.
     /// </summary>
     /// <remarks>
-    /// Uses <see cref="AxisAlignedRectangle.AbsoluteX"/> and <see cref="AxisAlignedRectangle.AbsoluteY"/>,
+    /// Uses <see cref="AARect.AbsoluteX"/> and <see cref="AARect.AbsoluteY"/>,
     /// so the rectangle's world position is resolved correctly even when it is offset from its parent entity's origin.
     /// </remarks>
-    public void RemoveNodesOverlapping(AxisAlignedRectangle rectangle)
+    public void RemoveNodesOverlapping(AARect rectangle)
     {
         float left   = rectangle.AbsoluteX - rectangle.Width  / 2f;
         float right  = rectangle.AbsoluteX + rectangle.Width  / 2f;

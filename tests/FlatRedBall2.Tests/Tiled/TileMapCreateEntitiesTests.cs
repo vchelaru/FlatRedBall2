@@ -258,7 +258,7 @@ public class TileMapCreateEntitiesTests
 
         tileMap.CreateEntities("Coin", factory);
         // Activation rect that overlaps (24, -40)
-        tileMap.LazySpawnManager.Update(left: 0f, right: 100f, bottom: -100f, top: 100f);
+        tileMap.LazySpawner.Update(left: 0f, right: 100f, bottom: -100f, top: 100f);
 
         factory.Count.ShouldBe(1);
         factory[0].X.ShouldBe(24f);
@@ -294,7 +294,7 @@ public class TileMapCreateEntitiesTests
         factory.Count.ShouldBe(0);
 
         // Activate the rect to spawn.
-        tileMap.LazySpawnManager.Update(-100f, 100f, -100f, 100f);
+        tileMap.LazySpawner.Update(-100f, 100f, -100f, 100f);
 
         factory.Count.ShouldBe(1);
         factory[0].Tag.ShouldBe("ruby");
@@ -347,7 +347,7 @@ public class TileMapCreateEntitiesTests
 
         configureCalls.ShouldBe(0);
 
-        tileMap.LazySpawnManager.Update(-100f, 100f, -100f, 100f);
+        tileMap.LazySpawner.Update(-100f, 100f, -100f, 100f);
 
         configureCalls.ShouldBe(1);
     }

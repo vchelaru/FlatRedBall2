@@ -48,5 +48,5 @@ public class AnimationFrameSave
     public bool ShouldSerializeRelativeY() => RelativeY != 0f;
 
     /// <summary>Per-frame shape definitions. Empty by default.</summary>
-    public ShapeCollectionSave? ShapeCollectionSave;
+    public ShapesSave? ShapesSave;
 }

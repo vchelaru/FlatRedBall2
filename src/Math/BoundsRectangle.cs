@@ -6,7 +6,7 @@ namespace FlatRedBall2.Math;
 /// a rectangular region (map bounds, spawn areas, trigger zones, viewport regions).
 /// </summary>
 /// <remarks>
-/// Unlike <see cref="Collision.AxisAlignedRectangle"/>, this is a plain data struct
+/// Unlike <see cref="Collision.AARect"/>, this is a plain data struct
 /// with no entity or physics overhead. Edge properties assume Y+ up (Top &gt; Bottom).
 /// </remarks>
 public readonly record struct BoundsRectangle(float CenterX, float CenterY, float Width, float Height)

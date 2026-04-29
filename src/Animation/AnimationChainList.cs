@@ -20,7 +20,7 @@ public class AnimationChainList : List<AnimationChain>
     /// auto-create that shape and attach it. When <c>false</c>, the missing shape throws —
     /// useful for typo-detection in tightly-authored projects.
     /// </summary>
-    public bool CreateMissingShapes { get; set; } = true;
+    public bool AutoCreateShapes { get; set; } = true;
 
     /// <summary>
     /// All shape names referenced by any frame of any chain in this list. The ownership set the
@@ -68,7 +68,7 @@ public class AnimationChainList : List<AnimationChain>
     /// the next debounce window.
     /// </para>
     /// </summary>
-    public bool TryReloadFrom(string path, ContentManagerService content)
+    public bool TryReloadFrom(string path, ContentLoader content)
     {
         AnimationChainList fresh;
         try

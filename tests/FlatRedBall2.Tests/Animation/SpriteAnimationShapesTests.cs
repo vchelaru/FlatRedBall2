@@ -33,7 +33,7 @@ public class SpriteAnimationShapesTests
     {
         // Body collider has a name "Body" but no animation frame mentions it — must be left alone.
         var entity = new Entity();
-        var body = new AxisAlignedRectangle { Name = "Body", Width = 20f, Height = 20f, IsVisible = true };
+        var body = new AARect { Name = "Body", Width = 20f, Height = 20f, IsVisible = true };
         entity.Add(body);
 
         var sprite = new Sprite();
@@ -54,7 +54,7 @@ public class SpriteAnimationShapesTests
     public void ApplyCurrentFrame_HitboxOnFrame_EnabledOnEntity()
     {
         var entity = new Entity();
-        var sword = new AxisAlignedRectangle { Name = "Sword", IsVisible = false };
+        var sword = new AARect { Name = "Sword", IsVisible = false };
         entity.Add(sword);
         entity.SetDefaultCollision(sword, false);
 
@@ -62,7 +62,7 @@ public class SpriteAnimationShapesTests
         entity.Add(sprite);
 
         var chain = ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "Sword", Width = 30f, Height = 10f, RelativeX = 15f }));
+            Frame(0.1f, new AnimationAARectFrame { Name = "Sword", Width = 30f, Height = 10f, RelativeX = 15f }));
         var list = new AnimationChainList();
         list.Add(chain);
         sprite.AnimationChains = list;
@@ -72,7 +72,7 @@ public class SpriteAnimationShapesTests
         sword.Width.ShouldBe(30f);
         sword.Height.ShouldBe(10f);
         sword.X.ShouldBe(15f);
-        entity.CollidesWith(new AxisAlignedRectangle { X = 15f, Y = 0f, Width = 1f, Height = 1f }).ShouldBeTrue();
+        entity.CollidesWith(new AARect { X = 15f, Y = 0f, Width = 1f, Height = 1f }).ShouldBeTrue();
     }
 
     [Fact]
@@ -84,17 +84,17 @@ public class SpriteAnimationShapesTests
 
         // Two-frame chain: frame 0 has Sword, frame 1 does not — the chainlist still owns "Sword".
         var chain = ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "Sword", Width = 30f, Height = 10f }),
+            Frame(0.1f, new AnimationAARectFrame { Name = "Sword", Width = 30f, Height = 10f }),
             Frame(0.1f));
         var list = new AnimationChainList();
         list.Add(chain);
         sprite.AnimationChains = list;
         sprite.PlayAnimation("Attack");
 
-        // Auto-created on frame 0 (CreateMissingShapes = true by default)
-        AxisAlignedRectangle? sword = null;
+        // Auto-created on frame 0 (AutoCreateShapes = true by default)
+        AARect? sword = null;
         foreach (var c in entity.Children)
-            if (c is AxisAlignedRectangle r && r.Name == "Sword") sword = r;
+            if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
         sword!.IsVisible.ShouldBeTrue();
 
@@ -102,7 +102,7 @@ public class SpriteAnimationShapesTests
         sprite.AnimateSelf(0.15);
 
         sword.IsVisible.ShouldBeFalse();
-        entity.CollidesWith(new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 100f, Height = 100f }).ShouldBeFalse();
+        entity.CollidesWith(new AARect { X = 0f, Y = 0f, Width = 100f, Height = 100f }).ShouldBeFalse();
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class SpriteAnimationShapesTests
         entity.Add(sprite);
 
         var attack = ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "Sword", Width = 30f, Height = 10f }));
+            Frame(0.1f, new AnimationAARectFrame { Name = "Sword", Width = 30f, Height = 10f }));
         var idle = ChainWithFrames("Idle",
             Frame(0.1f)); // no Sword
 
@@ -123,9 +123,9 @@ public class SpriteAnimationShapesTests
         sprite.AnimationChains = list;
 
         sprite.PlayAnimation("Attack");
-        AxisAlignedRectangle? sword = null;
+        AARect? sword = null;
         foreach (var c in entity.Children)
-            if (c is AxisAlignedRectangle r && r.Name == "Sword") sword = r;
+            if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
         sword!.IsVisible.ShouldBeTrue();
 
@@ -149,7 +149,7 @@ public class SpriteAnimationShapesTests
 
         var combat = new AnimationChainList();
         combat.Add(ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "Sword", Width = 30f, Height = 10f })));
+            Frame(0.1f, new AnimationAARectFrame { Name = "Sword", Width = 30f, Height = 10f })));
 
         var movement = new AnimationChainList();
         movement.Add(ChainWithFrames("Walk", Frame(0.1f))); // owns no shapes
@@ -157,9 +157,9 @@ public class SpriteAnimationShapesTests
         sprite.AnimationChains = combat;
         sprite.PlayAnimation("Attack");
 
-        AxisAlignedRectangle? sword = null;
+        AARect? sword = null;
         foreach (var c in entity.Children)
-            if (c is AxisAlignedRectangle r && r.Name == "Sword") sword = r;
+            if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
         sword!.IsVisible.ShouldBeTrue();
 
@@ -175,7 +175,7 @@ public class SpriteAnimationShapesTests
     public void ApplyCurrentFrame_TypeMismatch_Throws()
     {
         var entity = new Entity();
-        var sword = new AxisAlignedRectangle { Name = "Sword" };
+        var sword = new AARect { Name = "Sword" };
         entity.Add(sword);
 
         var sprite = new Sprite();
@@ -192,15 +192,15 @@ public class SpriteAnimationShapesTests
     }
 
     [Fact]
-    public void ApplyCurrentFrame_CreateMissingShapesFalse_MissingShapeThrows()
+    public void ApplyCurrentFrame_AutoCreateShapesFalse_MissingShapeThrows()
     {
         var entity = new Entity();
         var sprite = new Sprite();
         entity.Add(sprite);
 
         var chain = ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "Sword", Width = 10f, Height = 10f }));
-        var list = new AnimationChainList { CreateMissingShapes = false };
+            Frame(0.1f, new AnimationAARectFrame { Name = "Sword", Width = 10f, Height = 10f }));
+        var list = new AnimationChainList { AutoCreateShapes = false };
         list.Add(chain);
         sprite.AnimationChains = list;
 
@@ -215,7 +215,7 @@ public class SpriteAnimationShapesTests
         entity.Add(sprite);
 
         var chain = ChainWithFrames("Attack",
-            Frame(0.1f, new AnimationRectangleFrame { Name = "", Width = 10f }));
+            Frame(0.1f, new AnimationAARectFrame { Name = "", Width = 10f }));
         var list = new AnimationChainList();
         list.Add(chain);
         sprite.AnimationChains = list;

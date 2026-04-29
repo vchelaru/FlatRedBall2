@@ -52,16 +52,16 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     /// <summary>
     /// Controls how this relationship resolves overlap with polygon tiles when one side is a
-    /// <see cref="TileShapeCollection"/>. Default <see cref="SlopeCollisionMode.Standard"/> uses
+    /// <see cref="TileShapes"/>. Default <see cref="SlopeCollisionMode.Standard"/> uses
     /// SAT (correct for top-down and non-player-vs-level pairs like a ball vs. tiles). Set to
     /// <see cref="SlopeCollisionMode.PlatformerFloor"/> for platformer player-vs-level to get
     /// heightmap-based vertical separation on floor slopes. Ignored when neither side is a
-    /// <see cref="TileShapeCollection"/>.
+    /// <see cref="TileShapes"/>.
     /// </summary>
     /// <remarks>
     /// Lives on the relationship — not the collection — so the same tile collection can be used
     /// with different semantics per relationship (e.g., player = PlatformerFloor, ball = Standard).
-    /// Also required when <see cref="OneWayDirection"/> is set on a <see cref="TileShapeCollection"/>
+    /// Also required when <see cref="OneWayDirection"/> is set on a <see cref="TileShapes"/>
     /// containing polygon (sloped) tiles — without PlatformerFloor, sloped cloud tiles fall back
     /// to SAT and the one-way gate won't compute the slope-aware LastPosition adjustment needed
     /// for uphill walking.
@@ -81,11 +81,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// clipping a platform's side is lifted up rather than shoved sideways. On sloped tiles the
     /// LastPosition gate is slope-aware — the surface-Y delta between last-frame X and current X
     /// is folded in so uphill walking passes. Player drop-through (Down+Jump, or airborne
-    /// Down-held) only bypasses this relationship when <see cref="AllowDropThrough"/> is set to
+    /// Down-held) only bypasses this relationship when <see cref="CanDropThrough"/> is set to
     /// <c>true</c> — see that property.
     /// </summary>
     /// <remarks>
-    /// For sloped cloud platforms (polygon tiles in a <see cref="TileShapeCollection"/>) also set
+    /// For sloped cloud platforms (polygon tiles in a <see cref="TileShapes"/>) also set
     /// <see cref="SlopeMode"/> to <see cref="SlopeCollisionMode.PlatformerFloor"/> — otherwise
     /// SAT is used, the surface-Y delta isn't computed, and uphill walking will fall through.
     /// All four directions (Up/Down/Left/Right) are implemented; the slope-aware LastPosition
@@ -111,7 +111,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// drop-through also skips ground-snap for this relationship — otherwise the snap raycast
     /// would yank the player back onto the cloud the frame after drop-through begins.
     /// </remarks>
-    public bool AllowDropThrough { get; set; } = false;
+    public bool CanDropThrough { get; set; } = false;
 
     /// <summary>
     /// When <c>true</c> and both lists are the same reference (self-collision), fires
@@ -185,7 +185,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private List<(A, B)>? _scratchEndedPairs;
     // Entities we've subscribed to _onDestroy for so we can fire Ended synchronously on destruction.
     // Tracked in a set to avoid double-subscribing across frames. HashSet<object> because A or B
-    // may be Entity, shape, or TileShapeCollection; only Entity has _onDestroy.
+    // may be Entity, shape, or TileShapes; only Entity has _onDestroy.
     private HashSet<object>? _hookedEntities;
     // Reused scratch set when a destroy hook fires, to dedupe pairs across current+previous before
     // firing Ended once per unique pair.
@@ -578,7 +578,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         }
     }
 
-    // Offers this relationship's TileShapeCollection to any IPlatformerEntity side as a
+    // Offers this relationship's TileShapes to any IPlatformerEntity side as a
     // ground-snap candidate. Only fires when SlopeMode == PlatformerFloor. No-op otherwise.
     private void TryOfferGroundSnap(A a, B b)
     {
@@ -588,17 +588,17 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         // snap too — otherwise ConsiderSnappingTo would raycast down and yank the player back
         // onto the cloud the frame after drop-through begins. Flat clouds don't hit this (they
         // use SlopeMode.Standard), but sloped clouds require PlatformerFloor.
-        if (AllowDropThrough && OneWayDirection != OneWayDirection.None)
+        if (CanDropThrough && OneWayDirection != OneWayDirection.None)
         {
             if (IsSuppressingDropThrough(a) || IsSuppressingDropThrough(b)) return;
         }
 
-        if (a is IPlatformerEntity pa && pa is Entity ea && b is TileShapeCollection tscB)
+        if (a is IPlatformerEntity pa && pa is Entity ea && b is TileShapes tscB)
         {
             pa.Platformer.ConsiderSnappingTo(ea, tscB);
             pa.Platformer.ContributeSlopeProbe(ea, tscB);
         }
-        else if (b is IPlatformerEntity pb && pb is Entity eb && a is TileShapeCollection tscA)
+        else if (b is IPlatformerEntity pb && pb is Entity eb && a is TileShapes tscA)
         {
             pb.Platformer.ConsiderSnappingTo(eb, tscA);
             pb.Platformer.ContributeSlopeProbe(eb, tscA);
@@ -613,10 +613,10 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Checks collision using CollisionDispatcher.CollidesWith so Line intersections are handled.
     // Iterates leaf shape pairs so any combination of leaf shapes, entities, and
-    // TileShapeCollections is dispatched correctly — including selected-shape vs entity cases.
+    // TileShapess is dispatched correctly — including selected-shape vs entity cases.
     private bool CheckCollision(ICollidable a, ICollidable b)
     {
-        if (b is TileShapeCollection tsc)
+        if (b is TileShapes tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
                 if (tsc.GetSeparationFor(leafA, SlopeMode) != Vector2.Zero)
@@ -633,13 +633,13 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
     // Returns the separation vector to push 'a' out of 'b'. Returns Vector2.Zero when no
     // physics separation is meaningful (e.g., Lines are infinitely thin).
-    // axisAlignedAggregate is true when the sep came from a TileShapeCollection whose
+    // axisAlignedAggregate is true when the sep came from a TileShapes whose
     // per-tile contributions were all axis-aligned (no polygon SAT diagonal) — bounce
     // callers use this to choose between a single-normal reflection (slope) and per-axis
     // zeroing (wall + floor corner).
     private Vector2 ComputeSeparationVector(ICollidable a, ICollidable b, out bool axisAlignedAggregate)
     {
-        if (b is TileShapeCollection tsc)
+        if (b is TileShapes tsc)
         {
             foreach (var leafA in Entity.GetLeafShapes(a))
             {
@@ -668,8 +668,8 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         if (OneWayDirection == OneWayDirection.None) return true;
 
         // Drop-through suppression only applies when this relationship opts in — hard one-way
-        // barriers (AllowDropThrough = false) ignore the player's drop-through state.
-        if (AllowDropThrough && (IsSuppressingDropThrough(a) || IsSuppressingDropThrough(b)))
+        // barriers (CanDropThrough = false) ignore the player's drop-through state.
+        if (CanDropThrough && (IsSuppressingDropThrough(a) || IsSuppressingDropThrough(b)))
             return false;
 
         switch (OneWayDirection)
@@ -691,10 +691,10 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                     // Slope-aware: on a cloud slope, the surface Y at LastPosition.X differs from
                     // the surface at the current X. Fold that delta in so uphill walking on a
                     // sloped one-way tile isn't rejected every frame. When the B side is a
-                    // TileShapeCollection we can query it; otherwise fall back to the flat check.
+                    // TileShapes we can query it; otherwise fall back to the flat check.
                     const float epsilon = 0.001f;
                     float surfaceDelta = 0f;
-                    if (b is TileShapeCollection tscGate)
+                    if (b is TileShapes tscGate)
                     {
                         float? lastSurface = tscGate.GetHeightmapSurfaceYAt(ea.LastPosition.X);
                         float? thisSurface = tscGate.GetHeightmapSurfaceYAt(ea.Position.X);
@@ -748,12 +748,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     private static void TryTransferPlatformVelocity(A a, B b, Vector2 sep)
     {
         // A is the platformer, A was pushed up by sep → sep.Y > 0
-        if (sep.Y > 0f && a is IPlatformerEntity pa && b is Entity entB && b is not TileShapeCollection)
+        if (sep.Y > 0f && a is IPlatformerEntity pa && b is Entity entB && b is not TileShapes)
         {
             pa.Platformer.ContributeGroundVelocity(entB.VelocityX);
         }
         // B is the platformer, B was pushed by -sep → B pushed up when sep.Y < 0
-        else if (sep.Y < 0f && b is IPlatformerEntity pb && a is Entity entA && a is not TileShapeCollection)
+        else if (sep.Y < 0f && b is IPlatformerEntity pb && a is Entity entA && a is not TileShapes)
         {
             pb.Platformer.ContributeGroundVelocity(entA.VelocityX);
         }

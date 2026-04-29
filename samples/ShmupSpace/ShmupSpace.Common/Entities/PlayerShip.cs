@@ -13,7 +13,7 @@ public class PlayerShip : Entity
 {
     private Sprite _ship = null!;
     private Sprite _booster = null!;
-    private AxisAlignedRectangle _body = null!;
+    private AARect _body = null!;
 
     private readonly TopDownBehavior _topDown = new();
     public TopDownBehavior TopDown => _topDown;
@@ -36,7 +36,7 @@ public class PlayerShip : Entity
         Add(_ship);
         _ship.PlayAnimation("ShipStraight");
 
-        _body = new AxisAlignedRectangle
+        _body = new AARect
         {
             Width = 12f,
             Height = 12f,

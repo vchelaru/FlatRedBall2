@@ -14,14 +14,14 @@ namespace FlatRedBall2.Tests.Animation;
 // Sprite.CurrentAnimation reference keeps playing from the updated frames without resetting.
 public class AnimationChainListReloadTests
 {
-    // In-memory file system: path → XML bytes. Routed through ContentManagerService.StreamProvider
+    // In-memory file system: path → XML bytes. Routed through ContentLoader.StreamProvider
     // so the engine never touches the disk and matches the production WASM/desktop code path
     // (TitleContainer.OpenStream rejects absolute filesystem paths).
     private readonly Dictionary<string, byte[]> _virtualFiles = new(StringComparer.OrdinalIgnoreCase);
 
-    private ContentManagerService MakeContent()
+    private ContentLoader MakeContent()
     {
-        var svc = new ContentManagerService();
+        var svc = new ContentLoader();
         svc.TextureLoader = _ => null!; // frames tolerate null Texture; we only validate chain structure
         svc.StreamProvider = path =>
         {
@@ -66,7 +66,7 @@ public class AnimationChainListReloadTests
 
     private void DeleteFile(string fileName) => _virtualFiles.Remove(fileName);
 
-    private AnimationChainList LoadFresh(string path, ContentManagerService content)
+    private AnimationChainList LoadFresh(string path, ContentLoader content)
         => content.LoadAnimationChainList(path);
 
     [Fact]

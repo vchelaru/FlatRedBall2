@@ -7,7 +7,7 @@ namespace FlatRedBall2.Tests.Collision;
 
 /// <summary>
 /// Tests for SAT-based polygon collision (Circle vs Polygon, Polygon vs Polygon,
-/// Polygon vs AxisAlignedRectangle). Each test verifies that GetSeparationVector
+/// Polygon vs AARect). Each test verifies that GetSeparationVector
 /// pushes the first argument AWAY from the second argument.
 /// </summary>
 public class PolygonCollisionTests
@@ -136,13 +136,13 @@ public class PolygonCollisionTests
         moved.GetSeparationVector(b).ShouldBe(Vector2.Zero);
     }
 
-    // ── Polygon vs AxisAlignedRectangle ────────────────────────────────────────
+    // ── Polygon vs AARect ────────────────────────────────────────
 
     [Fact]
     public void PolygonVsRect_PolyToRight_PushesPolyRight()
     {
         var poly = Square(60f, 0f);
-        var rect = new AxisAlignedRectangle { Width = 100f, Height = 100f, X = 0f, Y = 0f };
+        var rect = new AARect { Width = 100f, Height = 100f, X = 0f, Y = 0f };
 
         var sep = poly.GetSeparationVector(rect);
 
@@ -154,7 +154,7 @@ public class PolygonCollisionTests
     public void PolygonVsRect_RectToRight_PushesRectRight()
     {
         var poly = Square(0f, 0f);
-        var rect = new AxisAlignedRectangle { Width = 100f, Height = 100f, X = 60f, Y = 0f };
+        var rect = new AARect { Width = 100f, Height = 100f, X = 60f, Y = 0f };
 
         var sep = rect.GetSeparationVector(poly);
 
@@ -236,7 +236,7 @@ public class PolygonCollisionTests
     {
         var poly = LShape(0f, 0f);
         // Rect entirely within the concave pocket.
-        var rect = new AxisAlignedRectangle { X = 25f, Y = -25f, Width = 10f, Height = 10f };
+        var rect = new AARect { X = 25f, Y = -25f, Width = 10f, Height = 10f };
 
         rect.GetSeparationVector(poly).ShouldBe(Vector2.Zero,
             "rect in concave pocket should not collide with L-shape");

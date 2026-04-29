@@ -116,7 +116,7 @@ public class GameScreen : Screen
 | Property | Type | Purpose |
 |----------|------|---------|
 | `Input` | `InputManager` | Keyboard, cursor, gamepads |
-| `Content` | `ContentManagerService` | Load textures, fonts via `.mgcb` pipeline |
+| `Content` | `ContentLoader` | Load textures, fonts via `.mgcb` pipeline |
 | `Random` | `GameRandom` | Seeded random with helpers (`Between`, `RadialVector2`) |
 | `Time` | `TimeManager` | Frame timing, async delays |
 | `Audio` | `AudioManager` | **Stub — throws NotImplementedException** |

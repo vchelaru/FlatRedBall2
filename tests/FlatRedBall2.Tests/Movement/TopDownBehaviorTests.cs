@@ -14,28 +14,28 @@ public class TopDownBehaviorTests
     [Fact]
     public void DirectionFacing_FourWay_DownInput_ReturnsDown()
     {
-        var direction = TopDownBehavior.DirectionFromVector(0f, -1f, PossibleDirections.FourWay);
+        var direction = TopDownBehavior.DirectionFromVector(0f, -1f, DirectionSnap.FourWay);
         direction.ShouldBe(TopDownDirection.Down);
     }
 
     [Fact]
     public void DirectionFacing_FourWay_RightInput_ReturnsRight()
     {
-        var direction = TopDownBehavior.DirectionFromVector(1f, 0f, PossibleDirections.FourWay);
+        var direction = TopDownBehavior.DirectionFromVector(1f, 0f, DirectionSnap.FourWay);
         direction.ShouldBe(TopDownDirection.Right);
     }
 
     [Fact]
     public void DirectionFacing_FourWay_UpInput_ReturnsUp()
     {
-        var direction = TopDownBehavior.DirectionFromVector(0f, 1f, PossibleDirections.FourWay);
+        var direction = TopDownBehavior.DirectionFromVector(0f, 1f, DirectionSnap.FourWay);
         direction.ShouldBe(TopDownDirection.Up);
     }
 
     [Fact]
     public void DirectionFacing_EightWay_DiagonalInput_ReturnsUpRight()
     {
-        var direction = TopDownBehavior.DirectionFromVector(1f, 1f, PossibleDirections.EightWay);
+        var direction = TopDownBehavior.DirectionFromVector(1f, 1f, DirectionSnap.EightWay);
         direction.ShouldBe(TopDownDirection.UpRight);
     }
 
@@ -109,7 +109,7 @@ public class TopDownBehaviorTests
         {
             MovementValues = values,
             MovementInput = new MockAxisInput(x: 1f, y: 0f),
-            InputEnabled = false,
+            IsInputEnabled = false,
         };
         var entity = new Entity();
 

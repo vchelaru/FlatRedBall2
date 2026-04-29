@@ -92,7 +92,7 @@ These are missing from the Sprite definition.
 ### 8. Collision Shapes — No Properties Shown
 
 AI can't create collision shapes because the doc shows `{ ... }` for all three shapes. It needs to see:
-- `AxisAlignedRectangle`: Width, Height (or is it ScaleX/ScaleY like FRB1?)
+- `AARect`: Width, Height (or is it ScaleX/ScaleY like FRB1?)
 - `Circle`: Radius
 - `Polygon`: how to define vertices
 
@@ -106,7 +106,7 @@ Each shape implementing `CollidesWith(ICollidable other)` means each shape must 
 
 Same problem as Gum. AI asked to "load a Tiled map" has 4 bullet points and no code. Show:
 ```csharp
-var map = ContentManager.Load<TiledMap>("level1");
+var map = ContentLoader.Load<TiledMap>("level1");
 // How to render it? How to get collision from it?
 ```
 

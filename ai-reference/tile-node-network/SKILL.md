@@ -13,7 +13,7 @@ description: "Tile Node Network in FlatRedBall2. Use when working with A* pathfi
 
 ## Standard Setup
 
-The standard FlatRedBall2 tile size is **16 units**. Node origins are offset by half a tile from the `TileShapeCollection` corner, so node centers fall at 8, 24, 40, … (i.e. `tileCollection.X + 8`, `tileCollection.Y + 8`).
+The standard FlatRedBall2 tile size is **16 units**. Node origins are offset by half a tile from the `TileShapes` corner, so node centers fall at 8, 24, 40, … (i.e. `tileCollection.X + 8`, `tileCollection.Y + 8`).
 
 ```csharp
 var network = new TileNodeNetwork(

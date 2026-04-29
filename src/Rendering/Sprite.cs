@@ -430,18 +430,18 @@ public class Sprite : IRenderable, IAttachable
         var existing = Parent!.FindShapeByName(name);
         switch (entry)
         {
-            case AnimationRectangleFrame rect:
+            case AnimationAARectFrame rect:
             {
                 if (existing == null)
                 {
-                    if (!_animationChains!.CreateMissingShapes)
+                    if (!_animationChains!.AutoCreateShapes)
                         throw new InvalidOperationException(
-                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
-                    var r = new AxisAlignedRectangle { Name = name };
+                            $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
+                    var r = new AARect { Name = name };
                     ApplyRectangle(r, rect);
                     Parent.Add(r);
                 }
-                else if (existing is AxisAlignedRectangle r)
+                else if (existing is AARect r)
                 {
                     ApplyRectangle(r, rect);
                     Parent.SetDefaultCollision(r, true);
@@ -457,9 +457,9 @@ public class Sprite : IRenderable, IAttachable
             {
                 if (existing == null)
                 {
-                    if (!_animationChains!.CreateMissingShapes)
+                    if (!_animationChains!.AutoCreateShapes)
                         throw new InvalidOperationException(
-                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
+                            $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var c = new Circle { Name = name };
                     ApplyCircle(c, circle);
                     Parent.Add(c);
@@ -480,9 +480,9 @@ public class Sprite : IRenderable, IAttachable
             {
                 if (existing == null)
                 {
-                    if (!_animationChains!.CreateMissingShapes)
+                    if (!_animationChains!.AutoCreateShapes)
                         throw new InvalidOperationException(
-                            $"Animation frame references shape '{name}' which is not on the entity, and CreateMissingShapes is false.");
+                            $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var p = new Polygon { Name = name };
                     ApplyPolygon(p, poly);
                     Parent.Add(p);
@@ -508,7 +508,7 @@ public class Sprite : IRenderable, IAttachable
         if (existing == null) return;
         switch (existing)
         {
-            case AxisAlignedRectangle r:
+            case AARect r:
                 r.IsVisible = false;
                 Parent.SetDefaultCollision(r, false);
                 break;
@@ -523,7 +523,7 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    private static void ApplyRectangle(AxisAlignedRectangle r, AnimationRectangleFrame entry)
+    private static void ApplyRectangle(AARect r, AnimationAARectFrame entry)
     {
         r.Width = entry.Width;
         r.Height = entry.Height;
@@ -585,7 +585,7 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>
     /// Detaches this sprite from its parent entity (which also unregisters it from the screen).
     /// Sprites do not own their <see cref="Texture"/> or <see cref="AnimationChains"/> — those
-    /// remain managed by the <c>ContentManagerService</c> that loaded them.
+    /// remain managed by the <c>ContentLoader</c> that loaded them.
     /// </summary>
     public void Destroy()
     {

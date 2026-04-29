@@ -15,12 +15,12 @@ namespace FlatRedBall2;
 /// files directly from disk; tracked PNG textures additionally support in-place hot-reload via
 /// <see cref="TryReload"/>.
 /// <para>
-/// Each <see cref="Screen"/> owns its own <see cref="ContentManagerService"/> via
-/// <c>Screen.ContentManager</c>. <see cref="UnloadAll"/> is invoked automatically on screen
+/// Each <see cref="Screen"/> owns its own <see cref="ContentLoader"/> via
+/// <c>Screen.ContentLoader</c>. <see cref="UnloadAll"/> is invoked automatically on screen
 /// transition — explicit unloads are only needed mid-screen.
 /// </para>
 /// </summary>
-public class ContentManagerService
+public class ContentLoader
 {
     private ContentManager? _contentManager;
     private GraphicsDevice? _graphicsDevice;
@@ -55,7 +55,7 @@ public class ContentManagerService
     internal Func<Texture2D, string, bool> TextureReloader { get; set; }
 
     /// <summary>Constructs a content service with the default texture loader/reloader. Call <c>Initialize</c> before use.</summary>
-    public ContentManagerService()
+    public ContentLoader()
     {
         TextureLoader = DefaultTextureLoader;
         TextureReloader = DefaultTextureReloader;
@@ -93,7 +93,7 @@ public class ContentManagerService
             return (T)(object)LoadTextureFromFile(path);
 
         if (_contentManager == null)
-            throw new InvalidOperationException("ContentManagerService not initialized. Call Initialize first.");
+            throw new InvalidOperationException("ContentLoader not initialized. Call Initialize first.");
         return _contentManager.Load<T>(path);
     }
 
@@ -136,7 +136,7 @@ public class ContentManagerService
     public Texture2D CreateSolidColor(int width, int height, Color color)
     {
         if (_graphicsDevice == null)
-            throw new InvalidOperationException("ContentManagerService not initialized.");
+            throw new InvalidOperationException("ContentLoader not initialized.");
         var tex = new Texture2D(_graphicsDevice, width, height);
         tex.SetData(Enumerable.Repeat(color, width * height).ToArray());
         Track(tex);
@@ -180,7 +180,7 @@ public class ContentManagerService
     private Texture2D DefaultTextureLoader(string path)
     {
         if (_graphicsDevice == null)
-            throw new InvalidOperationException("ContentManagerService not initialized.");
+            throw new InvalidOperationException("ContentLoader not initialized.");
         using var stream = StreamProvider(path);
         var texture = Texture2D.FromStream(_graphicsDevice, stream);
         PremultiplyIfNeeded(texture);
@@ -190,7 +190,7 @@ public class ContentManagerService
     private bool DefaultTextureReloader(Texture2D existing, string path)
     {
         if (_graphicsDevice == null)
-            throw new InvalidOperationException("ContentManagerService not initialized.");
+            throw new InvalidOperationException("ContentLoader not initialized.");
         using var stream = StreamProvider(path);
         using var incoming = Texture2D.FromStream(_graphicsDevice, stream);
         if (incoming.Width != existing.Width || incoming.Height != existing.Height)
@@ -237,9 +237,9 @@ public class ContentManagerService
     /// Creates a content service whose load methods all return defaults — useful for headless
     /// testing where no <see cref="GraphicsDevice"/> or <see cref="ContentManager"/> exists.
     /// </summary>
-    public static ContentManagerService CreateNull() => new NullContentManagerService();
+    public static ContentLoader CreateNull() => new NullContentLoader();
 
-    private class NullContentManagerService : ContentManagerService
+    private class NullContentLoader : ContentLoader
     {
         /// <inheritdoc/>
         public new T Load<T>(string path) => default!;

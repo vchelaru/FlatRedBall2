@@ -12,7 +12,7 @@ public class Player : Entity, IPlatformerEntity
 {
     private readonly PlatformerBehavior _platformer = new();
 
-    private AxisAlignedRectangle _body = null!;
+    private AARect _body = null!;
     private Sprite _sprite = null!;
     private bool _isSwimming;
 
@@ -22,11 +22,11 @@ public class Player : Entity, IPlatformerEntity
     private PlatformerConfig _normalConfig = null!;
     private PlatformerConfig _waterConfig = null!;
 
-    public AxisAlignedRectangle CollisionBody => _body;
+    public AARect CollisionBody => _body;
 
     public PlatformerBehavior Platformer => _platformer;
 
-    public TileShapeCollection? Ladders
+    public TileShapes? Ladders
     {
         get => _platformer.Ladders;
         set => _platformer.Ladders = value;
@@ -34,7 +34,7 @@ public class Player : Entity, IPlatformerEntity
 
     // Ladders are built into PlatformerBehavior; water is a game-defined concept,
     // so we hold the zone ourselves and use it to swap movement values each frame.
-    public TileShapeCollection? WaterZones { get; set; }
+    public TileShapes? WaterZones { get; set; }
 
     public override void CustomInitialize()
     {
@@ -48,7 +48,7 @@ public class Player : Entity, IPlatformerEntity
         var animations = Engine.Content.LoadAnimationChainList("Content/Animations/PlayerAnimations.achx");
         _sprite.AnimationChains = animations;
         Add(_sprite);
-        _body = new AxisAlignedRectangle
+        _body = new AARect
         {
             Width = 12f,
             Height = 20f,

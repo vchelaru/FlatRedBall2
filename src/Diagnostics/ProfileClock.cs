@@ -5,7 +5,7 @@ namespace FlatRedBall2.Diagnostics;
 // High-resolution timestamp helper used by Screen.Update / FlatRedBallService.Update / Draw to
 // fill in FrameProfile fields. Stopwatch.GetTimestamp is RDTSC-backed on x64 (~5-10ns per call),
 // cheap enough to leave on per-frame in release.
-internal static class ProfilingClock
+internal static class ProfileClock
 {
     private static readonly double TickToMs = 1000.0 / Stopwatch.Frequency;
 

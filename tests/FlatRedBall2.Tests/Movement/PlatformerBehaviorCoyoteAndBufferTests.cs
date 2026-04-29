@@ -34,7 +34,7 @@ public class PlatformerBehaviorCoyoteAndBufferTests
             JumpInput = jump,
         };
         var entity = new Entity();
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         entity.Add(body);
         // Start grounded
         entity.LastReposition = new Vector2(0f, 5f);
@@ -224,7 +224,7 @@ public class PlatformerBehaviorCoyoteAndBufferTests
         var jump = new PressableInput();
         var platformer = new PlatformerBehavior { GroundMovement = ground, AirMovement = air, JumpInput = jump };
         var entity = new Entity();
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         entity.Add(body);
 
         // Airborne start

@@ -9,10 +9,10 @@ namespace FlatRedBall2.Animation.Content;
 /// <see cref="AnimationChainListSave.ToAnimationChainList"/>.
 /// </summary>
 [System.Serializable]
-public class ShapeCollectionSave
+public class ShapesSave
 {
     /// <summary>Rectangles defined for this frame.</summary>
-    public List<AxisAlignedRectangleSave> AxisAlignedRectangleSaves = new();
+    public List<AARectSave> AARectSaves = new();
 
     /// <summary>Circles defined for this frame.</summary>
     public List<CircleSave> CircleSaves = new();
@@ -21,9 +21,9 @@ public class ShapeCollectionSave
     public List<PolygonSave> PolygonSaves = new();
 }
 
-/// <summary>Serialized rectangle entry within a <see cref="ShapeCollectionSave"/>.</summary>
+/// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
 [System.Serializable]
-public class AxisAlignedRectangleSave
+public class AARectSave
 {
     /// <summary>Shape name; matched by name against entity-attached shapes.</summary>
     public string Name = string.Empty;
@@ -37,7 +37,7 @@ public class AxisAlignedRectangleSave
     public float ScaleY = 16f;
 }
 
-/// <summary>Serialized circle entry within a <see cref="ShapeCollectionSave"/>.</summary>
+/// <summary>Serialized circle entry within a <see cref="ShapesSave"/>.</summary>
 [System.Serializable]
 public class CircleSave
 {
@@ -51,7 +51,7 @@ public class CircleSave
     public float Radius = 16f;
 }
 
-/// <summary>Serialized polygon entry within a <see cref="ShapeCollectionSave"/>.</summary>
+/// <summary>Serialized polygon entry within a <see cref="ShapesSave"/>.</summary>
 [System.Serializable]
 public class PolygonSave
 {

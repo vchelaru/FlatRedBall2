@@ -8,7 +8,7 @@ namespace ShmupSpace.Entities;
 public class PlayerBullet : Entity
 {
     private Sprite _sprite = null!;
-    private AxisAlignedRectangle _body = null!;
+    private AARect _body = null!;
 
     public override void CustomInitialize()
     {
@@ -16,7 +16,7 @@ public class PlayerBullet : Entity
         Add(_sprite);
         _sprite.PlayAnimation("PlayerShot1");
 
-        _body = new AxisAlignedRectangle
+        _body = new AARect
         {
             Width = 6f,
             Height = 14f,
