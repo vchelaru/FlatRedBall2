@@ -19,17 +19,38 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
 
-## CollisionRelationship list-type tightening
-**Priority: Soon** — `CollisionRelationship<A, B>` stores its operand collections as `IEnumerable<A>` / `IEnumerable<B>` (`src/Collision/CollisionRelationship.cs:36-37`).
+## Multi-pass collision resolution for dense clusters
+**Priority: Soon** — `CollisionRelationship.RunCollisions` resolves each pair once per frame. In tightly packed piles (validated visually with `AutoEvalBallPartitionSample` at 1500+ balls under gravity), one pass cannot fully separate balls that have multiple overlapping neighbors, so residual overlaps remain visible frame after frame.
 
-- Pair-iteration path at `RunCollisions` `foreach (var a in _listA) foreach (var b in _listB)` boxes the struct enumerators of the underlying `List<T>`/`Factory<T>` to `IEnumerator<T>` — two enumerator allocations per relationship per frame.
-- The same-list path already runtime-casts to `IReadOnlyList<A>` to recover indexed iteration, proving the runtime objects support it.
-- Tighten the field types (and the `Screen.AddCollisionRelationship<A,B>` overloads) to `IReadOnlyList<A>` / `IReadOnlyList<B>`. Callers in the engine + samples already pass `Factory<T>` or `List<T>`; non-breaking for the common case.
-- Also unlocks indexed access for a partition-aware broad phase (drop-in at index k for sort-and-sweep).
+- Add a `MaxIterations` setting on `CollisionRelationship` (default 1, opt in to higher for piles).
+- Each iteration runs the pair sweep again over the *currently-overlapping* set; terminate early when an iteration produces zero separation movement.
+- Validate against `AutoEvalBallPartitionSample` — overlaps in the pile should visibly disappear at MaxIterations=4 or so.
+- Watch out: the simple "rerun the same sweep" approach fires `CollisionOccurred` / `CollisionStarted` events per-iteration, which is wrong. Need to gate event firing to only the first iteration (or hoist event firing out of the inner pair-resolution loop).
 
-## Factory Object Pooling
-**Priority: Soon** — `Factory<T>` currently allocates on `Create()` and discards on destroy. For SMB-style entity churn (fireballs, coin-pop particles, score popups, brick rubble) this generates avoidable GC pressure on hot paths.
+This is the proper fix for the "balls visibly overlap in dense piles" symptom. Single-pass impulse resolution is a fundamental limitation, not a partition bug — verified by `PartitionAxis_DenseClusterOf30Balls_CoversSameUniquePairsAsNaive` test.
 
-- Opt-in pool mode on `Factory<T>`: destroyed instances return to a free list; subsequent `Create()` calls hand them back after a `Reset()` hook on the entity.
-- Decide entity reset contract: does pooling require a `Reset()` virtual on `Entity`, or is the pattern "destroy clears state, CustomInitialize re-initializes"?
-- Interaction with `IsSolidGrid` factory mode and entity-collision-relationship dispatch — pooled entities must not leave dangling references in collision lists.
+## CollisionRelationship per-pair inner-loop optimization
+**Priority: Soon** — `AutoEvalBallPartitionSample` profiling shows ~150ns/check in Release for circle-vs-circle ball pairs. The broad-phase prunes correctly (50k checks against a 1.9M naive baseline); the cost is per-check overhead. Concrete optimization candidates:
+
+- **Skip `RecordContact` when no `CollisionStarted` / `CollisionEnded` subscribers.** Currently runs a `HashSet<(A,B)>` insert on every overlapping pair regardless of whether anyone listens. Tuple boxing + hashing is a meaningful chunk of the per-check cost. Gate behind a "has subscriber" boolean.
+- **Inline the common Circle-vs-Circle case** in `CollisionDispatcher.GetSeparationVector`. The type-pair `switch` does runtime `is` checks on every call; for the dominant case (entity with one circle child vs. another), a fast path that skips the leaf-shape walk and the dispatch table is worthwhile.
+- **Cache `Entity.BroadPhaseRadius`.** Currently recomputed on every read (loops over `_shapes`, calls `MathF.Sqrt`). Read once per pair in `RunSameListCollisionsSweep` and `RunPair`, twice if we count `aRight` / `bLeft`. Cache on Entity, invalidate when shapes are added/removed or the offset changes.
+
+Validate before/after with the `FrameProfile.CollisionMs` reading in the sample at a fixed ball count (say, 500). Ship one optimization at a time so each can be measured.
+
+## Sweep-and-prune iteration bias
+**Priority: Eventual** — `RunSameListCollisionsSweep` always iterates pairs `(i, j)` with `i < j`. When a pair bounces, A=list[i] (lower X) is pushed left and B=list[j] (higher X) is pushed right. The leftmost ball in any cluster only ever gets pushed *left* by its pairings; the rightmost only *right*. Over many frames this slowly biases the pile shape — visually subtle, statistically real.
+
+Cheap fix: alternate sweep direction every other frame (`i = N-1` down to `0`, `j = i-1` down to `0`). Keeps unique-pair coverage; no API change. Costs one bool field on `CollisionRelationship` and a sign flip on the loop bounds.
+
+Only meaningful in scenes with hundreds of densely-packed dynamic bodies — bullet swarms, particle piles, the ball-partition stress test. Most game scenes won't notice.
+
+## TileShapeCollection.AddRectangleBorder convenience
+**Priority: Soon** — building an arena/play-field wall ring (every game with bounded play area: arcade brawler, bumper-ball arena, top-down shooter map edges) currently takes ~12 lines of cell-loop boilerplate per side. The `AutoEvalBallPartitionSample` had to write:
+
+```csharp
+for (int c = 0; c < cols; c++) { tiles.AddTileAtCell(c, 0); tiles.AddTileAtCell(c, rows - 1); }
+for (int r = 1; r < rows - 1; r++) { tiles.AddTileAtCell(0, r); tiles.AddTileAtCell(cols - 1, r); }
+```
+
+Add `TileShapeCollection.AddRectangleBorder(int colMin, int rowMin, int colMax, int rowMax)` (or a thickness-parameterized variant) so a one-liner replaces the four-loop dance. Skip if the natural pattern in actual games is to source walls from a TMX file — if Tiled is the canonical authoring path for level edges, the code-only convenience is a sharp tool for sample/test code only and may not earn its keep.

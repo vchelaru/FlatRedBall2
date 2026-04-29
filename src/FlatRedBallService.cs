@@ -35,6 +35,21 @@ public class FlatRedBallService
     /// <summary>The shared engine instance used by every screen, entity, and factory.</summary>
     public static FlatRedBallService Default { get; } = new FlatRedBallService();
 
+    // In-progress profile being filled during the current frame. Mutated in place by Screen.Update
+    // and the engine's Update/Draw methods. NOT user-visible — reads during the frame would mix
+    // current-frame phase values against previous-frame totals. Committed to _lastFrame at the
+    // end of Draw, when the frame's measurements are all populated.
+    internal FrameProfile _frameProfile;
+    private FrameProfile _lastFrame;
+
+    /// <summary>
+    /// Snapshot of the most recently completed frame's timing breakdown. Coherent by design —
+    /// every field comes from the same frame, captured at end-of-Draw. Read at any point in the
+    /// next frame (e.g. in <see cref="Screen.CustomActivity"/>) for HUD / profiling output.
+    /// See <see cref="FrameProfile"/> for what each field measures.
+    /// </summary>
+    public FrameProfile LastFrame => _lastFrame;
+
     private Game? _game;
     private GraphicsDeviceManager? _graphicsManager;
     private SpriteBatch? _spriteBatch;
@@ -614,6 +629,7 @@ public class FlatRedBallService
     /// </summary>
     public void Update(GameTime gameTime)
     {
+        long updateStart = System.Diagnostics.Stopwatch.GetTimestamp();
 #if DEBUG
         if (_automationMode != null)
         {
@@ -635,14 +651,24 @@ public class FlatRedBallService
 
         // Drain any pending content reloads BEFORE entity / collision / activity passes so the
         // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
+        long tWatch = System.Diagnostics.Stopwatch.GetTimestamp();
         CurrentScreen.TickContentWatchers(DateTime.UtcNow);
+        _frameProfile.ContentWatcherMs = ProfilingClock.Ms(tWatch, System.Diagnostics.Stopwatch.GetTimestamp());
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
-        Input.Update(Time.RealTimeSinceStart);
 
+        long tInput = System.Diagnostics.Stopwatch.GetTimestamp();
+        Input.Update(Time.RealTimeSinceStart);
+        _frameProfile.InputMs = ProfilingClock.Ms(tInput, System.Diagnostics.Stopwatch.GetTimestamp());
+
+        _frameProfile.AudioMs = 0;
+        _frameProfile.GumUpdateMs = 0;
         if (_spriteBatch != null)
         {
+            long tAudio = System.Diagnostics.Stopwatch.GetTimestamp();
             Audio.Update();
+            _frameProfile.AudioMs = ProfilingClock.Ms(tAudio, System.Diagnostics.Stopwatch.GetTimestamp());
+
             CurrentScreen.Overlay.BeginFrame();
 
             // Build the input/animation update list: legacy global root, every camera's UiRoot
@@ -656,7 +682,9 @@ public class FlatRedBallService
                 _gumUpdateList.Add(CurrentScreen.Cameras[i].UiRoot);
             _gumUpdateList.Add(CurrentScreen.OverlayRoot);
 
+            long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
             _gum.Update(gameTime, _gumUpdateList);
+            _frameProfile.GumUpdateMs = ProfilingClock.Ms(tGum, System.Diagnostics.Stopwatch.GetTimestamp());
         }
 
         // Complete any delay tasks whose conditions are now met, then flush their
@@ -666,6 +694,10 @@ public class FlatRedBallService
         _syncContext.Update();
 
         CurrentScreen.Update(Time.CurrentFrameTime);
+
+        _frameProfile.UpdateTotalMs = ProfilingClock.Ms(updateStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        // FrameTotalMs is finalized at end of Draw (when both Update and Draw measurements exist
+        // for this same frame); writing it here would mix this-frame Update with last-frame Draw.
     }
 
     /// <summary>
@@ -680,6 +712,7 @@ public class FlatRedBallService
     /// </summary>
     public void Draw()
     {
+        long drawStart = System.Diagnostics.Stopwatch.GetTimestamp();
         if (_spriteBatch == null) return;
 
         RenderDiagnostics.BeginFrame();
@@ -749,5 +782,13 @@ public class FlatRedBallService
 #if DEBUG
         _automationMode?.FlushStepResponse(Time.CurrentFrame);
 #endif
+
+        _frameProfile.DrawTotalMs = ProfilingClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.RenderMs = _frameProfile.DrawTotalMs;
+        _frameProfile.FrameTotalMs = _frameProfile.UpdateTotalMs + _frameProfile.DrawTotalMs;
+
+        // Commit the in-progress profile — this is the only point where every field is populated
+        // and consistent. Reads of LastFrame during the next frame see this coherent snapshot.
+        _lastFrame = _frameProfile;
     }
 }

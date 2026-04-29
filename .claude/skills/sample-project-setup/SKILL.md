@@ -45,6 +45,9 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
 
 A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. Minimal content — the sample csproj plus the engine csproj:
 
+> **Anti-precedent warning.** Roughly a third of the existing samples in `samples/auto/` are missing this file — that's drift, not the rule. If you scaffolded a new project by copying a sibling sample, the `.slnx` may not be there to copy. Add it from the template below; do not infer the pattern from the directory listing of one neighbor.
+
+
 ```xml
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
