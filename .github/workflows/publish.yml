@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version override (leave blank to auto-increment from latest NuGet)'
+        description: 'Version override, e.g. 0.2.0-preview.1 (leave blank to auto-increment preview number)'
         required: false
         default: ''
 
