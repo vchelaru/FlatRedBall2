@@ -8,6 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>MyGame</RootNamespace>
+    <!-- Use the precompiled apos-shapes.xnb shipped in Content/ instead of compiling
+         the shader from source (which requires Wine on macOS/Linux). -->
+    <SkipAposShapeContent>true</SkipAposShapeContent>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Apos.Shapes" Version="0.6.8" />
