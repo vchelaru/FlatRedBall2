@@ -45,6 +45,9 @@ Raw visual objects with no built-in input handling. Use these for non-interactiv
 | `TextRuntime` | Text with custom `FontSize`/`FontScale` not exposed by `Label` |
 | `ColoredRectangleRuntime` | Solid-color rectangle (health bars, UI frames, heart indicators) |
 | `SpriteRuntime` | Textured image |
+| `ColoredCircleRuntime` | Anti-aliased filled circle (Gum.Shapes package) |
+| `RoundedRectangleRuntime` | Anti-aliased rounded rectangle, optional gradient (Gum.Shapes package) |
+| `ArcRuntime` | Anti-aliased arc/ring segment (Gum.Shapes package) |
 
 ```csharp
 using MonoGameGum.GueDeriving;
@@ -242,7 +245,7 @@ The API differs by type:
 ## Gotchas
 
 - **"Keyboard navigation" on Forms controls means Tab/accessibility focus only — not arrow keys.** Game action menus (battle commands, pause menus) require custom logic: maintain a `_selectedIndex` int and drive selection with `WasKeyPressed(Keys.Up/Down/Left/Right)` in `Screen.CustomActivity`. Apply visual highlight by toggling a property on the selected element. Do not try to use `Button.IsFocused` or `OnKeyDown` for this — Forms focus is designed for form tab-order, not game input.
-- **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
+- **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Shapes (`ColoredCircleRuntime`, `RoundedRectangleRuntime`, `ArcRuntime`) are in `MonoGameAndGum.Renderables`. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
 - **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Projected world coordinates under zoom** — `Camera.WorldToScreen` gives viewport pixels, but Gum applies zoom scaling during render. For projected Gum overlays (selection rectangles, tile highlights), convert viewport-pixel coordinates into Gum canvas units using zoom compensation (`1 / Camera.Zoom`) to avoid double-scaling drift.
