@@ -1,4 +1,4 @@
-# ai-reference
+# frb-skills
 
 Skills for game developers building with FlatRedBall2.
 

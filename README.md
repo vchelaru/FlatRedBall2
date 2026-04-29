@@ -27,7 +27,7 @@ Each sample is a complete runnable game built on the engine — open the source 
 - **Async support** — async/await compatible throughout the game loop
 - **Hot reload** — all content files reload at runtime without restarting
 - **Extensive XML documentation** — every public API documented; IntelliSense covers everything
-- **AI assistant support** — ships with skill files in `/ai-reference/` for any AI coding tool
+- **AI assistant support** — ships with skill files in `/frb-skills/` for any AI coding tool
 
 ## Prerequisites
 
@@ -127,7 +127,7 @@ A window should open showing the text "Hello from FlatRedBall 2" centered on a b
 
 - Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code goes. `CustomInitialize` runs once when the screen starts (it's where the placeholder label is created — delete that block once you start building your own game); `CustomActivity` runs every frame.
 - For complete examples of real games, browse the [`samples/`](samples/) directory of **this repository** (not your project). Each sample is a runnable project demonstrating different engine features.
-- For task-specific guidance (entities, collision, animation, etc.), see [`ai-reference/`](ai-reference/) — Markdown guides written for AI assistants but readable by humans too.
+- For task-specific guidance (entities, collision, animation, etc.), see [`frb-skills/`](frb-skills/) — Markdown guides written for AI assistants but readable by humans too.
 
 ### Manual setup (reference)
 
@@ -213,7 +213,7 @@ See the `samples/` directory for complete working examples.
 
 ## Working with AI Assistants
 
-FlatRedBall2 ships with skill files in [`/ai-reference/`](ai-reference/) — plain Markdown guides covering common engine tasks (entities, collision, physics, animation, audio, and more). Copy them into your game repo so your AI coding assistant has engine context without you pasting anything manually.
+FlatRedBall2 ships with skill files in [`/frb-skills/`](frb-skills/) — plain Markdown guides covering common engine tasks (entities, collision, physics, animation, audio, and more). Copy them into your game repo so your AI coding assistant has engine context without you pasting anything manually.
 
 Add the skill files to your project. Run these from your project's root folder (e.g. `YourGameName/`):
 
@@ -222,21 +222,21 @@ dotnet new install FlatRedBall2.Templates   # skip if already installed
 dotnet new frb2-skills
 ```
 
-This creates an `ai-reference/` folder in the current directory. Most AI tools can be pointed at that folder or configured to load files from it automatically.
+This creates a `frb-skills/` folder in the current directory. Most AI tools can be pointed at that folder or configured to load files from it automatically.
 
 **Claude Code** — copy the skills into `.claude/skills/` so they are picked up automatically. Run from the same project root:
 
 ```
 # macOS / Linux
-mkdir -p .claude/skills && cp -r ai-reference/. .claude/skills/
+mkdir -p .claude/skills && cp -r frb-skills/. .claude/skills/
 
 # Windows (PowerShell or cmd)
-xcopy /E /I ai-reference .claude\skills
+xcopy /E /I frb-skills .claude\skills
 ```
 
-You can keep `ai-reference/` as the source of truth and gitignore `.claude/skills/`, or drop `ai-reference/` and commit `.claude/skills/` directly — either works.
+You can keep `frb-skills/` as the source of truth and gitignore `.claude/skills/`, or drop `frb-skills/` and commit `.claude/skills/` directly — either works.
 
-**Other AI tools** — paste the relevant file from `ai-reference/` into your context window before starting a task. Each file is self-contained.
+**Other AI tools** — paste the relevant file from `frb-skills/` into your context window before starting a task. Each file is self-contained.
 
 ## FlatRedBall vs FlatRedBall2
 

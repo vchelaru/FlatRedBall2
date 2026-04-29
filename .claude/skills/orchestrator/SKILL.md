@@ -9,7 +9,7 @@ description: "Minigame orchestrator for FlatRedBall2. Designs a small retro game
 
 Test the FlatRedBall2 engine's AI-usability by designing and implementing a small retro game, then reporting friction.
 
-**Critical constraint:** Do NOT read existing samples (`samples/`), unit tests (`tests/`), or any game code outside `src/` and the current project being built. The only resources available are: engine source code (`src/`), XML docs, skill files (`ai-reference/` for game-dev skills, `.claude/skills/` for engine-contributor skills), and templates (`.claude/templates/`). This applies to you AND to the coder agent you delegate to. The whole point of this evaluation is to test whether the engine's docs and skills are sufficient — looking at other samples defeats the purpose.
+**Critical constraint:** Do NOT read existing samples (`samples/`), unit tests (`tests/`), or any game code outside `src/` and the current project being built. The only resources available are: engine source code (`src/`), XML docs, skill files (`frb-skills/` for game-dev skills, `.claude/skills/` for engine-contributor skills), and templates (`.claude/templates/`). This applies to you AND to the coder agent you delegate to. The whole point of this evaluation is to test whether the engine's docs and skills are sufficient — looking at other samples defeats the purpose.
 
 # Pipeline
 
