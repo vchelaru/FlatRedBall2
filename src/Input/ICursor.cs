@@ -80,7 +80,7 @@ public interface ICursor
     /// <summary>
     /// Maximum gap between two press (or two release) transitions for them to register as a
     /// double-press / double-click. Default 250 ms, matching the historical FlatRedBall convention.
-    /// Measured against wall-clock time (<see cref="TimeManager.RealTimeSinceStart"/>), so game
+    /// Measured against wall-clock time (<see cref="TimeManager.UnscaledTimeSinceStart"/>), so game
     /// pause / time-scaling do not affect detection.
     /// </summary>
     System.TimeSpan DoubleClickThreshold { get; set; }

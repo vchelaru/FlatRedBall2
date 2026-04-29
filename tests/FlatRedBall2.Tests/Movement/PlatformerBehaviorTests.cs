@@ -11,7 +11,7 @@ namespace FlatRedBall2.Tests.Movement;
 public class PlatformerBehaviorTests
 {
     private static FrameTime MakeFrame(float deltaSeconds, float totalSeconds = 0f)
-        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.FromSeconds(totalSeconds));
+        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.FromSeconds(totalSeconds));
 
     [Fact]
     public void HorizontalInput_WithNoAcceleration_SetsVelocityDirectly()

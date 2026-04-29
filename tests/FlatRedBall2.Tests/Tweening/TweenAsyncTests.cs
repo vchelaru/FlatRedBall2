@@ -21,7 +21,7 @@ public class TweenAsyncTests
     }
 
     private static FrameTime Frame(float dt) =>
-        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
+        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
     public async Task TweenAsync_ColorOverload_TerminalValueObservedBeforeAwaitResumes()

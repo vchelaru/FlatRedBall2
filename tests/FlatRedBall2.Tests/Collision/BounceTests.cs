@@ -27,7 +27,7 @@ public class BounceTests
     }
 
     private static FrameTime MakeFrame(float deltaSeconds)
-        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
+        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
     public void Ball_WithGravityAndBounce_RemainsInsideArena()

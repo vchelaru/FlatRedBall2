@@ -39,7 +39,7 @@ public class ScreenTests
         screen.Cameras.Add(second);
         screen.Camera.VelocityX = 50f;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f), TimeSpan.FromSeconds(1f), TimeSpan.Zero, TimeSpan.Zero));
 
         screen.Camera.X.ShouldBe(50f, tolerance: 0.001f);
         second.X.ShouldBe(100f, tolerance: 0.001f);
@@ -134,7 +134,7 @@ public class ScreenTests
         screen.Register(entity);
         int expectedActivityCount = 1;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
         entity.ActivityCount.ShouldBe(expectedActivityCount);
     }
@@ -150,9 +150,88 @@ public class ScreenTests
         screen.PauseThisScreen();
         int expectedActivityCount = 0;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
         entity.ActivityCount.ShouldBe(expectedActivityCount);
+    }
+
+    [Fact]
+    public void Update_WhenPaused_EntityWithPauseModeAlways_StillRunsCustomActivityAndPhysics()
+    {
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen { Engine = engine };
+        var always = new ActivityTrackingEntity { PauseMode = PauseMode.Always, VelocityX = 100f };
+        var pausable = new ActivityTrackingEntity();
+        screen.Register(always);
+        screen.Register(pausable);
+        screen.PauseThisScreen();
+
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f), TimeSpan.FromSeconds(1f), TimeSpan.Zero, TimeSpan.Zero));
+
+        always.ActivityCount.ShouldBe(1);
+        always.X.ShouldBe(100f, tolerance: 0.001f);
+        pausable.ActivityCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Update_WhenPaused_CollisionDoesNotRunEvenForAlwaysEntities()
+    {
+        // Collision is gated by screen pause — even if both participants are PauseMode.Always,
+        // the collision pass is skipped and CollisionOccurred must not fire.
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen { Engine = engine };
+        var a = new Entity { PauseMode = PauseMode.Always };
+        a.Add(new AxisAlignedRectangle { Width = 16f, Height = 16f });
+        var b = new Entity { PauseMode = PauseMode.Always };
+        b.Add(new AxisAlignedRectangle { Width = 16f, Height = 16f });
+        screen.Register(a);
+        screen.Register(b);
+        // Overlapping AARects (both 16x16 at X=0) — would collide if collision ran.
+        bool collided = false;
+        screen.AddCollisionRelationship(a, new[] { b }).CollisionOccurred += (_, _) => collided = true;
+        screen.PauseThisScreen();
+
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+
+        collided.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Update_WhenPaused_PauseModeChangedMidPause_TakesEffectOnNextUpdate()
+    {
+        // PauseMode is read live each frame, not cached at pause-time.
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen { Engine = engine };
+        var entity = new ActivityTrackingEntity();
+        screen.Register(entity);
+        screen.PauseThisScreen();
+
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        entity.ActivityCount.ShouldBe(0);
+
+        entity.PauseMode = PauseMode.Always;
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+
+        entity.ActivityCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Update_NotPaused_AlwaysAndPausableEntitiesBothTickOnce()
+    {
+        // Symmetry check: in an unpaused screen, PauseMode.Always must not double-tick or skip.
+        var engine = new FlatRedBallService();
+        var screen = new TestScreen { Engine = engine };
+        var pausable = new ActivityTrackingEntity { VelocityX = 100f };
+        var always = new ActivityTrackingEntity { PauseMode = PauseMode.Always, VelocityX = 100f };
+        screen.Register(pausable);
+        screen.Register(always);
+
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f), TimeSpan.FromSeconds(1f), TimeSpan.Zero, TimeSpan.Zero));
+
+        pausable.ActivityCount.ShouldBe(1);
+        always.ActivityCount.ShouldBe(1);
+        pausable.X.ShouldBe(100f, tolerance: 0.001f);
+        always.X.ShouldBe(100f, tolerance: 0.001f);
     }
 
     [Fact]
@@ -164,7 +243,7 @@ public class ScreenTests
         screen.PauseThisScreen();
         int expectedActivityCount = 1;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
         screen.ActivityCount.ShouldBe(expectedActivityCount);
     }
@@ -178,11 +257,11 @@ public class ScreenTests
         var entity = new ActivityTrackingEntity();
         screen.Register(entity);
         screen.PauseThisScreen();
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
         screen.UnpauseThisScreen();
         int expectedActivityCount = 1;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
         entity.ActivityCount.ShouldBe(expectedActivityCount);
     }

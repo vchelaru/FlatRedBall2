@@ -4,14 +4,17 @@ namespace FlatRedBall2;
 
 /// <summary>
 /// Per-frame time bundle passed to <see cref="Entity.CustomActivity"/> and other update hooks.
-/// All values respect <see cref="TimeManager.TimeScale"/> — a scale of 0.5 halves <see cref="Delta"/>.
+/// <see cref="Delta"/> respects <see cref="TimeManager.TimeScale"/>; <see cref="UnscaledDelta"/>
+/// is the wall-clock delta and ignores <c>TimeScale</c>. Both keep advancing while the screen
+/// is paused — pause is enforced by <see cref="Screen"/>, not by zeroing the delta.
 /// <see cref="SinceScreenStart"/> is paused when the screen is paused; <see cref="SinceGameStart"/>
 /// keeps advancing.
 /// </summary>
-/// <param name="Delta">Time elapsed since the previous frame.</param>
+/// <param name="Delta">Time elapsed since the previous frame, multiplied by <see cref="TimeManager.TimeScale"/>.</param>
+/// <param name="UnscaledDelta">Wall-clock time elapsed since the previous frame. Not multiplied by <see cref="TimeManager.TimeScale"/>.</param>
 /// <param name="SinceScreenStart">Time accumulated since the current screen activated; pauses with the screen.</param>
 /// <param name="SinceGameStart">Time accumulated since <see cref="FlatRedBallService.Initialize"/>.</param>
-public readonly record struct FrameTime(TimeSpan Delta, TimeSpan SinceScreenStart, TimeSpan SinceGameStart)
+public readonly record struct FrameTime(TimeSpan Delta, TimeSpan UnscaledDelta, TimeSpan SinceScreenStart, TimeSpan SinceGameStart)
 {
     /// <summary>
     /// <see cref="Delta"/> as a <see cref="float"/> in seconds — the standard <c>dt</c> for physics
@@ -26,4 +29,11 @@ public readonly record struct FrameTime(TimeSpan Delta, TimeSpan SinceScreenStar
     /// </para>
     /// </summary>
     public float DeltaSeconds => (float)Delta.TotalSeconds;
+
+    /// <summary>
+    /// <see cref="UnscaledDelta"/> as a <see cref="float"/> in seconds. Use for per-frame math that
+    /// must not respond to <see cref="TimeManager.TimeScale"/> (UI tween animation, cursor movement,
+    /// debug overlays).
+    /// </summary>
+    public float UnscaledDeltaSeconds => (float)UnscaledDelta.TotalSeconds;
 }

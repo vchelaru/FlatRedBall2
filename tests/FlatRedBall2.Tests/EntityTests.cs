@@ -26,6 +26,14 @@ public class EntityTests
     }
 
     [Fact]
+    public void PauseMode_NewEntity_DefaultsToPausable()
+    {
+        var entity = new Entity();
+
+        entity.PauseMode.ShouldBe(PauseMode.Pausable);
+    }
+
+    [Fact]
     public void AbsoluteRotation_IncludesParentRotation()
     {
         var parentRotation = Angle.FromDegrees(45f);

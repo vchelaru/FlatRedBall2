@@ -142,6 +142,48 @@ public class TimeManagerTests
         time.CurrentScreenTime.TotalSeconds.ShouldBe(0.0, tolerance: 0.0001);
     }
 
+    [Fact]
+    public void UnscaledTimeSinceStart_AdvancesEvenWhenTimeScaleIsZero()
+    {
+        var time = new TimeManager();
+        time.TimeScale = 0f;
+
+        Tick(time, 0.5);
+
+        time.UnscaledTimeSinceStart.TotalSeconds.ShouldBe(0.5, tolerance: 0.0001);
+    }
+
+    [Fact]
+    public void CurrentFrameTime_ScreenIsPaused_DeltaAndUnscaledDeltaStillAdvance()
+    {
+        // Pausing a screen suppresses entity activity, but the time bundle itself keeps
+        // advancing — both Delta and UnscaledDelta should reflect the wall-clock tick.
+        var time = new TimeManager();
+        time.TimeScale = 1f;
+
+        time.Update(MakeGameTime(0.5), screenIsPaused: true);
+
+        var ft = time.CurrentFrameTime;
+        ft.UnscaledDelta.TotalSeconds.ShouldBe(0.5, tolerance: 0.0001);
+        ft.Delta.TotalSeconds.ShouldBe(0.5, tolerance: 0.0001);
+        // Sanity: screenIsPaused flag actually took effect — CurrentScreenTime is frozen.
+        time.CurrentScreenTime.TotalSeconds.ShouldBe(0.0, tolerance: 0.0001);
+    }
+
+    [Fact]
+    public void CurrentFrameTime_TimeScaleTwo_UnscaledDeltaMatchesWallClock()
+    {
+        var time = new TimeManager();
+        time.TimeScale = 2f;
+
+        Tick(time, 0.25);
+
+        var ft = time.CurrentFrameTime;
+        ft.UnscaledDelta.TotalSeconds.ShouldBe(0.25, tolerance: 0.0001);
+        ft.Delta.TotalSeconds.ShouldBe(0.5, tolerance: 0.0001);
+        ft.UnscaledDeltaSeconds.ShouldBe(0.25f, tolerance: 0.0001f);
+    }
+
     // -------------------------------------------------------------------------
     // ResetScreen
     // -------------------------------------------------------------------------

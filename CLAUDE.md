@@ -6,6 +6,17 @@
 
 FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top of MonoGame. It integrates Gum (UI) and Tiled (level editing) as dependencies.
 
+## Prerelease Status — Breaking Changes Are Free
+
+**FlatRedBall2 is in active prerelease development. There are no shipping consumers, no public API surface to preserve, and no backwards-compatibility obligations.** Anything in the engine — type names, method signatures, namespaces, defaults, semantics — can be changed at any time if a better design exists.
+
+When proposing or evaluating a change:
+- **Do not** raise "this will break existing code" as a concern. It is not a concern. Existing call sites in samples and tests are part of this codebase and will be updated alongside the change.
+- **Do not** add deprecation shims, `[Obsolete]` attributes, alias members, or "kept for compatibility" wrappers. Just change the thing.
+- **Do** propose the cleanest API; if a rename or restructuring makes the engine clearer, it is on the table.
+
+The only relevant question is "is this the right design?" — never "will this break someone?"
+
 ## Key Files
 
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL 3.8.*)

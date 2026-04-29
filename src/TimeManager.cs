@@ -29,7 +29,7 @@ public class TimeManager
 {
     private TimeSpan _sinceGameStart;
     private TimeSpan _sinceScreenStart;
-    private TimeSpan _realSinceGameStart;
+    private TimeSpan _unscaledSinceGameStart;
 
     /// <summary>Scaling factor applied to real elapsed time. Values &lt; 1 slow the game; &gt; 1 speed it up.</summary>
     public float TimeScale { get; set; } = 1f;
@@ -47,10 +47,11 @@ public class TimeManager
     /// <summary>
     /// Elapsed wall-clock time since <see cref="FlatRedBallService.Initialize"/> was called.
     /// Unaffected by <see cref="TimeScale"/> and unaffected by screen pause — strictly monotonic.
-    /// Use this for input gestures (double-click thresholds, hold timers) and any other timing that
-    /// should not freeze when the game pauses or slow down when the game runs in slow motion.
+    /// "Unscaled" specifically means "not multiplied by <see cref="TimeScale"/>." Use this for input
+    /// gestures (double-click thresholds, hold timers) and any other timing that should not freeze
+    /// when the game pauses or slow down when the game runs in slow motion.
     /// </summary>
-    public TimeSpan RealTimeSinceStart => _realSinceGameStart;
+    public TimeSpan UnscaledTimeSinceStart => _unscaledSinceGameStart;
 
     /// <summary>Total number of frames that have elapsed since <see cref="FlatRedBallService.Initialize"/> was called.</summary>
     public long CurrentFrame { get; private set; }
@@ -167,14 +168,14 @@ public class TimeManager
 
     internal void Update(GameTime gameTime, bool screenIsPaused)
     {
-        var realDelta = gameTime.ElapsedGameTime;
-        var scaledDelta = TimeSpan.FromSeconds(realDelta.TotalSeconds * TimeScale);
-        _realSinceGameStart += realDelta;
+        var unscaledDelta = gameTime.ElapsedGameTime;
+        var scaledDelta = TimeSpan.FromSeconds(unscaledDelta.TotalSeconds * TimeScale);
+        _unscaledSinceGameStart += unscaledDelta;
         _sinceGameStart += scaledDelta;
         if (!screenIsPaused)
             _sinceScreenStart += scaledDelta;
         CurrentFrame++;
-        CurrentFrameTime = new FrameTime(scaledDelta, _sinceScreenStart, _sinceGameStart);
+        CurrentFrameTime = new FrameTime(scaledDelta, unscaledDelta, _sinceScreenStart, _sinceGameStart);
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ public class FrameProfileTests
         var screen = new TestScreen();
         screen.Engine = engine;
 
-        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
+        screen.Update(new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero));
 
         var profile = engine.LastFrame;
         profile.PhysicsMs.ShouldBeGreaterThanOrEqualTo(0);

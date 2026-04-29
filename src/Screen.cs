@@ -176,9 +176,16 @@ public class Screen
 
     /// <summary>
     /// Registers a manually-created entity with this screen for physics, activity, and lifecycle management.
-    /// <para><b>Only call this for entities you instantiated with <c>new</c>.</b> Entities created via
-    /// <c>Factory&lt;T&gt;.Create()</c> are registered automatically — calling <c>Register</c> on them
-    /// would add them to the update loop twice.</para>
+    /// <para><b>Pick the spawn path that matches your intent:</b></para>
+    /// <para>• <b>Spawning a normal game entity?</b> Use <c>Factory&lt;T&gt;.Create()</c>, not this method.
+    /// Factory injects <see cref="Entity.Engine"/>, registers with the screen, and calls
+    /// <see cref="Entity.CustomInitialize"/> for you. Calling <c>Register</c> on a Factory-created entity
+    /// double-registers it and breaks the update loop.</para>
+    /// <para>• <b>Constructing an entity by hand</b> (test scaffolding, hot-reload restoration, or any case
+    /// where you need to set fields between <c>new</c> and registration)? Use <c>Register</c>. It does not
+    /// call <see cref="Entity.CustomInitialize"/> — by design, so your manual setup is not clobbered. If
+    /// your entity overrides <c>CustomInitialize</c> and you want it to run, invoke
+    /// <c>entity.CustomInitialize()</c> yourself after <c>Register</c>.</para>
     /// <para><b>Add renderable children before calling <c>Register</c></b> if you want them on this
     /// screen's render list. <c>Register</c> walks the entity's existing children and adds any
     /// <c>IRenderable</c>s to this screen. After registration, <c>entity.Add(...)</c> routes new
@@ -806,7 +813,25 @@ public class Screen
             engine._frameProfile.TweenMs = 0;
         }
 
-        if (!IsPaused)
+        if (IsPaused)
+        {
+            // While paused: only entities with PauseMode.Always tick physics + CustomActivity.
+            // Collision, lazy-spawn, partition sort, tweens, sprite animation, and fire-and-forget
+            // lifetimes all stay frozen — those are deeper changes deferred for now.
+            long tPaused = System.Diagnostics.Stopwatch.GetTimestamp();
+            for (int i = _entities.Count - 1; i >= 0; i--)
+            {
+                if (i >= _entities.Count) continue;
+                var entity = _entities[i];
+                if (entity.PauseMode != PauseMode.Always) continue;
+                entity.PhysicsUpdate(frameTime);
+                if (i >= _entities.Count) continue;
+                _entities[i].CustomActivity(frameTime);
+            }
+            if (engine != null)
+                engine._frameProfile.ActivityMs = ProfilingClock.Ms(tPaused, System.Diagnostics.Stopwatch.GetTimestamp());
+        }
+        else
         {
             // 1. Physics pass
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
