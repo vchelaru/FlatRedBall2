@@ -119,11 +119,4 @@ public class GameScreen : Screen
                 MoveToScreen<GameScreen>(s => s.LevelIndex = nextLevel);
             };
     }
-
-    public override void CustomActivity(FrameTime time)
-    {
-        Overlay.Text(_enemyFactory.Count.ToString());
-        base.CustomActivity(time);
-    }
-
 }
