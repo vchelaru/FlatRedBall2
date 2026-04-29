@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
@@ -360,7 +361,7 @@ public class TileMap
     /// exist yet. Iterate <see cref="Factory{T}.Instances"/> on the factory to find live
     /// instances at any later moment.
     /// </returns>
-    public IReadOnlyList<T> CreateEntities<T>(
+    public IReadOnlyList<T> CreateEntities<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(
         string className,
         Factory<T> factory,
         Origin origin = Origin.Center,
@@ -584,7 +585,7 @@ public class TileMap
         };
     }
 
-    private static Dictionary<string, PropertyInfo> BuildPropertyMap<T>()
+    private static Dictionary<string, PropertyInfo> BuildPropertyMap<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>()
     {
         var map = new Dictionary<string, PropertyInfo>(StringComparer.OrdinalIgnoreCase);
         foreach (var prop in typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance))

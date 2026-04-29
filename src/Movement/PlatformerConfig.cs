@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -34,17 +35,17 @@ public class PlatformerConfig
     /// config (no movement slots) if the JSON deserializes to null.</summary>
     public static PlatformerConfig FromJsonString(string json)
     {
-        var config = JsonSerializer.Deserialize<PlatformerConfig>(json, SerializerOptions);
+        var config = JsonSerializer.Deserialize(json, PlatformerConfigJsonContext.Default.PlatformerConfig);
         return config ?? new PlatformerConfig();
     }
-
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
 }
+
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    ReadCommentHandling = JsonCommentHandling.Skip,
+    AllowTrailingCommas = true)]
+[JsonSerializable(typeof(PlatformerConfig))]
+internal partial class PlatformerConfigJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Bag of movement slots authored in JSON. Each slot is optional; omitted slots leave the
