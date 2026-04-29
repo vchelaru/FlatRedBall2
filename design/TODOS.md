@@ -19,8 +19,5 @@ Open work only. When an item ships, delete it — don't leave a "landed" breadcr
 Open questions:
 - **Content sourcing.** Large portions of the skill files are high-quality prose that could seed the docs (e.g. "entities and factories," "collision relationships," "content-boundary"). Tension: skills are AI-optimized (terse, bullet-heavy), docs are human-optimized (more narrative, more examples). Do we fork the content, cross-reference, or generate one from the other?
 
-## Rename `ai-reference/` to `frb-skills/`
-**Priority: Soon** — The directory name `ai-reference` collides with the collision system terminology in conversation (AI = artificial intelligence vs. the directory). Rename to `frb-skills/` for clarity. Update CLAUDE.md, symlinks under `.claude/skills/`, and any references in skill files.
-
 ## Linux/macOS setup documentation
 **Priority: Soon** — The project currently has no guidance for building or running on Linux/macOS. Document the prerequisites: installing Wine (needed for MonoGame content pipeline tooling), and link to the relevant MonoGame setup instructions for non-Windows platforms.

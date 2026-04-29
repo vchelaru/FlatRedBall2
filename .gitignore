@@ -17,7 +17,7 @@
 /samples/auto
 /samples/SlopesSample
 
-# Local symlinks — canonical 3rd-party skills live in /ai-reference/.
+# Local symlinks — canonical 3rd-party skills live in /frb-skills/.
 # Symlinks under .claude/skills/ exist so Claude Code's skill discovery
 # finds them locally during engine development. Not portable across clones.
 /.claude/skills/animation
