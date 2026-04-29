@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using FlatRedBall2.Collision;
 using Shouldly;
 using Xunit;
@@ -227,5 +228,41 @@ public class SweepAndPruneTests
         rel.RunCollisions();
 
         rel.DeepCollisionCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void RunSameListCollisionsSweep_AlternatesSweepDirection_PairOrderReversesOnSecondFrame()
+    {
+        // Three overlapping balls in a line. On the first frame the sweep processes pairs
+        // in ascending index order (0,1), (0,2), (1,2). On the second frame the sweep
+        // direction reverses, so the first pair processed involves the highest-index entity.
+        var (factory, _) = CreateFactory();
+        factory.PartitionAxis = Axis.X;
+        var a = factory.Create(); a.X = 0f; a.Name = "a";
+        var b = factory.Create(); b.X = 10f; b.Name = "b";
+        var c = factory.Create(); c.X = 20f; c.Name = "c";
+        ((IFactory)factory).SortForPartition();
+
+        var rel = new CollisionRelationship<BallEntity, BallEntity>(factory, factory);
+
+        var activePairs = new List<(string, string)>();
+        rel.CollisionOccurred += (x, y) => activePairs.Add((x.Name!, y.Name!));
+
+        rel.RunCollisions();
+        var frame1Pairs = activePairs.ToList();
+        activePairs.Clear();
+
+        rel.RunCollisions();
+        var frame2Pairs = activePairs.ToList();
+
+        // Both frames should find the same 3 unique pairs (same collisions detected).
+        frame1Pairs.Count.ShouldBe(3);
+        frame2Pairs.Count.ShouldBe(3);
+
+        // The first pair processed should differ — frame 1 starts from the low end,
+        // frame 2 starts from the high end.
+        var firstPairFrame1 = frame1Pairs.First();
+        var firstPairFrame2 = frame2Pairs.First();
+        firstPairFrame1.ShouldNotBe(firstPairFrame2);
     }
 }

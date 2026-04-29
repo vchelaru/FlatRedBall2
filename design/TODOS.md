@@ -32,17 +32,7 @@ This is the proper fix for the "balls visibly overlap in dense piles" symptom. S
 ## CollisionRelationship per-pair inner-loop optimization
 **Priority: Soon** — `AutoEvalBallPartitionSample` profiling shows ~150ns/check in Release for circle-vs-circle ball pairs. The broad-phase prunes correctly (50k checks against a 1.9M naive baseline); the cost is per-check overhead. Concrete optimization candidates:
 
-- **Skip `RecordContact` when no `CollisionStarted` / `CollisionEnded` subscribers.** Currently runs a `HashSet<(A,B)>` insert on every overlapping pair regardless of whether anyone listens. Tuple boxing + hashing is a meaningful chunk of the per-check cost. Gate behind a "has subscriber" boolean.
 - **Inline the common Circle-vs-Circle case** in `CollisionDispatcher.GetSeparationVector`. The type-pair `switch` does runtime `is` checks on every call; for the dominant case (entity with one circle child vs. another), a fast path that skips the leaf-shape walk and the dispatch table is worthwhile.
 - **Cache `Entity.BroadPhaseRadius`.** Currently recomputed on every read (loops over `_shapes`, calls `MathF.Sqrt`). Read once per pair in `RunSameListCollisionsSweep` and `RunPair`, twice if we count `aRight` / `bLeft`. Cache on Entity, invalidate when shapes are added/removed or the offset changes.
 
 Validate before/after with the `FrameProfile.CollisionMs` reading in the sample at a fixed ball count (say, 500). Ship one optimization at a time so each can be measured.
-
-## Sweep-and-prune iteration bias
-**Priority: Eventual** — `RunSameListCollisionsSweep` always iterates pairs `(i, j)` with `i < j`. When a pair bounces, A=list[i] (lower X) is pushed left and B=list[j] (higher X) is pushed right. The leftmost ball in any cluster only ever gets pushed *left* by its pairings; the rightmost only *right*. Over many frames this slowly biases the pile shape — visually subtle, statistically real.
-
-Cheap fix: alternate sweep direction every other frame (`i = N-1` down to `0`, `j = i-1` down to `0`). Keeps unique-pair coverage; no API change. Costs one bool field on `CollisionRelationship` and a sign flip on the loop bounds.
-
-Only meaningful in scenes with hundreds of densely-packed dynamic bodies — bullet swarms, particle piles, the ball-partition stress test. Most game scenes won't notice.
-
-
