@@ -1,5 +1,5 @@
 using System.IO;
-using System.Xml.Serialization;
+using System.Text;
 using FlatRedBall2.Animation.Content;
 using Shouldly;
 using Xunit;
@@ -8,26 +8,23 @@ namespace FlatRedBall2.Tests.Animation;
 
 public class AnimationChainListSaveTests
 {
-    // Minimal helper: round-trip serialize then deserialize to simulate FromFile without disk I/O
-    private static AnimationChainListSave RoundTrip(AnimationChainListSave save)
-    {
-        var serializer = new XmlSerializer(typeof(AnimationChainListSave));
-        using var ms = new MemoryStream();
-        serializer.Serialize(ms, save);
-        ms.Position = 0;
-        return (AnimationChainListSave)serializer.Deserialize(ms)!;
-    }
+    private static AnimationChainListSave Parse(string xml)
+        => AnimationChainListSave.FromFile("test.achx",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
     [Fact]
-    public void RoundTrip_SingleChainWithTwoFrames_PreservesNamesAndFrameCount()
+    public void FromFile_SingleChainWithTwoFrames_PreservesNamesAndFrameCount()
     {
-        var save = new AnimationChainListSave();
-        var chain = new AnimationChainSave { Name = "Walk" };
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "walk1.png", FrameLength = 0.1f });
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "walk2.png", FrameLength = 0.1f });
-        save.AnimationChains.Add(chain);
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <AnimationChain><Name>Walk</Name>" +
+            "    <Frame><TextureName>walk1.png</TextureName><FrameLength>0.1</FrameLength></Frame>" +
+            "    <Frame><TextureName>walk2.png</TextureName><FrameLength>0.1</FrameLength></Frame>" +
+            "  </AnimationChain>" +
+            "</AnimationChainArraySave>";
 
-        var result = RoundTrip(save);
+        var result = Parse(xml);
 
         result.AnimationChains.Count.ShouldBe(1);
         result.AnimationChains[0].Name.ShouldBe("Walk");
@@ -37,37 +34,31 @@ public class AnimationChainListSaveTests
     }
 
     [Fact]
-    public void RoundTrip_FlipHorizontalFalse_NotSerializedThenDeserializesToFalse()
+    public void FromFile_FlipHorizontalOmitted_DefaultsToFalse()
     {
-        // FlipHorizontal=false should be omitted from XML (ShouldSerialize returns false).
-        // After round-trip the default value (false) is still correct.
-        var save = new AnimationChainListSave();
-        var chain = new AnimationChainSave { Name = "Idle" };
-        chain.Frames.Add(new AnimationFrameSave { TextureName = "idle.png", FlipHorizontal = false });
-        save.AnimationChains.Add(chain);
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <AnimationChain><Name>Idle</Name>" +
+            "    <Frame><TextureName>idle.png</TextureName><FrameLength>0.1</FrameLength></Frame>" +
+            "  </AnimationChain>" +
+            "</AnimationChainArraySave>";
 
-        var serializer = new XmlSerializer(typeof(AnimationChainListSave));
-        using var ms = new MemoryStream();
-        serializer.Serialize(ms, save);
-        string xml = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        var result = Parse(xml);
 
-        // The element must not appear in the XML when false
-        xml.ShouldNotContain("FlipHorizontal");
-
-        ms.Position = 0;
-        var result = (AnimationChainListSave)serializer.Deserialize(ms)!;
         result.AnimationChains[0].Frames[0].FlipHorizontal.ShouldBeFalse();
     }
 
     [Fact]
-    public void RoundTrip_TimeMeasurementUnitMillisecond_RoundTripsCorrectly()
+    public void FromFile_TimeMeasurementUnitMillisecond_ParsedCorrectly()
     {
-        var save = new AnimationChainListSave
-        {
-            TimeMeasurementUnit = TimeMeasurementUnit.Millisecond
-        };
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <TimeMeasurementUnit>Millisecond</TimeMeasurementUnit>" +
+            "</AnimationChainArraySave>";
 
-        var result = RoundTrip(save);
+        var result = Parse(xml);
 
         result.TimeMeasurementUnit.ShouldBe(TimeMeasurementUnit.Millisecond);
     }

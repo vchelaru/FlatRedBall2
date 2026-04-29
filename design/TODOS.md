@@ -5,16 +5,9 @@
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
 ## Native AOT
-**Priority: Eventual** — `<IsAotCompatible>true</IsAotCompatible>` is on `FlatRedBall2.csproj`; AOT analyzers run at build time. Two warning sites remain (12 warnings across 2 TFMs).
+**Priority: Eventual** — `<IsAotCompatible>true</IsAotCompatible>` is on `FlatRedBall2.csproj`; AOT analyzers run at build time. Zero warnings remain — the engine library is analyzer-clean.
 
-### XmlSerializer in animation loading (IL2026 + IL3050)
-`AnimationChainListSave.FromFile()` and `AdobeAnimateAtlasImporter.FromFile()` use `XmlSerializer` to load `.achx` and Adobe Animate atlas XML files. `XmlSerializer` relies on runtime codegen — fundamentally AOT-incompatible.
-
-Options:
-- **A) Manual XML parsing** — `XDocument` with hand-written mapping. AOT-safe, keeps XML format, more code to maintain.
-- **B) .NET 9+ XML source gen** — `XmlSerializer` gained source-gen support in .NET 9. Works on net10.0 but not net8.0 (KNI). May need `#if` or dropping net8.0 XML animation support.
-
-**Full validation (phase 2):** `<PublishAot>true</PublishAot>` on a sample executable, `dotnet publish -c Release -r win-x64`, then exercise tilemap load and animation loading at runtime.
+**Next step (phase 2):** `<PublishAot>true</PublishAot>` on a sample executable, `dotnet publish -c Release -r win-x64`, then exercise tilemap load and animation loading at runtime to confirm no reflection paths break.
 
 ## Documentation Site
 **Priority: Soon** — Stand up a public docs site for FlatRedBall2. Today all guidance lives in skill files (AI-facing, in-repo) and inline XML docs; a human-facing site is the missing third leg.
