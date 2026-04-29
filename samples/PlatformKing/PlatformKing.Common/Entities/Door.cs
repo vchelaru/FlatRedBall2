@@ -8,11 +8,11 @@ namespace PlatformKing.Entities;
 // transitions to the next level.
 public class Door : Entity
 {
-    public AxisAlignedRectangle Body { get; private set; } = null!;
+    public AARect Body { get; private set; } = null!;
 
     public override void CustomInitialize()
     {
-        Body = new AxisAlignedRectangle
+        Body = new AARect
         {
             Width = 16f,
             Height = 16f,

@@ -17,7 +17,7 @@ Create and maintain skills for FlatRedBall2. The philosophy below overrides gene
 
 1. **Lead with roadsigns.** The top of the skill should answer "for task X, go to class/method Y." Agents come here to be routed.
 2. **Document gotchas.** Non-obvious behavior, order-of-operations requirements, silent failures, things that contradict intuition. This is the highest-value content.
-3. **Name non-obvious members the agent wouldn't guess exist.** One-liner: "`TileShapeCollection` has `Raycast` for line-of-sight checks." Saves a file read.
+3. **Name non-obvious members the agent wouldn't guess exist.** One-liner: "`TileShapes` has `Raycast` for line-of-sight checks." Saves a file read.
 4. **Cross-reference when a workflow spans skills.** "For attack hitboxes, combine this with `isDefaultCollision: false` from `entities-and-factories`."
 5. **Prefer prose over code.** A sentence that names the types and the sequence is usually enough.
 6. **Treat "names mislead, here's the incantation" as API feedback, not skill content.** FRB2 is not public — the engine is expected to churn. File the API fix; do not paper over a misleading name with a code sample.

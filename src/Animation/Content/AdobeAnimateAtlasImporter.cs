@@ -40,9 +40,9 @@ public class AdobeAnimateAtlasSave
 
     /// <summary>
     /// Deserializes an Adobe Animate TextureAtlas XML file. Production code should prefer
-    /// <c>ContentManagerService.LoadAdobeAnimateAtlas(path, frameRate)</c>, which routes the read
+    /// <c>ContentLoader.LoadAdobeAnimateAtlas(path, frameRate)</c>, which routes the read
     /// through the service's stream seam. This overload exists for tooling and tests that work
-    /// without a <see cref="FlatRedBall2.ContentManagerService"/>.
+    /// without a <see cref="FlatRedBall2.ContentLoader"/>.
     /// </summary>
     /// <param name="filePath">Path to the atlas XML, relative to the title container.</param>
     /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
@@ -67,7 +67,7 @@ public class AdobeAnimateAtlasSave
     /// </summary>
     /// <param name="contentManager">Content manager used to load the atlas texture.</param>
     /// <param name="frameRate">Frames per second applied to every frame. Defaults to 30.</param>
-    public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentManagerService contentManager, float frameRate = 30f)
+    public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentLoader contentManager, float frameRate = 30f)
     {
         string atlasDir = string.IsNullOrEmpty(FileName) ? "" : Path.GetDirectoryName(FileName) ?? "";
         string texPath = !string.IsNullOrEmpty(atlasDir)

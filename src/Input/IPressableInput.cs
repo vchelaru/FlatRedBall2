@@ -5,7 +5,7 @@ namespace FlatRedBall2.Input;
 /// <summary>
 /// Boolean "button-like" input abstraction. Concrete implementations include
 /// <see cref="KeyboardPressableInput"/>, <see cref="GamepadPressableInput"/>, and the composite
-/// <see cref="OrPressableInput"/>. Use this anywhere you want to accept "any button" rather than
+/// <see cref="AnyPressableInput"/>. Use this anywhere you want to accept "any button" rather than
 /// hard-coding a specific key or gamepad button.
 /// </summary>
 public interface IPressableInput
@@ -39,7 +39,7 @@ public interface IPressableInput
 /// each property is true if <em>any</em> of the contained inputs reports it as true.
 /// Typically created via <see cref="IPressableInputExtensions.Or"/>.
 /// </summary>
-public class OrPressableInput : IPressableInput
+public class AnyPressableInput : IPressableInput
 {
     /// <summary>
     /// The list of inputs being combined. Add inputs directly or use the fluent
@@ -48,7 +48,7 @@ public class OrPressableInput : IPressableInput
     public List<IPressableInput> Inputs { get; } = new();
 
     /// <summary>Creates a composite seeded with two inputs. Additional inputs can be appended via <see cref="IPressableInputExtensions.Or"/> or directly to <see cref="Inputs"/>.</summary>
-    public OrPressableInput(IPressableInput input1, IPressableInput input2)
+    public AnyPressableInput(IPressableInput input1, IPressableInput input2)
     {
         Inputs.Add(input1);
         Inputs.Add(input2);
@@ -96,23 +96,23 @@ public class OrPressableInput : IPressableInput
 public static class IPressableInputExtensions
 {
     /// <summary>
-    /// Returns an <see cref="OrPressableInput"/> that combines this input with
+    /// Returns an <see cref="AnyPressableInput"/> that combines this input with
     /// <paramref name="other"/> using OR semantics. Calling Or on an existing
-    /// <see cref="OrPressableInput"/> adds to it in place rather than wrapping it.
+    /// <see cref="AnyPressableInput"/> adds to it in place rather than wrapping it.
     /// </summary>
     /// <remarks>
-    /// If <paramref name="thisInput"/> is already an <see cref="OrPressableInput"/>, it is
+    /// If <paramref name="thisInput"/> is already an <see cref="AnyPressableInput"/>, it is
     /// mutated and returned — not wrapped. This enables fluent chaining
     /// (<c>a.Or(b).Or(c)</c>) without extra allocations, but means stored intermediate
     /// results will also reflect the added input.
     /// </remarks>
-    public static OrPressableInput Or(this IPressableInput thisInput, IPressableInput other)
+    public static AnyPressableInput Or(this IPressableInput thisInput, IPressableInput other)
     {
-        if (thisInput is OrPressableInput orInput)
+        if (thisInput is AnyPressableInput orInput)
         {
             orInput.Inputs.Add(other);
             return orInput;
         }
-        return new OrPressableInput(thisInput, other);
+        return new AnyPressableInput(thisInput, other);
     }
 }

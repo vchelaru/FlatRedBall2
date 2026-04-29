@@ -14,11 +14,11 @@ public class FactoryTests
     // the body's absolute position, which depends on entity X/Y being set.
     private class GridBrick : Entity
     {
-        public AxisAlignedRectangle Body { get; private set; } = null!;
+        public AARect Body { get; private set; } = null!;
         public float CellSize { get; set; } = 16f;
         public override void CustomInitialize()
         {
-            Body = new AxisAlignedRectangle { Width = CellSize, Height = CellSize };
+            Body = new AARect { Width = CellSize, Height = CellSize };
             Add(Body);
         }
     }
@@ -114,7 +114,7 @@ public class FactoryTests
     }
 
     [Fact]
-    public void IsSolidGrid_DefaultFalse_LeavesRepositionDirectionsAll()
+    public void IsSolidGrid_DefaultFalse_LeavesSolidSidesAll()
     {
         var screen = new TestScreen();
         screen.Engine = new FlatRedBallService();
@@ -125,8 +125,8 @@ public class FactoryTests
         var b = factory.Create();
         b.X = 16; b.Y = 0;
 
-        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
-        b.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+        a.Body.SolidSides.ShouldBe(SolidSides.All);
+        b.Body.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -145,8 +145,8 @@ public class FactoryTests
         }
 
         // Left brick: right face suppressed (neighbor to the right), others active.
-        left.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Right);
-        right.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Left);
+        left.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Right);
+        right.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Left);
     }
 
     [Fact]
@@ -167,10 +167,10 @@ public class FactoryTests
             right = factory.Create(); right.X = 40; right.Y = 8;
         }
 
-        left.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Right);
-        mid.Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Left & ~RepositionDirections.Right);
-        right.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Left);
+        left.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Right);
+        mid.Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Left & ~SolidSides.Right);
+        right.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Left);
     }
 
     [Fact]
@@ -212,17 +212,17 @@ public class FactoryTests
         bricks[1, 1].Destroy();
 
         // (0,1) left-middle: lost Right (center gone), still has neighbors below (0,0) and above (0,2).
-        bricks[0, 1].Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Down & ~RepositionDirections.Up);
+        bricks[0, 1].Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Down & ~SolidSides.Up);
         // (2,1) right-middle: symmetric.
-        bricks[2, 1].Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Down & ~RepositionDirections.Up);
+        bricks[2, 1].Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Down & ~SolidSides.Up);
         // (1,0) bottom-middle: lost Up (center gone), still has neighbors left (0,0) and right (2,0).
-        bricks[1, 0].Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Left & ~RepositionDirections.Right);
+        bricks[1, 0].Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Left & ~SolidSides.Right);
         // (1,2) top-middle: symmetric.
-        bricks[1, 2].Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Left & ~RepositionDirections.Right);
+        bricks[1, 2].Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Left & ~SolidSides.Right);
     }
 
     [Fact]
@@ -249,8 +249,8 @@ public class FactoryTests
             c = factory.Create(); c.X = 16; c.Y = 0;
         }
 
-        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Right);
-        c.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Left);
+        a.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Right);
+        c.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Left);
     }
 
     [Fact]
@@ -274,9 +274,9 @@ public class FactoryTests
         z.Destroy();
 
         // Survivors X, Y, V at cols 0, 2, 4 — none adjacent. All faces restored.
-        x.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
-        y.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
-        v.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+        x.Body.SolidSides.ShouldBe(SolidSides.All);
+        y.Body.SolidSides.ShouldBe(SolidSides.All);
+        v.Body.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -297,8 +297,8 @@ public class FactoryTests
         b.Destroy();
 
         // A was missing its Right face (neighbor b) — should now be All again.
-        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
-        c.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+        a.Body.SolidSides.ShouldBe(SolidSides.All);
+        c.Body.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -325,8 +325,8 @@ public class FactoryTests
 
         c.ShouldBeSameAs(b);
         // a at col 0, c at col 2 — no adjacency, all faces restored.
-        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
-        c.Body.RepositionDirections.ShouldBe(RepositionDirections.All);
+        a.Body.SolidSides.ShouldBe(SolidSides.All);
+        c.Body.SolidSides.ShouldBe(SolidSides.All);
     }
 
     [Fact]
@@ -344,10 +344,10 @@ public class FactoryTests
             c = factory.Create(); c.X = 32; c.Y = 0;
         }
 
-        a.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Right);
-        b.Body.RepositionDirections.ShouldBe(
-            RepositionDirections.All & ~RepositionDirections.Left & ~RepositionDirections.Right);
-        c.Body.RepositionDirections.ShouldBe(RepositionDirections.All & ~RepositionDirections.Left);
+        a.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Right);
+        b.Body.SolidSides.ShouldBe(
+            SolidSides.All & ~SolidSides.Left & ~SolidSides.Right);
+        c.Body.SolidSides.ShouldBe(SolidSides.All & ~SolidSides.Left);
     }
 
     private class InitTrackingEntity : Entity
@@ -358,7 +358,7 @@ public class FactoryTests
 
     private class PoolableBullet : Entity
     {
-        public AxisAlignedRectangle Body { get; private set; } = null!;
+        public AARect Body { get; private set; } = null!;
         public int InitCount;
         public int ResetCount;
         public int CustomDestroyCount;
@@ -366,7 +366,7 @@ public class FactoryTests
         public override void CustomInitialize()
         {
             InitCount++;
-            Body = new AxisAlignedRectangle { Width = 4, Height = 2 };
+            Body = new AARect { Width = 4, Height = 2 };
             Add(Body);
         }
         protected override void Reset()

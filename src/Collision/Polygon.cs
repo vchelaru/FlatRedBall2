@@ -38,15 +38,15 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 
     /// <summary>
     /// Cardinal directions in which separation pushes are allowed during SAT collision.
-    /// Set by <see cref="TileShapeCollection"/> based on neighbor occupancy: a polygon
-    /// tile with a neighbor on its right has <see cref="RepositionDirections.Right"/>
+    /// Set by <see cref="TileShapes"/> based on neighbor occupancy: a polygon
+    /// tile with a neighbor on its right has <see cref="SolidSides.Right"/>
     /// cleared, so SAT will not produce a +X push that would shove the mover into the
     /// neighbor. Eliminates seam snagging at boundaries between adjacent polygon tiles.
     /// Per-edge suppression is insufficient because opposite parallel edges share the
     /// same projection axis — directional filtering on the resulting MTV is the only
     /// approach that handles concave tile clusters correctly.
     /// </summary>
-    internal RepositionDirections RepositionDirections { get; set; } = RepositionDirections.All;
+    internal SolidSides SolidSides { get; set; } = SolidSides.All;
 
     /// <summary>
     /// The convex sub-polygons that tile this polygon's area, in local (unrotated, unpositioned) space.
@@ -71,7 +71,7 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 
     /// <summary>
     /// Creates a rectangular polygon centered on the origin with the given <paramref name="width"/>
-    /// and <paramref name="height"/>. Identical in geometry to <see cref="AxisAlignedRectangle"/>
+    /// and <paramref name="height"/>. Identical in geometry to <see cref="AARect"/>
     /// when unrotated; use this when you need a rectangle that can rotate or compose with concave shapes.
     /// </summary>
     public static Polygon CreateRectangle(float width, float height)

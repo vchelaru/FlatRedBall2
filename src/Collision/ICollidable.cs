@@ -4,9 +4,9 @@ namespace FlatRedBall2.Collision;
 
 /// <summary>
 /// Anything that can participate in collision: primitive shapes
-/// (<see cref="AxisAlignedRectangle"/>, <see cref="Circle"/>, <see cref="Polygon"/>,
+/// (<see cref="AARect"/>, <see cref="Circle"/>, <see cref="Polygon"/>,
 /// <see cref="Line"/>), <see cref="Entity"/> (an aggregate of leaf shapes), and static
-/// geometry (<see cref="TileShapeCollection"/>).
+/// geometry (<see cref="TileShapes"/>).
 /// </summary>
 /// <remarks>
 /// Most game code interacts with collision via
@@ -23,16 +23,16 @@ public interface ICollidable
 
     /// <summary>
     /// Conservative bounding radius used by sweep-and-prune broad phase.
-    /// Returns <see cref="float.MaxValue"/> for shapes with no meaningful single center (e.g. <see cref="TileShapeCollection"/>).
+    /// Returns <see cref="float.MaxValue"/> for shapes with no meaningful single center (e.g. <see cref="TileShapes"/>).
     /// </summary>
     float BroadPhaseRadius { get; }
 
     /// <summary>
     /// Returns whether <paramref name="worldPoint"/> lies inside this shape (boundary inclusive).
-    /// Implemented on primitive shapes (<see cref="AxisAlignedRectangle"/>, <see cref="Circle"/>,
+    /// Implemented on primitive shapes (<see cref="AARect"/>, <see cref="Circle"/>,
     /// <see cref="Polygon"/>) for hit-testing — e.g. <c>cursor.IsOver(shape)</c>. The default
     /// implementation returns <c>false</c>; aggregate types (<see cref="Entity"/>,
-    /// <see cref="TileShapeCollection"/>) are tested via dedicated entry points instead.
+    /// <see cref="TileShapes"/>) are tested via dedicated entry points instead.
     /// </summary>
     bool Contains(Vector2 worldPoint) => false;
 
@@ -41,12 +41,12 @@ public interface ICollidable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Implementations on <see cref="Entity"/> and <see cref="TileShapeCollection"/> iterate leaf shapes and handle
+    /// Implementations on <see cref="Entity"/> and <see cref="TileShapes"/> iterate leaf shapes and handle
     /// any <c>ICollidable</c> as <paramref name="other"/>. Implementations on primitive shapes (e.g.
-    /// <see cref="AxisAlignedRectangle"/>) delegate directly to <c>CollisionDispatcher</c>, which only recognises
-    /// primitive shape types and <c>TileShapeCollection</c> — passing an <see cref="Entity"/> as <paramref name="other"/>
+    /// <see cref="AARect"/>) delegate directly to <c>CollisionDispatcher</c>, which only recognises
+    /// primitive shape types and <c>TileShapes</c> — passing an <see cref="Entity"/> as <paramref name="other"/>
     /// from a primitive shape will return <c>false</c>. Always call this method on an <see cref="Entity"/> or
-    /// <see cref="TileShapeCollection"/> when the other side may be an entity.
+    /// <see cref="TileShapes"/> when the other side may be an entity.
     /// </para>
     /// </remarks>
     bool CollidesWith(ICollidable other);
@@ -60,7 +60,7 @@ public interface ICollidable
     /// <summary>
     /// Pushes this object out of <paramref name="other"/> using the mass-weighted share of the
     /// separation vector. See <see cref="Entity.SeparateFrom"/> for mass-ratio semantics.
-    /// No-op on shapes that have no movable position of their own (e.g. <see cref="TileShapeCollection"/>).
+    /// No-op on shapes that have no movable position of their own (e.g. <see cref="TileShapes"/>).
     /// </summary>
     void SeparateFrom(ICollidable other, float thisMass = 1f, float otherMass = 1f);
 

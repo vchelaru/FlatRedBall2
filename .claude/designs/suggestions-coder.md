@@ -94,7 +94,7 @@ Should be `IReadOnlyList<IAttachable>`. Using `object` means AI must cast on eve
 
 ### 18. [Minor] Screen constructor/injection not shown
 
-AI will try `new GameScreen()` and not know how Engine/Camera/ContentManager get injected.
+AI will try `new GameScreen()` and not know how Engine/Camera/ContentLoader get injected.
 
 ### 19. [Minor] AudioManager takes string names — load path format unknown
 

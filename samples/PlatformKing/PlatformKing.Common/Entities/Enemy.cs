@@ -22,13 +22,13 @@ public class Enemy : Entity
     private readonly PlatformerBehavior _platformer = new();
     private readonly PatrolInput _patrolInput = new() { X = 1f };
 
-    public AxisAlignedRectangle Body { get; private set; } = null!;
-    private AxisAlignedRectangle _leftFoot = null!;
-    private AxisAlignedRectangle _rightFoot = null!;
+    public AARect Body { get; private set; } = null!;
+    private AARect _leftFoot = null!;
+    private AARect _rightFoot = null!;
     private Sprite _sprite = null!;
 
-    public TileShapeCollection? SolidCollision { get; set; }
-    public TileShapeCollection? JumpThroughCollision { get; set; }
+    public TileShapes? SolidCollision { get; set; }
+    public TileShapes? JumpThroughCollision { get; set; }
 
     public override void CustomInitialize()
     {
@@ -38,7 +38,7 @@ public class Enemy : Entity
         _sprite.AnimationChains = animations;
         Add(_sprite);
 
-        Body = new AxisAlignedRectangle
+        Body = new AARect
         {
             Width = 14f,
             Height = 14f,
@@ -52,7 +52,7 @@ public class Enemy : Entity
         // Foot probes sit just outside the body's left/right edges and just below
         // its bottom. Each frame we check whether the probe overlaps any ground;
         // if the one ahead of travel does not, we've reached a ledge and flip.
-        _leftFoot = new AxisAlignedRectangle
+        _leftFoot = new AARect
         {
             Width = 2f,
             Height = 2f,
@@ -64,7 +64,7 @@ public class Enemy : Entity
         };
         Add(_leftFoot, isDefaultCollision: false);
 
-        _rightFoot = new AxisAlignedRectangle
+        _rightFoot = new AARect
         {
             Width = 2f,
             Height = 2f,
@@ -104,7 +104,7 @@ public class Enemy : Entity
         _sprite.PlayAnimation(_patrolInput.X >= 0f ? "WalkRight" : "WalkLeft");
     }
 
-    private bool HasGround(AxisAlignedRectangle foot)
+    private bool HasGround(AARect foot)
     {
         if (SolidCollision != null && foot.CollidesWith(SolidCollision))
             return true;

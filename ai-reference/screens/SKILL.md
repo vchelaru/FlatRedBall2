@@ -50,7 +50,7 @@ See `engine-overview` for the full 8-step frame loop. Key ordering for screens:
 |----------|------|-------|
 | `Camera` | `Camera` | This screen's camera — set background color, world bounds, position |
 | `Engine` | `FlatRedBallService` | Access to `Random`, `Input`, `Audio`, etc. |
-| `ContentManager` | `ContentManagerService` | Load textures, fonts, and other content |
+| `ContentLoader` | `ContentLoader` | Load textures, fonts, and other content |
 | `RenderList` | `IReadOnlyList<IRenderable>` | All renderables sorted and drawn each frame; use `Add`/`Remove` to modify |
 | `Layers` | `List<Layer>` | Named layers for render ordering |
 
@@ -172,7 +172,7 @@ snap.NearPoint(new Vector2(0, 0), 100f).ShouldNotBeEmpty();
 - **Delay before transitioning** — to pause before a screen change (e.g., a flash effect), `await Engine.Time.DelaySeconds(t, Token)` first, then call `MoveToScreen<T>()`. Never use `Thread.Sleep` — it freezes the render thread and blocks the game loop entirely.
 - **`MoveToScreen` is deferred** — the transition does not happen immediately. Code after `MoveToScreen<T>()` in the same frame still runs. If you want to stop processing, `return` after the call.
 - **Do not cache entity references across `MoveToScreen`** — the source screen's entities are destroyed on transition. Singletons and static fields must store data values only, not object references to entities.
-- **Save data is not a content asset** — player save files (`PlayerData`, inventory, progress) cannot be loaded via `ContentManager.Load<T>()`. Use `System.IO.File.ReadAllText` + `System.Text.Json.JsonSerializer` directly.
+- **Save data is not a content asset** — player save files (`PlayerData`, inventory, progress) cannot be loaded via `ContentLoader.Load<T>()`. Use `System.IO.File.ReadAllText` + `System.Text.Json.JsonSerializer` directly.
 - **All entities and factories are destroyed automatically** on screen change. You do not need to manually destroy them in `CustomDestroy`.
 - **Gum elements are also cleared automatically** — no teardown needed for elements added via `Add`.
 - **`CustomDestroy` is for external resources only** — e.g., file handles or network connections you opened yourself.

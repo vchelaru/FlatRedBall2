@@ -44,7 +44,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `collision-relationships` — AddCollisionRelationship, move/bounce semantics
 - `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
 - `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds
-- `shapes` — AxisAlignedRectangle, Circle, Polygon, visual properties
+- `shapes` — AARect, Circle, Polygon, visual properties
 - `input-system` — Keyboard, gamepad, input binding
 - `camera` — Camera setup and transforms
 - `screens` — Screen lifecycle and transitions
@@ -61,7 +61,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
 - `grid-movement` — Tile-by-tile grid movement (Pokémon/dungeon-crawler/roguelike): one key = one tile, input gate during tween, pre-move collision check
 - `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
-- `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapeCollection`, enemy navigation pattern
+- `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapes`, enemy navigation pattern
 - `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
 - `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
@@ -81,7 +81,7 @@ Invoke these with the Skill tool when working on specific topics:
 
 Do not attempt to use these — they exist as API placeholders:
 - DebugRenderer: All draw methods are no-ops
-- Tiled integration: `TileMapCollisionGenerator` uses MonoGame.Extended 6.0 preview
+- Tiled integration: `TileMapCollisions` uses MonoGame.Extended 6.0 preview
 
 ## AI-Usability Goals
 

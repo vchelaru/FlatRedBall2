@@ -122,7 +122,7 @@ using var reader = new StreamReader(stream);
 var json = reader.ReadToEnd();
 ```
 
-This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentManagerService` already do the right thing internally). Save data and user settings legitimately need `File` and stay desktop-only — gate them with `#if !KNI`.
+This applies to game-specific config loaders (the engine's own `PlatformerConfig.FromJson`, `TopDownConfig.FromJson`, `TileMap`, animation/atlas loaders, and `ContentLoader` already do the right thing internally). Save data and user settings legitimately need `File` and stay desktop-only — gate them with `#if !KNI`.
 
 ## Content pipeline — single source of truth in Common
 

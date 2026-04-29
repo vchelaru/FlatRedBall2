@@ -6,11 +6,11 @@ namespace PlatformKing.Entities;
 
 public class Box : Entity
 {
-    public AxisAlignedRectangle Body { get; private set; } = null!;
+    public AARect Body { get; private set; } = null!;
 
     public override void CustomInitialize()
     {
-        Body = new AxisAlignedRectangle
+        Body = new AARect
         {
             Width = 14f,
             Height = 14f,

@@ -1,6 +1,6 @@
 ---
 name: levels
-description: "Level Data in FlatRedBall2. Use when working with level layouts, level progression, loading TMX maps, generating collision from tile layers, or transitioning between levels. Covers TMX-based level setup, TileShapeCollection generation, and level advancement patterns."
+description: "Level Data in FlatRedBall2. Use when working with level layouts, level progression, loading TMX maps, generating collision from tile layers, or transitioning between levels. Covers TMX-based level setup, TileShapes generation, and level advancement patterns."
 ---
 
 # Level Data in FlatRedBall2
@@ -16,7 +16,7 @@ using FlatRedBall2.Tiled;
 
 public class GameScreen : Screen
 {
-    private TileShapeCollection _solidCollision = null!;
+    private TileShapes _solidCollision = null!;
 
     public override void CustomInitialize()
     {
@@ -33,7 +33,7 @@ public class GameScreen : Screen
 **Key types** (all in `FlatRedBall2.Tiled`):
 - `TileMap` — loads a TMX file, wraps layers, generates collision
 - `TileMapLayer` — per-layer Z, visibility, and render layer control
-- `TileShapeCollection` — collision grid (`FlatRedBall2.Collision`)
+- `TileShapes` — collision grid (`FlatRedBall2.Collision`)
 
 ## TileMap Position
 
@@ -58,7 +58,7 @@ Add(solid);
 Add(jumpThrough);
 ```
 
-Each collection can have its own collision relationship. For jump-through platforms, set `OneWayDirection = OneWayDirection.Up` and `AllowDropThrough = true` on the relationship — the player passes through from below, lands from above, and can drop down with Down+Jump. For hard one-way barriers (`OneWayCollision` tile class — Yoshi-style ratchet doors), set `OneWayDirection = OneWayDirection.Up` and leave `AllowDropThrough = false`. See the `collision-relationships` skill for details. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
+Each collection can have its own collision relationship. For jump-through platforms, set `OneWayDirection = OneWayDirection.Up` and `CanDropThrough = true` on the relationship — the player passes through from below, lands from above, and can drop down with Down+Jump. For hard one-way barriers (`OneWayCollision` tile class — Yoshi-style ratchet doors), set `OneWayDirection = OneWayDirection.Up` and leave `CanDropThrough = false`. See the `collision-relationships` skill for details. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
@@ -66,7 +66,7 @@ var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "Gamepla
 
 ## Slope Tiles and Sub-Cell Shapes
 
-Tiles in the tileset can declare custom collision via an `<objectgroup>` containing polygons and/or plain `<object>` rectangles. `GenerateCollisionFromClass` emits polygons as `Polygon` tiles and rectangles as sub-cell `AxisAlignedRectangle`s, instead of the default full-cell rect. Polygons and rects can coexist on the same tile. For platformer floors, set `SlopeMode = PlatformerFloor` on the **collision relationship** (not on the collection) so vertical separation uses a heightmap instead of SAT:
+Tiles in the tileset can declare custom collision via an `<objectgroup>` containing polygons and/or plain `<object>` rectangles. `GenerateCollisionFromClass` emits polygons as `Polygon` tiles and rectangles as sub-cell `AARect`s, instead of the default full-cell rect. Polygons and rects can coexist on the same tile. For platformer floors, set `SlopeMode = PlatformerFloor` on the **collision relationship** (not on the collection) so vertical separation uses a heightmap instead of SAT:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision");
@@ -85,7 +85,7 @@ See the `tmx` skill for how to author the polygon on the tileset tile.
 
 `CreateEntities` scans both **object layers** (for precisely-placed tile objects) and **regular tile layers** (for tiles painted with Tiled's brush). Any tile whose Class matches the requested name becomes one entity — use whichever authoring path fits the designer's workflow. Painted tile layers have no per-cell custom properties; reflection-based property mapping is a no-op for that path.
 
-The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapeCollection` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. The two methods never fight over the same tile — pick one per Class.
+The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapes` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. The two methods never fight over the same tile — pick one per Class.
 
 Place tile objects on Tiled object layers (using tiles with a Class set in the tileset). Game code spawns entities from them with `CreateEntities`:
 

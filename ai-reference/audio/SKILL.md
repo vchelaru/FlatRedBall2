@@ -36,7 +36,7 @@ Add audio files to `Content/Content.mgcb`, then load via `Engine.Content.Load<>`
 ```csharp
 var song = Engine.Content.Load<Song>("MySong");
 var sfx  = Engine.Content.Load<SoundEffect>("Hit");
-// No manual tracking needed — ContentManager disposes on screen transition
+// No manual tracking needed — ContentLoader disposes on screen transition
 ```
 
 Usings required: `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
@@ -95,5 +95,5 @@ Engine.Audio.MusicEnabled = false; // pauses current song immediately; true resu
 
 - **Music does not stop automatically on screen transition** — call `Engine.Audio.StopSong()` in `CustomDestroy`, or music keeps playing into the next screen.
 - **`Song.FromUri` only works with OGG** — on DesktopGL (NVorbis), `Song.FromUri` fails at runtime with MP3. Use the MGCB pipeline and `Engine.Content.Load<Song>` for MP3 files.
-- **Track SoundEffect only when loaded via `FromStream`** — call `Engine.Content.Track(sfx)` when using `SoundEffect.FromStream` so it is disposed on screen transition. MGCB-loaded assets (`Engine.Content.Load<SoundEffect>`) are disposed automatically by the ContentManager — do not call `Track` for those.
+- **Track SoundEffect only when loaded via `FromStream`** — call `Engine.Content.Track(sfx)` when using `SoundEffect.FromStream` so it is disposed on screen transition. MGCB-loaded assets (`Engine.Content.Load<SoundEffect>`) are disposed automatically by the ContentLoader — do not call `Track` for those.
 - **Per-frame dedup in collision handlers** — `Play(sfx)` in a `CollisionOccurred` handler is safe to call unconditionally; it fires at most once per frame regardless of how many pairs collide.

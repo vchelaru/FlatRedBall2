@@ -11,13 +11,13 @@ namespace FlatRedBall2.Collision;
 /// <summary>
 /// A non-rotating rectangle aligned to the X and Y axes — the most common collision primitive
 /// for tile-based geometry, hitboxes, and trigger zones. Cheaper to test than <see cref="Polygon"/>
-/// and supports per-side selective response via <see cref="RepositionDirections"/>.
+/// and supports per-side selective response via <see cref="SolidSides"/>.
 /// </summary>
 /// <remarks>
 /// Position (<see cref="X"/>/<see cref="Y"/>) is the rectangle's <i>center</i>, not a corner.
 /// Use <see cref="Polygon.CreateRectangle"/> if you need a rectangle that can rotate.
 /// </remarks>
-public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
+public class AARect : IAttachable, IRenderable, ICollidable
 {
     /// <summary>Width in world units. Defaults to 32. Centered on <see cref="X"/>.</summary>
     public float Width { get; set; } = 32f;
@@ -29,13 +29,13 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     /// When a collision occurs, the engine computes the minimum displacement along each allowed
     /// axis and applies the smallest one — so even a left-edge hit against a Down-only rect
     /// will push the object downward rather than suppressing the collision.
-    /// Defaults to <see cref="RepositionDirections.All"/>.
+    /// Defaults to <see cref="SolidSides.All"/>.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Use this to prevent "snagging" at the seams of adjacent rectangles. For a horizontal
-    /// strip of floor tiles, clear <see cref="RepositionDirections.Left"/> and
-    /// <see cref="RepositionDirections.Right"/> from interior tiles so objects glide across
+    /// strip of floor tiles, clear <see cref="SolidSides.Left"/> and
+    /// <see cref="SolidSides.Right"/> from interior tiles so objects glide across
     /// the top surface without catching on shared vertical edges.
     /// </para>
     /// <para>
@@ -43,7 +43,7 @@ public class AxisAlignedRectangle : IAttachable, IRenderable, ICollidable
     /// grazes the target face (or corner), never inflated to its bounding box.
     /// </para>
     /// </remarks>
-    public RepositionDirections RepositionDirections { get; set; } = RepositionDirections.All;
+    public SolidSides SolidSides { get; set; } = SolidSides.All;
 
     // IAttachable
     /// <inheritdoc/>

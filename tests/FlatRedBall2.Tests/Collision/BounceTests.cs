@@ -22,7 +22,7 @@ public class BounceTests
     private static Entity MakeWall(float x, float y, float width, float height)
     {
         var wall = new Entity { X = x, Y = y };
-        wall.Add(new AxisAlignedRectangle { Width = width, Height = height });
+        wall.Add(new AARect { Width = width, Height = height });
         return wall;
     }
 
@@ -129,7 +129,7 @@ public class BounceTests
 
         // Wall at X=20, width=16 → left edge at 12; circle right edge at 16 → 4px overlap.
         var wall = new Entity { X = 20f };
-        wall.Add(new AxisAlignedRectangle { Width = 16f, Height = 100f });
+        wall.Add(new AARect { Width = 16f, Height = 100f });
 
         grandparent.CollidesWith(wall).ShouldBeTrue();
 
@@ -183,11 +183,11 @@ public class BounceTests
         //   V' = V - 2(V·n)n = (0, -100) + 141.42 · (-0.707, 0.707) ≈ (-100, 0)
         // So the ball should deflect horizontally to the LEFT, not bounce straight up.
         //
-        // The wall-slam fix gates on "other is TileShapeCollection && both axes non-zero"
+        // The wall-slam fix gates on "other is TileShapes && both axes non-zero"
         // and decomposes per-axis — which, for a slope polygon's diagonal SAT normal,
         // produces V' = (0, +100) (straight up) instead of the correct (-100, 0).
         // This test should be RED with that gate in place.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, UpRightSlope());
 
         var ball = new Entity { X = 9f, Y = 9.5f };
@@ -201,7 +201,7 @@ public class BounceTests
         sep.X.ShouldBeLessThan(-0.01f, "slope SAT must push ball left (away from the slope)");
         sep.Y.ShouldBeGreaterThan(0.01f, "slope SAT must push ball up (away from the slope)");
 
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { ball }, new[] { tiles });
         rel.SlopeMode = SlopeCollisionMode.Standard;
         rel.BounceFirstOnCollision(elasticity: 1f);
@@ -242,12 +242,12 @@ public class BounceTests
         // have been zeroed from.
         //
         // Post-fix: each axis is zeroed independently → (0, 0).
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(-1, 0);
         tiles.AddTileAtCell(0, -1);
 
         var player = new Entity { X = -0.33342f, Y = 15.90277f };
-        var body = new AxisAlignedRectangle { Width = 16f, Height = 32f };
+        var body = new AARect { Width = 16f, Height = 32f };
         player.Add(body);
         player.VelocityX = -250f;
         player.VelocityY = -11.66669f;
@@ -257,7 +257,7 @@ public class BounceTests
         sep.X.ShouldBe(8.33342f, tolerance: 0.001f);
         sep.Y.ShouldBe(0.097229f, tolerance: 0.001f);
 
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { player }, new[] { tiles });
         rel.SlopeMode = SlopeCollisionMode.PlatformerFloor;
         rel.BounceFirstOnCollision(elasticity: 0f);

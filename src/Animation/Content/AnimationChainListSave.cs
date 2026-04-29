@@ -61,9 +61,9 @@ public class AnimationChainListSave
 
     /// <summary>
     /// Deserializes a .achx file. Production code should prefer
-    /// <c>ContentManagerService.LoadAnimationChainList(path)</c>, which routes the read through
+    /// <c>ContentLoader.LoadAnimationChainList(path)</c>, which routes the read through
     /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
-    /// overload exists for tooling and tests that work without a <see cref="ContentManagerService"/>.
+    /// overload exists for tooling and tests that work without a <see cref="ContentLoader"/>.
     /// </summary>
     /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
     /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
@@ -82,17 +82,17 @@ public class AnimationChainListSave
 
     /// <summary>
     /// Converts this save object to a runtime <see cref="AnimationChainList"/>, loading
-    /// all referenced textures through <see cref="ContentManagerService.Load{T}"/>.
+    /// all referenced textures through <see cref="ContentLoader.Load{T}"/>.
     /// Texture paths are passed as-is: if the frame's <c>TextureName</c> includes an
     /// extension (e.g. <c>"Player.png"</c>), it loads directly from disk and participates
-    /// in PNG hot-reload via <see cref="ContentManagerService.TryReload"/>; if there is
+    /// in PNG hot-reload via <see cref="ContentLoader.TryReload"/>; if there is
     /// no extension, it goes through MonoGame's compiled xnb pipeline (not hot-reloadable).
     /// </summary>
     /// <remarks>
     /// Texture names are resolved relative to the .achx file location when
     /// <see cref="FileRelativeTextures"/> is <c>true</c>.
     /// </remarks>
-    public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentManagerService contentManager)
+    public AnimationChainList ToAnimationChainList(FlatRedBall2.ContentLoader contentManager)
     {
         string achxDir = string.IsNullOrEmpty(FileName) ? "" : Path.GetDirectoryName(FileName) ?? "";
 
@@ -154,7 +154,7 @@ public class AnimationChainListSave
                         frame.SourceRectangle = new Rectangle(left, top, width, height);
                 }
 
-                AppendShapes(frame, frameSave.ShapeCollectionSave);
+                AppendShapes(frame, frameSave.ShapesSave);
 
                 chain.Add(frame);
             }
@@ -165,14 +165,14 @@ public class AnimationChainListSave
         return list;
     }
 
-    private static void AppendShapes(FlatRedBall2.Animation.AnimationFrame frame, ShapeCollectionSave? shapes)
+    private static void AppendShapes(FlatRedBall2.Animation.AnimationFrame frame, ShapesSave? shapes)
     {
         if (shapes == null) return;
 
-        foreach (var rect in shapes.AxisAlignedRectangleSaves)
+        foreach (var rect in shapes.AARectSaves)
         {
-            ValidateName(rect.Name, "AxisAlignedRectangleSave");
-            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationRectangleFrame
+            ValidateName(rect.Name, "AARectSave");
+            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationAARectFrame
             {
                 Name = rect.Name,
                 RelativeX = rect.X,
@@ -214,6 +214,6 @@ public class AnimationChainListSave
     {
         if (string.IsNullOrEmpty(name))
             throw new System.InvalidOperationException(
-                $"{elementType} in .achx ShapeCollectionSave is missing a Name. Per-frame shapes must have non-empty unique names.");
+                $"{elementType} in .achx ShapesSave is missing a Name. Per-frame shapes must have non-empty unique names.");
     }
 }

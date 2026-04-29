@@ -50,7 +50,7 @@ No way to display a sub-region of a texture. Sprite sheets are universal in 2D. 
 ### 6. Collision Shapes Have No Properties Shown
 **Flagged by: Docs Writer, PM**
 
-`AxisAlignedRectangle`, `Circle`, `Polygon` shown as `{ ... }`. AI can't create them because it doesn't know the properties (Width/Height? ScaleX/ScaleY? Radius? Points?). Need properties + a "create shape, set size, attach to entity" example.
+`AARect`, `Circle`, `Polygon` shown as `{ ... }`. AI can't create them because it doesn't know the properties (Width/Height? ScaleX/ScaleY? Radius? Points?). Need properties + a "create shape, set size, attach to entity" example.
 
 ### 7. AnimationChain Types Undefined
 **Flagged by: Docs Writer**
@@ -95,7 +95,7 @@ AI asked to "add a health bar" or "add a button" has zero information. Need at m
 
 AI asked to "load a level" has zero information. Need: load TMX, render on layer, get collision.
 
-### 14. ContentManager Load Path Format Unknown
+### 14. ContentLoader Load Path Format Unknown
 **Flagged by: Docs Writer**
 
 `Load<T>(string path)` — is path a content pipeline name (`"player"`)? File path (`"Content/player.png"`)? AI will guess wrong.
@@ -123,7 +123,7 @@ Multiplicative vs subtractive produces different gameplay. Specify: `vel *= (1 -
 ### 19. AudioManager — Load vs Play Ambiguity
 **Flagged by: Docs Writer**
 
-Does `PlaySong("bgm")` load and play? Or load first via ContentManager? Show the pattern.
+Does `PlaySong("bgm")` load and play? Or load first via ContentLoader? Show the pattern.
 
 ---
 

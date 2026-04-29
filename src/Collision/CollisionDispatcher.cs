@@ -41,21 +41,21 @@ internal static class CollisionDispatcher
         // Line vs AARect now has separation support — use the standard path.
         // For other Line pairs (Line vs Line, Line vs Circle, Line vs Polygon),
         // delegate to Line's own intersection test since no separation exists.
-        if (a is Line la && b is not AxisAlignedRectangle) return la.CollidesWith(b);
-        if (b is Line lb && a is not AxisAlignedRectangle) return lb.CollidesWith(a);
-        // TileShapeCollection.CollidesWith uses a direct cell-occupancy scan that is
+        if (a is Line la && b is not AARect) return la.CollidesWith(b);
+        if (b is Line lb && a is not AARect) return lb.CollidesWith(a);
+        // TileShapes.CollidesWith uses a direct cell-occupancy scan that is
         // correct even when the caller is fully surrounded (net separation == zero).
-        if (a is TileShapeCollection tsca) return tsca.CollidesWith(b);
-        if (b is TileShapeCollection tscb) return tscb.CollidesWith(a);
+        if (a is TileShapes tsca) return tsca.CollidesWith(b);
+        if (b is TileShapes tscb) return tscb.CollidesWith(a);
         return GetSeparationVector(a, b) != Vector2.Zero || PointsOverlap(a, b);
     }
 
     /// <summary>
     /// Computes the separation vector required to push object 'a' out of 'b'.
     /// </summary>
-    // Returns the displacement needed to move 'a' out of 'b', respecting b's RepositionDirections.
+    // Returns the displacement needed to move 'a' out of 'b', respecting b's SolidSides.
     // Returns Vector2.Zero if no collision.
-    // When b has RepositionDirections != All, computes the minimum displacement restricted to
+    // When b has SolidSides != All, computes the minimum displacement restricted to
     // each allowed axis and returns the smallest one — so a left-edge hit against a Down-only
     // rect pushes the object downward rather than being suppressed. For circles, the exact
     // circle-arc geometry is used; the object is never treated as a bounding box.
@@ -63,24 +63,24 @@ internal static class CollisionDispatcher
     {
         var mtv = (a, b) switch
         {
-            (AxisAlignedRectangle ra, AxisAlignedRectangle rb) => AabbVsAabb(ra, rb),
+            (AARect ra, AARect rb) => AabbVsAabb(ra, rb),
             (Circle ca, Circle cb)                             => CircleVsCircle(ca, cb),
-            (AxisAlignedRectangle ra, Circle cb)               => -AabbVsCircle(ra, cb),
-            (Circle ca, AxisAlignedRectangle rb)               => AabbVsCircle(rb, ca),
+            (AARect ra, Circle cb)               => -AabbVsCircle(ra, cb),
+            (Circle ca, AARect rb)               => AabbVsCircle(rb, ca),
             (Polygon pa, Polygon pb)                           => PolygonVsPolygon(pa, pb),
-            (Polygon pa, AxisAlignedRectangle rb)              => PolygonVsAabb(pa, rb),
-            (AxisAlignedRectangle ra, Polygon pb)              => -PolygonVsAabb(pb, ra),
+            (Polygon pa, AARect rb)              => PolygonVsAabb(pa, rb),
+            (AARect ra, Polygon pb)              => -PolygonVsAabb(pb, ra),
             (Polygon pa, Circle cb)                            => PolygonVsCircle(pa, cb),
             (Circle ca, Polygon pb)                            => -PolygonVsCircle(pb, ca),
-            (Line la, AxisAlignedRectangle rb)                 => LineVsAabb(la, rb),
-            (AxisAlignedRectangle ra, Line lb)                 => -LineVsAabb(lb, ra),
-            (_, TileShapeCollection tsc)                       => tsc.GetSeparationFor(a),
+            (Line la, AARect rb)                 => LineVsAabb(la, rb),
+            (AARect ra, Line lb)                 => -LineVsAabb(lb, ra),
+            (_, TileShapes tsc)                       => tsc.GetSeparationFor(a),
             _                                                  => Vector2.Zero
         };
 
         if (mtv == Vector2.Zero) return Vector2.Zero;
 
-        if (b is AxisAlignedRectangle rectB && rectB.RepositionDirections != RepositionDirections.All)
+        if (b is AARect rectB && rectB.SolidSides != SolidSides.All)
             mtv = ComputeDirectionalSeparation(a, rectB);
 
         return mtv;
@@ -88,18 +88,18 @@ internal static class CollisionDispatcher
 
     // Computes the minimum displacement for 'a' restricted to b's allowed axes.
     // Tries every allowed direction and returns the one with the smallest magnitude.
-    private static Vector2 ComputeDirectionalSeparation(ICollidable a, AxisAlignedRectangle b)
+    private static Vector2 ComputeDirectionalSeparation(ICollidable a, AARect b)
     {
-        var dirs = b.RepositionDirections;
-        if (dirs == RepositionDirections.None) return Vector2.Zero;
+        var dirs = b.SolidSides;
+        if (dirs == SolidSides.None) return Vector2.Zero;
 
         Vector2 best = Vector2.Zero;
         float bestMag = float.MaxValue;
 
-        if (dirs.HasFlag(RepositionDirections.Down))  TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Down),  ref best, ref bestMag);
-        if (dirs.HasFlag(RepositionDirections.Up))    TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Up),    ref best, ref bestMag);
-        if (dirs.HasFlag(RepositionDirections.Left))  TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Left),  ref best, ref bestMag);
-        if (dirs.HasFlag(RepositionDirections.Right)) TryAxis(ComputeAxisSeparation(a, b, RepositionDirections.Right), ref best, ref bestMag);
+        if (dirs.HasFlag(SolidSides.Down))  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Down),  ref best, ref bestMag);
+        if (dirs.HasFlag(SolidSides.Up))    TryAxis(ComputeAxisSeparation(a, b, SolidSides.Up),    ref best, ref bestMag);
+        if (dirs.HasFlag(SolidSides.Left))  TryAxis(ComputeAxisSeparation(a, b, SolidSides.Left),  ref best, ref bestMag);
+        if (dirs.HasFlag(SolidSides.Right)) TryAxis(ComputeAxisSeparation(a, b, SolidSides.Right), ref best, ref bestMag);
 
         return best;
 
@@ -115,7 +115,7 @@ internal static class CollisionDispatcher
     // For circles the exact arc formula is used: targetCenter = face ± √(r²−d²) where d is the
     // perpendicular distance from the circle center to the face being exited.
     // For other shape types the AABB bounding-box approximation is used (exact for rects).
-    private static Vector2 ComputeAxisSeparation(ICollidable a, AxisAlignedRectangle b, RepositionDirections dir)
+    private static Vector2 ComputeAxisSeparation(ICollidable a, AARect b, SolidSides dir)
     {
         float bLeft   = b.AbsoluteX - b.Width  / 2f;
         float bRight  = b.AbsoluteX + b.Width  / 2f;
@@ -136,7 +136,7 @@ internal static class CollisionDispatcher
 
             switch (dir)
             {
-                case RepositionDirections.Down:
+                case SolidSides.Down:
                     // Only push down if the circle center is below the tile's center.
                     // This prevents corner-clips from above triggering a downward push.
                     if (cy >= bCenterY) return Vector2.Zero;
@@ -147,14 +147,14 @@ internal static class CollisionDispatcher
                     float deltaDown  = targetDown - cy;
                     return deltaDown < 0f ? new Vector2(0f, deltaDown) : Vector2.Zero;
 
-                case RepositionDirections.Up:
+                case SolidSides.Up:
                     if (cy <= bCenterY) return Vector2.Zero;
                     if (dx >= r) return Vector2.Zero;
                     float targetUp  = bTop + MathF.Sqrt(r * r - dx * dx);
                     float deltaUp   = targetUp - cy;
                     return deltaUp > 0f ? new Vector2(0f, deltaUp) : Vector2.Zero;
 
-                case RepositionDirections.Left:
+                case SolidSides.Left:
                     if (cx >= bCenterX) return Vector2.Zero;
                     // Exit through the left face. Circle center lands at rect.left − √(r²−dy²).
                     if (dy >= r) return Vector2.Zero;
@@ -162,7 +162,7 @@ internal static class CollisionDispatcher
                     float deltaLeft   = targetLeft - cx;
                     return deltaLeft < 0f ? new Vector2(deltaLeft, 0f) : Vector2.Zero;
 
-                case RepositionDirections.Right:
+                case SolidSides.Right:
                     if (cx <= bCenterX) return Vector2.Zero;
                     if (dy >= r) return Vector2.Zero;
                     float targetRight = bRight + MathF.Sqrt(r * r - dy * dy);
@@ -172,7 +172,7 @@ internal static class CollisionDispatcher
         }
         else
         {
-            // AABB bounding-box approach — exact for AxisAlignedRectangle, approximate for Polygon.
+            // AABB bounding-box approach — exact for AARect, approximate for Polygon.
             var (aMinX, aMaxX, aMinY, aMaxY) = GetBounds(a);
             float aCenterX = (aMinX + aMaxX) / 2f;
             float aCenterY = (aMinY + aMaxY) / 2f;
@@ -182,19 +182,19 @@ internal static class CollisionDispatcher
             // should not be pushed rightward.
             switch (dir)
             {
-                case RepositionDirections.Down:
+                case SolidSides.Down:
                     if (aCenterY >= bCenterY) return Vector2.Zero;
                     float sepD = bBottom - aMaxY;
                     return sepD < 0f ? new Vector2(0f, sepD) : Vector2.Zero;
-                case RepositionDirections.Up:
+                case SolidSides.Up:
                     if (aCenterY <= bCenterY) return Vector2.Zero;
                     float sepU = bTop - aMinY;
                     return sepU > 0f ? new Vector2(0f, sepU) : Vector2.Zero;
-                case RepositionDirections.Left:
+                case SolidSides.Left:
                     if (aCenterX >= bCenterX) return Vector2.Zero;
                     float sepL = bLeft - aMaxX;
                     return sepL < 0f ? new Vector2(sepL, 0f) : Vector2.Zero;
-                case RepositionDirections.Right:
+                case SolidSides.Right:
                     if (aCenterX <= bCenterX) return Vector2.Zero;
                     float sepR = bRight - aMinX;
                     return sepR > 0f ? new Vector2(sepR, 0f) : Vector2.Zero;
@@ -204,12 +204,12 @@ internal static class CollisionDispatcher
     }
 
     // Returns the axis-aligned bounding box of any supported ICollidable.
-    // Internal so TileShapeCollection can use it for spatial partitioning.
+    // Internal so TileShapes can use it for spatial partitioning.
     internal static (float minX, float maxX, float minY, float maxY) GetBounds(ICollidable c)
     {
         switch (c)
         {
-            case AxisAlignedRectangle r:
+            case AARect r:
                 return (r.AbsoluteX - r.Width / 2f,  r.AbsoluteX + r.Width / 2f,
                         r.AbsoluteY - r.Height / 2f, r.AbsoluteY + r.Height / 2f);
             case Circle ci:
@@ -248,7 +248,7 @@ internal static class CollisionDispatcher
     }
 
     // AABB vs AABB
-    private static Vector2 AabbVsAabb(AxisAlignedRectangle a, AxisAlignedRectangle b)
+    private static Vector2 AabbVsAabb(AARect a, AARect b)
     {
         float ax = a.AbsoluteX, ay = a.AbsoluteY;
         float bx = b.AbsoluteX, by = b.AbsoluteY;
@@ -283,7 +283,7 @@ internal static class CollisionDispatcher
     }
 
     // AABB vs Circle
-    private static Vector2 AabbVsCircle(AxisAlignedRectangle rect, Circle circle)
+    private static Vector2 AabbVsCircle(AARect rect, Circle circle)
     {
         float rx = rect.AbsoluteX, ry = rect.AbsoluteY;
         float cx = circle.AbsoluteX, cy = circle.AbsoluteY;
@@ -316,7 +316,7 @@ internal static class CollisionDispatcher
 
     // Line segment vs AABB — treats the segment as a degenerate AABB (its bounding box).
     // Exact for axis-aligned lines; bounding-box approximation for diagonal lines.
-    private static Vector2 LineVsAabb(Line line, AxisAlignedRectangle rect)
+    private static Vector2 LineVsAabb(Line line, AARect rect)
     {
         // First verify actual intersection (the segment might miss the rect even if bounding boxes overlap).
         if (!line.CollideAgainst(rect)) return Vector2.Zero;
@@ -344,45 +344,45 @@ internal static class CollisionDispatcher
     }
 
     // Tile-side polygon separation: like GetSeparationVector but filters SAT axes by
-    // the tile's RepositionDirections so an MTV pointing into a neighbor (which would
+    // the tile's SolidSides so an MTV pointing into a neighbor (which would
     // snag the mover across the seam) is rejected and SAT picks the next-smallest
     // valid axis. Per-edge suppression is insufficient because opposite parallel
     // edges share the same axis — only the signed MTV direction is decisive.
     //
     // The filtered SAT helpers below (ConvexVsConvexFiltered, ConvexVsAabbPointsFiltered,
     // ConvexPartVsCircleFiltered) intentionally duplicate the unfiltered variants rather
-    // than threading a `RepositionDirections allowed = All` parameter through the existing
+    // than threading a `SolidSides allowed = All` parameter through the existing
     // PolygonVsAabb/PolygonVsCircle/PolygonVsPolygon chains. The filter only applies to
     // tile-side polygons, so adding the parameter to every poly-vs-X path would touch
     // call sites that don't care about it. If a second consumer of directional filtering
     // appears, consolidate by threading the parameter and deleting these duplicates.
     internal static Vector2 GetTilePolygonSeparation(ICollidable shape, Polygon polyTile)
     {
-        var allowed = polyTile.RepositionDirections;
-        if (allowed == RepositionDirections.All) return GetSeparationVector(shape, polyTile);
-        if (allowed == RepositionDirections.None) return Vector2.Zero;
+        var allowed = polyTile.SolidSides;
+        if (allowed == SolidSides.All) return GetSeparationVector(shape, polyTile);
+        if (allowed == SolidSides.None) return Vector2.Zero;
 
         return shape switch
         {
-            AxisAlignedRectangle r => -PolygonVsAabbFiltered(polyTile, r, allowed),
+            AARect r => -PolygonVsAabbFiltered(polyTile, r, allowed),
             Circle c               => -PolygonVsCircleFiltered(polyTile, c, allowed),
             Polygon p              => PolygonVsPolygonFiltered(p, polyTile, allowed),
             _                      => Vector2.Zero
         };
     }
 
-    private static bool IsAllowedDirection(Vector2 v, RepositionDirections allowed)
+    private static bool IsAllowedDirection(Vector2 v, SolidSides allowed)
     {
-        if (v.X > 0f && !allowed.HasFlag(RepositionDirections.Right)) return false;
-        if (v.X < 0f && !allowed.HasFlag(RepositionDirections.Left))  return false;
-        if (v.Y > 0f && !allowed.HasFlag(RepositionDirections.Up))    return false;
-        if (v.Y < 0f && !allowed.HasFlag(RepositionDirections.Down))  return false;
+        if (v.X > 0f && !allowed.HasFlag(SolidSides.Right)) return false;
+        if (v.X < 0f && !allowed.HasFlag(SolidSides.Left))  return false;
+        if (v.Y > 0f && !allowed.HasFlag(SolidSides.Up))    return false;
+        if (v.Y < 0f && !allowed.HasFlag(SolidSides.Down))  return false;
         return true;
     }
 
     // Filtered Polygon vs AABB. 'allowed' constrains the shape-side push direction
     // (not the tile-side MTV direction returned here — they're negations of each other).
-    private static Vector2 PolygonVsAabbFiltered(Polygon poly, AxisAlignedRectangle rect, RepositionDirections allowed)
+    private static Vector2 PolygonVsAabbFiltered(Polygon poly, AARect rect, SolidSides allowed)
     {
         var rectPoints = GetAabbPoints(rect);
         Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
@@ -400,7 +400,7 @@ internal static class CollisionDispatcher
         return bestMtv;
     }
 
-    private static Vector2 PolygonVsCircleFiltered(Polygon poly, Circle circle, RepositionDirections allowed)
+    private static Vector2 PolygonVsCircleFiltered(Polygon poly, Circle circle, SolidSides allowed)
     {
         var circleCenter = new Vector2(circle.AbsoluteX, circle.AbsoluteY);
 
@@ -417,7 +417,7 @@ internal static class CollisionDispatcher
         return bestMtv;
     }
 
-    private static Vector2 PolygonVsPolygonFiltered(Polygon mover, Polygon tile, RepositionDirections allowed)
+    private static Vector2 PolygonVsPolygonFiltered(Polygon mover, Polygon tile, SolidSides allowed)
     {
         Vector2 bestMtv = Vector2.Zero;
         float bestMagSq = float.MaxValue;
@@ -434,7 +434,7 @@ internal static class CollisionDispatcher
     }
 
     // Returned MTV pushes 'a' (the tile-side) — shape-side push is its negation.
-    private static Vector2 ConvexVsAabbPointsFiltered(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect, RepositionDirections allowed)
+    private static Vector2 ConvexVsAabbPointsFiltered(Vector2[] part, Vector2[] rectPoints, Vector2[] axesRect, SolidSides allowed)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
@@ -456,7 +456,7 @@ internal static class CollisionDispatcher
         return minMtv;
     }
 
-    private static Vector2 ConvexPartVsCircleFiltered(Vector2[] partPoints, Circle circle, Vector2 circleCenter, RepositionDirections allowed)
+    private static Vector2 ConvexPartVsCircleFiltered(Vector2[] partPoints, Circle circle, Vector2 circleCenter, SolidSides allowed)
     {
         var axes = new List<Vector2>(GetAxesFromPoints(partPoints));
         var closest = ClosestPointOnPoly(partPoints, circleCenter);
@@ -489,7 +489,7 @@ internal static class CollisionDispatcher
     }
 
     // Returned MTV pushes the mover (first arg). Shape-side push equals MTV directly.
-    private static Vector2 ConvexVsConvexFiltered(Vector2[] mover, Vector2[] tile, RepositionDirections allowed)
+    private static Vector2 ConvexVsConvexFiltered(Vector2[] mover, Vector2[] tile, SolidSides allowed)
     {
         Vector2 minMtv = Vector2.Zero;
         float minOverlap = float.MaxValue;
@@ -529,7 +529,7 @@ internal static class CollisionDispatcher
     }
 
     // Polygon vs AABB — iterate convex parts, AABB is always convex.
-    private static Vector2 PolygonVsAabb(Polygon poly, AxisAlignedRectangle rect)
+    private static Vector2 PolygonVsAabb(Polygon poly, AARect rect)
     {
         var rectPoints = GetAabbPoints(rect);
         Vector2[] axesRect = { new Vector2(1, 0), new Vector2(0, 1) };
@@ -685,7 +685,7 @@ internal static class CollisionDispatcher
         return result;
     }
 
-    private static Vector2[] GetAabbPoints(AxisAlignedRectangle rect)
+    private static Vector2[] GetAabbPoints(AARect rect)
     {
         float hw = rect.Width / 2f, hh = rect.Height / 2f;
         float cx = rect.AbsoluteX, cy = rect.AbsoluteY;

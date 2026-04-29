@@ -17,11 +17,11 @@ public class GameScreen : Screen
     private Factory<Door> _doorFactory = null!;
     private Factory<CameraControllingEntity> _cameraFactory = null!;
 
-    private TileShapeCollection _solid = null!;
-    private TileShapeCollection _jumpThrough = null!;
-    private TileShapeCollection _ladders = null!;
-    private TileShapeCollection _water = null!;
-    private TileShapeCollection _deathTiles = null!;
+    private TileShapes _solid = null!;
+    private TileShapes _jumpThrough = null!;
+    private TileShapes _ladders = null!;
+    private TileShapes _water = null!;
+    private TileShapes _deathTiles = null!;
 
     public override void CustomInitialize()
     {
@@ -93,7 +93,7 @@ public class GameScreen : Screen
 
         var playerVsJumpThrough = AddCollisionRelationship(_playerFactory, _jumpThrough);
         playerVsJumpThrough.OneWayDirection = OneWayDirection.Up;
-        playerVsJumpThrough.AllowDropThrough = true;
+        playerVsJumpThrough.CanDropThrough = true;
         playerVsJumpThrough.BounceFirstOnCollision(elasticity: 0f);
 
         AddCollisionRelationship<Player, Box>(_playerFactory, _boxFactory)

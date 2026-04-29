@@ -4,7 +4,7 @@ namespace FlatRedBall2.Movement;
 
 /// <summary>
 /// The direction a top-down entity is currently facing.
-/// The active set of directions is controlled by <see cref="PossibleDirections"/>.
+/// The active set of directions is controlled by <see cref="DirectionSnap"/>.
 /// </summary>
 public enum TopDownDirection
 {
@@ -30,7 +30,7 @@ public enum TopDownDirection
 /// Controls how many discrete directions are snapped to when updating
 /// <see cref="TopDownBehavior.DirectionFacing"/>.
 /// </summary>
-public enum PossibleDirections
+public enum DirectionSnap
 {
     /// <summary>Snap to the four cardinal directions: Right, Up, Left, Down.</summary>
     FourWay,
@@ -41,7 +41,7 @@ public enum PossibleDirections
 /// <summary>
 /// Axis that diagonal directions collapse onto when reducing to a cardinal.
 /// </summary>
-public enum DiagonalAxis
+public enum DiagonalCollapse
 {
     /// <summary>Diagonals collapse to Left/Right (e.g. UpRight → Right). Best for character art where horizontal silhouettes read most distinctly.</summary>
     Horizontal,
@@ -79,9 +79,9 @@ public static class TopDownDirectionExtensions
     /// Useful for selecting animations when input is 8-way but art has only 4 chains.
     /// </summary>
     /// <param name="direction">The direction to collapse.</param>
-    /// <param name="axis">Which axis diagonals collapse onto. Defaults to <see cref="DiagonalAxis.Horizontal"/>.</param>
-    public static TopDownDirection ToCardinal(this TopDownDirection direction, DiagonalAxis axis = DiagonalAxis.Horizontal)
-        => axis == DiagonalAxis.Horizontal
+    /// <param name="axis">Which axis diagonals collapse onto. Defaults to <see cref="DiagonalCollapse.Horizontal"/>.</param>
+    public static TopDownDirection ToCardinal(this TopDownDirection direction, DiagonalCollapse axis = DiagonalCollapse.Horizontal)
+        => axis == DiagonalCollapse.Horizontal
             ? direction switch
             {
                 TopDownDirection.UpRight or TopDownDirection.DownRight => TopDownDirection.Right,

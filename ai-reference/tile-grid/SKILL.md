@@ -106,7 +106,7 @@ void SyncVisual(int col, int row)
 
 For very large grids (16,000+ tiles), spawn only the tiles visible in the canvas viewport and re-cull when your UI scroll offset changes. At 128×128 = 16,384 tiles, spawning all at once is slow but acceptable at startup (~500ms). Profile before optimizing.
 
-If your grid lives in world-space instead, prefer world renderables (`AxisAlignedRectangle`/`Sprite`) so camera transforms are automatic.
+If your grid lives in world-space instead, prefer world renderables (`AARect`/`Sprite`) so camera transforms are automatic.
 
 ---
 
@@ -165,5 +165,5 @@ Use integer math (column/row distances) when possible — it avoids the square r
 
 - **16,384 tiles (128×128):** Initial spawn is slow (~300–600ms for `ColoredRectangleRuntime` objects). Acceptable for city builders. If it's a problem, spawn only the visible viewport and lazy-spawn as camera pans.
 - **Per-tick full-grid scan:** Scanning all 16,384 tiles each sim tick is fast (< 1ms). Do not premature-optimize. Only cache derived data (e.g., "powered tiles" bitset) if profiling reveals it's a bottleneck.
-- **Do not use `TileShapeCollection` for visual-only grids.** `TileShapeCollection` is a collision structure, not a rendering structure. Use `ColoredRectangleRuntime` for programmer-art visual tiles.
+- **Do not use `TileShapes` for visual-only grids.** `TileShapes` is a collision structure, not a rendering structure. Use `ColoredRectangleRuntime` for programmer-art visual tiles.
 - **Entity-per-tile is expensive at this scale.** Avoid spawning a full `Entity` subclass for each tile — the per-entity overhead (factory registration, physics update, etc.) at 16k tiles adds up. Use lightweight Gum visuals or `ColoredRectangleRuntime` instead.

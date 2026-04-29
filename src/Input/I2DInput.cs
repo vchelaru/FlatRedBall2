@@ -44,7 +44,7 @@ public interface I2DInput
 /// largest absolute value on each axis independently. Typically created via
 /// <see cref="I2DInputExtensions.Or"/>.
 /// </summary>
-public class Multiple2DInputs : I2DInput
+public class Combined2DInput : I2DInput
 {
     /// <summary>
     /// The list of inputs being combined. Add inputs directly or use the fluent
@@ -90,25 +90,25 @@ public class Multiple2DInputs : I2DInput
 public static class I2DInputExtensions
 {
     /// <summary>
-    /// Returns a <see cref="Multiple2DInputs"/> that combines this input with <paramref name="other"/>,
+    /// Returns a <see cref="Combined2DInput"/> that combines this input with <paramref name="other"/>,
     /// returning whichever has the larger absolute value on each axis. Calling Or on an existing
-    /// <see cref="Multiple2DInputs"/> adds to it in place rather than wrapping it.
+    /// <see cref="Combined2DInput"/> adds to it in place rather than wrapping it.
     /// </summary>
     /// <remarks>
-    /// If <paramref name="thisInput"/> is already a <see cref="Multiple2DInputs"/>, it is mutated
+    /// If <paramref name="thisInput"/> is already a <see cref="Combined2DInput"/>, it is mutated
     /// and returned — not wrapped. This enables fluent chaining (<c>a.Or(b).Or(c)</c>) without extra
     /// allocations, but means stored intermediate results will also reflect the added input.
     /// </remarks>
-    public static Multiple2DInputs Or(this I2DInput thisInput, I2DInput other)
+    public static Combined2DInput Or(this I2DInput thisInput, I2DInput other)
     {
-        Multiple2DInputs result;
-        if (thisInput is Multiple2DInputs multi)
+        Combined2DInput result;
+        if (thisInput is Combined2DInput multi)
         {
             result = multi;
         }
         else
         {
-            result = new Multiple2DInputs();
+            result = new Combined2DInput();
             result.Inputs.Add(thisInput);
         }
         result.Inputs.Add(other);

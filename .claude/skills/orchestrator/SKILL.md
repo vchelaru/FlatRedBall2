@@ -196,7 +196,7 @@ Before writing any feedback item, run this checklist. If an item fails validatio
 - **XML docs were wrong or misleading** — doc said X, actual behavior was Y → `[Docs]` issue
 - **Skill was inaccurate or contradicted another skill** — inconsistent guidance → `[Skill]` issue
 - **Guardrail missing** — you went down a completely wrong path that a "use X, not Y" note would have prevented → `[Skill]` gap (guardrail)
-- **Non-obvious member that you couldn't guess existed** — something like `RepositionDirections` or `Raycast` on a tile collection, where the name or concept isn't predictable from the class → `[Skill]` gap (worth a brief mention in the skill to save future agents from reading the file)
+- **Non-obvious member that you couldn't guess existed** — something like `SolidSides` or `Raycast` on a tile collection, where the name or concept isn't predictable from the class → `[Skill]` gap (worth a brief mention in the skill to save future agents from reading the file)
 
 ## What Belongs Where (Do Not Suggest the Wrong Fix)
 
@@ -226,7 +226,7 @@ Every feedback item must include a confidence rating from 1 to 3:
 
 Each feedback item should be formatted as: `- [Category] (Confidence N) Description`
 
-Example: `- [API] (Confidence 3) TileShapeCollection silently accepts tiles before GridSize is set — positions are wrong with no error.`
+Example: `- [API] (Confidence 3) TileShapes silently accepts tiles before GridSize is set — positions are wrong with no error.`
 
 - **Be specific.** "The collision API was confusing" is useless. "I expected `AddCollisionRelationship` to return the relationship object for chaining, but it returns void" is useful.
 - **Prefix each item** with `[API]`, `[Docs]`, or `[Skill]` so the reader knows where to act.

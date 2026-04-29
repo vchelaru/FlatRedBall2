@@ -53,7 +53,7 @@ public class LineTests
     public void CollidesWith_LineVsAARect_Intersecting_ReturnsTrue()
     {
         var line = new Line                  { X = 0f, Y = 0f,   EndPoint = new Vector2(100f, 100f) };
-        var rect = new AxisAlignedRectangle  { X = 0f, Y = 0f,   Width = 10f, Height = 10f };
+        var rect = new AARect  { X = 0f, Y = 0f,   Width = 10f, Height = 10f };
 
         ((ICollidable)line).CollidesWith(rect).ShouldBeTrue();
     }
@@ -119,14 +119,14 @@ public class LineTests
         line.CollideAgainst(circle).ShouldBeTrue();
     }
 
-    // ── CollideAgainst(AxisAlignedRectangle) ─────────────────────────────
+    // ── CollideAgainst(AARect) ─────────────────────────────
 
     [Fact]
     public void CollideAgainst_LineVsAARect_EndpointInsideRect_ReturnsTrue()
     {
         // First endpoint (0,0) is inside the 10×10 rect centered at origin.
         var line = new Line                 { X = 0f, Y = 0f, EndPoint = new Vector2(100f, 100f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 10f, Height = 10f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 10f, Height = 10f };
 
         line.CollideAgainst(rect).ShouldBeTrue();
     }
@@ -136,7 +136,7 @@ public class LineTests
     {
         // Diagonal from (−20,−20) to (20,20) crosses a 10×10 rect at origin.
         var line = new Line                 { X = -20f, Y = -20f, EndPoint = new Vector2(40f, 40f) };
-        var rect = new AxisAlignedRectangle { X = 0f,   Y = 0f,   Width = 10f, Height = 10f };
+        var rect = new AARect { X = 0f,   Y = 0f,   Width = 10f, Height = 10f };
 
         line.CollideAgainst(rect).ShouldBeTrue();
     }
@@ -145,7 +145,7 @@ public class LineTests
     public void CollideAgainst_LineVsAARect_SegmentMissesRect_ReturnsFalse()
     {
         var line = new Line                 { X = -50f, Y = 0f, EndPoint = new Vector2(30f, 0f) };
-        var rect = new AxisAlignedRectangle { X = 0f,   Y = 0f, Width = 10f, Height = 10f };
+        var rect = new AARect { X = 0f,   Y = 0f, Width = 10f, Height = 10f };
 
         line.CollideAgainst(rect).ShouldBeFalse();
     }
@@ -263,13 +263,13 @@ public class LineTests
             .ShouldBeNull();
     }
 
-    // ── Raycast closest-hit: Line vs TileShapeCollection ─────────────────
+    // ── Raycast closest-hit: Line vs TileShapes ─────────────────
 
     [Fact]
     public void Raycast_LineVsTiles_RayHitsTile_ReturnsHitPoint()
     {
         // Single tile at cell (5, 0) with GridSize=32 → tile left face at x = 160.
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 32f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 32f };
         tiles.AddTileAtCell(5, 0);
 
         bool hit = tiles.Raycast(new Vector2(0f, 16f), new Vector2(400f, 16f),
@@ -282,7 +282,7 @@ public class LineTests
     [Fact]
     public void Raycast_LineVsTiles_RayMisses_ReturnsFalse()
     {
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 32f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 32f };
         tiles.AddTileAtCell(5, 0);
 
         // Ray passes above all tiles.
@@ -295,7 +295,7 @@ public class LineTests
     [Fact]
     public void Raycast_LineVsTiles_MultipleTilesAlongRay_ReturnsNearestTile()
     {
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 32f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 32f };
         tiles.AddTileAtCell(3, 0); // left face at x = 96
         tiles.AddTileAtCell(7, 0); // left face at x = 224
 
@@ -309,7 +309,7 @@ public class LineTests
     [Fact]
     public void Raycast_LineVsTiles_RayEndsBeforeTile_ReturnsFalse()
     {
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 32f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 32f };
         tiles.AddTileAtCell(10, 0); // left face at x = 320
 
         // Ray only reaches x = 200.
@@ -322,7 +322,7 @@ public class LineTests
     [Fact]
     public void Raycast_LineVsTiles_NormalPointsTowardRayOrigin()
     {
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 32f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 32f };
         tiles.AddTileAtCell(5, 0);
 
         tiles.Raycast(new Vector2(0f, 16f), new Vector2(400f, 16f),
@@ -333,14 +333,14 @@ public class LineTests
         normal.Y.ShouldBe(0f, 0.01f);
     }
 
-    // ── GetSeparationVector (Line vs AxisAlignedRectangle) ─────────────
+    // ── GetSeparationVector (Line vs AARect) ─────────────
 
     [Fact]
     public void GetSeparationVector_LineVsAARect_NotOverlapping_ReturnsZero()
     {
         // Vertical line well above the rect — no collision.
         var line = new Line { X = 0f, Y = 100f, EndPoint = new Vector2(0f, 20f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         line.GetSeparationVector(rect).ShouldBe(Vector2.Zero);
     }
@@ -353,7 +353,7 @@ public class LineTests
         // Bottom of line is at y=10, which is 6 units below the top edge.
         // Should push up so feet sit on the top edge: sep.Y = 6.
         var line = new Line { X = 0f, Y = 10f, EndPoint = new Vector2(0f, 24f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         var sep = line.GetSeparationVector(rect);
 
@@ -368,7 +368,7 @@ public class LineTests
         // Rect centered at (0, 0), 32×32 → bottom edge at y=-16.
         // Top of line (y=-15) is 1 unit inside the rect bottom. Should push down.
         var line = new Line { X = 0f, Y = -39f, EndPoint = new Vector2(0f, 24f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         var sep = line.GetSeparationVector(rect);
 
@@ -385,7 +385,7 @@ public class LineTests
         // Y: line is at y=0, rect spans [-16,16] — line center is at rect center so Y push = 16.
         // Shortest push is X=2 (push right to clear the right edge).
         var line = new Line { X = 14f, Y = 0f, EndPoint = new Vector2(6f, 0f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         var sep = line.GetSeparationVector(rect);
 
@@ -401,7 +401,7 @@ public class LineTests
         // Y push up = 16 - 14 = 2. X push (nearest edge) would be much larger.
         // Shortest is Y push up = 2.
         var line = new Line { X = 0f, Y = 14f, EndPoint = new Vector2(2f, 0f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         var sep = line.GetSeparationVector(rect);
 
@@ -409,7 +409,7 @@ public class LineTests
         sep.X.ShouldBe(0f);
     }
 
-    // ── SeparateFrom (Line vs AxisAlignedRectangle) ──────────────────────
+    // ── SeparateFrom (Line vs AARect) ──────────────────────
 
     [Fact]
     public void SeparateFrom_LineVsAARect_MovesLineOutOfRect()
@@ -418,7 +418,7 @@ public class LineTests
         // Rect centered at (0, 0), 32×32 → top at y=16.
         // Line Point1 at (0, 12), Point2 at (0, 36). Penetration = 16 - 12 = 4.
         var line = new Line { X = 0f, Y = 12f, EndPoint = new Vector2(0f, 24f) };
-        var rect = new AxisAlignedRectangle { X = 0f, Y = 0f, Width = 32f, Height = 32f };
+        var rect = new AARect { X = 0f, Y = 0f, Width = 32f, Height = 32f };
 
         line.SeparateFrom(rect, thisMass: 0f, otherMass: 1f);
 

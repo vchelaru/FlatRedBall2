@@ -7,7 +7,7 @@ namespace FlatRedBall2.Tests.Collision;
 
 public class CollisionEnterExitTests
 {
-    private static AxisAlignedRectangle Rect(float x, float y = 0f, float size = 32f) =>
+    private static AARect Rect(float x, float y = 0f, float size = 32f) =>
         new() { Width = size, Height = size, X = x, Y = y };
 
     [Fact]
@@ -15,7 +15,7 @@ public class CollisionEnterExitTests
     {
         var a = Rect(0f);
         var b = Rect(100f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         int startedCount = 0;
         rel.CollisionStarted += (_, _) => startedCount++;
@@ -36,7 +36,7 @@ public class CollisionEnterExitTests
     {
         var a = Rect(0f);
         var b = Rect(20f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         int endedCount = 0;
         rel.CollisionEnded += (_, _) => endedCount++;
@@ -57,7 +57,7 @@ public class CollisionEnterExitTests
     {
         var a = Rect(0f);
         var b = Rect(200f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         int started = 0, ended = 0;
         rel.CollisionStarted += (_, _) => started++;
@@ -83,7 +83,7 @@ public class CollisionEnterExitTests
     {
         var a = Rect(0f);
         var b = Rect(500f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         int started = 0, ended = 0;
         rel.CollisionStarted += (_, _) => started++;
@@ -102,7 +102,7 @@ public class CollisionEnterExitTests
     {
         var a = Rect(0f);
         var b = Rect(20f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         var order = new List<string>();
         rel.CollisionStarted += (_, _) => order.Add("Started");
@@ -120,10 +120,10 @@ public class CollisionEnterExitTests
         var a2 = Rect(300f);
         var b1 = Rect(20f);         // overlaps a1
         var b2 = Rect(500f);        // apart from everyone
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a1, a2 }, new[] { b1, b2 });
-        var startedPairs = new List<(AxisAlignedRectangle, AxisAlignedRectangle)>();
-        var endedPairs = new List<(AxisAlignedRectangle, AxisAlignedRectangle)>();
+        var startedPairs = new List<(AARect, AARect)>();
+        var endedPairs = new List<(AARect, AARect)>();
         rel.CollisionStarted += (x, y) => startedPairs.Add((x, y));
         rel.CollisionEnded += (x, y) => endedPairs.Add((x, y));
 
@@ -152,7 +152,7 @@ public class CollisionEnterExitTests
         var b = Rect(20f);          // overlaps a
         var c = Rect(500f);         // alone
         var list = new[] { a, b, c };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list);
+        var rel = new CollisionRelationship<AARect, AARect>(list, list);
         int started = 0, ended = 0;
         rel.CollisionStarted += (_, _) => started++;
         rel.CollisionEnded += (_, _) => ended++;
@@ -173,7 +173,7 @@ public class CollisionEnterExitTests
         // Regression: adding Started/Ended must not skip physics response on entry frame.
         var a = Rect(0f);
         var b = Rect(20f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
                       new[] { a }, new[] { b })
                   .MoveFirstOnCollision();
         rel.CollisionStarted += (_, _) => { };
@@ -189,11 +189,11 @@ public class CollisionEnterExitTests
     {
         // Uses Entity (not raw shape) so the _onDestroy hook path is exercised.
         var ent = new Entity();
-        var shape = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var shape = new AARect { Width = 32f, Height = 32f };
         ent.Add(shape);
 
         var wall = Rect(20f);
-        var rel = new CollisionRelationship<Entity, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<Entity, AARect>(
             new[] { ent }, new[] { wall });
         int ended = 0;
         Entity? endedArgFirst = null;
@@ -216,10 +216,10 @@ public class CollisionEnterExitTests
     {
         // The common "player touches coin → coin dies" case.
         var player = new Entity();
-        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        player.Add(new AARect { Width = 32f, Height = 32f });
 
         var coin = new Entity();
-        coin.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f });
+        coin.Add(new AARect { Width = 32f, Height = 32f, X = 20f });
 
         var rel = new CollisionRelationship<Entity, Entity>(
             new List<Entity> { player }, new List<Entity> { coin });
@@ -238,7 +238,7 @@ public class CollisionEnterExitTests
         // Smoke test: with neither event subscribed, behavior is unchanged and no exceptions.
         var a = Rect(0f);
         var b = Rect(20f);
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(
+        var rel = new CollisionRelationship<AARect, AARect>(
             new[] { a }, new[] { b });
         int occurred = 0;
         rel.CollisionOccurred += (_, _) => occurred++;

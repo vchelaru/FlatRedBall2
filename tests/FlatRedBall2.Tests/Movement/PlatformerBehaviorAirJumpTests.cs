@@ -25,19 +25,19 @@ public class PlatformerBehaviorAirJumpTests
         return behavior;
     }
 
-    private static (Entity entity, AxisAlignedRectangle body) MakeAirborneEntity()
+    private static (Entity entity, AARect body) MakeAirborneEntity()
     {
         var entity = new Entity { X = 0f, Y = 100f };
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         entity.Add(body);
         // LastReposition default is Vector2.Zero → not grounded
         return (entity, body);
     }
 
-    private static (Entity entity, AxisAlignedRectangle body) MakeGroundedEntity()
+    private static (Entity entity, AARect body) MakeGroundedEntity()
     {
         var entity = new Entity { X = 0f, Y = 0f };
-        var body = new AxisAlignedRectangle { Width = 12f, Height = 20f, Y = 10f };
+        var body = new AARect { Width = 12f, Height = 20f, Y = 10f };
         entity.Add(body);
         entity.LastReposition = new Vector2(0f, 5f); // pushed up → grounded
         return (entity, body);

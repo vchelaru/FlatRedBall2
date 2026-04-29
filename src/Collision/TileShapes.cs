@@ -7,7 +7,7 @@ using XnaColor = Microsoft.Xna.Framework.Color;
 namespace FlatRedBall2.Collision;
 
 /// <summary>
-/// Controls how polygon tiles in a <see cref="TileShapeCollection"/> resolve overlap.
+/// Controls how polygon tiles in a <see cref="TileShapes"/> resolve overlap.
 /// </summary>
 public enum SlopeCollisionMode
 {
@@ -19,7 +19,7 @@ public enum SlopeCollisionMode
 
 /// <summary>
 /// A grid-based static collision structure for tile maps. Each filled cell holds one
-/// <see cref="AxisAlignedRectangle"/>; spatial partitioning limits collision checks to
+/// <see cref="AARect"/>; spatial partitioning limits collision checks to
 /// the cells overlapping the querying shape rather than all tiles.
 /// </summary>
 /// <remarks>
@@ -27,16 +27,16 @@ public enum SlopeCollisionMode
 /// automatically. <see cref="GridSize"/> must be set before adding tiles; call
 /// <see cref="Clear"/> first if you need to change it after tiles have been added.
 /// </remarks>
-public class TileShapeCollection : ICollidable
+public class TileShapes : ICollidable
 {
-    private readonly Dictionary<(int col, int row), AxisAlignedRectangle> _tiles = new();
+    private readonly Dictionary<(int col, int row), AARect> _tiles = new();
     private readonly Dictionary<(int col, int row), Polygon> _polyTiles = new();
     // Sub-cell rectangles authored as <object> rects in Tiled. Multiple may coexist in a single
-    // cell (e.g., separate spike rects). They participate in RepositionDirections adjacency
+    // cell (e.g., separate spike rects). They participate in SolidSides adjacency
     // updates: a face is suppressed when an aligned, overlapping opposite face from another
     // sub-cell rect or full-cell tile meets it — forming a continuous surface (e.g., two
     // half-height curbs side-by-side).
-    private readonly Dictionary<(int col, int row), List<AxisAlignedRectangle>> _subCellRects = new();
+    private readonly Dictionary<(int col, int row), List<AARect>> _subCellRects = new();
 
     /// <summary>
     /// World X of the left edge of cell (0, 0). Can be changed at any time —
@@ -107,7 +107,7 @@ public class TileShapeCollection : ICollidable
 
     /// <summary>
     /// Returns all tile shapes (rectangles and polygons) currently in this collection. Used by
-    /// <c>Screen.Add(TileShapeCollection)</c> to register tiles for rendering.
+    /// <c>Screen.Add(TileShapes)</c> to register tiles for rendering.
     /// </summary>
     internal IEnumerable<IRenderable> AllTiles
     {
@@ -219,7 +219,7 @@ public class TileShapeCollection : ICollidable
         }
     }
 
-    private IEnumerable<AxisAlignedRectangle> EnumerateSubCellRects()
+    private IEnumerable<AARect> EnumerateSubCellRects()
     {
         foreach (var list in _subCellRects.Values)
             foreach (var r in list) yield return r;
@@ -244,13 +244,13 @@ public class TileShapeCollection : ICollidable
 
     /// <summary>
     /// Adds a solid tile at the given grid cell. Does nothing if a tile already exists there.
-    /// <see cref="RepositionDirections"/> on adjacent tiles are updated automatically.
+    /// <see cref="SolidSides"/> on adjacent tiles are updated automatically.
     /// </summary>
     public void AddTileAtCell(int col, int row)
     {
         if (_tiles.ContainsKey((col, row))) return;
 
-        var tile = new AxisAlignedRectangle
+        var tile = new AARect
         {
             Width = GridSize,
             Height = GridSize,
@@ -280,7 +280,7 @@ public class TileShapeCollection : ICollidable
 
     /// <summary>
     /// Removes the tile at the given grid cell. Does nothing if no tile exists there.
-    /// <see cref="RepositionDirections"/> on neighboring tiles are updated automatically.
+    /// <see cref="SolidSides"/> on neighboring tiles are updated automatically.
     /// </summary>
     public void RemoveTileAtCell(int col, int row)
     {
@@ -301,17 +301,17 @@ public class TileShapeCollection : ICollidable
     }
 
     /// <summary>
-    /// Returns the <see cref="AxisAlignedRectangle"/> at the given grid cell, or <c>null</c>
+    /// Returns the <see cref="AARect"/> at the given grid cell, or <c>null</c>
     /// if the cell is empty.
     /// </summary>
-    public AxisAlignedRectangle? GetTileAtCell(int col, int row) =>
+    public AARect? GetTileAtCell(int col, int row) =>
         _tiles.TryGetValue((col, row), out var tile) ? tile : null;
 
     /// <summary>
-    /// Returns the <see cref="AxisAlignedRectangle"/> at the grid cell containing
+    /// Returns the <see cref="AARect"/> at the grid cell containing
     /// <paramref name="x"/>, <paramref name="y"/>, or <c>null</c> if the cell is empty.
     /// </summary>
-    public AxisAlignedRectangle? GetTileAtWorld(float x, float y)
+    public AARect? GetTileAtWorld(float x, float y)
     {
         var (col, row) = WorldToCell(x, y);
         return GetTileAtCell(col, row);
@@ -332,7 +332,7 @@ public class TileShapeCollection : ICollidable
     /// </para>
     /// <para>
     /// Unlike rectangle tiles, polygon tiles do not participate in automatic
-    /// <see cref="RepositionDirections"/> management — their collision response is determined
+    /// <see cref="SolidSides"/> management — their collision response is determined
     /// entirely by the polygon geometry via SAT.
     /// </para>
     /// </remarks>
@@ -377,13 +377,13 @@ public class TileShapeCollection : ICollidable
         _polyTiles.TryGetValue((col, row), out var poly) ? poly : null;
 
     /// <summary>
-    /// Adds a sub-cell <see cref="AxisAlignedRectangle"/> whose center sits at the cell's world
+    /// Adds a sub-cell <see cref="AARect"/> whose center sits at the cell's world
     /// center plus <paramref name="localCenterX"/> / <paramref name="localCenterY"/>. Used by
-    /// <see cref="Tiled.TileMapCollisionGenerator"/> to emit Tiled <c>&lt;object&gt;</c> rectangle
+    /// <see cref="Tiled.TileMapCollisions"/> to emit Tiled <c>&lt;object&gt;</c> rectangle
     /// collision shapes; multiple sub-cell rects may coexist in the same cell.
     /// </summary>
     /// <remarks>
-    /// Sub-cell rects participate in <see cref="RepositionDirections"/> adjacency updates: a face
+    /// Sub-cell rects participate in <see cref="SolidSides"/> adjacency updates: a face
     /// is suppressed when it shares an aligned, overlapping opposite face with another sub-cell
     /// rect (same or neighbor cell) or with a full-cell neighbor tile. This prevents snagging at
     /// seams when adjacent sub-cell rects form a continuous surface (e.g., a row of half-height
@@ -394,7 +394,7 @@ public class TileShapeCollection : ICollidable
     /// </remarks>
     public void AddRectangleTileAtCell(int col, int row, float localCenterX, float localCenterY, float width, float height)
     {
-        var rect = new AxisAlignedRectangle
+        var rect = new AARect
         {
             Width = width,
             Height = height,
@@ -409,7 +409,7 @@ public class TileShapeCollection : ICollidable
 
         if (!_subCellRects.TryGetValue((col, row), out var list))
         {
-            list = new List<AxisAlignedRectangle>();
+            list = new List<AARect>();
             _subCellRects[(col, row)] = list;
         }
         list.Add(rect);
@@ -421,10 +421,10 @@ public class TileShapeCollection : ICollidable
     /// Returns the sub-cell rectangles at the given grid cell, or an empty list if none exist.
     /// Unlike <see cref="GetTileAtCell"/>, multiple rectangles may be returned.
     /// </summary>
-    public IReadOnlyList<AxisAlignedRectangle> GetRectangleTilesAtCell(int col, int row) =>
+    public IReadOnlyList<AARect> GetRectangleTilesAtCell(int col, int row) =>
         _subCellRects.TryGetValue((col, row), out var list)
             ? list
-            : Array.Empty<AxisAlignedRectangle>();
+            : Array.Empty<AARect>();
 
     /// <summary>
     /// Adds solid tiles along the perimeter of the rectangle defined by
@@ -489,39 +489,39 @@ public class TileShapeCollection : ICollidable
     {
         if (!_tiles.TryGetValue((col, row), out var tile)) return;
 
-        var dirs = RepositionDirections.All;
+        var dirs = SolidSides.All;
         bool hasLeft  = _tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row));
         bool hasRight = _tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row));
         bool hasDown  = _tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1));
         bool hasUp    = _tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1));
-        if (hasLeft)  dirs &= ~RepositionDirections.Left;
-        if (hasRight) dirs &= ~RepositionDirections.Right;
-        if (hasDown)  dirs &= ~RepositionDirections.Down;
-        if (hasUp)    dirs &= ~RepositionDirections.Up;
+        if (hasLeft)  dirs &= ~SolidSides.Left;
+        if (hasRight) dirs &= ~SolidSides.Right;
+        if (hasDown)  dirs &= ~SolidSides.Down;
+        if (hasUp)    dirs &= ~SolidSides.Up;
 
-        tile.RepositionDirections = dirs;
+        tile.SolidSides = dirs;
     }
 
-    // Sets RepositionDirections on the polygon tile at (col, row) based on cardinal
+    // Sets SolidSides on the polygon tile at (col, row) based on cardinal
     // neighbor occupancy. A neighbor on a side blocks push in that direction so SAT
     // won't shove the mover across the seam into the neighbor.
     private void UpdatePolygonEdges(int col, int row)
     {
         if (!_polyTiles.TryGetValue((col, row), out var poly)) return;
 
-        var dirs = RepositionDirections.All;
-        if (_tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row))) dirs &= ~RepositionDirections.Left;
-        if (_tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row))) dirs &= ~RepositionDirections.Right;
-        if (_tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1))) dirs &= ~RepositionDirections.Down;
-        if (_tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1))) dirs &= ~RepositionDirections.Up;
+        var dirs = SolidSides.All;
+        if (_tiles.ContainsKey((col - 1, row)) || _polyTiles.ContainsKey((col - 1, row))) dirs &= ~SolidSides.Left;
+        if (_tiles.ContainsKey((col + 1, row)) || _polyTiles.ContainsKey((col + 1, row))) dirs &= ~SolidSides.Right;
+        if (_tiles.ContainsKey((col, row - 1)) || _polyTiles.ContainsKey((col, row - 1))) dirs &= ~SolidSides.Down;
+        if (_tiles.ContainsKey((col, row + 1)) || _polyTiles.ContainsKey((col, row + 1))) dirs &= ~SolidSides.Up;
 
-        poly.RepositionDirections = dirs;
+        poly.SolidSides = dirs;
     }
 
-    // Recomputes RepositionDirections for every sub-cell rect in (col, row) by finding, for each
+    // Recomputes SolidSides for every sub-cell rect in (col, row) by finding, for each
     // of its four faces, an aligned-and-overlapping opposite face from another sub-cell rect or
     // full-cell tile (same cell, or immediate neighbors). Any such match suppresses the whole
-    // face — partial-overlap face fragmentation is not modeled (RepositionDirections is a 4-bit
+    // face — partial-overlap face fragmentation is not modeled (SolidSides is a 4-bit
     // bitfield, not a range). When a sub-cell rect fully covers an adjacent full-cell tile's face
     // (endpoints coincide within eps), the matching bit on the full-cell tile is also cleared so
     // the seam presents a single continuous surface. Partial coverage intentionally leaves the
@@ -536,51 +536,51 @@ public class TileShapeCollection : ICollidable
 
         foreach (var rect in rects)
         {
-            var dirs = RepositionDirections.All;
+            var dirs = SolidSides.All;
             float left   = rect.X - rect.Width  / 2f;
             float right  = rect.X + rect.Width  / 2f;
             float bottom = rect.Y - rect.Height / 2f;
             float top    = rect.Y + rect.Height / 2f;
 
-            if (HasAlignedFace(col, row, rect, RepositionDirections.Left,  left,   bottom, top)
-                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, RepositionDirections.Left,  left,   bottom, top))
-                dirs &= ~RepositionDirections.Left;
-            if (HasAlignedFace(col, row, rect, RepositionDirections.Right, right,  bottom, top)
-                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, RepositionDirections.Right, right,  bottom, top))
-                dirs &= ~RepositionDirections.Right;
-            if (HasAlignedFace(col, row, rect, RepositionDirections.Down,  bottom, left,   right)
-                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, RepositionDirections.Down,  bottom, left,   right))
-                dirs &= ~RepositionDirections.Down;
-            if (HasAlignedFace(col, row, rect, RepositionDirections.Up,    top,    left,   right)
-                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, RepositionDirections.Up,    top,    left,   right))
-                dirs &= ~RepositionDirections.Up;
+            if (HasAlignedFace(col, row, rect, SolidSides.Left,  left,   bottom, top)
+                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, SolidSides.Left,  left,   bottom, top))
+                dirs &= ~SolidSides.Left;
+            if (HasAlignedFace(col, row, rect, SolidSides.Right, right,  bottom, top)
+                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, SolidSides.Right, right,  bottom, top))
+                dirs &= ~SolidSides.Right;
+            if (HasAlignedFace(col, row, rect, SolidSides.Down,  bottom, left,   right)
+                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, SolidSides.Down,  bottom, left,   right))
+                dirs &= ~SolidSides.Down;
+            if (HasAlignedFace(col, row, rect, SolidSides.Up,    top,    left,   right)
+                || IsFaceFullyCoveredByAdjacentPolygonEdge(col, row, SolidSides.Up,    top,    left,   right))
+                dirs &= ~SolidSides.Up;
 
-            rect.RepositionDirections = dirs;
+            rect.SolidSides = dirs;
 
             // Full-coverage seam: if this sub-cell rect's face spans the entire adjacent full-cell
             // tile's opposite face, clear the full-cell's matching bit too.
-            SuppressFullCellFaceIfFullyCovered(col, row, RepositionDirections.Left,  left,   bottom, top);
-            SuppressFullCellFaceIfFullyCovered(col, row, RepositionDirections.Right, right,  bottom, top);
-            SuppressFullCellFaceIfFullyCovered(col, row, RepositionDirections.Down,  bottom, left,   right);
-            SuppressFullCellFaceIfFullyCovered(col, row, RepositionDirections.Up,    top,    left,   right);
+            SuppressFullCellFaceIfFullyCovered(col, row, SolidSides.Left,  left,   bottom, top);
+            SuppressFullCellFaceIfFullyCovered(col, row, SolidSides.Right, right,  bottom, top);
+            SuppressFullCellFaceIfFullyCovered(col, row, SolidSides.Down,  bottom, left,   right);
+            SuppressFullCellFaceIfFullyCovered(col, row, SolidSides.Up,    top,    left,   right);
         }
     }
 
     // If the full-cell neighbor in 'dir' has its opposite face at 'facePos' and that face's
     // parallel-axis extent is fully contained within [rangeMin, rangeMax] (within eps), clear
-    // the corresponding RepositionDirections bit on the neighbor. Partial coverage is a no-op.
+    // the corresponding SolidSides bit on the neighbor. Partial coverage is a no-op.
     private void SuppressFullCellFaceIfFullyCovered(int col, int row,
-        RepositionDirections dir, float facePos, float rangeMin, float rangeMax)
+        SolidSides dir, float facePos, float rangeMin, float rangeMax)
     {
         const float eps = 1e-3f;
 
         int nCol = col, nRow = row;
         switch (dir)
         {
-            case RepositionDirections.Left:  nCol -= 1; break;
-            case RepositionDirections.Right: nCol += 1; break;
-            case RepositionDirections.Down:  nRow -= 1; break;
-            case RepositionDirections.Up:    nRow += 1; break;
+            case SolidSides.Left:  nCol -= 1; break;
+            case SolidSides.Right: nCol += 1; break;
+            case SolidSides.Down:  nRow -= 1; break;
+            case SolidSides.Up:    nRow += 1; break;
         }
 
         if (!_tiles.TryGetValue((nCol, nRow), out var fullTile)) return;
@@ -593,35 +593,35 @@ public class TileShapeCollection : ICollidable
         // For each dir: check alignment of the full-cell's opposite face, then verify the
         // full-cell face's parallel extent is fully covered by [rangeMin, rangeMax].
         bool aligned, fullyCovered;
-        RepositionDirections clearBit;
+        SolidSides clearBit;
         switch (dir)
         {
-            case RepositionDirections.Left:
+            case SolidSides.Left:
                 aligned = MathF.Abs(oRight - facePos) < eps;
                 fullyCovered = rangeMin <= oBottom + eps && rangeMax >= oTop - eps;
-                clearBit = RepositionDirections.Right;
+                clearBit = SolidSides.Right;
                 break;
-            case RepositionDirections.Right:
+            case SolidSides.Right:
                 aligned = MathF.Abs(oLeft - facePos) < eps;
                 fullyCovered = rangeMin <= oBottom + eps && rangeMax >= oTop - eps;
-                clearBit = RepositionDirections.Left;
+                clearBit = SolidSides.Left;
                 break;
-            case RepositionDirections.Down:
+            case SolidSides.Down:
                 aligned = MathF.Abs(oTop - facePos) < eps;
                 fullyCovered = rangeMin <= oLeft + eps && rangeMax >= oRight - eps;
-                clearBit = RepositionDirections.Up;
+                clearBit = SolidSides.Up;
                 break;
-            case RepositionDirections.Up:
+            case SolidSides.Up:
                 aligned = MathF.Abs(oBottom - facePos) < eps;
                 fullyCovered = rangeMin <= oLeft + eps && rangeMax >= oRight - eps;
-                clearBit = RepositionDirections.Down;
+                clearBit = SolidSides.Down;
                 break;
             default:
                 return;
         }
 
         if (aligned && fullyCovered)
-            fullTile.RepositionDirections &= ~clearBit;
+            fullTile.SolidSides &= ~clearBit;
     }
 
     // True if the neighbor cell in 'dir' holds a polygon whose axis-aligned edge lies on the
@@ -629,22 +629,22 @@ public class TileShapeCollection : ICollidable
     // Only axis-aligned polygon edges along the boundary can match; slanted edges never will, so
     // slope polygons do not suppress the rect face along their slanted sides.
     private bool IsFaceFullyCoveredByAdjacentPolygonEdge(int col, int row,
-        RepositionDirections dir, float facePos, float rangeMin, float rangeMax)
+        SolidSides dir, float facePos, float rangeMin, float rangeMax)
     {
         const float eps = 1e-3f;
 
         int nCol = col, nRow = row;
         switch (dir)
         {
-            case RepositionDirections.Left:  nCol -= 1; break;
-            case RepositionDirections.Right: nCol += 1; break;
-            case RepositionDirections.Down:  nRow -= 1; break;
-            case RepositionDirections.Up:    nRow += 1; break;
+            case SolidSides.Left:  nCol -= 1; break;
+            case SolidSides.Right: nCol += 1; break;
+            case SolidSides.Down:  nRow -= 1; break;
+            case SolidSides.Up:    nRow += 1; break;
         }
 
         if (!_polyTiles.TryGetValue((nCol, nRow), out var poly)) return false;
 
-        bool isVerticalEdge = dir == RepositionDirections.Left || dir == RepositionDirections.Right;
+        bool isVerticalEdge = dir == SolidSides.Left || dir == SolidSides.Right;
 
         for (int i = 0; i < poly.Points.Count; i++)
         {
@@ -678,8 +678,8 @@ public class TileShapeCollection : ICollidable
     // Returns true if some rect (sub-cell or full-cell, same or neighbor cell) has an opposite
     // face lying on 'facePos' (the perpendicular-axis coordinate of 'rect's face in 'dir') with
     // non-zero overlap along [rangeMin, rangeMax] (the parallel-axis extent of 'rect's face).
-    private bool HasAlignedFace(int col, int row, AxisAlignedRectangle rect,
-        RepositionDirections dir, float facePos, float rangeMin, float rangeMax)
+    private bool HasAlignedFace(int col, int row, AARect rect,
+        SolidSides dir, float facePos, float rangeMin, float rangeMax)
     {
         const float eps = 1e-3f;
 
@@ -697,10 +697,10 @@ public class TileShapeCollection : ICollidable
         int nCol = col, nRow = row;
         switch (dir)
         {
-            case RepositionDirections.Left:  nCol -= 1; break;
-            case RepositionDirections.Right: nCol += 1; break;
-            case RepositionDirections.Down:  nRow -= 1; break;
-            case RepositionDirections.Up:    nRow += 1; break;
+            case SolidSides.Left:  nCol -= 1; break;
+            case SolidSides.Right: nCol += 1; break;
+            case SolidSides.Down:  nRow -= 1; break;
+            case SolidSides.Up:    nRow += 1; break;
         }
 
         if (_tiles.TryGetValue((nCol, nRow), out var fullTile)
@@ -716,8 +716,8 @@ public class TileShapeCollection : ICollidable
         return false;
     }
 
-    private static bool OppositeFaceMatches(AxisAlignedRectangle other,
-        RepositionDirections dir, float facePos, float rangeMin, float rangeMax, float eps)
+    private static bool OppositeFaceMatches(AARect other,
+        SolidSides dir, float facePos, float rangeMin, float rangeMax, float eps)
     {
         float oLeft   = other.X - other.Width  / 2f;
         float oRight  = other.X + other.Width  / 2f;
@@ -728,16 +728,16 @@ public class TileShapeCollection : ICollidable
         // Down checks other's top, Up checks other's bottom.
         switch (dir)
         {
-            case RepositionDirections.Left:
+            case SolidSides.Left:
                 return MathF.Abs(oRight - facePos) < eps
                     && MathF.Min(oTop, rangeMax) - MathF.Max(oBottom, rangeMin) > eps;
-            case RepositionDirections.Right:
+            case SolidSides.Right:
                 return MathF.Abs(oLeft - facePos) < eps
                     && MathF.Min(oTop, rangeMax) - MathF.Max(oBottom, rangeMin) > eps;
-            case RepositionDirections.Down:
+            case SolidSides.Down:
                 return MathF.Abs(oTop - facePos) < eps
                     && MathF.Min(oRight, rangeMax) - MathF.Max(oLeft, rangeMin) > eps;
-            case RepositionDirections.Up:
+            case SolidSides.Up:
                 return MathF.Abs(oBottom - facePos) < eps
                     && MathF.Min(oRight, rangeMax) - MathF.Max(oLeft, rangeMin) > eps;
         }
@@ -795,7 +795,7 @@ public class TileShapeCollection : ICollidable
                         // the top face is covered by another tile and isn't a landing
                         // surface.
                         if (sep.X != 0f && sep.Y == 0f && ent != null && ent.VelocityY < 0f
-                            && tile.RepositionDirections.HasFlag(RepositionDirections.Up))
+                            && tile.SolidSides.HasFlag(SolidSides.Up))
                         {
                             float lastBottom = minY - ent.VelocityY / 60f;
                             if (lastBottom > rectTop)
@@ -1008,7 +1008,7 @@ public class TileShapeCollection : ICollidable
     /// <param name="hitPoint">Hit point.</param>
     /// <param name="hitNormal">Hit normal.</param>
     /// <param name="hitShape">
-    /// The shape that produced the hit — an <see cref="AxisAlignedRectangle"/> (full-cell tile or
+    /// The shape that produced the hit — an <see cref="AARect"/> (full-cell tile or
     /// sub-cell rect) or a <see cref="Polygon"/>. <c>null</c> if no hit.
     /// </param>
     public bool Raycast(Vector2 start, Vector2 end, out Vector2 hitPoint, out Vector2 hitNormal, out ICollidable? hitShape)
@@ -1212,7 +1212,7 @@ public class TileShapeCollection : ICollidable
     // Slab-method ray-vs-AABB over all sub-cell rects in the given cell. Returns the earliest
     // hit (smallest t in [0,1] along start + dir). Normal points back toward the ray origin.
     private bool TryRaycastSubCellRects(int col, int row, Vector2 start, Vector2 dir,
-        out Vector2 hitPoint, out Vector2 hitNormal, out AxisAlignedRectangle? hitRect)
+        out Vector2 hitPoint, out Vector2 hitNormal, out AARect? hitRect)
     {
         hitPoint = Vector2.Zero;
         hitNormal = Vector2.Zero;
@@ -1223,7 +1223,7 @@ public class TileShapeCollection : ICollidable
 
         float bestT = float.MaxValue;
         Vector2 bestNormal = Vector2.Zero;
-        AxisAlignedRectangle? bestRect = null;
+        AARect? bestRect = null;
 
         foreach (var rect in list)
         {
@@ -1287,7 +1287,7 @@ public class TileShapeCollection : ICollidable
         return true;
     }
 
-    // ICollidable — TileShapeCollection is static geometry; only the querying shape moves.
+    // ICollidable — TileShapes is static geometry; only the querying shape moves.
     /// <inheritdoc/>
     public float AbsoluteX => X;
     /// <inheritdoc/>

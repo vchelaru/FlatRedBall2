@@ -3,7 +3,7 @@ using System;
 namespace FlatRedBall2.Collision;
 
 /// <summary>
-/// Controls which directions an <see cref="AxisAlignedRectangle"/> may reposition overlapping objects.
+/// Controls which directions an <see cref="AARect"/> may reposition overlapping objects.
 /// Used to eliminate "snagging" — the unintended velocity deflection that occurs when a moving
 /// object grazes the shared edge between two adjacent rectangles.
 /// </summary>
@@ -21,7 +21,7 @@ namespace FlatRedBall2.Collision;
 /// </para>
 /// </remarks>
 [Flags]
-public enum RepositionDirections
+public enum SolidSides
 {
     /// <summary>No sides are solid — everything passes through.</summary>
     None  = 0,

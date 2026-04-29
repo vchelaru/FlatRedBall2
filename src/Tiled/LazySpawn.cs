@@ -32,17 +32,17 @@ public enum LazySpawnMode
 
 /// <summary>
 /// Activation rectangle in world space — typically a camera's visible bounds. Multiple rects
-/// may be passed to <see cref="LazySpawnManager.Update(ReadOnlySpan{ActivationRect})"/> for
+/// may be passed to <see cref="LazySpawner.Update(ReadOnlySpan{SpawnBounds})"/> for
 /// split-screen; a placement is "covered" if any rect contains it.
 /// </summary>
-public readonly record struct ActivationRect(float Left, float Right, float Bottom, float Top);
+public readonly record struct SpawnBounds(float Left, float Right, float Bottom, float Top);
 
 /// <summary>
 /// Tracks <see cref="LazySpawnRecord{T}"/>s for a <see cref="TileMap"/> and ticks them each
 /// frame against one or more activation rects. Records are inert until added; the manager
 /// performs no allocation on the per-frame hotpath.
 /// </summary>
-public sealed class LazySpawnManager
+public sealed class LazySpawner
 {
     private readonly List<ILazySpawnRecord> _records = new();
 
@@ -63,7 +63,7 @@ public sealed class LazySpawnManager
     /// after that rect is expanded by the factory's <see cref="Factory{T}.LazySpawnBuffer"/>.
     /// Reloadable records re-arm only once every rect has left.
     /// </summary>
-    public void Update(ReadOnlySpan<ActivationRect> rects)
+    public void Update(ReadOnlySpan<SpawnBounds> rects)
     {
         for (int i = 0; i < _records.Count; i++)
             _records[i].Tick(rects);
@@ -75,14 +75,14 @@ public sealed class LazySpawnManager
     /// </summary>
     public void Update(float left, float right, float bottom, float top)
     {
-        ReadOnlySpan<ActivationRect> rects = [new ActivationRect(left, right, bottom, top)];
+        ReadOnlySpan<SpawnBounds> rects = [new SpawnBounds(left, right, bottom, top)];
         Update(rects);
     }
 }
 
 internal interface ILazySpawnRecord
 {
-    void Tick(ReadOnlySpan<ActivationRect> rects);
+    void Tick(ReadOnlySpan<SpawnBounds> rects);
 }
 
 internal enum LazySpawnRecordState
@@ -110,7 +110,7 @@ internal sealed class LazySpawnRecord<T> : ILazySpawnRecord where T : Entity, ne
         _applyAfterInit = applyAfterInit;
     }
 
-    public void Tick(ReadOnlySpan<ActivationRect> rects)
+    public void Tick(ReadOnlySpan<SpawnBounds> rects)
     {
         if (_state == LazySpawnRecordState.Consumed) return;
 

@@ -45,16 +45,16 @@ public override async void CustomActivity(FrameTime time)
 
 ## Pre-Move Collision Check
 
-Use `TileShapeCollection.GetTileAtWorld(x, y)` to test the target tile before committing:
+Use `TileShapes.GetTileAtWorld(x, y)` to test the target tile before committing:
 
 ```csharp
 private bool IsBlocked(float x, float y)
     => _solidTiles.GetTileAtWorld(x, y) != null;
 ```
 
-`TileShapeCollection` is injected from the screen after spawning via a method on the entity. See the `levels` skill for how to generate it from a TMX layer.
+`TileShapes` is injected from the screen after spawning via a method on the entity. See the `levels` skill for how to generate it from a TMX layer.
 
-> **Namespace gotcha** — `TileShapeCollection` lives in `FlatRedBall2.Collision`, not `FlatRedBall2.Tiled`. Add `using FlatRedBall2.Collision;` to any file that declares a `TileShapeCollection` field.
+> **Namespace gotcha** — `TileShapes` lives in `FlatRedBall2.Collision`, not `FlatRedBall2.Tiled`. Add `using FlatRedBall2.Collision;` to any file that declares a `TileShapes` field.
 
 ## Tween Helper
 

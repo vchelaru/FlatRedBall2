@@ -85,8 +85,8 @@ uses `DecelerationTime`; pressing directly forward uses `AccelerationTime`. Both
 ## Direction Facing
 
 ```csharp
-_topDown.PossibleDirections = PossibleDirections.FourWay;   // Right, Up, Left, Down
-_topDown.PossibleDirections = PossibleDirections.EightWay;  // + diagonals (default)
+_topDown.DirectionSnap = DirectionSnap.FourWay;   // Right, Up, Left, Down
+_topDown.DirectionSnap = DirectionSnap.EightWay;  // + diagonals (default)
 
 TopDownDirection dir = _topDown.DirectionFacing;
 // e.g. TopDownDirection.Up, .DownLeft, etc.
@@ -128,21 +128,21 @@ Scales `MaxSpeed` without modifying the `TopDownValues` object.
 _topDown.DirectionFacing   // TopDownDirection enum — updated each frame
 _topDown.IsMoving          // true when velocity magnitude > epsilon (use this for animation, NOT input)
 _topDown.SpeedMultiplier   // read/write, defaults to 1f
-_topDown.InputEnabled      // set false to freeze input without destroying movement values
+_topDown.IsInputEnabled      // set false to freeze input without destroying movement values
 ```
 
 Use `IsMoving` (not `MovementInput.X != 0`) to pick idle vs. walk animations — input stays non-zero when the entity is held against a wall, but `IsMoving` correctly flips to false because collision zeroes velocity.
 
 ## Mapping 8-Way Facing to 4-Direction Art
 
-Games often keep `PossibleDirections.EightWay` (the default) so diagonal input feels responsive but ship art with only 4 cardinal chains (`WalkUp`, `WalkDown`, `WalkLeft`, `WalkRight`). Collapse the diagonals at animation-selection time with `ToCardinal()` — do **not** switch to `FourWay`, which snaps the facing itself and makes diagonals feel notchy.
+Games often keep `DirectionSnap.EightWay` (the default) so diagonal input feels responsive but ship art with only 4 cardinal chains (`WalkUp`, `WalkDown`, `WalkLeft`, `WalkRight`). Collapse the diagonals at animation-selection time with `ToCardinal()` — do **not** switch to `FourWay`, which snaps the facing itself and makes diagonals feel notchy.
 
 ```csharp
 string chain = (_topDown.IsMoving ? "Walk" : "Idle") + _topDown.DirectionFacing.ToCardinal();
 _sprite.PlayAnimation(chain);
 ```
 
-`ToCardinal()` defaults to `DiagonalAxis.Horizontal` (UpRight/DownRight → Right, UpLeft/DownLeft → Left) because horizontal silhouettes usually read more distinctly. Pass `DiagonalAxis.Vertical` when up/down poses are more distinct than left/right.
+`ToCardinal()` defaults to `DiagonalCollapse.Horizontal` (UpRight/DownRight → Right, UpLeft/DownLeft → Left) because horizontal silhouettes usually read more distinctly. Pass `DiagonalCollapse.Vertical` when up/down poses are more distinct than left/right.
 
 ## Collision Setup
 
@@ -173,4 +173,4 @@ _aiInput.Y = dir.Y;
 
 - Diagonal input magnitudes > 1 are clamped to the unit circle — full speed in 8 directions.
 - `UpdateDirectionFromInput` defaults to `true`. Set it to `false` and `UpdateDirectionFromVelocity` to `true` if you want direction to lag behind input (e.g. tank-style).
-- `InputEnabled = false` stops reading input but does not zero velocity — the entity will coast until friction/collision stops it.
+- `IsInputEnabled = false` stops reading input but does not zero velocity — the entity will coast until friction/collision stops it.

@@ -98,7 +98,7 @@ Add a new `<layer>` element. Increment the `id` and update `nextlayerid` on `<ma
 
 ### Author a slope tile (polygon collision)
 
-Slope collision is defined on a tileset tile via an `<objectgroup>` containing one `<polygon>`. `TileMapCollisionGenerator` converts any such polygon to a local-space `Polygon` prototype (centered on the cell, Y-up) and emits it via `TileShapeCollection.AddPolygonTileAtCell` instead of a rect. For platformer floor slopes, set `SlopeMode = PlatformerFloor` on the **player's collision relationship** (not on the collection) — see the `collision-relationships` and `platformer-movement` skills.
+Slope collision is defined on a tileset tile via an `<objectgroup>` containing one `<polygon>`. `TileMapCollisions` converts any such polygon to a local-space `Polygon` prototype (centered on the cell, Y-up) and emits it via `TileShapes.AddPolygonTileAtCell` instead of a rect. For platformer floor slopes, set `SlopeMode = PlatformerFloor` on the **player's collision relationship** (not on the collection) — see the `collision-relationships` and `platformer-movement` skills.
 
 ```xml
 <tile id="11" type="SolidCollision">
@@ -110,7 +110,7 @@ Slope collision is defined on a tileset tile via an `<objectgroup>` containing o
 </tile>
 ```
 
-Points are pixels in tile-local space, **Y-down** (Tiled's convention — origin at tile top-left, `y` increases downward). **FlatRedBall2 uses Y-up** in world space, so the two conventions disagree. You do NOT need to convert — `TileMapCollisionGenerator` does the Y-flip and cell-centering for you. Write polygons using Tiled's native coords. The example above is a lower-left triangle inside a 16×16 tile. `StandardTileset.tsx` ships with several slope tiles already authored this way (tile ids 11, 12, 13, 107).
+Points are pixels in tile-local space, **Y-down** (Tiled's convention — origin at tile top-left, `y` increases downward). **FlatRedBall2 uses Y-up** in world space, so the two conventions disagree. You do NOT need to convert — `TileMapCollisions` does the Y-flip and cell-centering for you. Write polygons using Tiled's native coords. The example above is a lower-left triangle inside a 16×16 tile. `StandardTileset.tsx` ships with several slope tiles already authored this way (tile ids 11, 12, 13, 107).
 
 **Polygon authoring — fill the cell, not just the surface.** A slope polygon needs the walking surface AND the solid mass below it, typically as a 4-point shape with the base on y=16 and a side on x=0 or x=16. Don't author a thin wedge triangle (e.g., `(0,12) (16,8) (0,16)`) — the walking edge `(0,12)→(16,8)` is correct but the hypotenuse back to the bottom-left leaves the bottom-right of the cell empty, so collision fails for anything approaching from below or from the right. For a gentle up-slope use a trapezoid like `(0,12) (16,8) (16,16) (0,16)`.
 
@@ -128,7 +128,7 @@ OR the appropriate mask(s) with the base GID. Example: tile ID 11 (GID 12) flipp
 
 ### Sub-cell rectangles
 
-A tileset tile can also carry one or more `<object>` elements with no child shape — plain Tiled rectangles. These emit as `AxisAlignedRectangle`s placed inside the cell (not the default full-cell rect). Use them for spikes, half-height platforms, or any box that doesn't fill the whole tile.
+A tileset tile can also carry one or more `<object>` elements with no child shape — plain Tiled rectangles. These emit as `AARect`s placed inside the cell (not the default full-cell rect). Use them for spikes, half-height platforms, or any box that doesn't fill the whole tile.
 
 ```xml
 <tile id="20" type="SolidCollision">
@@ -140,7 +140,7 @@ A tileset tile can also carry one or more `<object>` elements with no child shap
 
 Multiple rects per tile are fine (e.g., two separate spike-rects). Rects and polygons can coexist on the same tile — both emit. Tile flip flags (H, V, diagonal) are honored for rects the same way they are for polygons.
 
-Adjacent sub-cell rects participate in `RepositionDirections` seam suppression: if two sub-cell rects share an aligned, overlapping face (e.g., two bottom-half curbs in neighbor cells), or if a sub-cell rect's face aligns with a full-cell neighbor tile's face, the sub-cell rect's face is suppressed. When a sub-cell rect fully covers the adjacent full-cell tile's face (endpoints coincide), the matching face on the full-cell tile is suppressed as well, so a mover crossing the seam sees one clean surface. Partial coverage (e.g., a short spike next to a tall wall) leaves the full-cell face live so the exposed portion still repositions correctly. A sub-cell rect face that is fully covered by an axis-aligned polygon edge along the shared cell boundary (e.g., a slope polygon's vertical back-edge meeting a half-height rect) is also suppressed on the rect side so the mover doesn't snag at the seam; the polygon side is not modified.
+Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub-cell rects share an aligned, overlapping face (e.g., two bottom-half curbs in neighbor cells), or if a sub-cell rect's face aligns with a full-cell neighbor tile's face, the sub-cell rect's face is suppressed. When a sub-cell rect fully covers the adjacent full-cell tile's face (endpoints coincide), the matching face on the full-cell tile is suppressed as well, so a mover crossing the seam sees one clean surface. Partial coverage (e.g., a short spike next to a tall wall) leaves the full-cell face live so the exposed portion still repositions correctly. A sub-cell rect face that is fully covered by an axis-aligned polygon edge along the shared cell boundary (e.g., a slope polygon's vertical back-edge meeting a half-height rect) is also suppressed on the rect side so the mover doesn't snag at the seam; the polygon side is not modified.
 
 **Current limitations:**
 - `<ellipse>` and polyline collision objects are ignored — only `<polygon>` and plain `<object>` rectangles are honored.

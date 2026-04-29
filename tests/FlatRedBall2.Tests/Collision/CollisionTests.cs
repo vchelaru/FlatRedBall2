@@ -13,10 +13,10 @@ public class CollisionTests
     [Fact]
     public void AllowDuplicatePairs_WhenFalse_EachPairFiresOnce()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
         var list = new[] { a, b };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list);
+        var rel = new CollisionRelationship<AARect, AARect>(list, list);
         int fireCount = 0;
         rel.CollisionOccurred += (_, _) => fireCount++;
 
@@ -28,14 +28,14 @@ public class CollisionTests
     [Fact]
     public void AllowDuplicatePairs_WhenTrue_FiresEventForBothOrderings()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
         var list = new[] { a, b };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list)
+        var rel = new CollisionRelationship<AARect, AARect>(list, list)
         {
             AllowDuplicatePairs = true,
         };
-        var firedFirstArgs = new List<AxisAlignedRectangle>();
+        var firedFirstArgs = new List<AARect>();
         rel.CollisionOccurred += (first, _) => firedFirstArgs.Add(first);
 
         rel.RunCollisions();
@@ -55,17 +55,17 @@ public class CollisionTests
         // so the one-way gate allows the collision. Previously the upper tile's larger downward
         // push overrode the lower tile's upward push, making sep.Y negative and causing the
         // one-way gate to reject the collision — the player fell through.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // bottom tile: top at y=16
         tiles.AddTileAtCell(0, 2); // upper tile: bottom at y=32 (one-cell gap)
 
         // Entity feet at y=14 (2 inside bottom tile), top at y=38 (6 inside upper tile).
         var entity = new Entity { X = 8f, Y = 14f };
         entity.LastPosition = new System.Numerics.Vector2(8f, 16f); // was on tile top last frame
-        var shape = new AxisAlignedRectangle { Width = 12f, Height = 24f, Y = 12f };
+        var shape = new AARect { Width = 12f, Height = 24f, Y = 12f };
         entity.Add(shape);
 
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { entity }, new[] { tiles })
         {
             OneWayDirection = OneWayDirection.Up,
@@ -81,8 +81,8 @@ public class CollisionTests
     [Fact]
     public void CollidesWith_AARectVsAARect_NotOverlapping_ReturnsFalse()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 100f, Y = 0f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 100f, Y = 0f };
 
         a.CollidesWith(b).ShouldBeFalse();
     }
@@ -90,8 +90,8 @@ public class CollisionTests
     [Fact]
     public void CollidesWith_AARectVsAARect_Overlapping_ReturnsTrue()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f, Y = 0f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f, Y = 0f };
 
         a.CollidesWith(b).ShouldBeTrue();
     }
@@ -99,7 +99,7 @@ public class CollisionTests
     [Fact]
     public void CollidesWith_AARectVsCircle_NotOverlapping_ReturnsFalse()
     {
-        var rect = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rect = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
         var circle = new Circle { Radius = 10f, X = 100f, Y = 0f };
 
         rect.CollidesWith(circle).ShouldBeFalse();
@@ -108,7 +108,7 @@ public class CollisionTests
     [Fact]
     public void CollidesWith_AARectVsCircle_Overlapping_ReturnsTrue()
     {
-        var rect = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rect = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
         var circle = new Circle { Radius = 20f, X = 28f, Y = 0f };
 
         rect.CollidesWith(circle).ShouldBeTrue();
@@ -136,8 +136,8 @@ public class CollisionTests
     public void GetSeparationVector_AARectVsAARect_PointsAway()
     {
         // a is at 0, b is at 20 — b overlaps a's right side; MTV should push a left (negative X)
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f, Y = 0f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f, Y = 0f };
 
         var sep = a.GetSeparationVector(b);
 
@@ -148,13 +148,13 @@ public class CollisionTests
     [Fact]
     public void GetSeparationVector_RepositionDirection_ShouldRedirectReposition()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f, RepositionDirections = RepositionDirections.Down };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f, SolidSides = SolidSides.Down };
         var b = new Circle { Radius = 10, X = -25, Y = -10f };
 
         var sep = b.GetSeparationVector(a);
 
         sep.X.ShouldBe(0);
-        sep.Y.ShouldBeLessThan(0, "because a's RepositionDirections should redirect the MTV downwards, even though the raw MTV from circle-vs-rect would be left");
+        sep.Y.ShouldBeLessThan(0, "because a's SolidSides should redirect the MTV downwards, even though the raw MTV from circle-vs-rect would be left");
     }
 
     // Circle at (0, -8): center inside the 32×32 rect at origin, near bottom face.
@@ -163,7 +163,7 @@ public class CollisionTests
     [Fact]
     public void GetSeparationVector_CircleCenterInsideRect_PushedDown_CenterIsRadiusBelowBottom()
     {
-        var rect   = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f, RepositionDirections = RepositionDirections.Down };
+        var rect   = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f, SolidSides = SolidSides.Down };
         var circle = new Circle { Radius = 10f, X = 0f, Y = -8f };
 
         var sep = circle.GetSeparationVector(rect);
@@ -183,7 +183,7 @@ public class CollisionTests
     [Fact]
     public void GetSeparationVector_CircleNearCorner_PushedDown_EdgeGrazesCorner()
     {
-        var rect   = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f, RepositionDirections = RepositionDirections.Down };
+        var rect   = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f, SolidSides = SolidSides.Down };
         var circle = new Circle { Radius = 10f, X = -22f, Y = -18f };
 
         var sep = circle.GetSeparationVector(rect);
@@ -202,9 +202,9 @@ public class CollisionTests
     [Fact]
     public void MoveBothOnCollision_BothObjectsMove()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
         rel.MoveBothOnCollision();
 
         rel.RunCollisions();
@@ -218,11 +218,11 @@ public class CollisionTests
     {
         // Verifies the parent entity's X changes, not the child shape's local X
         var entityA = new Entity { X = 0f };
-        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectA = new AARect { Width = 32f, Height = 32f };
         entityA.Add(rectA);
 
         var entityB = new Entity { X = 20f };
-        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectB = new AARect { Width = 32f, Height = 32f };
         entityB.Add(rectB);
 
         var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
@@ -238,9 +238,9 @@ public class CollisionTests
     [Fact]
     public void MoveFirstOnCollision_OnlyFirstMoves()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
         rel.MoveFirstOnCollision();
 
         rel.RunCollisions();
@@ -252,9 +252,9 @@ public class CollisionTests
     [Fact]
     public void MoveSecondOnCollision_OnlySecondMoves()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
         rel.MoveSecondOnCollision();
 
         rel.RunCollisions();
@@ -266,9 +266,9 @@ public class CollisionTests
     [Fact]
     public void OneWayDirection_Default_IsNone()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+        var a = new AARect { Width = 32f, Height = 32f };
+        var b = new AARect { Width = 32f, Height = 32f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
 
         rel.OneWayDirection.ShouldBe(OneWayDirection.None);
     }
@@ -280,9 +280,9 @@ public class CollisionTests
         // SAT picks Y axis (vertical-dominant overlap) and produces sep.Y < 0.
         var a = new OneWayTestPlayer { X = 0f, Y = -25f, VelocityY = 50f };
         a.LastPosition = new System.Numerics.Vector2(0f, -33f); // was below resolved Y last frame
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Down,
         };
@@ -299,9 +299,9 @@ public class CollisionTests
     {
         // A above B — sep.Y would be positive (push up). Down gate rejects.
         var a = new OneWayTestPlayer { X = 0f, Y = 25f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Down,
         };
@@ -320,9 +320,9 @@ public class CollisionTests
     {
         // Velocity gate: an entity below the ceiling but already falling shouldn't be pulled down further.
         var a = new OneWayTestPlayer { X = 0f, Y = -25f, VelocityY = -200f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Down,
         };
@@ -342,9 +342,9 @@ public class CollisionTests
         // Vertical-dominant overlap: SAT returns a pure-Y sep. X must not move (sep.X zeroed).
         var a = new OneWayTestPlayer { X = 5f, Y = -20f, VelocityY = 50f };
         a.LastPosition = new System.Numerics.Vector2(5f, -33f);
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Down,
         };
@@ -363,9 +363,9 @@ public class CollisionTests
         // SAT picks X axis (horizontal-dominant overlap) with sep.X < 0 (push A back left).
         var a = new OneWayTestPlayer { X = -25f, Y = 0f, VelocityX = 50f };
         a.LastPosition = new System.Numerics.Vector2(-33f, 0f);
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Left,
         };
@@ -382,9 +382,9 @@ public class CollisionTests
     {
         // A on the right side — sep.X would be positive (push right). Left gate rejects.
         var a = new OneWayTestPlayer { X = 25f, Y = 0f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Left,
         };
@@ -403,9 +403,9 @@ public class CollisionTests
     {
         // Velocity gate: an entity already moving left shouldn't be pushed further left through the door.
         var a = new OneWayTestPlayer { X = -25f, Y = 0f, VelocityX = -200f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Left,
         };
@@ -424,9 +424,9 @@ public class CollisionTests
     {
         var a = new OneWayTestPlayer { X = -20f, Y = 5f, VelocityX = 50f };
         a.LastPosition = new System.Numerics.Vector2(-33f, 5f);
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Left,
         };
@@ -444,9 +444,9 @@ public class CollisionTests
         // Mirror of Left: blocks leftward motion. A approaches from the right moving left.
         var a = new OneWayTestPlayer { X = 25f, Y = 0f, VelocityX = -50f };
         a.LastPosition = new System.Numerics.Vector2(33f, 0f);
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Right,
         };
@@ -462,9 +462,9 @@ public class CollisionTests
     public void OneWayRight_AOverlapsBFromLeft_DoesNotSeparate()
     {
         var a = new OneWayTestPlayer { X = -25f, Y = 0f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Right,
         };
@@ -482,9 +482,9 @@ public class CollisionTests
     public void OneWayRight_FromRight_MovingRightward_DoesNotSeparate()
     {
         var a = new OneWayTestPlayer { X = 25f, Y = 0f, VelocityX = 200f };
-        a.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        a.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Right,
         };
@@ -503,9 +503,9 @@ public class CollisionTests
     {
         // A sits just above B with a small vertical overlap. AabbVsAabb will produce sep.Y > 0
         // (push A upward), so the one-way Up gate fires.
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 25f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 25f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -522,9 +522,9 @@ public class CollisionTests
     {
         // A sits below B with vertical overlap — sep.Y would be negative (push A down).
         // Gate rejects this: no separation, no event.
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = -25f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f, Y = -25f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -543,9 +543,9 @@ public class CollisionTests
     {
         // Horizontal-dominant overlap: AabbVsAabb returns a pure-X separation (sep.Y == 0).
         // Gate rejects: sep.Y <= 0 means "not pushed upward".
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 25f, Y = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        var a = new AARect { Width = 32f, Height = 32f, X = 25f, Y = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -566,9 +566,9 @@ public class CollisionTests
         // A above B with vertical-dominant overlap — SAT returns a pure-Y sep, so X doesn't move.
         // This also pins the "sep.X zeroed before ApplyResponse" contract: any X in the sep would
         // translate into X motion here, and we'd see it.
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 5f, Y = 20f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b })
+        var a = new AARect { Width = 32f, Height = 32f, X = 5f, Y = 20f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -581,28 +581,28 @@ public class CollisionTests
     }
 
     [Fact]
-    public void AllowDropThrough_DefaultsToFalse()
+    public void CanDropThrough_DefaultsToFalse()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(new[] { a }, new[] { b });
+        var a = new AARect { Width = 32f, Height = 32f };
+        var b = new AARect { Width = 32f, Height = 32f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
 
-        rel.AllowDropThrough.ShouldBeFalse();
+        rel.CanDropThrough.ShouldBeFalse();
     }
 
     [Fact]
-    public void OneWayUp_AllowDropThroughFalse_PlayerSuppressing_StillSeparates()
+    public void OneWayUp_CanDropThroughFalse_PlayerSuppressing_StillSeparates()
     {
-        // Hard one-way barrier (e.g. Yoshi's Island ratchet door): AllowDropThrough = false.
+        // Hard one-way barrier (e.g. Yoshi's Island ratchet door): CanDropThrough = false.
         // Even with the player's drop-through flag active, separation must still fire.
         var player = MakeSuppressingPlayer(y: 25f);
         // Simulate "was on top of barrier last frame" so the positional gate accepts.
         player.LastPosition = new System.Numerics.Vector2(0f, 33f);
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { player }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
-            // AllowDropThrough = false (default)
+            // CanDropThrough = false (default)
         };
         rel.MoveFirstOnCollision();
 
@@ -614,16 +614,16 @@ public class CollisionTests
     }
 
     [Fact]
-    public void OneWayUp_AllowDropThroughTrue_PlayerSuppressing_SkipsSeparation()
+    public void OneWayUp_CanDropThroughTrue_PlayerSuppressing_SkipsSeparation()
     {
-        // Cloud platform: AllowDropThrough = true. Player's drop-through flag bypasses the pair entirely.
+        // Cloud platform: CanDropThrough = true. Player's drop-through flag bypasses the pair entirely.
         var player = MakeSuppressingPlayer(y: 25f);
         float startY = player.Y;
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { player }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
-            AllowDropThrough = true,
+            CanDropThrough = true,
         };
         rel.MoveFirstOnCollision();
         bool fired = false;
@@ -632,7 +632,7 @@ public class CollisionTests
         player.Platformer.IsSuppressingOneWayCollision.ShouldBeTrue();
         rel.RunCollisions();
 
-        player.Y.ShouldBe(startY, "drop-through active + AllowDropThrough=true → relationship bypassed");
+        player.Y.ShouldBe(startY, "drop-through active + CanDropThrough=true → relationship bypassed");
         fired.ShouldBeFalse();
     }
 
@@ -642,15 +642,15 @@ public class CollisionTests
         // Drop-through is *direction-gated* inside TryApplyOneWayGate — it only has an effect
         // when OneWayDirection != None. A solid (two-way) relationship with
         // OneWayDirection = None must never be bypassed by the player's suppression flag, even
-        // if AllowDropThrough is (deliberately / accidentally) set to true. Regression against
-        // a hypothetical bug where AllowDropThrough became a global "skip collision" kill switch.
+        // if CanDropThrough is (deliberately / accidentally) set to true. Regression against
+        // a hypothetical bug where CanDropThrough became a global "skip collision" kill switch.
         var player = MakeSuppressingPlayer(y: 25f);
         float startY = player.Y;
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { player }, new[] { b })
         {
             OneWayDirection = OneWayDirection.None, // solid, two-way
-            AllowDropThrough = true,                // intentionally misconfigured
+            CanDropThrough = true,                // intentionally misconfigured
         };
         rel.MoveFirstOnCollision();
         bool fired = false;
@@ -674,9 +674,9 @@ public class CollisionTests
         // enough.
         var player = new OneWayTestPlayer { Y = 12f, VelocityY = -50f };
         player.LastPosition = new System.Numerics.Vector2(0f, 14f); // last frame: also inside tile from below
-        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        player.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { player }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -697,9 +697,9 @@ public class CollisionTests
         // Even when sep.Y > 0 (deep enough overlap that SAT picks the upward exit), an upward-
         // moving entity should pass through. Gate requires VelocityY <= 0 for OneWayDirection.Up.
         var player = new OneWayTestPlayer { Y = 25f, VelocityY = 200f };
-        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f, Y = 0f };
-        var rel = new CollisionRelationship<OneWayTestPlayer, AxisAlignedRectangle>(new[] { player }, new[] { b })
+        player.Add(new AARect { Width = 32f, Height = 32f });
+        var b = new AARect { Width = 32f, Height = 32f, X = 0f, Y = 0f };
+        var rel = new CollisionRelationship<OneWayTestPlayer, AARect>(new[] { player }, new[] { b })
         {
             OneWayDirection = OneWayDirection.Up,
         };
@@ -720,7 +720,7 @@ public class CollisionTests
         // is higher than at LastPosition.X when walking uphill. The original flat gate would
         // reject every frame ("LastPos.Y < Position.Y + sep.Y") and the player would tunnel.
         // The slope-aware gate folds in the (lastSurface - thisSurface) delta so the check passes.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         // Right-ascending triangle in cell (0,0): world (0,0)→(16,0)→(16,16).
         tiles.AddPolygonTileAtCell(0, 0, Polygon.FromPoints(new[]
         {
@@ -734,9 +734,9 @@ public class CollisionTests
             X = 8f, Y = 23f, VelocityY = 0f,
             LastPosition = new System.Numerics.Vector2(4f, 20f),
         };
-        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        player.Add(new AARect { Width = 32f, Height = 32f });
 
-        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapes>(
             new[] { player }, new[] { tiles })
         {
             OneWayDirection = OneWayDirection.Up,
@@ -755,7 +755,7 @@ public class CollisionTests
         // Player rising into a sloped cloud from below — velocity gate still rejects regardless
         // of surface-Y delta. Ensures the slope-aware path didn't accidentally bypass the
         // VelocityY > 0 gate.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddPolygonTileAtCell(0, 0, Polygon.FromPoints(new[]
         {
             new System.Numerics.Vector2(-8f, -8f),
@@ -764,9 +764,9 @@ public class CollisionTests
         }));
 
         var player = new OneWayTestPlayer { X = 8f, Y = 15f, VelocityY = 200f };
-        player.Add(new AxisAlignedRectangle { Width = 32f, Height = 32f });
+        player.Add(new AARect { Width = 32f, Height = 32f });
 
-        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapes>(
             new[] { player }, new[] { tiles })
         {
             OneWayDirection = OneWayDirection.Up,
@@ -788,7 +788,7 @@ public class CollisionTests
         // positional gate, allowing an 8px upward sep through the one-way gate.
         // Fix: surfaceDelta only uses polygon surfaces — rect tiles return null, delta = 0,
         // and the original flat gate correctly rejects.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // flat rect: center (8,8), spans [0,16]×[0,16], top = 16
         tiles.AddPolygonTileAtCell(1, 0, Polygon.FromPoints(new[]
         {
@@ -810,9 +810,9 @@ public class CollisionTests
             X = 10f, Y = 18f, VelocityY = -5f,
             LastPosition = new System.Numerics.Vector2(20f, 16f),
         };
-        player.Add(new AxisAlignedRectangle { Width = 12f, Height = 20f });
+        player.Add(new AARect { Width = 12f, Height = 20f });
 
-        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapeCollection>(
+        var rel = new CollisionRelationship<OneWayTestPlayer, TileShapes>(
             new[] { player }, new[] { tiles })
         {
             OneWayDirection = OneWayDirection.Up,
@@ -848,7 +848,7 @@ public class CollisionTests
     private static OneWayTestPlayer MakeSuppressingPlayer(float y)
     {
         var player = new OneWayTestPlayer { Y = y };
-        var shape = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var shape = new AARect { Width = 32f, Height = 32f };
         player.Add(shape);
 
         player.Behavior.AirMovement = new PlatformerValues();
@@ -864,11 +864,11 @@ public class CollisionTests
     public void RunCollisions_SameList_EachPairCheckedExactlyOnce()
     {
         // Three overlapping rects — all 3 unordered pairs collide, each should fire exactly once.
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 10f };
-        var c = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 10f };
+        var c = new AARect { Width = 32f, Height = 32f, X = 20f };
         var list = new[] { a, b, c };
-        var rel = new CollisionRelationship<AxisAlignedRectangle, AxisAlignedRectangle>(list, list);
+        var rel = new CollisionRelationship<AARect, AARect>(list, list);
         int fireCount = 0;
         rel.CollisionOccurred += (_, _) => fireCount++;
 
@@ -880,8 +880,8 @@ public class CollisionTests
     [Fact]
     public void SeparateFrom_EqualMasses_MovesHalfOverlap()
     {
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
 
         a.SeparateFrom(b, thisMass: 1f, otherMass: 1f);
 
@@ -892,11 +892,11 @@ public class CollisionTests
     public void SeparateFrom_MovesEntityOutOfOverlap()
     {
         var entityA = new Entity();
-        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectA = new AARect { Width = 32f, Height = 32f };
         entityA.Add(rectA);
 
         var entityB = new Entity();
-        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectB = new AARect { Width = 32f, Height = 32f };
         entityB.Add(rectB);
 
         entityA.X = 0f;
@@ -913,8 +913,8 @@ public class CollisionTests
     public void SeparateFrom_ZeroMass_MovesFullOverlap()
     {
         // mass=0 = massless: the full overlap is absorbed by this object
-        var a = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
-        var b = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 20f };
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
 
         a.SeparateFrom(b, thisMass: 0f, otherMass: 1f);
 
@@ -927,13 +927,13 @@ public class CollisionTests
     public void WithFirstShape_OverlappingShape_DetectsCollision()
     {
         var entityA = new Entity { X = 0f };
-        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f }; // at world X=0, overlaps entityB
-        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 100f }; // at world X=100, no overlap
+        var rectA1 = new AARect { Width = 32f, Height = 32f, X = 0f }; // at world X=0, overlaps entityB
+        var rectA2 = new AARect { Width = 32f, Height = 32f, X = 100f }; // at world X=100, no overlap
         entityA.Add(rectA1);
         entityA.Add(rectA2, isDefaultCollision: false);
 
         var entityB = new Entity { X = 20f };
-        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectB = new AARect { Width = 32f, Height = 32f };
         entityB.Add(rectB);
 
         int fireCount = 0;
@@ -949,13 +949,13 @@ public class CollisionTests
     public void WithFirstShape_NonOverlappingShape_NoCollision()
     {
         var entityA = new Entity { X = 0f };
-        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // overlaps entityB
-        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 100f };  // far away
+        var rectA1 = new AARect { Width = 32f, Height = 32f, X = 0f };   // overlaps entityB
+        var rectA2 = new AARect { Width = 32f, Height = 32f, X = 100f };  // far away
         entityA.Add(rectA1, isDefaultCollision: false);
         entityA.Add(rectA2, isDefaultCollision: false);
 
         var entityB = new Entity { X = 20f };
-        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectB = new AARect { Width = 32f, Height = 32f };
         entityB.Add(rectB);
 
         int fireCount = 0;
@@ -973,11 +973,11 @@ public class CollisionTests
         // Entity A's selected child rect overlaps entity B.
         // After separation, entity A's Position should shift; rectA's local offset should stay 0.
         var entityA = new Entity { X = 0f };
-        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };
+        var rectA = new AARect { Width = 32f, Height = 32f, X = 0f };
         entityA.Add(rectA);
 
         var entityB = new Entity { X = 20f };
-        var rectB = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectB = new AARect { Width = 32f, Height = 32f };
         entityB.Add(rectB);
 
         var rel = new CollisionRelationship<Entity, Entity>(new[] { entityA }, new[] { entityB });
@@ -993,12 +993,12 @@ public class CollisionTests
     public void WithSecondShape_OverlappingShape_DetectsCollision()
     {
         var entityA = new Entity { X = 0f };
-        var rectA = new AxisAlignedRectangle { Width = 32f, Height = 32f };
+        var rectA = new AARect { Width = 32f, Height = 32f };
         entityA.Add(rectA);
 
         var entityB = new Entity { X = 20f };
-        var rectB1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // overlaps entityA
-        var rectB2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f }; // far away
+        var rectB1 = new AARect { Width = 32f, Height = 32f, X = 0f };   // overlaps entityA
+        var rectB2 = new AARect { Width = 32f, Height = 32f, X = 200f }; // far away
         entityB.Add(rectB1);
         entityB.Add(rectB2, isDefaultCollision: false);
 
@@ -1016,14 +1016,14 @@ public class CollisionTests
     {
         // Only the pair (rectA2, rectB2) overlaps. Using selectors for both sides should detect it.
         var entityA = new Entity { X = 0f };
-        var rectA1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 0f };   // world X=0
-        var rectA2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f };  // world X=200
+        var rectA1 = new AARect { Width = 32f, Height = 32f, X = 0f };   // world X=0
+        var rectA2 = new AARect { Width = 32f, Height = 32f, X = 200f };  // world X=200
         entityA.Add(rectA1, isDefaultCollision: false);
         entityA.Add(rectA2, isDefaultCollision: false);
 
         var entityB = new Entity { X = 0f };
-        var rectB1 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 500f }; // world X=500, no overlap
-        var rectB2 = new AxisAlignedRectangle { Width = 32f, Height = 32f, X = 200f }; // world X=200, overlaps rectA2
+        var rectB1 = new AARect { Width = 32f, Height = 32f, X = 500f }; // world X=500, no overlap
+        var rectB2 = new AARect { Width = 32f, Height = 32f, X = 200f }; // world X=200, overlaps rectA2
         entityB.Add(rectB1, isDefaultCollision: false);
         entityB.Add(rectB2, isDefaultCollision: false);
 
@@ -1036,7 +1036,7 @@ public class CollisionTests
         fireCount.ShouldBe(1);
     }
 
-    // ── Non-default shapes vs TileShapeCollection ────────────────────────
+    // ── Non-default shapes vs TileShapes ────────────────────────
     // Models the "ledge probe" / "weak spot" / "muzzle point" pattern:
     // an auxiliary shape attached to an entity for manual queries or a
     // different collision relationship, which must NOT participate in the
@@ -1048,17 +1048,17 @@ public class CollisionTests
         // Entity's default body sits above the tile row (Y=20, tile spans Y=0..16).
         // An auxiliary "foot probe" poked below the body overlaps the tile.
         // If the probe is non-default, the Entity-vs-TSC relationship must ignore it.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0); // tile occupying X=0..16, Y=0..16
 
         var entity = new Entity { X = 8f, Y = 20f };
-        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f }; // at (8,20), no tile overlap
+        var body = new AARect { Width = 8f, Height = 8f }; // at (8,20), no tile overlap
         entity.Add(body);
-        var footProbe = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), inside tile
+        var footProbe = new AARect { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), inside tile
         entity.Add(footProbe, isDefaultCollision: false);
 
         int fireCount = 0;
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { entity }, new[] { tiles });
         rel.CollisionOccurred += (_, _) => fireCount++;
         rel.RunCollisions();
@@ -1071,12 +1071,12 @@ public class CollisionTests
     {
         // Ledge-detection use case: a probe excluded from default collision
         // must still be usable for manual CollidesWith queries against a TSC.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         var entity = new Entity { X = 8f, Y = 20f };
-        var footOnGround = new AxisAlignedRectangle { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), in tile
-        var footOffLedge = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 24f, Y = -13f }; // at (32,7), no tile
+        var footOnGround = new AARect { Width = 2f, Height = 2f, Y = -13f }; // at (8,7), in tile
+        var footOffLedge = new AARect { Width = 2f, Height = 2f, X = 24f, Y = -13f }; // at (32,7), no tile
         entity.Add(footOnGround, isDefaultCollision: false);
         entity.Add(footOffLedge, isDefaultCollision: false);
 
@@ -1088,17 +1088,17 @@ public class CollisionTests
     public void NonDefaultShape_DefaultBodyOverlappingTiles_StillTriggersRelationship()
     {
         // Inverse guard: excluding a probe must NOT suppress the default body's collision.
-        var tiles = new TileShapeCollection { GridSize = 16f };
+        var tiles = new TileShapes { GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
 
         var entity = new Entity { X = 8f, Y = 8f }; // body sits inside the tile
-        var body = new AxisAlignedRectangle { Width = 8f, Height = 8f };
+        var body = new AARect { Width = 8f, Height = 8f };
         entity.Add(body);
-        var probe = new AxisAlignedRectangle { Width = 2f, Height = 2f, X = 100f }; // far away
+        var probe = new AARect { Width = 2f, Height = 2f, X = 100f }; // far away
         entity.Add(probe, isDefaultCollision: false);
 
         int fireCount = 0;
-        var rel = new CollisionRelationship<Entity, TileShapeCollection>(
+        var rel = new CollisionRelationship<Entity, TileShapes>(
             new[] { entity }, new[] { tiles });
         rel.CollisionOccurred += (_, _) => fireCount++;
         rel.RunCollisions();

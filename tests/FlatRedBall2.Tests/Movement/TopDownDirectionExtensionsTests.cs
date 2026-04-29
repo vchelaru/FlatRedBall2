@@ -17,7 +17,7 @@ public class TopDownDirectionExtensionsTests
     [InlineData(TopDownDirection.DownLeft,  TopDownDirection.Left)]
     public void ToCardinal_HorizontalAxis_CollapsesDiagonalsToLeftOrRight(TopDownDirection input, TopDownDirection expected)
     {
-        input.ToCardinal(DiagonalAxis.Horizontal).ShouldBe(expected);
+        input.ToCardinal(DiagonalCollapse.Horizontal).ShouldBe(expected);
     }
 
     [Theory]
@@ -31,7 +31,7 @@ public class TopDownDirectionExtensionsTests
     [InlineData(TopDownDirection.DownLeft,  TopDownDirection.Down)]
     public void ToCardinal_VerticalAxis_CollapsesDiagonalsToUpOrDown(TopDownDirection input, TopDownDirection expected)
     {
-        input.ToCardinal(DiagonalAxis.Vertical).ShouldBe(expected);
+        input.ToCardinal(DiagonalCollapse.Vertical).ShouldBe(expected);
     }
 
     [Fact]

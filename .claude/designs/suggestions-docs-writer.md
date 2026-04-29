@@ -12,7 +12,7 @@ The doc describes a render list but never shows how to add things to it. AI crea
 
 ### 2. [Critical] Collision shapes have no properties shown
 
-`AxisAlignedRectangle`, `Circle`, `Polygon` are shown as `{ ... }` with zero properties. AI cannot create a collision shape because it doesn't know:
+`AARect`, `Circle`, `Polygon` are shown as `{ ... }` with zero properties. AI cannot create a collision shape because it doesn't know:
 - Is it `Width`/`Height` or `ScaleX`/`ScaleY`?
 - Is it `Radius` on Circle?
 - How to define Polygon vertices?
@@ -39,7 +39,7 @@ No way to display a sub-region of a texture. Sprite sheets are standard. AI aske
 ### 7. [Critical] AnimationChain types undefined
 
 `CurrentAnimation`, `PlayAnimation(string name)` but no explanation of:
-- How to load animations (`ContentManager.Load<AnimationChainList>("player")`?)
+- How to load animations (`ContentLoader.Load<AnimationChainList>("player")`?)
 - How to assign animations to a Sprite
 - What AnimationChain contains (frames? textures? durations?)
 
@@ -67,7 +67,7 @@ Entity implements ICollidable "by aggregating shapes." But shapes also implement
 
 Sprite has `Layer` property, `IRenderable` has `Layer`, but no example shows `sprite.Layer = frb.LayerManager.Get("Foreground")`. AI doesn't know the assignment pattern.
 
-### 13. [Important] ContentManagerService load path format unknown
+### 13. [Important] ContentLoader load path format unknown
 
 `Load<T>(string path)` — is path a MonoGame content pipeline name (`"player"` without extension), a file path (`"Content/player.png"`), or relative? AI will guess wrong.
 
@@ -77,7 +77,7 @@ Sprite has `Layer` property, `IRenderable` has `Layer`, but no example shows `sp
 
 ### 15. [Important] AudioManager load vs play ambiguity
 
-`PlaySong(string name)` — does this load and play? Or must content be loaded first via ContentManager? If load-first, show the step.
+`PlaySong(string name)` — does this load and play? Or must content be loaded first via ContentLoader? If load-first, show the step.
 
 ### 16. [Important] Sprite.Color type ambiguous
 

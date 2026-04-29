@@ -1,6 +1,6 @@
 # Per-Frame Shapes (Hitboxes / Hurtboxes)
 
-Animation frames can carry shape definitions (`AxisAlignedRectangle`, `Circle`, `Polygon`) which the engine reconciles onto the parent entity as the animation plays. The intended use is hitboxes and hurtboxes that come and go with specific frames of an attack, parry, or i-frame window.
+Animation frames can carry shape definitions (`AARect`, `Circle`, `Polygon`) which the engine reconciles onto the parent entity as the animation plays. The intended use is hitboxes and hurtboxes that come and go with specific frames of an attack, parry, or i-frame window.
 
 ## The ownership rule (load-bearing — read this before authoring)
 
@@ -19,11 +19,11 @@ Shapes whose names are not in *any* chainlist's owned set are **never touched**.
 - Names must be unique within a single frame.
 - The match key is **name only**. If a frame says shape `"Sword"` is a Polygon and the entity already has a `"Sword"` rectangle, that's a type mismatch — throws at apply time.
 
-## CreateMissingShapes
+## AutoCreateShapes
 
 Default `true` on `AnimationChainList`. When a frame names a shape that doesn't yet exist on the entity, the engine instantiates it and attaches it. This is the ergonomic code path — no need to pre-declare every hitbox in `CustomInitialize`.
 
-Set `chainList.CreateMissingShapes = false` to make missing shapes a runtime error instead. Useful when you want typo detection.
+Set `chainList.AutoCreateShapes = false` to make missing shapes a runtime error instead. Useful when you want typo detection.
 
 ## Cross-chain switching
 
@@ -41,12 +41,12 @@ Animation-created shapes are **not** auto-registered with any collision relation
 
 Per-frame shape entries are typed:
 
-- `AnimationRectangleFrame` — `Name`, `RelativeX/Y`, `Width`, `Height`
+- `AnimationAARectFrame` — `Name`, `RelativeX/Y`, `Width`, `Height`
 - `AnimationCircleFrame` — `Name`, `RelativeX/Y`, `Radius`
 - `AnimationPolygonFrame` — `Name`, `RelativeX/Y`, `Points` (Vector2 array)
 
-Add them to `AnimationFrame.Shapes`. The shapes themselves on the entity are the regular `AxisAlignedRectangle` / `Circle` / `Polygon` types — the `Animation*Frame` types are just per-frame data carriers.
+Add them to `AnimationFrame.Shapes`. The shapes themselves on the entity are the regular `AARect` / `Circle` / `Polygon` types — the `Animation*Frame` types are just per-frame data carriers.
 
 ## .achx authoring
 
-Frame shapes round-trip via the `<ShapeCollectionSave>` element on each `<Frame>` (`<AxisAlignedRectangleSaves>`, `<CircleSaves>`, `<PolygonSaves>`). Rectangle dimensions in the .achx use FRB1's half-extent `ScaleX`/`ScaleY` and are doubled into `Width`/`Height` at load time. See `achx-authoring.md` for the surrounding schema.
+Frame shapes round-trip via the `<ShapesSave>` element on each `<Frame>` (`<AARectSaves>`, `<CircleSaves>`, `<PolygonSaves>`). Rectangle dimensions in the .achx use FRB1's half-extent `ScaleX`/`ScaleY` and are doubled into `Width`/`Height` at load time. See `achx-authoring.md` for the surrounding schema.

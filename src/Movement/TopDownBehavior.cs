@@ -19,7 +19,7 @@ public class TopDownBehavior
     /// When false, input is ignored and the entity decelerates toward zero velocity.
     /// Velocity and acceleration are still applied by the physics system.
     /// </summary>
-    public bool InputEnabled { get; set; } = true;
+    public bool IsInputEnabled { get; set; } = true;
 
     /// <summary>
     /// Scales <see cref="TopDownValues.MaxSpeed"/> each frame.
@@ -28,7 +28,7 @@ public class TopDownBehavior
     public float SpeedMultiplier { get; set; } = 1f;
 
     /// <summary>Which discrete directions are available for <see cref="DirectionFacing"/>.</summary>
-    public PossibleDirections PossibleDirections { get; set; } = PossibleDirections.EightWay;
+    public DirectionSnap DirectionSnap { get; set; } = DirectionSnap.EightWay;
 
     /// <summary>The direction the entity is currently facing. Updated each frame based on input or velocity.</summary>
     public TopDownDirection DirectionFacing { get; set; } = TopDownDirection.Right;
@@ -55,7 +55,7 @@ public class TopDownBehavior
         var currentVelocity = new Vector2(entity.VelocityX, entity.VelocityY);
 
         var desiredVelocity = Vector2.Zero;
-        if (InputEnabled && MovementInput != null)
+        if (IsInputEnabled && MovementInput != null)
         {
             var input = new Vector2(MovementInput.X, MovementInput.Y);
             if (input.LengthSquared() > 1f)
@@ -131,13 +131,13 @@ public class TopDownBehavior
 
             // Update facing direction.
             if (MovementValues.UpdateDirectionFromInput && hasDesiredVelocity)
-                DirectionFacing = DirectionFromVector(desiredVelocity.X, desiredVelocity.Y, PossibleDirections);
+                DirectionFacing = DirectionFromVector(desiredVelocity.X, desiredVelocity.Y, DirectionSnap);
             else if (MovementValues.UpdateDirectionFromVelocity)
             {
                 if (!isMoving && hasDesiredVelocity)
-                    DirectionFacing = DirectionFromVector(desiredVelocity.X, desiredVelocity.Y, PossibleDirections);
+                    DirectionFacing = DirectionFromVector(desiredVelocity.X, desiredVelocity.Y, DirectionSnap);
                 else if (isMoving)
-                    DirectionFacing = DirectionFromVector(currentVelocity.X, currentVelocity.Y, PossibleDirections);
+                    DirectionFacing = DirectionFromVector(currentVelocity.X, currentVelocity.Y, DirectionSnap);
             }
         }
         else
@@ -162,11 +162,11 @@ public class TopDownBehavior
 
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
-    internal static TopDownDirection DirectionFromVector(float x, float y, PossibleDirections possibleDirections)
+    internal static TopDownDirection DirectionFromVector(float x, float y, DirectionSnap possibleDirections)
     {
         var angle = MathF.Atan2(y, x); // Y+ is up in world space
 
-        if (possibleDirections == PossibleDirections.FourWay)
+        if (possibleDirections == DirectionSnap.FourWay)
         {
             if (angle >= -MathF.PI / 4f && angle < MathF.PI / 4f) return TopDownDirection.Right;
             if (angle >= MathF.PI / 4f && angle < 3f * MathF.PI / 4f) return TopDownDirection.Up;

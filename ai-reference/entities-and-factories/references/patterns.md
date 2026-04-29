@@ -24,7 +24,7 @@ For the full decision tree on property design (forwarding vs init-only vs reacti
 
 ## Render-Only Shape Children (`isDefaultCollision: false`)
 
-Pass `isDefaultCollision: false` to `Add` to attach a shape (`AxisAlignedRectangle`, `Circle`, `Polygon`) for rendering and positioning only — it will not participate in `CollidesWith` or any standard collision relationship. Useful for visual indicators like attack ranges, sight cones, or HUD-style overlays attached to an entity.
+Pass `isDefaultCollision: false` to `Add` to attach a shape (`AARect`, `Circle`, `Polygon`) for rendering and positioning only — it will not participate in `CollidesWith` or any standard collision relationship. Useful for visual indicators like attack ranges, sight cones, or HUD-style overlays attached to an entity.
 
 ```csharp
 // Visual range indicator — renders but never collides by default
@@ -45,7 +45,7 @@ SetDefaultCollision(range, false);  // exclude from default collision
 
 ## Solid-Grid Factories (`IsSolidGrid`)
 
-For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AxisAlignedRectangle` child's `RepositionDirections` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapeCollection` does for tile grids, but for entity factories.
+For factories whose entities form a regular grid of solid blocks (destructible brick rows, crate walls, etc.), set `factory.IsSolidGrid = true`. The factory then maintains each entity's first `AARect` child's `SolidSides` based on 4-neighbor adjacency — interior shared faces are suppressed so a mover glides across the row without snagging at seams. Same fix as `TileShapes` does for tile grids, but for entity factories.
 
 Cell size is inferred from the first entity's body; mismatched sizes throw. `TileMap.CreateEntities` automatically wraps its spawn loop in the factory's grid batch so RD is recomputed once at the end. For hand-authored bulk spawns, wrap the loop in `using (factory.BeginGridBatch()) { … }` — without batching, `Create` can't compute cell indices because `X`/`Y` aren't set until after `Create` returns.
 

@@ -8,7 +8,7 @@ using XnaVec2 = Microsoft.Xna.Framework.Vector2;
 namespace FlatRedBall2.Tiled;
 
 /// <summary>
-/// Generates a <see cref="TileShapeCollection"/> from a <see cref="TilemapTileLayer"/>
+/// Generates a <see cref="TileShapes"/> from a <see cref="TilemapTileLayer"/>
 /// by matching tiles on their <see cref="TilemapTileData.Class"/> attribute or a custom property.
 /// </summary>
 /// <remarks>
@@ -23,7 +23,7 @@ namespace FlatRedBall2.Tiled;
 /// non-zero global ID that pass the predicate produce collision rectangles.
 /// </para>
 /// </remarks>
-public static class TileMapCollisionGenerator
+public static class TileMapCollisions
 {
     /// <summary>
     /// Scans every tile in <paramref name="layer"/> and adds a collision rectangle for each tile
@@ -41,8 +41,8 @@ public static class TileMapCollisionGenerator
     /// Top edge of the map in world space (Tiled convention). The generator converts to Y-up
     /// internally — pass the top edge, not the bottom.
     /// </param>
-    /// <returns>A <see cref="TileShapeCollection"/> containing one rectangle per matching tile.</returns>
-    public static TileShapeCollection GenerateFromClass(
+    /// <returns>A <see cref="TileShapes"/> containing one rectangle per matching tile.</returns>
+    public static TileShapes GenerateFromClass(
         Tilemap tilemap,
         TilemapTileLayer layer,
         string className,
@@ -68,8 +68,8 @@ public static class TileMapCollisionGenerator
     /// Top edge of the map in world space (Tiled convention). The generator converts to Y-up
     /// internally — pass the top edge, not the bottom.
     /// </param>
-    /// <returns>A <see cref="TileShapeCollection"/> containing one rectangle per matching tile.</returns>
-    public static TileShapeCollection GenerateFromProperty(
+    /// <returns>A <see cref="TileShapes"/> containing one rectangle per matching tile.</returns>
+    public static TileShapes GenerateFromProperty(
         Tilemap tilemap,
         TilemapTileLayer layer,
         string propertyName,
@@ -94,8 +94,8 @@ public static class TileMapCollisionGenerator
     /// Top edge of the map in world space (Tiled convention). The generator converts to Y-up
     /// internally — pass the top edge, not the bottom.
     /// </param>
-    /// <returns>A <see cref="TileShapeCollection"/> containing one rectangle per matching tile across all layers.</returns>
-    public static TileShapeCollection GenerateFromClass(
+    /// <returns>A <see cref="TileShapes"/> containing one rectangle per matching tile across all layers.</returns>
+    public static TileShapes GenerateFromClass(
         Tilemap tilemap,
         string className,
         float mapX = 0f,
@@ -120,8 +120,8 @@ public static class TileMapCollisionGenerator
     /// Top edge of the map in world space (Tiled convention). The generator converts to Y-up
     /// internally — pass the top edge, not the bottom.
     /// </param>
-    /// <returns>A <see cref="TileShapeCollection"/> containing one rectangle per matching tile across all layers.</returns>
-    public static TileShapeCollection GenerateFromProperty(
+    /// <returns>A <see cref="TileShapes"/> containing one rectangle per matching tile across all layers.</returns>
+    public static TileShapes GenerateFromProperty(
         Tilemap tilemap,
         string propertyName,
         float mapX = 0f,
@@ -132,7 +132,7 @@ public static class TileMapCollisionGenerator
     }
 
     /// <summary>
-    /// Repopulates an existing <see cref="TileShapeCollection"/> from the given layer using the
+    /// Repopulates an existing <see cref="TileShapes"/> from the given layer using the
     /// supplied predicate. Caller is responsible for clearing <paramref name="target"/> first if
     /// stale cells should be removed. Used by <see cref="TileMap.TryReload"/>.
     /// </summary>
@@ -140,18 +140,18 @@ public static class TileMapCollisionGenerator
         Tilemap tilemap,
         TilemapTileLayer layer,
         Func<TilemapTileData, bool> predicate,
-        TileShapeCollection target)
+        TileShapes target)
     {
         AddMatchingTiles(tilemap, layer, predicate, target);
     }
 
     /// <summary>
-    /// All-layers variant of <see cref="RegenerateInto(Tilemap, TilemapTileLayer, Func{TilemapTileData, bool}, TileShapeCollection)"/>.
+    /// All-layers variant of <see cref="RegenerateInto(Tilemap, TilemapTileLayer, Func{TilemapTileData, bool}, TileShapes)"/>.
     /// </summary>
     internal static void RegenerateInto(
         Tilemap tilemap,
         Func<TilemapTileData, bool> predicate,
-        TileShapeCollection target)
+        TileShapes target)
     {
         foreach (var layer in tilemap.Layers)
         {
@@ -165,16 +165,16 @@ public static class TileMapCollisionGenerator
     /// tiles, and adds a collision rectangle for each tile that satisfies <paramref name="predicate"/>.
     /// Tiled rows (Y-down) are flipped to engine rows (Y-up).
     /// </summary>
-    private static TileShapeCollection Generate(
+    private static TileShapes Generate(
         Tilemap tilemap,
         TilemapTileLayer layer,
         float mapX,
         float mapY,
         Func<TilemapTileData, bool> predicate)
     {
-        // mapY is the top edge (Tiled convention). TileShapeCollection.Y is the bottom edge
+        // mapY is the top edge (Tiled convention). TileShapes.Y is the bottom edge
         // (Y-up convention). Convert: bottom = top - totalHeight.
-        var collection = new TileShapeCollection
+        var collection = new TileShapes
         {
             X = mapX,
             Y = mapY - layer.Height * tilemap.TileHeight,
@@ -185,7 +185,7 @@ public static class TileMapCollisionGenerator
         return collection;
     }
 
-    private static TileShapeCollection GenerateFromAllLayers(
+    private static TileShapes GenerateFromAllLayers(
         Tilemap tilemap,
         float mapX,
         float mapY,
@@ -193,7 +193,7 @@ public static class TileMapCollisionGenerator
     {
         // Use the first tile layer's dimensions for the collection grid.
         // All tile layers in a Tiled map share the same tile dimensions.
-        var collection = new TileShapeCollection
+        var collection = new TileShapes
         {
             X = mapX,
             GridSize = tilemap.TileWidth
@@ -216,7 +216,7 @@ public static class TileMapCollisionGenerator
         Tilemap tilemap,
         TilemapTileLayer layer,
         Func<TilemapTileData, bool> predicate,
-        TileShapeCollection collection)
+        TileShapes collection)
     {
         for (int row = 0; row < layer.Height; row++)
         {
@@ -232,7 +232,7 @@ public static class TileMapCollisionGenerator
                 if (tileData == null || !predicate(tileData))
                     continue;
 
-                // Tiled is Y-down; TileShapeCollection is Y-up. Flip the row.
+                // Tiled is Y-down; TileShapes is Y-up. Flip the row.
                 int flippedRow = layer.Height - 1 - row;
 
                 BuildCollisionShapes(tileData, collection.GridSize, tile.FlipFlags,

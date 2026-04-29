@@ -109,13 +109,13 @@ public class Line : IAttachable, IRenderable, ICollidable
 
     /// <summary>
     /// Returns true if this segment intersects <paramref name="other"/>.
-    /// Handles Line, Circle, and AxisAlignedRectangle. Returns false for unrecognized types.
+    /// Handles Line, Circle, and AARect. Returns false for unrecognized types.
     /// </summary>
     public bool CollidesWith(ICollidable other) => other switch
     {
         Line otherLine                 => CollideAgainst(otherLine),
         Circle circle                  => CollideAgainst(circle),
-        AxisAlignedRectangle rect      => CollideAgainst(rect),
+        AARect rect      => CollideAgainst(rect),
         Polygon polygon                => CollideAgainst(polygon),
         _                              => false
     };
@@ -126,7 +126,7 @@ public class Line : IAttachable, IRenderable, ICollidable
 
     /// <summary>
     /// Returns the minimum displacement needed to separate this segment from <paramref name="other"/>.
-    /// Only meaningful for <see cref="AxisAlignedRectangle"/> targets — other shape pairings return
+    /// Only meaningful for <see cref="AARect"/> targets — other shape pairings return
     /// <see cref="Vector2.Zero"/> because there is no well-defined separation vector for a degenerate
     /// (zero-width) segment.
     /// </summary>
@@ -172,7 +172,7 @@ public class Line : IAttachable, IRenderable, ICollidable
     /// Tests the segment against all four edges of the AABB, and also checks
     /// whether either endpoint lies inside the rectangle.
     /// </summary>
-    public bool CollideAgainst(AxisAlignedRectangle other)
+    public bool CollideAgainst(AARect other)
     {
         float left   = other.AbsoluteX - other.Width  / 2f;
         float right  = other.AbsoluteX + other.Width  / 2f;

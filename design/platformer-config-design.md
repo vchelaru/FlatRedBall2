@@ -75,7 +75,7 @@ Animation controller, animation JSON section, and RegisterState API were **inten
 
 ## Key source references
 
-- `src/Movement/PlatformerConfig.cs` — DTOs (`PlatformerConfig`, `MovementConfig`, `MovementSlot`) and `FromJson`/`FromJsonString` loader
+- `src/Movement/PlatformerConfig.cs` — DTOs (`PlatformerConfig`, `PlatformerMovementConfig`, `MovementSlot`) and `FromJson`/`FromJsonString` loader
 - `src/Movement/PlatformerConfigExtensions.cs` — `ApplyTo` extension method (config → behavior wiring)
 - `src/Movement/PlatformerValues.cs:18` — existing `SetJumpHeights(minHeight, maxHeight?)` function
 - `src/Movement/PlatformerBehavior.cs:14` — `GroundMovement` / `AirMovement` fixed slots

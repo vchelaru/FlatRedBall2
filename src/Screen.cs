@@ -82,7 +82,7 @@ public class Screen
         }
     }
     /// <summary>This screen's content loader. Unloaded automatically on screen transition.</summary>
-    public ContentManagerService ContentManager { get; } = new ContentManagerService();
+    public ContentLoader ContentLoader { get; } = new ContentLoader();
     /// <summary>The engine that owns this screen. Injected before <see cref="CustomInitialize"/>.</summary>
     public FlatRedBallService Engine { get; internal set; } = null!;
 
@@ -158,13 +158,13 @@ public class Screen
 
     /// <summary>
     /// Registers all tiles in <paramref name="tiles"/> for rendering and wires up future
-    /// <see cref="Collision.TileShapeCollection.AddTileAtCell"/> /
-    /// <see cref="Collision.TileShapeCollection.RemoveTileAtCell"/> /
-    /// <see cref="Collision.TileShapeCollection.AddPolygonTileAtCell"/> /
-    /// <see cref="Collision.TileShapeCollection.RemovePolygonTileAtCell"/>
+    /// <see cref="Collision.TileShapes.AddTileAtCell"/> /
+    /// <see cref="Collision.TileShapes.RemoveTileAtCell"/> /
+    /// <see cref="Collision.TileShapes.AddPolygonTileAtCell"/> /
+    /// <see cref="Collision.TileShapes.RemovePolygonTileAtCell"/>
     /// calls so newly added or removed tiles stay in sync automatically.
     /// </summary>
-    public void Add(Collision.TileShapeCollection tiles, Layer? layer = null)
+    public void Add(Collision.TileShapes tiles, Layer? layer = null)
     {
         if (layer != null || Layer != null)
             tiles.Layer = layer ?? Layer;
@@ -209,7 +209,7 @@ public class Screen
 
     /// <summary>
     /// Adds all visual layers of a <see cref="TileMap"/> to this screen's render list and
-    /// registers the map's <see cref="TileMap.LazySpawnManager"/> for per-frame ticking
+    /// registers the map's <see cref="TileMap.LazySpawner"/> for per-frame ticking
     /// against this screen's camera. Lazy-spawn placements registered before or after this
     /// call will fire when the camera reaches them.
     /// Individual layer Z values and visibility are respected.
@@ -235,7 +235,7 @@ public class Screen
     }
 
     private readonly List<TileMap> _lazySpawnSources = new();
-    private ActivationRect[]? _lazySpawnRectBuffer;
+    private SpawnBounds[]? _lazySpawnRectBuffer;
 
     /// <summary>
     /// Adds a Gum Forms control to this screen's primary camera HUD. Equivalent to
@@ -785,15 +785,15 @@ public class Screen
 
     /// <summary>
     /// Registers a collision relationship between a group of entities and a
-    /// <see cref="Collision.TileShapeCollection"/>. Type argument <typeparamref name="A"/> is
+    /// <see cref="Collision.TileShapes"/>. Type argument <typeparamref name="A"/> is
     /// inferred from <paramref name="entities"/>, so no explicit type arguments are needed:
     /// <code>AddCollisionRelationship(_playerFactory, _tiles).MoveFirstOnCollision();</code>
     /// </summary>
-    public CollisionRelationship<A, Collision.TileShapeCollection> AddCollisionRelationship<A>(
-        IReadOnlyList<A> entities, Collision.TileShapeCollection tiles)
+    public CollisionRelationship<A, Collision.TileShapes> AddCollisionRelationship<A>(
+        IReadOnlyList<A> entities, Collision.TileShapes tiles)
         where A : ICollidable
     {
-        var rel = new CollisionRelationship<A, Collision.TileShapeCollection>(entities, new[] { tiles });
+        var rel = new CollisionRelationship<A, Collision.TileShapes>(entities, new[] { tiles });
         _collisionRelationships.Add(rel);
         return rel;
     }
@@ -829,7 +829,7 @@ public class Screen
                 _entities[i].CustomActivity(frameTime);
             }
             if (engine != null)
-                engine._frameProfile.ActivityMs = ProfilingClock.Ms(tPaused, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.ActivityMs = ProfileClock.Ms(tPaused, System.Diagnostics.Stopwatch.GetTimestamp());
         }
         else
         {
@@ -841,7 +841,7 @@ public class Screen
             for (int i = 0; i < Cameras.Count; i++)
                 Cameras[i].PhysicsUpdate(frameTime.DeltaSeconds);
             if (engine != null)
-                engine._frameProfile.PhysicsMs = ProfilingClock.Ms(t0, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.PhysicsMs = ProfileClock.Ms(t0, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 1.25 Lazy-spawn: tick each enrolled tilemap against every camera's rect so
             //      placements that just scrolled into view (on any camera, for split-screen)
@@ -849,30 +849,30 @@ public class Screen
             //      entities are visible to broad-phase on the same frame they spawn.
             long t1 = System.Diagnostics.Stopwatch.GetTimestamp();
             if (_lazySpawnRectBuffer is null || _lazySpawnRectBuffer.Length < Cameras.Count)
-                _lazySpawnRectBuffer = new ActivationRect[Cameras.Count];
+                _lazySpawnRectBuffer = new SpawnBounds[Cameras.Count];
             for (int c = 0; c < Cameras.Count; c++)
             {
                 var cam = Cameras[c];
-                _lazySpawnRectBuffer[c] = new ActivationRect(cam.Left, cam.Right, cam.Bottom, cam.Top);
+                _lazySpawnRectBuffer[c] = new SpawnBounds(cam.Left, cam.Right, cam.Bottom, cam.Top);
             }
             var lazySpawnRects = _lazySpawnRectBuffer.AsSpan(0, Cameras.Count);
             for (int i = 0; i < _lazySpawnSources.Count; i++)
-                _lazySpawnSources[i].LazySpawnManager.Update(lazySpawnRects);
+                _lazySpawnSources[i].LazySpawner.Update(lazySpawnRects);
             if (engine != null)
-                engine._frameProfile.LazySpawnMs = ProfilingClock.Ms(t1, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.LazySpawnMs = ProfileClock.Ms(t1, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 1.5 Sort partitioned factories so broad-phase sweep uses up-to-date order.
             long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
             Engine?.SortPartitionedFactories();
             if (engine != null)
-                engine._frameProfile.PartitionSortMs = ProfilingClock.Ms(t2, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.PartitionSortMs = ProfileClock.Ms(t2, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 2. Collision phase
             long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var rel in _collisionRelationships)
                 rel.RunCollisions();
             if (engine != null)
-                engine._frameProfile.CollisionMs = ProfilingClock.Ms(t3, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.CollisionMs = ProfileClock.Ms(t3, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // Loops 2.5, 3, 4 fire user callbacks (tween Ended, CustomActivity, AnimationFinished)
             // that may Destroy entities — mutating _entities and _renderList. Reverse-for with a
@@ -895,7 +895,7 @@ public class Screen
                 _tweens.Update(dt);
             }
             if (engine != null)
-                engine._frameProfile.TweenMs = ProfilingClock.Ms(t4, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.TweenMs = ProfileClock.Ms(t4, System.Diagnostics.Stopwatch.GetTimestamp());
 
             // 3. Entity CustomActivity — runs first (context-free; works regardless of screen)
             long t5 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -931,14 +931,14 @@ public class Screen
                 }
             }
             if (engine != null)
-                engine._frameProfile.ActivityMs = ProfilingClock.Ms(t5, System.Diagnostics.Stopwatch.GetTimestamp());
+                engine._frameProfile.ActivityMs = ProfileClock.Ms(t5, System.Diagnostics.Stopwatch.GetTimestamp());
         }
 
         // 5. Screen CustomActivity — always runs so pause menu logic can respond to input
         long t6 = System.Diagnostics.Stopwatch.GetTimestamp();
         CustomActivity(frameTime);
         if (engine != null)
-            engine._frameProfile.ActivityMs += ProfilingClock.Ms(t6, System.Diagnostics.Stopwatch.GetTimestamp());
+            engine._frameProfile.ActivityMs += ProfileClock.Ms(t6, System.Diagnostics.Stopwatch.GetTimestamp());
     }
 
     // Internal draw — called by FlatRedBallService once per camera in Screen.Cameras. The engine

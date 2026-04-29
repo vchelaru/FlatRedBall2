@@ -12,7 +12,7 @@ description: "Entities and Factories in FlatRedBall2. Use when working with Enti
 1. **Always spawn through `Factory<T>`** — never `new MyEntity()`. Bypassing the factory breaks `Engine.GetFactory<T>()` and collision relationships. This applies even when there is only one instance (e.g., one ball in Pong).
 2. **Override `CustomInitialize` for setup, `CustomActivity` for per-frame logic.** Add shape children, create input handlers, and wire references in `CustomInitialize`. The constructor is too early — `Engine` is null until the factory injects it (see `engine-overview`).
 3. **Don't write properties whose only effect happens in `CustomInitialize`.** They look configurable but silently fail when assigned after `Create()` returns. Three fixes by case: expose the child shape directly (forwarding), pass init-only data through `Create(e => e.X = ...)` so it's set before `CustomInitialize` runs, or write a reactive setter for state the gameplay legitimately mutates. See `references/reactive-properties.md` — this is the most common entity-design footgun in FRB2.
-4. **Don't create entities for static walls / floors / ceilings.** Use `TileShapeCollection` instead — see `collision-relationships`.
+4. **Don't create entities for static walls / floors / ceilings.** Use `TileShapes` instead — see `collision-relationships`.
 
 ## Lifecycle Order
 
@@ -26,11 +26,11 @@ description: "Entities and Factories in FlatRedBall2. Use when working with Enti
 public class Player : Entity
 {
     private KeyboardInput2D _movement = null!;
-    public AxisAlignedRectangle Rectangle { get; private set; } = null!;
+    public AARect Rectangle { get; private set; } = null!;
 
     public override void CustomInitialize()
     {
-        Rectangle = new AxisAlignedRectangle
+        Rectangle = new AARect
         {
             Width = 40, Height = 40,
             Color = new Color(80, 140, 255, 220),
@@ -135,7 +135,7 @@ Optional `string?` for identifying entities in tests and diagnostics. `SceneSnap
 - `references/reactive-properties.md` — property-vs-child-shape decision; the most common entity-design footgun
 - `references/patterns.md` — render-only shapes (`isDefaultCollision`), solid-grid factories (`IsSolidGrid`), spawning from within an entity, death effects, particles, configuring after `Create()`
 - `shapes` skill — shape types, visibility, color, render pipeline registration
-- `collision-relationships` skill — `AddCollisionRelationship` over a `Factory<T>`, `TileShapeCollection`
+- `collision-relationships` skill — `AddCollisionRelationship` over a `Factory<T>`, `TileShapes`
 - `levels` skill — `TileMap.CreateEntities` for designer-placed entities
 
 ## Common Pitfalls

@@ -13,10 +13,10 @@ public class ScreenTests
 
     private class BodiedEntity : Entity
     {
-        public AxisAlignedRectangle Body { get; private set; } = null!;
+        public AARect Body { get; private set; } = null!;
         public override void CustomInitialize()
         {
-            Body = new AxisAlignedRectangle { Width = 16, Height = 16 };
+            Body = new AARect { Width = 16, Height = 16 };
             Add(Body);
         }
     }
@@ -46,17 +46,17 @@ public class ScreenTests
     }
 
     [Fact]
-    public void Overlay_DrawRepositionDirections_Factory_EmitsOneArrowPerSetBit()
+    public void Overlay_DrawSolidSides_Factory_EmitsOneArrowPerSetBit()
     {
         var engine = new FlatRedBallService();
         var screen = new TestScreen { Engine = engine };
         var factory = new Factory<BodiedEntity>(screen);
         var entity = factory.Create();
         // Up|Right → 2 arrows; Down and Left should emit nothing.
-        entity.Body.RepositionDirections = RepositionDirections.Up | RepositionDirections.Right;
+        entity.Body.SolidSides = SolidSides.Up | SolidSides.Right;
 
         int before = CountVisiblePolygons(screen);
-        screen.Overlay.DrawRepositionDirections(factory);
+        screen.Overlay.DrawSolidSides(factory);
         int after = CountVisiblePolygons(screen);
 
         // One filled triangle polygon per active bit.
@@ -64,17 +64,17 @@ public class ScreenTests
     }
 
     [Fact]
-    public void Overlay_DrawRepositionDirections_TileShapeCollection_EmitsOneArrowPerActiveFace()
+    public void Overlay_DrawSolidSides_TileShapes_EmitsOneArrowPerActiveFace()
     {
         var screen = new TestScreen();
-        var tiles = new TileShapeCollection { X = 0f, Y = 0f, GridSize = 16f };
+        var tiles = new TileShapes { X = 0f, Y = 0f, GridSize = 16f };
         tiles.AddTileAtCell(0, 0);
         tiles.AddTileAtCell(1, 0);
         // Adjacent tiles → TSC suppresses shared faces: tile 0 loses Right, tile 1 loses Left.
         // Each tile has 3 active bits → 3 arrows → 3 body lines per tile → 6 total.
 
         int before = CountVisiblePolygons(screen);
-        screen.Overlay.DrawRepositionDirections(tiles);
+        screen.Overlay.DrawSolidSides(tiles);
         int after = CountVisiblePolygons(screen);
 
         (after - before).ShouldBe(6);
@@ -103,7 +103,7 @@ public class ScreenTests
         var screen = new TestScreen();
         screen.Engine = engine;
         var entity = new Entity();
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         entity.Add(rect);
 
         screen.Register(entity);
@@ -181,9 +181,9 @@ public class ScreenTests
         var engine = new FlatRedBallService();
         var screen = new TestScreen { Engine = engine };
         var a = new Entity { PauseMode = PauseMode.Always };
-        a.Add(new AxisAlignedRectangle { Width = 16f, Height = 16f });
+        a.Add(new AARect { Width = 16f, Height = 16f });
         var b = new Entity { PauseMode = PauseMode.Always };
-        b.Add(new AxisAlignedRectangle { Width = 16f, Height = 16f });
+        b.Add(new AARect { Width = 16f, Height = 16f });
         screen.Register(a);
         screen.Register(b);
         // Overlapping AARects (both 16x16 at X=0) — would collide if collision ran.

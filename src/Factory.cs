@@ -114,9 +114,9 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// <summary>
     /// When <c>true</c>, entities created by this factory are treated as cells of a regular grid
     /// of solid blocks (e.g., rows of destructible bricks). Each entity's first
-    /// <see cref="AxisAlignedRectangle"/> child has its <c>RepositionDirections</c> maintained
+    /// <see cref="AARect"/> child has its <c>SolidSides</c> maintained
     /// automatically so adjacent cells share suppressed interior faces — identical to
-    /// <see cref="TileShapeCollection"/>'s seam-suppression, but for entity factories.
+    /// <see cref="TileShapes"/>'s seam-suppression, but for entity factories.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -317,19 +317,19 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
         return entity;
     }
 
-    private static AxisAlignedRectangle FindBody(T entity)
+    private static AARect FindBody(T entity)
     {
         foreach (var child in entity.Children)
         {
-            if (child is AxisAlignedRectangle rect)
+            if (child is AARect rect)
                 return rect;
         }
         throw new InvalidOperationException(
             $"Factory<{typeof(T).Name}>.IsSolidGrid requires each entity to have an " +
-            $"AxisAlignedRectangle child, but none was found.");
+            $"AARect child, but none was found.");
     }
 
-    private (int col, int row) CellOf(AxisAlignedRectangle body)
+    private (int col, int row) CellOf(AARect body)
     {
         float cw = _cellWidth!.Value;
         float ch = _cellHeight!.Value;
@@ -392,15 +392,15 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     {
         if (!_grid.TryGetValue(cell, out var entity)) return;
         var body = FindBody(entity);
-        var dirs = RepositionDirections.All;
-        if (_grid.ContainsKey((cell.col - 1, cell.row))) dirs &= ~RepositionDirections.Left;
-        if (_grid.ContainsKey((cell.col + 1, cell.row))) dirs &= ~RepositionDirections.Right;
-        if (_grid.ContainsKey((cell.col, cell.row - 1))) dirs &= ~RepositionDirections.Down;
-        if (_grid.ContainsKey((cell.col, cell.row + 1))) dirs &= ~RepositionDirections.Up;
-        body.RepositionDirections = dirs;
+        var dirs = SolidSides.All;
+        if (_grid.ContainsKey((cell.col - 1, cell.row))) dirs &= ~SolidSides.Left;
+        if (_grid.ContainsKey((cell.col + 1, cell.row))) dirs &= ~SolidSides.Right;
+        if (_grid.ContainsKey((cell.col, cell.row - 1))) dirs &= ~SolidSides.Down;
+        if (_grid.ContainsKey((cell.col, cell.row + 1))) dirs &= ~SolidSides.Up;
+        body.SolidSides = dirs;
     }
 
-    // Flushes all pending members into _grid and recomputes RepositionDirections in one pass.
+    // Flushes all pending members into _grid and recomputes SolidSides in one pass.
     // Rebuilds from scratch so membership matches the authoritative _gridMembers set.
     private void FlushGrid()
     {

@@ -237,7 +237,7 @@ public class FlatRedBallService
         CurrentScreen.DisposeContentWatchers();
         CurrentScreen.CustomDestroy();
         CurrentScreen._tweens.Clear();
-        CurrentScreen.ContentManager.UnloadAll();
+        CurrentScreen.ContentLoader.UnloadAll();
 
         // Cancel all async work that was started on the old screen.
         // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
@@ -270,9 +270,9 @@ public class FlatRedBallService
         screen.Engine = this;
         if (_game != null)
         {
-            // Each screen gets its own ContentManager so UnloadAll() only disposes that screen's
+            // Each screen gets its own ContentLoader so UnloadAll() only disposes that screen's
             // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
-            screen.ContentManager.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
+            screen.ContentLoader.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
 
             var bounds = _game.Window.ClientBounds;
             for (int i = 0; i < screen.Cameras.Count; i++)
@@ -569,7 +569,7 @@ public class FlatRedBallService
     /// <summary>Sound effect and music playback service.</summary>
     public AudioManager Audio { get; } = new AudioManager();
     /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
-    public ContentManagerService Content { get; } = new ContentManagerService();
+    public ContentLoader Content { get; } = new ContentLoader();
     /// <summary>Engine clocks and async delay primitives. See <see cref="TimeManager"/>.</summary>
     public TimeManager Time { get; } = new TimeManager();
     /// <summary>Per-frame draw-call instrumentation. Off by default — see <see cref="Diagnostics.RenderDiagnostics.IsEnabled"/>.</summary>
@@ -653,13 +653,13 @@ public class FlatRedBallService
         // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
         long tWatch = System.Diagnostics.Stopwatch.GetTimestamp();
         CurrentScreen.TickContentWatchers(DateTime.UtcNow);
-        _frameProfile.ContentWatcherMs = ProfilingClock.Ms(tWatch, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.ContentWatcherMs = ProfileClock.Ms(tWatch, System.Diagnostics.Stopwatch.GetTimestamp());
 
         Time.Update(gameTime, CurrentScreen.IsPaused);
 
         long tInput = System.Diagnostics.Stopwatch.GetTimestamp();
         Input.Update(Time.UnscaledTimeSinceStart);
-        _frameProfile.InputMs = ProfilingClock.Ms(tInput, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.InputMs = ProfileClock.Ms(tInput, System.Diagnostics.Stopwatch.GetTimestamp());
 
         _frameProfile.AudioMs = 0;
         _frameProfile.GumUpdateMs = 0;
@@ -667,7 +667,7 @@ public class FlatRedBallService
         {
             long tAudio = System.Diagnostics.Stopwatch.GetTimestamp();
             Audio.Update();
-            _frameProfile.AudioMs = ProfilingClock.Ms(tAudio, System.Diagnostics.Stopwatch.GetTimestamp());
+            _frameProfile.AudioMs = ProfileClock.Ms(tAudio, System.Diagnostics.Stopwatch.GetTimestamp());
 
             CurrentScreen.Overlay.BeginFrame();
 
@@ -684,7 +684,7 @@ public class FlatRedBallService
 
             long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
             _gum.Update(gameTime, _gumUpdateList);
-            _frameProfile.GumUpdateMs = ProfilingClock.Ms(tGum, System.Diagnostics.Stopwatch.GetTimestamp());
+            _frameProfile.GumUpdateMs = ProfileClock.Ms(tGum, System.Diagnostics.Stopwatch.GetTimestamp());
         }
 
         // Complete any delay tasks whose conditions are now met, then flush their
@@ -695,7 +695,7 @@ public class FlatRedBallService
 
         CurrentScreen.Update(Time.CurrentFrameTime);
 
-        _frameProfile.UpdateTotalMs = ProfilingClock.Ms(updateStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.UpdateTotalMs = ProfileClock.Ms(updateStart, System.Diagnostics.Stopwatch.GetTimestamp());
         // FrameTotalMs is finalized at end of Draw (when both Update and Draw measurements exist
         // for this same frame); writing it here would mix this-frame Update with last-frame Draw.
     }
@@ -783,7 +783,7 @@ public class FlatRedBallService
         _automationMode?.FlushStepResponse(Time.CurrentFrame);
 #endif
 
-        _frameProfile.DrawTotalMs = ProfilingClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
         _frameProfile.RenderMs = _frameProfile.DrawTotalMs;
         _frameProfile.FrameTotalMs = _frameProfile.UpdateTotalMs + _frameProfile.DrawTotalMs;
 

@@ -26,7 +26,7 @@ public class LayerConsistencyTests
     [Fact]
     public void IRenderable_Layer_DefaultsToNull()
     {
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
 
         rect.Layer.ShouldBeNull();
     }
@@ -47,7 +47,7 @@ public class LayerConsistencyTests
         var screen = new TestScreen();
         var layer = new Layer("Game");
         screen.Layers.Add(layer);
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         screen.Add(rect);
 
         screen.Layer = layer;
@@ -63,7 +63,7 @@ public class LayerConsistencyTests
         screen.Layers.Add(layer);
         screen.Layer = layer;
 
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         screen.Add(rect);
 
         rect.Layer.ShouldBe(layer);
@@ -79,7 +79,7 @@ public class LayerConsistencyTests
         screen.Layers.Add(hudLayer);
         screen.Layer = gameLayer;
 
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         screen.Add(rect, layer: hudLayer);
 
         rect.Layer.ShouldBe(hudLayer);
@@ -103,7 +103,7 @@ public class LayerConsistencyTests
         screen.Engine = engine;
         var entity = new Entity();
         screen.Register(entity);
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         entity.Add(rect);
         var layer = new Layer("HUD");
         screen.Layers.Add(layer);
@@ -125,7 +125,7 @@ public class LayerConsistencyTests
         screen.Layers.Add(layer);
         entity.Layer = layer;
 
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         entity.Add(rect);
 
         rect.Layer.ShouldBe(layer);
@@ -145,7 +145,7 @@ public class LayerConsistencyTests
         screen.Layers.Add(uiLayer);
         entity.Layer = gameLayer;
 
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         entity.Add(rect, layer: uiLayer);
 
         rect.Layer.ShouldBe(uiLayer);
@@ -160,7 +160,7 @@ public class LayerConsistencyTests
         var parent = new Entity();
         screen.Register(parent);
         var child = new Entity();
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         child.Add(rect);
         parent.Add(child);
         var layer = new Layer("HUD");
@@ -203,13 +203,13 @@ public class LayerConsistencyTests
         entity.Layer.ShouldBeNull();
     }
 
-    // --- TileShapeCollection.Layer ---
+    // --- TileShapes.Layer ---
 
     [Fact]
-    public void TileShapeCollection_Layer_PropagatesLayerToExistingTiles()
+    public void TileShapes_Layer_PropagatesLayerToExistingTiles()
     {
         var screen = new TestScreen();
-        var tiles = new TileShapeCollection { GridSize = 16 };
+        var tiles = new TileShapes { GridSize = 16 };
         screen.Add(tiles);
         tiles.AddTileAtCell(0, 0);
         var layer = new Layer("Game");
@@ -223,12 +223,12 @@ public class LayerConsistencyTests
     }
 
     [Fact]
-    public void TileShapeCollection_Layer_InheritedByNewTiles()
+    public void TileShapes_Layer_InheritedByNewTiles()
     {
         var screen = new TestScreen();
         var layer = new Layer("Game");
         screen.Layers.Add(layer);
-        var tiles = new TileShapeCollection { GridSize = 16 };
+        var tiles = new TileShapes { GridSize = 16 };
         screen.Add(tiles);
         tiles.Layer = layer;
 
@@ -239,13 +239,13 @@ public class LayerConsistencyTests
     }
 
     [Fact]
-    public void Screen_Add_TileShapeCollection_ExplicitLayer()
+    public void Screen_Add_TileShapes_ExplicitLayer()
     {
         var screen = new TestScreen();
         var layer = new Layer("Game");
         screen.Layers.Add(layer);
 
-        var tiles = new TileShapeCollection { GridSize = 16 };
+        var tiles = new TileShapes { GridSize = 16 };
         screen.Add(tiles, layer: layer);
         tiles.AddTileAtCell(0, 0);
 
@@ -255,14 +255,14 @@ public class LayerConsistencyTests
     }
 
     [Fact]
-    public void Screen_Add_TileShapeCollection_InheritsScreenLayer()
+    public void Screen_Add_TileShapes_InheritsScreenLayer()
     {
         var screen = new TestScreen();
         var layer = new Layer("Game");
         screen.Layers.Add(layer);
         screen.Layer = layer;
 
-        var tiles = new TileShapeCollection { GridSize = 16 };
+        var tiles = new TileShapes { GridSize = 16 };
         screen.Add(tiles);
         tiles.AddTileAtCell(0, 0);
 
@@ -280,7 +280,7 @@ public class LayerConsistencyTests
         var screen = new TestScreen();
         screen.Engine = engine;
         var entity = new Entity();
-        var rect = new AxisAlignedRectangle();
+        var rect = new AARect();
         entity.Add(rect);
         screen.Register(entity);
         var layer = new Layer("Game");
@@ -295,7 +295,7 @@ public class LayerConsistencyTests
     [Fact]
     public void AllRenderableTypes_Layer_DefaultsToNull()
     {
-        new AxisAlignedRectangle().Layer.ShouldBeNull();
+        new AARect().Layer.ShouldBeNull();
         new Circle().Layer.ShouldBeNull();
         new Polygon().Layer.ShouldBeNull();
         new Line().Layer.ShouldBeNull();

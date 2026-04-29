@@ -41,7 +41,7 @@ public class ScreenLazySpawnTickTests
     }
 
     [Fact]
-    public void ScreenAddTileMap_TicksLazySpawnManager_OnUpdate()
+    public void ScreenAddTileMap_TicksLazySpawner_OnUpdate()
     {
         var screen = new TestScreen { Engine = new FlatRedBallService() };
         var factory = new Factory<Marker>(screen) { LazySpawn = LazySpawnMode.OneShot };
