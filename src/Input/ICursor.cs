@@ -29,6 +29,13 @@ public interface ICursor
     /// <summary>Cursor position in screen pixels, top-left origin. Use for HUD hit-testing.</summary>
     Vector2 ScreenPosition { get; }
 
+    /// <summary>
+    /// True when the cursor's screen position falls inside any registered camera viewport.
+    /// False when the cursor is outside the game window's client area (e.g. on the title bar,
+    /// off-screen, or before any cameras are registered).
+    /// </summary>
+    bool IsInWindow { get; }
+
     /// <summary>True every frame the primary button (left mouse / first touch) is held down.</summary>
     bool PrimaryDown { get; }
 

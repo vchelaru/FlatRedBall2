@@ -40,6 +40,8 @@ public class Entity : ICollidable, IAttachable
 {
     private readonly List<IAttachable> _children = new();
     private readonly List<ICollidable> _shapes = new();
+    private float _cachedBroadPhaseRadius;
+    private bool _broadPhaseRadiusDirty = true;
     private readonly List<GraphicalUiElement> _gumChildren = new();
 
     /// <summary>
@@ -130,22 +132,27 @@ public class Entity : ICollidable, IAttachable
     /// <summary>
     /// Maximum distance from <see cref="AbsoluteX"/>/<see cref="AbsoluteY"/> to the far edge of
     /// any attached collision shape, used by the broad phase to cull entity pairs before
-    /// per-shape collision checks. Recomputed on access; reflects current shape positions.
+    /// per-shape collision checks. Cached and invalidated when shapes are added or removed.
     /// </summary>
     public float BroadPhaseRadius
     {
         get
         {
-            float max = 0f;
-            foreach (var shape in _shapes)
+            if (_broadPhaseRadiusDirty)
             {
-                float offsetDist = MathF.Sqrt(
-                    (shape.AbsoluteX - AbsoluteX) * (shape.AbsoluteX - AbsoluteX) +
-                    (shape.AbsoluteY - AbsoluteY) * (shape.AbsoluteY - AbsoluteY));
-                float r = offsetDist + shape.BroadPhaseRadius;
-                if (r > max) max = r;
+                float max = 0f;
+                foreach (var shape in _shapes)
+                {
+                    float offsetDist = MathF.Sqrt(
+                        (shape.AbsoluteX - AbsoluteX) * (shape.AbsoluteX - AbsoluteX) +
+                        (shape.AbsoluteY - AbsoluteY) * (shape.AbsoluteY - AbsoluteY));
+                    float r = offsetDist + shape.BroadPhaseRadius;
+                    if (r > max) max = r;
+                }
+                _cachedBroadPhaseRadius = max;
+                _broadPhaseRadiusDirty = false;
             }
-            return max;
+            return _cachedBroadPhaseRadius;
         }
     }
 
@@ -331,7 +338,10 @@ public class Entity : ICollidable, IAttachable
         _children.Add(child);
 
         if (child is ICollidable collidable)
+        {
             _shapes.Add(collidable);
+            _broadPhaseRadiusDirty = true;
+        }
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
             _engine!.CurrentScreen.Add(renderable, layer ?? Layer);
@@ -357,7 +367,10 @@ public class Entity : ICollidable, IAttachable
         _children.Add(child);
 
         if (isDefaultCollision)
+        {
             _shapes.Add(child);
+            _broadPhaseRadiusDirty = true;
+        }
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
             _engine!.CurrentScreen.Add(renderable, layer ?? Layer);
@@ -391,11 +404,15 @@ public class Entity : ICollidable, IAttachable
         if (isDefaultCollision)
         {
             if (!_shapes.Contains(shape))
+            {
                 _shapes.Add(shape);
+                _broadPhaseRadiusDirty = true;
+            }
         }
         else
         {
-            _shapes.Remove(shape);
+            if (_shapes.Remove(shape))
+                _broadPhaseRadiusDirty = true;
         }
     }
 
@@ -409,8 +426,8 @@ public class Entity : ICollidable, IAttachable
         _children.Remove(child);
         child.Parent = null;
 
-        if (child is ICollidable collidable)
-            _shapes.Remove(collidable);
+        if (child is ICollidable collidable && _shapes.Remove(collidable))
+            _broadPhaseRadiusDirty = true;
 
         if (child is IRenderable renderable)
             _engine?.CurrentScreen?.Remove(renderable);
@@ -550,6 +567,7 @@ public class Entity : ICollidable, IAttachable
             child.Destroy();
         _children.Clear();
         _shapes.Clear();
+        _broadPhaseRadiusDirty = true;
         _onDestroy?.Invoke();
         Destroyed?.Invoke();
     }

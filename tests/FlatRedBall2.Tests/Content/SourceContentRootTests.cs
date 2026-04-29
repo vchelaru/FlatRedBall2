@@ -37,7 +37,7 @@ public class SourceContentRootTests
     public void SourceContentRoot_AutoDetect_ReturnsNullWhenNoCsprojFound()
     {
         var root = Path.Combine(Path.GetTempPath(), "frb2-srcroot-" + System.Guid.NewGuid().ToString("N"));
-        var bin = Path.Combine(root, "deep", "deep", "deep");
+        var bin = Path.Combine(root, "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10");
         Directory.CreateDirectory(bin);
 
         try

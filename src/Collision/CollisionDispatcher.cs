@@ -266,8 +266,7 @@ internal static class CollisionDispatcher
             return new Vector2(0f, ay < by ? -overlapY : overlapY);
     }
 
-    // Circle vs Circle
-    private static Vector2 CircleVsCircle(Circle a, Circle b)
+    internal static Vector2 CircleVsCircle(Circle a, Circle b)
     {
         float dx = b.AbsoluteX - a.AbsoluteX;
         float dy = b.AbsoluteY - a.AbsoluteY;
