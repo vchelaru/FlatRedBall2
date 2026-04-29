@@ -9,7 +9,7 @@ namespace FlatRedBall2.Tests.Movement;
 public class TopDownBehaviorTests
 {
     private static FrameTime MakeFrame(float deltaSeconds)
-        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
+        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
     public void DirectionFacing_FourWay_DownInput_ReturnsDown()

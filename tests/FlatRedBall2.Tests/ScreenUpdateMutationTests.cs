@@ -55,7 +55,7 @@ public class ScreenUpdateMutationTests
     }
 
     private static FrameTime Frame(float dt) =>
-        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
+        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
     public void Update_AnimationFinishedDestroysEntity_DoesNotThrow()

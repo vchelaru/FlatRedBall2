@@ -12,7 +12,7 @@ namespace FlatRedBall2.Tests.Movement;
 public class PlatformerBehaviorClimbingTests
 {
     private static FrameTime Frame(float dt = 1f / 60f, float total = 0f)
-        => new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.FromSeconds(total));
+        => new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.FromSeconds(total));
 
     private static PlatformerBehavior MakePlatformer(AxisAlignedRectangle body, I2DInput? input = null)
     {

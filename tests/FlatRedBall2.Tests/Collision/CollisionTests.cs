@@ -855,7 +855,7 @@ public class CollisionTests
         player.Behavior.MovementInput = new DownHeldAxisInput();
         player.LastReposition = System.Numerics.Vector2.Zero; // airborne
 
-        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
+        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         player.Behavior.Update(player, frame);
         return player;
     }

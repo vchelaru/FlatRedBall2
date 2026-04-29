@@ -14,7 +14,7 @@ public class ScreenLazySpawnTickTests
     private class TestScreen : Screen { }
 
     private static FrameTime Frame(float dt) =>
-        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
+        new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.Zero);
 
     private static Tilemap BuildTilemap(int tileSize = 16)
     {

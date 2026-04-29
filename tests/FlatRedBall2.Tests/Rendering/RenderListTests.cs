@@ -51,7 +51,7 @@ public class RenderListTests
         screen.Add(highZ);
         screen.Add(lowZ);
 
-        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
+        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
 
         screen.RenderList.Count.ShouldBe(2);
@@ -72,7 +72,7 @@ public class RenderListTests
         screen.Add(fgItem);
         screen.Add(bgItem);
 
-        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
+        var frame = new FrameTime(TimeSpan.FromSeconds(1f / 60f), TimeSpan.FromSeconds(1f / 60f), TimeSpan.Zero, TimeSpan.Zero);
         screen.Update(frame);
 
         screen.RenderList.Count.ShouldBe(2);

@@ -8,7 +8,7 @@ namespace FlatRedBall2.Tests;
 public class PhysicsTests
 {
     private static FrameTime MakeFrame(float deltaSeconds)
-        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
+        => new FrameTime(TimeSpan.FromSeconds(deltaSeconds), TimeSpan.FromSeconds(deltaSeconds), TimeSpan.Zero, TimeSpan.Zero);
 
     [Fact]
     public void ChildEntity_DoesNotRunPhysicsIndependently()

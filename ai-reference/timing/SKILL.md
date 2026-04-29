@@ -9,9 +9,28 @@ The engine provides `FrameTime` to every `CustomActivity` call. Use `time.DeltaS
 
 `FrameTime.SinceGameStart` is a `TimeSpan` (use `.TotalSeconds` for a float). It's useful for absolute timestamps but the countdown pattern below is simpler for most cases.
 
+### Scaled vs. Unscaled Delta
+
+`FrameTime` carries two per-frame deltas:
+
+- **`Delta` / `DeltaSeconds`** — multiplied by `Engine.Time.TimeScale`. This is what you want 99% of the time. If the player triggers slow-mo by setting `TimeScale = 0.5f`, gameplay using `DeltaSeconds` slows down with it.
+- **`UnscaledDelta` / `UnscaledDeltaSeconds`** — the raw wall-clock delta, ignoring `TimeScale`. Use for things that should run at real-world speed regardless of slow-mo or fast-forward: UI animations, debug overlays, screen-shake decay, anything player-facing that would feel wrong if it slowed down with the game world.
+
+"Unscaled" means **not multiplied by `TimeScale`**. It does *not* mean "ignores pause" — both `Delta` and `UnscaledDelta` keep advancing while a screen is paused; the difference is purely the scale multiplication. (Pausing is handled separately — see "Pause and `Entity.PauseMode`" below.)
+
+For cumulative wall-clock time across the whole game, read `Engine.Time.UnscaledTimeSinceStart` (a `TimeSpan`).
+
+## Pause and `Entity.PauseMode`
+
+`Screen.PauseThisScreen()` suppresses entity physics, entity `CustomActivity`, and collision processing for the screen. `Screen.CustomActivity`, Gum UI, and input keep running — pause-menu logic still works.
+
+By default, every entity is `PauseMode.Pausable` and freezes with the screen. To opt an individual entity out of pause suppression — e.g., a cursor entity, parallax background, or animated menu spinner that should keep ticking even while gameplay is frozen — set `entity.PauseMode = PauseMode.Always;` (typically in `CustomInitialize`). Its `PhysicsUpdate` and `CustomActivity` will run every frame regardless of `Screen.IsPaused`.
+
+Note: collision processing for `Always` entities is still gated by screen pause — they move independently but won't interact with other entities until the screen unpauses. For UI-style entities that just need to animate or follow input, this is exactly what you want.
+
 ## TimeSpan Convention
 
-Engine-wide rule: **public time-state and duration parameters use `TimeSpan`** (`Engine.Time.CurrentScreenTime`, `Engine.Time.RealTimeSinceStart`, `Engine.Time.Delay(TimeSpan)`, `Tween` `duration:`, `AnimationFrame.FrameLength`, etc.). The **deliberate exception** is `FrameTime.DeltaSeconds`, which stays `float` because per-frame physics math (`Position += Velocity * dt`) would be hostile if it required `(float)Delta.TotalSeconds` at every call site.
+Engine-wide rule: **public time-state and duration parameters use `TimeSpan`** (`Engine.Time.CurrentScreenTime`, `Engine.Time.UnscaledTimeSinceStart`, `Engine.Time.Delay(TimeSpan)`, `Tween` `duration:`, `AnimationFrame.FrameLength`, etc.). The **deliberate exception** is `FrameTime.DeltaSeconds`, which stays `float` because per-frame physics math (`Position += Velocity * dt`) would be hostile if it required `(float)Delta.TotalSeconds` at every call site.
 
 For `Engine.Time.Delay`, a convenience overload `DelaySeconds(double)` is also available so call sites with literal seconds don't need `TimeSpan.FromSeconds(...)` ceremony — both forms are valid:
 
@@ -158,7 +177,7 @@ var chosen = _choice.Value;
 - **`DelayFrames` has no cancellation token** but is still cancelled on screen transition — continuations guarded by `Token` are not needed, but keep frame waits short regardless.
 - **`async void` only at the top level** — use `async void` for `CustomInitialize`/event callbacks. Internal helpers should return `Task` and be `await`ed.
 - **`DeltaSeconds` is not zero while paused** — timer fields decremented by `DeltaSeconds` in entity `CustomActivity` won't tick while paused because entity `CustomActivity` is skipped. But screen `CustomActivity` always runs, so timer fields there do still count down. Use `if (!IsPaused)` guards in screen code if needed.
-- **`DelaySeconds` deadlocks if the screen is paused** — `DelaySeconds` counts screen time, which freezes when `PauseThisScreen()` is active. Never `await DelaySeconds(...)` from within a code path that has already called `PauseThisScreen()`. Use `DelayFrames` instead for timed sequences that need the screen paused.
+- **`DelaySeconds` freezes with the screen** — `DelaySeconds` counts screen time, which is paused by `PauseThisScreen()` and resumes on `UnpauseThisScreen()`. This is the right behavior for game logic ("wait 2 s, then spawn the boss" should not advance while the player is paused at a menu). For UI flows that should *keep* advancing during pause — paced dialog, animated menu reveals — use `DelayFrames` instead, which always ticks regardless of pause.
 
 ## Simulation Clock (Pauseable, Variable Speed)
 

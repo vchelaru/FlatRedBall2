@@ -248,6 +248,15 @@ public class Entity : ICollidable, IAttachable
     /// </summary>
     public bool IsAbsoluteVisible => IsVisible && (Parent == null || Parent.IsAbsoluteVisible);
 
+    /// <summary>
+    /// Controls whether this entity is suppressed by <see cref="Screen.IsPaused"/>. Defaults to
+    /// <see cref="PauseMode.Pausable"/>. Set to <see cref="PauseMode.Always"/> for entities that
+    /// must keep running while the screen is paused (cursors, parallax, menu spinners). Read each
+    /// frame by <see cref="Screen"/>; safe to change at runtime. Collision processing for
+    /// <see cref="PauseMode.Always"/> entities remains paused with the screen.
+    /// </summary>
+    public PauseMode PauseMode { get; set; } = PauseMode.Pausable;
+
     // Engine reference — injected by Factory or Screen.Register
     private FlatRedBallService? _engine;
 

@@ -11,7 +11,7 @@ namespace FlatRedBall2.Tests.Movement;
 public class PlatformerBehaviorAirJumpTests
 {
     private static FrameTime Frame(float dt = 1f / 60f, float total = 0f)
-        => new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.FromSeconds(total));
+        => new FrameTime(TimeSpan.FromSeconds(dt), TimeSpan.FromSeconds(dt), TimeSpan.Zero, TimeSpan.FromSeconds(total));
 
     private static PlatformerBehavior MakePlatformer(PressableInput jump, float airJumpVelocity = 300f, PlatformerValues? afterDoubleJump = null)
     {

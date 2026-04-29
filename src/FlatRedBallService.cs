@@ -658,7 +658,7 @@ public class FlatRedBallService
         Time.Update(gameTime, CurrentScreen.IsPaused);
 
         long tInput = System.Diagnostics.Stopwatch.GetTimestamp();
-        Input.Update(Time.RealTimeSinceStart);
+        Input.Update(Time.UnscaledTimeSinceStart);
         _frameProfile.InputMs = ProfilingClock.Ms(tInput, System.Diagnostics.Stopwatch.GetTimestamp());
 
         _frameProfile.AudioMs = 0;
