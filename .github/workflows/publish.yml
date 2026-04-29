@@ -4,12 +4,45 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g. 0.1.0-preview.1)'
-        required: true
-        default: '0.1.0-preview.1'
+        description: 'Version override (leave blank to auto-increment from latest NuGet)'
+        required: false
+        default: ''
 
 jobs:
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - name: Resolve version
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "Using manual version: ${{ github.event.inputs.version }}"
+            exit 0
+          fi
+
+          # Query NuGet for the latest version of the primary package
+          VERSIONS=$(curl -sf https://api.nuget.org/v3-flatcontainer/flatredball2.monogame/index.json | jq -r '.versions[-1]')
+          if [ -z "$VERSIONS" ] || [ "$VERSIONS" = "null" ]; then
+            echo "::error::Could not fetch latest version from NuGet"
+            exit 1
+          fi
+
+          LATEST="$VERSIONS"
+          echo "Latest NuGet version: $LATEST"
+
+          # Increment the last numeric segment (e.g. 0.1.0-preview.3 -> 0.1.0-preview.4)
+          PREFIX="${LATEST%.*}"
+          LAST="${LATEST##*.}"
+          NEXT="$PREFIX.$((LAST + 1))"
+
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Auto-incremented to: $NEXT"
+
   publish:
+    needs: resolve-version
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,13 +70,14 @@ jobs:
           -c Release
           -p:PackageId=${{ matrix.packageId }}
           -p:TargetFrameworks=${{ matrix.targetFrameworks }}
-          -p:PackageVersion=${{ github.event.inputs.version }}
+          -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
 
       - name: Publish to NuGet
         run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   publish-templates:
+    needs: resolve-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -58,7 +92,7 @@ jobs:
         run: >
           dotnet pack templates/FlatRedBall2.Templates.csproj
           -c Release
-          -p:PackageVersion=${{ github.event.inputs.version }}
+          -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
 
       - name: Publish Templates to NuGet
