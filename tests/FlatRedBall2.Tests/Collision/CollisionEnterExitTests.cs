@@ -233,6 +233,60 @@ public class CollisionEnterExitTests
     }
 
     [Fact]
+    public void CrossListCollision_EntityDestroyedAndRemovedFromList_DoesNotThrow()
+    {
+        // One bullet overlapping two enemies — the bullet is destroyed on the first hit,
+        // and the inner loop must not re-index into the now-shorter bullet list.
+        var bullets = new List<Entity>();
+        var enemies = new List<Entity>();
+
+        var bullet = new Entity();
+        bullet.Add(new AARect { Width = 8f, Height = 8f });
+        bullets.Add(bullet);
+
+        for (int i = 0; i < 3; i++)
+        {
+            var enemy = new Entity();
+            enemy.Add(new AARect { Width = 8f, Height = 8f });
+            enemies.Add(enemy);
+        }
+
+        var rel = new CollisionRelationship<Entity, Entity>(bullets, enemies);
+        rel.CollisionOccurred += (b, e) =>
+        {
+            if (bullets.Contains(b)) { bullets.Remove(b); b.Destroy(); }
+            if (enemies.Contains(e)) { enemies.Remove(e); e.Destroy(); }
+        };
+
+        Should.NotThrow(() => rel.RunCollisions());
+    }
+
+    [Fact]
+    public void SameListCollision_EntityDestroyedAndRemovedFromList_DoesNotThrow()
+    {
+        var entities = new List<Entity>();
+
+        for (int i = 0; i < 4; i++)
+        {
+            var ent = new Entity();
+            ent.Add(new AARect { Width = 32f, Height = 32f, X = i * 10f });
+            entities.Add(ent);
+        }
+
+        var rel = new CollisionRelationship<Entity, Entity>(entities, entities);
+        rel.CollisionOccurred += (a, b) =>
+        {
+            if (entities.Contains(b))
+            {
+                entities.Remove(b);
+                b.Destroy();
+            }
+        };
+
+        Should.NotThrow(() => rel.RunCollisions());
+    }
+
+    [Fact]
     public void NoSubscribers_NoTrackingOverhead()
     {
         // Smoke test: with neither event subscribed, behavior is unchanged and no exceptions.

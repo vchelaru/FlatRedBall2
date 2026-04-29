@@ -17,7 +17,7 @@ public class TitleScreen : Screen
         panel.Anchor(Anchor.Center);
 
         var title = new Label { Text = "SHMUP SPACE" };
-        var prompt = new Label { Text = "Press Space to Start" };
+        var prompt = new Label { Text = "Press Space or Tap to Start" };
         panel.AddChild(title);
         panel.AddChild(prompt);
 
@@ -27,7 +27,8 @@ public class TitleScreen : Screen
     public override void CustomActivity(FrameTime time)
     {
         var kb = Engine.Input.Keyboard;
-        if (kb.WasKeyPressed(Keys.Space) || kb.WasKeyPressed(Keys.Enter))
+        if (kb.WasKeyPressed(Keys.Space) || kb.WasKeyPressed(Keys.Enter) ||
+            Engine.Input.Cursor.PrimaryPressed)
             MoveToScreen<GameScreen>();
     }
 }

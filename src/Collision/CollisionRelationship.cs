@@ -389,14 +389,19 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 RunCrossListCollisionsSweep(axisA.Value);
             else
             {
-                // Indexed iteration — iterating the IReadOnlyList<T>-typed fields via foreach would
-                // dispatch through IEnumerable<T>.GetEnumerator() and box the underlying struct
-                // enumerators, allocating once per operand per frame.
-                int countA = _listA.Count;
-                int countB = _listB.Count;
-                for (int i = 0; i < countA; i++)
-                    for (int j = 0; j < countB; j++)
-                        RunPair(_listA[i], _listB[j]);
+                for (int i = 0; i < _listA.Count; i++)
+                {
+                    var a = _listA[i];
+                    for (int j = 0; j < _listB.Count; j++)
+                    {
+                        RunPair(a, _listB[j]);
+                        if (i >= _listA.Count || !ReferenceEquals(_listA[i], a))
+                        {
+                            i--;
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -439,18 +444,35 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // The cast (B)(object)b is safe: A == B is guaranteed when both lists share a reference.
     private void RunSameListCollisions(bool forward)
     {
-        int count = _listA.Count;
         if (forward)
         {
-            for (int i = 0; i < count; i++)
-                for (int j = i + 1; j < count; j++)
-                    RunSameListPair(_listA[i], _listA[j]);
+            for (int i = 0; i < _listA.Count; i++)
+            {
+                var a = _listA[i];
+                for (int j = i + 1; j < _listA.Count; j++)
+                {
+                    RunSameListPair(a, _listA[j]);
+                    if (i >= _listA.Count || !ReferenceEquals(_listA[i], a))
+                    {
+                        i--;
+                        break;
+                    }
+                }
+            }
         }
         else
         {
-            for (int i = count - 1; i >= 0; i--)
+            for (int i = _listA.Count - 1; i >= 0; i--)
+            {
+                if (i >= _listA.Count) continue;
+                var a = _listA[i];
                 for (int j = i - 1; j >= 0; j--)
-                    RunSameListPair(_listA[i], _listA[j]);
+                {
+                    RunSameListPair(a, _listA[j]);
+                    if (i >= _listA.Count || !ReferenceEquals(_listA[i], a))
+                        break;
+                }
+            }
         }
     }
 
