@@ -41,17 +41,26 @@ var sfx  = Engine.Content.Load<SoundEffect>("Hit");
 
 Usings required: `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
 
-### Direct path — OGG only
+### Direct path — loading from file without MGCB
 
-`Song.FromUri` works if the file is OGG Vorbis. MP3 fails at runtime because MonoGame DesktopGL uses NVorbis, which only reads OGG.
+Use MonoGame's static methods to load audio files directly from disk, bypassing the content pipeline entirely. Each method has format restrictions.
+
+**Song (music) — OGG only:**
+
+`Song.FromUri` only accepts OGG Vorbis on DesktopGL. MP3 fails at runtime because the backend uses NVorbis. Use the MGCB pipeline above for MP3 files.
 
 ```csharp
-// Only works for .ogg files
 var song = Song.FromUri("MySong", new Uri(Path.GetFullPath("Content/MySong.ogg")));
+```
 
-// SoundEffect loaded from file stream — manual tracking required
-var sfx = SoundEffect.FromStream(File.OpenRead("Content/Hit.wav"));
-Engine.Content.Track(sfx);  // ensures disposal on screen transition
+**SoundEffect — WAV only:**
+
+`SoundEffect.FromStream` only accepts WAV format (PCM, uncompressed). OGG and MP3 sound effects require the MGCB pipeline.
+
+```csharp
+using var stream = File.OpenRead("Content/Hit.wav");
+var sfx = SoundEffect.FromStream(stream);
+Engine.Content.Track(sfx);  // required — ensures disposal on screen transition
 ```
 
 Usings required: `System.IO`, `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
