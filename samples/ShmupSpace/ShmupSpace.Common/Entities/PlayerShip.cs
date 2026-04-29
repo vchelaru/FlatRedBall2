@@ -46,10 +46,12 @@ public class PlayerShip : Entity
 
         var keyboard = Engine.Input.Keyboard;
         _topDown.MovementInput = new KeyboardInput2D(keyboard, Keys.Left, Keys.Right, Keys.Up, Keys.Down)
-            .Or(new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S));
+            .Or(new KeyboardInput2D(keyboard, Keys.A, Keys.D, Keys.W, Keys.S))
+            .Or(new CursorTrackingInput2D(Engine.Input.Cursor, () => new System.Numerics.Vector2(X, Y)));
         screen.PlayerTopDownConfig.ApplyTo(_topDown);
 
-        _fire = new KeyboardPressableInput(keyboard, Keys.Space);
+        _fire = new KeyboardPressableInput(keyboard, Keys.Space)
+            .Or(new CursorPressableInput(Engine.Input.Cursor));
     }
 
     public override void CustomActivity(FrameTime time)
