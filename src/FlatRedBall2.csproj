@@ -10,6 +10,7 @@
       Promote to error before the first stable (non-preview) NuGet ships.
     -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
 
     <!-- NuGet Metadata -->
     <Authors>Victor Chelaru</Authors>

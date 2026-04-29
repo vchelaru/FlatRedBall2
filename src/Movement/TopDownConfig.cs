@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2.Movement;
@@ -31,17 +32,17 @@ public class TopDownConfig
     /// (no movement slot) if the JSON deserializes to null.</summary>
     public static TopDownConfig FromJsonString(string json)
     {
-        var config = JsonSerializer.Deserialize<TopDownConfig>(json, SerializerOptions);
+        var config = JsonSerializer.Deserialize(json, TopDownConfigJsonContext.Default.TopDownConfig);
         return config ?? new TopDownConfig();
     }
-
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
 }
+
+[JsonSourceGenerationOptions(
+    PropertyNameCaseInsensitive = true,
+    ReadCommentHandling = JsonCommentHandling.Skip,
+    AllowTrailingCommas = true)]
+[JsonSerializable(typeof(TopDownConfig))]
+internal partial class TopDownConfigJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Nullable-field mirror of <see cref="TopDownValues"/>. Omitted fields fall back to

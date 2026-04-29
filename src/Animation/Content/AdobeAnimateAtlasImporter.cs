@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Xml.Serialization;
+using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
@@ -23,26 +23,22 @@ namespace FlatRedBall2.Animation.Content;
 /// pixel lands at the entity's origin — keeps a multi-size character (e.g. one with a "feet"
 /// pivot) anchored across frames.
 /// </remarks>
-[XmlRoot("TextureAtlas")]
 public class AdobeAnimateAtlasSave
 {
     /// <summary>Relative path to the atlas PNG, as authored in the Adobe Animate export. Resolved against the atlas XML's directory at load time.</summary>
-    [XmlAttribute("imagePath")]
     public string ImagePath = string.Empty;
 
     /// <summary>All sub-texture entries from the atlas XML, in document order. Each one becomes a single <see cref="AnimationFrame"/> during <see cref="ToAnimationChainList"/>.</summary>
-    [XmlElement("SubTexture")]
     public List<AdobeAnimateSubTexture> SubTextures = new();
 
     /// <summary>Absolute path of the source XML file, populated by <see cref="FromFile"/>. Used to resolve <see cref="ImagePath"/> relative to the atlas directory.</summary>
-    [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Deserializes an Adobe Animate TextureAtlas XML file. Production code should prefer
-    /// <c>ContentLoader.LoadAdobeAnimateAtlas(path, frameRate)</c>, which routes the read
-    /// through the service's stream seam. This overload exists for tooling and tests that work
-    /// without a <see cref="FlatRedBall2.ContentLoader"/>.
+    /// Loads an Adobe Animate TextureAtlas XML file via manual parsing (AOT-safe). Production
+    /// code should prefer <c>ContentLoader.LoadAdobeAnimateAtlas(path, frameRate)</c>, which
+    /// routes the read through the service's stream seam. This overload exists for tooling and
+    /// tests that work without a <see cref="FlatRedBall2.ContentLoader"/>.
     /// </summary>
     /// <param name="filePath">Path to the atlas XML, relative to the title container.</param>
     /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
@@ -50,11 +46,36 @@ public class AdobeAnimateAtlasSave
     {
         streamProvider ??= XnaTitleContainer.OpenStream;
         using var stream = streamProvider(filePath);
-        var serializer = new XmlSerializer(typeof(AdobeAnimateAtlasSave));
-        var result = (AdobeAnimateAtlasSave)serializer.Deserialize(stream)!;
-        // Store the path as-given so ToAnimationChainList can resolve the sibling PNG via
-        // the same title-container-relative scheme. Path.GetFullPath would prepend CWD,
-        // which is "/" on WASM.
+        var doc = XDocument.Load(stream);
+        var root = doc.Root!;
+
+        var result = new AdobeAnimateAtlasSave
+        {
+            ImagePath = (string?)root.Attribute("imagePath") ?? string.Empty
+        };
+
+        foreach (var subEl in root.Elements("SubTexture"))
+        {
+            var sub = new AdobeAnimateSubTexture
+            {
+                Name = (string?)subEl.Attribute("name") ?? string.Empty,
+                X = (int)subEl.Attribute("x")!,
+                Y = (int)subEl.Attribute("y")!,
+                Width = (int)subEl.Attribute("width")!,
+                Height = (int)subEl.Attribute("height")!,
+            };
+
+            var pivotXAttr = subEl.Attribute("pivotX");
+            if (pivotXAttr != null)
+                sub.PivotX = float.Parse(pivotXAttr.Value, CultureInfo.InvariantCulture);
+
+            var pivotYAttr = subEl.Attribute("pivotY");
+            if (pivotYAttr != null)
+                sub.PivotY = float.Parse(pivotYAttr.Value, CultureInfo.InvariantCulture);
+
+            result.SubTextures.Add(sub);
+        }
+
         result.FileName = filePath;
         return result;
     }
@@ -146,49 +167,33 @@ public class AdobeAnimateAtlasSave
 }
 
 /// <summary>
-/// A single sub-texture (frame) within an <see cref="AdobeAnimateAtlasSave"/>. Deserialized from one
+/// A single sub-texture (frame) within an <see cref="AdobeAnimateAtlasSave"/>. Parsed from one
 /// <c>&lt;SubTexture&gt;</c> element in the atlas XML. Content-interchange model — not a runtime type.
 /// </summary>
 public class AdobeAnimateSubTexture
 {
     /// <summary>Frame name as authored by Adobe Animate (e.g. <c>Eyeball_Idle0000</c>). Trailing digits are stripped to group frames into an <see cref="AnimationChain"/>.</summary>
-    [XmlAttribute("name")] public string Name = string.Empty;
+    public string Name = string.Empty;
     /// <summary>Left edge of this frame within the atlas, in pixels.</summary>
-    [XmlAttribute("x")] public int X;
+    public int X;
     /// <summary>Top edge of this frame within the atlas, in pixels.</summary>
-    [XmlAttribute("y")] public int Y;
+    public int Y;
     /// <summary>Width of this frame within the atlas, in pixels.</summary>
-    [XmlAttribute("width")] public int Width;
+    public int Width;
     /// <summary>Height of this frame within the atlas, in pixels.</summary>
-    [XmlAttribute("height")] public int Height;
+    public int Height;
 
     /// <summary>
     /// X pivot (origin) for this frame as authored in Adobe Animate, in source-rect pixels from the
     /// left, or <see cref="float.NaN"/> if unspecified. Converted into <see cref="AnimationFrame.RelativeX"/>
     /// at <see cref="AdobeAnimateAtlasSave.ToAnimationChainList"/> time.
     /// </summary>
-    [XmlIgnore] public float PivotX = float.NaN;
+    public float PivotX = float.NaN;
     /// <summary>
     /// Y pivot (origin) for this frame as authored in Adobe Animate, in source-rect pixels from the
     /// top (Y-down), or <see cref="float.NaN"/> if unspecified. Converted into
     /// <see cref="AnimationFrame.RelativeY"/> at <see cref="AdobeAnimateAtlasSave.ToAnimationChainList"/>
     /// time, with the sign flip from Adobe's Y-down to FRB2's world Y-up baked in.
     /// </summary>
-    [XmlIgnore] public float PivotY = float.NaN;
-
-    /// <summary>Serialization shim for the XML <c>pivotX</c> attribute. Empty string round-trips as <see cref="float.NaN"/> on <see cref="PivotX"/>. Do not read at runtime — use <see cref="PivotX"/>.</summary>
-    [XmlAttribute("pivotX")]
-    public string PivotXText
-    {
-        get => float.IsNaN(PivotX) ? "" : PivotX.ToString(CultureInfo.InvariantCulture);
-        set => PivotX = string.IsNullOrEmpty(value) ? float.NaN : float.Parse(value, CultureInfo.InvariantCulture);
-    }
-
-    /// <summary>Serialization shim for the XML <c>pivotY</c> attribute. Empty string round-trips as <see cref="float.NaN"/> on <see cref="PivotY"/>. Do not read at runtime — use <see cref="PivotY"/>.</summary>
-    [XmlAttribute("pivotY")]
-    public string PivotYText
-    {
-        get => float.IsNaN(PivotY) ? "" : PivotY.ToString(CultureInfo.InvariantCulture);
-        set => PivotY = string.IsNullOrEmpty(value) ? float.NaN : float.Parse(value, CultureInfo.InvariantCulture);
-    }
+    public float PivotY = float.NaN;
 }

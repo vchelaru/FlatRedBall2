@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Xml.Serialization;
+using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
@@ -37,7 +38,6 @@ public enum TextureCoordinateType
 /// Load with <see cref="FromFile"/> and convert to runtime types with
 /// <see cref="ToAnimationChainList"/>.
 /// </summary>
-[XmlRoot("AnimationChainArraySave")]
 public class AnimationChainListSave
 {
     /// <summary>
@@ -52,15 +52,13 @@ public class AnimationChainListSave
     public TextureCoordinateType CoordinateType = TextureCoordinateType.UV;
 
     /// <summary>The list of animation chains.</summary>
-    [XmlElement("AnimationChain")]
     public List<AnimationChainSave> AnimationChains = new();
 
     /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>.</summary>
-    [XmlIgnore]
     public string FileName { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Deserializes a .achx file. Production code should prefer
+    /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer
     /// <c>ContentLoader.LoadAnimationChainList(path)</c>, which routes the read through
     /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
     /// overload exists for tooling and tests that work without a <see cref="ContentLoader"/>.
@@ -71,13 +69,138 @@ public class AnimationChainListSave
     {
         streamProvider ??= XnaTitleContainer.OpenStream;
         using var stream = streamProvider(filePath);
-        var serializer = new XmlSerializer(typeof(AnimationChainListSave));
-        var result = (AnimationChainListSave)serializer.Deserialize(stream)!;
-        // Store the path as-given so ToAnimationChainList can resolve sibling textures
-        // through the same title-container-relative scheme. Path.GetFullPath would prepend
-        // the CWD, which is "/" on WASM and produces wrong texture paths.
+        var doc = XDocument.Load(stream);
+        var root = doc.Root!;
+
+        var result = new AnimationChainListSave();
+
+        var frt = root.Element("FileRelativeTextures");
+        if (frt != null)
+            result.FileRelativeTextures = bool.Parse(frt.Value);
+
+        var tmu = root.Element("TimeMeasurementUnit");
+        if (tmu != null)
+            result.TimeMeasurementUnit = Enum.Parse<TimeMeasurementUnit>(tmu.Value);
+
+        var ct = root.Element("CoordinateType");
+        if (ct != null)
+            result.CoordinateType = Enum.Parse<TextureCoordinateType>(ct.Value);
+
+        foreach (var chainEl in root.Elements("AnimationChain"))
+        {
+            var chain = new AnimationChainSave
+            {
+                Name = (string?)chainEl.Element("Name") ?? string.Empty
+            };
+
+            foreach (var frameEl in chainEl.Elements("Frame"))
+                chain.Frames.Add(ParseFrame(frameEl));
+
+            result.AnimationChains.Add(chain);
+        }
+
         result.FileName = filePath;
         return result;
+    }
+
+    private static AnimationFrameSave ParseFrame(XElement el)
+    {
+        var frame = new AnimationFrameSave();
+        frame.TextureName = (string?)el.Element("TextureName") ?? string.Empty;
+        frame.FrameLength = FloatEl(el, "FrameLength");
+        frame.LeftCoordinate = FloatEl(el, "LeftCoordinate");
+        frame.RightCoordinate = FloatEl(el, "RightCoordinate", 1f);
+        frame.TopCoordinate = FloatEl(el, "TopCoordinate");
+        frame.BottomCoordinate = FloatEl(el, "BottomCoordinate", 1f);
+        frame.FlipHorizontal = BoolEl(el, "FlipHorizontal");
+        frame.FlipVertical = BoolEl(el, "FlipVertical");
+        frame.RelativeX = FloatEl(el, "RelativeX");
+        frame.RelativeY = FloatEl(el, "RelativeY");
+
+        var shapesEl = el.Element("ShapesSave");
+        if (shapesEl != null)
+            frame.ShapesSave = ParseShapes(shapesEl);
+
+        return frame;
+    }
+
+    private static ShapesSave ParseShapes(XElement el)
+    {
+        var shapes = new ShapesSave();
+
+        var aarctsEl = el.Element("AARectSaves");
+        if (aarctsEl != null)
+        {
+            foreach (var r in aarctsEl.Elements("AARectSave"))
+            {
+                shapes.AARectSaves.Add(new AARectSave
+                {
+                    Name = (string?)r.Element("Name") ?? string.Empty,
+                    X = FloatEl(r, "X"),
+                    Y = FloatEl(r, "Y"),
+                    ScaleX = FloatEl(r, "ScaleX", 16f),
+                    ScaleY = FloatEl(r, "ScaleY", 16f),
+                });
+            }
+        }
+
+        var circlesEl = el.Element("CircleSaves");
+        if (circlesEl != null)
+        {
+            foreach (var c in circlesEl.Elements("CircleSave"))
+            {
+                shapes.CircleSaves.Add(new CircleSave
+                {
+                    Name = (string?)c.Element("Name") ?? string.Empty,
+                    X = FloatEl(c, "X"),
+                    Y = FloatEl(c, "Y"),
+                    Radius = FloatEl(c, "Radius", 16f),
+                });
+            }
+        }
+
+        var polysEl = el.Element("PolygonSaves");
+        if (polysEl != null)
+        {
+            foreach (var p in polysEl.Elements("PolygonSave"))
+            {
+                var poly = new PolygonSave
+                {
+                    Name = (string?)p.Element("Name") ?? string.Empty,
+                    X = FloatEl(p, "X"),
+                    Y = FloatEl(p, "Y"),
+                };
+
+                var pointsEl = p.Element("Points");
+                if (pointsEl != null)
+                {
+                    foreach (var v in pointsEl.Elements("Vector2Save"))
+                    {
+                        poly.Points.Add(new Vector2Save
+                        {
+                            X = FloatEl(v, "X"),
+                            Y = FloatEl(v, "Y"),
+                        });
+                    }
+                }
+
+                shapes.PolygonSaves.Add(poly);
+            }
+        }
+
+        return shapes;
+    }
+
+    private static float FloatEl(XElement parent, string name, float defaultValue = 0f)
+    {
+        var el = parent.Element(name);
+        return el != null ? float.Parse(el.Value, CultureInfo.InvariantCulture) : defaultValue;
+    }
+
+    private static bool BoolEl(XElement parent, string name, bool defaultValue = false)
+    {
+        var el = parent.Element(name);
+        return el != null ? bool.Parse(el.Value) : defaultValue;
     }
 
     /// <summary>

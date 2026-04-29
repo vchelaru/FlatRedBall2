@@ -76,11 +76,7 @@ public class AnimationChainList : List<AnimationChain>
             fresh = content.LoadAnimationChainList(path);
         }
         catch (IOException) { return false; }
-        // XmlSerializer.Deserialize wraps parse errors in InvalidOperationException with an
-        // XmlException inner. Anything else under that type is a genuine bug from downstream
-        // code (e.g. a broken texture loader) and must propagate so it isn't papered over as
-        // "file mid-write, retry later."
-        catch (System.InvalidOperationException ex) when (ex.InnerException is XmlException) { return false; }
+        catch (XmlException) { return false; }
 
         foreach (var freshChain in fresh)
         {

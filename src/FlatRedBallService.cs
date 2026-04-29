@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -55,6 +56,7 @@ public class FlatRedBallService
     private SpriteBatch? _spriteBatch;
     private Texture2D? _whitePixel;
     private Action? _pendingScreenChange;
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
     private Type? _lastScreenType;
     private Action<Screen>? _lastScreenConfigure;
     private readonly List<GraphicalUiElement> _gumUpdateList = new();

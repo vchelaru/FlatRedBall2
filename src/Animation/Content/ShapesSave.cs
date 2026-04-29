@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Xml.Serialization;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -8,7 +7,6 @@ namespace FlatRedBall2.Animation.Content;
 /// converted to runtime <see cref="AnimationShapeFrame"/> instances by
 /// <see cref="AnimationChainListSave.ToAnimationChainList"/>.
 /// </summary>
-[System.Serializable]
 public class ShapesSave
 {
     /// <summary>Rectangles defined for this frame.</summary>
@@ -22,7 +20,6 @@ public class ShapesSave
 }
 
 /// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
-[System.Serializable]
 public class AARectSave
 {
     /// <summary>Shape name; matched by name against entity-attached shapes.</summary>
@@ -38,7 +35,6 @@ public class AARectSave
 }
 
 /// <summary>Serialized circle entry within a <see cref="ShapesSave"/>.</summary>
-[System.Serializable]
 public class CircleSave
 {
     /// <summary>Shape name.</summary>
@@ -52,7 +48,6 @@ public class CircleSave
 }
 
 /// <summary>Serialized polygon entry within a <see cref="ShapesSave"/>.</summary>
-[System.Serializable]
 public class PolygonSave
 {
     /// <summary>Shape name.</summary>
@@ -66,7 +61,6 @@ public class PolygonSave
 }
 
 /// <summary>Serialized 2D point used by <see cref="PolygonSave"/>.</summary>
-[System.Serializable]
 public class Vector2Save
 {
     /// <summary>X coordinate.</summary>

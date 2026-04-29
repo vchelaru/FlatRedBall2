@@ -1,5 +1,5 @@
 using System.IO;
-using System.Xml.Serialization;
+using System.Text;
 using FlatRedBall2.Animation.Content;
 using Shouldly;
 using Xunit;
@@ -17,17 +17,14 @@ public class AdobeAnimateAtlasSaveTests
     <SubTexture name=""Eyeball_Blink0001"" x=""235"" y=""239"" width=""155"" height=""159""/>
 </TextureAtlas>";
 
-    private static AdobeAnimateAtlasSave Deserialize(string xml)
-    {
-        var serializer = new XmlSerializer(typeof(AdobeAnimateAtlasSave));
-        using var sr = new StringReader(xml);
-        return (AdobeAnimateAtlasSave)serializer.Deserialize(sr)!;
-    }
+    private static AdobeAnimateAtlasSave Parse(string xml)
+        => AdobeAnimateAtlasSave.FromFile("test.xml",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
     [Fact]
     public void Deserialize_ParsesImagePathAndSubTextures()
     {
-        var save = Deserialize(SampleXml);
+        var save = Parse(SampleXml);
 
         save.ImagePath.ShouldBe("Eyeball_Idle.png");
         save.SubTextures.Count.ShouldBe(5);
@@ -39,7 +36,7 @@ public class AdobeAnimateAtlasSaveTests
     [Fact]
     public void Deserialize_PivotAttributes_ParsedWhenPresentNaNWhenAbsent()
     {
-        var save = Deserialize(SampleXml);
+        var save = Parse(SampleXml);
 
         save.SubTextures[0].PivotX.ShouldBe(77.1f, tolerance: 0.01f);
         save.SubTextures[0].PivotY.ShouldBe(79.6f, tolerance: 0.01f);
@@ -48,9 +45,38 @@ public class AdobeAnimateAtlasSaveTests
     }
 
     [Fact]
+    public void ToAnimationChainList_BottomCenterPivot_AnchorsAtFeet()
+    {
+        var save = Parse(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][1].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][1].RelativeY.ShouldBe(50f, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_CenteredPivot_ProducesZeroOffsets()
+    {
+        var save = Parse(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][0].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][0].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_FrameLengthIsOneOverFrameRate()
+    {
+        var save = Parse(SampleXml);
+        var list = save.BuildList(null, frameRate: 24f);
+
+        list[0][0].FrameLength.TotalSeconds.ShouldBe(1.0 / 24.0, tolerance: 0.0001);
+    }
+
+    [Fact]
     public void ToAnimationChainList_GroupsByNamePrefixAndSortsByFrameNumber()
     {
-        var save = Deserialize(SampleXml);
+        var save = Parse(SampleXml);
         var list = save.BuildList(null, frameRate: 30f);
 
         list.Count.ShouldBe(2);
@@ -58,7 +84,6 @@ public class AdobeAnimateAtlasSaveTests
         list[1].Name.ShouldBe("Eyeball_Blink");
 
         list[0].Count.ShouldBe(3);
-        // Sample has Idle frames authored out-of-order (0000, 0002, 0001); must sort by name
         list[0][0].SourceRectangle!.Value.Y.ShouldBe(40);   // 0000
         list[0][1].SourceRectangle!.Value.Y.ShouldBe(239);  // 0001
         list[0][2].SourceRectangle!.Value.Y.ShouldBe(40);   // 0002
@@ -67,19 +92,25 @@ public class AdobeAnimateAtlasSaveTests
     }
 
     [Fact]
-    public void ToAnimationChainList_FrameLengthIsOneOverFrameRate()
+    public void ToAnimationChainList_NoPivotAttributes_LeavesOffsetsAtZero()
     {
-        var save = Deserialize(SampleXml);
-        var list = save.BuildList(null, frameRate: 24f);
+        var save = Parse(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
 
-        list[0][0].FrameLength.TotalSeconds.ShouldBe(1.0 / 24.0, tolerance: 0.0001);
+        list[0][3].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
+        list[0][3].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
     }
 
-    // Pivot conversion: Adobe Animate authors pivot in source-rect pixels from top-left (Y-down).
-    // FRB2 sprites render with their center as the anchor and world Y+ up. Conversion to
-    // RelativeX/Y so the pivot pixel lands at the entity's position:
-    //   RelativeX = srcW/2 - pivotX
-    //   RelativeY = pivotY - srcH/2
+    [Fact]
+    public void ToAnimationChainList_TopLeftPivot_ShiftsSpriteRightAndDown()
+    {
+        var save = Parse(PivotXml);
+        var list = save.BuildList(null, frameRate: 30f);
+
+        list[0][2].RelativeX.ShouldBe(50f, tolerance: 0.0001f);
+        list[0][2].RelativeY.ShouldBe(-50f, tolerance: 0.0001f);
+    }
+
     private const string PivotXml = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <TextureAtlas imagePath=""char.png"">
     <SubTexture name=""Char0000"" x=""0"" y=""0"" width=""100"" height=""100"" pivotX=""50"" pivotY=""50""/>
@@ -87,48 +118,4 @@ public class AdobeAnimateAtlasSaveTests
     <SubTexture name=""Char0002"" x=""0"" y=""0"" width=""100"" height=""100"" pivotX=""0""  pivotY=""0""/>
     <SubTexture name=""Char0003"" x=""0"" y=""0"" width=""100"" height=""100""/>
 </TextureAtlas>";
-
-    [Fact]
-    public void ToAnimationChainList_CenteredPivot_ProducesZeroOffsets()
-    {
-        var save = Deserialize(PivotXml);
-        var list = save.BuildList(null, frameRate: 30f);
-
-        list[0][0].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
-        list[0][0].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
-    }
-
-    [Fact]
-    public void ToAnimationChainList_BottomCenterPivot_AnchorsAtFeet()
-    {
-        // Pivot at (50, 100) on a 100x100 frame — typical "feet" anchor for a character.
-        // RelativeX = 50 - 50 = 0; RelativeY = 100 - 50 = 50 (sprite shifts up so feet are at entity origin).
-        var save = Deserialize(PivotXml);
-        var list = save.BuildList(null, frameRate: 30f);
-
-        list[0][1].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
-        list[0][1].RelativeY.ShouldBe(50f, tolerance: 0.0001f);
-    }
-
-    [Fact]
-    public void ToAnimationChainList_TopLeftPivot_ShiftsSpriteRightAndDown()
-    {
-        // Pivot at (0, 0) on a 100x100 frame.
-        // RelativeX = 50 - 0 = 50; RelativeY = 0 - 50 = -50.
-        var save = Deserialize(PivotXml);
-        var list = save.BuildList(null, frameRate: 30f);
-
-        list[0][2].RelativeX.ShouldBe(50f, tolerance: 0.0001f);
-        list[0][2].RelativeY.ShouldBe(-50f, tolerance: 0.0001f);
-    }
-
-    [Fact]
-    public void ToAnimationChainList_NoPivotAttributes_LeavesOffsetsAtZero()
-    {
-        var save = Deserialize(PivotXml);
-        var list = save.BuildList(null, frameRate: 30f);
-
-        list[0][3].RelativeX.ShouldBe(0f, tolerance: 0.0001f);
-        list[0][3].RelativeY.ShouldBe(0f, tolerance: 0.0001f);
-    }
 }
