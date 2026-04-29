@@ -64,6 +64,7 @@ Invoke these with the Skill tool when working on specific topics:
 - `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapes`, enemy navigation pattern
 - `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished
 - `audio` — AudioManager, loading SoundEffect/Song, music, volume
+- `shaders` — Custom .fx shaders, precompiled XNBs, Wine/libmojoshader setup, version guard
 - `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
 - `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
 - `multiplatform-conversion` — Convert a single-target desktop sample into a dual-target desktop + KNI BlazorGL (web/WASM) project

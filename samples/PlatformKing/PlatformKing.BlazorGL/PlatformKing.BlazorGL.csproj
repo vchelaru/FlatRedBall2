@@ -12,6 +12,9 @@
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
 
+  <!-- Must be after KniPlatform is set so the allowlist can match -->
+  <Import Project="..\..\..\src\PrecompiledShaders\AposShapesPrecompiled.props" />
+
   <ItemGroup>
     <Compile Include="Program.cs" />
   </ItemGroup>
