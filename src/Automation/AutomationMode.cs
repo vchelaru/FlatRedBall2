@@ -285,8 +285,10 @@ internal class AutomationMode
             return false;
         }
         var inst = factory.EntityInstances[0];
+#pragma warning disable IL2075 // Intentional reflection; DEBUG-only, never runs in AOT deployments.
         var p = inst.GetType().GetProperty(propName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+#pragma warning restore IL2075
         if (p == null || !p.CanWrite)
         {
             error = $"{entityName}.{propName} is not a writable public property";
@@ -335,7 +337,9 @@ internal class AutomationMode
     {
         var dict = new Dictionary<string, object?>();
         var t = entity.GetType();
+#pragma warning disable IL2075 // Intentional reflection; DEBUG-only, never runs in AOT deployments.
         foreach (var prop in t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+#pragma warning restore IL2075
         {
             if (!prop.CanRead) continue;
             if (prop.GetIndexParameters().Length > 0) continue;
@@ -378,7 +382,9 @@ internal class AutomationMode
 
     private void WriteResponse(object response)
     {
+#pragma warning disable IL2026, IL3050 // Intentional dynamic JSON; DEBUG-only, never runs in AOT deployments.
         var json = JsonSerializer.Serialize(response);
+#pragma warning restore IL2026, IL3050
         lock (_output)
         {
             _output.WriteLine(json);

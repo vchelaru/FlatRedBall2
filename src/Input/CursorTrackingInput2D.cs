@@ -11,7 +11,7 @@ namespace FlatRedBall2.Input;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <paramref name="positionProvider"/> is called each frame to get the "from" position (typically
+/// <c>positionProvider</c> is called each frame to get the "from" position (typically
 /// the entity's current world position). This avoids a hard dependency on <see cref="Entity"/> so
 /// the input can be used with any positional source.
 /// </para>
