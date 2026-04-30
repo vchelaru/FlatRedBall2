@@ -53,6 +53,7 @@
   <ShowLocalizationInGum>true</ShowLocalizationInGum>
   <CurrentLanguageIndex>0</CurrentLanguageIndex>
   <ScreenReference Name="GameScreenGum" />
+  <ScreenReference Name="TestScreen" />
   <ComponentReference Name="CardGum" />
   <ComponentReference Name="Controls/ButtonClose" />
   <ComponentReference Name="Controls/ButtonConfirm" />

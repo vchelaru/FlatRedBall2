@@ -3,8 +3,11 @@
     "ExpandedNodes": [
       "Screens",
       "Screens/GameScreenGum",
+      "Screens/GameScreenGum/FoundationContainer",
+      "Screens/GameScreenGum/TableauContainer",
+      "Screens/TestScreen",
       "Components",
-      "Components/CardGum",
+      "Components/FoundationSlot",
       "Standard"
     ]
   }

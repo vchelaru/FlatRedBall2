@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>TestScreen</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="int" Name="Background1.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">309</Value>
+    </Variable>
+    <Variable Type="bool" Name="Background1.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.StrokeDashLength" SetsValue="true">
+      <Value xsi:type="xsd:float">19</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.StrokeGapLength" SetsValue="true">
+      <Value xsi:type="xsd:float">22</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">5</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">214</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">76</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Background1.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background1.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">27</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Background1.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background1.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Background2.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="int" Name="Background2.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">309</Value>
+    </Variable>
+    <Variable Type="bool" Name="Background2.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">true</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.StrokeDashLength" SetsValue="true">
+      <Value xsi:type="xsd:float">19</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.StrokeGapLength" SetsValue="true">
+      <Value xsi:type="xsd:float">22</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">5</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">214</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">98</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Background2.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">39</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Background2.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Background3.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">189</Value>
+    </Variable>
+    <Variable Type="bool" Name="Background3.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.StrokeDashLength" SetsValue="true">
+      <Value xsi:type="xsd:float">19</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.StrokeGapLength" SetsValue="true">
+      <Value xsi:type="xsd:float">22</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">5</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">166</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.X" SetsValue="true">
+      <Value xsi:type="xsd:float">59</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Background3.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background3.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Background3.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">501</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Background3.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background3.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">361</Value>
+    </Variable>
+    <Variable Type="bool" Name="ColoredCircleInstance.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.StrokeDashLength" SetsValue="true">
+      <Value xsi:type="xsd:float">34</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.StrokeGapLength" SetsValue="true">
+      <Value xsi:type="xsd:float">9</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">12</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">371</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.X" SetsValue="true">
+      <Value xsi:type="xsd:float">351</Value>
+    </Variable>
+    <Variable Type="float" Name="ColoredCircleInstance.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">156</Value>
+    </Variable>
+  </State>
+  <Instance Name="Background2" BaseType="RoundedRectangle" />
+  <Instance Name="Background1" BaseType="RoundedRectangle" />
+  <Instance Name="Background3" BaseType="RoundedRectangle" />
+  <Instance Name="ColoredCircleInstance" BaseType="ColoredCircle" />
+  <Behaviors />
+</ScreenSave>
