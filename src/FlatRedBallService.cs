@@ -165,7 +165,7 @@ public class FlatRedBallService
             _gum.Initialize(game, DefaultVisualsVersion.V3);
         }
         GumRenderBatch.Instance.Initialize();
-        ShapeRenderer.Self.Initialize();
+        ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
         System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
     }
 

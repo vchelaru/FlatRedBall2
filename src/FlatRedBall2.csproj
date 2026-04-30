@@ -56,8 +56,8 @@
   <!-- MonoGame backend -->
   <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
     <PackageReference Include="Apos.Shapes" Version="*" />
-    <PackageReference Include="Gum.MonoGame" Version="2026.4.5.1" />
-    <PackageReference Include="Gum.Shapes.MonoGame" Version="2026.4.5.1" />
+    <PackageReference Include="Gum.MonoGame" Version="2026.4.29.1-preview.11" />
+    <PackageReference Include="Gum.Shapes.MonoGame" Version="2026.4.29.1-preview.11" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
@@ -67,8 +67,8 @@
   <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
   <ItemGroup Condition="'$(Backend)' == 'Kni'">
     <PackageReference Include="Apos.Shapes.KNI" Version="*" />
-    <PackageReference Include="Gum.KNI" Version="2026.4.5.1" />
-    <PackageReference Include="Gum.Shapes.KNI" Version="2026.4.5.1" />
+    <PackageReference Include="Gum.KNI" Version="2026.4.29.1-preview.11" />
+    <PackageReference Include="Gum.Shapes.KNI" Version="2026.4.29.1-preview.11" />
     <PackageReference Include="KNI.Extended" Version="6.0.0-preview.*" />
     <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
     <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
