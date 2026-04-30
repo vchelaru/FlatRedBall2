@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Solitaire</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Mirror the engine's backend defines so game code can #if KNI / #if MONOGAME. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
+  </PropertyGroup>
+
+  <!-- net8.0 -> KNI backend (nkast XNA). net10.0 -> MonoGame backend (DesktopGL). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\FlatRedBall2.csproj" />
+  </ItemGroup>
+
+  <!-- Gum project files copied to output so the engine can load them at runtime. -->
+  <ItemGroup>
+    <Content Include="Content\GumProject\**\*.*"
+             CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="Content\GumProject\**\*.*" />
+  </ItemGroup>
+</Project>

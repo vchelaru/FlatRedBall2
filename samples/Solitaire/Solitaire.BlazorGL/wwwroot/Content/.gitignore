@@ -1,0 +1,5 @@
+# Copied from Solitaire.Common/Content/ at build time by the
+# CopyCommonRawAssetsToWwwroot MSBuild target. Source of truth lives in Common.
+# XNBs are also deposited here by the RedirectKniContentToWwwroot target.
+*
+!.gitignore

@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScreenSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>GameScreenGum</Name>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="int" Name="Felt.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">37</Value>
+    </Variable>
+    <Variable Type="int" Name="Felt.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">102</Value>
+    </Variable>
+    <Variable Type="float" Name="Felt.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Felt.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="int" Name="Felt.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">11</Value>
+    </Variable>
+    <Variable Type="float" Name="Felt.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Felt.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="Felt.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Felt.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Felt.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Felt.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Felt.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Felt.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="int" Name="Foundation0.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation0.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation0.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Foundation0.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">FoundationContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation0.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation0.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Foundation0.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation0.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation0.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Foundation0.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation0.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Foundation1.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation1.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation1.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Foundation1.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">FoundationContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation1.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Foundation1.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation1.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Foundation1.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation1.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Foundation2.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation2.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation2.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Foundation2.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">FoundationContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation2.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Foundation2.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Foundation2.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Foundation3.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation3.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation3.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Foundation3.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">FoundationContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation3.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation3.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Foundation3.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation3.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Foundation3.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Foundation3.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Foundation3.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="ChildrenLayout" Name="FoundationContainer.ChildrenLayout" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="FoundationContainer.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">134</Value>
+    </Variable>
+    <Variable Type="float" Name="FoundationContainer.StackSpacing" SetsValue="true">
+      <Value xsi:type="xsd:float">25</Value>
+    </Variable>
+    <Variable Type="float" Name="FoundationContainer.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="FoundationContainer.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">4</Value>
+    </Variable>
+    <Variable Type="float" Name="FoundationContainer.X" SetsValue="true">
+      <Value xsi:type="xsd:float">464</Value>
+    </Variable>
+    <Variable Type="float" Name="FoundationContainer.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">50</Value>
+    </Variable>
+    <Variable Type="int" Name="StockSlot.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="StockSlot.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="StockSlot.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="float" Name="StockSlot.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="StockSlot.X" SetsValue="true">
+      <Value xsi:type="xsd:float">-540</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="StockSlot.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="StockSlot.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="StockSlot.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">-260</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="StockSlot.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="StockSlot.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau0.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau0.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau0.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau0.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau0.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau0.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau0.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau0.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau0.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau0.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau0.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau1.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau1.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau1.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau1.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau1.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau1.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau1.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau1.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau1.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau2.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau2.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau2.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau2.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau2.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau2.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau2.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau3.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau3.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau3.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau3.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau3.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau3.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau3.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau3.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau3.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau3.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau3.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau4.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau4.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau4.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau4.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau4.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau4.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau4.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau4.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau4.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau4.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau4.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau5.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau5.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau5.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau5.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau5.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau5.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau5.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau5.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau5.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau5.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau5.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="int" Name="Tableau6.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau6.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau6.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="string" Name="Tableau6.Parent" SetsValue="true">
+      <Value xsi:type="xsd:string">TableauContainer</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau6.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau6.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Tableau6.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau6.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="float" Name="Tableau6.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Tableau6.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Tableau6.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="ChildrenLayout" Name="TableauContainer.ChildrenLayout" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="TableauContainer.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">120</Value>
+    </Variable>
+    <Variable Type="float" Name="TableauContainer.StackSpacing" SetsValue="true">
+      <Value xsi:type="xsd:float">25</Value>
+    </Variable>
+    <Variable Type="float" Name="TableauContainer.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">711</Value>
+    </Variable>
+    <Variable Type="float" Name="TableauContainer.X" SetsValue="true">
+      <Value xsi:type="xsd:float">148</Value>
+    </Variable>
+    <Variable Type="float" Name="TableauContainer.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">222</Value>
+    </Variable>
+    <Variable Type="int" Name="WasteSlot.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">40</Value>
+    </Variable>
+    <Variable Type="float" Name="WasteSlot.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="WasteSlot.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="float" Name="WasteSlot.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+    <Variable Type="float" Name="WasteSlot.X" SetsValue="true">
+      <Value xsi:type="xsd:float">-435</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="WasteSlot.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="WasteSlot.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="WasteSlot.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">-260</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="WasteSlot.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="WasteSlot.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+  </State>
+  <Instance Name="Foundation0" BaseType="FoundationSlot" />
+  <Instance Name="Foundation1" BaseType="FoundationSlot" />
+  <Instance Name="Foundation2" BaseType="FoundationSlot" />
+  <Instance Name="Foundation3" BaseType="FoundationSlot" />
+  <Instance Name="Tableau0" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau1" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau2" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau3" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau4" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau5" BaseType="RoundedRectangle" />
+  <Instance Name="Tableau6" BaseType="RoundedRectangle" />
+  <Instance Name="Felt" BaseType="ColoredRectangle" />
+  <Instance Name="FoundationContainer" BaseType="Container" />
+  <Instance Name="StockSlot" BaseType="RoundedRectangle" />
+  <Instance Name="WasteSlot" BaseType="RoundedRectangle" />
+  <Instance Name="TableauContainer" BaseType="Container" />
+  <Behaviors />
+</ScreenSave>

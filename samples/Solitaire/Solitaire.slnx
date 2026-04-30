@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
+  <Project Path="Solitaire.Common/Solitaire.Common.csproj" />
+  <Project Path="Solitaire.Desktop/Solitaire.Desktop.csproj" />
+  <Project Path="Solitaire.BlazorGL/Solitaire.BlazorGL.csproj" />
+  <Project Path="Solitaire.Tests/Solitaire.Tests.csproj" />
+</Solution>

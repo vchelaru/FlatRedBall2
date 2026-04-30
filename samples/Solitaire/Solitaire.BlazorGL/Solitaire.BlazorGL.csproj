@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Solitaire.BlazorGL</RootNamespace>
+    <AssemblyName>Solitaire.BlazorGL</AssemblyName>
+    <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
+    <KniPlatform>BlazorGL</KniPlatform>
+    <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
+  </PropertyGroup>
+
+  <Import Project="..\..\..\src\PrecompiledShaders\AposShapesPrecompiled.props" />
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Devices" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Storage" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.XR" Version="4.2.9001" />
+    <PackageReference Include="nkast.Kni.Platform.Blazor.GL" Version="4.2.9001.1" />
+    <PackageReference Include="nkast.Xna.Framework.Content.Pipeline.Builder" Version="4.2.9001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.17" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.17" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Solitaire.Common\Solitaire.Common.csproj" />
+    <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
+  </ItemGroup>
+
+  <!--
+    Common's Gum project files must land in the project's PHYSICAL wwwroot/Content/ so
+    Blazor's static-web-asset manifest serves them. Source of truth lives in Common.
+  -->
+  <ItemGroup>
+    <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.*"
+                      Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**" />
+  </ItemGroup>
+  <Target Name="CopyCommonRawAssetsToWwwroot"
+          BeforeTargets="GenerateStaticWebAssetsManifest;AssignTargetPaths"
+          Inputs="@(_CommonRawAssets)"
+          Outputs="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(_CommonRawAssets)"
+          DestinationFiles="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="RedirectKniContentToWwwroot" AfterTargets="CollectContentReferences">
+    <ItemGroup>
+      <ContentReference>
+        <ContentOutputDir>$(MSBuildProjectDirectory)\wwwroot\Content\%(ContentReference.OutputFolder)\</ContentOutputDir>
+      </ContentReference>
+    </ItemGroup>
+  </Target>
+
+</Project>
