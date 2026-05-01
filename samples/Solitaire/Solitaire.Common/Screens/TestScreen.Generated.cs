@@ -37,7 +37,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
         });
     }
     public ColoredRectangleRuntime ColoredRectangleInstance1 { get; protected set; }
-    public RoundedRectangleRuntime Background2 { get; protected set; }
+    public RoundedRectangleRuntime RoundedRectangleInstance { get; protected set; }
 
     public TestScreen(InteractiveGue visual) : base(visual)
     {
@@ -52,7 +52,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
     {
         base.ReactToVisualChanged();
         ColoredRectangleInstance1 = this.Visual?.GetGraphicalUiElementByName("ColoredRectangleInstance1") as global::MonoGameGum.GueDeriving.ColoredRectangleRuntime;
-        Background2 = this.Visual?.GetGraphicalUiElementByName("Background2") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
+        RoundedRectangleInstance = this.Visual?.GetGraphicalUiElementByName("RoundedRectangleInstance") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
         CustomInitialize();
     }
     //Not assigning variables because Object Instantiation Type is set to By Name rather than Fully In Code

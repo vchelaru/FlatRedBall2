@@ -43,6 +43,8 @@ public class GameScreen : Screen
     private GameState _state = null!;
     private Factory<CardEntity> _cardFactory = null!;
     private readonly Dictionary<Card, CardEntity> _entityFor = new();
+    private FrameworkElement[] _foundationSlots = null!;
+    private GraphicalUiElement[] _tableauSlots = null!;
 
     // Drag state
     private List<CardEntity> _dragRun = new();
@@ -74,6 +76,16 @@ public class GameScreen : Screen
         _gum.Foundation1.SuitState = Solitaire.Components.FoundationSlot.Suit.Hearts;
         _gum.Foundation2.SuitState = Solitaire.Components.FoundationSlot.Suit.Clubs;
         _gum.Foundation3.SuitState = Solitaire.Components.FoundationSlot.Suit.Diamonds;
+
+        _foundationSlots = new FrameworkElement[]
+        {
+            _gum.Foundation0, _gum.Foundation1, _gum.Foundation2, _gum.Foundation3,
+        };
+        _tableauSlots = new GraphicalUiElement[]
+        {
+            _gum.Tableau0, _gum.Tableau1, _gum.Tableau2, _gum.Tableau3,
+            _gum.Tableau4, _gum.Tableau5, _gum.Tableau6,
+        };
 
         _gum.RestartGameButton.Click += (_, _) => StartNewGame();
 
@@ -154,9 +166,6 @@ public class GameScreen : Screen
         {
             return;
         }
-
-        //System.Diagnostics.Debug.WriteLine(GumService.Default.Cursor.GetEventFailureReason(_gum.RestartGameButton));
-
 
         var cursor = Engine.Input.Cursor;
         var world = cursor.WorldPosition;
@@ -266,17 +275,13 @@ public class GameScreen : Screen
                 isVisible: isInFan || isCollapsedTop);
         }
 
-        var foundationSlots = new FrameworkElement[]
-        {
-            _gum.Foundation0, _gum.Foundation1, _gum.Foundation2, _gum.Foundation3,
-        };
         for (int f = 0; f < _state.Foundations.Length; f++)
         {
             var pile = _state.Foundations[f];
             // Topmost non-dragged: when the pile's top card is being dragged off, the card
             // beneath it should reveal during the drag — not snap into view at EndDrag.
             int visibleTop = TopVisibleIndex(pile);
-            var (x, y) = SlotWorldCenter(foundationSlots[f].Visual);
+            var (x, y) = SlotWorldCenter(_foundationSlots[f].Visual);
             for (int i = 0; i < pile.Count; i++)
             {
                 var card = pile.Cards[i];
@@ -285,15 +290,10 @@ public class GameScreen : Screen
             }
         }
 
-        var tableauSlots = new GraphicalUiElement[]
-        {
-            _gum.Tableau0, _gum.Tableau1, _gum.Tableau2, _gum.Tableau3,
-            _gum.Tableau4, _gum.Tableau5, _gum.Tableau6,
-        };
         for (int col = 0; col < _state.Tableaus.Length; col++)
         {
             var pile = _state.Tableaus[col];
-            var (x, startY) = SlotWorldCenter(tableauSlots[col]);
+            var (x, startY) = SlotWorldCenter(_tableauSlots[col]);
             float y = startY;
             for (int i = 0; i < pile.Count; i++)
             {
@@ -602,13 +602,9 @@ public class GameScreen : Screen
         // Check foundations — only legal for a single-card move.
         if (moving.Count == 1)
         {
-            var foundationSlots = new FrameworkElement[]
-            {
-                _gum.Foundation0, _gum.Foundation1, _gum.Foundation2, _gum.Foundation3,
-            };
             for (int f = 0; f < _state.Foundations.Length; f++)
             {
-                if (CursorOver(foundationSlots[f].Visual, world)
+                if (CursorOver(_foundationSlots[f].Visual, world)
                     && Rules.CanPlaceOnFoundation(root, _state.Foundations[f]))
                 {
                     destination = _state.Foundations[f];
@@ -618,14 +614,9 @@ public class GameScreen : Screen
         }
 
         // Check tableaus.
-        var tableauSlots = new GraphicalUiElement[]
-        {
-            _gum.Tableau0, _gum.Tableau1, _gum.Tableau2, _gum.Tableau3,
-            _gum.Tableau4, _gum.Tableau5, _gum.Tableau6,
-        };
         for (int col = 0; col < _state.Tableaus.Length; col++)
         {
-            if (IsCursorOverTableauColumn(tableauSlots[col], _state.Tableaus[col], world)
+            if (IsCursorOverTableauColumn(_tableauSlots[col], _state.Tableaus[col], world)
                 && Rules.CanPlaceOnTableau(root, _state.Tableaus[col].Top))
             {
                 destination = _state.Tableaus[col];

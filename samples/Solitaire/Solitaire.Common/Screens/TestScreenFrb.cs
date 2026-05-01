@@ -1,4 +1,4 @@
-﻿using FlatRedBall2;
+using FlatRedBall2;
 using Solitaire.Entities;
 using System;
 using System.Collections.Generic;
@@ -14,10 +14,10 @@ internal class TestScreenFrb : Screen
     {
         this.Add(new TestScreen());
 
-        var rectEntity = new GumRectEntity { X = -330, Y = 240 };
-        Register(rectEntity);
-        rectEntity.CustomInitialize();
+        //var rectEntity = new GumRectEntity { X = -330, Y = 240 };
+        //Register(rectEntity);
+        //rectEntity.CustomInitialize();
 
-        base.CustomInitialize();
+        //base.CustomInitialize();
     }
 }

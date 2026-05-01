@@ -156,9 +156,6 @@ public class CardEntity : Entity
         // top-to-bottom order during the slide.
         Z = TweenLiftZ + z;
 
-        // Lerp X and Y inside a single float tween so we only own one Tweener.
-        // The Vector2 overload would be tidier but binds to MonoGame's Vector2,
-        // which collides with System.Numerics on the KNI/net8.0 target.
         float fromX = X, fromY = Y;
         float toX = x, toY = y;
         float finalZ = z;

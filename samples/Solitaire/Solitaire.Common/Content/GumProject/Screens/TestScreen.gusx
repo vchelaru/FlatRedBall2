@@ -10,13 +10,13 @@
       <Value xsi:type="xsd:int">148</Value>
     </Variable>
     <Variable Type="float" Name="ColoredRectangleInstance1.Height" SetsValue="true">
-      <Value xsi:type="xsd:float">307</Value>
+      <Value xsi:type="xsd:float">101</Value>
     </Variable>
     <Variable Type="int" Name="ColoredRectangleInstance1.Red" SetsValue="true">
       <Value xsi:type="xsd:int">0</Value>
     </Variable>
     <Variable Type="float" Name="ColoredRectangleInstance1.Width" SetsValue="true">
-      <Value xsi:type="xsd:float">216</Value>
+      <Value xsi:type="xsd:float">133</Value>
     </Variable>
     <Variable Type="float" Name="ColoredRectangleInstance1.X" SetsValue="true">
       <Value xsi:type="xsd:float">43</Value>
@@ -24,7 +24,23 @@
     <Variable Type="float" Name="ColoredRectangleInstance1.Y" SetsValue="true">
       <Value xsi:type="xsd:float">51</Value>
     </Variable>
+    <Variable Type="int" Name="RoundedRectangleInstance.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">176</Value>
+    </Variable>
+    <Variable Type="float" Name="RoundedRectangleInstance.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">99</Value>
+    </Variable>
+    <Variable Type="float" Name="RoundedRectangleInstance.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">131</Value>
+    </Variable>
+    <Variable Type="float" Name="RoundedRectangleInstance.X" SetsValue="true">
+      <Value xsi:type="xsd:float">44</Value>
+    </Variable>
+    <Variable Type="float" Name="RoundedRectangleInstance.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">52</Value>
+    </Variable>
   </State>
   <Instance Name="ColoredRectangleInstance1" BaseType="ColoredRectangle" />
+  <Instance Name="RoundedRectangleInstance" BaseType="RoundedRectangle" />
   <Behaviors />
 </ScreenSave>

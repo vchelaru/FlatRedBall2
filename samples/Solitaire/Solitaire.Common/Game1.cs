@@ -28,7 +28,7 @@ public class Game1 : Game
         ds.ResolutionHeight = height;
         ds.PreferredWindowWidth = 800;
         ds.PreferredWindowHeight = height;
-        ds.AllowUserResizing = true ;
+        ds.AllowUserResizing = true;
 
         FlatRedBallService.Default.PrepareWindow<GameScreen>(_graphics);
     }
