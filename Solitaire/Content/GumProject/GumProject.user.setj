@@ -2,8 +2,8 @@
   "TreeViewState": {
     "ExpandedNodes": [
       "Screens",
+      "Screens/TestScreen",
       "Components",
-      "Components/Controls",
       "Components/WinOverlayGum",
       "Standard"
     ]
