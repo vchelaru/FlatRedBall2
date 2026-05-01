@@ -36,6 +36,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
             return gue;
         });
     }
+    public ColoredRectangleRuntime ColoredRectangleInstance1 { get; protected set; }
     public RoundedRectangleRuntime Background2 { get; protected set; }
 
     public TestScreen(InteractiveGue visual) : base(visual)
@@ -50,6 +51,7 @@ if(element == null) throw new System.InvalidOperationException("Could not find a
     protected override void ReactToVisualChanged()
     {
         base.ReactToVisualChanged();
+        ColoredRectangleInstance1 = this.Visual?.GetGraphicalUiElementByName("ColoredRectangleInstance1") as global::MonoGameGum.GueDeriving.ColoredRectangleRuntime;
         Background2 = this.Visual?.GetGraphicalUiElementByName("Background2") as global::MonoGameGum.GueDeriving.RoundedRectangleRuntime;
         CustomInitialize();
     }

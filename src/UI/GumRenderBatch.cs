@@ -34,11 +34,15 @@ public class GumRenderBatch : IRenderBatch
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
-        // Render Gum at the camera's effective pixels-per-design-unit so that UI scales identically
-        // to the game world. PixelsPerUnit folds together both sources of scale: viewport/Orthogonal
-        // ratio (the implicit window-vs-resolution scale) AND runtime Camera.Zoom. The update loop
-        // sets CanvasWidth/Height in design units, so this matrix maps those units to screen pixels.
+        // PixelsPerUnit folds together window-vs-resolution scale AND the FlatRedBall Camera.Zoom.
+        // Two consumers need it:
+        //   1. Rendering — Gum's BasicEffect path (NET8+) reads ForcedMatrix as the world transform;
+        //      without it, world = Identity and the Camera.Zoom alone won't scale draws.
+        //   2. Forms input — Cursor.XRespectingGumZoomAndBounds reads Renderer.Camera.Zoom directly
+        //      to convert window pixels into canvas units for hit-testing.
+        // Drive both from the same source so render and hit-test never disagree.
         var scale = camera.PixelsPerUnit;
+        RenderingLibrary.SystemManagers.Default.Renderer.Camera.Zoom = scale;
         var matrix = scale == 1f
             ? (Matrix?)null
             : Matrix.CreateScale(scale, scale, 1f);

@@ -210,6 +210,20 @@ public class Camera
     }
 
     /// <summary>
+    /// Projects a world-space position to Gum-canvas (design unit) coordinates with origin
+    /// top-left and Y+ down. Use this — not <see cref="WorldToScreen"/> — when assigning
+    /// <c>GraphicalUiElement.X/Y</c> for a Gum visual rendered through the engine's GumBatch:
+    /// the batch already scales canvas units to viewport pixels, so passing pixels here would
+    /// double-scale and drift on horizontal window resize.
+    /// </summary>
+    public NumericsVector2 WorldToCanvas(NumericsVector2 worldPosition)
+    {
+        return new NumericsVector2(
+             (worldPosition.X - X) * Zoom + OrthogonalWidth  / 2f,
+            -(worldPosition.Y - Y) * Zoom + OrthogonalHeight / 2f);
+    }
+
+    /// <summary>
     /// Unprojects a screen-space pixel position (origin top-left, Y+ down) to a world-space
     /// position (Y+ up). Useful for picking, mouse-to-world, etc. Inverse of <see cref="WorldToScreen"/>.
     /// </summary>

@@ -71,6 +71,47 @@ public class CameraTests
     }
 
     [Fact]
+    public void WorldToCanvas_MapsWorldOriginToCanvasCenter()
+    {
+        // Canvas units: world (camera.X, camera.Y) -> (orthoW/2, orthoH/2). No viewport-pixel involvement.
+        var camera = MakeCamera(800, 640);
+        camera.OrthogonalWidth = 800;
+        camera.OrthogonalHeight = 640;
+
+        var canvas = camera.WorldToCanvas(new System.Numerics.Vector2(0f, 0f));
+
+        canvas.X.ShouldBe(400f, tolerance: 0.01f);
+        canvas.Y.ShouldBe(320f, tolerance: 0.01f);
+    }
+
+    [Fact]
+    public void WorldToCanvas_InvariantToViewportWidth()
+    {
+        // The whole point of canvas-space conversion: a Gum visual positioned via WorldToCanvas
+        // must land at the same canvas coords regardless of viewport pixel width, so that Gum's
+        // own canvas->viewport scale (driven by viewport.Height) is the only place pixel sizing
+        // happens. This is the invariant that resize-drift breaks under WorldToScreen.
+        var wide = MakeCamera(1600, 640); // window stretched horizontally
+        var narrow = MakeCamera(400, 640); // window squeezed horizontally
+        wide.OrthogonalWidth = 1600; wide.OrthogonalHeight = 640;
+        narrow.OrthogonalWidth = 400; narrow.OrthogonalHeight = 640;
+
+        // Same world point on both — but DominantAxis.Height-style cameras have different
+        // orthoW because the world width tracks the window. The *canvas* mapping should
+        // still place the point at the same canvas-Y (height is the dominant axis) and
+        // the same offset from canvas-center-X in design units.
+        var w = wide.WorldToCanvas(new System.Numerics.Vector2(-330f, 240f));
+        var n = narrow.WorldToCanvas(new System.Numerics.Vector2(-330f, 240f));
+
+        // Canvas X = (worldX - camX) * Zoom + orthoW/2.  Different orthoW => different canvas X,
+        // but the offset *from center* must be identical to the world offset (here -330):
+        (w.X - wide.OrthogonalWidth / 2f).ShouldBe(-330f, tolerance: 0.01f);
+        (n.X - narrow.OrthogonalWidth / 2f).ShouldBe(-330f, tolerance: 0.01f);
+        // Y axis: pinned to design height — exact same canvas Y in both cameras.
+        w.Y.ShouldBe(n.Y, tolerance: 0.01f);
+    }
+
+    [Fact]
     public void ScreenToWorld_ZoomTwo_InvertsWorldToScreen()
     {
         var camera = MakeCamera(1280, 720);
