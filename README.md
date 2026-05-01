@@ -14,6 +14,7 @@ Each sample is a complete runnable game built on the engine — open the source 
 |--------|-------------|------|
 | [ShmupSpace](samples/ShmupSpace/) | Shoot-em-up | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/ShmupSpace/) |
 | [PlatformKing](samples/PlatformKing/) | Platformer | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/PlatformKing/) |
+| [Solitaire](samples/Solitaire/) | Klondike solitaire | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/Solitaire/) |
 
 ## Features
 
