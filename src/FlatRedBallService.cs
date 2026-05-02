@@ -644,8 +644,12 @@ public class FlatRedBallService
     // Sub-systems
     /// <summary>The MonoGame graphics device. Throws if accessed before <see cref="Initialize"/>.</summary>
     public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
-    /// <summary>Deterministic random number source — used by every gameplay system that needs randomness so seeds can be reproduced.</summary>
-    public GameRandom Random { get; } = new GameRandom();
+    /// <summary>
+    /// Engine-owned random number source — used by gameplay systems that want a seedable shared instance.
+    /// Time-seeded by default; <see cref="EnableAutomationMode(int?)"/> replaces it with a deterministic
+    /// instance so recorded automation runs reproduce exactly.
+    /// </summary>
+    public GameRandom Random { get; private set; } = new GameRandom();
     /// <summary>Polled keyboard, mouse, and gamepad state. Updated once per frame at the top of <see cref="Update"/>.</summary>
     public InputManager Input { get; } = new InputManager();
     /// <summary>Sound effect and music playback service.</summary>
@@ -705,14 +709,32 @@ public class FlatRedBallService
     /// <summary>
     /// Activates automation mode when the game is launched with --frb-auto. No-op otherwise.
     /// Call in Game.Initialize after base.Initialize(). In Release builds this is a no-op.
+    /// <para>
+    /// When automation activates, <see cref="Random"/> is replaced with a deterministic
+    /// <see cref="GameRandom"/> so recorded NDJSON runs reproduce exactly.
+    /// </para>
     /// </summary>
-    public void EnableAutomationMode()
+    /// <param name="seed">
+    /// Seed for <see cref="Random"/> when automation activates. Ignored entirely when
+    /// --frb-auto is absent — the call is a no-op in that case and <see cref="Random"/>
+    /// keeps its default time-based seed. When --frb-auto is present, omitting this
+    /// parameter (or passing <c>null</c>) seeds <see cref="Random"/> with <c>0</c>.
+    /// </param>
+    public void EnableAutomationMode(int? seed = null)
     {
         if (System.Environment.GetCommandLineArgs().Contains("--frb-auto"))
-        {
-            _automationMode = new Automation.AutomationMode(this);
-            _automationMode.Start();
-        }
+            StartAutomationMode(seed);
+    }
+
+    /// <summary>
+    /// Activates automation mode unconditionally — bypassing the --frb-auto flag check.
+    /// Internal entry point for tests and any future programmatic activation path.
+    /// </summary>
+    internal void StartAutomationMode(int? seed = null, System.IO.TextReader? input = null, System.IO.TextWriter? output = null)
+    {
+        Random = new GameRandom(seed ?? 0);
+        _automationMode = new Automation.AutomationMode(this, output);
+        _automationMode.Start(input);
     }
 
     /// <summary>
@@ -729,7 +751,7 @@ public class FlatRedBallService
     public void RegisterValueSetter(string entityName, string propName, Action<double> setter)
         => _automationMode?.RegisterValueSetter(entityName, propName, setter);
 #else
-    public void EnableAutomationMode() { }
+    public void EnableAutomationMode(int? seed = null) { }
     public void RegisterStateProvider(string name, Func<object> provider) { }
     public void RegisterValueSetter(string entityName, string propName, Action<double> setter) { }
 #endif

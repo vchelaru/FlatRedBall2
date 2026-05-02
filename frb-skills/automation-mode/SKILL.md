@@ -24,6 +24,24 @@ dotnet run -- --frb-auto
 
 That's the entire required wiring. Entities and their public properties are auto-discovered — no per-property registration.
 
+### Deterministic randomness
+
+When automation activates, `FlatRedBallService.Random` is replaced with a deterministic `GameRandom` so recorded NDJSON sessions reproduce exactly. Pass an explicit seed to choose which run.
+
+```csharp
+FlatRedBallService.Default.EnableAutomationMode(seed: 1234);
+```
+
+| `--frb-auto` flag | `seed:` param | Result |
+|---|---|---|
+| absent | (any) | time-based — automation off, seed param ignored |
+| present | omitted | seed `0` |
+| present | `1234` | seed `1234` |
+
+The seed is only applied when `--frb-auto` activates automation; without the flag, ship-time seed values have no effect on a normal run.
+
+Game code that constructs its own `Random`/`GameRandom` is **not** seeded by the engine — route gameplay randomness through `FlatRedBallService.Random` (or derive your own seed from it) if you want it included in the deterministic run.
+
 ## Command Protocol
 
 Each command is a JSON object terminated by `\n`. Each response is a JSON object on its own line, always containing `ok` and `frame`.

@@ -17,21 +17,6 @@ Possible directions:
 - Or reach into Gum's Forms input system to register entity-attached `FrameworkElement`s as input-eligible without re-parenting.
 - Either way: fixing this also fixes per-element hot-reload for entity visuals (no screen restart needed), so it's worth doing properly rather than papering over each symptom.
 
-## Window resize misaligns world-space cards in Solitaire
-
-Resizing the Solitaire window causes every card to draw at an offset from its slot. Cards
-are positioned via `SlotWorldCenter` which converts a Gum slot's `AbsoluteLeft/Top` (canvas
-space) into world coords by subtracting half the camera's orthogonal extents — but on resize
-the canvas-to-world relationship shifts (Pattern A stretch-to-viewport), and either the slot
-absolutes, the camera extents, or the cached anchor positions go stale. Repro: launch
-Solitaire desktop, resize the window, observe cards drift relative to the green-felt slot
-graphics. Decide whether the fix belongs in the sample (re-run layout on resize), in the
-engine's world↔canvas helper, or in Gum's resize signaling.
-
-## Deterministic randoms under automation mode
-
-When automation mode is active, `FlatRedBallService.Random` (and any other engine-owned `GameRandom` paths) should seed deterministically so that recorded automation runs reproduce exactly. Game code that constructs its own `Random` / `GameRandom` should still get a well-defined seed when it asks the engine for one, so non-determinism doesn't sneak in through `new Random()` calls. Open question: how the seed is communicated (env var, automation-mode init field, dedicated `AutomationOptions.Seed`?) — settle that before implementing.
-
 ## Web load times for large Gum projects
 
 Initial load is slow on the BlazorGL/KNI target when a `.gumx` references many components — fonts, control templates, generated runtime types all compile/initialize on the main thread before the first frame draws. Need to (a) measure where the time actually goes (Gum project load vs. runtime registration via `RegisterRuntimeType` module initializers vs. asset decode), (b) decide whether the fix is engine-side (lazy/deferred runtime registration, parallel asset decode) or Gum-side (incremental project load), and (c) confirm WASM-specific costs separate from the same load on desktop. Solitaire's `.gumx` is the readily-available large project to profile against.
