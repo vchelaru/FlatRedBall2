@@ -47,6 +47,8 @@ public class InputManager
     internal void InjectKey(Keys key, bool down) => _keyboard.InjectKey(key, down);
     internal void InjectGamepadButton(int playerIndex, Buttons button, bool down) => _gamepads[playerIndex].InjectButton(button, down);
     internal void InjectGamepadAxis(int playerIndex, GamepadAxis axis, float value) => _gamepads[playerIndex].InjectAxis(axis, value);
+    internal void InjectCursor(int screenX, int screenY, bool primary, bool secondary) => _cursor.Inject(screenX, screenY, primary, secondary);
+    internal Cursor InternalCursor => _cursor;
 
     internal void Update(TimeSpan realTimeSinceStart)
     {

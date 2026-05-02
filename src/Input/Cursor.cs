@@ -36,6 +36,15 @@ public class Cursor : ICursor
     private Vector2 _touchScreenPos;
     private bool _touchAvailable = true;
 
+    // Synthetic state from automation injection. Once enabled, the live mouse is ignored and
+    // touch polling is skipped — the cursor reads exclusively from these fields. Sticky across
+    // frames; Inject() updates them in place.
+    private bool _hasInjection;
+    private int _injectedX;
+    private int _injectedY;
+    private ButtonState _injectedPrimary = ButtonState.Released;
+    private ButtonState _injectedSecondary = ButtonState.Released;
+
     // Wall-clock timestamps of the last detected press/release per button.
     // null means "never seen" — guarantees the first transition cannot accidentally register as a
     // double. Using nullable instead of TimeSpan.MinValue because the latter overflows on subtraction.
@@ -58,8 +67,43 @@ public class Cursor : ICursor
         _activeCamera = null;
     }
 
+    /// <summary>
+    /// Called by automation mode to override the live mouse. Once any value is injected the
+    /// cursor reads exclusively from injected state — touch and real mouse polling stop. The
+    /// values persist across frames; subsequent calls update them in place.
+    /// </summary>
+    internal void Inject(int screenX, int screenY, bool primary, bool secondary)
+    {
+        _hasInjection = true;
+        _injectedX = screenX;
+        _injectedY = screenY;
+        _injectedPrimary = primary ? ButtonState.Pressed : ButtonState.Released;
+        _injectedSecondary = secondary ? ButtonState.Pressed : ButtonState.Released;
+    }
+
+    // Inverse of GetWorldPosition: takes a world position, projects it to viewport-local pixels
+    // through the camera, then offsets by the viewport origin to land in window-screen space.
+    internal Vector2 WorldToScreen(Vector2 worldPosition, Camera camera)
+    {
+        var local = camera.WorldToScreen(worldPosition);
+        var vp = camera.Viewport;
+        return local + new Vector2(vp.X, vp.Y);
+    }
+
+    // First registered camera, or null. Used by automation to pick a camera for world-space
+    // cursor injection without exposing the cameras list publicly.
+    internal Camera? PrimaryCamera => _cameras != null && _cameras.Count > 0 ? _cameras[0] : null;
+
     // Called once per frame by InputManager before entity/screen logic runs.
-    internal void Update(TimeSpan realTimeSinceStart) => Update(Mouse.GetState(), realTimeSinceStart);
+    internal void Update(TimeSpan realTimeSinceStart)
+    {
+        var state = _hasInjection
+            ? new MouseState(_injectedX, _injectedY, 0,
+                _injectedPrimary, ButtonState.Released, _injectedSecondary,
+                ButtonState.Released, ButtonState.Released)
+            : Mouse.GetState();
+        Update(state, realTimeSinceStart);
+    }
 
     // Test seam: lets unit tests drive mouse-derived properties without a real GameWindow.
     internal void Update(MouseState mouseState, TimeSpan realTimeSinceStart)
@@ -70,7 +114,9 @@ public class Cursor : ICursor
         _touchActivePrev = _touchActive;
         _touchActive = false;
 
-        if (_touchAvailable)
+        // Skip touch polling once injection is active — automation drives the cursor exclusively
+        // through the synthetic mouse state, and TouchPanel.GetState() requires a real window.
+        if (_touchAvailable && !_hasInjection)
             UpdateTouch();
 
         UpdateActiveCamera();

@@ -184,6 +184,40 @@ internal class AutomationMode
                     WriteResponse(new { ok = false, frame, error = $"unknown axis: {axisStr}" });
                 break;
             }
+            case "cursor":
+            {
+                var x         = cmd.TryGetProperty("x", out var xp) ? (float)xp.GetDouble() : 0f;
+                var y         = cmd.TryGetProperty("y", out var yp) ? (float)yp.GetDouble() : 0f;
+                var primary   = cmd.TryGetProperty("primary",   out var pp) && pp.GetBoolean();
+                var secondary = cmd.TryGetProperty("secondary", out var sp) && sp.GetBoolean();
+                var space     = cmd.TryGetProperty("space",     out var sps) ? sps.GetString() : "screen";
+
+                int sx, sy;
+                if (space == "screen" || space == null)
+                {
+                    sx = (int)System.MathF.Round(x);
+                    sy = (int)System.MathF.Round(y);
+                }
+                else if (space == "world")
+                {
+                    var camera = _engine.Input.InternalCursor.PrimaryCamera;
+                    if (camera == null)
+                    {
+                        WriteResponse(new { ok = false, frame, error = "cursor world-space injection requires a registered camera" });
+                        break;
+                    }
+                    var screen = _engine.Input.InternalCursor.WorldToScreen(new System.Numerics.Vector2(x, y), camera);
+                    sx = (int)System.MathF.Round(screen.X);
+                    sy = (int)System.MathF.Round(screen.Y);
+                }
+                else
+                {
+                    WriteResponse(new { ok = false, frame, error = $"unknown cursor space: {space}" });
+                    break;
+                }
+                _engine.Input.InjectCursor(sx, sy, primary, secondary);
+                break;
+            }
             default:
                 WriteResponse(new { ok = false, frame, error = $"unknown input type: {type}" });
                 break;

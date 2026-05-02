@@ -34,6 +34,8 @@ Each command is a JSON object terminated by `\n`. Each response is a JSON object
 | Key down/up | `{"cmd":"input","type":"key","key":"Space","down":true}` |
 | Gamepad button | `{"cmd":"input","type":"gamepad","player":0,"button":"A","down":true}` |
 | Gamepad axis | `{"cmd":"input","type":"axis","player":0,"axis":"LeftStickX","value":0.8}` |
+| Cursor (screen px) | `{"cmd":"input","type":"cursor","x":120,"y":80,"primary":true}` |
+| Cursor (world coords) | `{"cmd":"input","type":"cursor","x":0,"y":0,"space":"world","primary":true}` |
 | Query active screen | `{"cmd":"query","target":"screen"}` |
 | Query all entities | `{"cmd":"query","target":"entities"}` |
 | Query one entity type | `{"cmd":"query","target":"Player"}` |
@@ -55,6 +57,8 @@ Synthetic state replaces MonoGame hardware polling. The injected state persists 
 Key names resolve via `Enum.Parse<Keys>()` — use MonoGame's `Keys` enum names verbatim (`Space`, `W`, `Left`, `LeftShift`). Same for gamepad buttons (`Buttons` enum) and axes (`GamepadAxis` enum: `LeftStickX`, `LeftStickY`, `RightStickX`, `RightStickY`, `LeftTrigger`, `RightTrigger`).
 
 Input commands produce no response — query if you need confirmation. `WasKeyPressed` style inputs require the down state to span at least one stepped frame between the down and up commands; combine `input down:true` → `step` → `input down:false` to register a press.
+
+Cursor injection takes screen pixels by default (origin top-left, Y+ down) or world coords with `"space":"world"`. World-space requires at least one registered camera and back-projects through the first one — split-screen disambiguation isn't supported yet, so for those cases use `"space":"screen"` and compute pixels yourself. `primary` and `secondary` mirror left/right mouse buttons; both default to `false` and are sticky across frames until the next cursor command. Once any cursor injection has occurred, the real mouse and touch input are ignored for the rest of the session — there is no opt-out yet.
 
 ## Querying Entities (Zero Config)
 

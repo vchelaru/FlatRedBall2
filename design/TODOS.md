@@ -4,10 +4,6 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
-## Mouse / cursor injection in automation mode
-
-`AutomationMode.ProcessInputCommand` handles `"key"`, `"gamepad"` (button), and `"axis"` (gamepad), but not the cursor — there's no `InjectCursor` on `InputManager` or pathway through `Cursor` to override `WorldPosition`/`PrimaryDown`/`PrimaryPressed`. Mouse-driven samples (e.g. Solitaire) can't be automation-tested without it. Add a synthetic-cursor input source mirroring the keyboard/gamepad pattern, plus an NDJSON command — likely `{"cmd":"input","type":"cursor","x":...,"y":...,"primary":true}` with coords in either screen or world space (decide which, or accept both via a `space` field).
-
 ## Entity-attached Gum visuals are not in Gum's update tree
 
 `Entity.Add(GraphicalUiElement)` and `Entity.Add(FrameworkElement)` wrap the visual in a `GumRenderable`, register it for rendering, and drive its position from the entity's `AbsoluteX/Y` each frame — but never add it as a child of any Gum root. Consequences:

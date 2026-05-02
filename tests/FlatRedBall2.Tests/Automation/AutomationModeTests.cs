@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using FlatRedBall2.Automation;
 using FlatRedBall2.Input;
+using FlatRedBall2.Rendering;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Shouldly;
 using Xunit;
@@ -80,6 +83,153 @@ public class GamepadInjectionTests
         gamepad.Update();
 
         gamepad.IsButtonDown(Buttons.A).ShouldBeTrue();
+    }
+}
+
+// --- Cursor injection ---
+
+public class CursorInjectionTests
+{
+    private static TimeSpan Sec(double s) => TimeSpan.FromSeconds(s);
+
+    [Fact]
+    public void Inject_ScreenPosition_AppearsAfterUpdate()
+    {
+        var cursor = new Cursor();
+
+        cursor.Inject(120, 80, primary: false, secondary: false);
+        cursor.Update(Sec(0));
+
+        cursor.ScreenPosition.X.ShouldBe(120f);
+        cursor.ScreenPosition.Y.ShouldBe(80f);
+    }
+
+    [Fact]
+    public void Inject_PrimaryDown_PrimaryDownReturnsTrue()
+    {
+        var cursor = new Cursor();
+
+        cursor.Inject(0, 0, primary: true, secondary: false);
+        cursor.Update(Sec(0));
+
+        cursor.PrimaryDown.ShouldBeTrue();
+        cursor.PrimaryPressed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inject_PressThenRelease_PrimaryClickFiresOnReleaseFrame()
+    {
+        var cursor = new Cursor();
+
+        cursor.Inject(0, 0, primary: true, secondary: false);
+        cursor.Update(Sec(0));
+        cursor.Inject(0, 0, primary: false, secondary: false);
+        cursor.Update(Sec(0.01));
+
+        cursor.PrimaryClick.ShouldBeTrue();
+        cursor.PrimaryDown.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inject_TwoPressesWithinThreshold_PrimaryDoublePressedFires()
+    {
+        var cursor = new Cursor();
+
+        cursor.Inject(0, 0, primary: true, secondary: false);  cursor.Update(Sec(0.00));
+        cursor.Inject(0, 0, primary: false, secondary: false); cursor.Update(Sec(0.05));
+        cursor.Inject(0, 0, primary: true, secondary: false);  cursor.Update(Sec(0.10));
+
+        cursor.PrimaryDoublePressed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inject_Secondary_SecondaryDownReturnsTrue()
+    {
+        var cursor = new Cursor();
+
+        cursor.Inject(0, 0, primary: false, secondary: true);
+        cursor.Update(Sec(0));
+
+        cursor.SecondaryDown.ShouldBeTrue();
+    }
+}
+
+// --- AutomationMode cursor command (NDJSON) ---
+
+public class AutomationModeCursorCommandTests
+{
+    private const int HostWidth = 1280;
+    private const int HostHeight = 720;
+    private const int OrthoHeight = 720;
+    private static readonly Viewport Host = new Viewport(0, 0, HostWidth, HostHeight);
+
+    private static Camera MakeCamera(float worldX, float worldY)
+    {
+        var cam = new Camera { X = worldX, Y = worldY, NormalizedViewport = new NormalizedRectangle(0f, 0f, 1f, 1f) };
+        cam.ApplyToHostRect(Host, OrthoHeight);
+        return cam;
+    }
+
+    [Fact]
+    public void CursorCommand_ScreenSpace_UpdatesScreenPositionAndPrimary()
+    {
+        var engine = new FlatRedBallService();
+        var mode = new AutomationMode(engine, new StringWriter());
+
+        mode.ProcessLine("{\"cmd\":\"input\",\"type\":\"cursor\",\"x\":120,\"y\":80,\"primary\":true}");
+        mode.TryAdvanceFrame(0);
+        engine.Input.Update(TimeSpan.Zero);
+
+        engine.Input.Cursor.ScreenPosition.X.ShouldBe(120f);
+        engine.Input.Cursor.ScreenPosition.Y.ShouldBe(80f);
+        engine.Input.Cursor.PrimaryDown.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CursorCommand_WorldSpace_BackProjectsThroughActiveCamera()
+    {
+        var engine = new FlatRedBallService();
+        var camera = MakeCamera(worldX: 0f, worldY: 0f);
+        engine.Input.SetCameras(new List<Camera> { camera });
+        var mode = new AutomationMode(engine, new StringWriter());
+
+        // World (0,0) sits at viewport center → screen (640, 360).
+        mode.ProcessLine("{\"cmd\":\"input\",\"type\":\"cursor\",\"x\":0,\"y\":0,\"space\":\"world\"}");
+        mode.TryAdvanceFrame(0);
+        engine.Input.Update(TimeSpan.Zero);
+
+        engine.Input.Cursor.WorldPosition.X.ShouldBe(0f, tolerance: 1f);
+        engine.Input.Cursor.WorldPosition.Y.ShouldBe(0f, tolerance: 1f);
+        engine.Input.Cursor.ScreenPosition.X.ShouldBe(HostWidth / 2f, tolerance: 1f);
+        engine.Input.Cursor.ScreenPosition.Y.ShouldBe(HostHeight / 2f, tolerance: 1f);
+    }
+
+    [Fact]
+    public void CursorCommand_WorldSpace_OffCenter_RoundtripsThroughCameraTransform()
+    {
+        var engine = new FlatRedBallService();
+        var camera = MakeCamera(worldX: 100f, worldY: 50f);
+        engine.Input.SetCameras(new List<Camera> { camera });
+        var mode = new AutomationMode(engine, new StringWriter());
+
+        mode.ProcessLine("{\"cmd\":\"input\",\"type\":\"cursor\",\"x\":250,\"y\":-30,\"space\":\"world\"}");
+        mode.TryAdvanceFrame(0);
+        engine.Input.Update(TimeSpan.Zero);
+
+        engine.Input.Cursor.WorldPosition.X.ShouldBe(250f, tolerance: 1f);
+        engine.Input.Cursor.WorldPosition.Y.ShouldBe(-30f, tolerance: 1f);
+    }
+
+    [Fact]
+    public void CursorCommand_UnknownSpace_WritesError()
+    {
+        var output = new StringWriter();
+        var mode = new AutomationMode(new FlatRedBallService(), output);
+
+        mode.ProcessLine("{\"cmd\":\"input\",\"type\":\"cursor\",\"x\":0,\"y\":0,\"space\":\"zoid\"}");
+        mode.TryAdvanceFrame(0);
+
+        output.ToString().ShouldContain("\"ok\":false");
     }
 }
 

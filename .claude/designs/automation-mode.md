@@ -43,6 +43,8 @@ Newline-delimited JSON (NDJSON) over stdin/stdout. One command per line in, one 
 | Key input | `{"cmd":"input","type":"key","key":"Space","down":true}` |
 | Gamepad button | `{"cmd":"input","type":"gamepad","player":0,"button":"A","down":true}` |
 | Gamepad axis | `{"cmd":"input","type":"axis","player":0,"axis":"LeftX","value":0.8}` |
+| Cursor (screen) | `{"cmd":"input","type":"cursor","x":120,"y":80,"primary":true}` |
+| Cursor (world)  | `{"cmd":"input","type":"cursor","x":0,"y":0,"space":"world","primary":true}` |
 | Query screen state | `{"cmd":"query","target":"screen"}` |
 | Query all entities | `{"cmd":"query","target":"entities"}` |
 | Query named entity | `{"cmd":"query","target":"entity","name":"Player"}` |
