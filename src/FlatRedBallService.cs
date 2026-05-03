@@ -237,7 +237,18 @@ public class FlatRedBallService
         // don't clobber a game that has set up its own asset bundling.
         if (ToolsUtilities.FileManager.CustomGetStreamFromFile == null)
         {
-            ToolsUtilities.FileManager.CustomGetStreamFromFile = Microsoft.Xna.Framework.TitleContainer.OpenStream;
+            // TitleContainer.OpenStream rejects paths with a leading '/' or '\' as rooted, but
+            // Gum's FileManager.MakeAbsolute can produce strings like "/Content/GumProject/..."
+            // when normalizing relative input against RelativeDirectory. Strip the leading
+            // separator so the host doesn't see a "rooted" path it refuses to open.
+            ToolsUtilities.FileManager.CustomGetStreamFromFile = path =>
+            {
+                if (!string.IsNullOrEmpty(path) && (path[0] == '/' || path[0] == '\\'))
+                {
+                    path = path.Substring(1);
+                }
+                return Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
+            };
         }
 #endif
 
