@@ -40,18 +40,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # Gum multi-targets to TFMs that need iOS / wasm workloads not preinstalled on the
-      # ubuntu runner. Restore the workloads transitively before the build instead of
-      # trying to filter Gum's TFMs at the command line — global -p:TargetFramework
-      # propagates inconsistently across multi-TFM ProjectReferences and breaks the build.
-      - name: Restore workloads
-        working-directory: FlatRedBall2
-        run: dotnet workload restore tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj
-
+      # Gum's MonoGameGum.csproj multi-targets net9.0-ios / net9.0-android, neither of
+      # which can be built on a Linux runner (iOS SDK is macOS-only). Gum exposes
+      # ExcludeIOS / ExcludeAndroid escape-hatch properties that drop those TFMs at
+      # evaluation; pass them as global properties so the whole graph evaluates without
+      # the mobile TFMs.
       - name: Restore
         working-directory: FlatRedBall2
-        run: dotnet restore tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj
+        run: dotnet restore tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj -p:ExcludeIOS=true -p:ExcludeAndroid=true
 
       - name: Test
         working-directory: FlatRedBall2
-        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --no-restore --verbosity normal
+        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --no-restore --verbosity normal -p:ExcludeIOS=true -p:ExcludeAndroid=true
