@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
@@ -366,6 +367,9 @@ public class WireframeControl : Control
     private HandleKind _draggingHandle;
     private SKPoint _dragStartWorld;
     private SKRect _dragStartBounds;
+
+    // Before-UV snapshot captured at drag start for undo recording
+    private float _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB;
 
     // Preview rectangle (magic wand / grid snap hover)
     private bool _showPreview;
@@ -976,10 +980,19 @@ public class WireframeControl : Control
         _draggingHandle  = handle;
         _dragStartWorld  = ScreenToTexture(startScreenX, startScreenY);
         _dragStartBounds = sel.Bounds;
+        _dragBeforeL = sel.Frame.LeftCoordinate;
+        _dragBeforeT = sel.Frame.TopCoordinate;
+        _dragBeforeR = sel.Frame.RightCoordinate;
+        _dragBeforeB = sel.Frame.BottomCoordinate;
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
         FrameRegionChanged?.Invoke(sel.Frame);
+        UndoManager.Self.Record(new FrameRegionChangedCommand(
+            sel.Frame,
+            _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+            sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
+            sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate));
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1217,6 +1230,10 @@ public class WireframeControl : Control
                 _draggingHandle = hitHandle;
                 _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 _dragStartBounds = hitFrame!.Bounds;
+                _dragBeforeL = hitFrame.Frame.LeftCoordinate;
+                _dragBeforeT = hitFrame.Frame.TopCoordinate;
+                _dragBeforeR = hitFrame.Frame.RightCoordinate;
+                _dragBeforeB = hitFrame.Frame.BottomCoordinate;
                 e.Pointer.Capture(this);
                 return;
             }
@@ -1373,6 +1390,11 @@ public class WireframeControl : Control
         if (_draggingRect != null)
         {
             FrameRegionChanged?.Invoke(_draggingRect.Frame);
+            UndoManager.Self.Record(new FrameRegionChangedCommand(
+                _draggingRect.Frame,
+                _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
+                _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate));
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
             e.Pointer.Capture(null);

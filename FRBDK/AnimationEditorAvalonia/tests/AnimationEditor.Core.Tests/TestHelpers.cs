@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using FlatRedBall.Content.AnimationChain;
 using FlatRedBall.Content.Math.Geometry;
@@ -46,6 +47,9 @@ internal static class TestHelpers
         AppState.Self.WireframeZoomValue = 100;
         AppState.Self.UnitType = AnimationEditor.Core.Data.UnitType.Pixel;
         AppState.Self.ProjectFolder = null;
+
+        // Clear undo/redo history so tests start with a clean slate
+        UndoManager.Self.Clear();
 
         return acls;
     }

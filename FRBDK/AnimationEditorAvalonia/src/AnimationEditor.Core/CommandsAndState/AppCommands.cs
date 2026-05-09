@@ -1,3 +1,4 @@
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall.Content.AnimationChain;
@@ -82,6 +83,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var selectedTextureFilePath = string.Empty;
             ProjectManager.Self.LoadAnimationChain(fileName);
+            UndoManager.Self.Clear();
             RefreshTreeViewRequested?.Invoke();
             IoManager.Self.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
@@ -99,6 +101,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void RefreshWireframe() =>
             RefreshWireframeRequested?.Invoke();
+
+        public void RefreshTreeView() =>
+            RefreshTreeViewRequested?.Invoke();
 
         public void SaveCurrentAnimationChainList(string fileName = null)
         {
@@ -129,16 +134,24 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteAnimationChains(List<AnimationChainSave> animationChains)
         {
-            var chainsCopy = animationChains.ToArray();
-            foreach (var chain in chainsCopy)
-            {
-                ProjectManager.Self.AnimationChainListSave.AnimationChains.Remove(chain);
-            }
+            var acls = ProjectManager.Self.AnimationChainListSave;
+
+            // Capture original indices before removal for undo
+            var entries = animationChains
+                .Select(c => (Chain: c, OriginalIndex: acls.AnimationChains.IndexOf(c)))
+                .Where(e => e.OriginalIndex >= 0)
+                .ToArray();
+
+            foreach (var (chain, _) in entries)
+                acls.AnimationChains.Remove(chain);
 
             RefreshTreeViewRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+
+            if (entries.Length > 0)
+                UndoManager.Self.Record(new DeleteChainsCommand(entries, acls));
         }
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
@@ -158,6 +171,7 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshFrameNodeRequested?.Invoke(frame);
             SelectedState.Self.SelectedRectangle = rectangleSave;
             SaveCurrentAnimationChainList();
+            UndoManager.Self.Record(new AddAxisAlignedRectangleCommand(rectangleSave, frame));
         }
 
         public void AddCircle(AnimationFrameSave frame)
@@ -176,6 +190,7 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshFrameNodeRequested?.Invoke(frame);
             SelectedState.Self.SelectedCircle = circleSave;
             SaveCurrentAnimationChainList();
+            UndoManager.Self.Record(new AddCircleCommand(circleSave, frame));
         }
 
         public void MatchRectangleToFrame(AxisAlignedRectangleSave rectangle, AnimationFrameSave animationFrame)
@@ -194,24 +209,28 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
         {
-            if (owner.ShapeCollectionSave.CircleSaves.Contains(circle))
-            {
-                owner.ShapeCollectionSave.CircleSaves.Remove(circle);
-                RefreshFrameNodeRequested?.Invoke(owner);
-                RefreshAnimationFrameDisplayRequested?.Invoke();
-                ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            }
+            var circles = owner.ShapeCollectionSave.CircleSaves;
+            int idx = circles.IndexOf(circle);
+            if (idx < 0) return;
+
+            circles.RemoveAt(idx);
+            RefreshFrameNodeRequested?.Invoke(owner);
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new DeleteCircleCommand(circle, owner, idx));
         }
 
         public void DeleteAxisAlignedRectangle(AxisAlignedRectangleSave rectangle, AnimationFrameSave owner)
         {
-            if (owner.ShapeCollectionSave.AxisAlignedRectangleSaves.Contains(rectangle))
-            {
-                owner.ShapeCollectionSave.AxisAlignedRectangleSaves.Remove(rectangle);
-                RefreshFrameNodeRequested?.Invoke(owner);
-                RefreshAnimationFrameDisplayRequested?.Invoke();
-                ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            }
+            var rects = owner.ShapeCollectionSave.AxisAlignedRectangleSaves;
+            int idx = rects.IndexOf(rectangle);
+            if (idx < 0) return;
+
+            rects.RemoveAt(idx);
+            RefreshFrameNodeRequested?.Invoke(owner);
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new DeleteAxisAlignedRectangleCommand(rectangle, owner, idx));
         }
 
         public async Task AskToDeleteRectangles(List<AxisAlignedRectangleSave> rectangles)
@@ -262,14 +281,20 @@ namespace AnimationEditor.Core.CommandsAndState
 
             if (await ConfirmAsync(message, "Delete?"))
             {
-                var framesToDelete = frames.ToArray();
                 var chain = SelectedState.Self.SelectedChain;
                 if (chain != null)
                 {
-                    foreach (var frame in framesToDelete)
-                    {
+                    // Capture original indices before removal
+                    var entries = frames
+                        .Select(f => (Frame: f, OriginalIndex: chain.Frames.IndexOf(f)))
+                        .Where(e => e.OriginalIndex >= 0)
+                        .ToArray();
+
+                    foreach (var (frame, _) in entries)
                         chain.Frames.Remove(frame);
-                    }
+
+                    if (entries.Length > 0)
+                        UndoManager.Self.Record(new DeleteFramesCommand(entries, chain));
                 }
 
                 RefreshChainNodeRequested?.Invoke(chain);
@@ -307,11 +332,13 @@ namespace AnimationEditor.Core.CommandsAndState
             name = StringFunctions.MakeStringUnique(name, acls.AnimationChains.Select(c => c.Name).ToList());
             var chain = new AnimationChainSave { Name = name };
             acls.AnimationChains.Add(chain);
+            int insertedAtIndex = acls.AnimationChains.Count - 1;
 
             RefreshTreeViewRequested?.Invoke();
             SelectedState.Self.SelectedChain = chain;
             SaveCurrentAnimationChainList();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new AddChainCommand(chain, acls, insertedAtIndex));
         }
 
         /// <summary>
@@ -327,10 +354,12 @@ namespace AnimationEditor.Core.CommandsAndState
                 acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
                 return false;
 
+            string oldName = chain.Name;
             chain.Name = newName;
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new RenameChainCommand(chain, oldName, newName));
             return true;
         }
 
@@ -340,10 +369,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void RenameFrame(AnimationFrameSave frame, string newTextureName)
         {
+            string? oldName = frame.TextureName;
             frame.TextureName = newTextureName;
             RefreshFrameNodeRequested?.Invoke(frame);
             SaveCurrentAnimationChainList();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new SetFrameTextureNameCommand(frame, oldName, newTextureName));
         }
 
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
@@ -359,10 +390,12 @@ namespace AnimationEditor.Core.CommandsAndState
                 ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
             };
             chain.Frames.Add(frame);
+            int insertedAtIndex = chain.Frames.Count - 1;
             RefreshChainNodeRequested?.Invoke(chain);
             SelectedState.Self.SelectedFrame = frame;
             SaveCurrentAnimationChainList();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new AddFrameCommand(frame, chain, insertedAtIndex));
         }
 
         public void MoveChain(AnimationChainSave chain, int delta)
@@ -700,6 +733,7 @@ namespace AnimationEditor.Core.CommandsAndState
             ProjectManager.Self.OnDiskCoordinateType = FlatRedBall.Graphics.TextureCoordinateType.Pixel;
             SelectedState.Self.SelectedChain = null;
             SelectedState.Self.SelectedFrame = null;
+            UndoManager.Self.Clear();
             RefreshTreeViewRequested?.Invoke();
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
         }
@@ -740,6 +774,7 @@ namespace AnimationEditor.Core.CommandsAndState
             SelectedState.Self.SelectedFrame = frame;
             RefreshChainNodeRequested?.Invoke(chain);
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new AddFrameCommand(frame, chain, chain.Frames.Count - 1));
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
@@ -754,9 +789,11 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetFrameTextureName(AnimationFrameSave frame, string? textureName)
         {
             if (frame == null) return;
+            string? oldName = frame.TextureName;
             frame.TextureName = textureName;
             RefreshFrameNodeRequested?.Invoke(frame);
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            UndoManager.Self.Record(new SetFrameTextureNameCommand(frame, oldName, textureName));
         }
     }
 }

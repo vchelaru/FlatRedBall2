@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.IO;
@@ -1723,6 +1724,18 @@ public partial class MainWindow : Window
             {
                 e.Handled = true;
                 WireframeCtrl.ToggleDebugMode();
+            }
+            else if (e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+                     !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                e.Handled = true;
+                UndoManager.Self.Undo();
+            }
+            else if ((e.Key == Key.Y && e.KeyModifiers.HasFlag(KeyModifiers.Control)) ||
+                     (e.Key == Key.Z && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift)))
+            {
+                e.Handled = true;
+                UndoManager.Self.Redo();
             }
         };
     }
