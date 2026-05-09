@@ -56,12 +56,8 @@
   <!-- MonoGame backend -->
   <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
     <PackageReference Include="Apos.Shapes" Version="*" />
-    <!-- Local Gum source link: temporary swap from NuGet to ProjectReference for in-place debugging.
-         Restore the package refs below before publishing. -->
-    <ProjectReference Include="..\..\Gum\MonoGameGum\MonoGameGum.csproj" />
-    <ProjectReference Include="..\..\Gum\Runtimes\GumShapes\MonoGameGumShapes.csproj" />
-    <!--<PackageReference Include="Gum.MonoGame" Version="2026.5.1.1-preview.16" />-->
-    <!--<PackageReference Include="Gum.Shapes.MonoGame" Version="2026.5.1.1-preview.16" />-->
+    <PackageReference Include="Gum.MonoGame" Version="2026.5.8.1" />
+    <PackageReference Include="Gum.Shapes.MonoGame" Version="2026.5.8.1" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
@@ -71,11 +67,8 @@
   <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
   <ItemGroup Condition="'$(Backend)' == 'Kni'">
     <PackageReference Include="Apos.Shapes.KNI" Version="*" />
-    <!-- Local Gum source link (KNI). Restore the package refs below before publishing. -->
-    <ProjectReference Include="..\..\Gum\MonoGameGum\KniGum\KniGum.csproj" />
-    <ProjectReference Include="..\..\Gum\Runtimes\GumShapes\KniGumShapes.csproj" />
-    <!--<PackageReference Include="Gum.KNI" Version="2026.5.1.1-preview.16" />-->
-    <!--<PackageReference Include="Gum.Shapes.KNI" Version="2026.5.1.1-preview.16" />-->
+    <PackageReference Include="Gum.KNI" Version="2026.5.8.1" />
+    <PackageReference Include="Gum.Shapes.KNI" Version="2026.5.8.1" />
     <PackageReference Include="KNI.Extended" Version="6.0.0-preview.*" />
     <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
     <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
