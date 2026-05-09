@@ -6,6 +6,7 @@ using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using FlatRedBall.Content.AnimationChain;
 using Xunit;
@@ -76,6 +77,78 @@ public class PreviewZoomComboSyncTests
 
         Assert.Equal("125%", combo.Text);
 
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PreviewZoomPlusBtn_StepsToNextPresetAbove_FromBetweenPresets()
+    {
+        ResetSingletons();
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var preview = FindCtrl<PreviewControl>(window, "PreviewCtrl");
+        var combo   = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
+        var plusBtn = FindCtrl<Button>(window, "PreviewZoomPlusBtn");
+
+        // 100 → 125 (between 100 and 200). + must jump to 200, not back to 100.
+        preview.SimulateWheelZoom(100, 100, zoomIn: true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("125%", combo.Text);
+
+        // Buttons are wired via the Click event; raise it directly to drive the handler.
+        plusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("200%", combo.Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PreviewZoomMinusBtn_StepsToPreviousPresetBelow_FromBetweenPresets()
+    {
+        ResetSingletons();
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var preview  = FindCtrl<PreviewControl>(window, "PreviewCtrl");
+        var combo    = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
+        var minusBtn = FindCtrl<Button>(window, "PreviewZoomMinusBtn");
+
+        preview.SimulateWheelZoom(100, 100, zoomIn: true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("125%", combo.Text);
+
+        minusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        // 125 → previous preset strictly less = 100.
+        Assert.Equal("100%", combo.Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ZoomPlusBtn_StepsFromExactPreset_GoesToNextPreset()
+    {
+        ResetSingletons();
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var wireframe = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+        var combo     = FindCtrl<AutoCompleteBox>(window, "ZoomCombo");
+        var plusBtn   = FindCtrl<Button>(window, "ZoomPlusBtn");
+
+        wireframe.SetZoomPercent(100);
+        Dispatcher.UIThread.RunJobs();
+
+        plusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        // From exactly 100 (a preset), + must jump to the strictly-greater one (200), not stay at 100.
+        Assert.Equal("200%", combo.Text);
         window.Close();
     }
 

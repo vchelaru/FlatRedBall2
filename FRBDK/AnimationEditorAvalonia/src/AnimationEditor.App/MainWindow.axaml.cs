@@ -121,6 +121,8 @@ public partial class MainWindow : Window
         ZoomCombo.KeyDown += OnZoomComboKeyDown;
         ZoomCombo.LostFocus += OnZoomComboLostFocus;
         ZoomCombo.SelectionChanged += OnZoomComboSelectionChanged;
+        ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
+        ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
         UnitTypeCombo.SelectionChanged += OnUnitTypeComboChanged;
 
         // Apply initial grid state
@@ -219,8 +221,10 @@ public partial class MainWindow : Window
     // suppression flag breaks the feedback loop when ZoomChanged → SyncZoomCombo
     // writes Text back into the control.
 
+    private static readonly int[] _zoomPresets =
+        { 10, 25, 50, 100, 200, 400, 800 };
     private static readonly string[] _zoomPresetTexts =
-        { "10%", "25%", "50%", "100%", "200%", "400%", "800%" };
+        _zoomPresets.Select(p => $"{p}%").ToArray();
 
     private void OnZoomComboKeyDown(object? sender, KeyEventArgs e)
     {
@@ -538,6 +542,8 @@ public partial class MainWindow : Window
         PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
         PreviewZoomCombo.LostFocus += OnPreviewZoomComboLostFocus;
         PreviewZoomCombo.SelectionChanged += OnPreviewZoomComboSelectionChanged;
+        PreviewZoomPlusBtn.Click  += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, +1, p => PreviewCtrl.SetZoomPercent(p));
+        PreviewZoomMinusBtn.Click += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, -1, p => PreviewCtrl.SetZoomPercent(p));
 
         PreviewCtrl.ZoomChanged += SyncPreviewZoomCombo;
     }
@@ -549,8 +555,32 @@ public partial class MainWindow : Window
     // lands on a non-preset value — making the preset-snap display from the
     // pre-fix code straight-up wrong.
 
+    private static readonly int[] _previewZoomPresets =
+        { 10, 25, 50, 100, 200, 400 };
     private static readonly string[] _previewZoomPresetTexts =
-        { "10%", "25%", "50%", "100%", "200%", "400%" };
+        _previewZoomPresets.Select(p => $"{p}%").ToArray();
+
+    /// <summary>
+    /// Steps to the next or previous preset relative to the current zoom percent.
+    /// + button: smallest preset strictly greater than current.
+    /// - button: largest preset strictly less than current.
+    /// If the current value is outside the preset range, clamps to the nearest end.
+    /// </summary>
+    private static void StepZoomPreset(float currentPct, int[] presets, int direction, Action<int> apply)
+    {
+        if (direction > 0)
+        {
+            for (int i = 0; i < presets.Length; i++)
+                if (presets[i] > currentPct) { apply(presets[i]); return; }
+            apply(presets[^1]);
+        }
+        else
+        {
+            for (int i = presets.Length - 1; i >= 0; i--)
+                if (presets[i] < currentPct) { apply(presets[i]); return; }
+            apply(presets[0]);
+        }
+    }
 
     private void OnPreviewZoomComboKeyDown(object? sender, KeyEventArgs e)
     {
