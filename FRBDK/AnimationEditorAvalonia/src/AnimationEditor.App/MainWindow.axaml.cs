@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
     private bool _suppressZoomComboChanged;
+    private bool _suppressPreviewZoomComboChanged;
 
     private FilePath SettingsFilePath =>
         (FilePath)(Path.GetDirectoryName(
@@ -116,7 +117,12 @@ public partial class MainWindow : Window
         GridSizeInput.LostFocus += OnGridSizeInputLostFocus;
         GridSizePlusBtn.Click  += OnGridSizePlusBtnClick;
         GridSizeMinusBtn.Click += OnGridSizeMinusBtnClick;
-        ZoomCombo.SelectionChanged += OnZoomComboChanged;
+        ZoomCombo.ItemsSource = _zoomPresetTexts;
+        ZoomCombo.KeyDown += OnZoomComboKeyDown;
+        ZoomCombo.LostFocus += OnZoomComboLostFocus;
+        ZoomCombo.SelectionChanged += OnZoomComboSelectionChanged;
+        ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
+        ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
         UnitTypeCombo.SelectionChanged += OnUnitTypeComboChanged;
 
         // Apply initial grid state
@@ -203,37 +209,64 @@ public partial class MainWindow : Window
         if (PropTileSection.IsVisible) UpdateCellPxDisplays();
     }
 
-    private void OnZoomComboChanged(object? sender, SelectionChangedEventArgs e)
+    // ── Editable zoom combo (top wireframe) ──────────────────────────────────
+    //
+    // AutoCompleteBox is used instead of ComboBox because it accepts arbitrary
+    // text. Wheel-zooming the wireframe can land on values that aren't in the
+    // preset list (e.g. 156%); the combo must display the live percent rather
+    // than snap to the nearest preset.
+    //
+    // Commit boundaries: Enter and LostFocus. SelectionChanged covers the case
+    // where the user picks a preset from the suggestion dropdown. The
+    // suppression flag breaks the feedback loop when ZoomChanged → SyncZoomCombo
+    // writes Text back into the control.
+
+    private static readonly int[] _zoomPresets =
+        { 10, 25, 50, 100, 200, 400, 800 };
+    private static readonly string[] _zoomPresetTexts =
+        _zoomPresets.Select(p => $"{p}%").ToArray();
+
+    private void OnZoomComboKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_suppressZoomComboChanged) return;
-        if (ZoomCombo.SelectedItem is ComboBoxItem item &&
-            item.Content is string text)
-        {
-            var numStr = text.TrimEnd('%');
-            if (int.TryParse(numStr, out int pct))
-                WireframeCtrl.SetZoomPercent(pct);
-        }
+        if (e.Key == Key.Enter) { CommitZoomComboText(); e.Handled = true; }
     }
 
-    private static readonly int[] _zoomPresets = { 10, 25, 50, 100, 200, 400, 800 };
+    private void OnZoomComboLostFocus(object? sender, RoutedEventArgs e) => CommitZoomComboText();
+
+    private void OnZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressZoomComboChanged) return;
+        if (ZoomCombo.SelectedItem is string s) ApplyZoomComboText(s);
+    }
+
+    private void CommitZoomComboText()
+    {
+        if (_suppressZoomComboChanged) return;
+        ApplyZoomComboText(ZoomCombo.Text ?? string.Empty);
+    }
+
+    private void ApplyZoomComboText(string text)
+    {
+        if (TryParsePercent(text, out int pct)) WireframeCtrl.SetZoomPercent(pct);
+    }
 
     /// <summary>
-    /// Syncs the ZoomCombo to the nearest preset for the given zoom percentage.
-    /// Uses a suppression flag to break the feedback loop with <see cref="OnZoomComboChanged"/>.
+    /// Updates the ZoomCombo display to the live zoom percent (rounded). Called
+    /// from <see cref="WireframeControl.ZoomChanged"/>; the suppression flag
+    /// stops this write from triggering CommitZoomComboText via LostFocus or
+    /// SelectionChanged feedback.
     /// </summary>
     private void SyncZoomCombo(float zoomPercent)
     {
-        int nearest = 0;
-        int bestDiff = int.MaxValue;
-        for (int i = 0; i < _zoomPresets.Length; i++)
-        {
-            int diff = Math.Abs(_zoomPresets[i] - (int)zoomPercent);
-            if (diff < bestDiff) { bestDiff = diff; nearest = i; }
-        }
-
         _suppressZoomComboChanged = true;
-        ZoomCombo.SelectedIndex = nearest;
+        ZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
         _suppressZoomComboChanged = false;
+    }
+
+    private static bool TryParsePercent(string text, out int pct)
+    {
+        var trimmed = text.Trim().TrimEnd('%').Trim();
+        return int.TryParse(trimmed, out pct);
     }
 
     private void OnUnitTypeComboChanged(object? sender, SelectionChangedEventArgs e)
@@ -505,16 +538,80 @@ public partial class MainWindow : Window
         ShowGuidesCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowGuides = ShowGuidesCheck.IsChecked == true;
 
-        PreviewZoomCombo.SelectionChanged += (_, _) =>
+        PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
+        PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
+        PreviewZoomCombo.LostFocus += OnPreviewZoomComboLostFocus;
+        PreviewZoomCombo.SelectionChanged += OnPreviewZoomComboSelectionChanged;
+        PreviewZoomPlusBtn.Click  += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, +1, p => PreviewCtrl.SetZoomPercent(p));
+        PreviewZoomMinusBtn.Click += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, -1, p => PreviewCtrl.SetZoomPercent(p));
+
+        PreviewCtrl.ZoomChanged += SyncPreviewZoomCombo;
+    }
+
+    // ── Editable preview-zoom combo (bottom preview) ─────────────────────────
+    //
+    // Same editable-AutoCompleteBox pattern as ZoomCombo above. The bottom
+    // preview's wheel zoom uses a 1.25 / 0.8 multiplier so it almost always
+    // lands on a non-preset value — making the preset-snap display from the
+    // pre-fix code straight-up wrong.
+
+    private static readonly int[] _previewZoomPresets =
+        { 10, 25, 50, 100, 200, 400 };
+    private static readonly string[] _previewZoomPresetTexts =
+        _previewZoomPresets.Select(p => $"{p}%").ToArray();
+
+    /// <summary>
+    /// Steps to the next or previous preset relative to the current zoom percent.
+    /// + button: smallest preset strictly greater than current.
+    /// - button: largest preset strictly less than current.
+    /// If the current value is outside the preset range, clamps to the nearest end.
+    /// </summary>
+    private static void StepZoomPreset(float currentPct, int[] presets, int direction, Action<int> apply)
+    {
+        if (direction > 0)
         {
-            if (PreviewZoomCombo.SelectedItem is ComboBoxItem item &&
-                item.Content is string text)
-            {
-                var numStr = text.TrimEnd('%');
-                if (int.TryParse(numStr, out int pct))
-                    PreviewCtrl.SetZoomPercent(pct);
-            }
-        };
+            for (int i = 0; i < presets.Length; i++)
+                if (presets[i] > currentPct) { apply(presets[i]); return; }
+            apply(presets[^1]);
+        }
+        else
+        {
+            for (int i = presets.Length - 1; i >= 0; i--)
+                if (presets[i] < currentPct) { apply(presets[i]); return; }
+            apply(presets[0]);
+        }
+    }
+
+    private void OnPreviewZoomComboKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { CommitPreviewZoomComboText(); e.Handled = true; }
+    }
+
+    private void OnPreviewZoomComboLostFocus(object? sender, RoutedEventArgs e)
+        => CommitPreviewZoomComboText();
+
+    private void OnPreviewZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressPreviewZoomComboChanged) return;
+        if (PreviewZoomCombo.SelectedItem is string s) ApplyPreviewZoomComboText(s);
+    }
+
+    private void CommitPreviewZoomComboText()
+    {
+        if (_suppressPreviewZoomComboChanged) return;
+        ApplyPreviewZoomComboText(PreviewZoomCombo.Text ?? string.Empty);
+    }
+
+    private void ApplyPreviewZoomComboText(string text)
+    {
+        if (TryParsePercent(text, out int pct)) PreviewCtrl.SetZoomPercent(pct);
+    }
+
+    private void SyncPreviewZoomCombo(float zoomPercent)
+    {
+        _suppressPreviewZoomComboChanged = true;
+        PreviewZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
+        _suppressPreviewZoomComboChanged = false;
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────

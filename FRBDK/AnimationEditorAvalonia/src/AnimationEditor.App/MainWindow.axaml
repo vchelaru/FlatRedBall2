@@ -162,17 +162,31 @@
                                 IsEnabled="{Binding #SnapToGridCheck.IsChecked}" />
 
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="LightGray" />
-                        <ComboBox x:Name="ZoomCombo"
-                                  Width="90"
-                                  SelectedIndex="3">
-                            <ComboBoxItem Content="10%" />
-                            <ComboBoxItem Content="25%" />
-                            <ComboBoxItem Content="50%" />
-                            <ComboBoxItem Content="100%" />
-                            <ComboBoxItem Content="200%" />
-                            <ComboBoxItem Content="400%" />
-                            <ComboBoxItem Content="800%" />
-                        </ComboBox>
+                        <AutoCompleteBox x:Name="ZoomCombo"
+                                         Width="90"
+                                         Text="100%"
+                                         MinimumPrefixLength="0"
+                                         FilterMode="None" />
+                        <Button x:Name="ZoomMinusBtn"
+                                Classes="compact"
+                                Content="-"
+                                Width="24" Height="24"
+                                Padding="0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Margin="2,0,0,0"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="Zoom out to previous preset" />
+                        <Button x:Name="ZoomPlusBtn"
+                                Classes="compact"
+                                Content="+"
+                                Width="24" Height="24"
+                                Padding="0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Margin="1,0,0,0"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="Zoom in to next preset" />
                     </WrapPanel>
                 </Border>
 
@@ -209,14 +223,31 @@
                                       Margin="0,0,12,0" />
                             <TextBlock Text="Zoom:" VerticalAlignment="Center"
                                        Margin="0,0,4,0" Foreground="LightGray" />
-                            <ComboBox x:Name="PreviewZoomCombo" Width="90" SelectedIndex="3">
-                                <ComboBoxItem Content="10%" />
-                                <ComboBoxItem Content="25%" />
-                                <ComboBoxItem Content="50%" />
-                                <ComboBoxItem Content="100%" />
-                                <ComboBoxItem Content="200%" />
-                                <ComboBoxItem Content="400%" />
-                            </ComboBox>
+                            <AutoCompleteBox x:Name="PreviewZoomCombo"
+                                             Width="90"
+                                             Text="100%"
+                                             MinimumPrefixLength="0"
+                                             FilterMode="None" />
+                            <Button x:Name="PreviewZoomMinusBtn"
+                                    Classes="compact"
+                                    Content="-"
+                                    Width="24" Height="24"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Margin="2,0,0,0"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="Zoom out to previous preset" />
+                            <Button x:Name="PreviewZoomPlusBtn"
+                                    Classes="compact"
+                                    Content="+"
+                                    Width="24" Height="24"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Margin="1,0,0,0"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="Zoom in to next preset" />
                             <Separator Margin="8,0" />
                             <Button x:Name="StopBtn" Content="⏹" Width="28" Height="24"
                                     Padding="0"

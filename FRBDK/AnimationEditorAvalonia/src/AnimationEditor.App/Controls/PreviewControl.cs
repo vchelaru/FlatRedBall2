@@ -190,10 +190,46 @@ public class PreviewControl : Control
 
     // ── Public API ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Fired after every zoom change. Payload is the new zoom as a percentage
+    /// (e.g. 100f = 100 %). Wheel-zoom can land on values that are not present
+    /// in any preset combo box bound to this control; subscribers should be
+    /// prepared to display arbitrary percentages.
+    /// </summary>
+    public event Action<float>? ZoomChanged;
+
     public void SetZoomPercent(int pct)
     {
         _zoom = Math.Clamp(pct / 100f, 0.05f, 32f);
         InvalidateVisual();
+        ZoomChanged?.Invoke(_zoom * 100f);
+    }
+
+    /// <summary>Current zoom factor (1.0 = 100 %).</summary>
+    public float Zoom => _zoom;
+
+    /// <summary>
+    /// Test-only: simulates a single mouse-wheel zoom event toward the given
+    /// control-space point. Mirrors <see cref="OnPointerWheelChanged"/> so
+    /// headless tests can drive the same code path without synthesising
+    /// pointer events.
+    /// </summary>
+    public void SimulateWheelZoom(double x, double y, bool zoomIn)
+    {
+        ApplyWheelZoom(x, y, zoomIn ? 1.25f : 0.8f);
+    }
+
+    private void ApplyWheelZoom(double x, double y, float factor)
+    {
+        float oldZoom = _zoom;
+        _zoom = Math.Clamp(_zoom * factor, 0.05f, 32f);
+        float ratio = _zoom / oldZoom;
+        float cx0 = (float)((Bounds.Width  - RulerSize) / 2f + RulerSize);
+        float cy0 = (float)((Bounds.Height - RulerSize) / 2f + RulerSize);
+        _panX = (float)((x - cx0) - (x - cx0 - _panX) * ratio);
+        _panY = (float)((y - cy0) - (y - cy0 - _panY) * ratio);
+        InvalidateVisual();
+        ZoomChanged?.Invoke(_zoom * 100f);
     }
 
     public void SetPan(float panX, float panY)
@@ -327,18 +363,10 @@ public class PreviewControl : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        float factor  = e.Delta.Y > 0 ? 1.25f : 0.8f;
-        var   pt      = e.GetPosition(this);
-        float oldZoom = _zoom;
-        _zoom = Math.Clamp(_zoom * factor, 0.05f, 32f);
-        float ratio = _zoom / oldZoom;
+        float factor = e.Delta.Y > 0 ? 1.25f : 0.8f;
+        var pt = e.GetPosition(this);
         // Zoom toward the cursor: the world coordinate under pt must stay fixed.
-        // cx0/cy0 is the screen position of the world origin when _panX/Y = 0.
-        float cx0 = (float)((Bounds.Width  - RulerSize) / 2f + RulerSize);
-        float cy0 = (float)((Bounds.Height - RulerSize) / 2f + RulerSize);
-        _panX = (float)((pt.X - cx0) - (pt.X - cx0 - _panX) * ratio);
-        _panY = (float)((pt.Y - cy0) - (pt.Y - cy0 - _panY) * ratio);
-        InvalidateVisual();
+        ApplyWheelZoom(pt.X, pt.Y, factor);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
