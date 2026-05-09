@@ -1354,22 +1354,11 @@ public class WireframeControl : Control
     private void UpdateHoverCursor(Point pos)
     {
         var (_, hitHandle) = HitTestHandle(pos);
-        Cursor = CursorFor(hitHandle);
+        var cursorType = HandleCursorMapper.CursorTypeFor(hitHandle);
+        Cursor = cursorType is null
+            ? Cursor.Default
+            : new Cursor(cursorType.Value);
     }
-
-    private static Cursor CursorFor(HandleKind kind) => kind switch
-    {
-        HandleKind.Move        => new Cursor(StandardCursorType.SizeAll),
-        HandleKind.TopLeft     => new Cursor(StandardCursorType.TopLeftCorner),
-        HandleKind.BotRight    => new Cursor(StandardCursorType.BottomRightCorner),
-        HandleKind.TopRight    => new Cursor(StandardCursorType.TopRightCorner),
-        HandleKind.BotLeft     => new Cursor(StandardCursorType.BottomLeftCorner),
-        HandleKind.MidLeft or
-        HandleKind.MidRight    => new Cursor(StandardCursorType.SizeWestEast),
-        HandleKind.TopCenter or
-        HandleKind.BotCenter   => new Cursor(StandardCursorType.SizeNorthSouth),
-        _                      => Cursor.Default,
-    };
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
