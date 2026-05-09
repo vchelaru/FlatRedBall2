@@ -22,6 +22,9 @@
                 <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
             </MenuItem>
             <MenuItem Header="_Edit">
+                <MenuItem Header="_Undo"            x:Name="MenuUndo"          InputGesture="Ctrl+Z" />
+                <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
+                <Separator />
                 <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
                 <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
                 <Separator />

@@ -454,6 +454,16 @@ public partial class MainWindow : Window
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
+        MenuUndo.IsEnabled = UndoManager.Self.CanUndo;
+        MenuRedo.IsEnabled = UndoManager.Self.CanRedo;
+        MenuUndo.Click += (_, _) => UndoManager.Self.Undo();
+        MenuRedo.Click += (_, _) => UndoManager.Self.Redo();
+        UndoManager.Self.StackChanged += () =>
+        {
+            MenuUndo.IsEnabled = UndoManager.Self.CanUndo;
+            MenuRedo.IsEnabled = UndoManager.Self.CanRedo;
+        };
+
         RefreshRecentFiles();
     }
 
