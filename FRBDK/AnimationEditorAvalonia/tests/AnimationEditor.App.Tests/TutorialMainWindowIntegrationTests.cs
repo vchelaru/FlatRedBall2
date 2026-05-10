@@ -185,12 +185,11 @@ public class TutorialMainWindowIntegrationTests
     }
 
     /// <summary>
-    /// <c>OnFrameCreatedFromRegion</c> must be a no-op when <c>FileName</c>
-    /// is not set (achx not yet saved). Prevents creating frames without
-    /// a project context to generate a relative texture path from.
+    /// Frames can be created even when no .achx file has been saved yet (unsaved project).
+    /// In that case <c>TextureName</c> is set to just the texture filename (basename).
     /// </summary>
     [AvaloniaFact]
-    public void GridSnapClick_NoAchxFileName_NoFrameAddedToChain()
+    public void GridSnapClick_NoAchxFileName_FrameAddedWithBasenameTextureName()
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -211,8 +210,9 @@ public class TutorialMainWindowIntegrationTests
 
             wireframe.SimulateGridSnapClick(8f, 8f);
 
-            // With no FileName the handler must bail early and add no frame
-            Assert.Empty(chain.Frames);
+            // Frame must be added even without a saved project file
+            Assert.Single(chain.Frames);
+            Assert.Equal("tex.png", chain.Frames[0].TextureName);
         }
         finally
         {

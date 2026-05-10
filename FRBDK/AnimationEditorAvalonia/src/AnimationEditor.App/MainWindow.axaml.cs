@@ -305,7 +305,6 @@ public partial class MainWindow : Window
     {
         var chain = SelectedState.Self.SelectedChain;
         if (chain is null) return;
-        if (string.IsNullOrEmpty(ProjectManager.Self.FileName)) return;
 
         var texPath = WireframeCtrl.LoadedTexturePath;
         if (string.IsNullOrEmpty(texPath)) return;
@@ -313,8 +312,14 @@ public partial class MainWindow : Window
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
 
-        string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
-        string relPath = FlatRedBall.IO.FileManager.MakeRelative(texPath, achxFolder);
+        // When an .achx project file is open, make the path relative to it.
+        // When no file exists yet (unsaved project), fall back to just the
+        // filename so frames can be created before the first save.
+        string relPath = !string.IsNullOrEmpty(ProjectManager.Self.FileName)
+            ? FlatRedBall.IO.FileManager.MakeRelative(
+                texPath,
+                FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName))
+            : System.IO.Path.GetFileName(texPath);
 
         var frame = new AnimationFrameSave
         {
