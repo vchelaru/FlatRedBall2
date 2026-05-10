@@ -297,8 +297,9 @@ public partial class MainWindow : Window
 
     private void OnFrameLiveUpdated(AnimationFrameSave frame)
     {
-        // Called on UI thread during drag — refresh property panel without saving
+        // Called on UI thread during drag — refresh property panel and preview without saving
         RefreshPropertyPanel();
+        AppCommands.Self.RefreshAnimationFrameDisplay();
     }
 
     private void OnFrameRegionChanged(AnimationFrameSave frame)
