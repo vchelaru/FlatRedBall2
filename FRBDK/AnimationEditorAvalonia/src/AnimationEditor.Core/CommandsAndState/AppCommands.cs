@@ -464,6 +464,23 @@ namespace AnimationEditor.Core.CommandsAndState
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
         }
 
+        /// <summary>
+        /// Moves the currently-selected frame or chain up (<paramref name="delta"/> = -1)
+        /// or down (<paramref name="delta"/> = +1) in the tree.
+        /// Frame selection takes priority: if a frame is selected its parent chain is used.
+        /// No-op when nothing is selected or when the item is already at the boundary.
+        /// </summary>
+        public void HandleReorder(int delta)
+        {
+            var frame = SelectedState.Self.SelectedFrame;
+            var chain = SelectedState.Self.SelectedChain;
+
+            if (frame is not null && chain is not null)
+                MoveFrame(frame, chain, delta);
+            else if (chain is not null)
+                MoveChain(chain, delta);
+        }
+
         public void FlipFrameHorizontally(AnimationFrameSave frame)
         {
             frame.FlipHorizontal = !frame.FlipHorizontal;

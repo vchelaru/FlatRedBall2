@@ -1729,7 +1729,10 @@ public partial class MainWindow : Window
 
     private void WireKeyboard()
     {
-        KeyDown += (_, e) =>
+        // Use Tunnel routing so we intercept keys before child controls (e.g. the TreeView,
+        // which handles Up/Down for navigation and would mark the event Handled before the
+        // default Bubble-phase KeyDown fires).
+        AddHandler(KeyDownEvent, (EventHandler<KeyEventArgs>)((_, e) =>
         {
             if (e.Handled) return;
 
@@ -1770,7 +1773,14 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 UndoManager.Self.Redo();
             }
-        };
+            else if ((e.Key == Key.Up || e.Key == Key.Down) &&
+                     e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            {
+                e.Handled = true;
+                int delta = e.Key == Key.Up ? -1 : +1;
+                AppCommands.Self.HandleReorder(delta);
+            }
+        }), RoutingStrategies.Tunnel);
     }
 
     // ── Copy / Paste ──────────────────────────────────────────────────────────
