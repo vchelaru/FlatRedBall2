@@ -75,9 +75,27 @@
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
-                            <TextBlock Text="{Binding Header}"
-                                       Foreground="LightGray"
-                                       Padding="2,1" />
+                            <Panel>
+                                <!-- Display mode -->
+                                <TextBlock Text="{Binding Header}"
+                                           Foreground="LightGray"
+                                           Padding="2,1"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding !IsEditing}" />
+                                <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
+                                <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                         IsVisible="{Binding IsEditing}"
+                                         Background="#2a2a2a"
+                                         Foreground="LightGray"
+                                         CaretBrush="LightGray"
+                                         SelectionBrush="#4466aa"
+                                         BorderThickness="1"
+                                         Margin="0"
+                                         Padding="2,1"
+                                         VerticalAlignment="Stretch"
+                                         VerticalContentAlignment="Center"
+                                         HorizontalAlignment="Stretch" />
+                            </Panel>
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>

@@ -662,6 +662,21 @@ public partial class MainWindow : Window
         // Expand/Collapse toolbar buttons
         ExpandAllBtn.Click  += (_, _) => SetAllExpanded(true);
         CollapseAllBtn.Click += (_, _) => SetAllExpanded(false);
+
+        // Inline rename: double-tap a chain node
+        AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
+
+        // Bubble-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel)
+        AnimTree.AddHandler(
+            InputElement.KeyDownEvent,
+            OnInlineRenameKeyDown,
+            RoutingStrategies.Bubble);
+
+        // Bubble-phase LostFocus from the inline TextBox: commit
+        AnimTree.AddHandler(
+            InputElement.LostFocusEvent,
+            OnInlineRenameLostFocus,
+            RoutingStrategies.Bubble);
     }
 
     private void SetAllExpanded(bool expanded)
@@ -995,7 +1010,7 @@ public partial class MainWindow : Window
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSeparator();
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
-            AddMenuItem("Rename…",          () => _ = AskRenameChainAsync(chain));
+            AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
             AddMenuItem("Delete AnimationChain",
                 () => _ = AppCommands.Self.AskToDeleteAnimationChains(new() { chain }));
@@ -1733,7 +1748,12 @@ public partial class MainWindow : Window
             else if (e.Key == Key.F2)
             {
                 e.Handled = true;
-                WireframeCtrl.ToggleDebugMode();
+                if (AnimTree.IsKeyboardFocusWithin &&
+                    AnimTree.SelectedItem is TreeNodeVm vm &&
+                    vm.Data is AnimationChainSave chain)
+                    BeginInlineRename(vm, chain);
+                else
+                    WireframeCtrl.ToggleDebugMode();
             }
             else if (e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
                      !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -2148,6 +2168,77 @@ public partial class MainWindow : Window
     }
 
     // ── Rename Chain / Frame ──────────────────────────────────────────────────
+
+    // ── Inline rename helpers ─────────────────────────────────────────────────
+
+    private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is not Control src) return;
+        var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        if (tvi?.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        e.Handled = true;
+        BeginInlineRename(vm, chain);
+    }
+
+    private void OnInlineRenameKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Source is not TextBox tb) return;
+        if (tb.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+
+        if (e.Key == Key.Return)
+        {
+            e.Handled = true;
+            CommitInlineRename(vm, chain, tb.Text ?? string.Empty);
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            vm.CancelEdit();
+            AnimTree.Focus();
+        }
+    }
+
+    private void OnInlineRenameLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (e.Source is not TextBox tb) return;
+        if (tb.DataContext is not TreeNodeVm vm) return;
+        if (!vm.IsEditing) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        CommitInlineRename(vm, chain, tb.Text ?? string.Empty);
+    }
+
+    private void BeginInlineRename(TreeNodeVm vm, AnimationChainSave chain)
+    {
+        vm.BeginEdit();
+        // After the visual tree updates, focus and select-all in the TextBox
+        Dispatcher.UIThread.Post(() =>
+        {
+            var tb = AnimTree.GetVisualDescendants()
+                .OfType<TextBox>()
+                .FirstOrDefault(t => t.DataContext == vm);
+            if (tb is null) return;
+            tb.Focus();
+            tb.SelectAll();
+        }, DispatcherPriority.Render);
+    }
+
+    private void BeginInlineRenameSelected(AnimationChainSave chain)
+    {
+        var vm = TreeBuilder.FindNodeForData(_treeRoots, chain);
+        if (vm is null) return;
+        BeginInlineRename(vm, chain);
+    }
+
+    private void CommitInlineRename(TreeNodeVm vm, AnimationChainSave chain, string newName)
+    {
+        newName = newName.Trim();
+        vm.IsEditing = false;
+        if (!string.IsNullOrEmpty(newName) && newName != chain.Name)
+            AppCommands.Self.RenameChain(chain, newName);
+        AnimTree.Focus();
+    }
 
     private async Task AskRenameChainAsync(AnimationChainSave chain)
     {

@@ -33,6 +33,35 @@ public class TreeNodeVm : INotifyPropertyChanged
         set { if (_isExpanded != value) { _isExpanded = value; Notify(); } }
     }
 
+    private bool _isEditing;
+    /// <summary>
+    /// When <c>true</c> the tree item shows an editable TextBox instead of a TextBlock.
+    /// Set via <see cref="BeginEdit"/>; cleared by <see cref="CancelEdit"/> or a successful commit.
+    /// </summary>
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set { if (_isEditing != value) { _isEditing = value; Notify(); } }
+    }
+
+    private string _editingText = string.Empty;
+    /// <summary>Current text in the inline rename TextBox.</summary>
+    public string EditingText
+    {
+        get => _editingText;
+        set { if (_editingText != value) { _editingText = value; Notify(); } }
+    }
+
+    /// <summary>Enter inline-edit mode, seeding <see cref="EditingText"/> from <see cref="Header"/>.</summary>
+    public void BeginEdit()
+    {
+        EditingText = Header;
+        IsEditing = true;
+    }
+
+    /// <summary>Exit inline-edit mode without applying any change.</summary>
+    public void CancelEdit() => IsEditing = false;
+
     /// <summary>Underlying data object — AnimationChainSave, AnimationFrameSave, etc.</summary>
     public object? Data { get; set; }
 
