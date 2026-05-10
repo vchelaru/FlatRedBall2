@@ -1671,7 +1671,7 @@ public partial class MainWindow : Window
         };
 
         var tb = new TextBox { Text = initial };
-        var ok = new Button { Content = "OK" };
+        var ok = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
 
         ok.Click     += (_, _) => { tcs.TrySetResult(tb.Text); dialog.Close(); };
@@ -1721,7 +1721,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
 
-        var ok = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var ok = new Button { Content = "OK", IsDefault = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
         var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 12 };
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
         panel.Children.Add(ok);
@@ -1935,7 +1935,7 @@ public partial class MainWindow : Window
         };
         var incrToggle = new CheckBox { Content = "Increment UV", IsChecked = true };
 
-        var ok     = new Button { Content = "OK" };
+        var ok     = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => dialog.Close();
         cancel.Click += (_, _) => { countInput.Value = 0; dialog.Close(); };
@@ -1987,18 +1987,7 @@ public partial class MainWindow : Window
 
         var justifyBottomRb = new RadioButton { Content = "Justify Bottom", IsChecked = true, GroupName = "mode" };
         var adjustAllRb     = new RadioButton { Content = "Adjust All (enter values)", GroupName = "mode" };
-        var relXInput = new NumericUpDown { Value = 0, FormatString = "0.###", Minimum = -9999, Maximum = 9999, Width = 90 };
-        var relYInput = new NumericUpDown { Value = 0, FormatString = "0.###", Minimum = -9999, Maximum = 9999, Width = 90 };
-
-        var adjustAllRow = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 6
-        };
-        adjustAllRow.Children.Add(new TextBlock { Text = "X:", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
-        adjustAllRow.Children.Add(relXInput);
-        adjustAllRow.Children.Add(new TextBlock { Text = "Y:", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
-        adjustAllRow.Children.Add(relYInput);
+        var (adjustAllRow, relXInput, relYInput) = BuildAdjustAllRow();
 
         var absoluteRb = new RadioButton { Content = "Absolute", IsChecked = true, GroupName = "offsetMode" };
         var relativeRb = new RadioButton { Content = "Relative", GroupName = "offsetMode" };
@@ -2020,7 +2009,7 @@ public partial class MainWindow : Window
         offsetModeRow.IsVisible = false;
 
         bool confirmed = false;
-        var ok = new Button { Content = "OK" };
+        var ok = new Button { Content = "OK", IsDefault = true };
         ok.Click += (_, _) => { confirmed = true; dialog.Close(); };
         var cancel = new Button { Content = "Cancel" };
         cancel.Click += (_, _) => dialog.Close();
@@ -2067,6 +2056,42 @@ public partial class MainWindow : Window
         AppCommands.Self.RefreshAnimationFrameDisplay();
         AppCommands.Self.SaveCurrentAnimationChainList();
         ApplicationEvents.Self.RaiseAnimationChainsChanged();
+    }
+
+    /// <summary>
+    /// Builds the X/Y input row for the Adjust Offsets dialog using a Grid so both
+    /// inputs receive proportional space rather than being squashed inside a StackPanel.
+    /// </summary>
+    public static (Grid AdjustAllRow, NumericUpDown RelXInput, NumericUpDown RelYInput) BuildAdjustAllRow()
+    {
+        var relXInput = new NumericUpDown { Value = 0, FormatString = "0.###", Minimum = -9999, Maximum = 9999 };
+        var relYInput = new NumericUpDown { Value = 0, FormatString = "0.###", Minimum = -9999, Maximum = 9999 };
+
+        var xLabel = new TextBlock
+        {
+            Text = "X:",
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        };
+        var yLabel = new TextBlock
+        {
+            Text = "Y:",
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Margin = new Avalonia.Thickness(8, 0, 4, 0)
+        };
+
+        Grid.SetColumn(xLabel, 0);
+        Grid.SetColumn(relXInput, 1);
+        Grid.SetColumn(yLabel, 2);
+        Grid.SetColumn(relYInput, 3);
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,*") };
+        grid.Children.Add(xLabel);
+        grid.Children.Add(relXInput);
+        grid.Children.Add(yLabel);
+        grid.Children.Add(relYInput);
+
+        return (grid, relXInput, relYInput);
     }
 
     // ── Resize Texture ────────────────────────────────────────────────────────
@@ -2120,7 +2145,7 @@ public partial class MainWindow : Window
         var hInput = new NumericUpDown { Value = oldH, Minimum = 1, Maximum = 65536, FormatString = "0", Width = 90 };
 
         bool confirmed = false;
-        var ok     = new Button { Content = "OK" };
+        var ok     = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel" };
         ok.Click     += (_, _) => { confirmed = true; dialog.Close(); };
         cancel.Click += (_, _) => dialog.Close();
