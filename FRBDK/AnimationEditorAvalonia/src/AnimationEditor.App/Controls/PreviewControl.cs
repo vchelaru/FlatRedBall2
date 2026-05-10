@@ -333,6 +333,25 @@ public class PreviewControl : Control
     private float ScreenToWorldX(float sx) => (sx - GetCenterX()) / _zoom;
 
     /// <summary>
+    /// Returns the cursor type to show when the pointer is at screen position
+    /// (<paramref name="px"/>, <paramref name="py"/>), based on proximity to
+    /// user-placed guides. Returns <c>null</c> when no guide is nearby.
+    /// </summary>
+    public StandardCursorType? GetGuideCursorAt(float px, float py)
+        => GuideCursorResolver.CursorTypeAt(px, py,
+            _hGuides.ToArray(), _vGuides.ToArray(),
+            _panX, _panY, _zoom,
+            (float)Bounds.Width, (float)Bounds.Height);
+
+    private void UpdateHoverCursor(Point pos)
+    {
+        StandardCursorType? cursorType = _draggedGuideIdx >= 0
+            ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
+            : GetGuideCursorAt((float)pos.X, (float)pos.Y);
+        Cursor = cursorType is null ? Cursor.Default : new Cursor(cursorType.Value);
+    }
+
+    /// <summary>
     /// Captures a thread-safe snapshot of collision shapes attached to the currently
     /// selected frame. Shapes are sourced from <see cref="SelectedState.Self.SelectedFrame"/>
     /// so they only appear when a specific frame is pinned (not during free playback).
@@ -382,6 +401,7 @@ public class PreviewControl : Control
         {
             _isPanning    = true;
             _lastMousePt  = pos;
+            Cursor        = Cursor.Default;
             e.Pointer.Capture(this);
             return;
         }
@@ -458,6 +478,8 @@ public class PreviewControl : Control
                 _vGuides[_draggedGuideIdx] = ScreenToWorldX((float)pos.X);
             InvalidateVisual();
         }
+
+        UpdateHoverCursor(pos);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -477,10 +499,17 @@ public class PreviewControl : Control
             }
             _draggedGuideIdx = -1;
             InvalidateVisual();
+            UpdateHoverCursor(pos);
         }
 
         _isPanning = false;
         e.Pointer.Capture(null);
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        Cursor = Cursor.Default;
     }
 
     // ── Inner types ───────────────────────────────────────────────────────────
