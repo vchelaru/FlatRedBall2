@@ -208,6 +208,25 @@ public class PreviewControl : Control
     /// <summary>Current zoom factor (1.0 = 100 %).</summary>
     public float Zoom => _zoom;
 
+    /// <summary>Test-only: adds a horizontal guide at the given world-Y coordinate.</summary>
+    public void AddHGuide(float worldY) { _hGuides.Add(worldY); InvalidateVisual(); }
+
+    /// <summary>Test-only: adds a vertical guide at the given world-X coordinate.</summary>
+    public void AddVGuide(float worldX) { _vGuides.Add(worldX); InvalidateVisual(); }
+
+    /// <summary>Test-only: returns the number of user-created horizontal guides.</summary>
+    public int HGuideCount => _hGuides.Count;
+
+    /// <summary>Test-only: returns the number of user-created vertical guides.</summary>
+    public int VGuideCount => _vGuides.Count;
+
+    /// <summary>
+    /// Test-only: simulates a right-click at the given control-space point,
+    /// removing any guide within hit distance. Mirrors <see cref="OnPointerPressed"/> so
+    /// headless tests can drive the right-click removal code path without synthesising events.
+    /// </summary>
+    public void SimulateRightClick(float x, float y) => TryRemoveGuideAt(x, y);
+
     /// <summary>
     /// Test-only: simulates a single mouse-wheel zoom event toward the given
     /// control-space point. Mirrors <see cref="OnPointerWheelChanged"/> so
@@ -432,6 +451,37 @@ public class PreviewControl : Control
 
     // ── Pointer events ────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Removes the first guide within hit distance of (<paramref name="px"/>, <paramref name="py"/>).
+    /// Clicks inside the ruler strips are ignored — guides are only visible in the canvas area.
+    /// Returns <c>true</c> if a guide was removed.
+    /// </summary>
+    private bool TryRemoveGuideAt(float px, float py)
+    {
+        if (px < RulerSize || py < RulerSize) return false;
+
+        const float hitPx = 4f;
+        for (int i = 0; i < _hGuides.Count; i++)
+        {
+            if (MathF.Abs(py - WorldToScreenY(_hGuides[i])) < hitPx)
+            {
+                _hGuides.RemoveAt(i);
+                InvalidateVisual();
+                return true;
+            }
+        }
+        for (int i = 0; i < _vGuides.Count; i++)
+        {
+            if (MathF.Abs(px - WorldToScreenX(_vGuides[i])) < hitPx)
+            {
+                _vGuides.RemoveAt(i);
+                InvalidateVisual();
+                return true;
+            }
+        }
+        return false;
+    }
+
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
@@ -456,6 +506,12 @@ public class PreviewControl : Control
             _lastMousePt  = pos;
             Cursor        = Cursor.Default;
             e.Pointer.Capture(this);
+            return;
+        }
+
+        if (props.IsRightButtonPressed)
+        {
+            TryRemoveGuideAt(px, py);
             return;
         }
 
