@@ -186,10 +186,11 @@ public class TutorialMainWindowIntegrationTests
 
     /// <summary>
     /// Frames can be created even when no .achx file has been saved yet (unsaved project).
-    /// In that case <c>TextureName</c> is set to just the texture filename (basename).
+    /// In that case <c>TextureName</c> stores the absolute texture path (matching the
+    /// drag-and-drop behaviour) so the wireframe can still resolve the texture for display.
     /// </summary>
     [AvaloniaFact]
-    public void GridSnapClick_NoAchxFileName_FrameAddedWithBasenameTextureName()
+    public void GridSnapClick_NoAchxFileName_FrameAddedWithAbsoluteTextureName()
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -210,9 +211,11 @@ public class TutorialMainWindowIntegrationTests
 
             wireframe.SimulateGridSnapClick(8f, 8f);
 
-            // Frame must be added even without a saved project file
+            // Frame must be added even without a saved project file;
+            // TextureName is the absolute path so DetermineTexturePath can resolve it.
             Assert.Single(chain.Frames);
-            Assert.Equal("tex.png", chain.Frames[0].TextureName);
+            Assert.Equal(new FlatRedBall.IO.FilePath(png).Standardized,
+                         new FlatRedBall.IO.FilePath(chain.Frames[0].TextureName).Standardized);
         }
         finally
         {

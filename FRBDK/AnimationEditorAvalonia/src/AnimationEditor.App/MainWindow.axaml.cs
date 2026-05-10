@@ -313,13 +313,13 @@ public partial class MainWindow : Window
         if (bitmapW == 0 || bitmapH == 0) return;
 
         // When an .achx project file is open, make the path relative to it.
-        // When no file exists yet (unsaved project), fall back to just the
-        // filename so frames can be created before the first save.
+        // When no file exists yet (unsaved project), keep the absolute path so
+        // WireframeControl.DetermineTexturePath can still resolve it for display.
         string relPath = !string.IsNullOrEmpty(ProjectManager.Self.FileName)
             ? FlatRedBall.IO.FileManager.MakeRelative(
                 texPath,
                 FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName))
-            : System.IO.Path.GetFileName(texPath);
+            : texPath;
 
         var frame = new AnimationFrameSave
         {
