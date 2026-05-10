@@ -232,8 +232,9 @@ public class WireframeHandlesAndBorderTests
             Assert.True(pxSelected.Red > 200,
                 $"Handle should be visible when frame selected; R={pxSelected.Red}");
 
-            // Deselect frame → handles gone
+            // Deselect frame AND chain → handles gone completely
             SelectedState.Self.SelectedFrame = null;
+            SelectedState.Self.SelectedChain = null;
             ctrl.RefreshFrames();
             using var bmDeselected = ctrl.RenderToBitmap(64, 64);
             var pxDeselected = bmDeselected.GetPixel(3, 3);
