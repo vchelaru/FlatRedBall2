@@ -71,31 +71,56 @@
                             <Setter Property="IsExpanded"
                                     Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
                         </Style>
+                        <!-- Inline "Add Frame" button: hidden by default, revealed on row hover -->
+                        <Style Selector="Button.add-frame-btn">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover Button.add-frame-btn">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
                     </TreeView.Styles>
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
-                            <Panel>
-                                <!-- Display mode -->
-                                <TextBlock Text="{Binding Header}"
-                                           Foreground="LightGray"
-                                           Padding="2,1"
-                                           VerticalAlignment="Center"
-                                           IsVisible="{Binding !IsEditing}" />
-                                <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
-                                <TextBox Text="{Binding EditingText, Mode=TwoWay}"
-                                         IsVisible="{Binding IsEditing}"
-                                         Background="#2a2a2a"
-                                         Foreground="LightGray"
-                                         CaretBrush="LightGray"
-                                         SelectionBrush="#4466aa"
-                                         BorderThickness="1"
-                                         Margin="0"
-                                         Padding="2,1"
-                                         VerticalAlignment="Stretch"
-                                         VerticalContentAlignment="Center"
-                                         HorizontalAlignment="Stretch" />
-                            </Panel>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Panel>
+                                    <!-- Display mode -->
+                                    <TextBlock Text="{Binding Header}"
+                                               Foreground="LightGray"
+                                               Padding="2,1"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding !IsEditing}" />
+                                    <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
+                                    <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                             IsVisible="{Binding IsEditing}"
+                                             Background="#2a2a2a"
+                                             Foreground="LightGray"
+                                             CaretBrush="LightGray"
+                                             SelectionBrush="#4466aa"
+                                             BorderThickness="1"
+                                             Margin="0"
+                                             Padding="2,1"
+                                             VerticalAlignment="Stretch"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalAlignment="Stretch" />
+                                </Panel>
+                                <!-- Inline "Add Frame" button — only visible on chain nodes; shown on hover -->
+                                <Button Grid.Column="1"
+                                        Classes="add-frame-btn"
+                                        Content="+"
+                                        IsVisible="{Binding IsChainNode}"
+                                        Width="18" Height="18"
+                                        Padding="0"
+                                        Margin="2,0,0,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Add Frame"
+                                        Click="OnAddFrameBtnClick" />
+                            </Grid>
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>

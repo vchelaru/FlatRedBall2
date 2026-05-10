@@ -696,6 +696,19 @@ public partial class MainWindow : Window
             node.IsExpanded = expanded;
     }
 
+    /// <summary>
+    /// Click handler for the inline "Add Frame" button shown on each chain node in the tree.
+    /// Adds a new frame to the animation chain that owns the clicked button.
+    /// </summary>
+    private void OnAddFrameBtnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        AppCommands.Self.AddFrame(chain);
+        e.Handled = true;
+    }
+
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
         // Use TryGetFiles() — the correct Avalonia 12 API for OS file drops
