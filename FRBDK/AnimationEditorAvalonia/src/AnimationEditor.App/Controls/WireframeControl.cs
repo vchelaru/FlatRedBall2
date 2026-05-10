@@ -376,6 +376,10 @@ public class WireframeControl : Control
     private bool _showPreview;
     private SKRect _previewRect;
 
+    // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
+    private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
+    private static Cursor AddFrameCursor => _addFrameCursorLazy.Value;
+
     // Per-texture saved camera (texture path → panX, panY, zoom, scrollTargetX, scrollTargetY).
     // In scroll-pan mode px/py are always epX/epY at save time; sx/sy are the scroll offsets.
     private readonly Dictionary<string, (float px, float py, float z, float sx, float sy)> _cameraByTexture = new();
@@ -1273,7 +1277,17 @@ public class WireframeControl : Control
             return;
         }
 
-        // 4. Click on an unselected frame to select it
+        // 4. Plain mode: Ctrl+click → create a new frame centered at the click point;
+        //    plain click → select the frame under the cursor.
+        if (isCtrl)
+        {
+            var (lastW, lastH) = GetLastFramePixelSize();
+            var (minX, minY, maxX, maxY) = PlainClickFrameRegionCalculator.Compute(
+                world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
+            FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+            return;
+        }
+
         TrySelectFrameAtPoint(world);
     }
 
@@ -1363,14 +1377,21 @@ public class WireframeControl : Control
             return;
         }
 
-        UpdateHoverCursor(pos);
+        UpdateHoverCursor(pos, isCtrl: (e.KeyModifiers & KeyModifiers.Control) != 0);
 
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
     }
 
-    private void UpdateHoverCursor(Point pos)
+    private void UpdateHoverCursor(Point pos, bool isCtrl = false)
     {
+        // When Ctrl is held and a bitmap is loaded, any click will create a new frame.
+        if (isCtrl && _bitmap != null)
+        {
+            Cursor = AddFrameCursor;
+            return;
+        }
+
         var (_, hitHandle) = HitTestHandle(pos);
         var cursorType = HandleCursorMapper.CursorTypeFor(hitHandle);
         Cursor = cursorType is null
@@ -1762,4 +1783,43 @@ public class WireframeControl : Control
 
         return FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName) + textureName;
     }
+
+    /// <summary>
+    /// Returns the pixel dimensions of the last frame in the currently selected
+    /// animation chain, or (0, 0) if no chain/frames exist.  Used to determine
+    /// the size of a new frame created by a plain-mode Ctrl+click.
+    /// </summary>
+    private (int w, int h) GetLastFramePixelSize()
+    {
+        if (_bitmap is null) return (0, 0);
+        var chain = SelectedState.Self.SelectedChain;
+        if (chain?.Frames == null || chain.Frames.Count == 0) return (0, 0);
+        var last = chain.Frames[chain.Frames.Count - 1];
+        int w = (int)Math.Round((last.RightCoordinate  - last.LeftCoordinate)  * _bitmap.Width);
+        int h = (int)Math.Round((last.BottomCoordinate - last.TopCoordinate)   * _bitmap.Height);
+        return (w, h);
+    }
+
+    /// <summary>
+    /// Test-only: simulates a Ctrl+click at the given screen position in plain mode
+    /// (no grid, no magic-wand).  No-op when the bitmap is null, the grid is active,
+    /// or magic-wand mode is on.  Fires <see cref="FrameCreatedFromRegion"/> with the
+    /// computed pixel bounds.
+    /// </summary>
+    public void SimulatePlainCtrlClick(float screenX, float screenY)
+    {
+        if (_bitmap is null || _showGrid || _isMagicWandMode) return;
+        var world = ScreenToTexture(screenX, screenY);
+        var (lastW, lastH) = GetLastFramePixelSize();
+        var (minX, minY, maxX, maxY) = PlainClickFrameRegionCalculator.Compute(
+            world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
+        FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+    }
+
+    /// <summary>
+    /// Builds a cross-hair "+" cursor and returns a <see cref="Cursor"/>
+    /// with its hot-spot at the centre pixel.  Called once by <see cref="_addFrameCursorLazy"/>.
+    /// </summary>
+    private static Cursor CreateAddFrameCursor() =>
+        new Cursor(StandardCursorType.Cross);
 }
