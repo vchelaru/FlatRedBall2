@@ -1976,7 +1976,7 @@ public partial class MainWindow : Window
         {
             Title = "Adjust Offsets",
             Width = 340,
-            Height = 220,
+            Height = 265,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
 
@@ -1995,9 +1995,24 @@ public partial class MainWindow : Window
         adjustAllRow.Children.Add(new TextBlock { Text = "Y:", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
         adjustAllRow.Children.Add(relYInput);
 
+        var absoluteRb = new RadioButton { Content = "Absolute", IsChecked = true, GroupName = "offsetMode" };
+        var relativeRb = new RadioButton { Content = "Relative", GroupName = "offsetMode" };
+
+        var offsetModeRow = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 16
+        };
+        offsetModeRow.Children.Add(absoluteRb);
+        offsetModeRow.Children.Add(relativeRb);
+
         adjustAllRb.IsCheckedChanged += (_, _) =>
-            adjustAllRow.IsVisible = adjustAllRb.IsChecked == true;
-        adjustAllRow.IsVisible = false;
+        {
+            adjustAllRow.IsVisible   = adjustAllRb.IsChecked == true;
+            offsetModeRow.IsVisible  = adjustAllRb.IsChecked == true;
+        };
+        adjustAllRow.IsVisible  = false;
+        offsetModeRow.IsVisible = false;
 
         bool confirmed = false;
         var ok = new Button { Content = "OK" };
@@ -2018,6 +2033,7 @@ public partial class MainWindow : Window
         panel.Children.Add(justifyBottomRb);
         panel.Children.Add(adjustAllRb);
         panel.Children.Add(adjustAllRow);
+        panel.Children.Add(offsetModeRow);
         panel.Children.Add(btns);
         dialog.Content = panel;
 
@@ -2040,7 +2056,7 @@ public partial class MainWindow : Window
             AppCommands.Self.AdjustOffsetsAdjustAll(chain,
                 (float)(relXInput.Value ?? 0),
                 (float)(relYInput.Value ?? 0),
-                relative: false);
+                relative: relativeRb.IsChecked == true);
         }
 
         AppCommands.Self.RefreshAnimationFrameDisplay();
