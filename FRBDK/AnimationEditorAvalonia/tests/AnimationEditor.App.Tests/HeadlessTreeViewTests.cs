@@ -7,7 +7,9 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FlatRedBall.Content.AnimationChain;
 using FlatRedBall.Content.Math.Geometry;
 using Xunit;
@@ -68,6 +70,17 @@ public class HeadlessTreeViewTests
             ?? throw new InvalidOperationException("OnTreeContextMenuOpening not found via reflection");
 
         method.Invoke(window, [null, new CancelEventArgs()]);
+    }
+
+    /// <summary>Invokes the private <c>RefreshTreeView</c> method directly.</summary>
+    private static void TriggerRefreshTreeView(MainWindow window)
+    {
+        var method = typeof(MainWindow).GetMethod(
+            "RefreshTreeView",
+            BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("RefreshTreeView not found via reflection");
+
+        method.Invoke(window, null);
     }
 
     private static List<string?> ContextMenuHeaders(MainWindow window)
@@ -380,6 +393,60 @@ public class HeadlessTreeViewTests
             var headers = ContextMenuHeaders(window);
             Assert.Contains("Delete AnimationChain", headers);
             Assert.DoesNotContain("Delete Frame", headers);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── TV08: Inline "Add Frame" button on chain nodes ────────────────────────
+
+    [AvaloniaFact]
+    public void ChainNode_AfterRefresh_HasIsChainNodeTrue()
+    {
+        var window = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var roots = GetRoots(GetTree(window));
+            Assert.Single(roots);
+            Assert.True(roots[0].IsChainNode);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void InlineAddFrameBtn_Click_AddsFrameToChain_AndSelectsIt()
+    {
+        var window = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Run" };
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            // Wire SaveCurrentAnimationChainList to a no-op so no file I/O happens
+            AppCommands.Self.DoOnUiThread = a => a();
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            // Find the add-frame button rendered inside the tree visual tree
+            var tree = GetTree(window);
+            var addBtn = tree.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(b => b.Classes.Contains("add-frame-btn") && b.IsVisible);
+
+            Assert.NotNull(addBtn);
+
+            // Simulate a click
+            addBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Single(chain.Frames);
+            Assert.Same(chain.Frames[0], SelectedState.Self.SelectedFrame);
         }
         finally { window.Close(); }
     }

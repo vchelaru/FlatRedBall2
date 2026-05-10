@@ -108,6 +108,34 @@ public class TreeBuilderPureTests
         Assert.True(node.IsExpanded);
     }
 
+    [Fact]
+    public void BuildChainNode_SetsIsChainNodeTrue()
+    {
+        var chain = new AnimationChainSave { Name = "Jump" };
+        var node = TreeBuilder.BuildChainNode(chain);
+        Assert.True(node.IsChainNode);
+    }
+
+    [Fact]
+    public void BuildFrameNode_HasIsChainNodeFalse()
+    {
+        var frame = new AnimationFrameSave { TextureName = "run1.png" };
+        var node = TreeBuilder.BuildFrameNode(frame);
+        Assert.False(node.IsChainNode);
+    }
+
+    [Fact]
+    public void BuildTree_ChainNodes_HaveIsChainNodeTrue()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Run" });
+
+        var result = TreeBuilder.BuildTree(acls);
+
+        Assert.All(result, n => Assert.True(n.IsChainNode));
+    }
+
     // ── BuildFrameNode & BuildFrameHeader ─────────────────────────────────────
 
     [Fact]

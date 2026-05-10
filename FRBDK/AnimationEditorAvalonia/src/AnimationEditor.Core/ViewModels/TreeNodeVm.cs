@@ -65,5 +65,11 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>Underlying data object — AnimationChainSave, AnimationFrameSave, etc.</summary>
     public object? Data { get; set; }
 
+    /// <summary>
+    /// True when this node represents an <see cref="FlatRedBall.Content.AnimationChain.AnimationChainSave"/>.
+    /// Used by the tree item template to show the inline Add Frame button only on chain nodes.
+    /// </summary>
+    public bool IsChainNode { get; set; }
+
     public ObservableCollection<TreeNodeVm> Children { get; } = new();
 }

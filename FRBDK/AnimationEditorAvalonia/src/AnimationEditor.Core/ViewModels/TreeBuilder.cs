@@ -43,7 +43,7 @@ public static class TreeBuilder
     /// <summary>Builds a single chain node with all its frame children.</summary>
     public static TreeNodeVm BuildChainNode(AnimationChainSave chain)
     {
-        var node = new TreeNodeVm { Header = chain.Name, Data = chain, IsExpanded = true };
+        var node = new TreeNodeVm { Header = chain.Name, Data = chain, IsExpanded = true, IsChainNode = true };
         foreach (var frame in chain.Frames)
             node.Children.Add(BuildFrameNode(frame));
         return node;
