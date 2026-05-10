@@ -28,4 +28,8 @@
   <ItemGroup>
     <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AnimationEditor.App.Tests" />
+  </ItemGroup>
 </Project>

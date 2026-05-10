@@ -325,12 +325,65 @@ public class PreviewControl : Control
 
     // ── Guide helpers ─────────────────────────────────────────────────────────
 
-    private float GetCenterX() => (float)((Bounds.Width  - RulerSize) / 2f + RulerSize + _panX);
-    private float GetCenterY() => (float)((Bounds.Height - RulerSize) / 2f + RulerSize + _panY);
+    private float GetCenterX(float? width  = null) => ((width  ?? (float)Bounds.Width)  - RulerSize) / 2f + RulerSize + _panX;
+    private float GetCenterY(float? height = null) => ((height ?? (float)Bounds.Height) - RulerSize) / 2f + RulerSize + _panY;
     private float WorldToScreenY(float wy) => GetCenterY() + wy * _zoom;
     private float WorldToScreenX(float wx) => GetCenterX() + wx * _zoom;
-    private float ScreenToWorldY(float sy) => (sy - GetCenterY()) / _zoom;
-    private float ScreenToWorldX(float sx) => (sx - GetCenterX()) / _zoom;
+    private float ScreenToWorldY(float sy, float? height = null) => (sy - GetCenterY(height)) / _zoom;
+    private float ScreenToWorldX(float sx, float? width  = null) => (sx - GetCenterX(width))  / _zoom;
+
+    // Guides snap to the nearest integer (pixel boundary) in world space.
+    private static float SnapToPixel(float world) => MathF.Round(world, MidpointRounding.AwayFromZero);
+
+    // ── Test helpers (internal) ───────────────────────────────────────────────
+
+    /// <summary>Horizontal guide world-Y values; exposed for headless tests.</summary>
+    internal IReadOnlyList<float> HGuides => _hGuides;
+
+    /// <summary>Vertical guide world-X values; exposed for headless tests.</summary>
+    internal IReadOnlyList<float> VGuides => _vGuides;
+
+    /// <summary>
+    /// Simulates a ruler-click that creates a horizontal guide at <paramref name="screenY"/>
+    /// within a control of height <paramref name="controlHeight"/>. Applies the same
+    /// snap-to-pixel logic as the live pointer handler.
+    /// </summary>
+    internal void SimulateAddHGuide(float screenY, float controlHeight)
+    {
+        _hGuides.Add(SnapToPixel(ScreenToWorldY(screenY, controlHeight)));
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Simulates a ruler-click that creates a vertical guide at <paramref name="screenX"/>
+    /// within a control of width <paramref name="controlWidth"/>. Applies the same
+    /// snap-to-pixel logic as the live pointer handler.
+    /// </summary>
+    internal void SimulateAddVGuide(float screenX, float controlWidth)
+    {
+        _vGuides.Add(SnapToPixel(ScreenToWorldX(screenX, controlWidth)));
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Simulates dragging horizontal guide at <paramref name="idx"/> to
+    /// <paramref name="screenY"/>. Applies snap-to-pixel.
+    /// </summary>
+    internal void SimulateDragHGuide(int idx, float screenY, float controlHeight)
+    {
+        _hGuides[idx] = SnapToPixel(ScreenToWorldY(screenY, controlHeight));
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Simulates dragging vertical guide at <paramref name="idx"/> to
+    /// <paramref name="screenX"/>. Applies snap-to-pixel.
+    /// </summary>
+    internal void SimulateDragVGuide(int idx, float screenX, float controlWidth)
+    {
+        _vGuides[idx] = SnapToPixel(ScreenToWorldX(screenX, controlWidth));
+        InvalidateVisual();
+    }
 
     /// <summary>
     /// Returns the cursor type to show when the pointer is at screen position
@@ -411,7 +464,7 @@ public class PreviewControl : Control
         // Click in left ruler strip → create horizontal guide
         if (px < RulerSize && py >= RulerSize)
         {
-            float wy = ScreenToWorldY(py);
+            float wy = SnapToPixel(ScreenToWorldY(py));
             _hGuides.Add(wy);
             _draggedGuideIdx = _hGuides.Count - 1;
             _draggingHGuide  = true;
@@ -423,7 +476,7 @@ public class PreviewControl : Control
         // Click in top ruler strip → create vertical guide
         if (py < RulerSize && px >= RulerSize)
         {
-            float wx = ScreenToWorldX(px);
+            float wx = SnapToPixel(ScreenToWorldX(px));
             _vGuides.Add(wx);
             _draggedGuideIdx = _vGuides.Count - 1;
             _draggingHGuide  = false;
@@ -473,9 +526,9 @@ public class PreviewControl : Control
         if (_draggedGuideIdx >= 0)
         {
             if (_draggingHGuide)
-                _hGuides[_draggedGuideIdx] = ScreenToWorldY((float)pos.Y);
+                _hGuides[_draggedGuideIdx] = SnapToPixel(ScreenToWorldY((float)pos.Y));
             else
-                _vGuides[_draggedGuideIdx] = ScreenToWorldX((float)pos.X);
+                _vGuides[_draggedGuideIdx] = SnapToPixel(ScreenToWorldX((float)pos.X));
             InvalidateVisual();
         }
 
