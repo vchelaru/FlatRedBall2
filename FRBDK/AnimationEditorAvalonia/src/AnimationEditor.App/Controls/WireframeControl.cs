@@ -369,6 +369,10 @@ public class WireframeControl : Control
     private SKPoint _dragStartWorld;
     private SKRect _dragStartBounds;
 
+    // Chain-drag state: set when the user drags the composite chain bounding rect
+    private bool _draggingChain;
+    private readonly List<(FrameRect Rect, SKRect StartBounds)> _chainDragStarts = new();
+
     // Before-UV snapshot captured at drag start for undo recording
     private float _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB;
 
@@ -413,6 +417,12 @@ public class WireframeControl : Control
 
     /// <summary>Fired after a frame's UV coords have been updated by dragging a handle.</summary>
     public event Action<AnimationFrameSave>? FrameRegionChanged;
+
+    /// <summary>
+    /// Fired after all frames in a chain have been translated by dragging the chain's
+    /// composite bounding rect on the wireframe. The payload is the chain whose frames moved.
+    /// </summary>
+    public event Action<AnimationChainSave>? ChainRegionChanged;
 
     /// <summary>
     /// Fired on every pointer move while dragging a handle (live update).
@@ -999,6 +1009,37 @@ public class WireframeControl : Control
     }
 
     /// <summary>
+    /// Simulates a complete chain-drag gesture: translates all frames of the currently-selected
+    /// chain from <paramref name="startScreenX"/>,<paramref name="startScreenY"/> to
+    /// <paramref name="endScreenX"/>,<paramref name="endScreenY"/> in screen space.
+    /// <para>
+    /// Drives the same <see cref="ApplyChainDrag"/> code path as real pointer events,
+    /// writes updated UV coordinates back to every frame, and fires
+    /// <see cref="ChainRegionChanged"/>. No-op when no chain is selected, no frames
+    /// are visible, or no texture is loaded.
+    /// </para>
+    /// </summary>
+    public void SimulateChainDrag(
+        float startScreenX, float startScreenY,
+        float endScreenX,   float endScreenY)
+    {
+        var chain = SelectedState.Self.SelectedChain;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+
+        _draggingChain = true;
+        _chainDragStarts.Clear();
+        foreach (var fr in _frameRects)
+            _chainDragStarts.Add((fr, fr.Bounds));
+        _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
+
+        ApplyChainDrag(new Point(endScreenX, endScreenY));
+
+        ChainRegionChanged?.Invoke(chain);
+        _draggingChain = false;
+        _chainDragStarts.Clear();
+    }
+
+    /// <summary>
     /// Test-only: starts a middle-mouse pan gesture with the anchor at the given
     /// <b>viewport-space</b> position. Call <see cref="SimulatePanMove"/> one or more
     /// times to continue the drag, then <see cref="SimulatePanEnd"/> when done.
@@ -1175,6 +1216,10 @@ public class WireframeControl : Control
             snap.OriginTexX = sel.Bounds.MidX - sel.Frame.RelativeX * offMult;
             snap.OriginTexY = sel.Bounds.MidY + sel.Frame.RelativeY * offMult;
         }
+        else if (SelectedState.Self.SelectedChain != null && _frameRects.Count > 0)
+        {
+            snap.SelectedHandleBounds = ComputeChainBoundingRect();
+        }
 
         return snap;
     }
@@ -1227,14 +1272,27 @@ public class WireframeControl : Control
             var (hitFrame, hitHandle) = HitTestHandle(pos);
             if (hitHandle != HandleKind.None)
             {
-                _draggingRect = hitFrame;
-                _draggingHandle = hitHandle;
-                _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
-                _dragStartBounds = hitFrame!.Bounds;
-                _dragBeforeL = hitFrame.Frame.LeftCoordinate;
-                _dragBeforeT = hitFrame.Frame.TopCoordinate;
-                _dragBeforeR = hitFrame.Frame.RightCoordinate;
-                _dragBeforeB = hitFrame.Frame.BottomCoordinate;
+                if (hitFrame != null)
+                {
+                    // Single-frame drag
+                    _draggingRect = hitFrame;
+                    _draggingHandle = hitHandle;
+                    _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+                    _dragStartBounds = hitFrame.Bounds;
+                    _dragBeforeL = hitFrame.Frame.LeftCoordinate;
+                    _dragBeforeT = hitFrame.Frame.TopCoordinate;
+                    _dragBeforeR = hitFrame.Frame.RightCoordinate;
+                    _dragBeforeB = hitFrame.Frame.BottomCoordinate;
+                }
+                else
+                {
+                    // Chain drag: move all chain frames together
+                    _draggingChain = true;
+                    _chainDragStarts.Clear();
+                    foreach (var fr in _frameRects)
+                        _chainDragStarts.Add((fr, fr.Bounds));
+                    _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+                }
                 e.Pointer.Capture(this);
                 return;
             }
@@ -1363,6 +1421,12 @@ public class WireframeControl : Control
             return;
         }
 
+        if (_draggingChain)
+        {
+            ApplyChainDrag(pos);
+            return;
+        }
+
         UpdateHoverCursor(pos);
 
         // Update hover preview for magic-wand / grid-snap
@@ -1398,6 +1462,16 @@ public class WireframeControl : Control
                 _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate));
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
+            e.Pointer.Capture(null);
+        }
+
+        if (_draggingChain)
+        {
+            var chain = SelectedState.Self.SelectedChain;
+            if (chain != null)
+                ChainRegionChanged?.Invoke(chain);
+            _draggingChain = false;
+            _chainDragStarts.Clear();
             e.Pointer.Capture(null);
         }
     }
@@ -1548,6 +1622,53 @@ public class WireframeControl : Control
         InvalidateVisual();
     }
 
+    private void ApplyChainDrag(Point pos)
+    {
+        if (!_draggingChain || _bitmap is null) return;
+
+        var world = ScreenToTexture((float)pos.X, (float)pos.Y);
+        float dx = world.X - _dragStartWorld.X;
+        float dy = world.Y - _dragStartWorld.Y;
+
+        // Snap to integer pixel; upgrade to grid-size snap when the grid is on.
+        int snapSize = (_showGrid && _gridSize > 0) ? _gridSize : 1;
+        dx = MathF.Round(dx / snapSize) * snapSize;
+        dy = MathF.Round(dy / snapSize) * snapSize;
+
+        float texW = _bitmap.Width;
+        float texH = _bitmap.Height;
+
+        foreach (var (fr, startBounds) in _chainDragStarts)
+        {
+            float newL = startBounds.Left   + dx;
+            float newT = startBounds.Top    + dy;
+            float newR = startBounds.Right  + dx;
+            float newB = startBounds.Bottom + dy;
+
+            fr.Bounds = new SKRect(newL, newT, newR, newB);
+            fr.Frame.LeftCoordinate   = newL / texW;
+            fr.Frame.TopCoordinate    = newT / texH;
+            fr.Frame.RightCoordinate  = newR / texW;
+            fr.Frame.BottomCoordinate = newB / texH;
+        }
+
+        InvalidateVisual();
+    }
+
+    private SKRect ComputeChainBoundingRect()
+    {
+        float l = float.MaxValue, t = float.MaxValue;
+        float r = float.MinValue, b = float.MinValue;
+        foreach (var fr in _frameRects)
+        {
+            l = MathF.Min(l, fr.Bounds.Left);
+            t = MathF.Min(t, fr.Bounds.Top);
+            r = MathF.Max(r, fr.Bounds.Right);
+            b = MathF.Max(b, fr.Bounds.Bottom);
+        }
+        return new SKRect(l, t, r, b);
+    }
+
     private void UpdatePreview(Point pos)
     {
         if (_bitmap is null) { ClearPreview(); return; }
@@ -1579,16 +1700,35 @@ public class WireframeControl : Control
     private (FrameRect? frame, HandleKind handle) HitTestHandle(Point pos)
     {
         var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
-        if (sel is null) return (null, HandleKind.None);
+        if (sel != null)
+        {
+            var sr = ToScreen(sel.Bounds);
 
-        var sr = ToScreen(sel.Bounds);
+            var kind = DragHandleHitTester.GetHandleAt(
+                (float)pos.X, (float)pos.Y,
+                sr.Left, sr.Top, sr.Right, sr.Bottom,
+                handleOffset: 5f);  // matches Hs: handles drawn outside the frame by this amount
 
-        var kind = DragHandleHitTester.GetHandleAt(
-            (float)pos.X, (float)pos.Y,
-            sr.Left, sr.Top, sr.Right, sr.Bottom,
-            handleOffset: 5f);  // matches Hs: handles drawn outside the frame by this amount
+            return kind == HandleKind.None ? (null, HandleKind.None) : (sel, kind);
+        }
 
-        return kind == HandleKind.None ? (null, HandleKind.None) : (sel, kind);
+        // Chain selected (no individual frame): test against the composite bounding rect.
+        // All hits are treated as Move since resizing the group is not supported.
+        if (SelectedState.Self.SelectedChain != null && _frameRects.Count > 0)
+        {
+            var chainRect = ComputeChainBoundingRect();
+            var sr = ToScreen(chainRect);
+
+            var kind = DragHandleHitTester.GetHandleAt(
+                (float)pos.X, (float)pos.Y,
+                sr.Left, sr.Top, sr.Right, sr.Bottom,
+                handleOffset: 5f);
+
+            if (kind != HandleKind.None)
+                return (null, HandleKind.Move);
+        }
+
+        return (null, HandleKind.None);
     }
 
     private void TrySelectFrameAtPoint(SKPoint worldPt)

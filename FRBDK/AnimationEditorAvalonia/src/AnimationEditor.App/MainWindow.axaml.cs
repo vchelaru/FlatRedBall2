@@ -284,9 +284,15 @@ public partial class MainWindow : Window
     private void WireWireframeControl()
     {
         WireframeCtrl.FrameRegionChanged     += OnFrameRegionChanged;
+        WireframeCtrl.ChainRegionChanged     += OnChainRegionChanged;
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         WireframeCtrl.ZoomChanged            += SyncZoomCombo;
+    }
+
+    private void OnChainRegionChanged(AnimationChainSave chain)
+    {
+        ApplicationEvents.Self.RaiseAnimationChainsChanged();
     }
 
     private void OnFrameLiveUpdated(AnimationFrameSave frame)
