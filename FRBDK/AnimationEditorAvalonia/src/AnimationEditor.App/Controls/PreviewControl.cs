@@ -229,6 +229,13 @@ public class PreviewControl : Control
     public void SimulateRightClick(float x, float y) => TryRemoveGuideAt(x, y);
 
     /// <summary>
+    /// Test-only: simulates a left-click on the canvas at (<paramref name="px"/>, <paramref name="py"/>)
+    /// and selects the topmost collision shape under the cursor, if any.
+    /// Mirrors the shape-selection code path in <see cref="OnPointerPressed"/>.
+    /// </summary>
+    internal void SimulateCanvasClick(float px, float py) => TrySelectShapeAt(px, py);
+
+    /// <summary>
     /// Test-only: simulates a single mouse-wheel zoom event toward the given
     /// control-space point. Mirrors <see cref="OnPointerWheelChanged"/> so
     /// headless tests can drive the same code path without synthesising
@@ -513,6 +520,54 @@ public class PreviewControl : Control
         return false;
     }
 
+    /// <summary>
+    /// Selects the topmost collision shape under (<paramref name="px"/>, <paramref name="py"/>)
+    /// in screen space. Circles are checked before rectangles because they are rendered on top.
+    /// Within each type, shapes are iterated in reverse render order so the last-drawn (topmost)
+    /// shape wins when two shapes overlap.
+    /// Returns <c>true</c> if a shape was selected.
+    /// </summary>
+    private bool TrySelectShapeAt(float px, float py)
+    {
+        var frame = SelectedState.Self.SelectedFrame;
+        if (frame?.ShapeCollectionSave is null) return false;
+        if (px < RulerSize || py < RulerSize) return false;
+
+        float cx = GetCenterX();
+        float cy = GetCenterY();
+        float om = AppState.Self.OffsetMultiplier * _zoom;
+        const float tolerance = 5f;
+
+        // Circles are rendered after rects (on top), so check circles first.
+        var circles = frame.ShapeCollectionSave.CircleSaves;
+        for (int i = circles.Count - 1; i >= 0; i--)
+        {
+            var c = circles[i];
+            float sx = cx + c.X * om;
+            float sy = cy - c.Y * om;
+            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
+            {
+                SelectedState.Self.SelectedCircle = c;
+                return true;
+            }
+        }
+
+        var rects = frame.ShapeCollectionSave.AxisAlignedRectangleSaves;
+        for (int i = rects.Count - 1; i >= 0; i--)
+        {
+            var r = rects[i];
+            float sx = cx + r.X * om;
+            float sy = cy - r.Y * om;
+            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
+            {
+                SelectedState.Self.SelectedRectangle = r;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
@@ -594,6 +649,9 @@ public class PreviewControl : Control
                 return;
             }
         }
+
+        // No guide hit — try to select a collision shape.
+        TrySelectShapeAt(px, py);
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
