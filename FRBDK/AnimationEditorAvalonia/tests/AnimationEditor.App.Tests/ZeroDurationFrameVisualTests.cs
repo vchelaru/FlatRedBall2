@@ -29,17 +29,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class ZeroDurationFrameVisualTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     private static void WriteColorPng(string path, SKColor color, int size = 16)
@@ -59,13 +59,13 @@ public class ZeroDurationFrameVisualTests
     [AvaloniaFact]
     public void Preview_SingleZeroDurationFrame_RendersTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -78,10 +78,10 @@ public class ZeroDurationFrameVisualTests
 
             var chain = new AnimationChainSave { Name = "ZeroTest" };
             chain.Frames.Add(frame);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
             // At zoom=1 a 16×16 texture sits in screen rect (34,34,50,50).
@@ -92,9 +92,9 @@ public class ZeroDurationFrameVisualTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -108,14 +108,14 @@ public class ZeroDurationFrameVisualTests
     [AvaloniaFact]
     public void Preview_ZeroDurationMultiFrameChain_Advance_MovesToNextFrame()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),   SKColors.Red,       size: 16);
             WriteColorPng(Path.Combine(dir, "green.png"), SKColors.LimeGreen, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame0 = new AnimationFrameSave
             {
@@ -138,11 +138,11 @@ public class ZeroDurationFrameVisualTests
 
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chain);
-            ProjectManager.Self.AnimationChainListSave = acls;
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave = acls;
+            ctx.SelectedState.SelectedChain = chain;
             // No SelectedFrame — lets playback drive the frame index
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chain);
             ctrl.Playback.Play();               // re-enable after PauseAutoPlayback()
@@ -159,9 +159,9 @@ public class ZeroDurationFrameVisualTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -174,12 +174,12 @@ public class ZeroDurationFrameVisualTests
     [AvaloniaFact]
     public void Preview_ZeroDurationChain_ManyAdvances_DoesNotCrash()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var chain = new AnimationChainSave { Name = "ZeroMany" };
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapeCollectionSave = new ShapeCollectionSave() });
         chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapeCollectionSave = new ShapeCollectionSave() });
 
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
         ctrl.Playback.SetChain(chain);
         ctrl.Playback.Play();
@@ -200,14 +200,14 @@ public class ZeroDurationFrameVisualTests
     [AvaloniaFact]
     public void Preview_ZeroDurationSecondFrame_LoopBackToFirstFrame()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),   SKColors.Red,       size: 16);
             WriteColorPng(Path.Combine(dir, "blue.png"),  SKColors.Blue,      size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame0 = new AnimationFrameSave
             {
@@ -230,10 +230,10 @@ public class ZeroDurationFrameVisualTests
 
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chain);
-            ProjectManager.Self.AnimationChainListSave = acls;
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave = acls;
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chain);
             ctrl.Playback.Play();
@@ -251,9 +251,9 @@ public class ZeroDurationFrameVisualTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }

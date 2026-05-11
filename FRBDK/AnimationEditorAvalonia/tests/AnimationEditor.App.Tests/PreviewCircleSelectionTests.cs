@@ -28,23 +28,23 @@ public class PreviewCircleSelectionTests
     private const float CX = (W - RulerSize) / 2f + RulerSize;   // 210
     private const float CY = (H - RulerSize) / 2f + RulerSize;   // 160
 
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.ConfirmAsync              = (_, _) => System.Threading.Tasks.Task.FromResult(true);
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.ConfirmAsync              = (_, _) => System.Threading.Tasks.Task.FromResult(true);
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
-    private static PreviewControl MakeControl()
+    private static PreviewControl MakeControl(TestServices ctx)
     {
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.Measure(new Size(W, H));
         ctrl.Arrange(new Rect(0, 0, W, H));
         return ctrl;
@@ -66,75 +66,75 @@ public class PreviewCircleSelectionTests
     [AvaloniaFact]
     public void SimulateCanvasClick_SelectsCircle_WhenClickAtCenter()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         var frame = MakeFrameWithCircle(0f, 0f, radius: 8f, out var circle);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         // At world (0,0), screen center is exactly (CX, CY).
         ctrl.SimulateCanvasClick(CX, CY);
 
-        Assert.Same(circle, SelectedState.Self.SelectedCircle);
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
     }
 
     [AvaloniaFact]
     public void SimulateCanvasClick_SelectsCircle_WhenClickInsideRadius()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         // Circle at world (10, 5), radius 20 → screen center (220, 155).
         var frame = MakeFrameWithCircle(10f, 5f, radius: 20f, out var circle);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         // Click 5px right of the screen center — still inside radius.
         ctrl.SimulateCanvasClick(CX + 10f + 5f, CY - 5f);
 
-        Assert.Same(circle, SelectedState.Self.SelectedCircle);
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
     }
 
     [AvaloniaFact]
     public void SimulateCanvasClick_DoesNotSelectCircle_WhenClickFarAway()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         var frame = MakeFrameWithCircle(0f, 0f, radius: 8f, out _);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         // Click 100px away from the circle center — well outside radius+tolerance.
         ctrl.SimulateCanvasClick(CX + 100f, CY + 100f);
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
     }
 
     [AvaloniaFact]
     public void SimulateCanvasClick_DoesNothing_WhenNoFrameSelected()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         // No frame selected — TrySelectShapeAt must not throw.
         ctrl.SimulateCanvasClick(CX, CY);
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
-        Assert.Null(SelectedState.Self.SelectedRectangle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
     }
 
     [AvaloniaFact]
     public void SimulateCanvasClick_DoesNothing_WhenClickInRulerStrip()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         var frame = MakeFrameWithCircle(0f, 0f, radius: 200f, out _);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         // Click in the ruler area (px < RulerSize) — must be ignored.
         ctrl.SimulateCanvasClick(5f, CY);
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
     }
 
     // ── Rect selection ───────────────────────────────────────────────────────
@@ -142,17 +142,17 @@ public class PreviewCircleSelectionTests
     [AvaloniaFact]
     public void SimulateCanvasClick_SelectsRect_WhenClickAtRectCenter()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         var rect = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
         var frame = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
         frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);
 
-        Assert.Same(rect, SelectedState.Self.SelectedRectangle);
+        Assert.Same(rect, ctx.SelectedState.SelectedRectangle);
     }
 
     // ── Priority: circle over rect ───────────────────────────────────────────
@@ -160,8 +160,8 @@ public class PreviewCircleSelectionTests
     [AvaloniaFact]
     public void SimulateCanvasClick_SelectsCircle_WhenCircleAndRectOverlap()
     {
-        ResetSingletons();
-        var ctrl = MakeControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
 
         // Both at origin — circle is rendered on top (drawn after rect), so it wins.
         var rect   = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 30f, ScaleY = 30f };
@@ -169,11 +169,11 @@ public class PreviewCircleSelectionTests
         var frame  = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
         frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
         frame.ShapeCollectionSave.CircleSaves.Add(circle);
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);
 
-        Assert.Same(circle, SelectedState.Self.SelectedCircle);
-        Assert.Null(SelectedState.Self.SelectedRectangle);
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
     }
 }

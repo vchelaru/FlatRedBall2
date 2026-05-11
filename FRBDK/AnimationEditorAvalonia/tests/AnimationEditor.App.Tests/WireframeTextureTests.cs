@@ -23,17 +23,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class WireframeTextureTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, string name, SKColor color, int size = 32)
@@ -55,14 +55,14 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_LoadTexture_RendersCorrectColor()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var redPng = WriteSolidPng(dir, "red.png", SKColors.Red, size: 32);
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(redPng);
             ctrl.SetCamera(0f, 0f, 1f); // 1:1 mapping, texture at (0,0)
 
@@ -88,14 +88,14 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_RefreshAll_AfterTextureChange_RendersNewTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var redPng  = WriteSolidPng(dir, "red.png",  SKColors.Red,  size: 32);
             var bluePng = WriteSolidPng(dir, "blue.png", SKColors.Blue, size: 32);
-            ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -106,11 +106,11 @@ public class WireframeTextureTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.RefreshAll();
             ctrl.SetCamera(0f, 0f, 1f);
 
@@ -135,9 +135,9 @@ public class WireframeTextureTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame  = null;
-            SelectedState.Self.SelectedChain  = null;
-            ProjectManager.Self.FileName      = string.Empty;
+            ctx.SelectedState.SelectedFrame  = null;
+            ctx.SelectedState.SelectedChain  = null;
+            ctx.ProjectManager.FileName      = string.Empty;
             System.IO.Directory.Delete(dir, true);
         }
     }
@@ -156,14 +156,14 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_SelectDifferentFrame_LoadsFrameTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var redPng  = WriteSolidPng(dir, "red.png",  SKColors.Red,  size: 32);
             var greenPng = WriteSolidPng(dir, "green.png", new SKColor(0, 200, 0), size: 32);
-            ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
             var frameRed = new AnimationFrameSave
             {
@@ -180,21 +180,21 @@ public class WireframeTextureTests
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frameRed);
             chain.Frames.Add(frameGreen);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
 
             // Select red frame — pixel (6,6): inside 32×32 frame, outside the top-left
             // resize handle (0±5px) and the origin crosshair centred at (16,16) ± 8px arm.
-            SelectedState.Self.SelectedFrame = frameRed;
+            ctx.SelectedState.SelectedFrame = frameRed;
             ctrl.RefreshAll();
             ctrl.SetCamera(0f, 0f, 1f);
             using var bmRed = ctrl.RenderToBitmap(64, 64);
             var redPx = bmRed.GetPixel(6, 6);
 
             // Select green frame
-            SelectedState.Self.SelectedFrame = frameGreen;
+            ctx.SelectedState.SelectedFrame = frameGreen;
             ctrl.RefreshAll();
             ctrl.SetCamera(0f, 0f, 1f);
             using var bmGreen = ctrl.RenderToBitmap(64, 64);
@@ -209,9 +209,9 @@ public class WireframeTextureTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame  = null;
-            SelectedState.Self.SelectedChain  = null;
-            ProjectManager.Self.FileName      = string.Empty;
+            ctx.SelectedState.SelectedFrame  = null;
+            ctx.SelectedState.SelectedChain  = null;
+            ctx.ProjectManager.FileName      = string.Empty;
             System.IO.Directory.Delete(dir, true);
         }
     }
@@ -229,14 +229,14 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_SelectSecondFrameSameTexture_BoundingBoxMovesToFrame2()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             // Single 64×64 texture shared by both frames
             var png = WriteSolidPng(dir, "sheet.png", SKColors.Blue, size: 64);
-            ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
             // Frame 1: left half (UV 0.0–0.5)
             var frame1 = new AnimationFrameSave
@@ -257,12 +257,12 @@ public class WireframeTextureTests
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(frame1);
             chain.Frames.Add(frame2);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
 
             // Select frame 1 and load
-            SelectedState.Self.SelectedFrame = frame1;
+            ctx.SelectedState.SelectedFrame = frame1;
             ctrl.RefreshAll();
             ctrl.SetCamera(0f, 0f, 1f);
 
@@ -274,7 +274,7 @@ public class WireframeTextureTests
             Assert.Equal(32f, sel1.Bounds.Right, 1f);   // 0.5 * 64 = 32
 
             // Now select frame 2 (same texture!) and refresh
-            SelectedState.Self.SelectedFrame = frame2;
+            ctx.SelectedState.SelectedFrame = frame2;
             ctrl.RefreshAll();
 
             var rectsAfterFrame2 = ctrl.GetFrameRects();
@@ -286,9 +286,9 @@ public class WireframeTextureTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName     = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
             System.IO.Directory.Delete(dir, true);
         }
     }
@@ -302,13 +302,13 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_LoadedTexturePath_ReflectsLoadedTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var png = WriteSolidPng(dir, "tex.png", SKColors.Cyan);
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
 
             Assert.Null(ctrl.LoadedTexturePath);
 
@@ -331,13 +331,13 @@ public class WireframeTextureTests
     [AvaloniaFact]
     public void Wireframe_BitmapSize_MatchesLoadedTextureDimensions()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var png = WriteSolidPng(dir, "sprite.png", SKColors.Yellow, size: 48);
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
 
             Assert.Equal((0, 0), ctrl.BitmapSize);
 

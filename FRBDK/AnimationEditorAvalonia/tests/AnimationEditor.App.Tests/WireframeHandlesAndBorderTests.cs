@@ -35,17 +35,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class WireframeHandlesAndBorderTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, SKColor color, int size = 64)
@@ -68,7 +68,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeHandles_SelectedFrame_TopLeftHandleIsOutsideFrame()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -85,11 +85,11 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
             ctrl.SetCamera(0, 0, 1);  // screen rect = (8,8,56,56); TL handle at (3,3)
@@ -117,7 +117,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeHandles_SelectedFrame_MidLeftHandleIsOutsideFrame()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -133,11 +133,11 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
             ctrl.SetCamera(0, 0, 1);
@@ -159,7 +159,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeHandles_NoSelectedFrame_NoWhiteHandleAtCorner()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -174,11 +174,11 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = null;   // ← NO frame selected
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = null;   // ← NO frame selected
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
             ctrl.SetCamera(0, 0, 1);
@@ -201,7 +201,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeHandles_SelectThenDeselect_HandleDisappears()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -218,15 +218,15 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0, 0, 1);
 
             // Select frame → TopLeft handle visible at (3,3)
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedFrame = frame;
             ctrl.RefreshFrames();
             using var bmSelected = ctrl.RenderToBitmap(64, 64);
             var pxSelected = bmSelected.GetPixel(3, 3);
@@ -234,8 +234,8 @@ public class WireframeHandlesAndBorderTests
                 $"Handle should be visible when frame selected; R={pxSelected.Red}");
 
             // Deselect frame AND chain → handles gone completely
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             ctrl.RefreshFrames();
             using var bmDeselected = ctrl.RenderToBitmap(64, 64);
             var pxDeselected = bmDeselected.GetPixel(3, 3);
@@ -261,14 +261,14 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeTextureOutline_BorderPixelBrighterThanInterior()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var png = WriteSolidPng(dir, SKColors.Black);  // 64×64 black texture
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0, 0, 1);   // texture at (0,0,64,64) on 96×96 canvas
 
@@ -296,14 +296,14 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeTextureOutline_OutsideBackgroundBrighterNearBorder()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var png = WriteSolidPng(dir, SKColors.Black);
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0, 0, 1);
 
@@ -339,7 +339,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void PreviewFrameBorder_LeftEdge_BrighterThanFarBackground()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -347,7 +347,7 @@ public class WireframeHandlesAndBorderTests
             // Dark texture so the white border is distinguishable over the frame colour
             var texPath = Path.Combine(dir, "dark.png");
             using (var bmp = new SKBitmap(16, 16)) { bmp.Erase(new SKColor(0, 0, 60)); using var d = bmp.Encode(SKEncodedImageFormat.Png, 100); File.WriteAllBytes(texPath, d.ToArray()); }
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -357,11 +357,11 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
             // Screen rect: (34,34,50,50).  Left border stroke at x≈34.
@@ -379,9 +379,9 @@ public class WireframeHandlesAndBorderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -397,14 +397,14 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void PreviewFrameBorder_TopEdge_BrighterThanBackground_WithBrightTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = Path.Combine(dir, "red.png");
             using (var bmp = new SKBitmap(16, 16)) { bmp.Erase(SKColors.Red); using var d = bmp.Encode(SKEncodedImageFormat.Png, 100); File.WriteAllBytes(texPath, d.ToArray()); }
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -414,11 +414,11 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
             // Top border stroke at y≈34.  Sample at (42, 33) — just above the rect,
@@ -436,9 +436,9 @@ public class WireframeHandlesAndBorderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -452,7 +452,7 @@ public class WireframeHandlesAndBorderTests
     [AvaloniaFact]
     public void WireframeSelectedFrame_ChangesBitmapComparedToNoSelection()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -467,18 +467,18 @@ public class WireframeHandlesAndBorderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = null;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = null;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0, 0, 1);
 
             ctrl.RefreshFrames();
             using var bmNoSel = ctrl.RenderToBitmap(64, 64);
 
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedFrame = frame;
             ctrl.RefreshFrames();
             using var bmSel = ctrl.RenderToBitmap(64, 64);
 

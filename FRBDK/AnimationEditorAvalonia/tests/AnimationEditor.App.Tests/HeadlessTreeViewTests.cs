@@ -30,21 +30,21 @@ public class HeadlessTreeViewTests
     /// Creates a headless <see cref="MainWindow"/>, shows it, and returns it.
     /// Callers must call <see cref="Window.Close"/> when done.
     /// </summary>
-    private static MainWindow CreateWindow()
+    private static (MainWindow Window, TestServices Ctx) CreateWindow()
     {
         // Reset data state so each test starts clean.
         // Note: we deliberately do NOT override DoOnUiThread — the window sets it
         // to InvokeAsync which is correct when running on the Avalonia UI thread.
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        AppCommands.Self.ConfirmAsync = (_, _) => Task.FromResult(true);
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
 
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
-        return window;
+        return (window, ctx);
     }
 
     /// <summary>Returns the AnimTree control from a window.</summary>
@@ -98,7 +98,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void TreeView_SelectionMode_IsMultiple()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree = GetTree(window);
@@ -110,7 +110,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void TreeView_SelectTwoNodes_BothAppearInSelectedItems()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -134,7 +134,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void TreeView_DeselectOne_LeavesSingleItemSelected()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -158,7 +158,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void TreeView_ClearSelectedItems_ResultsInEmptySelection()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -180,7 +180,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_NoSelection_ContainsAddAnimationChain()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree = GetTree(window);
@@ -196,7 +196,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_ChainSelected_ContainsDeleteChain()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -217,7 +217,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_ChainSelected_ContainsAddFrame()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -238,7 +238,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_ChainSelected_ContainsMoveAndFlipItems()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -263,7 +263,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_FrameSelected_ContainsDeleteFrame()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -284,7 +284,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_FrameSelected_ContainsShapeItems()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -307,7 +307,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_RectSelected_ContainsDeleteRectangle()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -328,7 +328,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_CircleSelected_ContainsDeleteCircle()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -349,7 +349,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_AlwaysContainsSortAlphabetically()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             // Test both: no selection case
@@ -369,7 +369,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ContextMenu_WhenSelectionChangedToChainBeforeOpen_ShowsChainNotFrameItems()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var tree  = GetTree(window);
@@ -403,11 +403,11 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void ChainNode_AfterRefresh_HasIsChainNodeTrue()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var chain = new AnimationChainSave { Name = "Walk" };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             TriggerRefreshTreeView(window);
             Dispatcher.UIThread.RunJobs();
@@ -424,7 +424,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void SelectCircle_TreeViewHighlightsCircleNode_NotFrameNode()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             // Arrange: chain → frame → circle in ProjectManager
@@ -437,14 +437,14 @@ public class HeadlessTreeViewTests
             frame.ShapeCollectionSave.CircleSaves.Add(circle);
             var chain  = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            ProjectManager.Self.FileName = "test.achx";
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.FileName = "test.achx";
 
             TriggerRefreshTreeView(window);
             Dispatcher.UIThread.RunJobs();
 
             // First select the frame (simulates the normal tree-click flow)
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
             var tree = GetTree(window);
@@ -455,7 +455,7 @@ public class HeadlessTreeViewTests
             Assert.Same(frameNode,  tree.SelectedItem);
 
             // Act: select the circle (e.g. from tree click or preview click)
-            SelectedState.Self.SelectedCircle = circle;
+            ctx.SelectedState.SelectedCircle = circle;
             Dispatcher.UIThread.RunJobs();
 
             // Assert: tree must highlight the circle node, not the frame node
@@ -467,7 +467,7 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void SelectRect_TreeViewHighlightsRectNode_NotFrameNode()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
@@ -479,13 +479,13 @@ public class HeadlessTreeViewTests
             frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            ProjectManager.Self.FileName = "test.achx";
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.FileName = "test.achx";
 
             TriggerRefreshTreeView(window);
             Dispatcher.UIThread.RunJobs();
 
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
             var tree     = GetTree(window);
@@ -494,7 +494,7 @@ public class HeadlessTreeViewTests
 
             Assert.Same(frameNode, tree.SelectedItem);
 
-            SelectedState.Self.SelectedRectangle = rect;
+            ctx.SelectedState.SelectedRectangle = rect;
             Dispatcher.UIThread.RunJobs();
 
             Assert.Same(rectNode, tree.SelectedItem);
@@ -505,14 +505,14 @@ public class HeadlessTreeViewTests
     [AvaloniaFact]
     public void InlineAddFrameBtn_Click_AddsFrameToChain_AndSelectsIt()
     {
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var chain = new AnimationChainSave { Name = "Run" };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             // Wire SaveCurrentAnimationChainList to a no-op so no file I/O happens
-            AppCommands.Self.DoOnUiThread = a => a();
+            ctx.AppCommands.DoOnUiThread = a => a();
 
             TriggerRefreshTreeView(window);
             Dispatcher.UIThread.RunJobs();
@@ -530,7 +530,7 @@ public class HeadlessTreeViewTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.Single(chain.Frames);
-            Assert.Same(chain.Frames[0], SelectedState.Self.SelectedFrame);
+            Assert.Same(chain.Frames[0], ctx.SelectedState.SelectedFrame);
         }
         finally { window.Close(); }
     }

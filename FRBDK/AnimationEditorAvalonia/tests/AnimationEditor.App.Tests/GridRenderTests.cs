@@ -27,17 +27,17 @@ public class GridRenderTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new FlatRedBall.Content.AnimationChain.AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new FlatRedBall.Content.AnimationChain.AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, SKColor color, int w = 64, int h = 64)
@@ -54,12 +54,12 @@ public class GridRenderTests
     /// Loads a black texture and sets the camera to pan=(0,0) zoom=1 so that
     /// texture coordinates equal screen coordinates in <see cref="WireframeControl.RenderToBitmap"/>.
     /// </summary>
-    private static (WireframeControl ctrl, string dir) BuildCtrl()
+    private static (WireframeControl ctrl, string dir) BuildCtrl(TestServices ctx)
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, SKColors.Black);
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);   // pan=(0,0), zoom=1 → screen ≡ texture coordinates
         return (ctrl, dir);
@@ -86,8 +86,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_Enabled_ProducesDifferentBitmapThanDisabled()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -116,8 +116,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_DifferentCellSizes_ProduceDifferentBitmaps()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -143,8 +143,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_IncrementCellSizeByOne_ProducesDifferentBitmap()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -170,8 +170,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_DecrementCellSizeByOne_ProducesDifferentBitmap()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -200,8 +200,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_CellSizeZero_RendersIdenticallyToGridOff()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 0);
@@ -228,8 +228,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void Grid_CellSizeOne_DoesNotCrash()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 1);
@@ -249,8 +249,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void SetGrid_GridState_ReflectsParameters()
     {
-        ResetSingletons();
-        var ctrl = new WireframeControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
 
         ctrl.SetGrid(true, 32);
         Assert.Equal((true, 32), ctrl.GridState);
@@ -268,8 +268,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void SnapClick_At20_20_FiresEventWithBounds16_16_32_32()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -291,8 +291,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void SnapClick_At40_40_FiresEventWithBounds32_32_48_48()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -314,8 +314,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void SnapClick_FrameSizeAlwaysEqualsCellSize()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             const int cellSize = 24;
@@ -340,8 +340,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void SnapClick_GridDisabled_NoEventFired()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(false, 16);
@@ -365,8 +365,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void HoverPreview_GridEnabled_NeverShowsPreview()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(true, 16);
@@ -384,8 +384,8 @@ public class GridRenderTests
     [AvaloniaFact]
     public void HoverPreview_GridDisabled_ShowPreviewIsFalse()
     {
-        ResetSingletons();
-        var (ctrl, dir) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
         try
         {
             ctrl.SetGrid(false, 16);
@@ -407,7 +407,7 @@ public class GridRenderTests
     [AvaloniaFact]
     public void GridEnabled_NonAlignedFrameBounds_SnapsToNearestGridLine()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         // 100×100 texture so pixel coords are easy to reason about.
@@ -424,15 +424,15 @@ public class GridRenderTests
             BottomCoordinate = 58f / 100f,
         };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        var ctrl = new WireframeControl();
-        ctrl.InitializeServices(SelectedState.Self, AppState.Self, AppCommands.Self, ApplicationEvents.Self, ProjectManager.Self);
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.InitializeServices(ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents, ctx.ProjectManager, ctx.UndoManager);
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
 
@@ -466,7 +466,7 @@ public class GridRenderTests
     [AvaloniaFact]
     public void GridEnabled_AlreadyAlignedBounds_NoChange()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
@@ -482,14 +482,14 @@ public class GridRenderTests
             BottomCoordinate = 60f / 100f,
         };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
 
@@ -516,7 +516,7 @@ public class GridRenderTests
     [AvaloniaFact]
     public void GridDisabled_BoundsMatchRawUV()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
@@ -532,14 +532,14 @@ public class GridRenderTests
             BottomCoordinate = 58f / 100f,
         };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
 

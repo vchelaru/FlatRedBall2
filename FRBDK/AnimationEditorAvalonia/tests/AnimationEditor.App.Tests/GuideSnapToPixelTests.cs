@@ -25,17 +25,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class GuideSnapToPixelTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     // ── Horizontal guide (HGuide) world-Y storage ─────────────────────────────
@@ -46,8 +46,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void HGuide_AtFractionalScreenY_SnapsToNearestPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200); // zoom=2 produces easy-to-reason fractional worlds
 
         // centerY = (64-20)/2 + 20 = 42; (43-42)/2 = 0.5 → snapped to 1
@@ -63,8 +63,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void HGuide_AtExactPixelScreenY_StoresIntegerUnchanged()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         // (44-42)/2 = 1.0 — already integer
@@ -81,8 +81,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void HGuide_AtNegativeFractionalScreenY_SnapsAwayFromZero()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         // (41-42)/2 = -0.5 → snapped to -1 (AwayFromZero, not banker's 0)
@@ -100,8 +100,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void VGuide_AtFractionalScreenX_SnapsToNearestPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         ctrl.SimulateAddVGuide(screenX: 43f, controlWidth: 64f);
@@ -118,8 +118,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void HGuide_Drag_SnapsToNearestPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         // Place guide at integer world 0 (screenY=42 → worldY=0)
@@ -138,8 +138,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void VGuide_Drag_SnapsToNearestPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         ctrl.SimulateAddVGuide(screenX: 42f, controlWidth: 64f);
@@ -160,8 +160,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void VGuide_SnappedWorldX1_RendersAtExpectedScreenPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         ctrl.SimulateAddVGuide(screenX: 43f, controlWidth: 64f);
@@ -185,8 +185,8 @@ public class GuideSnapToPixelTests
     [AvaloniaFact]
     public void HGuide_SnappedWorldY1_RendersAtExpectedScreenPixel()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SetZoomPercent(200);
 
         ctrl.SimulateAddHGuide(screenY: 43f, controlHeight: 64f);

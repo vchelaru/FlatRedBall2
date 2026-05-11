@@ -22,18 +22,18 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class PreviewZoomComboSyncTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.ConfirmAsync              = (_, _) => Task.FromResult(true);
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.UnitType                     = UnitType.Pixel;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.UnitType                     = UnitType.Pixel;
+        return ctx;
     }
 
     private static T FindCtrl<T>(MainWindow w, string name) where T : Control
@@ -43,7 +43,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void PreviewControl_FiresZoomChanged_OnWheelZoom()
     {
-        var preview = new PreviewControl();
+        var ctx = ResetSingletons();
+        var preview = ctx.CreatePreviewControl();
         // Force a non-zero bounds so ApplyWheelZoom math is exercised.
         preview.Measure(new Size(400, 300));
         preview.Arrange(new Rect(0, 0, 400, 300));
@@ -61,9 +62,9 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void PreviewZoomCombo_DisplaysExactPercent_AfterWheelZoomOnPreview()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
 
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -84,8 +85,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void PreviewZoomPlusBtn_StepsToNextPresetAbove_FromBetweenPresets()
     {
-        ResetSingletons();
-        var window = new MainWindow();
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -109,8 +110,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void PreviewZoomMinusBtn_StepsToPreviousPresetBelow_FromBetweenPresets()
     {
-        ResetSingletons();
-        var window = new MainWindow();
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -133,8 +134,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void ZoomPlusBtn_StepsFromExactPreset_GoesToNextPreset()
     {
-        ResetSingletons();
-        var window = new MainWindow();
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -156,9 +157,9 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void ZoomCombo_DisplaysExactPercent_AfterWheelZoomOnWireframe()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
 
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -186,7 +187,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void WireframeControl_FiresZoomChanged_OnWheelZoom()
     {
-        var ctrl = new WireframeControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.Measure(new Size(400, 300));
         ctrl.Arrange(new Rect(0, 0, 400, 300));
 
@@ -208,8 +210,8 @@ public class PreviewZoomComboSyncTests
     [AvaloniaFact]
     public void ZoomMinusBtn_StepsToPreviousPresetBelow_FromBetweenPresets()
     {
-        ResetSingletons();
-        var window = new MainWindow();
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

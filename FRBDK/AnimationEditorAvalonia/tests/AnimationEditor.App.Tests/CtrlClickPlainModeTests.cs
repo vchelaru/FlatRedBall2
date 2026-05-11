@@ -18,17 +18,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class CtrlClickPlainModeTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, int w = 64, int h = 64)
@@ -41,12 +41,12 @@ public class CtrlClickPlainModeTests
         return path;
     }
 
-    private static (WireframeControl ctrl, string dir) BuildCtrl(int w = 64, int h = 64)
+    private static (WireframeControl ctrl, string dir) BuildCtrl(TestServices ctx, int w = 64, int h = 64)
     {
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, w, h);
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
         return (ctrl, dir);
@@ -57,8 +57,8 @@ public class CtrlClickPlainModeTests
     [AvaloniaFact]
     public void CtrlClick_NoBitmap_DoesNotFire()
     {
-        ResetSingletons();
-        var ctrl = new WireframeControl();  // no texture loaded
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();  // no texture loaded
         bool fired = false;
         ctrl.FrameCreatedFromRegion += (_, _, _, _) => fired = true;
 
@@ -72,8 +72,8 @@ public class CtrlClickPlainModeTests
     [AvaloniaFact]
     public void CtrlClick_NoGrid_NoWand_FiresFrameCreatedFromRegion()
     {
-        ResetSingletons();
-        var (ctrl, _) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, _) = BuildCtrl(ctx);
         (int x0, int y0, int x1, int y1)? received = null;
         ctrl.FrameCreatedFromRegion += (x0, y0, x1, y1) => received = (x0, y0, x1, y1);
 
@@ -85,8 +85,8 @@ public class CtrlClickPlainModeTests
     [AvaloniaFact]
     public void CtrlClick_NoGrid_NoWand_FrameCenteredAtClick_DefaultSize16()
     {
-        ResetSingletons();
-        var (ctrl, _) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, _) = BuildCtrl(ctx);
         (int x0, int y0, int x1, int y1)? received = null;
         ctrl.FrameCreatedFromRegion += (x0, y0, x1, y1) => received = (x0, y0, x1, y1);
 
@@ -106,12 +106,12 @@ public class CtrlClickPlainModeTests
     [AvaloniaFact]
     public void CtrlClick_UsesLastFrameSize_WhenLargerThan16()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir);
 
-        ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
         var chain = new AnimationChainSave { Name = "Chain" };
         // Last frame occupies the left half of the 64×64 texture → 32×64 pixels
@@ -126,10 +126,10 @@ public class CtrlClickPlainModeTests
             ShapeCollectionSave = new ShapeCollectionSave(),
         };
         chain.Frames.Add(lastFrame);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.SelectedState.SelectedChain = chain;
 
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
 
@@ -153,8 +153,8 @@ public class CtrlClickPlainModeTests
     [AvaloniaFact]
     public void CtrlClick_WithGridActive_SimulatePlainCtrlClickIsNoOp()
     {
-        ResetSingletons();
-        var (ctrl, _) = BuildCtrl();
+        var ctx = ResetSingletons();
+        var (ctrl, _) = BuildCtrl(ctx);
         ctrl.SetGrid(true, 16);
         bool fired = false;
         ctrl.FrameCreatedFromRegion += (_, _, _, _) => fired = true;

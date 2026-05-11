@@ -33,20 +33,20 @@ public class TutorialMainWindowIntegrationTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static MainWindow CreateWindow()
+    private static (MainWindow Window, TestServices Ctx) CreateWindow()
     {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.ConfirmAsync              = (_, _) => Task.FromResult(true);
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
 
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
-        return window;
+        return (window, ctx);
     }
 
     private static WireframeControl GetWireframe(MainWindow w)
@@ -84,16 +84,16 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png  = WriteSolidPng(dir, "sprite.png", SKColors.Red, size: 64);
             var achx = System.IO.Path.Combine(dir, "test.achx");
-            ProjectManager.Self.FileName = achx;
+            ctx.ProjectManager.FileName = achx;
 
             var chain = new AnimationChainSave { Name = "Idle" };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
             var wireframe = GetWireframe(window);
             wireframe.LoadTexture(png);
@@ -119,13 +119,13 @@ public class TutorialMainWindowIntegrationTests
             Assert.Equal(0.5f,  frame.BottomCoordinate, precision: 4);
 
             // SelectedFrame must be set
-            Assert.Same(frame, SelectedState.Self.SelectedFrame);
+            Assert.Same(frame, ctx.SelectedState.SelectedFrame);
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName     = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }
@@ -141,16 +141,16 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png  = WriteSolidPng(dir, "sheet.png", SKColors.Blue, size: 64);
             var achx = System.IO.Path.Combine(dir, "test.achx");
-            ProjectManager.Self.FileName = achx;
+            ctx.ProjectManager.FileName = achx;
 
             var chain = new AnimationChainSave { Name = "Run" };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
             var wireframe = GetWireframe(window);
             wireframe.LoadTexture(png);
@@ -177,9 +177,9 @@ public class TutorialMainWindowIntegrationTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName     = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }
@@ -195,15 +195,15 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png = WriteSolidPng(dir, "tex.png", SKColors.Green, size: 32);
-            // Deliberately do NOT set ProjectManager.Self.FileName
+            // Deliberately do NOT set ctx.ProjectManager.FileName
 
             var chain = new AnimationChainSave { Name = "Idle" };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
             var wireframe = GetWireframe(window);
             wireframe.LoadTexture(png);
@@ -220,8 +220,8 @@ public class TutorialMainWindowIntegrationTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }
@@ -234,7 +234,7 @@ public class TutorialMainWindowIntegrationTests
     /// frame rectangle — without waiting for the async RefreshWireframe event.
     ///
     /// Before the fix, <c>ApplyFramePixelCoords</c> called
-    /// <c>AppCommands.Self.RefreshWireframe()</c>, which queued
+    /// <c>ctx.AppCommands.RefreshWireframe()</c>, which queued
     /// <c>Dispatcher.UIThread.InvokeAsync(RefreshAll)</c>.  The frame rect in
     /// the wireframe was still at the old position immediately after the spinner
     /// changed (and never updated in headless tests without <c>RunJobs()</c>).
@@ -247,13 +247,13 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png  = WriteSolidPng(dir, "sprite.png", SKColors.Red, size: 64);
             var achx = System.IO.Path.Combine(dir, "test.achx");
-            ProjectManager.Self.FileName = achx;
-            AppState.Self.UnitType = UnitType.Pixel;
+            ctx.ProjectManager.FileName = achx;
+            ctx.AppState.UnitType = UnitType.Pixel;
 
             // Frame: pixel (0,0,16,16) on a 64×64 texture → UV (0, 0, 0.25, 0.25)
             var frame = new AnimationFrameSave
@@ -266,7 +266,7 @@ public class TutorialMainWindowIntegrationTests
             };
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             // Load texture BEFORE selecting the frame so BitmapSize is non-zero
             // when RefreshPropertyPanel runs and populates PropPixelX.
@@ -275,8 +275,8 @@ public class TutorialMainWindowIntegrationTests
             wireframe.SetCamera(0f, 0f, 1f);
             wireframe.RefreshFrames();
 
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs(); // flush InvokeAsync(RefreshPropertyPanel)
 
             var propX = window.FindControl<NumericUpDown>("PropPixelX")
@@ -293,9 +293,9 @@ public class TutorialMainWindowIntegrationTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName     = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }
@@ -305,7 +305,7 @@ public class TutorialMainWindowIntegrationTests
 
     /// <summary>
     /// Tutorial step: "Save this file to your computer."
-    /// Calling <c>AppCommands.Self.SaveAsAnimationChain(path)</c> must create
+    /// Calling <c>ctx.AppCommands.SaveAsAnimationChain(path)</c> must create
     /// an XML file at the given path that can be read back.
     ///
     /// This mirrors the tutorial requirement that a file must exist on disk
@@ -316,7 +316,7 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var achx = System.IO.Path.Combine(dir, "animations.achx");
@@ -330,10 +330,10 @@ public class TutorialMainWindowIntegrationTests
                 ShapeCollectionSave = new ShapeCollectionSave(),
             };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
-            ProjectManager.Self.FileName = achx;
-            AppCommands.Self.SaveCurrentAnimationChainList(achx);
+            ctx.ProjectManager.FileName = achx;
+            ctx.AppCommands.SaveCurrentAnimationChainList(achx);
 
             Assert.True(System.IO.File.Exists(achx),
                 $"SaveAs should create the file at: {achx}");
@@ -344,7 +344,7 @@ public class TutorialMainWindowIntegrationTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
+            ctx.ProjectManager.FileName = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }
@@ -364,12 +364,12 @@ public class TutorialMainWindowIntegrationTests
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png  = WriteSolidPng(dir, "idle.png", SKColors.Lime, size: 16);
             var achx = System.IO.Path.Combine(dir, "test.achx");
-            ProjectManager.Self.FileName = achx;
+            ctx.ProjectManager.FileName = achx;
 
             var frame = new AnimationFrameSave
             {
@@ -379,10 +379,10 @@ public class TutorialMainWindowIntegrationTests
             };
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
 
             // Select chain → preview should start playing
-            SelectedState.Self.SelectedChain = chain;
+            ctx.SelectedState.SelectedChain = chain;
 
             var preview = window.FindControl<PreviewControl>("PreviewCtrl")
                           ?? throw new InvalidOperationException("PreviewCtrl not found");
@@ -408,9 +408,9 @@ public class TutorialMainWindowIntegrationTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame  = null;
-            SelectedState.Self.SelectedChain  = null;
-            ProjectManager.Self.FileName      = string.Empty;
+            ctx.SelectedState.SelectedFrame  = null;
+            ctx.SelectedState.SelectedChain  = null;
+            ctx.ProjectManager.FileName      = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }

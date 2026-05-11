@@ -113,8 +113,8 @@ public class PreviewControl : Control
     /// </summary>
     public SKBitmap RenderToBitmap(int width, int height)
     {
-        var chain         = SelectedState.Self.SelectedChain;
-        var selectedFrame = SelectedState.Self.SelectedFrame;
+        var chain         = _selectedState!.SelectedChain;
+        var selectedFrame = _selectedState!.SelectedFrame;
 
         AnimationFrameSave? displayFrame = null;
         AnimationFrameSave? onionFrame   = null;
@@ -143,7 +143,7 @@ public class PreviewControl : Control
 
         var snap   = new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
                                         _showGuides, texPath, onionPath, width, height,
-                                        AppState.Self.OffsetMultiplier,
+                                        _appState!.OffsetMultiplier,
                                         _hGuides.ToArray(), _vGuides.ToArray(),
                                         _draggedGuideIdx, _draggingHGuide,
                                         BuildShapeInfos());
@@ -205,7 +205,7 @@ public class PreviewControl : Control
     private void OnTimerTick(object? sender, EventArgs e)
     {
         // Only advance when the whole chain is playing (no specific frame pinned)
-        if (SelectedState.Self.SelectedFrame is not null) return;
+        if (_selectedState!.SelectedFrame is not null) return;
         _playback.Advance(0.016);
     }
 
@@ -213,7 +213,7 @@ public class PreviewControl : Control
 
     private void OnSelectionChanged()
     {
-        _playback.SetChain(SelectedState.Self.SelectedChain);
+        _playback.SetChain(_selectedState!.SelectedChain);
         InvalidateVisual();
     }
 
@@ -322,9 +322,9 @@ public class PreviewControl : Control
             return File.Exists(frame.TextureName) ? frame.TextureName : null;
 
         // Relative path: requires a saved ACHX to derive the base folder.
-        if (string.IsNullOrEmpty(ProjectManager.Self.FileName))
+        if (string.IsNullOrEmpty(_projectManager!.FileName))
             return null;
-        string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
+        string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
         string full = new FilePath(achxFolder + frame.TextureName).FullPath;
         if (!File.Exists(full))
             return null;
@@ -335,8 +335,8 @@ public class PreviewControl : Control
 
     public override void Render(DrawingContext ctx)
     {
-        var chain         = SelectedState.Self.SelectedChain;
-        var selectedFrame = SelectedState.Self.SelectedFrame;
+        var chain         = _selectedState!.SelectedChain;
+        var selectedFrame = _selectedState!.SelectedFrame;
 
         AnimationFrameSave? displayFrame = null;
         AnimationFrameSave? onionFrame   = null;
@@ -372,7 +372,7 @@ public class PreviewControl : Control
             new RenderSnapshot(
                 displayFrame, onionFrame, _zoom, _panX, _panY, _showGuides,
                 texPath, onionPath, (float)w, (float)h,
-                AppState.Self.OffsetMultiplier,
+                _appState!.OffsetMultiplier,
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
                 BuildShapeInfos()),
@@ -491,19 +491,19 @@ public class PreviewControl : Control
 
     /// <summary>
     /// Captures a thread-safe snapshot of collision shapes attached to the currently
-    /// selected frame. Shapes are sourced from <see cref="SelectedState.Self.SelectedFrame"/>
+    /// selected frame. Shapes are sourced from <see cref="ISelectedState.SelectedFrame"/>
     /// so they only appear when a specific frame is pinned (not during free playback).
     /// </summary>
     private PreviewShapeInfo[] BuildShapeInfos()
     {
-        var frame = SelectedState.Self.SelectedFrame;
+        var frame = _selectedState!.SelectedFrame;
         if (frame?.ShapeCollectionSave is null) return Array.Empty<PreviewShapeInfo>();
 
-        var selectedRects = SelectedState.Self.SelectedRectangles.ToHashSet();
-        if (SelectedState.Self.SelectedRectangle is { } sr) selectedRects.Add(sr);
+        var selectedRects = _selectedState!.SelectedRectangles.ToHashSet();
+        if (_selectedState!.SelectedRectangle is { } sr) selectedRects.Add(sr);
 
-        var selectedCircles = SelectedState.Self.SelectedCircles.ToHashSet();
-        if (SelectedState.Self.SelectedCircle is { } sc) selectedCircles.Add(sc);
+        var selectedCircles = _selectedState!.SelectedCircles.ToHashSet();
+        if (_selectedState!.SelectedCircle is { } sc) selectedCircles.Add(sc);
 
         var list = new List<PreviewShapeInfo>();
         foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
@@ -557,13 +557,13 @@ public class PreviewControl : Control
     /// </summary>
     private bool TrySelectShapeAt(float px, float py)
     {
-        var frame = SelectedState.Self.SelectedFrame;
+        var frame = _selectedState!.SelectedFrame;
         if (frame?.ShapeCollectionSave is null) return false;
         if (px < RulerSize || py < RulerSize) return false;
 
         float cx = GetCenterX();
         float cy = GetCenterY();
-        float om = AppState.Self.OffsetMultiplier * _zoom;
+        float om = _appState!.OffsetMultiplier * _zoom;
         const float tolerance = 5f;
 
         // Circles are rendered after rects (on top), so check circles first.
@@ -575,7 +575,7 @@ public class PreviewControl : Control
             float sy = cy - c.Y * om;
             if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
             {
-                SelectedState.Self.SelectedCircle = c;
+                _selectedState!.SelectedCircle = c;
                 return true;
             }
         }
@@ -588,7 +588,7 @@ public class PreviewControl : Control
             float sy = cy - r.Y * om;
             if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
             {
-                SelectedState.Self.SelectedRectangle = r;
+                _selectedState!.SelectedRectangle = r;
                 return true;
             }
         }

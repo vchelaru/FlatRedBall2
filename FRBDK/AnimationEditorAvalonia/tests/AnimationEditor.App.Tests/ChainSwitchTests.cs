@@ -37,17 +37,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class ChainSwitchTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     private static void WriteColorPng(string path, SKColor color, int size = 16)
@@ -77,7 +77,7 @@ public class ChainSwitchTests
     [AvaloniaFact]
     public void Preview_ChainSwitch_DirectReset_ShowsNewChainFrame0()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -86,7 +86,7 @@ public class ChainSwitchTests
             WriteColorPng(Path.Combine(dir, "lime.png"),   SKColors.LimeGreen, size: 16);
             WriteColorPng(Path.Combine(dir, "blue.png"),   SKColors.Blue,      size: 16);
             WriteColorPng(Path.Combine(dir, "yellow.png"), SKColors.Yellow,    size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var chainA = new AnimationChainSave { Name = "ChainA" };
             chainA.Frames.Add(MakeFrame("red.png"));
@@ -99,11 +99,11 @@ public class ChainSwitchTests
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chainA);
             acls.AnimationChains.Add(chainB);
-            ProjectManager.Self.AnimationChainListSave = acls;
+            ctx.ProjectManager.AnimationChainListSave = acls;
 
-            SelectedState.Self.SelectedChain = chainA;
+            ctx.SelectedState.SelectedChain = chainA;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chainA);
             ctrl.Playback.Play();
@@ -112,7 +112,7 @@ public class ChainSwitchTests
             Assert.Equal(1, ctrl.Playback.CurrentFrameIndex);
 
             // Switch to chain B via direct API and update SelectedState
-            SelectedState.Self.SelectedChain = chainB;
+            ctx.SelectedState.SelectedChain = chainB;
             ctrl.Playback.SetChain(chainB); // direct reset — bypasses dispatcher
             ctrl.Playback.Play();
 
@@ -127,9 +127,9 @@ public class ChainSwitchTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -147,14 +147,14 @@ public class ChainSwitchTests
     [AvaloniaFact]
     public void Preview_ChainSwitch_SelectionEventPath_ResetsPlaybackAndRendersFrame0()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),  SKColors.Red,  size: 16);
             WriteColorPng(Path.Combine(dir, "blue.png"), SKColors.Blue, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var chainA = new AnimationChainSave { Name = "ChainA" };
             chainA.Frames.Add(MakeFrame("red.png"));
@@ -167,15 +167,15 @@ public class ChainSwitchTests
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chainA);
             acls.AnimationChains.Add(chainB);
-            ProjectManager.Self.AnimationChainListSave = acls;
+            ctx.ProjectManager.AnimationChainListSave = acls;
 
             // Create control FIRST so its SelectionChanged subscription is active
-            var ctrl = new PreviewControl();
-            ctrl.InitializeServices(SelectedState.Self, AppState.Self, AppCommands.Self, ApplicationEvents.Self, ProjectManager.Self);
+            var ctrl = ctx.CreatePreviewControl();
+            ctrl.InitializeServices(ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents, ctx.ProjectManager);
             ctrl.PauseAutoPlayback();
 
             // Now set chain A — fires SelectionChanged, which the control handles via InvokeAsync
-            SelectedState.Self.SelectedChain = chainA;
+            ctx.SelectedState.SelectedChain = chainA;
             Dispatcher.UIThread.RunJobs();  // flush → OnSelectionChanged → _playback.SetChain(chainA)
 
             ctrl.Playback.Play();
@@ -184,7 +184,7 @@ public class ChainSwitchTests
             Assert.Equal(1, ctrl.Playback.CurrentFrameIndex);
 
             // Production-style switch: change SelectedState only (no direct Playback call)
-            SelectedState.Self.SelectedChain = chainB;
+            ctx.SelectedState.SelectedChain = chainB;
             Dispatcher.UIThread.RunJobs();  // flush OnSelectionChanged → SetChain(chainB)
 
             // After the dispatcher flush the playback controller must be at frame 0
@@ -199,9 +199,9 @@ public class ChainSwitchTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -215,14 +215,14 @@ public class ChainSwitchTests
     [AvaloniaFact]
     public void Preview_ChainSwitch_StaleIndex_ClampsWithoutException()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),  SKColors.Red,  size: 16);
             WriteColorPng(Path.Combine(dir, "blue.png"), SKColors.Blue, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var chainA = new AnimationChainSave { Name = "Long" };
             chainA.Frames.Add(MakeFrame("red.png"));
@@ -236,11 +236,11 @@ public class ChainSwitchTests
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chainA);
             acls.AnimationChains.Add(chainB);
-            ProjectManager.Self.AnimationChainListSave = acls;
+            ctx.ProjectManager.AnimationChainListSave = acls;
 
-            SelectedState.Self.SelectedChain = chainA;
+            ctx.SelectedState.SelectedChain = chainA;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chainA);
             ctrl.Playback.Play();
@@ -251,7 +251,7 @@ public class ChainSwitchTests
 
             // Switch to chain B through SelectedState but do NOT flush the dispatcher.
             // This simulates the window between the selection change and the async callback.
-            SelectedState.Self.SelectedChain = chainB;
+            ctx.SelectedState.SelectedChain = chainB;
             // _playback.CurrentFrameIndex is still 2 (stale), but RenderToBitmap must
             // clamp it to chainB.Frames.Count - 1 = 1 without crashing.
             var ex = Record.Exception(() =>
@@ -265,9 +265,9 @@ public class ChainSwitchTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -281,20 +281,20 @@ public class ChainSwitchTests
     [AvaloniaFact]
     public void Preview_ChainSwitch_ToNull_RendersBackground()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var chain = new AnimationChainSave { Name = "A" };
             chain.Frames.Add(MakeFrame("red.png"));
 
-            SelectedState.Self.SelectedChain = chain;
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
 
             // Verify red texture is rendered with chain set
@@ -306,7 +306,7 @@ public class ChainSwitchTests
             }
 
             // Now switch to null
-            SelectedState.Self.SelectedChain = null;
+            ctx.SelectedState.SelectedChain = null;
             Dispatcher.UIThread.RunJobs();
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -318,9 +318,9 @@ public class ChainSwitchTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -338,14 +338,14 @@ public class ChainSwitchTests
     [AvaloniaFact]
     public void Preview_SpeedMultiplier_PropertyBinding_DelegatesToPlayback()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),  SKColors.Red,       size: 16);
             WriteColorPng(Path.Combine(dir, "lime.png"), SKColors.LimeGreen, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var chain = new AnimationChainSave { Name = "SpeedTest" };
             chain.Frames.Add(MakeFrame("red.png",  0.1f));
@@ -353,10 +353,10 @@ public class ChainSwitchTests
 
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chain);
-            ProjectManager.Self.AnimationChainListSave = acls;
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave = acls;
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chain);
 
@@ -381,9 +381,9 @@ public class ChainSwitchTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }

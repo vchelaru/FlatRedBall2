@@ -453,6 +453,7 @@ public class WireframeControl : Control
     private IAppCommands? _appCommands;
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
+    private IUndoManager? _undoManager;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -463,13 +464,15 @@ public class WireframeControl : Control
         IAppState appState,
         IAppCommands appCommands,
         IApplicationEvents events,
-        IProjectManager projectManager)
+        IProjectManager projectManager,
+        IUndoManager undoManager)
     {
         _selectedState   = selectedState;
         _appState        = appState;
         _appCommands     = appCommands;
         _events          = events;
         _projectManager  = projectManager;
+        _undoManager     = undoManager;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
@@ -1031,7 +1034,7 @@ public class WireframeControl : Control
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
         FrameRegionChanged?.Invoke(sel.Frame);
-        UndoManager.Self.Record(new FrameRegionChangedCommand(
+        _undoManager!.Record(new FrameRegionChangedCommand(
             sel.Frame,
             _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
             sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
@@ -1539,7 +1542,7 @@ public class WireframeControl : Control
         if (_draggingRect != null)
         {
             FrameRegionChanged?.Invoke(_draggingRect.Frame);
-            UndoManager.Self.Record(new FrameRegionChangedCommand(
+            _undoManager!.Record(new FrameRegionChangedCommand(
                 _draggingRect.Frame,
                 _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
                 _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
@@ -1552,7 +1555,7 @@ public class WireframeControl : Control
 
         if (_draggingChain)
         {
-            var chain = SelectedState.Self.SelectedChain;
+            var chain = _selectedState!.SelectedChain;
             if (chain != null)
                 ChainRegionChanged?.Invoke(chain);
             _draggingChain = false;
@@ -1835,7 +1838,7 @@ public class WireframeControl : Control
         {
             if (fr.Bounds.Contains(worldPt))
             {
-                SelectedState.Self.SelectedFrame = fr.Frame;
+                _selectedState!.SelectedFrame = fr.Frame;
                 return;
             }
         }
@@ -1843,8 +1846,8 @@ public class WireframeControl : Control
 
     private void ApplyRegionToSelectedFrame(int minX, int minY, int maxX, int maxY)
     {
-        if (SelectedState.Self.SelectedFrame is null || _bitmap is null) return;
-        var frame = SelectedState.Self.SelectedFrame;
+        if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
+        var frame = _selectedState!.SelectedFrame;
         float w = _bitmap.Width, h = _bitmap.Height;
         frame.LeftCoordinate   = minX / w;
         frame.RightCoordinate  = maxX / w;
@@ -1877,13 +1880,13 @@ public class WireframeControl : Control
 
         if (_bitmap is null) { InvalidateVisual(); return; }
 
-        var selectedFrame  = SelectedState.Self.SelectedFrame;
-        var selectedChain  = SelectedState.Self.SelectedChain;
-        var selectedChains = SelectedState.Self.SelectedChains;
+        var selectedFrame  = _selectedState!.SelectedFrame;
+        var selectedChain  = _selectedState!.SelectedChain;
+        var selectedChains = _selectedState!.SelectedChains;
 
-        string? achxFolder = string.IsNullOrEmpty(ProjectManager.Self.FileName)
+        string? achxFolder = string.IsNullOrEmpty(_projectManager!.FileName)
             ? null
-            : FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
+            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
 
         IEnumerable<AnimationFrameSave> framesToShow;
         if (selectedFrame != null)
@@ -1988,17 +1991,17 @@ public class WireframeControl : Control
 
     private string? DetermineTexturePath()
     {
-        string? textureName = SelectedState.Self.SelectedFrame?.TextureName
-                           ?? SelectedState.Self.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
+        string? textureName = _selectedState!.SelectedFrame?.TextureName
+                           ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
 
         if (string.IsNullOrEmpty(textureName))
             return null;
 
         // If no ACHX is saved yet, the texture path is already absolute.
-        if (string.IsNullOrEmpty(ProjectManager.Self.FileName))
+        if (string.IsNullOrEmpty(_projectManager!.FileName))
             return textureName;
 
-        return FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName) + textureName;
+        return FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName) + textureName;
     }
 
     /// <summary>
@@ -2009,7 +2012,7 @@ public class WireframeControl : Control
     private (int w, int h) GetLastFramePixelSize()
     {
         if (_bitmap is null) return (0, 0);
-        var chain = SelectedState.Self.SelectedChain;
+        var chain = _selectedState!.SelectedChain;
         if (chain?.Frames == null || chain.Frames.Count == 0) return (0, 0);
         var last = chain.Frames[chain.Frames.Count - 1];
         int w = (int)Math.Round((last.RightCoordinate  - last.LeftCoordinate)  * _bitmap.Width);

@@ -8,8 +8,6 @@ namespace AnimationEditor.Core.IO
 {
     public class IoManager : IIoManager
     {
-        public static IoManager Self { get; set; } = null!;
-
         private readonly IAppState _appState;
 
         public IoManager(IAppState appState)

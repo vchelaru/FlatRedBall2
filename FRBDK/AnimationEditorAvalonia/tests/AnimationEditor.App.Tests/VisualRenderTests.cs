@@ -26,17 +26,17 @@ public class VisualRenderTests
 {
     // ── Test helpers ──────────────────────────────────────────────────────────
 
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     /// <summary>
@@ -90,8 +90,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeRenderToBitmap_ReturnsRequestedDimensions()
     {
-        ResetSingletons();
-        var ctrl = new WireframeControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
 
         using var bm = ctrl.RenderToBitmap(320, 240);
 
@@ -104,8 +104,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeRenderToBitmap_NoTexture_FillsWithBackgroundColor()
     {
-        ResetSingletons();
-        var ctrl = new WireframeControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
 
         using var bm = ctrl.RenderToBitmap(64, 64);
         var center = bm.GetPixel(32, 32);
@@ -121,7 +121,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeRenderToBitmap_WithRedTexture_DrawsTexturePixelAtCenter()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "red.png");
@@ -129,7 +129,7 @@ public class VisualRenderTests
         {
             WriteColorPng(png, SKColors.Red, size: 16);
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.CenterFitForSize(64, 64);
 
@@ -154,7 +154,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeGetFrameRects_CountMatchesChainFrameCount()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "sheet.png");
@@ -178,10 +178,10 @@ public class VisualRenderTests
                 ShapeCollectionSave = new ShapeCollectionSave()
             });
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
 
@@ -198,7 +198,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeGetFrameRects_BoundsMatchUvCoordinates()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "sheet.png");
@@ -216,10 +216,10 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
 
@@ -243,8 +243,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewRenderToBitmap_ReturnsRequestedDimensions()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
 
         using var bm = ctrl.RenderToBitmap(160, 120);
@@ -258,8 +258,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_PauseAutoPlayback_FreezesFrameIndex()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();  // stop timer + pause state machine
 
         var chain = new AnimationChainSave { Name = "Idle" };
@@ -282,8 +282,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_ManualAdvance_UpdatesFrameIndex()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
 
         var chain = new AnimationChainSave { Name = "Run" };
@@ -305,8 +305,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_ResumeAfterPause_RestoresIsPlaying()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
 
         ctrl.PauseAutoPlayback();
         Assert.False(ctrl.Playback.IsPlaying);
@@ -335,7 +335,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeSelectedFrame_PixelInsideOverlay_HasBlueTint()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "white.png");
@@ -353,11 +353,11 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;   // IsSelected=true → fill alpha=45
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;   // IsSelected=true → fill alpha=45
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.CenterFitForSize(128, 128);
             ctrl.RefreshFrames();
@@ -390,7 +390,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeGetFrameRects_IsSelectedMatchesSelectedFrameState()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "sheet.png");
@@ -416,16 +416,16 @@ public class VisualRenderTests
             chain.Frames.Add(frame0);
             chain.Frames.Add(frame1);
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
 
             // Phase 1: no selected frame → the control shows every chain frame,
             // none of which should be marked as selected.
 #pragma warning disable CS8625
-            SelectedState.Self.SelectedFrame = null;
+            ctx.SelectedState.SelectedFrame = null;
 #pragma warning restore CS8625
             ctrl.RefreshFrames();
             var allRects = ctrl.GetFrameRects();
@@ -434,7 +434,7 @@ public class VisualRenderTests
 
             // Phase 2: select frame0 → the control shows only that frame and
             // reports IsSelected=true on it.
-            SelectedState.Self.SelectedFrame = frame0;
+            ctx.SelectedState.SelectedFrame = frame0;
             ctrl.RefreshFrames();
             var selectedRects = ctrl.GetFrameRects();
             Assert.Single(selectedRects);
@@ -458,7 +458,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeFrameOverlay_InsidePixelRedIsLowerThanOutside()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "white.png");
@@ -476,11 +476,11 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Half" };
             chain.Frames.Add(frame);
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;  // selected → fill alpha=45
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;  // selected → fill alpha=45
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.CenterFitForSize(128, 128);
             ctrl.RefreshFrames();
@@ -511,8 +511,8 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewGuides_DrawGreenCrossHairAtCenter()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
         ctrl.ShowGuides = true;   // no chain; guides are drawn over dark background
 
@@ -540,7 +540,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewWithTexture_DrawsRedFrameAtCanvasCenter()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "red.png");
@@ -550,7 +550,7 @@ public class VisualRenderTests
 
             // ResolveTexturePath requires FileName to be set so it can resolve
             // the texture path relative to the .achx directory.
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -563,11 +563,11 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;   // pin to this frame
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;   // pin to this frame
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -595,13 +595,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewFlipHorizontal_LeftAndRightPixelsAreSwapped()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteHSplitPng(Path.Combine(dir, "hsplit.png"), SKColors.Red, SKColors.Green);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -614,11 +614,11 @@ public class VisualRenderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
@@ -649,13 +649,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewFlipVertical_TopAndBottomPixelsAreSwapped()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteVSplitPng(Path.Combine(dir, "vsplit.png"), SKColors.Red, SKColors.Blue);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -668,11 +668,11 @@ public class VisualRenderTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
@@ -711,7 +711,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void PreviewOnionSkin_GhostVisible_AndCurrentFrameCoversGhost_InOverlapRegion()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -720,7 +720,7 @@ public class VisualRenderTests
             // frame1 (current):      8×8 lime — rendered at screen rect (38,38,46,46)
             WriteColorPng(Path.Combine(dir, "red.png"),  SKColors.Red,  size: 16);
             WriteColorPng(Path.Combine(dir, "lime.png"), SKColors.Lime, size:  8);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame0 = new AnimationFrameSave
             {
@@ -737,11 +737,11 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame0);
             chain.Frames.Add(frame1);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame1;  // frame0 becomes the onion
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame1;  // frame0 becomes the onion
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.ShowOnionSkin = true;
 
@@ -773,14 +773,14 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_MultiFrameChain_Playback_RendersCurrentFrameTexture()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"),  SKColors.Red,  size: 16);
             WriteColorPng(Path.Combine(dir, "lime.png"), SKColors.Lime, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame0 = new AnimationFrameSave
             {
@@ -797,11 +797,11 @@ public class VisualRenderTests
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame0);
             chain.Frames.Add(frame1);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
             // SelectedFrame stays null → playback controller drives frame selection
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.PauseAutoPlayback();
             ctrl.Playback.SetChain(chain);  // reset to frame 0, IsPlaying=false
             ctrl.Playback.Play();           // re-enable; timer is still stopped
@@ -829,14 +829,14 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_UvSubregion_LeftHalf_RendersLeftTexturePixels()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             // 32×32 H-split: left half=Red, right half=Blue
             WriteHSplitPng(Path.Combine(dir, "hsplit.png"), SKColors.Red, SKColors.Blue, 32, 32);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             // UV selects only the left half (columns 0–15)
             var frame = new AnimationFrameSave
@@ -845,9 +845,9 @@ public class VisualRenderTests
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 0.5f, BottomCoordinate = 1f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
             // sw=16, sh=32, dw=16, dh=32, dx=34, dy=26 → screen rect (34,26,50,58)
@@ -858,9 +858,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -871,13 +871,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_UvSubregion_RightHalf_RendersRightTexturePixels()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteHSplitPng(Path.Combine(dir, "hsplit.png"), SKColors.Red, SKColors.Blue, 32, 32);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             // UV selects only the right half (columns 16–31)
             var frame = new AnimationFrameSave
@@ -886,9 +886,9 @@ public class VisualRenderTests
                 LeftCoordinate = 0.5f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(64, 64);
 
             // Same screen rect; src starts at x=16, so pixel (42,42) maps to texture (24,16) → right → Blue
@@ -898,9 +898,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -914,13 +914,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_Zoom200_FrameOccupiesLargerScreenArea()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -928,9 +928,9 @@ public class VisualRenderTests
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetZoomPercent(200);
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -950,9 +950,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -966,13 +966,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_PanRight_FrameShiftsRight()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -980,9 +980,9 @@ public class VisualRenderTests
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetPan(16f, 0f);
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -998,9 +998,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -1008,15 +1008,15 @@ public class VisualRenderTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Loads a single frame into a fresh chain and sets it as selected.</summary>
-    private static void SetupSingleFrame(string dir, AnimationFrameSave frame)
+    private static void SetupSingleFrame(TestServices ctx, string dir, AnimationFrameSave frame)
     {
         var chain = new AnimationChainSave { Name = "Test" };
         chain.Frames.Add(frame);
         var acls = new AnimationChainListSave();
         acls.AnimationChains.Add(chain);
-        ProjectManager.Self.AnimationChainListSave = acls;
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
     }
 
     // ── WireframeControl — edge cases ─────────────────────────────────────────
@@ -1028,7 +1028,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void WireframeGetFrameRects_TextureLoadedButNoChainSelected_ReturnsEmpty()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "tex.png");
@@ -1036,7 +1036,7 @@ public class VisualRenderTests
         {
             WriteColorPng(png, SKColors.Blue, size: 16);
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             // SelectedChain remains null from ResetSingletons
             ctrl.RefreshFrames();
@@ -1055,7 +1055,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Wireframe_8FrameSpriteSheet_GetFrameRects_Returns8()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "Idle.png");
@@ -1079,10 +1079,10 @@ public class VisualRenderTests
                         ShapeCollectionSave = new ShapeCollectionSave()
                     });
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
 
@@ -1098,7 +1098,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Wireframe_8FrameSpriteSheet_FirstFrame_RectMatchesTopLeftCell()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var png = Path.Combine(dir, "Idle.png");
@@ -1121,10 +1121,10 @@ public class VisualRenderTests
                         ShapeCollectionSave = new ShapeCollectionSave()
                     });
 
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
 
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.RefreshFrames();
 
@@ -1157,13 +1157,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_RelativeY_Positive_ShiftsFrameHigherOnScreen()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             // 16×16 frame covering the full texture, RelativeY = +8 (up in game space)
             var frame = new AnimationFrameSave
@@ -1173,9 +1173,9 @@ public class VisualRenderTests
                 RelativeY = 8f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetZoomPercent(100);
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -1192,9 +1192,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -1208,13 +1208,13 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_RelativeX_Positive_ShiftsFrameRightOfCenter()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -1223,9 +1223,9 @@ public class VisualRenderTests
                 RelativeX = 8f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetZoomPercent(100);
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -1242,9 +1242,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -1258,14 +1258,14 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_OffsetMultiplier2_RelativeY_DoublesScreenShift()
     {
-        ResetSingletons();
-        AppState.Self.OffsetMultiplier = 2f;
+        var ctx = ResetSingletons();
+        ctx.AppState.OffsetMultiplier = 2f;
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             WriteColorPng(Path.Combine(dir, "red.png"), SKColors.Red, size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -1274,9 +1274,9 @@ public class VisualRenderTests
                 RelativeY = 8f,
                 ShapeCollectionSave = new ShapeCollectionSave()
             };
-            SetupSingleFrame(dir, frame);
+            SetupSingleFrame(ctx, dir, frame);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetZoomPercent(100);
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -1293,10 +1293,10 @@ public class VisualRenderTests
         }
         finally
         {
-            AppState.Self.OffsetMultiplier = 1f;
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.AppState.OffsetMultiplier = 1f;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -1309,7 +1309,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public async Task Preview_OnionSkin_DifferentRelativeY_RendersAtOwnPosition()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -1318,7 +1318,7 @@ public class VisualRenderTests
             // Onion frame (index 0, prev): red, RelativeY=+8 → centred at (42,34)
             WriteColorPng(Path.Combine(dir, "green.png"), SKColors.Lime, size: 16);
             WriteColorPng(Path.Combine(dir, "red.png"),   SKColors.Red,  size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var onionFrame = new AnimationFrameSave
             {
@@ -1342,11 +1342,11 @@ public class VisualRenderTests
 
             var acls = new AnimationChainListSave();
             acls.AnimationChains.Add(chain);
-            ProjectManager.Self.AnimationChainListSave = acls;
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = mainFrame;  // current = index 1
+            ctx.ProjectManager.AnimationChainListSave = acls;
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = mainFrame;  // current = index 1
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.SetZoomPercent(100);
             ctrl.ShowOnionSkin = true;
 
@@ -1365,9 +1365,9 @@ public class VisualRenderTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -1384,7 +1384,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_RectShape_RendersGreenOutlineAtExpectedPosition()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
@@ -1393,12 +1393,12 @@ public class VisualRenderTests
         frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(
             new AxisAlignedRectangleSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 });
 
-        SelectedState.Self.SelectedFrame = frame;
-        AppState.Self.OffsetMultiplier = 1f;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.AppState.OffsetMultiplier = 1f;
 
         try
         {
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             // 100×100: RulerSize=20, cx=cy=60, top-edge of rect → y = 60 - 15 = 45
             using var bm = ctrl.RenderToBitmap(100, 100);
 
@@ -1413,7 +1413,7 @@ public class VisualRenderTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
+            ctx.SelectedState.SelectedFrame = null;
         }
     }
 
@@ -1425,7 +1425,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_CircleShape_RendersGreenOutlineAtTopOfCircle()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
@@ -1434,12 +1434,12 @@ public class VisualRenderTests
         frame.ShapeCollectionSave.CircleSaves.Add(
             new CircleSave { Name = "Ring", X = 0, Y = 0, Radius = 15 });
 
-        SelectedState.Self.SelectedFrame = frame;
-        AppState.Self.OffsetMultiplier = 1f;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.AppState.OffsetMultiplier = 1f;
 
         try
         {
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(100, 100);
 
             // Top of circle is at (60, 60-15) = (60, 45)
@@ -1449,7 +1449,7 @@ public class VisualRenderTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
+            ctx.SelectedState.SelectedFrame = null;
         }
     }
 
@@ -1461,7 +1461,7 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_SelectedRect_RendersGoldOutline()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var rect = new AxisAlignedRectangleSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 };
         var frame = new AnimationFrameSave
         {
@@ -1470,13 +1470,13 @@ public class VisualRenderTests
         };
         frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
 
-        SelectedState.Self.SelectedFrame = frame;
-        SelectedState.Self.SelectedRectangle = rect; // mark as selected
-        AppState.Self.OffsetMultiplier = 1f;
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.SelectedState.SelectedRectangle = rect; // mark as selected
+        ctx.AppState.OffsetMultiplier = 1f;
 
         try
         {
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             using var bm = ctrl.RenderToBitmap(100, 100);
 
             // Top edge of rect at (60, 45): selected shape uses gold color (R>200, G>150, B<50)
@@ -1488,8 +1488,8 @@ public class VisualRenderTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedRectangle = null;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedRectangle = null;
         }
     }
 
@@ -1501,12 +1501,12 @@ public class VisualRenderTests
     [AvaloniaFact]
     public void Preview_NoPinnedFrame_NoShapesRendered()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         // SelectedFrame stays null — shapes should NOT appear
-        SelectedState.Self.SelectedFrame = null;
-        AppState.Self.OffsetMultiplier = 1f;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.AppState.OffsetMultiplier = 1f;
 
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         using var bm = ctrl.RenderToBitmap(100, 100);
 
         // Sample several points inside the content area where a shape outline

@@ -10,8 +10,6 @@ namespace AnimationEditor.Core.CommandsAndState
     /// </summary>
     public class AppState : IAppState
     {
-        public static AppState Self { get; set; } = null!;
-
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
 

@@ -27,17 +27,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class GuidePanTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     private static void WritePng(string path, SKColor color, int size = 16)
@@ -58,8 +58,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_HiddenWhenShowGuidesFalse_NoCrosshairAtCenter()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = false;
 
         using var bm = ctrl.RenderToBitmap(64, 64);
@@ -80,8 +80,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_DefaultPan_VerticalLineAtCenterX()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
 
         using var bm = ctrl.RenderToBitmap(64, 64);
@@ -105,8 +105,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_PanX16_VerticalLineShiftsToX48()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(16f, 0f);
 
@@ -128,8 +128,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_PanXNeg8_VerticalLineShiftsToX24()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(-8f, 0f);
 
@@ -154,8 +154,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_PanY16_HorizontalLineShiftsToY48()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(0f, 16f);
 
@@ -177,8 +177,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_PanYNeg8_HorizontalLineShiftsToY24()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(0f, -8f);
 
@@ -206,14 +206,14 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_WithDarkTexture_CrosshairIsGreenDominantOverFrame()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             // Dark blue texture so guide green channel is distinguishable
             WritePng(Path.Combine(dir, "dark.png"), new SKColor(0, 0, 60), size: 16);
-            ProjectManager.Self.FileName = Path.Combine(dir, "test.achx");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
             var frame = new AnimationFrameSave
             {
@@ -223,11 +223,11 @@ public class GuidePanTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.ShowGuides = true;
 
             using var bm = ctrl.RenderToBitmap(64, 64);
@@ -241,9 +241,9 @@ public class GuidePanTests
         }
         finally
         {
-            ProjectManager.Self.FileName = string.Empty;
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
             Directory.Delete(dir, recursive: true);
         }
     }
@@ -258,8 +258,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_PanXY8_BothLinesShiftToNewPosition()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(8f, 8f);
 
@@ -289,8 +289,8 @@ public class GuidePanTests
     [AvaloniaFact]
     public void Guide_ToggleOffThenOn_ProducesIdenticalBitmap()
     {
-        ResetSingletons();
-        var ctrl = new PreviewControl();
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreatePreviewControl();
 
         ctrl.ShowGuides = true;
         using var bmOn1 = ctrl.RenderToBitmap(64, 64);

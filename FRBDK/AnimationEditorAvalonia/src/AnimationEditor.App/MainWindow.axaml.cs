@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private readonly IApplicationEvents _events;
     private readonly IIoManager _ioManager;
     private readonly IObjectFinder _objectFinder;
+    private readonly IUndoManager _undoManager;
 
     private AppSettingsModel _appSettings = new();
     private bool _suppressPropRefresh;
@@ -51,22 +52,6 @@ public partial class MainWindow : Window
         (FilePath)(Path.GetDirectoryName(
             System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\AESettings.json");
 
-    /// <summary>
-    /// Parameterless constructor for headless tests.
-    /// Requires all static Self bridges to be set before calling
-    /// (use <c>TestHelpers.ResetServices()</c> in tests).
-    /// </summary>
-    public MainWindow() : this(
-        ProjectManager.Self,
-        SelectedState.Self,
-        AppCommands.Self,
-        AppState.Self,
-        ApplicationEvents.Self,
-        IoManager.Self,
-        ObjectFinder.Self)
-    {
-    }
-
     public MainWindow(
         IProjectManager projectManager,
         ISelectedState selectedState,
@@ -74,7 +59,8 @@ public partial class MainWindow : Window
         IAppState appState,
         IApplicationEvents events,
         IIoManager ioManager,
-        IObjectFinder objectFinder)
+        IObjectFinder objectFinder,
+        IUndoManager undoManager)
     {
         _projectManager = projectManager;
         _selectedState = selectedState;
@@ -83,6 +69,7 @@ public partial class MainWindow : Window
         _events = events;
         _ioManager = ioManager;
         _objectFinder = objectFinder;
+        _undoManager = undoManager;
 
         InitializeComponent();
         WireframeCtrl.AttachScrollViewer(WireframeScrollViewer);
@@ -98,7 +85,7 @@ public partial class MainWindow : Window
         WirePlaybackControls();
         WireKeyboard();
 
-        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager);
+        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager);
 
         Opened += OnOpened;
@@ -504,14 +491,14 @@ public partial class MainWindow : Window
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
-        MenuUndo.IsEnabled = UndoManager.Self.CanUndo;
-        MenuRedo.IsEnabled = UndoManager.Self.CanRedo;
-        MenuUndo.Click += (_, _) => UndoManager.Self.Undo();
-        MenuRedo.Click += (_, _) => UndoManager.Self.Redo();
-        UndoManager.Self.StackChanged += () =>
+        MenuUndo.IsEnabled = _undoManager.CanUndo;
+        MenuRedo.IsEnabled = _undoManager.CanRedo;
+        MenuUndo.Click += (_, _) => _undoManager.Undo();
+        MenuRedo.Click += (_, _) => _undoManager.Redo();
+        _undoManager.StackChanged += () =>
         {
-            MenuUndo.IsEnabled = UndoManager.Self.CanUndo;
-            MenuRedo.IsEnabled = UndoManager.Self.CanRedo;
+            MenuUndo.IsEnabled = _undoManager.CanUndo;
+            MenuRedo.IsEnabled = _undoManager.CanRedo;
         };
 
         RefreshRecentFiles();
@@ -1838,13 +1825,13 @@ public partial class MainWindow : Window
                      !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
                 e.Handled = true;
-                UndoManager.Self.Undo();
+                _undoManager.Undo();
             }
             else if ((e.Key == Key.Y && e.KeyModifiers.HasFlag(KeyModifiers.Control)) ||
                      (e.Key == Key.Z && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift)))
             {
                 e.Handled = true;
-                UndoManager.Self.Redo();
+                _undoManager.Redo();
             }
             else if ((e.Key == Key.Up || e.Key == Key.Down) &&
                      e.KeyModifiers.HasFlag(KeyModifiers.Alt))

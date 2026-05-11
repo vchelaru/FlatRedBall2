@@ -29,21 +29,21 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class PreviewLiveUpdateTests
 {
-    private static MainWindow CreateWindow()
+    private static (MainWindow Window, TestServices Ctx) CreateWindow()
     {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppCommands.Self.ConfirmAsync              = (_, _) => Task.FromResult(true);
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
 
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
-        return window;
+        return (window, ctx);
     }
 
     private static WireframeControl GetWireframe(MainWindow w)
@@ -75,12 +75,12 @@ public class PreviewLiveUpdateTests
     {
         var dir    = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
-        var window = CreateWindow();
+        var (window, ctx) = CreateWindow();
         try
         {
             var png  = WriteSolidPng(dir, SKColors.Gray);
             var achx = System.IO.Path.Combine(dir, "test.achx");
-            ProjectManager.Self.FileName = achx;
+            ctx.ProjectManager.FileName = achx;
 
             var chain = new AnimationChainSave { Name = "Test" };
             var frame = new AnimationFrameSave
@@ -92,9 +92,9 @@ public class PreviewLiveUpdateTests
                 ShapeCollectionSave = new ShapeCollectionSave(),
             };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-            SelectedState.Self.SelectedChain = chain;
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
 
             var wireframe = GetWireframe(window);
             wireframe.LoadTexture(png);
@@ -103,7 +103,7 @@ public class PreviewLiveUpdateTests
             Dispatcher.UIThread.RunJobs();
 
             bool refreshRequested = false;
-            AppCommands.Self.RefreshAnimationFrameDisplayRequested += () => refreshRequested = true;
+            ctx.AppCommands.RefreshAnimationFrameDisplayRequested += () => refreshRequested = true;
 
             // Simulate dragging the TopLeft handle 8 px inward — fires FrameLiveUpdated
             wireframe.SimulateHandleDrag(HandleKind.TopLeft,
@@ -116,9 +116,9 @@ public class PreviewLiveUpdateTests
         }
         finally
         {
-            SelectedState.Self.SelectedFrame = null;
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName     = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
             window.Close();
             System.IO.Directory.Delete(dir, true);
         }

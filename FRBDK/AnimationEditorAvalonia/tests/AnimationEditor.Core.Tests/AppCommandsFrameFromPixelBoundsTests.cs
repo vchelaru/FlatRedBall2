@@ -7,15 +7,12 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class AppCommandsFrameFromPixelBoundsTests
 {
-    public AppCommandsFrameFromPixelBoundsTests()
-    {
-        TestHelpers.SetupFreshAcls();
-    }
+    private readonly TestServices ctx = TestHelpers.SetupFreshAcls();
 
-    private static AnimationChainSave MakeChain(string name = "Chain")
+    private AnimationChainSave MakeChain(string name = "Chain")
     {
         var chain = new AnimationChainSave { Name = name };
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
         return chain;
     }
 
@@ -25,7 +22,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void AddsFrameToChain()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "tex.png", 0, 0, 64, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "tex.png", 0, 0, 64, 64, 128, 128);
         Assert.Single(chain.Frames);
     }
 
@@ -33,7 +30,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_HasCorrectTextureName()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "sprites/hero.png", 0, 0, 32, 32, 64, 64);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "sprites/hero.png", 0, 0, 32, 32, 64, 64);
         Assert.Equal("sprites/hero.png", chain.Frames[0].TextureName);
     }
 
@@ -41,7 +38,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_LeftCoordinate_IsPixelOverWidth()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 32, 0, 96, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 32, 0, 96, 64, 128, 128);
         Assert.Equal(32f / 128f, chain.Frames[0].LeftCoordinate, precision: 5);
     }
 
@@ -49,7 +46,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_RightCoordinate_IsMaxXOverWidth()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 96, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 96, 64, 128, 128);
         Assert.Equal(96f / 128f, chain.Frames[0].RightCoordinate, precision: 5);
     }
 
@@ -57,7 +54,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_TopCoordinate_IsMinYOverHeight()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 16, 64, 80, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 16, 64, 80, 128, 128);
         Assert.Equal(16f / 128f, chain.Frames[0].TopCoordinate, precision: 5);
     }
 
@@ -65,7 +62,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_BottomCoordinate_IsMaxYOverHeight()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 80, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 80, 128, 128);
         Assert.Equal(80f / 128f, chain.Frames[0].BottomCoordinate, precision: 5);
     }
 
@@ -73,7 +70,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_FrameLength_IsDefaultPointOne()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
         Assert.Equal(0.1f, chain.Frames[0].FrameLength, precision: 5);
     }
 
@@ -81,7 +78,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void Frame_ShapeCollectionSave_IsInitialised()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
         Assert.NotNull(chain.Frames[0].ShapeCollectionSave);
     }
 
@@ -91,8 +88,8 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void NewFrame_IsSelected()
     {
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
-        Assert.Same(chain.Frames[0], SelectedState.Self.SelectedFrame);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
+        Assert.Same(chain.Frames[0], ctx.SelectedState.SelectedFrame);
     }
 
     // ── Events ───────────────────────────────────────────────────────────
@@ -101,9 +98,9 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void FiresAnimationChainsChanged()
     {
         bool fired = false;
-        ApplicationEvents.Self.AnimationChainsChanged += () => fired = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => fired = true;
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
         Assert.True(fired);
     }
 
@@ -111,9 +108,9 @@ public class AppCommandsFrameFromPixelBoundsTests
     public void FiresRefreshChainNodeRequested()
     {
         AnimationChainSave? received = null;
-        AppCommands.Self.RefreshChainNodeRequested += c => received = c;
+        ctx.AppCommands.RefreshChainNodeRequested += c => received = c;
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
         Assert.Same(chain, received);
     }
 
@@ -124,7 +121,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     {
         // 200 wide × 100 tall; region from (50,25) to (150,75)
         var chain = MakeChain();
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "wide.png", 50, 25, 150, 75, 200, 100);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "wide.png", 50, 25, 150, 75, 200, 100);
         var f = chain.Frames[0];
         Assert.Equal(50f / 200f, f.LeftCoordinate,   precision: 5);
         Assert.Equal(150f / 200f, f.RightCoordinate,  precision: 5);

@@ -14,17 +14,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class GuideValueLabelTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier = 1f;
+        return ctx;
     }
 
     // ── FormatGuideLabel unit tests ───────────────────────────────────────────
@@ -66,9 +66,9 @@ public class GuideValueLabelTests
     [AvaloniaFact]
     public void HGuide_WhenDragged_LabelPixelsDifferFromNonDragged()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         const int size = 200;
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SimulateAddHGuide(screenY: 110f, controlHeight: size); // worldY ≈ 0
 
         // Render without drag (baseline)
@@ -97,9 +97,9 @@ public class GuideValueLabelTests
     [AvaloniaFact]
     public void VGuide_WhenDragged_LabelPixelsDifferFromNonDragged()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         const int size = 200;
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SimulateAddVGuide(screenX: 110f, controlWidth: size); // worldX ≈ 0
 
         // Render without drag (baseline)
@@ -127,9 +127,9 @@ public class GuideValueLabelTests
     [AvaloniaFact]
     public void HGuide_AfterDragEnds_LabelDisappears()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         const int size = 200;
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.SimulateAddHGuide(screenY: 110f, controlHeight: size);
 
         using var bmBase = ctrl.RenderToBitmap(size, size);

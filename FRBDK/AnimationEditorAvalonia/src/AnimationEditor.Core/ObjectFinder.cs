@@ -5,8 +5,6 @@ namespace AnimationEditor.Core
 {
     public class ObjectFinder : IObjectFinder
     {
-        public static ObjectFinder Self { get; set; } = null!;
-
         private readonly IProjectManager _pm;
 
         public ObjectFinder(IProjectManager pm)

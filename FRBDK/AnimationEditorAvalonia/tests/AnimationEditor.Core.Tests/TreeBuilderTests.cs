@@ -249,64 +249,69 @@ public class TreeBuilderSingletonTests
     [Fact]
     public void RouteNodeSelection_ChainNode_SetsSelectedChain()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = new AnimationChainSave { Name = "Walk" };
         acls.AnimationChains.Add(chain);
         var vm = new TreeNodeVm { Data = chain };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
         Assert.True(handled);
-        Assert.Same(chain, AnimationEditor.Core.SelectedState.Self.SelectedChain);
+        Assert.Same(chain, ctx.SelectedState.SelectedChain);
     }
 
     [Fact]
     public void RouteNodeSelection_FrameNode_SetsSelectedFrame()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", frameCount: 1);
         var frame = chain.Frames[0];
         var vm    = new TreeNodeVm { Data = frame };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
         Assert.True(handled);
-        Assert.Same(frame, AnimationEditor.Core.SelectedState.Self.SelectedFrame);
+        Assert.Same(frame, ctx.SelectedState.SelectedFrame);
     }
 
     [Fact]
     public void RouteNodeSelection_RectangleNode_SetsSelectedRectangle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
         var vm   = new TreeNodeVm { Data = rect };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
         Assert.True(handled);
-        Assert.Same(rect, AnimationEditor.Core.SelectedState.Self.SelectedRectangle);
+        Assert.Same(rect, ctx.SelectedState.SelectedRectangle);
     }
 
     [Fact]
     public void RouteNodeSelection_CircleNode_SetsSelectedCircle()
     {
-        var acls   = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var circle = new CircleSave { Name = "HurtCircle" };
         var vm     = new TreeNodeVm { Data = circle };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
         Assert.True(handled);
-        Assert.Same(circle, AnimationEditor.Core.SelectedState.Self.SelectedCircle);
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
     }
 
     [Fact]
     public void RouteNodeSelection_NullData_ReturnsFalse()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var vm = new TreeNodeVm { Data = null };
 
-        var handled = TreeBuilder.RouteNodeSelection(vm.Data, SelectedState.Self, acls);
+        var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
         Assert.False(handled);
     }
@@ -319,56 +324,59 @@ public class TreeBuilderSingletonTests
     [Fact]
     public void RouteNodeSelection_FrameAlreadySelected_WithCircle_ClearsCircle()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", frameCount: 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "C" };
 
         // Select the frame first, then a shape (SelectedCircle.set does not clear SelectedFrame)
-        SelectedState.Self.SelectedFrame  = frame;
-        SelectedState.Self.SelectedCircle = circle;
-        Assert.Same(circle, SelectedState.Self.SelectedCircle);
+        ctx.SelectedState.SelectedFrame  = frame;
+        ctx.SelectedState.SelectedCircle = circle;
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
 
         // Re-click the same frame node — must clear the circle
-        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
+        TreeBuilder.RouteNodeSelection(frame, ctx.SelectedState, acls);
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
-        Assert.Same(frame, SelectedState.Self.SelectedFrame);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
+        Assert.Same(frame, ctx.SelectedState.SelectedFrame);
     }
 
     [Fact]
     public void RouteNodeSelection_FrameAlreadySelected_WithRect_ClearsRect()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle", frameCount: 1);
         var frame = chain.Frames[0];
         var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
 
-        SelectedState.Self.SelectedFrame     = frame;
-        SelectedState.Self.SelectedRectangle = rect;
-        Assert.Same(rect, SelectedState.Self.SelectedRectangle);
+        ctx.SelectedState.SelectedFrame     = frame;
+        ctx.SelectedState.SelectedRectangle = rect;
+        Assert.Same(rect, ctx.SelectedState.SelectedRectangle);
 
-        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
+        TreeBuilder.RouteNodeSelection(frame, ctx.SelectedState, acls);
 
-        Assert.Null(SelectedState.Self.SelectedRectangle);
-        Assert.Same(frame, SelectedState.Self.SelectedFrame);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
+        Assert.Same(frame, ctx.SelectedState.SelectedFrame);
     }
 
     [Fact]
     public void RouteNodeSelection_ChainAfterFrame_ClearsSelectedFrame()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", frameCount: 1);
         var frame = chain.Frames[0];
 
         // Select the frame first.
-        TreeBuilder.RouteNodeSelection(frame, SelectedState.Self, acls);
-        Assert.Same(frame, AnimationEditor.Core.SelectedState.Self.SelectedFrame);
+        TreeBuilder.RouteNodeSelection(frame, ctx.SelectedState, acls);
+        Assert.Same(frame, ctx.SelectedState.SelectedFrame);
 
         // Now select the parent chain — SelectedFrame must be cleared.
-        TreeBuilder.RouteNodeSelection(chain, SelectedState.Self, acls);
+        TreeBuilder.RouteNodeSelection(chain, ctx.SelectedState, acls);
 
-        Assert.Null(AnimationEditor.Core.SelectedState.Self.SelectedFrame);
-        Assert.Same(chain, AnimationEditor.Core.SelectedState.Self.SelectedChain);
+        Assert.Null(ctx.SelectedState.SelectedFrame);
+        Assert.Same(chain, ctx.SelectedState.SelectedChain);
     }
 }

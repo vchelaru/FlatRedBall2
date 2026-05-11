@@ -15,8 +15,6 @@ namespace AnimationEditor.Core
 
     public class SelectedState : ISelectedState
     {
-        public static SelectedState Self { get; set; } = null!;
-
         private readonly IProjectManager _pm;
 
         public SelectedState(IProjectManager pm)

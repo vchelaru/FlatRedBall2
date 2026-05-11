@@ -18,17 +18,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class WireframeChainDragTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, SKColor color, int size = 64,
@@ -51,7 +51,7 @@ public class WireframeChainDragTests
     /// </summary>
     private static (WireframeControl ctrl, AnimationChainSave chain,
                     AnimationFrameSave frameA, AnimationFrameSave frameB, string dir)
-        BuildCtrlWithChainSelected()
+        BuildCtrlWithChainSelected(TestServices ctx)
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -77,14 +77,14 @@ public class WireframeChainDragTests
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
         // Select the chain — no individual frame selected
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
 
-        var ctrl = new WireframeControl();
-        ctrl.InitializeServices(SelectedState.Self, AppState.Self, AppCommands.Self, ApplicationEvents.Self, ProjectManager.Self);
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.InitializeServices(ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents, ctx.ProjectManager, ctx.UndoManager);
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0f, 0f, 1f);
         ctrl.RefreshFrames();
@@ -106,8 +106,8 @@ public class WireframeChainDragTests
     [AvaloniaFact]
     public void SimulateChainDrag_WithTwoFrames_AllFramesTranslatedByDelta()
     {
-        ResetSingletons();
-        var (ctrl, _, frameA, frameB, dir) = BuildCtrlWithChainSelected();
+        var ctx = ResetSingletons();
+        var (ctrl, _, frameA, frameB, dir) = BuildCtrlWithChainSelected(ctx);
         try
         {
             // Pre-drag frame sizes
@@ -144,8 +144,8 @@ public class WireframeChainDragTests
     [AvaloniaFact]
     public void SimulateChainDrag_FiresChainRegionChangedWithCorrectChain()
     {
-        ResetSingletons();
-        var (ctrl, chain, _, _, dir) = BuildCtrlWithChainSelected();
+        var ctx = ResetSingletons();
+        var (ctrl, chain, _, _, dir) = BuildCtrlWithChainSelected(ctx);
         try
         {
             AnimationChainSave? notified = null;
@@ -168,13 +168,13 @@ public class WireframeChainDragTests
     [AvaloniaFact]
     public void SimulateChainDrag_NoChainSelected_NoException()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, SKColors.Black);
         try
         {
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0f, 0f, 1f);
             // No chain selected → must not throw

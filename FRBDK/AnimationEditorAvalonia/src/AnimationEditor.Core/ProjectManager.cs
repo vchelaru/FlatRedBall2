@@ -13,8 +13,6 @@ namespace AnimationEditor.Core
 {
     public class ProjectManager : IProjectManager
     {
-        public static ProjectManager Self { get; set; } = null!;
-
         static TileMapInformationList mTileMapInformationList = new TileMapInformationList();
 
         public AnimationChainListSave? AnimationChainListSave { get; set; }

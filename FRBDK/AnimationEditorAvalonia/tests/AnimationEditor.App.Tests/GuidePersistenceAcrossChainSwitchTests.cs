@@ -26,17 +26,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class GuidePersistenceAcrossChainSwitchTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
     private static string WritePng(string dir, SKColor color, int size = 16)
@@ -61,22 +61,22 @@ public class GuidePersistenceAcrossChainSwitchTests
     [AvaloniaFact]
     public void Guide_AfterChainSwitch_VerticalLineRemainsAtSameX()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(8f, 0f); // vertical guide at x = (Width-20)/2+20+8 = 50
 
-        SelectedState.Self.SelectedChain = chainIdle;
+        ctx.SelectedState.SelectedChain = chainIdle;
         Dispatcher.UIThread.RunJobs();
         using var bmIdle = ctrl.RenderToBitmap(64, 64);
 
-        SelectedState.Self.SelectedChain = chainRun;
+        ctx.SelectedState.SelectedChain = chainRun;
         Dispatcher.UIThread.RunJobs();
         using var bmRun = ctrl.RenderToBitmap(64, 64);
 
@@ -99,21 +99,21 @@ public class GuidePersistenceAcrossChainSwitchTests
     [AvaloniaFact]
     public void Guide_AfterChainSwitch_HorizontalLineRemainsAtSameY()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(0f, 8f); // horizontal guide at y = (Height-20)/2+20+8 = 50
 
-        SelectedState.Self.SelectedChain = chainIdle;
+        ctx.SelectedState.SelectedChain = chainIdle;
         Dispatcher.UIThread.RunJobs();
 
-        SelectedState.Self.SelectedChain = chainRun;
+        ctx.SelectedState.SelectedChain = chainRun;
         Dispatcher.UIThread.RunJobs();
 
         using var bmRun = ctrl.RenderToBitmap(64, 64);
@@ -135,20 +135,20 @@ public class GuidePersistenceAcrossChainSwitchTests
     [AvaloniaFact]
     public void Guide_MultipleChainSwitches_GuideDoesNotDrift()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         ctrl.SetPan(8f, 8f); // guide at (50, 50)
 
         for (int i = 0; i < 4; i++)
         {
-            SelectedState.Self.SelectedChain = i % 2 == 0 ? chainIdle : chainRun;
+            ctx.SelectedState.SelectedChain = i % 2 == 0 ? chainIdle : chainRun;
             Dispatcher.UIThread.RunJobs();
         }
 
@@ -177,27 +177,27 @@ public class GuidePersistenceAcrossChainSwitchTests
     [AvaloniaFact]
     public void Guide_WithTexturedChains_PersistsAfterSwitch()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         try
         {
             var chainIdle = new AnimationChainSave { Name = "Idle" };
             var chainRun  = new AnimationChainSave { Name = "Run"  };
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
-            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
-            var ctrl = new PreviewControl();
+            var ctrl = ctx.CreatePreviewControl();
             ctrl.ShowGuides = true;
             ctrl.SetPan(8f, 0f); // vertical guide at x = 42+8 = 50
 
             // Select Idle chain
-            SelectedState.Self.SelectedChain = chainIdle;
+            ctx.SelectedState.SelectedChain = chainIdle;
             Dispatcher.UIThread.RunJobs();
             using var bmIdle = ctrl.RenderToBitmap(64, 64);
 
             // Switch to Run chain
-            SelectedState.Self.SelectedChain = chainRun;
+            ctx.SelectedState.SelectedChain = chainRun;
             Dispatcher.UIThread.RunJobs();
             using var bmRun = ctrl.RenderToBitmap(64, 64);
 
@@ -212,8 +212,8 @@ public class GuidePersistenceAcrossChainSwitchTests
         }
         finally
         {
-            SelectedState.Self.SelectedChain = null;
-            ProjectManager.Self.FileName = string.Empty;
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName = string.Empty;
             System.IO.Directory.Delete(dir, recursive: true);
         }
     }

@@ -27,17 +27,17 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class WireframeHandleDragTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, SKColor color, int size = 64,
@@ -59,7 +59,7 @@ public class WireframeHandleDragTests
     /// <c>RefreshFramesInternal</c> (achxFolder + TextureName == loadedTexturePath)
     /// passes correctly.  Returns (ctrl, frame, dir).
     /// </summary>
-    private static (WireframeControl ctrl, AnimationFrameSave frame, string dir) BuildCtrlWithSelectedFrame()
+    private static (WireframeControl ctrl, AnimationFrameSave frame, string dir) BuildCtrlWithSelectedFrame(TestServices ctx)
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -75,13 +75,13 @@ public class WireframeHandleDragTests
         };
         var chain = new AnimationChainSave { Name = "Test" };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
 
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        var ctrl = new WireframeControl();
+        var ctrl = ctx.CreateWireframeControl();
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0f, 0f, 1f);
         ctrl.RefreshFrames();
@@ -100,8 +100,8 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_TopLeft_MovedInward8px_UpdatesLeftAndTopUV()
     {
-        ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame();
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
         try
         {
             ctrl.SimulateHandleDrag(HandleKind.TopLeft,
@@ -126,8 +126,8 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_BotRight_MovedInward8px_UpdatesRightAndBottomUV()
     {
-        ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame();
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
         try
         {
             ctrl.SimulateHandleDrag(HandleKind.BotRight,
@@ -151,8 +151,8 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_TopCenter_MovedDown16px_OnlyTopUVChanges()
     {
-        ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame();
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
         try
         {
             ctrl.SimulateHandleDrag(HandleKind.TopCenter,
@@ -182,12 +182,12 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_Move_Translate8px_PreservesFrameSize()
     {
-        ResetSingletons();
-        var (ctrl, _, dir) = BuildCtrlWithSelectedFrame();   // full-UV frame from helper (will replace)
+        var ctx = ResetSingletons();
+        var (ctrl, _, dir) = BuildCtrlWithSelectedFrame(ctx);   // full-UV frame from helper (will replace)
         try
         {
             // Replace the frame with a 32×32 centre frame so there's room to Move
-            var chain = SelectedState.Self.SelectedChain!;
+            var chain = ctx.SelectedState.SelectedChain!;
             chain.Frames.Clear();
             var frame = new AnimationFrameSave
             {
@@ -198,7 +198,7 @@ public class WireframeHandleDragTests
                 ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave(),
             };
             chain.Frames.Add(frame);
-            SelectedState.Self.SelectedFrame = frame;
+            ctx.SelectedState.SelectedFrame = frame;
             ctrl.RefreshFrames();
 
             float preDx = frame.RightCoordinate  - frame.LeftCoordinate;  // 0.5
@@ -234,8 +234,8 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_TopLeft_FiresFrameRegionChangedWithCorrectFrame()
     {
-        ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame();
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
         try
         {
             AnimationFrameSave? notifiedFrame = null;
@@ -261,8 +261,8 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_TopLeft_RenderedBitmapChangesAfterDrag()
     {
-        ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame();
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
         try
         {
             using var beforeDrag = ctrl.RenderToBitmap(64, 64);
@@ -291,13 +291,13 @@ public class WireframeHandleDragTests
     [AvaloniaFact]
     public void HandleDrag_NoFrameSelected_NoException()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
         var png = WriteSolidPng(dir, SKColors.Black);
         try
         {
-            var ctrl = new WireframeControl();
+            var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
             ctrl.SetCamera(0f, 0f, 1f);
             // No frame selected → should not throw

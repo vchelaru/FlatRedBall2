@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -54,35 +55,28 @@ public partial class App : Application
             new ObjectFinder(sp.GetRequiredService<IProjectManager>()));
         sc.AddSingleton<IObjectFinder>(sp => sp.GetRequiredService<ObjectFinder>());
 
+        sc.AddSingleton<UndoManager>();
+        sc.AddSingleton<IUndoManager>(sp => sp.GetRequiredService<UndoManager>());
+
         sc.AddSingleton<AppCommands>(sp =>
             new AppCommands(
                 sp.GetRequiredService<IProjectManager>(),
                 sp.GetRequiredService<ISelectedState>(),
                 sp.GetRequiredService<IApplicationEvents>(),
                 sp.GetRequiredService<IIoManager>(),
-                sp.GetRequiredService<IObjectFinder>()));
+                sp.GetRequiredService<IObjectFinder>(),
+                sp.GetRequiredService<IUndoManager>()));
         sc.AddSingleton<IAppCommands>(sp => sp.GetRequiredService<AppCommands>());
 
-        sc.AddTransient<MainWindow>(sp =>
-        {
-            // Set static Self bridges so legacy code (e.g. UndoManager) still works.
-            ProjectManager.Self    = sp.GetRequiredService<ProjectManager>();
-            ApplicationEvents.Self = sp.GetRequiredService<ApplicationEvents>();
-            SelectedState.Self     = sp.GetRequiredService<SelectedState>();
-            AppState.Self          = sp.GetRequiredService<AppState>();
-            IoManager.Self         = sp.GetRequiredService<IoManager>();
-            ObjectFinder.Self      = sp.GetRequiredService<ObjectFinder>();
-            AppCommands.Self       = sp.GetRequiredService<AppCommands>();
-
-            return new MainWindow(
-                sp.GetRequiredService<IProjectManager>(),
-                sp.GetRequiredService<ISelectedState>(),
-                sp.GetRequiredService<IAppCommands>(),
-                sp.GetRequiredService<IAppState>(),
-                sp.GetRequiredService<IApplicationEvents>(),
-                sp.GetRequiredService<IIoManager>(),
-                sp.GetRequiredService<IObjectFinder>());
-        });
+        sc.AddTransient<MainWindow>(sp => new MainWindow(
+            sp.GetRequiredService<IProjectManager>(),
+            sp.GetRequiredService<ISelectedState>(),
+            sp.GetRequiredService<IAppCommands>(),
+            sp.GetRequiredService<IAppState>(),
+            sp.GetRequiredService<IApplicationEvents>(),
+            sp.GetRequiredService<IIoManager>(),
+            sp.GetRequiredService<IObjectFinder>(),
+            sp.GetRequiredService<IUndoManager>()));
 
         return sc.BuildServiceProvider();
     }

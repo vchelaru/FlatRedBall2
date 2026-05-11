@@ -47,7 +47,7 @@ dotnet test  FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 dotnet test  FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
 ```
 
-App tests use `[AvaloniaFact]` from `Avalonia.Headless.XUnit`; they construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions. See `WireframePanZoomTests.cs` for the established pattern (singletons reset, tmp-dir PNG fixture, `FindCtrl<T>` helper).
+App tests use `[AvaloniaFact]` from `Avalonia.Headless.XUnit`; they construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions. See `WireframePanZoomTests.cs` for the established pattern (per-test service graph via `TestHelpers.BuildServices()`, tmp-dir PNG fixture, `FindCtrl<T>` helper).
 
 ## Two-panel mental model
 
@@ -56,6 +56,10 @@ App tests use `[AvaloniaFact]` from `Avalonia.Headless.XUnit`; they construct `M
 
 Both panels have their own zoom combo box wired in `MainWindow.axaml.cs` (`ZoomCombo` ↔ `WireframeCtrl`, `PreviewZoomCombo` ↔ `PreviewCtrl`). Each control raises a `ZoomChanged` event that `MainWindow` syncs back into the combo using a suppression flag to break the feedback loop. Mirror that pattern for any new bidirectional control ↔ combo wiring.
 
-## Singleton reset (test gotcha)
+## Service wiring in tests
 
-`ProjectManager.Self`, `SelectedState.Self`, `AppCommands.Self`, `AppState.Self`, and `ApplicationEvents.Self` are process-wide singletons. Headless tests must reset them in a helper at the top of each test (`ResetSingletons()`) — otherwise the previous test's selection leaks in and you'll chase phantom failures.
+Services (`ProjectManager`, `SelectedState`, `AppCommands`, `AppState`, `ApplicationEvents`, `IoManager`, `ObjectFinder`, `UndoManager`) are constructor-injected — no static `Self` accessors, no global state. Production wires them through a `Microsoft.Extensions.DependencyInjection` container in `App.axaml.cs`.
+
+Tests build their own fresh graph per test via `TestHelpers.BuildServices()` (App) / `TestHelpers.SetupFreshAcls()` (Core), which returns a `TestServices` context exposing every service. Tests then address services through that context (`ctx.AppCommands.Foo()`) rather than statics. Each test gets a brand-new graph, so cross-test selection leakage is impossible.
+
+When constructing an Avalonia control directly (`WireframeControl` / `PreviewControl`) — because Avalonia requires a parameterless constructor for XAML — call `ctx.CreateWireframeControl()` / `ctx.CreatePreviewControl()`, which wraps `new WireframeControl()` and `InitializeServices(...)` so the control's injected fields are populated before any method runs.

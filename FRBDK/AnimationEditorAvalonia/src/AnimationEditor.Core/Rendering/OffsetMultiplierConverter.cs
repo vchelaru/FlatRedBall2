@@ -4,11 +4,10 @@ namespace AnimationEditor.Core.Rendering;
 /// Pure conversions between the stored <c>RelativeX/Y</c> values and the
 /// "display" values shown in the property panel when the offset multiplier (PL12) is set.
 ///
-/// From the WinForms <c>AnimationFrameDisplayer</c>:
-/// <code>
-/// GetRelativeX  → frame.RelativeX * PreviewManager.Self.OffsetMultiplier
-/// SetRelativeX  → frame.RelativeX = displayValue / PreviewManager.Self.OffsetMultiplier
-/// </code>
+/// <para>
+/// <c>display = stored × OffsetMultiplier</c>; the inverse is used when the user
+/// edits the display value.
+/// </para>
 /// </summary>
 public static class OffsetMultiplierConverter
 {

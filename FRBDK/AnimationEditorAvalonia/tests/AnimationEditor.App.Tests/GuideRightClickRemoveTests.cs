@@ -25,22 +25,22 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class GuideRightClickRemoveTests
 {
-    private static void ResetSingletons()
-    {
-        TestHelpers.ResetServices();
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.OffsetMultiplier             = 1f;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.OffsetMultiplier             = 1f;
+        return ctx;
     }
 
-    private static PreviewControl MakeArrangedControl()
+    private static PreviewControl MakeArrangedControl(TestServices ctx)
     {
-        var ctrl = new PreviewControl();
+        var ctrl = ctx.CreatePreviewControl();
         ctrl.ShowGuides = true;
         // Arrange to a known size so GetCenterX/Y match the 64×64 render size.
         ctrl.Measure(new Size(64, 64));
@@ -57,8 +57,8 @@ public class GuideRightClickRemoveTests
     [AvaloniaFact]
     public void SimulateRightClick_NearHGuide_HGuideIsRemoved()
     {
-        ResetSingletons();
-        var ctrl = MakeArrangedControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeArrangedControl(ctx);
         ctrl.AddHGuide(0f);    // world Y=0 → screen Y=42
         Assert.Equal(1, ctrl.HGuideCount);
 
@@ -75,8 +75,8 @@ public class GuideRightClickRemoveTests
     [AvaloniaFact]
     public void SimulateRightClick_AwayFromGuide_GuideIsRetained()
     {
-        ResetSingletons();
-        var ctrl = MakeArrangedControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeArrangedControl(ctx);
         ctrl.AddHGuide(0f);    // world Y=0 → screen Y=42
         Assert.Equal(1, ctrl.HGuideCount);
 
@@ -94,8 +94,8 @@ public class GuideRightClickRemoveTests
     [AvaloniaFact]
     public void SimulateRightClick_NearVGuide_VGuideIsRemoved()
     {
-        ResetSingletons();
-        var ctrl = MakeArrangedControl();
+        var ctx = ResetSingletons();
+        var ctrl = MakeArrangedControl(ctx);
         ctrl.AddVGuide(0f);    // world X=0 → screen X=42
         Assert.Equal(1, ctrl.VGuideCount);
 

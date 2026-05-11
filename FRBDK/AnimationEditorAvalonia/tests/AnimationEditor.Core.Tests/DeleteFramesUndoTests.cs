@@ -14,15 +14,16 @@ public class DeleteFramesUndoTests
     [Fact]
     public async Task DeleteFrames_Undo_RestoresFrameAtOriginalIndex()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", frameCount: 3);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         var middle = chain.Frames[1];
 
-        await AppCommands.Self.AskToDeleteFrames(new List<AnimationFrameSave> { middle });
+        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { middle });
         Assert.Equal(2, chain.Frames.Count);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal(3, chain.Frames.Count);
         Assert.Same(middle, chain.Frames[1]);
@@ -31,16 +32,17 @@ public class DeleteFramesUndoTests
     [Fact]
     public async Task DeleteFrames_UndoThenRedo_RemovesFrameAgain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", frameCount: 2);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         var first = chain.Frames[0];
 
-        await AppCommands.Self.AskToDeleteFrames(new List<AnimationFrameSave> { first });
-        UndoManager.Self.Undo();
+        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { first });
+        ctx.UndoManager.Undo();
         Assert.Equal(2, chain.Frames.Count);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Single(chain.Frames);
         Assert.DoesNotContain(first, chain.Frames);
@@ -49,16 +51,17 @@ public class DeleteFramesUndoTests
     [Fact]
     public async Task DeleteMultipleFrames_Undo_RestoresAllAtOriginalPositions()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", frameCount: 4);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         var f0 = chain.Frames[0];
         var f2 = chain.Frames[2];
 
-        await AppCommands.Self.AskToDeleteFrames(new List<AnimationFrameSave> { f0, f2 });
+        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { f0, f2 });
         Assert.Equal(2, chain.Frames.Count);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal(4, chain.Frames.Count);
         Assert.Same(f0, chain.Frames[0]);

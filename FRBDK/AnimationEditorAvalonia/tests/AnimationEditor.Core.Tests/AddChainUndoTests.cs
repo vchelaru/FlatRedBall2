@@ -13,31 +13,33 @@ public class AddChainUndoTests
     [Fact]
     public async Task AddAnimationChain_Undo_FiresAnimationChainsChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        await ctx.AppCommands.AddAnimationChain();
 
         bool fired = false;
         void Handler() => fired = true;
-        ApplicationEvents.Self.AnimationChainsChanged += Handler;
+        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
         try
         {
-            UndoManager.Self.Undo();
+            ctx.UndoManager.Undo();
             Assert.True(fired, "AnimationChainsChanged should fire on undo");
         }
         finally
         {
-            ApplicationEvents.Self.AnimationChainsChanged -= Handler;
+            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
         }
     }
 
     [Fact]
     public async Task AddAnimationChain_Undo_RemovesChainFromAcls()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        await ctx.AppCommands.AddAnimationChain();
         Assert.Single(acls.AnimationChains);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Empty(acls.AnimationChains);
     }
@@ -45,12 +47,13 @@ public class AddChainUndoTests
     [Fact]
     public async Task AddAnimationChain_UndoThenRedo_ReAddsChain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
-        UndoManager.Self.Undo();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        await ctx.AppCommands.AddAnimationChain();
+        ctx.UndoManager.Undo();
         Assert.Empty(acls.AnimationChains);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Single(acls.AnimationChains);
     }
