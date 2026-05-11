@@ -1120,4 +1120,181 @@ public class WireframePanZoomTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    // ── Zoom-to-cursor: scroll-bounds drift ───────────────────────────────────
+
+    /// <summary>
+    /// Regression guard for the zoom-to-cursor scroll-bounds drift bug (#138).
+    ///
+    /// Root cause: <c>ZoomToward</c> assigns <c>_panX = EffectivePaddingX()</c>
+    /// unconditionally when scroll mode is active, but <c>TryApplyPendingScroll</c>
+    /// later clamps the applied scroll to <c>maxScrollX</c>.  The un-compensated
+    /// mismatch causes the content-space coordinate under the cursor to drift after
+    /// every zoom step when the scroll is pinned at its maximum.
+    ///
+    /// Repro: 100×100 image at 100 % zoom, panned to <c>maxScrollX</c>, cursor placed
+    /// 10 px past the right edge of the image (content coord 110).  A 2× zoom-in
+    /// computes <c>newScrollX &gt; maxScrollX</c>.
+    ///
+    /// In the fixed-padding regime (narrow headless viewport ≈ 432 px wide):
+    ///   <c>overflow = deltaZoom × (wx − imgW) = 1 × 10 = 10</c>, drift = 5 px.
+    /// In the dynamic-padding regime (wider viewport):
+    ///   overflow is even larger (≥ 60 px), drift ≥ 30 px.
+    ///
+    /// Without the fix, <c>_panX</c> stays at <c>epX</c> while <c>sv.Offset.X</c>
+    /// is clamped, causing a drift of at least 5 px — well above the 1-px threshold.
+    ///
+    /// Fix: pre-clamp <c>newScrollX</c> inside <c>ZoomToward</c> and subtract the
+    /// overflow from <c>_panX</c> so the cursor-to-content mapping is preserved.
+    /// </summary>
+    [AvaloniaFact]
+    public void ZoomIn_WhenScrollAtRightBound_CursorContentCoordIsPreserved()
+    {
+        ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var window = new MainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
+
+            // 100×100 image.  At zoom=1 the cursor 10 px past the right edge (content
+            // coord 110) guarantees overflow = deltaZoom*(wx−imgW) in BOTH the fixed-
+            // padding regime (typical narrow headless viewport) and the dynamic regime.
+            const int   imgSize = 100;
+            const float tx0     = imgSize + 10f;  // content coord to preserve (= 110)
+            var texPath = WriteSolidPng(dir, "drift.png", imgSize, imgSize);
+            ctrl.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            double vpW = sv.Viewport.Width;
+            double vpH = sv.Viewport.Height;
+
+            // Zoom to 100 % so the calculation below has a known zoom0 = 1.0.
+            ctrl.SetZoomPercent(100);
+            Dispatcher.UIThread.RunJobs();
+
+            // Scroll to the right boundary by panning far enough left.
+            // maxScrollX ≤ 300 for any reasonable headless viewport, so 400 px is safe.
+            ctrl.SimulatePanStart((float)(vpW / 2), (float)(vpH / 2));
+            ctrl.SimulatePanMove((float)(vpW / 2) - 400f, (float)(vpH / 2));
+            ctrl.SimulatePanEnd();
+            Dispatcher.UIThread.RunJobs();
+
+            // ── Record pre-zoom state ──────────────────────────────────────────
+            float zoom0    = ctrl.CameraState.Zoom;   // 1.0
+            float panX0    = ctrl.PanOffset.X;
+            float scrollX0 = (float)sv.Offset.X;     // = maxScrollX after pan
+
+            // Derive vpX so the content coord under the cursor equals tx0 exactly.
+            float vpX = panX0 + tx0 * zoom0 - scrollX0;
+            Assert.True(vpX >= 0 && vpX <= (float)vpW,
+                $"Setup: vpX={vpX:F1} must be in [0, vpW={vpW:F1}].  " +
+                $"panX0={panX0:F1}  scrollX0={scrollX0:F1}  zoom0={zoom0:F3}");
+
+            // ── One 2× zoom-in at the cursor position ──────────────────────────
+            ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 2.0f);
+            Dispatcher.UIThread.RunJobs();
+
+            // ── Assert: content coord under cursor must be preserved ───────────
+            // sv.Offset.X is the scroll actually applied (clamped to maxScrollX).
+            // With the fix, _panX absorbs the overflow so the mapping is exact.
+            // Without the fix, drift ≥ 5 px (fixed regime) or ≥ 30 px (dynamic).
+            float scrollX1 = (float)sv.Offset.X;
+            float panX1    = ctrl.PanOffset.X;
+            float zoom1    = ctrl.CameraState.Zoom;
+
+            float txAfter = (vpX + scrollX1 - panX1) / zoom1;
+
+            Assert.True(Math.Abs(txAfter - tx0) < 1.0f,
+                $"Content coord under cursor must be preserved after 2× zoom at scroll boundary; " +
+                $"expected≈{tx0:F3}  got={txAfter:F3}  drift={txAfter - tx0:F3}. " +
+                $"scroll: {scrollX0:F1}→{scrollX1:F1}  panX: {panX0:F1}→{panX1:F1}  " +
+                $"zoom: {zoom0:F3}→{zoom1:F3}  vpX={vpX:F1}  vpW={vpW:F1}");
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Regression guard for the zoom-to-cursor scroll-bounds drift bug (#138) with
+    /// three rapid successive wheel-zoom notches.
+    ///
+    /// Each 1.25× notch queued back-to-back (no <c>RunJobs</c> between them) chains off
+    /// <c>_scrollTargetX</c> and <c>_panX</c> from the previous step.  Without the fix
+    /// the drift accumulates; with the fix each step preserves the content-space anchor
+    /// and the invariant holds after <c>RunJobs</c> flushes all pending applies.
+    ///
+    /// Uses the same 100×100 / cursor-past-right-edge setup as the single-zoom test so
+    /// overflow is guaranteed in both the fixed- and dynamic-padding regimes.
+    /// </summary>
+    [AvaloniaFact]
+    public void ZoomIn_RapidSuccessiveZooms_NoDriftAtScrollBound()
+    {
+        ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var window = new MainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
+
+            const int   imgSize = 100;
+            const float tx0     = imgSize + 10f;  // content coord to preserve (= 110)
+            var texPath = WriteSolidPng(dir, "drift2.png", imgSize, imgSize);
+            ctrl.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            double vpW = sv.Viewport.Width;
+            double vpH = sv.Viewport.Height;
+
+            ctrl.SetZoomPercent(100);
+            Dispatcher.UIThread.RunJobs();
+
+            // Scroll to the right boundary.
+            ctrl.SimulatePanStart((float)(vpW / 2), (float)(vpH / 2));
+            ctrl.SimulatePanMove((float)(vpW / 2) - 400f, (float)(vpH / 2));
+            ctrl.SimulatePanEnd();
+            Dispatcher.UIThread.RunJobs();
+
+            float zoom0    = ctrl.CameraState.Zoom;
+            float panX0    = ctrl.PanOffset.X;
+            float scrollX0 = (float)sv.Offset.X;
+
+            float vpX = panX0 + tx0 * zoom0 - scrollX0;
+            Assert.True(vpX >= 0 && vpX <= (float)vpW,
+                $"Setup: vpX={vpX:F1} must be in [0, vpW={vpW:F1}].  " +
+                $"panX0={panX0:F1}  scrollX0={scrollX0:F1}  zoom0={zoom0:F3}");
+
+            // Three rapid zoom-in notches with no RunJobs between them.
+            ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 1.25f);
+            ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 1.25f);
+            ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 1.25f);
+            Dispatcher.UIThread.RunJobs();
+
+            float scrollX1 = (float)sv.Offset.X;
+            float panX1    = ctrl.PanOffset.X;
+            float zoom1    = ctrl.CameraState.Zoom;
+
+            float txAfter = (vpX + scrollX1 - panX1) / zoom1;
+
+            Assert.True(Math.Abs(txAfter - tx0) < 1.5f,
+                $"Content coord under cursor must be preserved after 3 rapid 1.25× zooms at scroll boundary; " +
+                $"expected≈{tx0:F3}  got={txAfter:F3}  drift={txAfter - tx0:F3}. " +
+                $"scroll: {scrollX0:F1}→{scrollX1:F1}  panX: {panX0:F1}→{panX1:F1}  " +
+                $"zoom: {zoom0:F3}→{zoom1:F3}  vpX={vpX:F1}  vpW={vpW:F1}");
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
