@@ -16,14 +16,14 @@ public class AppCommandsNewFileTests
     public void NewFile_CreatesEmptyAcls()
     {
         // Arrange – pre-populate
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(
             new AnimationChainSave { Name = "Existing" });
 
         // Act
         AppCommands.Self.NewFile();
 
         Assert.NotNull(ProjectManager.Self.AnimationChainListSave);
-        Assert.Empty(ProjectManager.Self.AnimationChainListSave.AnimationChains);
+        Assert.Empty(ProjectManager.Self.AnimationChainListSave!.AnimationChains);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class AppCommandsNewFileTests
     public void NewFile_ClearsSelectedChain()
     {
         var chain = new AnimationChainSave { Name = "A" };
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         SelectedState.Self.SelectedChain = chain;
 
         AppCommands.Self.NewFile();
@@ -54,7 +54,7 @@ public class AppCommandsNewFileTests
         var chain = new AnimationChainSave { Name = "A" };
         var frame = new AnimationFrameSave { FrameLength = 0.1f };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         SelectedState.Self.SelectedChain = chain;
         SelectedState.Self.SelectedFrame = frame;
 
@@ -91,6 +91,6 @@ public class AppCommandsNewFileTests
         AppCommands.Self.NewFile();
         AppCommands.Self.NewFile();
 
-        Assert.Empty(ProjectManager.Self.AnimationChainListSave.AnimationChains);
+        Assert.Empty(ProjectManager.Self.AnimationChainListSave!.AnimationChains);
     }
 }

@@ -2,7 +2,7 @@ namespace AnimationEditor.Core
 {
     public class Singleton<T> where T : new()
     {
-        static T mSelf;
+        static T? mSelf;
 
         public static T Self
         {

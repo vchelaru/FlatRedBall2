@@ -125,7 +125,7 @@ public class CtrlClickPlainModeTests
             ShapeCollectionSave = new ShapeCollectionSave(),
         };
         chain.Frames.Add(lastFrame);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         SelectedState.Self.SelectedChain = chain;
 
         var ctrl = new WireframeControl();

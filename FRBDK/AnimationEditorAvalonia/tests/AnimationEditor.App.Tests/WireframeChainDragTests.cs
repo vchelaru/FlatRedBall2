@@ -76,7 +76,7 @@ public class WireframeChainDragTests
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
 
         // Select the chain — no individual frame selected

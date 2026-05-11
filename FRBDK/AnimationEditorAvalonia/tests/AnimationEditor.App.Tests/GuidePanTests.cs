@@ -222,7 +222,7 @@ public class GuidePanTests
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
             SelectedState.Self.SelectedChain = chain;
             SelectedState.Self.SelectedFrame = frame;
 

@@ -100,9 +100,10 @@ public class WireframeControl : Control
                     s.PanY + s.ImageHeight * s.Zoom);
 
                 // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity
-                using var imgPaint = new SKPaint();
-                imgPaint.FilterQuality = s.Zoom >= 1f ? SKFilterQuality.None : SKFilterQuality.Low;
-                canvas.DrawImage(s.Image, dest, imgPaint);
+                var sampling = s.Zoom >= 1f
+                    ? new SKSamplingOptions(SKFilterMode.Nearest)
+                    : new SKSamplingOptions(SKFilterMode.Linear);
+                canvas.DrawImage(s.Image, dest, sampling);
 
                 // Outline around whole texture
                 using var outlinePaint = new SKPaint

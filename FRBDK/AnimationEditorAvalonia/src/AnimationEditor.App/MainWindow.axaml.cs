@@ -1261,9 +1261,7 @@ public partial class MainWindow : Window
         // outside the .achx folder so they round-trip correctly.
         string storePath = string.IsNullOrEmpty(achxFolder)
             ? resolvedAbsPath
-            : TexturePathHelper.ComputeStorePath(
-                resolvedAbsPath,
-                FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName));
+            : TexturePathHelper.ComputeStorePath(resolvedAbsPath, achxFolder);
 
         AppCommands.Self.SetFrameTextureName(frame, storePath);
         WireframeCtrl.LoadTexture(resolvedAbsPath);

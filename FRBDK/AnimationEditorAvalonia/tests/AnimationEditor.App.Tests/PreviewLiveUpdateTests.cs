@@ -91,7 +91,7 @@ public class PreviewLiveUpdateTests
                 ShapeCollectionSave = new ShapeCollectionSave(),
             };
             chain.Frames.Add(frame);
-            ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
             SelectedState.Self.SelectedChain = chain;
             SelectedState.Self.SelectedFrame = frame;
 

@@ -64,8 +64,8 @@ public class GuidePersistenceAcrossChainSwitchTests
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainRun);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = new PreviewControl();
         ctrl.ShowGuides = true;
@@ -102,8 +102,8 @@ public class GuidePersistenceAcrossChainSwitchTests
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainRun);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = new PreviewControl();
         ctrl.ShowGuides = true;
@@ -138,8 +138,8 @@ public class GuidePersistenceAcrossChainSwitchTests
 
         var chainIdle = new AnimationChainSave { Name = "Idle" };
         var chainRun  = new AnimationChainSave { Name = "Run"  };
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainIdle);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainRun);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = new PreviewControl();
         ctrl.ShowGuides = true;
@@ -183,8 +183,8 @@ public class GuidePersistenceAcrossChainSwitchTests
         {
             var chainIdle = new AnimationChainSave { Name = "Idle" };
             var chainRun  = new AnimationChainSave { Name = "Run"  };
-            ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainIdle);
-            ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chainRun);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainIdle);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
             var ctrl = new PreviewControl();
             ctrl.ShowGuides = true;

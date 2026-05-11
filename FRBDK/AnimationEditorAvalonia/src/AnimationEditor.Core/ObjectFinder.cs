@@ -5,9 +5,9 @@ namespace AnimationEditor.Core
 {
     public class ObjectFinder : Singleton<ObjectFinder>
     {
-        public AnimationFrameSave GetAnimationFrameContaining(AxisAlignedRectangleSave rectangle)
+        public AnimationFrameSave? GetAnimationFrameContaining(AxisAlignedRectangleSave rectangle)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave.AnimationChains)
+            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
@@ -18,9 +18,9 @@ namespace AnimationEditor.Core
             return null;
         }
 
-        public AnimationFrameSave GetAnimationFrameContaining(CircleSave circle)
+        public AnimationFrameSave? GetAnimationFrameContaining(CircleSave circle)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave.AnimationChains)
+            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
@@ -31,9 +31,9 @@ namespace AnimationEditor.Core
             return null;
         }
 
-        public AnimationChainSave GetAnimationChainContaining(AnimationFrameSave frame)
+        public AnimationChainSave? GetAnimationChainContaining(AnimationFrameSave frame)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave.AnimationChains)
+            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var possibleFrame in chain.Frames)
                 {

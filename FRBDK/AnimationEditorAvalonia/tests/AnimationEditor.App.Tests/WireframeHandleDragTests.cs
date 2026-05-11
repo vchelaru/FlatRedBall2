@@ -74,7 +74,7 @@ public class WireframeHandleDragTests
         };
         var chain = new AnimationChainSave { Name = "Test" };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         ProjectManager.Self.FileName = System.IO.Path.Combine(dir, "test.achx");
 
         SelectedState.Self.SelectedChain = chain;

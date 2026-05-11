@@ -5,13 +5,13 @@ namespace AnimationEditor.Core.CommandsAndState
 {
     public class ApplicationEvents : Singleton<ApplicationEvents>
     {
-        public event Action AfterZoomChange;
-        public event Action WireframePanning;
-        public event Action WireframeTextureChange;
-        public event Action<string> AchxLoaded;
-        public event Action<AxisAlignedRectangleSave> AfterAxisAlignedRectangleChanged;
-        public event Action<CircleSave> AfterCircleChanged;
-        public event Action AnimationChainsChanged;
+        public event Action? AfterZoomChange;
+        public event Action? WireframePanning;
+        public event Action? WireframeTextureChange;
+        public event Action<string>? AchxLoaded;
+        public event Action<AxisAlignedRectangleSave>? AfterAxisAlignedRectangleChanged;
+        public event Action<CircleSave>? AfterCircleChanged;
+        public event Action? AnimationChainsChanged;
 
         public void RaiseAfterAxisAlignedRectangleChanged(AxisAlignedRectangleSave rectangle) =>
             AfterAxisAlignedRectangleChanged?.Invoke(rectangle);

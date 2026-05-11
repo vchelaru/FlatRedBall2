@@ -13,7 +13,7 @@ public class TextureListBuilderTests
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Chain" };
         foreach (var t in textureNames)
-            chain.Frames.Add(new AnimationFrameSave { TextureName = t });
+            chain.Frames.Add(new AnimationFrameSave { TextureName = t! });
         acls.AnimationChains.Add(chain);
         return acls;
     }

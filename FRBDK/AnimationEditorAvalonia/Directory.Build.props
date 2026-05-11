@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- All projects under AnimationEditorAvalonia/ must build with zero warnings. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

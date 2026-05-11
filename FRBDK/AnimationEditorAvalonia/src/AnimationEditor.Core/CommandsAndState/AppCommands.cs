@@ -43,27 +43,27 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>
         /// Request a full tree-view refresh. Raised instead of calling TreeViewManager directly.
         /// </summary>
-        public event Action RefreshTreeViewRequested;
+        public event Action? RefreshTreeViewRequested;
 
         /// <summary>
         /// Request a single chain's tree node to refresh.
         /// </summary>
-        public event Action<AnimationChainSave> RefreshChainNodeRequested;
+        public event Action<AnimationChainSave>? RefreshChainNodeRequested;
 
         /// <summary>
         /// Request a single frame's tree node to refresh.
         /// </summary>
-        public event Action<AnimationFrameSave> RefreshFrameNodeRequested;
+        public event Action<AnimationFrameSave>? RefreshFrameNodeRequested;
 
         /// <summary>
         /// Request the preview/animation-frame display to refresh.
         /// </summary>
-        public event Action RefreshAnimationFrameDisplayRequested;
+        public event Action? RefreshAnimationFrameDisplayRequested;
 
         /// <summary>
         /// Request the wireframe to refresh.
         /// </summary>
-        public event Action RefreshWireframeRequested;
+        public event Action? RefreshWireframeRequested;
 
         /// <summary>
         /// File dialog abstraction. Wired to Avalonia's <c>StorageProvider</c> by the
@@ -105,7 +105,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void RefreshTreeView() =>
             RefreshTreeViewRequested?.Invoke();
 
-        public void SaveCurrentAnimationChainList(string fileName = null)
+        public void SaveCurrentAnimationChainList(string? fileName = null)
         {
             var target = fileName ?? ProjectManager.Self.FileName;
             if (!string.IsNullOrEmpty(target))
@@ -135,6 +135,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void DeleteAnimationChains(List<AnimationChainSave> animationChains)
         {
             var acls = ProjectManager.Self.AnimationChainListSave;
+            if (acls == null) return;
 
             // Capture original indices before removal for undo
             var entries = animationChains
@@ -295,9 +296,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
                     if (entries.Length > 0)
                         UndoManager.Self.Record(new DeleteFramesCommand(entries, chain));
+
+                    RefreshChainNodeRequested?.Invoke(chain);
                 }
 
-                RefreshChainNodeRequested?.Invoke(chain);
                 RefreshWireframeRequested?.Invoke();
                 ApplicationEvents.Self.RaiseAnimationChainsChanged();
             }
@@ -807,7 +809,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (frame == null) return;
             string? oldName = frame.TextureName;
-            frame.TextureName = textureName;
+            frame.TextureName = textureName!;
             RefreshFrameNodeRequested?.Invoke(frame);
             ApplicationEvents.Self.RaiseAnimationChainsChanged();
             UndoManager.Self.Record(new SetFrameTextureNameCommand(frame, oldName, textureName));

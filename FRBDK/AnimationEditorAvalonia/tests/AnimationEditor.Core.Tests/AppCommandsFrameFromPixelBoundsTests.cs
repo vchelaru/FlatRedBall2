@@ -15,7 +15,7 @@ public class AppCommandsFrameFromPixelBoundsTests
     private static AnimationChainSave MakeChain(string name = "Chain")
     {
         var chain = new AnimationChainSave { Name = name };
-        ProjectManager.Self.AnimationChainListSave.AnimationChains.Add(chain);
+        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
         return chain;
     }
 

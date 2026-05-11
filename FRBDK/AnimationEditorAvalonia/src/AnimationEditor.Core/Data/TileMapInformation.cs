@@ -4,7 +4,7 @@ namespace AnimationEditor.Core.Data
 {
     public class TileMapInformation
     {
-        public string Name;
+        public string? Name;
         public int TileWidth;
         public int TileHeight;
     }
@@ -13,7 +13,7 @@ namespace AnimationEditor.Core.Data
     {
         public List<TileMapInformation> TileMapInfos = new List<TileMapInformation>();
 
-        public TileMapInformation GetTileMapInformation(string fileName)
+        public TileMapInformation? GetTileMapInformation(string fileName)
         {
             foreach (var info in TileMapInfos)
             {

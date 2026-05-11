@@ -210,7 +210,7 @@ public class AnimationFrameSaveConditionalSerializationTests
     [Fact]
     public void Serialization_WhenShapeCollectionSaveIsNull_OmitsElement()
     {
-        var frame = new AnimationFrameSave { ShapeCollectionSave = null };
+        var frame = new AnimationFrameSave { ShapeCollectionSave = null! };
 
         var xml = SerializeFrame(frame);
 
@@ -236,7 +236,7 @@ public class AnimationFrameSaveConditionalSerializationTests
     [Fact]
     public void ShouldSerializeShapeCollectionSave_Property_WhenNullReturnsFalse()
     {
-        var frame = new AnimationFrameSave { ShapeCollectionSave = null };
+        var frame = new AnimationFrameSave { ShapeCollectionSave = null! };
 
         Assert.False(frame.ShouldSerializeShapeCollectionSave);
     }
