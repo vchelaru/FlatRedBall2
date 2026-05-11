@@ -1611,17 +1611,30 @@ public class WireframeControl : Control
 
             // Scroll axes: derive the required scroll offset so the zoom pivot stays fixed.
             // The image is at content position (epX, epY); pivot preservation gives:
-            //   newScrollX = scrollX - newPanX + epX
-            float newScrollX = overflowX ? Math.Max(0f, scrollX - newPanX + epX) : 0f;
-            float newScrollY = overflowY ? Math.Max(0f, scrollY - newPanY + epY) : 0f;
+            //   rawScrollX = scrollX - newPanX + epX
+            // Pre-clamp to maxScrollX so that _panX can absorb any overshoot.  Without
+            // this, TryApplyPendingScroll silently clamps sv.Offset.X while _panX stays
+            // at epX, causing the cursor's content-space coordinate to drift on each
+            // zoom step when the pivot is near the scroll boundary (#138).
+            float rawScrollX = overflowX ? Math.Max(0f, scrollX - newPanX + epX) : 0f;
+            float rawScrollY = overflowY ? Math.Max(0f, scrollY - newPanY + epY) : 0f;
+            float maxScrollX = overflowX
+                ? Math.Max(0f, _bitmap!.Width  * _zoom + 2 * epX - (float)vp.Width)
+                : 0f;
+            float maxScrollY = overflowY
+                ? Math.Max(0f, _bitmap!.Height * _zoom + 2 * epY - (float)vp.Height)
+                : 0f;
+            float newScrollX = Math.Min(rawScrollX, maxScrollX);
+            float newScrollY = Math.Min(rawScrollY, maxScrollY);
 
-            _panX = overflowX ? epX : newPanX - scrollX;
-            _panY = overflowY ? epY : newPanY - scrollY;
+            // _panX absorbs the clamped overflow so the cursor pivot is preserved.
+            _panX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
+            _panY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
 
             DebugLog("ZOOM_TOWARD",
                 $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +
                 $"ovX={overflowX} ovY={overflowY} scrollX={scrollX:F1} " +
-                $"newScrollX={newScrollX:F1} vpW={vp.Width:F1} " +
+                $"rawScrollX={rawScrollX:F1} newScrollX={newScrollX:F1} vpW={vp.Width:F1} " +
                 $"imgW*zoom={(_bitmap?.Width ?? 0) * _zoom:F1}");
 
             // Queue the scroll to be applied AFTER the layout pass.
