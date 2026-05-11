@@ -168,14 +168,10 @@ public partial class MainWindow : Window
         var frame = SelectedState.Self.SelectedFrame;
         if (frame == null) return;
 
-        string storePath = absolutePath;
-        if (!string.IsNullOrEmpty(ProjectManager.Self.FileName))
-        {
-            string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
-            string rel = Path.GetRelativePath(achxFolder, absolutePath);
-            if (!rel.StartsWith(".."))
-                storePath = rel;
-        }
+        string achxFolder = string.IsNullOrEmpty(ProjectManager.Self.FileName)
+            ? string.Empty
+            : FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
+        string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
         AppCommands.Self.SetFrameTextureName(frame, storePath);
         RefreshPropertyPanel();
     }
@@ -494,8 +490,8 @@ public partial class MainWindow : Window
             if (TextureCombo.SelectedItem as string != texPath)
             {
                 _suppressTextureComboChanged = true;
-                TextureCombo.SelectedItem = texPath;
-                _suppressTextureComboChanged = false;
+                try { TextureCombo.SelectedItem = texPath; }
+                finally { _suppressTextureComboChanged = false; }
                 WireframeCtrl.LoadTexture(texPath);
             }
         }
@@ -1319,14 +1315,13 @@ public partial class MainWindow : Window
             }
         }
 
-        // Store relative path when the file lives under the ACHX folder
-        string storePath = resolvedAbsPath;
-        if (!string.IsNullOrEmpty(achxFolder) && Path.IsPathRooted(resolvedAbsPath))
-        {
-            string rel = Path.GetRelativePath(achxFolder, resolvedAbsPath);
-            if (!rel.StartsWith(".."))
-                storePath = rel;
-        }
+        // Store relative path when possible; ../relative paths are allowed for textures
+        // outside the .achx folder so they round-trip correctly.
+        string storePath = string.IsNullOrEmpty(achxFolder)
+            ? resolvedAbsPath
+            : TexturePathHelper.ComputeStorePath(
+                resolvedAbsPath,
+                FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName));
 
         AppCommands.Self.SetFrameTextureName(frame, storePath);
         WireframeCtrl.LoadTexture(resolvedAbsPath);
@@ -1406,7 +1401,8 @@ public partial class MainWindow : Window
                 PropFrameLen.Value   = (decimal)frame.FrameLength;
                 PropRelX.Value       = (decimal)frame.RelativeX;
                 PropRelY.Value       = (decimal)frame.RelativeY;
-                PropTextureName.Text = frame.TextureName ?? "";
+                PropTextureName.Text = TexturePathHelper.ComputeDisplayPath(
+                    frame.TextureName, ProjectManager.Self.FileName);
 
                 var unitType = AppState.Self.UnitType;
                 PropPixelSection.IsVisible = unitType != UnitType.TextureCoordinate;
