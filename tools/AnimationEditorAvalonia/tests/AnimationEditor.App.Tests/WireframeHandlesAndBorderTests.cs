@@ -443,6 +443,56 @@ public class WireframeHandlesAndBorderTests
         }
     }
 
+    // ── Handles hidden when chain (not individual frame) is selected ──────────
+
+    /// <summary>
+    /// When an AnimationChain is selected but no individual frame is selected,
+    /// resize handles must NOT be rendered.  The handle zones around the chain's
+    /// bounding rect should be dark background, not white.
+    ///
+    /// Frame at UV 0.25→0.75 on a 64×64 texture → screen rect (16,16,48,48).
+    /// TopLeft handle centre = (11,11) — must not be white.
+    /// </summary>
+    [AvaloniaFact]
+    public void WireframeHandles_ChainSelected_NoHandlesRendered()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteSolidPng(dir, SKColors.DarkGray);
+
+            var frame = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.25f, TopCoordinate = 0.25f,
+                RightCoordinate = 0.75f, BottomCoordinate = 0.75f,
+                ShapeCollectionSave = new ShapeCollectionSave()
+            };
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            // Chain selected — no individual frame selected
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = null;
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);  // screen rect (16,16,48,48); TL handle centre (11,11)
+
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            // TL handle centre (11,11) must not be white — handles are only for single-frame selection
+            var px = bm.GetPixel(11, 11);
+            Assert.True(px.Red < 200 && px.Green < 200 && px.Blue < 200,
+                $"TL handle zone (11,11) should be dark when chain (not frame) is selected; R={px.Red} G={px.Green} B={px.Blue}");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
     // ── Render with vs without selected frame — different bitmaps ────────────
 
     /// <summary>

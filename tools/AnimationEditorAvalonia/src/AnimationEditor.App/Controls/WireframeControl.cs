@@ -1305,10 +1305,8 @@ public class WireframeControl : Control
             snap.OriginTexX = sel.Bounds.MidX - sel.Frame.RelativeX * offMult;
             snap.OriginTexY = sel.Bounds.MidY + sel.Frame.RelativeY * offMult;
         }
-        else if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
-        {
-            snap.SelectedHandleBounds = ComputeChainBoundingRect();
-        }
+        // Chain selected (no individual frame): handles are not rendered.
+        // Move-drag still works via HitTestHandle, which uses _frameRects directly.
 
         return snap;
     }
