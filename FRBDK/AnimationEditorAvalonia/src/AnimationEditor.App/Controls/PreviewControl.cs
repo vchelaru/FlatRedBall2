@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
@@ -26,34 +27,40 @@ namespace AnimationEditor.App.Controls;
 /// </summary>
 public class PreviewControl : Control
 {
-    // ── Animation state ───────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Animation state ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private readonly DispatcherTimer _timer;
     private readonly AnimationEditor.Core.CommandsAndState.PlaybackController _playback = new();
 
-    // ── Bitmap cache ──────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Bitmap cache ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private readonly Dictionary<string, SKBitmap?> _bitmapCache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // ── Camera ────────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Camera ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private float _zoom = 1f;
     private float _panX, _panY;
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Settings ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private bool _showOnionSkin;
     private bool _showGuides;
 
-    // ── Pan drag ──────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Pan drag ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private bool  _isPanning;
     private Point _lastMousePt;
 
-    // ── Rulers / guides ───────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Rulers / guides ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
     private const float RulerSize = 20f;
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
     private bool _draggingHGuide;                  // true = horizontal guide
 
-    // ── Public properties ─────────────────────────────────────────────────────
+    // -- Shape drag -----------------------------------------------------------
+    private object? _draggingShape;   // AxisAlignedRectangleSave or CircleSave
+    private float   _shapeDragStartX;
+    private float   _shapeDragStartY;
+    private Point   _shapeDragAnchor;
+
+    // ΓöÇΓöÇ Public properties ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     public bool ShowOnionSkin
     {
@@ -153,13 +160,14 @@ public class PreviewControl : Control
         return bitmap;
     }
 
-    // ── Injected services ─────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Injected services ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private ISelectedState? _selectedState;
     private IAppState? _appState;
     private IAppCommands? _appCommands;
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
+    private IUndoManager? _undoManager;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -170,13 +178,15 @@ public class PreviewControl : Control
         IAppState appState,
         IAppCommands appCommands,
         IApplicationEvents events,
-        IProjectManager projectManager)
+        IProjectManager projectManager,
+        IUndoManager undoManager)
     {
         _selectedState  = selectedState;
         _appState       = appState;
         _appCommands    = appCommands;
         _events         = events;
         _projectManager = projectManager;
+        _undoManager    = undoManager;
 
         _selectedState.SelectionChanged                        += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _events.AnimationChainsChanged                         += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -184,7 +194,7 @@ public class PreviewControl : Control
         _appCommands.RefreshAnimationFrameDisplayRequested     += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
     }
 
-    // ── Constructor ───────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ ConstructorΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     public PreviewControl()
     {
@@ -200,7 +210,7 @@ public class PreviewControl : Control
         _timer.Start();
     }
 
-    // ── Timer ─────────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Timer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
@@ -209,7 +219,7 @@ public class PreviewControl : Control
         _playback.Advance(0.016);
     }
 
-    // ── State reset ───────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ State reset ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private void OnSelectionChanged()
     {
@@ -217,7 +227,7 @@ public class PreviewControl : Control
         InvalidateVisual();
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Public API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     /// <summary>
     /// Fired after every zoom change. Payload is the new zoom as a percentage
@@ -262,6 +272,31 @@ public class PreviewControl : Control
     /// Mirrors the shape-selection code path in <see cref="OnPointerPressed"/>.
     /// </summary>
     internal void SimulateCanvasClick(float px, float py) => TrySelectShapeAt(px, py);
+    /// <summary>
+    /// Test-only: applies a world-space drag delta to the currently selected shape and commits.
+    /// Bypasses coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier.
+    /// </summary>
+    internal void SimulateShapeDrag(float worldDx, float worldDy)
+    {
+        _draggingShape = _selectedState!.SelectedShape;
+        if (_draggingShape is null) return;
+
+        if (_draggingShape is AxisAlignedRectangleSave r)
+        {
+            _shapeDragStartX = r.X;
+            _shapeDragStartY = r.Y;
+            r.X += worldDx;
+            r.Y += worldDy;
+        }
+        else if (_draggingShape is CircleSave c)
+        {
+            _shapeDragStartX = c.X;
+            _shapeDragStartY = c.Y;
+            c.X += worldDx;
+            c.Y += worldDy;
+        }
+        CommitShapeDrag();
+    }
 
     /// <summary>
     /// Test-only: simulates a single mouse-wheel zoom event toward the given
@@ -294,7 +329,7 @@ public class PreviewControl : Control
         InvalidateVisual();
     }
 
-    // ── Bitmap cache helpers ──────────────────────────────────────────────────
+    // ΓöÇΓöÇ Bitmap cache helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private SKBitmap? GetBitmap(string? path)
     {
@@ -331,7 +366,7 @@ public class PreviewControl : Control
         return full;
     }
 
-    // ── Avalonia rendering ────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Avalonia rendering ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     public override void Render(DrawingContext ctx)
     {
@@ -379,7 +414,7 @@ public class PreviewControl : Control
             _bitmapCache));
     }
 
-    // ── Guide helpers ─────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Guide helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private float GetCenterX(float? width  = null) => ((width  ?? (float)Bounds.Width)  - RulerSize) / 2f + RulerSize + _panX;
     private float GetCenterY(float? height = null) => ((height ?? (float)Bounds.Height) - RulerSize) / 2f + RulerSize + _panY;
@@ -391,7 +426,7 @@ public class PreviewControl : Control
     // Guides snap to the nearest integer (pixel boundary) in world space.
     private static float SnapToPixel(float world) => MathF.Round(world, MidpointRounding.AwayFromZero);
 
-    // ── Test helpers (internal) ───────────────────────────────────────────────
+    // ΓöÇΓöÇ Test helpers (internal) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     /// <summary>Horizontal guide world-Y values; exposed for headless tests.</summary>
     internal IReadOnlyList<float> HGuides => _hGuides;
@@ -483,9 +518,16 @@ public class PreviewControl : Control
 
     private void UpdateHoverCursor(Point pos)
     {
+        if (_draggingShape is not null)
+        {
+            Cursor = new Cursor(StandardCursorType.SizeAll);
+            return;
+        }
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
             ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
             : GetGuideCursorAt((float)pos.X, (float)pos.Y);
+        if (cursorType is null && HitTestShape((float)pos.X, (float)pos.Y) is not null)
+            cursorType = StandardCursorType.SizeAll;
         Cursor = cursorType is null ? Cursor.Default : new Cursor(cursorType.Value);
     }
 
@@ -515,11 +557,11 @@ public class PreviewControl : Control
         return list.ToArray();
     }
 
-    // ── Pointer events ────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Pointer events ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     /// <summary>
     /// Removes the first guide within hit distance of (<paramref name="px"/>, <paramref name="py"/>).
-    /// Clicks inside the ruler strips are ignored — guides are only visible in the canvas area.
+    /// Clicks inside the ruler strips are ignored ΓÇö guides are only visible in the canvas area.
     /// Returns <c>true</c> if a guide was removed.
     /// </summary>
     private bool TryRemoveGuideAt(float px, float py)
@@ -546,6 +588,97 @@ public class PreviewControl : Control
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Returns the topmost collision shape under the given screen-space point, or
+    /// <c>null</c> if no shape is hit. The currently selected shape has priority over
+    /// unselected shapes; circles are checked before rectangles (rendered on top).
+    /// Returns <c>null</c> for clicks inside the ruler strips.
+    /// </summary>
+    private object? HitTestShape(float px, float py)
+    {
+        var frame = _selectedState!.SelectedFrame;
+        if (frame?.ShapeCollectionSave is null) return null;
+        if (px < RulerSize || py < RulerSize) return null;
+
+        float cx = GetCenterX();
+        float cy = GetCenterY();
+        float om = _appState!.OffsetMultiplier * _zoom;
+        const float tolerance = 5f;
+
+        // Selected shape has priority so the user can drag what they already selected.
+        var sel = _selectedState!.SelectedShape;
+        if (sel is CircleSave selC)
+        {
+            float sx = cx + selC.X * om;
+            float sy = cy - selC.Y * om;
+            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, selC.Radius * om, tolerance))
+                return selC;
+        }
+        else if (sel is AxisAlignedRectangleSave selR)
+        {
+            float sx = cx + selR.X * om;
+            float sy = cy - selR.Y * om;
+            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, selR.ScaleX * om, selR.ScaleY * om, tolerance))
+                return selR;
+        }
+
+        var circles = frame.ShapeCollectionSave.CircleSaves;
+        for (int i = circles.Count - 1; i >= 0; i--)
+        {
+            var c = circles[i];
+            if (ReferenceEquals(c, sel)) continue;
+            float sx = cx + c.X * om;
+            float sy = cy - c.Y * om;
+            if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
+                return c;
+        }
+
+        var rects = frame.ShapeCollectionSave.AxisAlignedRectangleSaves;
+        for (int i = rects.Count - 1; i >= 0; i--)
+        {
+            var r = rects[i];
+            if (ReferenceEquals(r, sel)) continue;
+            float sx = cx + r.X * om;
+            float sy = cy - r.Y * om;
+            if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
+                return r;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finalises an in-progress shape drag: records an undo command (unless the delta is
+    /// negligible), fires <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>,
+    /// saves, and re-assigns the selection so the property panel refreshes.
+    /// </summary>
+    private void CommitShapeDrag()
+    {
+        if (_draggingShape is null) return;
+
+        float newX, newY;
+        if (_draggingShape is AxisAlignedRectangleSave r)      { newX = r.X; newY = r.Y; }
+        else { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; }
+
+        const float eps = 1e-4f;
+        if (MathF.Abs(newX - _shapeDragStartX) > eps || MathF.Abs(newY - _shapeDragStartY) > eps)
+        {
+            var frame = _selectedState!.SelectedFrame;
+            if (frame is not null)
+                _undoManager!.Record(new MoveShapeCommand(
+                    frame, _draggingShape, _shapeDragStartX, _shapeDragStartY, newX, newY,
+                    _appCommands!, _events!));
+            _events!.RaiseAnimationChainsChanged();
+            _appCommands!.SaveCurrentAnimationChainList();
+        }
+
+        // Re-assign to fire SelectionChanged so the property panel refreshes.
+        if (_draggingShape is AxisAlignedRectangleSave rs) _selectedState!.SelectedRectangle = rs;
+        else if (_draggingShape is CircleSave cs)          _selectedState!.SelectedCircle    = cs;
+
+        _draggingShape = null;
     }
 
     /// <summary>
@@ -631,7 +764,7 @@ public class PreviewControl : Control
 
         if (!props.IsLeftButtonPressed) return;
 
-        // Click in left ruler strip → create horizontal guide
+        // Click in left ruler strip ΓåÆ create horizontal guide
         if (px < RulerSize && py >= RulerSize)
         {
             float wy = SnapToPixel(ScreenToWorldY(py));
@@ -643,7 +776,7 @@ public class PreviewControl : Control
             return;
         }
 
-        // Click in top ruler strip → create vertical guide
+        // Click in top ruler strip ΓåÆ create vertical guide
         if (py < RulerSize && px >= RulerSize)
         {
             float wx = SnapToPixel(ScreenToWorldX(px));
@@ -655,7 +788,7 @@ public class PreviewControl : Control
             return;
         }
 
-        // Click near existing guide → drag it
+        // Click near existing guide ΓåÆ drag it
         const float hitPx = 4f;
         for (int i = 0; i < _hGuides.Count; i++)
         {
@@ -678,7 +811,22 @@ public class PreviewControl : Control
             }
         }
 
-        // No guide hit — try to select a collision shape.
+        // No guide hit — try to drag a shape (or just select one).
+        var hitShape = HitTestShape(px, py);
+        if (hitShape is not null)
+        {
+            _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
+            if (hitShape is AxisAlignedRectangleSave hr) _selectedState!.SelectedRectangle = hr;
+            else if (hitShape is CircleSave hc)          _selectedState!.SelectedCircle    = hc;
+            _draggingShape   = hitShape;
+            _shapeDragAnchor = pos;
+            if (hitShape is AxisAlignedRectangleSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
+            else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
+            e.Pointer.Capture(this);
+            return;
+        }
+
+        // No shape hit — try to select a collision shape.
         TrySelectShapeAt(px, py);
     }
 
@@ -692,6 +840,20 @@ public class PreviewControl : Control
             _panX      += (float)(pos.X - _lastMousePt.X);
             _panY      += (float)(pos.Y - _lastMousePt.Y);
             _lastMousePt = pos;
+            InvalidateVisual();
+            return;
+        }
+
+
+        if (_draggingShape is not null)
+        {
+            float om = _appState!.OffsetMultiplier * _zoom;
+            float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
+            float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
+            float newX = _shapeDragStartX + dx;
+            float newY = _shapeDragStartY + dy;
+            if (_draggingShape is AxisAlignedRectangleSave r) { r.X = newX; r.Y = newY; }
+            else if (_draggingShape is CircleSave c)          { c.X = newX; c.Y = newY; }
             InvalidateVisual();
             return;
         }
@@ -711,6 +873,13 @@ public class PreviewControl : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_draggingShape is not null)
+        {
+            CommitShapeDrag();
+            e.Pointer.Capture(null);
+            return;
+        }
 
         if (_draggedGuideIdx >= 0)
         {
@@ -738,7 +907,7 @@ public class PreviewControl : Control
         Cursor = Cursor.Default;
     }
 
-    // ── Inner types ───────────────────────────────────────────────────────────
+    // ΓöÇΓöÇ Inner types ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
     private enum PreviewShapeKind { Rect, Circle }
 
@@ -769,7 +938,7 @@ public class PreviewControl : Control
         bool   DraggingHGuide,
         PreviewShapeInfo[] Shapes);
 
-    // ── Shared SkiaSharp rendering (used by both live and off-screen paths) ───
+    // ΓöÇΓöÇ Shared SkiaSharp rendering (used by both live and off-screen paths) ΓöÇΓöÇΓöÇ
 
     private static void RenderSkCore(
         SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKBitmap?> cache)
@@ -780,7 +949,7 @@ public class PreviewControl : Control
         float cx = (s.Width  - RulerSize) / 2f + RulerSize + s.PanX;
         float cy = (s.Height - RulerSize) / 2f + RulerSize + s.PanY;
 
-        // ── Clip content/guide drawing to the non-ruler area ─────────────────
+        // ΓöÇΓöÇ Clip content/guide drawing to the non-ruler area ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         canvas.Save();
         canvas.ClipRect(new SKRect(RulerSize, RulerSize, s.Width, s.Height));
 
@@ -838,7 +1007,7 @@ public class PreviewControl : Control
             }
         }
 
-        // ── Collision shapes (AxisAlignedRectangles and Circles) ─────────────
+        // ΓöÇΓöÇ Collision shapes (AxisAlignedRectangles and Circles) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         if (s.Shapes.Length > 0)
         {
             float om = s.OffsetMultiplier * s.Zoom;
@@ -869,7 +1038,7 @@ public class PreviewControl : Control
             }
         }
 
-        // Dragged guide value label — drawn last so it stays on top of shapes
+        // Dragged guide value label ΓÇö drawn last so it stays on top of shapes
         if (s.DraggedGuideIdx >= 0)
         {
             using var dragLabelFont = new SKFont { Size = 11f };
@@ -905,7 +1074,7 @@ public class PreviewControl : Control
 
         canvas.Restore(); // end content clip
 
-        // ── Ruler strips ─────────────────────────────────────────────────────
+        // ΓöÇΓöÇ Ruler strips ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
         using var rulerBg = new SKPaint { Color = new SKColor(50, 50, 55) };
         canvas.DrawRect(new SKRect(0,         0, s.Width, RulerSize), rulerBg);   // top
         canvas.DrawRect(new SKRect(0, RulerSize, RulerSize, s.Height), rulerBg);  // left
@@ -927,7 +1096,7 @@ public class PreviewControl : Control
         float majorStep = GetRulerStep(s.Zoom);
         float minorStep = majorStep / 5f;
 
-        // Top (horizontal) ruler — ticks at world-X positions
+        // Top (horizontal) ruler ΓÇö ticks at world-X positions
         float wxStart = (RulerSize - cx) / s.Zoom;
         float wxEnd   = (s.Width  - cx) / s.Zoom;
         for (float wx = MathF.Floor(wxStart / minorStep) * minorStep; wx <= wxEnd; wx += minorStep)
@@ -941,7 +1110,7 @@ public class PreviewControl : Control
                 canvas.DrawText(((int)MathF.Round(wx)).ToString(), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
         }
 
-        // Left (vertical) ruler — ticks at world-Y positions
+        // Left (vertical) ruler ΓÇö ticks at world-Y positions
         float wyStart = (RulerSize - cy) / s.Zoom;
         float wyEnd   = (s.Height  - cy) / s.Zoom;
         for (float wy = MathF.Floor(wyStart / minorStep) * minorStep; wy <= wyEnd; wy += minorStep)

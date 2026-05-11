@@ -86,7 +86,7 @@ public partial class MainWindow : Window
         WireKeyboard();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
-        PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager);
+        PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
 
         Opened += OnOpened;
     }
