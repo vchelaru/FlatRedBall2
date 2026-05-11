@@ -418,6 +418,89 @@ public class HeadlessTreeViewTests
         finally { window.Close(); }
     }
 
+    // ── Tree selection sync with shapes ───────────────────────────────────────
+
+    [AvaloniaFact]
+    public void SelectCircle_TreeViewHighlightsCircleNode_NotFrameNode()
+    {
+        var window = CreateWindow();
+        try
+        {
+            // Arrange: chain → frame → circle in ProjectManager
+            var circle = new CircleSave { Name = "CircleInstance", Radius = 8f };
+            var frame  = new AnimationFrameSave
+            {
+                TextureName         = "Tex.png",
+                ShapeCollectionSave = new ShapeCollectionSave()
+            };
+            frame.ShapeCollectionSave.CircleSaves.Add(circle);
+            var chain  = new AnimationChainSave { Name = "Run" };
+            chain.Frames.Add(frame);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ProjectManager.Self.FileName = "test.achx";
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            // First select the frame (simulates the normal tree-click flow)
+            SelectedState.Self.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var roots = GetRoots(tree);
+            var frameNode  = roots[0].Children[0];          // chain → frame
+            var circleNode = frameNode.Children[0];          // frame → circle
+
+            Assert.Same(frameNode,  tree.SelectedItem);
+
+            // Act: select the circle (e.g. from tree click or preview click)
+            SelectedState.Self.SelectedCircle = circle;
+            Dispatcher.UIThread.RunJobs();
+
+            // Assert: tree must highlight the circle node, not the frame node
+            Assert.Same(circleNode, tree.SelectedItem);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void SelectRect_TreeViewHighlightsRectNode_NotFrameNode()
+    {
+        var window = CreateWindow();
+        try
+        {
+            var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
+            var frame = new AnimationFrameSave
+            {
+                TextureName         = "Tex.png",
+                ShapeCollectionSave = new ShapeCollectionSave()
+            };
+            frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+            var chain = new AnimationChainSave { Name = "Idle" };
+            chain.Frames.Add(frame);
+            ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
+            ProjectManager.Self.FileName = "test.achx";
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            SelectedState.Self.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+
+            var tree     = GetTree(window);
+            var frameNode = GetRoots(tree)[0].Children[0];
+            var rectNode  = frameNode.Children[0];
+
+            Assert.Same(frameNode, tree.SelectedItem);
+
+            SelectedState.Self.SelectedRectangle = rect;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Same(rectNode, tree.SelectedItem);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void InlineAddFrameBtn_Click_AddsFrameToChain_AndSelectsIt()
     {

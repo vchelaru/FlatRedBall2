@@ -929,16 +929,16 @@ public partial class MainWindow : Window
 
     private void SyncTreeSelection()
     {
-        var selFrame = SelectedState.Self.SelectedFrame;
-        var selChain = SelectedState.Self.SelectedChain;
+        // Shapes are more specific than frames — prefer them so clicking a circle or
+        // rect in the tree (or preview panel) keeps the shape node highlighted.
+        object? sel = (object?)SelectedState.Self.SelectedCircle
+                   ?? SelectedState.Self.SelectedRectangle
+                   ?? SelectedState.Self.SelectedFrame
+                   ?? (object?)SelectedState.Self.SelectedChain;
 
-        TreeNodeVm? target = selFrame is not null
-            ? TreeBuilder.FindNodeForData(_treeRoots, selFrame)
-            : selChain is not null
-                ? TreeBuilder.FindNodeForData(_treeRoots, selChain)
-                : null;
+        var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
-        if (target is not null && AnimTree.SelectedItem != target)
+        if (target is not null && !ReferenceEquals(AnimTree.SelectedItem, target))
             AnimTree.SelectedItem = target;
     }
 
