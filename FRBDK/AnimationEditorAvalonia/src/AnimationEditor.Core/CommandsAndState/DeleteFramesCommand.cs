@@ -7,13 +7,19 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly (AnimationFrameSave Frame, int OriginalIndex)[] _entries;
         private readonly AnimationChainSave _chain;
+        private readonly IAppCommands _commands;
+        private readonly IApplicationEvents _events;
 
         public DeleteFramesCommand(
             (AnimationFrameSave Frame, int OriginalIndex)[] entries,
-            AnimationChainSave chain)
+            AnimationChainSave chain,
+            IAppCommands commands,
+            IApplicationEvents events)
         {
             _entries = entries;
             _chain = chain;
+            _commands = commands;
+            _events = events;
         }
 
         public void Undo()
@@ -23,18 +29,18 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 int safeIdx = Math.Min(idx, _chain.Frames.Count);
                 _chain.Frames.Insert(safeIdx, frame);
             }
-            AppCommands.Self.RefreshTreeNode(_chain);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_chain);
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
 
         public void Redo()
         {
             foreach (var (frame, _) in _entries)
                 _chain.Frames.Remove(frame);
-            AppCommands.Self.RefreshTreeNode(_chain);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_chain);
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

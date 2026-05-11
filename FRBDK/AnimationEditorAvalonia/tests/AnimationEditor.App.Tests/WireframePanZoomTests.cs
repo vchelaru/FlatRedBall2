@@ -29,17 +29,18 @@ public class WireframePanZoomTests
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static void ResetSingletons()
-    {
-        ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-        ProjectManager.Self.FileName               = null;
-        SelectedState.Self.SelectedChain           = null;
-        SelectedState.Self.SelectedFrame           = null;
-        SelectedState.Self.SelectedNodes           = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread              = a => a();
-        AppCommands.Self.ConfirmAsync              = (_, _) => Task.FromResult(true);
-        AppCommands.Self.FileDialogService         = NullFileDialogService.Instance;
-        AppState.Self.UnitType                     = UnitType.Pixel;
+    private static TestServices ResetSingletons() {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName               = null;
+        ctx.SelectedState.SelectedChain           = null;
+        ctx.SelectedState.SelectedFrame           = null;
+        ctx.SelectedState.SelectedNodes           = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread              = a => a();
+        ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
+        ctx.AppState.UnitType                     = UnitType.Pixel;
+        return ctx;
     }
 
     private static string WriteSolidPng(string dir, string name, int size = 32)
@@ -68,14 +69,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void LoadTexture_SmallImage_IsCentred_PanXGreaterThanZero()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "small.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();  // settle initial layout
 
@@ -104,14 +105,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void SetZoomPercent_SlightZoomIn_SmallImageStayCentred_PanXGreaterThanZero()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "small.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -151,14 +152,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void SetZoomPercent_ZoomOut_SmallImageStayCentred_PanXGreaterThanZero()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "small.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -200,14 +201,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void SetZoomPercent_LargeZoom_ImageInScrollMode_PanXEqualsDeadSpacePadding()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "small.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -256,14 +257,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ScrollPan_PanLeft50px_ScrollOffsetIncreasesBy50()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "big.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -310,14 +311,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ScrollPan_SameEndpoint_RepeatedMove_ScrollIsStable_NoOscillation()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "big.png", size: 32);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -370,7 +371,7 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void RapidZoom_ScrollTargetIsCorrect_PanNotLocked()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -378,7 +379,7 @@ public class WireframePanZoomTests
             // A 256×256 image overflows any headless viewport at 500%+ zoom.
             var texPath = WriteSolidPng(dir, "medium.png", size: 256);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -453,7 +454,7 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ModerateZoom_SingleOverflowTransition_PanRightIsNotLocked()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -461,7 +462,7 @@ public class WireframePanZoomTests
             // 512×512 image — overflows a typical wireframe viewport at ~150-200% zoom.
             var texPath = WriteSolidPng(dir, "medium512.png", size: 512);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -527,14 +528,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ModerateZoom_OverflowTransition_PanBothDirectionsWork()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "medium512b.png", size: 512);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -618,14 +619,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomOverflow_IntermediateScrollChangedZero_PanRemainsUnlocked()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "race512.png", size: 512);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -701,12 +702,12 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomOverflow_OneWheelNotchFromFit_PanRightNotLocked()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -800,14 +801,14 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomOverflow_StartPanWhilePendingApply_UsesCorrectScrollAnchor()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var texPath = WriteSolidPng(dir, "anchor512.png", size: 512);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -889,12 +890,12 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomTowardRightEdge_OvershootTarget_ClampedAndPanNotLocked()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -978,12 +979,12 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void HybridOverflow_YOnlyOverflows_PanXUsesScrollPan()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -1070,7 +1071,7 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void SwitchTextureAndBack_PanXEqualsEffectivePadding_NotZero()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
@@ -1078,7 +1079,7 @@ public class WireframePanZoomTests
             var texA = WriteSolidPng(dir, "a.png", size: 32);
             var texB = WriteSolidPng(dir, "b.png", size: 64);
 
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -1150,12 +1151,12 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomIn_WhenScrollAtRightBound_CursorContentCoordIsPreserved()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 
@@ -1236,12 +1237,12 @@ public class WireframePanZoomTests
     [AvaloniaFact]
     public void ZoomIn_RapidSuccessiveZooms_NoDriftAtScrollBound()
     {
-        ResetSingletons();
+        var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            var window = new MainWindow();
+            var window = ctx.CreateMainWindow();
             window.Show();
             Dispatcher.UIThread.RunJobs();
 

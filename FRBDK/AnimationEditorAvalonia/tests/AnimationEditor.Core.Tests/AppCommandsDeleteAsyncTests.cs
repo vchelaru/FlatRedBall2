@@ -20,13 +20,14 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteAnimationChains_WhenConfirmed_DeletesChains()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chainA = TestHelpers.MakeChain(acls, "A");
         var chainB = TestHelpers.MakeChain(acls, "B");
         var chainC = TestHelpers.MakeChain(acls, "C");
 
-        await AppCommands.Self.AskToDeleteAnimationChains(
+        await ctx.AppCommands.AskToDeleteAnimationChains(
             new List<AnimationChainSave> { chainA, chainC });
 
         Assert.Single(acls.AnimationChains);
@@ -36,12 +37,13 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteAnimationChains_WhenCancelled_DoesNotDeleteAnyChains()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(false);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
         TestHelpers.MakeChain(acls, "A");
         TestHelpers.MakeChain(acls, "B");
 
-        await AppCommands.Self.AskToDeleteAnimationChains(
+        await ctx.AppCommands.AskToDeleteAnimationChains(
             new List<AnimationChainSave> { acls.AnimationChains[0] });
 
         Assert.Equal(2, acls.AnimationChains.Count);
@@ -50,21 +52,22 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteAnimationChains_WhenConfirmed_FiresAnimationChainsChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "X");
         bool fired = false;
         void Handler() => fired = true;
-        ApplicationEvents.Self.AnimationChainsChanged += Handler;
+        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
         try
         {
-            await AppCommands.Self.AskToDeleteAnimationChains(
+            await ctx.AppCommands.AskToDeleteAnimationChains(
                 new List<AnimationChainSave> { chain });
             Assert.True(fired);
         }
         finally
         {
-            ApplicationEvents.Self.AnimationChainsChanged -= Handler;
+            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
         }
     }
 
@@ -73,13 +76,14 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteFrames_WhenConfirmed_DeletesFramesFromSelectedChain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 3);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         var frameToDelete = chain.Frames[1];
 
-        await AppCommands.Self.AskToDeleteFrames(
+        await ctx.AppCommands.AskToDeleteFrames(
             new List<AnimationFrameSave> { frameToDelete });
 
         Assert.Equal(2, chain.Frames.Count);
@@ -89,12 +93,13 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteFrames_WhenCancelled_DoesNotDeleteAnyFrames()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(false);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
         var chain = TestHelpers.MakeChain(acls, "Run", 3);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
 
-        await AppCommands.Self.AskToDeleteFrames(
+        await ctx.AppCommands.AskToDeleteFrames(
             new List<AnimationFrameSave> { chain.Frames[0] });
 
         Assert.Equal(3, chain.Frames.Count);
@@ -103,13 +108,14 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteFrames_WhenConfirmed_DeletesMultipleFrames()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 4);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         var toDelete = new List<AnimationFrameSave> { chain.Frames[0], chain.Frames[2] };
 
-        await AppCommands.Self.AskToDeleteFrames(toDelete);
+        await ctx.AppCommands.AskToDeleteFrames(toDelete);
 
         Assert.Equal(2, chain.Frames.Count);
     }
@@ -117,22 +123,23 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteFrames_WhenConfirmed_FiresAnimationChainsChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 2);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
         bool fired = false;
         void Handler() => fired = true;
-        ApplicationEvents.Self.AnimationChainsChanged += Handler;
+        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
         try
         {
-            await AppCommands.Self.AskToDeleteFrames(
+            await ctx.AppCommands.AskToDeleteFrames(
                 new List<AnimationFrameSave> { chain.Frames[0] });
             Assert.True(fired);
         }
         finally
         {
-            ApplicationEvents.Self.AnimationChainsChanged -= Handler;
+            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
         }
     }
 
@@ -141,14 +148,15 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteRectangles_WhenConfirmed_RemovesRectangleFromFrame()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
         frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
 
-        await AppCommands.Self.AskToDeleteRectangles(
+        await ctx.AppCommands.AskToDeleteRectangles(
             new List<AxisAlignedRectangleSave> { rect });
 
         Assert.Empty(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
@@ -157,14 +165,15 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteRectangles_WhenCancelled_DoesNotRemoveRectangle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(false);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
         frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
 
-        await AppCommands.Self.AskToDeleteRectangles(
+        await ctx.AppCommands.AskToDeleteRectangles(
             new List<AxisAlignedRectangleSave> { rect });
 
         Assert.Single(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
@@ -173,9 +182,10 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteRectangles_ConfirmMessageContainsRectangleName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         string? capturedMessage = null;
-        AppCommands.Self.ConfirmAsync = (msg, _) =>
+        ctx.AppCommands.ConfirmAsync = (msg, _) =>
         {
             capturedMessage = msg;
             return Task.FromResult(false);
@@ -185,7 +195,7 @@ public class AppCommandsDeleteAsyncTests
         var rect = new AxisAlignedRectangleSave { Name = "BodyCollision" };
         frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
 
-        await AppCommands.Self.AskToDeleteRectangles(
+        await ctx.AppCommands.AskToDeleteRectangles(
             new List<AxisAlignedRectangleSave> { rect });
 
         Assert.NotNull(capturedMessage);
@@ -197,14 +207,15 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteCircles_WhenConfirmed_RemovesCircleFromFrame()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
         frame.ShapeCollectionSave!.CircleSaves.Add(circle);
 
-        await AppCommands.Self.AskToDeleteCircles(
+        await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
 
         Assert.Empty(frame.ShapeCollectionSave!.CircleSaves);
@@ -213,14 +224,15 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteCircles_WhenCancelled_DoesNotRemoveCircle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.ConfirmAsync = (_, __) => Task.FromResult(false);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
         frame.ShapeCollectionSave!.CircleSaves.Add(circle);
 
-        await AppCommands.Self.AskToDeleteCircles(
+        await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
 
         Assert.Single(frame.ShapeCollectionSave!.CircleSaves);
@@ -229,9 +241,10 @@ public class AppCommandsDeleteAsyncTests
     [Fact]
     public async Task AskToDeleteCircles_ConfirmMessageContainsCircleName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         string? capturedMessage = null;
-        AppCommands.Self.ConfirmAsync = (msg, _) =>
+        ctx.AppCommands.ConfirmAsync = (msg, _) =>
         {
             capturedMessage = msg;
             return Task.FromResult(false);
@@ -241,7 +254,7 @@ public class AppCommandsDeleteAsyncTests
         var circle = new CircleSave { Name = "DetectionArea", Radius = 20 };
         frame.ShapeCollectionSave!.CircleSaves.Add(circle);
 
-        await AppCommands.Self.AskToDeleteCircles(
+        await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
 
         Assert.NotNull(capturedMessage);

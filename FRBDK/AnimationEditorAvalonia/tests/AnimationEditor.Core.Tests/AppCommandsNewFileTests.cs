@@ -7,45 +7,42 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class AppCommandsNewFileTests
 {
-    public AppCommandsNewFileTests()
-    {
-        TestHelpers.SetupFreshAcls();
-    }
+    private readonly TestServices ctx = TestHelpers.SetupFreshAcls();
 
     [Fact]
     public void NewFile_CreatesEmptyAcls()
     {
         // Arrange – pre-populate
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(
             new AnimationChainSave { Name = "Existing" });
 
         // Act
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.NotNull(ProjectManager.Self.AnimationChainListSave);
-        Assert.Empty(ProjectManager.Self.AnimationChainListSave!.AnimationChains);
+        Assert.NotNull(ctx.ProjectManager.AnimationChainListSave);
+        Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
     }
 
     [Fact]
     public void NewFile_ClearsFileName()
     {
-        ProjectManager.Self.FileName = @"C:\some\file.achx";
+        ctx.ProjectManager.FileName = @"C:\some\file.achx";
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.True(string.IsNullOrEmpty(ProjectManager.Self.FileName));
+        Assert.True(string.IsNullOrEmpty(ctx.ProjectManager.FileName));
     }
 
     [Fact]
     public void NewFile_ClearsSelectedChain()
     {
         var chain = new AnimationChainSave { Name = "A" };
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        SelectedState.Self.SelectedChain = chain;
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.SelectedState.SelectedChain = chain;
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.Null(SelectedState.Self.SelectedChain);
+        Assert.Null(ctx.SelectedState.SelectedChain);
     }
 
     [Fact]
@@ -54,22 +51,22 @@ public class AppCommandsNewFileTests
         var chain = new AnimationChainSave { Name = "A" };
         var frame = new AnimationFrameSave { FrameLength = 0.1f };
         chain.Frames.Add(frame);
-        ProjectManager.Self.AnimationChainListSave!.AnimationChains.Add(chain);
-        SelectedState.Self.SelectedChain = chain;
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.Null(SelectedState.Self.SelectedFrame);
+        Assert.Null(ctx.SelectedState.SelectedFrame);
     }
 
     [Fact]
     public void NewFile_FiresRefreshTreeViewRequested()
     {
         bool fired = false;
-        AppCommands.Self.RefreshTreeViewRequested += () => fired = true;
+        ctx.AppCommands.RefreshTreeViewRequested += () => fired = true;
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
         Assert.True(fired);
     }
@@ -78,9 +75,9 @@ public class AppCommandsNewFileTests
     public void NewFile_FiresAnimationChainsChanged()
     {
         bool fired = false;
-        ApplicationEvents.Self.AnimationChainsChanged += () => fired = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => fired = true;
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
         Assert.True(fired);
     }
@@ -88,9 +85,9 @@ public class AppCommandsNewFileTests
     [Fact]
     public void NewFile_CalledTwice_StillLeavesEmptyAcls()
     {
-        AppCommands.Self.NewFile();
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.Empty(ProjectManager.Self.AnimationChainListSave!.AnimationChains);
+        Assert.Empty(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
     }
 }

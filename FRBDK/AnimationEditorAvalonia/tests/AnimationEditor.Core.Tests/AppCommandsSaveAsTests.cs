@@ -11,11 +11,12 @@ namespace AnimationEditor.Core.Tests;
 public class AppCommandsSaveAsTests : IDisposable
 {
     private readonly TestHelpers.TempDir _dir;
+    private readonly TestServices ctx;
 
     public AppCommandsSaveAsTests()
     {
         _dir = new TestHelpers.TempDir();
-        TestHelpers.SetupFreshAcls();
+        ctx = TestHelpers.SetupFreshAcls();
     }
 
     public void Dispose() => _dir.Dispose();
@@ -25,9 +26,9 @@ public class AppCommandsSaveAsTests : IDisposable
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_WhenDialogCancelled_DoesNotSaveFile()
     {
-        AppCommands.Self.FileDialogService = new StubFileDialogService(null);
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(null);
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
         Assert.Empty(Directory.GetFiles(_dir.Path, "*.achx"));
     }
@@ -35,22 +36,22 @@ public class AppCommandsSaveAsTests : IDisposable
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_WhenDialogCancelled_DoesNotUpdateFileName()
     {
-        AppCommands.Self.FileDialogService = new StubFileDialogService(null);
-        ProjectManager.Self.FileName = null;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(null);
+        ctx.ProjectManager.FileName = null;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
-        Assert.Null(ProjectManager.Self.FileName);
+        Assert.Null(ctx.ProjectManager.FileName);
     }
 
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_WhenDialogCancelled_DoesNotFireSaveAsCompleted()
     {
-        AppCommands.Self.FileDialogService = new StubFileDialogService(null);
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(null);
         bool fired = false;
-        AppCommands.Self.SaveAsCompleted += _ => fired = true;
+        ctx.AppCommands.SaveAsCompleted += _ => fired = true;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
         Assert.False(fired);
     }
@@ -61,12 +62,13 @@ public class AppCommandsSaveAsTests : IDisposable
     public async Task SaveCurrentAnimationChainListAsync_WhenPathReturned_SavesFile()
     {
         var target = Path.Combine(_dir.Path, "out.achx");
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.FileDialogService = new StubFileDialogService(target);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
         acls.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
-        ProjectManager.Self.AnimationChainListSave = acls;
+        ctx.ProjectManager.AnimationChainListSave = acls;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
         Assert.True(File.Exists(target));
     }
@@ -75,26 +77,28 @@ public class AppCommandsSaveAsTests : IDisposable
     public async Task SaveCurrentAnimationChainListAsync_WhenPathReturned_UpdatesProjectManagerFileName()
     {
         var target = Path.Combine(_dir.Path, "out.achx");
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.FileDialogService = new StubFileDialogService(target);
-        ProjectManager.Self.AnimationChainListSave = acls;
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+        ctx.ProjectManager.AnimationChainListSave = acls;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
-        Assert.Equal(target, ProjectManager.Self.FileName);
+        Assert.Equal(target, ctx.ProjectManager.FileName);
     }
 
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_WhenPathReturned_FiresSaveAsCompletedWithPath()
     {
         var target = Path.Combine(_dir.Path, "out.achx");
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.FileDialogService = new StubFileDialogService(target);
-        ProjectManager.Self.AnimationChainListSave = acls;
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
+        ctx.ProjectManager.AnimationChainListSave = acls;
         string? received = null;
-        AppCommands.Self.SaveAsCompleted += p => received = p;
+        ctx.AppCommands.SaveAsCompleted += p => received = p;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
         Assert.Equal(target, received);
     }
@@ -103,12 +107,13 @@ public class AppCommandsSaveAsTests : IDisposable
     public async Task SaveCurrentAnimationChainListAsync_SavedFile_ContainsChainData()
     {
         var target = Path.Combine(_dir.Path, "data.achx");
-        var acls = TestHelpers.SetupFreshAcls();
-        AppCommands.Self.FileDialogService = new StubFileDialogService(target);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(target);
         acls.AnimationChains.Add(new AnimationChainSave { Name = "Run" });
-        ProjectManager.Self.AnimationChainListSave = acls;
+        ctx.ProjectManager.AnimationChainListSave = acls;
 
-        await AppCommands.Self.SaveCurrentAnimationChainListAsync();
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
 
         var xml = File.ReadAllText(target);
         Assert.Contains("Run", xml);

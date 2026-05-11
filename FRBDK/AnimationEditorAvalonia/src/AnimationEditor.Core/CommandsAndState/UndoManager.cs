@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// Manages unlimited undo/redo history for the animation editor.
     /// Call <see cref="Record"/> after every mutating operation.
     /// </summary>
-    public class UndoManager : Singleton<UndoManager>
+    public class UndoManager : IUndoManager
     {
         private readonly Stack<IUndoableCommand> _undoStack = new();
         private readonly Stack<IUndoableCommand> _redoStack = new();

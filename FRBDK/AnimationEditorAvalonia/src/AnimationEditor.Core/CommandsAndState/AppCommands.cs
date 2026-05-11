@@ -15,8 +15,30 @@ namespace AnimationEditor.Core.CommandsAndState
     /// Platform-independent command hub. UI-thread marshalling and dialog confirmations
     /// are handled by the registered delegates so this class stays free of Avalonia/WinForms.
     /// </summary>
-    public class AppCommands : Singleton<AppCommands>
+    public class AppCommands : IAppCommands
     {
+        private readonly IProjectManager _pm;
+        private readonly ISelectedState _selectedState;
+        private readonly IApplicationEvents _events;
+        private readonly IObjectFinder _objectFinder;
+        private readonly IIoManager _ioManager;
+        private readonly IUndoManager _undoManager;
+
+        public AppCommands(
+            IProjectManager pm,
+            ISelectedState selectedState,
+            IApplicationEvents events,
+            IIoManager ioManager,
+            IObjectFinder objectFinder,
+            IUndoManager undoManager)
+        {
+            _pm = pm;
+            _selectedState = selectedState;
+            _events = events;
+            _ioManager = ioManager;
+            _objectFinder = objectFinder;
+            _undoManager = undoManager;
+        }
         // Delegates wired up by the Avalonia app layer ----------------------------
 
         /// <summary>
@@ -82,10 +104,10 @@ namespace AnimationEditor.Core.CommandsAndState
         public void LoadAnimationChain(string fileName)
         {
             var selectedTextureFilePath = string.Empty;
-            ProjectManager.Self.LoadAnimationChain(fileName);
-            UndoManager.Self.Clear();
+            _pm.LoadAnimationChain(fileName);
+            _undoManager.Clear();
             RefreshTreeViewRequested?.Invoke();
-            IoManager.Self.LoadAndApplyCompanionFileFor(fileName);
+            _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
         }
@@ -107,10 +129,10 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SaveCurrentAnimationChainList(string? fileName = null)
         {
-            var target = fileName ?? ProjectManager.Self.FileName;
+            var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
-                ProjectManager.Self.SaveAnimationChainList(target);
+                _pm.SaveAnimationChainList(target);
             }
         }
 
@@ -128,13 +150,13 @@ namespace AnimationEditor.Core.CommandsAndState
             if (string.IsNullOrEmpty(path)) return;
 
             SaveCurrentAnimationChainList(path);
-            ProjectManager.Self.FileName = path;
+            _pm.FileName = path;
             SaveAsCompleted?.Invoke(path);
         }
 
         public void DeleteAnimationChains(List<AnimationChainSave> animationChains)
         {
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
             // Capture original indices before removal for undo
@@ -148,11 +170,11 @@ namespace AnimationEditor.Core.CommandsAndState
 
             RefreshTreeViewRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
 
             if (entries.Length > 0)
-                UndoManager.Self.Record(new DeleteChainsCommand(entries, acls));
+                _undoManager.Record(new DeleteChainsCommand(entries, acls, this, _events));
         }
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
@@ -170,9 +192,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
             RefreshFrameNodeRequested?.Invoke(frame);
-            SelectedState.Self.SelectedRectangle = rectangleSave;
+            _selectedState.SelectedRectangle = rectangleSave;
             SaveCurrentAnimationChainList();
-            UndoManager.Self.Record(new AddAxisAlignedRectangleCommand(rectangleSave, frame));
+            _undoManager.Record(new AddAxisAlignedRectangleCommand(rectangleSave, frame, this, _events));
         }
 
         public void AddCircle(AnimationFrameSave frame)
@@ -189,9 +211,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
             RefreshFrameNodeRequested?.Invoke(frame);
-            SelectedState.Self.SelectedCircle = circleSave;
+            _selectedState.SelectedCircle = circleSave;
             SaveCurrentAnimationChainList();
-            UndoManager.Self.Record(new AddCircleCommand(circleSave, frame));
+            _undoManager.Record(new AddCircleCommand(circleSave, frame, this, _events));
         }
 
         public void MatchRectangleToFrame(AxisAlignedRectangleSave rectangle, AnimationFrameSave animationFrame)
@@ -217,8 +239,8 @@ namespace AnimationEditor.Core.CommandsAndState
             circles.RemoveAt(idx);
             RefreshFrameNodeRequested?.Invoke(owner);
             RefreshAnimationFrameDisplayRequested?.Invoke();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new DeleteCircleCommand(circle, owner, idx));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new DeleteCircleCommand(circle, owner, idx, this, _events));
         }
 
         public void DeleteAxisAlignedRectangle(AxisAlignedRectangleSave rectangle, AnimationFrameSave owner)
@@ -230,8 +252,8 @@ namespace AnimationEditor.Core.CommandsAndState
             rects.RemoveAt(idx);
             RefreshFrameNodeRequested?.Invoke(owner);
             RefreshAnimationFrameDisplayRequested?.Invoke();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new DeleteAxisAlignedRectangleCommand(rectangle, owner, idx));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new DeleteAxisAlignedRectangleCommand(rectangle, owner, idx, this, _events));
         }
 
         public async Task AskToDeleteRectangles(List<AxisAlignedRectangleSave> rectangles)
@@ -243,7 +265,7 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 foreach (var rectangle in rectangles.ToArray())
                 {
-                    var frame = ObjectFinder.Self.GetAnimationFrameContaining(rectangle);
+                    var frame = _objectFinder.GetAnimationFrameContaining(rectangle);
                     if (frame != null) DeleteAxisAlignedRectangle(rectangle, frame);
                 }
             }
@@ -258,7 +280,7 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 foreach (var circle in circles.ToArray())
                 {
-                    var frame = ObjectFinder.Self.GetAnimationFrameContaining(circle);
+                    var frame = _objectFinder.GetAnimationFrameContaining(circle);
                     if (frame != null) DeleteCircle(circle, frame);
                 }
             }
@@ -282,7 +304,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             if (await ConfirmAsync(message, "Delete?"))
             {
-                var chain = SelectedState.Self.SelectedChain;
+                var chain = _selectedState.SelectedChain;
                 if (chain != null)
                 {
                     // Capture original indices before removal
@@ -295,19 +317,19 @@ namespace AnimationEditor.Core.CommandsAndState
                         chain.Frames.Remove(frame);
 
                     if (entries.Length > 0)
-                        UndoManager.Self.Record(new DeleteFramesCommand(entries, chain));
+                        _undoManager.Record(new DeleteFramesCommand(entries, chain, this, _events));
 
                     RefreshChainNodeRequested?.Invoke(chain);
                 }
 
                 RefreshWireframeRequested?.Invoke();
-                ApplicationEvents.Self.RaiseAnimationChainsChanged();
+                _events.RaiseAnimationChainsChanged();
             }
         }
 
         private List<string> GetSelectedFrameShapeNames()
         {
-            var frame = SelectedState.Self.SelectedFrame;
+            var frame = _selectedState.SelectedFrame;
             if (frame?.ShapeCollectionSave == null) return new List<string>();
 
             return frame.ShapeCollectionSave.AxisAlignedRectangleSaves
@@ -320,7 +342,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public async Task AddAnimationChain()
         {
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls is null) return;
 
             var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
@@ -337,10 +359,10 @@ namespace AnimationEditor.Core.CommandsAndState
             int insertedAtIndex = acls.AnimationChains.Count - 1;
 
             RefreshTreeViewRequested?.Invoke();
-            SelectedState.Self.SelectedChain = chain;
+            _selectedState.SelectedChain = chain;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new AddChainCommand(chain, acls, insertedAtIndex));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new AddChainCommand(chain, acls, insertedAtIndex, this, _events));
         }
 
         /// <summary>
@@ -351,7 +373,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             if (chain.Name == newName) return true;
 
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls is not null &&
                 acls.AnimationChains.Any(c => !ReferenceEquals(c, chain) && c.Name == newName))
                 return false;
@@ -360,8 +382,8 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Name = newName;
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new RenameChainCommand(chain, oldName, newName));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new RenameChainCommand(chain, oldName, newName, this, _events));
             return true;
         }
 
@@ -375,8 +397,8 @@ namespace AnimationEditor.Core.CommandsAndState
             frame.TextureName = newTextureName;
             RefreshFrameNodeRequested?.Invoke(frame);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new SetFrameTextureNameCommand(frame, oldName, newTextureName));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new SetFrameTextureNameCommand(frame, oldName, newTextureName, this, _events));
         }
 
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
@@ -394,15 +416,15 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Frames.Add(frame);
             int insertedAtIndex = chain.Frames.Count - 1;
             RefreshChainNodeRequested?.Invoke(chain);
-            SelectedState.Self.SelectedFrame = frame;
+            _selectedState.SelectedFrame = frame;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new AddFrameCommand(frame, chain, insertedAtIndex));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new AddFrameCommand(frame, chain, insertedAtIndex, this, _events));
         }
 
         public void MoveChain(AnimationChainSave chain, int delta)
         {
-            var chains = ProjectManager.Self.AnimationChainListSave?.AnimationChains;
+            var chains = _pm.AnimationChainListSave?.AnimationChains;
             if (chains is null) return;
             int idx    = chains.IndexOf(chain);
             int newIdx = Math.Clamp(idx + delta, 0, chains.Count - 1);
@@ -411,29 +433,29 @@ namespace AnimationEditor.Core.CommandsAndState
             chains.Insert(newIdx, chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
         {
-            var chains = ProjectManager.Self.AnimationChainListSave?.AnimationChains;
+            var chains = _pm.AnimationChainListSave?.AnimationChains;
             if (chains is null) return;
             chains.Remove(chain);
             chains.Insert(0, chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void MoveChainToBottom(AnimationChainSave chain)
         {
-            var chains = ProjectManager.Self.AnimationChainListSave?.AnimationChains;
+            var chains = _pm.AnimationChainListSave?.AnimationChains;
             if (chains is null) return;
             chains.Remove(chain);
             chains.Add(chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
@@ -445,7 +467,7 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Frames.Insert(newIdx, frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
@@ -454,7 +476,7 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Frames.Insert(0, frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
@@ -463,7 +485,7 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Frames.Add(frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         /// <summary>
@@ -474,8 +496,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void HandleReorder(int delta)
         {
-            var frame = SelectedState.Self.SelectedFrame;
-            var chain = SelectedState.Self.SelectedChain;
+            var frame = _selectedState.SelectedFrame;
+            var chain = _selectedState.SelectedChain;
 
             if (frame is not null && chain is not null)
                 MoveFrame(frame, chain, delta);
@@ -487,7 +509,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             frame.FlipHorizontal = !frame.FlipHorizontal;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -495,7 +517,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             frame.FlipVertical = !frame.FlipVertical;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -505,7 +527,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 frame.FlipHorizontal = !frame.FlipHorizontal;
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -515,7 +537,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 frame.FlipVertical = !frame.FlipVertical;
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -524,7 +546,7 @@ namespace AnimationEditor.Core.CommandsAndState
             chain.Frames.Reverse();
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
@@ -532,7 +554,7 @@ namespace AnimationEditor.Core.CommandsAndState
             foreach (var frame in chain.Frames)
                 frame.FrameLength = frameLength;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         public AnimationChainSave? DuplicateChain(
@@ -541,7 +563,7 @@ namespace AnimationEditor.Core.CommandsAndState
             bool   flipV    = false,
             string? newName = null)
         {
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls is null) return null;
 
             var copyName = newName ?? StringFunctions.MakeStringUnique(
@@ -581,15 +603,15 @@ namespace AnimationEditor.Core.CommandsAndState
 
             acls.AnimationChains.Add(copy);
             RefreshTreeViewRequested?.Invoke();
-            SelectedState.Self.SelectedChain = copy;
+            _selectedState.SelectedChain = copy;
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             return copy;
         }
 
         public void SortAnimationsAlphabetically()
         {
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls is null) return;
             var sorted = acls.AnimationChains.OrderBy(c => c.Name).ToList();
             acls.AnimationChains.Clear();
@@ -597,7 +619,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 acls.AnimationChains.Add(c);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         // ── A16: Adjust Offsets ───────────────────────────────────────────────
@@ -626,7 +648,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     AdjustOffsetCalculator.ApplyJustifyBottom([frame], height.Value, offsetMultiplier);
             }
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -642,7 +664,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
         }
 
@@ -658,7 +680,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         /// <summary>
@@ -671,7 +693,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         // ── F12: Add Multiple Frames ──────────────────────────────────────────
@@ -693,12 +715,12 @@ namespace AnimationEditor.Core.CommandsAndState
             foreach (var frame in result.Frames)
             {
                 chain.Frames.Add(frame);
-                SelectedState.Self.SelectedFrame = frame;
+                _selectedState.SelectedFrame = frame;
             }
 
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
 
             return result.ExceededTextureBounds;
         }
@@ -717,12 +739,12 @@ namespace AnimationEditor.Core.CommandsAndState
             int oldWidth, int oldHeight,
             int newWidth, int newHeight)
         {
-            var acls = ProjectManager.Self.AnimationChainListSave;
+            var acls = _pm.AnimationChainListSave;
             if (acls is null) return [];
 
-            var aclsDir = string.IsNullOrEmpty(ProjectManager.Self.FileName)
+            var aclsDir = string.IsNullOrEmpty(_pm.FileName)
                 ? string.Empty
-                : System.IO.Path.GetDirectoryName(ProjectManager.Self.FileName) ?? string.Empty;
+                : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
 
             var modified = TextureResizeAdjuster.AdjustAll(
                 acls, aclsDir, absoluteTextureFilePath,
@@ -731,7 +753,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (modified.Count > 0)
             {
                 SaveCurrentAnimationChainList();
-                ApplicationEvents.Self.RaiseAnimationChainsChanged();
+                _events.RaiseAnimationChainsChanged();
                 RefreshWireframeRequested?.Invoke();
             }
 
@@ -747,14 +769,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void NewFile()
         {
-            ProjectManager.Self.AnimationChainListSave = new AnimationChainListSave();
-            ProjectManager.Self.FileName = string.Empty;
-            ProjectManager.Self.OnDiskCoordinateType = FlatRedBall.Graphics.TextureCoordinateType.Pixel;
-            SelectedState.Self.SelectedChain = null;
-            SelectedState.Self.SelectedFrame = null;
-            UndoManager.Self.Clear();
+            _pm.AnimationChainListSave = new AnimationChainListSave();
+            _pm.FileName = string.Empty;
+            _pm.OnDiskCoordinateType = FlatRedBall.Graphics.TextureCoordinateType.Pixel;
+            _selectedState.SelectedChain = null;
+            _selectedState.SelectedFrame = null;
+            _undoManager.Clear();
             RefreshTreeViewRequested?.Invoke();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _events.RaiseAnimationChainsChanged();
         }
 
         // ── WF09: Create frame from magic-wand pixel bounds ───────────────────
@@ -790,10 +812,10 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             chain.Frames.Add(frame);
-            SelectedState.Self.SelectedFrame = frame;
+            _selectedState.SelectedFrame = frame;
             RefreshChainNodeRequested?.Invoke(chain);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new AddFrameCommand(frame, chain, chain.Frames.Count - 1));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new AddFrameCommand(frame, chain, chain.Frames.Count - 1, this, _events));
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
@@ -811,8 +833,8 @@ namespace AnimationEditor.Core.CommandsAndState
             string? oldName = frame.TextureName;
             frame.TextureName = textureName!;
             RefreshFrameNodeRequested?.Invoke(frame);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            UndoManager.Self.Record(new SetFrameTextureNameCommand(frame, oldName, textureName));
+            _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new SetFrameTextureNameCommand(frame, oldName, textureName, this, _events));
         }
     }
 }

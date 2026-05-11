@@ -3,7 +3,7 @@ using System;
 
 namespace AnimationEditor.Core.CommandsAndState
 {
-    public class ApplicationEvents : Singleton<ApplicationEvents>
+    public class ApplicationEvents : IApplicationEvents
     {
         public event Action? AfterZoomChange;
         public event Action? WireframePanning;

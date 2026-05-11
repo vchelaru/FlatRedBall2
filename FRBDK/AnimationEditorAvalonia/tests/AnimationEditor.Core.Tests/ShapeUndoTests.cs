@@ -13,15 +13,16 @@ public class ShapeUndoTests
     [Fact]
     public void AddAxisAlignedRectangle_Undo_RemovesRect()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
 
-        AppCommands.Self.AddAxisAlignedRectangle(frame);
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
         Assert.Single(frame.ShapeCollectionSave.AxisAlignedRectangleSaves);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Empty(frame.ShapeCollectionSave.AxisAlignedRectangleSaves);
     }
@@ -29,16 +30,17 @@ public class ShapeUndoTests
     [Fact]
     public void AddAxisAlignedRectangle_UndoThenRedo_ReAddsRect()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
 
-        AppCommands.Self.AddAxisAlignedRectangle(frame);
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
         var originalRect = frame.ShapeCollectionSave.AxisAlignedRectangleSaves[0];
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Single(frame.ShapeCollectionSave.AxisAlignedRectangleSaves);
         Assert.Same(originalRect, frame.ShapeCollectionSave.AxisAlignedRectangleSaves[0]);
@@ -49,20 +51,21 @@ public class ShapeUndoTests
     [Fact]
     public void DeleteAxisAlignedRectangle_Undo_RestoresRectAtOriginalIndex()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
-        AppCommands.Self.AddAxisAlignedRectangle(frame);
-        AppCommands.Self.AddAxisAlignedRectangle(frame);
-        UndoManager.Self.Clear(); // clear add history — we're testing delete
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
+        ctx.UndoManager.Clear(); // clear add history — we're testing delete
         var rects = frame.ShapeCollectionSave.AxisAlignedRectangleSaves;
         var first = rects[0];
 
-        AppCommands.Self.DeleteAxisAlignedRectangle(first, frame);
+        ctx.AppCommands.DeleteAxisAlignedRectangle(first, frame);
         Assert.Single(rects);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal(2, rects.Count);
         Assert.Same(first, rects[0]);
@@ -71,19 +74,20 @@ public class ShapeUndoTests
     [Fact]
     public void DeleteAxisAlignedRectangle_UndoThenRedo_RemovesAgain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
-        AppCommands.Self.AddAxisAlignedRectangle(frame);
-        UndoManager.Self.Clear();
+        ctx.AppCommands.AddAxisAlignedRectangle(frame);
+        ctx.UndoManager.Clear();
         var rect = frame.ShapeCollectionSave.AxisAlignedRectangleSaves[0];
 
-        AppCommands.Self.DeleteAxisAlignedRectangle(rect, frame);
-        UndoManager.Self.Undo();
+        ctx.AppCommands.DeleteAxisAlignedRectangle(rect, frame);
+        ctx.UndoManager.Undo();
         Assert.Single(frame.ShapeCollectionSave.AxisAlignedRectangleSaves);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Empty(frame.ShapeCollectionSave.AxisAlignedRectangleSaves);
     }
@@ -93,15 +97,16 @@ public class ShapeUndoTests
     [Fact]
     public void AddCircle_Undo_RemovesCircle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
 
-        AppCommands.Self.AddCircle(frame);
+        ctx.AppCommands.AddCircle(frame);
         Assert.Single(frame.ShapeCollectionSave.CircleSaves);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Empty(frame.ShapeCollectionSave.CircleSaves);
     }
@@ -109,16 +114,17 @@ public class ShapeUndoTests
     [Fact]
     public void AddCircle_UndoThenRedo_ReAddsCircle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
 
-        AppCommands.Self.AddCircle(frame);
+        ctx.AppCommands.AddCircle(frame);
         var originalCircle = frame.ShapeCollectionSave.CircleSaves[0];
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Single(frame.ShapeCollectionSave.CircleSaves);
         Assert.Same(originalCircle, frame.ShapeCollectionSave.CircleSaves[0]);
@@ -129,20 +135,21 @@ public class ShapeUndoTests
     [Fact]
     public void DeleteCircle_Undo_RestoresCircleAtOriginalIndex()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
-        AppCommands.Self.AddCircle(frame);
-        AppCommands.Self.AddCircle(frame);
-        UndoManager.Self.Clear();
+        ctx.AppCommands.AddCircle(frame);
+        ctx.AppCommands.AddCircle(frame);
+        ctx.UndoManager.Clear();
         var circles = frame.ShapeCollectionSave.CircleSaves;
         var first = circles[0];
 
-        AppCommands.Self.DeleteCircle(first, frame);
+        ctx.AppCommands.DeleteCircle(first, frame);
         Assert.Single(circles);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal(2, circles.Count);
         Assert.Same(first, circles[0]);
@@ -151,19 +158,20 @@ public class ShapeUndoTests
     [Fact]
     public void DeleteCircle_UndoThenRedo_RemovesAgain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
         var frame = TestHelpers.MakeFrame();
         chain.Frames.Add(frame);
-        AppCommands.Self.AddCircle(frame);
-        UndoManager.Self.Clear();
+        ctx.AppCommands.AddCircle(frame);
+        ctx.UndoManager.Clear();
         var circle = frame.ShapeCollectionSave.CircleSaves[0];
 
-        AppCommands.Self.DeleteCircle(circle, frame);
-        UndoManager.Self.Undo();
+        ctx.AppCommands.DeleteCircle(circle, frame);
+        ctx.UndoManager.Undo();
         Assert.Single(frame.ShapeCollectionSave.CircleSaves);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Empty(frame.ShapeCollectionSave.CircleSaves);
     }

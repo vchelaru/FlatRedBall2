@@ -16,7 +16,7 @@ namespace AnimationEditor.App.Tests;
 ///
 /// Each test:
 ///   1. Creates a headless MainWindow and selects a frame.
-///   2. Changes <see cref="UnitType"/> by updating <see cref="AppState.Self.UnitType"/>
+///   2. Changes <see cref="UnitType"/> by updating <see cref="ctx.AppState.UnitType"/>
 ///      directly, then raises <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>
 ///      and flushes the dispatcher so the async InvokeAsync completes.
 ///   3. Asserts the visibility of <c>PropPixelSection</c>, <c>PropTcSection</c>,
@@ -28,9 +28,11 @@ namespace AnimationEditor.App.Tests;
 /// </summary>
 public class UnitTypePropPanelTests
 {
+    private TestServices ctx = null!;
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static MainWindow CreateWindowWithFrame(out AnimationFrameSave frame)
+    private MainWindow CreateWindowWithFrame(out AnimationFrameSave frame)
     {
         var acls  = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Walk" };
@@ -47,22 +49,23 @@ public class UnitTypePropPanelTests
         acls.AnimationChains.Add(chain);
 
         // Reset all singletons before creating the window.
-        ProjectManager.Self.AnimationChainListSave = acls;
-        ProjectManager.Self.FileName = null;
-        SelectedState.Self.SelectedChain = null;
-        SelectedState.Self.SelectedFrame = null;
-        SelectedState.Self.SelectedNodes = new System.Collections.Generic.List<object>();
-        AppCommands.Self.DoOnUiThread = a => a();
-        AppCommands.Self.ConfirmAsync = (_, _) => Task.FromResult(true);
-        AppCommands.Self.FileDialogService = NullFileDialogService.Instance;
-        AppState.Self.UnitType = UnitType.Pixel;
+        ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        ctx.ProjectManager.FileName = null;
+        ctx.SelectedState.SelectedChain = null;
+        ctx.SelectedState.SelectedFrame = null;
+        ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>();
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        ctx.AppState.UnitType = UnitType.Pixel;
 
         // Create and show FIRST so the window subscribes to SelectionChanged.
-        var window = new MainWindow();
+        var window = ctx.CreateMainWindow();
         window.Show();
 
         // THEN set selection — this fires SelectionChanged which the window now handles.
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
         Dispatcher.UIThread.RunJobs();   // flush InvokeAsync(RefreshPropertyPanel)
 
         return window;
@@ -72,12 +75,12 @@ public class UnitTypePropPanelTests
     /// Changes the unit type and re-triggers property panel refresh via the normal
     /// SelectionChanged pathway (same sequence as the toolbar combo firing OnUnitTypeComboChanged).
     /// </summary>
-    private static void SetUnitAndRefresh(UnitType unitType)
+    private void SetUnitAndRefresh(UnitType unitType)
     {
-        AppState.Self.UnitType = unitType;
+        ctx.AppState.UnitType = unitType;
         // Re-assign the selected frame — fires SelectionChanged →
         // HandleSelectionChanged → InvokeAsync(RefreshPropertyPanel)
-        SelectedState.Self.SelectedFrame = SelectedState.Self.SelectedFrame;
+        ctx.SelectedState.SelectedFrame = ctx.SelectedState.SelectedFrame;
         Dispatcher.UIThread.RunJobs();
     }
 
@@ -107,7 +110,7 @@ public class UnitTypePropPanelTests
         try
         {
             // Clear selection — fires SelectionChanged which refreshes the panel
-            SelectedState.Self.SelectedFrame = null;
+            ctx.SelectedState.SelectedFrame = null;
             Dispatcher.UIThread.RunJobs();
 
             var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
@@ -252,15 +255,15 @@ public class UnitTypePropPanelTests
 
             combo.SelectedIndex = (int)UnitType.Pixel;
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.Pixel, AppState.Self.UnitType);
+            Assert.Equal(UnitType.Pixel, ctx.AppState.UnitType);
 
             combo.SelectedIndex = (int)UnitType.TextureCoordinate;
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.TextureCoordinate, AppState.Self.UnitType);
+            Assert.Equal(UnitType.TextureCoordinate, ctx.AppState.UnitType);
 
             combo.SelectedIndex = (int)UnitType.SpriteSheet;
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.SpriteSheet, AppState.Self.UnitType);
+            Assert.Equal(UnitType.SpriteSheet, ctx.AppState.UnitType);
         }
         finally { window.Close(); }
     }

@@ -22,11 +22,12 @@ public class WorkflowTutorialTests
     [Fact]
     public async Task Step1_CreateIdleChain_RenameToIdle_ChainNameIsIdle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
 
-        await AppCommands.Self.AddAnimationChain();
-        var chain = SelectedState.Self.SelectedChain!;
-        bool renamed = AppCommands.Self.RenameChain(chain, "Idle");
+        await ctx.AppCommands.AddAnimationChain();
+        var chain = ctx.SelectedState.SelectedChain!;
+        bool renamed = ctx.AppCommands.RenameChain(chain, "Idle");
 
         Assert.True(renamed, "RenameChain should succeed for a unique name");
         Assert.Equal("Idle", chain.Name);
@@ -39,10 +40,11 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step2_AddFrameToIdleChain_FrameStartsWithNoTexture()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle");
 
-        AppCommands.Self.AddFrame(chain);
+        ctx.AppCommands.AddFrame(chain);
 
         Assert.Single(chain.Frames);
         Assert.Equal(string.Empty, chain.Frames[0].TextureName);
@@ -54,12 +56,13 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step3_SetTextureName_FrameHasTextureName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle");
-        AppCommands.Self.AddFrame(chain);
+        ctx.AppCommands.AddFrame(chain);
         var frame = chain.Frames[0];
 
-        AppCommands.Self.SetFrameTextureName(frame, "Idle.png");
+        ctx.AppCommands.SetFrameTextureName(frame, "Idle.png");
 
         Assert.Equal("Idle.png", frame.TextureName);
     }
@@ -90,7 +93,8 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step5_IdleAnimation_8SpriteSheetFrames_AllHaveUniqueUVRects()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle");
 
         int cellW = 32, cellH = 64, texW = 128, texH = 128;
@@ -154,7 +158,8 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step6_IdleAnimation_AllEightFrames_HaveSameTextureAndDefaultDuration()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle");
 
         int cellW = 32, cellH = 64, texW = 128, texH = 128;
@@ -181,10 +186,11 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step6_SetAllFrameLengths_AllFramesUpdatedToNewDuration()
     {
-        var acls  = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle", frameCount: 8);
 
-        AppCommands.Self.SetAllFrameLengths(chain, 0.05f);
+        ctx.AppCommands.SetAllFrameLengths(chain, 0.05f);
 
         Assert.All(chain.Frames, f => Assert.Equal(0.05f, f.FrameLength, precision: 5));
     }
@@ -195,15 +201,16 @@ public class WorkflowTutorialTests
     [Fact]
     public async Task Step7_CreateRunAnimation_AclsNowHasTwoChains()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
 
-        await AppCommands.Self.AddAnimationChain();
-        var idle = SelectedState.Self.SelectedChain!;
-        AppCommands.Self.RenameChain(idle, "Idle");
+        await ctx.AppCommands.AddAnimationChain();
+        var idle = ctx.SelectedState.SelectedChain!;
+        ctx.AppCommands.RenameChain(idle, "Idle");
 
-        await AppCommands.Self.AddAnimationChain();
-        var run = SelectedState.Self.SelectedChain!;
-        AppCommands.Self.RenameChain(run, "Run");
+        await ctx.AppCommands.AddAnimationChain();
+        var run = ctx.SelectedState.SelectedChain!;
+        ctx.AppCommands.RenameChain(run, "Run");
 
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Equal("Idle", acls.AnimationChains[0].Name);
@@ -217,11 +224,12 @@ public class WorkflowTutorialTests
     [Fact]
     public void Step8_PixelMode_AddFrameFromBounds_UVsMatchPixelRegion()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run");
 
         // Doc example: first run frame covers roughly the left half of a 128×128 sprite sheet
-        AppCommands.Self.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128, 128, 128);
+        ctx.AppCommands.AddFrameFromPixelBounds(chain, "Running.png", 0, 0, 64, 128, 128, 128);
 
         var frame = chain.Frames[0];
         Assert.Equal(0f,   frame.LeftCoordinate,   precision: 5);

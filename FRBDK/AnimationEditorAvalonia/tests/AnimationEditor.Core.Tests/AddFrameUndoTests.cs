@@ -13,13 +13,14 @@ public class AddFrameUndoTests
     [Fact]
     public void AddFrame_Undo_RemovesFrameFromChain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
 
-        AppCommands.Self.AddFrame(chain, "sprite.png");
+        ctx.AppCommands.AddFrame(chain, "sprite.png");
         Assert.Single(chain.Frames);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Empty(chain.Frames);
     }
@@ -27,15 +28,16 @@ public class AddFrameUndoTests
     [Fact]
     public void AddFrame_UndoThenRedo_ReAddsFrame()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk");
 
-        AppCommands.Self.AddFrame(chain, "sprite.png");
+        ctx.AppCommands.AddFrame(chain, "sprite.png");
         var originalFrame = chain.Frames[0];
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
         Assert.Empty(chain.Frames);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Single(chain.Frames);
         Assert.Same(originalFrame, chain.Frames[0]);

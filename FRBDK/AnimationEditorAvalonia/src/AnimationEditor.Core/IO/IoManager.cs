@@ -6,8 +6,14 @@ using FilePath = FlatRedBall.IO.FilePath;
 
 namespace AnimationEditor.Core.IO
 {
-    public class IoManager : Singleton<IoManager>
+    public class IoManager : IIoManager
     {
+        private readonly IAppState _appState;
+
+        public IoManager(IAppState appState)
+        {
+            _appState = appState;
+        }
         /// <summary>Raised when saving the companion file fails. The app layer should display the error.</summary>
         public event Action<string, Exception>? SaveFailed;
 
@@ -53,9 +59,9 @@ namespace AnimationEditor.Core.IO
 
         private void ApplySettings(AESettingsSave settings)
         {
-            AppState.Self.UnitType = settings.UnitType;
-            AppState.Self.IsSnapToGridChecked = settings.SnapToGrid;
-            AppState.Self.GridSize = settings.GridSize;
+            _appState.UnitType = settings.UnitType;
+            _appState.IsSnapToGridChecked = settings.SnapToGrid;
+            _appState.GridSize = settings.GridSize;
 
             // Expanded nodes and guide lines are stored in settings but applied by
             // the UI layer — raise an event so the tree and preview panels can pick them up.

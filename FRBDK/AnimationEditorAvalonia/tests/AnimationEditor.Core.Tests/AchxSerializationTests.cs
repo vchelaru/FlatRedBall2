@@ -19,7 +19,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesChainName()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/test.achx";
         var acls = new AnimationChainListSave();
@@ -34,7 +34,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesFrameTextureName()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/tex.achx";
         var acls = new AnimationChainListSave();
@@ -51,7 +51,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesFrameUvCoordinates()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/uv.achx";
         var acls = new AnimationChainListSave();
@@ -78,7 +78,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesFrameLength()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/fl.achx";
         var acls = new AnimationChainListSave();
@@ -97,7 +97,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_WhenFlipHorizontalTrue_Preserved()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/flip.achx";
         var acls = new AnimationChainListSave();
@@ -114,7 +114,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_WhenFlipVerticalTrue_Preserved()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/flipV.achx";
         var acls = new AnimationChainListSave();
@@ -133,7 +133,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesNonZeroRelativeXY()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/rel.achx";
         var acls = new AnimationChainListSave();
@@ -154,7 +154,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesAxisAlignedRectangleInFrame()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/rect.achx";
         var acls = new AnimationChainListSave();
@@ -179,7 +179,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_PreservesCircleInFrame()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/circle.achx";
         var acls = new AnimationChainListSave();
@@ -205,7 +205,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_MultipleChains_AllPreserved()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/multi.achx";
         var acls = new AnimationChainListSave();
@@ -225,7 +225,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_MultipleChains_OrderPreserved()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/order.achx";
         var acls = new AnimationChainListSave();
@@ -245,7 +245,7 @@ public class AchxSerializationTests
     [Fact]
     public void SaveThenLoad_EmptyAcls_LoadsWithNoChains()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/empty.achx";
         var acls = new AnimationChainListSave();
@@ -261,7 +261,7 @@ public class AchxSerializationTests
     [Fact]
     public void Save_XmlRootElementIsAnimationChainArraySave()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/rootcheck.achx";
         var acls = new AnimationChainListSave();
@@ -276,7 +276,7 @@ public class AchxSerializationTests
     [Fact]
     public void Save_EachChainSerializesAsAnimationChainElement()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var path = dir.Path + "/chainelem.achx";
         var acls = new AnimationChainListSave();

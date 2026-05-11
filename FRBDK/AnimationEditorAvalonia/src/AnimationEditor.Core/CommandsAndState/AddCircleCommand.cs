@@ -7,29 +7,34 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly CircleSave _circle;
         private readonly AnimationFrameSave _frame;
+        private readonly IAppCommands _commands;
+        private readonly IApplicationEvents _events;
 
-        public AddCircleCommand(CircleSave circle, AnimationFrameSave frame)
+        public AddCircleCommand(CircleSave circle, AnimationFrameSave frame,
+            IAppCommands commands, IApplicationEvents events)
         {
             _circle = circle;
             _frame = frame;
+            _commands = commands;
+            _events = events;
         }
 
         public void Undo()
         {
             _frame.ShapeCollectionSave.CircleSaves.Remove(_circle);
-            AppCommands.Self.RefreshTreeNode(_frame);
-            AppCommands.Self.RefreshAnimationFrameDisplay();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _commands.RefreshAnimationFrameDisplay();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
 
         public void Redo()
         {
             _frame.ShapeCollectionSave.CircleSaves.Add(_circle);
-            AppCommands.Self.RefreshTreeNode(_frame);
-            AppCommands.Self.RefreshAnimationFrameDisplay();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _commands.RefreshAnimationFrameDisplay();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

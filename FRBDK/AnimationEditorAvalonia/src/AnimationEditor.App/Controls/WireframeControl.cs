@@ -446,6 +446,39 @@ public class WireframeControl : Control
     /// </summary>
     public event Action<int, int, int, int>? FrameCreatedFromRegion;
 
+    // ── Injected services ─────────────────────────────────────────────────────
+
+    private ISelectedState? _selectedState;
+    private IAppState? _appState;
+    private IAppCommands? _appCommands;
+    private IApplicationEvents? _events;
+    private IProjectManager? _projectManager;
+    private IUndoManager? _undoManager;
+
+    /// <summary>
+    /// Called from MainWindow after DI container wires all services.
+    /// Moves subscriptions out of the constructor so services are available.
+    /// </summary>
+    public void InitializeServices(
+        ISelectedState selectedState,
+        IAppState appState,
+        IAppCommands appCommands,
+        IApplicationEvents events,
+        IProjectManager projectManager,
+        IUndoManager undoManager)
+    {
+        _selectedState   = selectedState;
+        _appState        = appState;
+        _appCommands     = appCommands;
+        _events          = events;
+        _projectManager  = projectManager;
+        _undoManager     = undoManager;
+
+        _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        _events.AchxLoaded                  += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+    }
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public WireframeControl()
@@ -453,10 +486,7 @@ public class WireframeControl : Control
         ClipToBounds = true;
         Focusable = true;
 
-        // Wire into Core event system
-        SelectedState.Self.SelectionChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
-        AppCommands.Self.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
-        ApplicationEvents.Self.AchxLoaded += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
         // Safety-net: LayoutUpdated fires after the FULL layout pass, at which point
         // sv.Extent is guaranteed to reflect the new (larger) content size.  If the
@@ -884,13 +914,13 @@ public class WireframeControl : Control
     {
         if (!_showGrid || _gridSize <= 0 || _bitmap is null) return;
 
-        var selectedFrame  = SelectedState.Self.SelectedFrame;
-        var selectedChain  = SelectedState.Self.SelectedChain;
-        var selectedChains = SelectedState.Self.SelectedChains;
+        var selectedFrame  = _selectedState?.SelectedFrame;
+        var selectedChain  = _selectedState?.SelectedChain;
+        var selectedChains = _selectedState?.SelectedChains;
 
-        string? achxFolder = string.IsNullOrEmpty(ProjectManager.Self.FileName)
+        string? achxFolder = string.IsNullOrEmpty(_projectManager?.FileName)
             ? null
-            : FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
+            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
 
         IEnumerable<AnimationFrameSave> framesToSnap;
         if (selectedFrame != null)
@@ -1004,11 +1034,12 @@ public class WireframeControl : Control
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
         FrameRegionChanged?.Invoke(sel.Frame);
-        UndoManager.Self.Record(new FrameRegionChangedCommand(
+        _undoManager!.Record(new FrameRegionChangedCommand(
             sel.Frame,
             _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
             sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
-            sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate));
+            sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate,
+            _appCommands!, _events!));
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1028,7 +1059,7 @@ public class WireframeControl : Control
         float startScreenX, float startScreenY,
         float endScreenX,   float endScreenY)
     {
-        var chain = SelectedState.Self.SelectedChain;
+        var chain = _selectedState?.SelectedChain;
         if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
 
         _draggingChain = true;
@@ -1251,11 +1282,11 @@ public class WireframeControl : Control
             // from the frame's center by (-RelativeX, +RelativeY) in game space
             // (RelativeX/Y stored in display pixels = stored * OffsetMultiplier).
             // Game Y+ = screen up = texture row decreasing → negate RelativeY.
-            float offMult = AppState.Self.OffsetMultiplier;
+            float offMult = _appState?.OffsetMultiplier ?? 1f;
             snap.OriginTexX = sel.Bounds.MidX - sel.Frame.RelativeX * offMult;
             snap.OriginTexY = sel.Bounds.MidY + sel.Frame.RelativeY * offMult;
         }
-        else if (SelectedState.Self.SelectedChain != null && _frameRects.Count > 0)
+        else if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
         {
             snap.SelectedHandleBounds = ComputeChainBoundingRect();
         }
@@ -1511,11 +1542,12 @@ public class WireframeControl : Control
         if (_draggingRect != null)
         {
             FrameRegionChanged?.Invoke(_draggingRect.Frame);
-            UndoManager.Self.Record(new FrameRegionChangedCommand(
+            _undoManager!.Record(new FrameRegionChangedCommand(
                 _draggingRect.Frame,
                 _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
                 _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
-                _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate));
+                _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate,
+                _appCommands!, _events!));
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
             e.Pointer.Capture(null);
@@ -1523,7 +1555,7 @@ public class WireframeControl : Control
 
         if (_draggingChain)
         {
-            var chain = SelectedState.Self.SelectedChain;
+            var chain = _selectedState!.SelectedChain;
             if (chain != null)
                 ChainRegionChanged?.Invoke(chain);
             _draggingChain = false;
@@ -1783,7 +1815,7 @@ public class WireframeControl : Control
 
         // Chain selected (no individual frame): test against the composite bounding rect.
         // All hits are treated as Move since resizing the group is not supported.
-        if (SelectedState.Self.SelectedChain != null && _frameRects.Count > 0)
+        if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
         {
             var chainRect = ComputeChainBoundingRect();
             var sr = ToScreen(chainRect);
@@ -1806,7 +1838,7 @@ public class WireframeControl : Control
         {
             if (fr.Bounds.Contains(worldPt))
             {
-                SelectedState.Self.SelectedFrame = fr.Frame;
+                _selectedState!.SelectedFrame = fr.Frame;
                 return;
             }
         }
@@ -1814,8 +1846,8 @@ public class WireframeControl : Control
 
     private void ApplyRegionToSelectedFrame(int minX, int minY, int maxX, int maxY)
     {
-        if (SelectedState.Self.SelectedFrame is null || _bitmap is null) return;
-        var frame = SelectedState.Self.SelectedFrame;
+        if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
+        var frame = _selectedState!.SelectedFrame;
         float w = _bitmap.Width, h = _bitmap.Height;
         frame.LeftCoordinate   = minX / w;
         frame.RightCoordinate  = maxX / w;
@@ -1848,13 +1880,13 @@ public class WireframeControl : Control
 
         if (_bitmap is null) { InvalidateVisual(); return; }
 
-        var selectedFrame  = SelectedState.Self.SelectedFrame;
-        var selectedChain  = SelectedState.Self.SelectedChain;
-        var selectedChains = SelectedState.Self.SelectedChains;
+        var selectedFrame  = _selectedState!.SelectedFrame;
+        var selectedChain  = _selectedState!.SelectedChain;
+        var selectedChains = _selectedState!.SelectedChains;
 
-        string? achxFolder = string.IsNullOrEmpty(ProjectManager.Self.FileName)
+        string? achxFolder = string.IsNullOrEmpty(_projectManager!.FileName)
             ? null
-            : FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName);
+            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
 
         IEnumerable<AnimationFrameSave> framesToShow;
         if (selectedFrame != null)
@@ -1959,17 +1991,17 @@ public class WireframeControl : Control
 
     private string? DetermineTexturePath()
     {
-        string? textureName = SelectedState.Self.SelectedFrame?.TextureName
-                           ?? SelectedState.Self.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
+        string? textureName = _selectedState!.SelectedFrame?.TextureName
+                           ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
 
         if (string.IsNullOrEmpty(textureName))
             return null;
 
         // If no ACHX is saved yet, the texture path is already absolute.
-        if (string.IsNullOrEmpty(ProjectManager.Self.FileName))
+        if (string.IsNullOrEmpty(_projectManager!.FileName))
             return textureName;
 
-        return FlatRedBall.IO.FileManager.GetDirectory(ProjectManager.Self.FileName) + textureName;
+        return FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName) + textureName;
     }
 
     /// <summary>
@@ -1980,7 +2012,7 @@ public class WireframeControl : Control
     private (int w, int h) GetLastFramePixelSize()
     {
         if (_bitmap is null) return (0, 0);
-        var chain = SelectedState.Self.SelectedChain;
+        var chain = _selectedState!.SelectedChain;
         if (chain?.Frames == null || chain.Frames.Count == 0) return (0, 0);
         var last = chain.Frames[chain.Frames.Count - 1];
         int w = (int)Math.Round((last.RightCoordinate  - last.LeftCoordinate)  * _bitmap.Width);

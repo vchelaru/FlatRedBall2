@@ -12,10 +12,10 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_SetsTextureNameOnFrame()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave();
 
-        AppCommands.Self.SetFrameTextureName(frame, "hero.png");
+        ctx.AppCommands.SetFrameTextureName(frame, "hero.png");
 
         Assert.Equal("hero.png", frame.TextureName);
     }
@@ -23,10 +23,10 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_CanOverwriteExistingName()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { TextureName = "old.png" };
 
-        AppCommands.Self.SetFrameTextureName(frame, "new.png");
+        ctx.AppCommands.SetFrameTextureName(frame, "new.png");
 
         Assert.Equal("new.png", frame.TextureName);
     }
@@ -34,10 +34,10 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_CanClearToNull()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { TextureName = "hero.png" };
 
-        AppCommands.Self.SetFrameTextureName(frame, null);
+        ctx.AppCommands.SetFrameTextureName(frame, null);
 
         Assert.Null(frame.TextureName);
     }
@@ -45,10 +45,10 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_CanClearToEmptyString()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { TextureName = "hero.png" };
 
-        AppCommands.Self.SetFrameTextureName(frame, "");
+        ctx.AppCommands.SetFrameTextureName(frame, "");
 
         Assert.Equal("", frame.TextureName);
     }
@@ -58,9 +58,9 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_NullFrame_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         // Should be a silent no-op
-        AppCommands.Self.SetFrameTextureName(null!, "hero.png");
+        ctx.AppCommands.SetFrameTextureName(null!, "hero.png");
     }
 
     // ── Event firing ──────────────────────────────────────────────────────────
@@ -68,12 +68,12 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_FiresAnimationChainsChanged()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame   = new AnimationFrameSave();
         bool fired  = false;
-        ApplicationEvents.Self.AnimationChainsChanged += () => fired = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => fired = true;
 
-        AppCommands.Self.SetFrameTextureName(frame, "run.png");
+        ctx.AppCommands.SetFrameTextureName(frame, "run.png");
 
         Assert.True(fired);
     }
@@ -81,12 +81,12 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_FiresRefreshFrameNodeRequested_WithCorrectFrame()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var frame             = new AnimationFrameSave();
         AnimationFrameSave? received = null;
-        AppCommands.Self.RefreshFrameNodeRequested += f => received = f;
+        ctx.AppCommands.RefreshFrameNodeRequested += f => received = f;
 
-        AppCommands.Self.SetFrameTextureName(frame, "idle.png");
+        ctx.AppCommands.SetFrameTextureName(frame, "idle.png");
 
         Assert.Same(frame, received);
     }
@@ -94,11 +94,11 @@ public class AppCommandsSetFrameTextureTests
     [Fact]
     public void SetFrameTextureName_NullFrame_DoesNotFireEvents()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool changed = false;
-        ApplicationEvents.Self.AnimationChainsChanged += () => changed = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => changed = true;
 
-        AppCommands.Self.SetFrameTextureName(null!, "hero.png");
+        ctx.AppCommands.SetFrameTextureName(null!, "hero.png");
 
         Assert.False(changed);
     }

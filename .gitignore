@@ -2,6 +2,9 @@
 **/bin/
 **/obj/
 
+# Personal local Claude instructions
+CLAUDE.local.md
+
 # Gum bundle output (produced by `gumcli pack`; loose source is checked in)
 **/*.gumpkg
 
@@ -48,3 +51,4 @@
 /.claude/skills/tmx
 /.claude/skills/top-down-movement
 /.claude/skills/tweening
+/.claude/worktrees

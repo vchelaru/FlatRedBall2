@@ -7,26 +7,31 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly AnimationFrameSave _frame;
         private readonly string? _oldName;
         private readonly string? _newName;
+        private readonly IAppCommands _commands;
+        private readonly IApplicationEvents _events;
 
-        public SetFrameTextureNameCommand(AnimationFrameSave frame, string? oldName, string? newName)
+        public SetFrameTextureNameCommand(AnimationFrameSave frame, string? oldName, string? newName,
+            IAppCommands commands, IApplicationEvents events)
         {
             _frame = frame;
             _oldName = oldName;
             _newName = newName;
+            _commands = commands;
+            _events = events;
         }
 
         public void Undo()
         {
             _frame.TextureName = _oldName!;
-            AppCommands.Self.RefreshTreeNode(_frame);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _commands.RefreshTreeNode(_frame);
+            _events.RaiseAnimationChainsChanged();
         }
 
         public void Redo()
         {
             _frame.TextureName = _newName!;
-            AppCommands.Self.RefreshTreeNode(_frame);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
+            _commands.RefreshTreeNode(_frame);
+            _events.RaiseAnimationChainsChanged();
         }
     }
 }

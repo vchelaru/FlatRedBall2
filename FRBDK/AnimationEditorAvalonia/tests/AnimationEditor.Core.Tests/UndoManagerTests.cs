@@ -4,25 +4,22 @@ using Xunit;
 
 namespace AnimationEditor.Core.Tests;
 
-[Collection("SequentialSingletons")]
 public class UndoManagerTests
 {
-    private static void Reset() => UndoManager.Self.Clear();
+    private readonly UndoManager _undo = new();
 
     // ── CanUndo / CanRedo initial state ───────────────────────────────────────
 
     [Fact]
     public void CanRedo_AfterClear_IsFalse()
     {
-        Reset();
-        Assert.False(UndoManager.Self.CanRedo);
+        Assert.False(_undo.CanRedo);
     }
 
     [Fact]
     public void CanUndo_AfterClear_IsFalse()
     {
-        Reset();
-        Assert.False(UndoManager.Self.CanUndo);
+        Assert.False(_undo.CanUndo);
     }
 
     // ── Clear ─────────────────────────────────────────────────────────────────
@@ -30,15 +27,14 @@ public class UndoManagerTests
     [Fact]
     public void Clear_EmptiesBothStacks()
     {
-        Reset();
         var cmd = new StubCommand();
-        UndoManager.Self.Record(cmd);
-        UndoManager.Self.Undo();   // moves cmd to redo stack
+        _undo.Record(cmd);
+        _undo.Undo();   // moves cmd to redo stack
 
-        UndoManager.Self.Clear();
+        _undo.Clear();
 
-        Assert.False(UndoManager.Self.CanUndo);
-        Assert.False(UndoManager.Self.CanRedo);
+        Assert.False(_undo.CanUndo);
+        Assert.False(_undo.CanRedo);
     }
 
     // ── Record ────────────────────────────────────────────────────────────────
@@ -46,23 +42,21 @@ public class UndoManagerTests
     [Fact]
     public void Record_AfterUndo_ClearsRedoStack()
     {
-        Reset();
         var first = new StubCommand();
-        UndoManager.Self.Record(first);
-        UndoManager.Self.Undo();          // first is now on redo stack
-        Assert.True(UndoManager.Self.CanRedo);
+        _undo.Record(first);
+        _undo.Undo();          // first is now on redo stack
+        Assert.True(_undo.CanRedo);
 
-        UndoManager.Self.Record(new StubCommand());  // recording clears redo
+        _undo.Record(new StubCommand());  // recording clears redo
 
-        Assert.False(UndoManager.Self.CanRedo);
+        Assert.False(_undo.CanRedo);
     }
 
     [Fact]
     public void Record_PushesToUndoStack()
     {
-        Reset();
-        UndoManager.Self.Record(new StubCommand());
-        Assert.True(UndoManager.Self.CanUndo);
+        _undo.Record(new StubCommand());
+        Assert.True(_undo.CanUndo);
     }
 
     // ── Redo ─────────────────────────────────────────────────────────────────
@@ -70,12 +64,11 @@ public class UndoManagerTests
     [Fact]
     public void Redo_CallsRedoOnCommand()
     {
-        Reset();
         var cmd = new StubCommand();
-        UndoManager.Self.Record(cmd);
-        UndoManager.Self.Undo();
+        _undo.Record(cmd);
+        _undo.Undo();
 
-        UndoManager.Self.Redo();
+        _undo.Redo();
 
         Assert.Equal(1, cmd.RedoCalls);
     }
@@ -83,20 +76,18 @@ public class UndoManagerTests
     [Fact]
     public void Redo_PushesBackToUndoStack()
     {
-        Reset();
-        UndoManager.Self.Record(new StubCommand());
-        UndoManager.Self.Undo();
+        _undo.Record(new StubCommand());
+        _undo.Undo();
 
-        UndoManager.Self.Redo();
+        _undo.Redo();
 
-        Assert.True(UndoManager.Self.CanUndo);
+        Assert.True(_undo.CanUndo);
     }
 
     [Fact]
     public void Redo_WhenEmpty_DoesNotThrow()
     {
-        Reset();
-        var ex = Record.Exception(() => UndoManager.Self.Redo());
+        var ex = Record.Exception(() => _undo.Redo());
         Assert.Null(ex);
     }
 
@@ -105,11 +96,10 @@ public class UndoManagerTests
     [Fact]
     public void Undo_CallsUndoOnCommand()
     {
-        Reset();
         var cmd = new StubCommand();
-        UndoManager.Self.Record(cmd);
+        _undo.Record(cmd);
 
-        UndoManager.Self.Undo();
+        _undo.Undo();
 
         Assert.Equal(1, cmd.UndoCalls);
     }
@@ -117,19 +107,17 @@ public class UndoManagerTests
     [Fact]
     public void Undo_PushesToRedoStack()
     {
-        Reset();
-        UndoManager.Self.Record(new StubCommand());
+        _undo.Record(new StubCommand());
 
-        UndoManager.Self.Undo();
+        _undo.Undo();
 
-        Assert.True(UndoManager.Self.CanRedo);
+        Assert.True(_undo.CanRedo);
     }
 
     [Fact]
     public void Undo_WhenEmpty_DoesNotThrow()
     {
-        Reset();
-        var ex = Record.Exception(() => UndoManager.Self.Undo());
+        var ex = Record.Exception(() => _undo.Undo());
         Assert.Null(ex);
     }
 

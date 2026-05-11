@@ -3,11 +3,17 @@ using FlatRedBall.Content.Math.Geometry;
 
 namespace AnimationEditor.Core
 {
-    public class ObjectFinder : Singleton<ObjectFinder>
+    public class ObjectFinder : IObjectFinder
     {
+        private readonly IProjectManager _pm;
+
+        public ObjectFinder(IProjectManager pm)
+        {
+            _pm = pm;
+        }
         public AnimationFrameSave? GetAnimationFrameContaining(AxisAlignedRectangleSave rectangle)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
+            foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
@@ -20,7 +26,7 @@ namespace AnimationEditor.Core
 
         public AnimationFrameSave? GetAnimationFrameContaining(CircleSave circle)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
+            foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
@@ -33,7 +39,7 @@ namespace AnimationEditor.Core
 
         public AnimationChainSave? GetAnimationChainContaining(AnimationFrameSave frame)
         {
-            foreach (var chain in ProjectManager.Self.AnimationChainListSave?.AnimationChains ?? [])
+            foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var possibleFrame in chain.Frames)
                 {

@@ -15,62 +15,65 @@ public class UndoIntegrationTests
     [Fact]
     public async Task MultiStep_AddChainThenAddFrame_UndoInOrder()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
 
         // Step 1: add a chain
-        await AppCommands.Self.AddAnimationChain();
+        await ctx.AppCommands.AddAnimationChain();
         var chain = acls.AnimationChains[0];
 
         // Step 2: add a frame to it
-        AppCommands.Self.AddFrame(chain, "sprite.png");
+        ctx.AppCommands.AddFrame(chain, "sprite.png");
         Assert.Single(chain.Frames);
 
         // Undo frame first
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
         Assert.Empty(chain.Frames);
         Assert.Single(acls.AnimationChains);
 
         // Undo chain second
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
         Assert.Empty(acls.AnimationChains);
     }
 
     [Fact]
     public async Task MultiStep_UndoThenRedo_RestoresFullHistory()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
 
-        await AppCommands.Self.AddAnimationChain();
+        await ctx.AppCommands.AddAnimationChain();
         var chain = acls.AnimationChains[0];
-        AppCommands.Self.AddFrame(chain, "a.png");
-        AppCommands.Self.AddFrame(chain, "b.png");
+        ctx.AppCommands.AddFrame(chain, "a.png");
+        ctx.AppCommands.AddFrame(chain, "b.png");
 
         // Undo both frames
-        UndoManager.Self.Undo();
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
+        ctx.UndoManager.Undo();
         Assert.Empty(chain.Frames);
 
         // Redo both frames
-        UndoManager.Self.Redo();
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
+        ctx.UndoManager.Redo();
         Assert.Equal(2, chain.Frames.Count);
     }
 
     [Fact]
     public void MultiStep_UndoAcrossSelectionChange_AppliesCorrectly()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chainA = TestHelpers.MakeChain(acls, "A");
         var chainB = TestHelpers.MakeChain(acls, "B");
 
         // Rename chain A while it's selected
-        AppCommands.Self.RenameChain(chainA, "A_renamed");
+        ctx.AppCommands.RenameChain(chainA, "A_renamed");
 
         // Switch selection to chain B (simulates the user clicking elsewhere)
-        SelectedState.Self.SelectedChain = chainB;
+        ctx.SelectedState.SelectedChain = chainB;
 
         // Undo should still restore chain A's name
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal("A", chainA.Name);
         Assert.Equal("B", chainB.Name); // B unaffected
@@ -81,26 +84,28 @@ public class UndoIntegrationTests
     [Fact]
     public async Task NewFile_ClearsUndoStack()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
-        Assert.True(UndoManager.Self.CanUndo);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        await ctx.AppCommands.AddAnimationChain();
+        Assert.True(ctx.UndoManager.CanUndo);
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.False(UndoManager.Self.CanUndo);
+        Assert.False(ctx.UndoManager.CanUndo);
     }
 
     [Fact]
     public async Task NewFile_ClearsRedoStack()
     {
-        var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
-        UndoManager.Self.Undo(); // moves to redo stack
-        Assert.True(UndoManager.Self.CanRedo);
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        await ctx.AppCommands.AddAnimationChain();
+        ctx.UndoManager.Undo(); // moves to redo stack
+        Assert.True(ctx.UndoManager.CanRedo);
 
-        AppCommands.Self.NewFile();
+        ctx.AppCommands.NewFile();
 
-        Assert.False(UndoManager.Self.CanRedo);
+        Assert.False(ctx.UndoManager.CanRedo);
     }
 
     // ── StackChanged event ────────────────────────────────────────────────────
@@ -108,63 +113,63 @@ public class UndoIntegrationTests
     [Fact]
     public void StackChanged_FiresOnRecord()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         int count = 0;
-        UndoManager.Self.StackChanged += () => count++;
+        ctx.UndoManager.StackChanged += () => count++;
 
-        UndoManager.Self.Record(new StubCmd());
+        ctx.UndoManager.Record(new StubCmd());
 
         Assert.Equal(1, count);
-        UndoManager.Self.StackChanged -= () => count++; // cleanup (delegate identity — use flag pattern instead)
+        ctx.UndoManager.StackChanged -= () => count++; // cleanup (delegate identity — use flag pattern instead)
     }
 
     [Fact]
     public void StackChanged_FiresOnUndo()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         int count = 0;
         void Handler() => count++;
-        UndoManager.Self.StackChanged += Handler;
-        UndoManager.Self.Record(new StubCmd());
+        ctx.UndoManager.StackChanged += Handler;
+        ctx.UndoManager.Record(new StubCmd());
         count = 0; // reset after Record
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal(1, count);
-        UndoManager.Self.StackChanged -= Handler;
+        ctx.UndoManager.StackChanged -= Handler;
     }
 
     [Fact]
     public void StackChanged_FiresOnRedo()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         int count = 0;
         void Handler() => count++;
-        UndoManager.Self.StackChanged += Handler;
-        UndoManager.Self.Record(new StubCmd());
-        UndoManager.Self.Undo();
+        ctx.UndoManager.StackChanged += Handler;
+        ctx.UndoManager.Record(new StubCmd());
+        ctx.UndoManager.Undo();
         count = 0; // reset after Record + Undo
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Equal(1, count);
-        UndoManager.Self.StackChanged -= Handler;
+        ctx.UndoManager.StackChanged -= Handler;
     }
 
     [Fact]
     public void StackChanged_FiresOnClear()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         int count = 0;
         void Handler() => count++;
-        UndoManager.Self.StackChanged += Handler;
-        UndoManager.Self.Record(new StubCmd());
+        ctx.UndoManager.StackChanged += Handler;
+        ctx.UndoManager.Record(new StubCmd());
         count = 0;
 
-        UndoManager.Self.Clear();
+        ctx.UndoManager.Clear();
 
         Assert.Equal(1, count);
-        UndoManager.Self.StackChanged -= Handler;
+        ctx.UndoManager.StackChanged -= Handler;
     }
 
     // ── Stub ──────────────────────────────────────────────────────────────────

@@ -9,31 +9,36 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly CircleSave _circle;
         private readonly AnimationFrameSave _frame;
         private readonly int _originalIndex;
+        private readonly IAppCommands _commands;
+        private readonly IApplicationEvents _events;
 
-        public DeleteCircleCommand(CircleSave circle, AnimationFrameSave frame, int originalIndex)
+        public DeleteCircleCommand(CircleSave circle, AnimationFrameSave frame, int originalIndex,
+            IAppCommands commands, IApplicationEvents events)
         {
             _circle = circle;
             _frame = frame;
             _originalIndex = originalIndex;
+            _commands = commands;
+            _events = events;
         }
 
         public void Undo()
         {
             int idx = Math.Min(_originalIndex, _frame.ShapeCollectionSave.CircleSaves.Count);
             _frame.ShapeCollectionSave.CircleSaves.Insert(idx, _circle);
-            AppCommands.Self.RefreshTreeNode(_frame);
-            AppCommands.Self.RefreshAnimationFrameDisplay();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _commands.RefreshAnimationFrameDisplay();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
 
         public void Redo()
         {
             _frame.ShapeCollectionSave.CircleSaves.Remove(_circle);
-            AppCommands.Self.RefreshTreeNode(_frame);
-            AppCommands.Self.RefreshAnimationFrameDisplay();
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _commands.RefreshAnimationFrameDisplay();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

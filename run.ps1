@@ -1,2 +1,2 @@
-$appDir = 'C:\Users\devin\OneDrive\Documents\Repos\FlatRedBall2\.claude\worktrees\120-ctrl-click-add-animation-frame\FRBDK\AnimationEditorAvalonia\src\AnimationEditor.App'
-Start-Process wt -ArgumentList "--title "Issue #120 - AnimationEditor" -d "$appDir""
+$appDir = Join-Path $PSScriptRoot "FRBDK\AnimationEditorAvalonia\src\AnimationEditor.App"
+Start-Process wt -ArgumentList "new-tab --title `"Issue #150 - DI Migration`" -d `"$appDir`""

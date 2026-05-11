@@ -7,15 +7,21 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly AnimationFrameSave _frame;
         private readonly float _bL, _bT, _bR, _bB;  // before UV
         private readonly float _aL, _aT, _aR, _aB;  // after UV
+        private readonly IAppCommands _commands;
+        private readonly IApplicationEvents _events;
 
         public FrameRegionChangedCommand(
             AnimationFrameSave frame,
             float bL, float bT, float bR, float bB,
-            float aL, float aT, float aR, float aB)
+            float aL, float aT, float aR, float aB,
+            IAppCommands commands,
+            IApplicationEvents events)
         {
             _frame = frame;
             _bL = bL; _bT = bT; _bR = bR; _bB = bB;
             _aL = aL; _aT = aT; _aR = aR; _aB = aB;
+            _commands = commands;
+            _events = events;
         }
 
         public void Undo()
@@ -24,10 +30,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _frame.TopCoordinate    = _bT;
             _frame.RightCoordinate  = _bR;
             _frame.BottomCoordinate = _bB;
-            AppCommands.Self.RefreshTreeNode(_frame);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.RefreshWireframe();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _events.RaiseAnimationChainsChanged();
+            _commands.RefreshWireframe();
+            _commands.SaveCurrentAnimationChainList();
         }
 
         public void Redo()
@@ -36,10 +42,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _frame.TopCoordinate    = _aT;
             _frame.RightCoordinate  = _aR;
             _frame.BottomCoordinate = _aB;
-            AppCommands.Self.RefreshTreeNode(_frame);
-            ApplicationEvents.Self.RaiseAnimationChainsChanged();
-            AppCommands.Self.RefreshWireframe();
-            AppCommands.Self.SaveCurrentAnimationChainList();
+            _commands.RefreshTreeNode(_frame);
+            _events.RaiseAnimationChainsChanged();
+            _commands.RefreshWireframe();
+            _commands.SaveCurrentAnimationChainList();
         }
     }
 }

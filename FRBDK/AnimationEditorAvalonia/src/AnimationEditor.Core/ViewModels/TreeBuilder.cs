@@ -89,30 +89,27 @@ public static class TreeBuilder
     // ── Selection routing ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Maps a selected <see cref="TreeNodeVm"/> to the appropriate
-    /// <see cref="SelectedState"/> property.
-    /// Returns <c>true</c> when the node's <see cref="TreeNodeVm.Data"/> matched
-    /// a known type.
+    /// Maps a selected data object to the appropriate
+    /// <see cref="ISelectedState"/> property.
+    /// Returns <c>true</c> when the data object matched a known type.
     /// <para>
     /// Only applies the selection when the data object is reachable from
-    /// <see cref="ProjectManager.Self"/>'s current chain list, preventing
-    /// stale tree nodes (e.g. from lingering UI callbacks after a test resets
-    /// the project) from overwriting live selection state.
+    /// <paramref name="acls"/>'s current chain list, preventing stale tree
+    /// nodes from overwriting live selection state.
     /// </para>
     /// </summary>
-    public static bool RouteNodeSelection(TreeNodeVm vm)
+    public static bool RouteNodeSelection(object? data, ISelectedState selectedState, AnimationChainListSave? acls)
     {
-        var acls = ProjectManager.Self.AnimationChainListSave;
-
-        switch (vm.Data)
+        if (data is null) return false;
+        switch (data)
         {
             case AnimationChainSave chain:
                 if (acls is null || !acls.AnimationChains.Contains(chain))
                     return true; // stale — recognised type, but don't corrupt state
                 // Re-assign even if chain is the same object when a frame is selected,
                 // so that SelectedChain setter clears SelectedFrame and fires SelectionChanged.
-                if (SelectedState.Self.SelectedChain != chain || SelectedState.Self.SelectedFrame != null)
-                    SelectedState.Self.SelectedChain = chain;
+                if (selectedState.SelectedChain != chain || selectedState.SelectedFrame != null)
+                    selectedState.SelectedChain = chain;
                 return true;
             case AnimationFrameSave frame:
             {
@@ -120,17 +117,17 @@ public static class TreeBuilder
                     return true; // stale — recognised type, but don't corrupt state
                 // Re-assign even when the same frame is already selected if a shape is
                 // selected, so that SelectedFrame.set clears SelectedCircle/SelectedRectangle.
-                if (SelectedState.Self.SelectedFrame != frame || SelectedState.Self.SelectedShape != null)
-                    SelectedState.Self.SelectedFrame = frame;
+                if (selectedState.SelectedFrame != frame || selectedState.SelectedShape != null)
+                    selectedState.SelectedFrame = frame;
                 return true;
             }
             case AxisAlignedRectangleSave rect:
-                if (SelectedState.Self.SelectedRectangle != rect)
-                    SelectedState.Self.SelectedRectangle = rect;
+                if (selectedState.SelectedRectangle != rect)
+                    selectedState.SelectedRectangle = rect;
                 return true;
             case CircleSave circle:
-                if (SelectedState.Self.SelectedCircle != circle)
-                    SelectedState.Self.SelectedCircle = circle;
+                if (selectedState.SelectedCircle != circle)
+                    selectedState.SelectedCircle = circle;
                 return true;
             default:
                 return false;

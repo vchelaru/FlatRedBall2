@@ -14,58 +14,62 @@ public class SelectedStateTests
     [Fact]
     public void SelectedChain_WhenSet_ClearsSelectedFrame()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
-        SelectedState.Self.SelectedFrame = chain.Frames[0];
+        ctx.SelectedState.SelectedFrame = chain.Frames[0];
 
         // Setting chain should clear frame
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
-        SelectedState.Self.SelectedChain = otherChain;
+        ctx.SelectedState.SelectedChain = otherChain;
 
-        Assert.Null(SelectedState.Self.SelectedFrame);
+        Assert.Null(ctx.SelectedState.SelectedFrame);
     }
 
     [Fact]
     public void SelectedChain_WhenSet_ClearsSelectedRectangle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
         frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
-        SelectedState.Self.SelectedChain = otherChain;
+        ctx.SelectedState.SelectedChain = otherChain;
 
-        Assert.Null(SelectedState.Self.SelectedRectangle);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
     }
 
     [Fact]
     public void SelectedChain_WhenSet_ClearsSelectedCircle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
         frame.ShapeCollectionSave!.CircleSaves.Add(circle);
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
-        SelectedState.Self.SelectedChain = otherChain;
+        ctx.SelectedState.SelectedChain = otherChain;
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
     }
 
     [Fact]
     public void SelectedChain_WhenSet_FiresSelectionChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run");
         bool fired = false;
-        SelectedState.Self.SelectionChanged += () => fired = true;
+        ctx.SelectedState.SelectionChanged += () => fired = true;
 
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
 
         Assert.True(fired);
     }
@@ -73,13 +77,14 @@ public class SelectedStateTests
     [Fact]
     public void SelectedChain_WhenSetToNull_StillFiresSelectionChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run");
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
 
         bool fired = false;
-        SelectedState.Self.SelectionChanged += () => fired = true;
-        SelectedState.Self.SelectedChain = null;
+        ctx.SelectedState.SelectionChanged += () => fired = true;
+        ctx.SelectedState.SelectedChain = null;
 
         Assert.True(fired);
     }
@@ -89,54 +94,58 @@ public class SelectedStateTests
     [Fact]
     public void SelectedFrame_WhenSet_AutoFindsParentChain()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 2);
         var frame = chain.Frames[1];
 
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        Assert.Same(chain, SelectedState.Self.SelectedChain);
+        Assert.Same(chain, ctx.SelectedState.SelectedChain);
     }
 
     [Fact]
     public void SelectedFrame_WhenSet_ClearsSelectedRectangle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
         frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        Assert.Null(SelectedState.Self.SelectedRectangle);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
     }
 
     [Fact]
     public void SelectedFrame_WhenSet_ClearsSelectedCircle()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
         frame.ShapeCollectionSave!.CircleSaves.Add(circle);
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
-        SelectedState.Self.SelectedFrame = frame;
+        ctx.SelectedState.SelectedFrame = frame;
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
     }
 
     [Fact]
     public void SelectedFrame_WhenSet_FiresSelectionChanged()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         bool fired = false;
-        SelectedState.Self.SelectionChanged += () => fired = true;
+        ctx.SelectedState.SelectionChanged += () => fired = true;
 
-        SelectedState.Self.SelectedFrame = chain.Frames[0];
+        ctx.SelectedState.SelectedFrame = chain.Frames[0];
 
         Assert.True(fired);
     }
@@ -144,13 +153,13 @@ public class SelectedStateTests
     [Fact]
     public void SelectedFrame_WhenFrameNotInAnyChain_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var standaloneFrame = TestHelpers.MakeFrame();
 
         // Should not throw even if frame isn't in ACLS
-        SelectedState.Self.SelectedFrame = standaloneFrame;
+        ctx.SelectedState.SelectedFrame = standaloneFrame;
 
-        Assert.Same(standaloneFrame, SelectedState.Self.SelectedFrame);
+        Assert.Same(standaloneFrame, ctx.SelectedState.SelectedFrame);
     }
 
     // ── SelectedRectangle / SelectedCircle mutual exclusion ───────────────────
@@ -158,40 +167,40 @@ public class SelectedStateTests
     [Fact]
     public void SelectedRectangle_WhenSet_ClearsSelectedCircle()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
-        Assert.Null(SelectedState.Self.SelectedCircle);
-        Assert.Same(rect, SelectedState.Self.SelectedRectangle);
+        Assert.Null(ctx.SelectedState.SelectedCircle);
+        Assert.Same(rect, ctx.SelectedState.SelectedRectangle);
     }
 
     [Fact]
     public void SelectedCircle_WhenSet_ClearsSelectedRectangle()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
-        Assert.Null(SelectedState.Self.SelectedRectangle);
-        Assert.Same(circle, SelectedState.Self.SelectedCircle);
+        Assert.Null(ctx.SelectedState.SelectedRectangle);
+        Assert.Same(circle, ctx.SelectedState.SelectedCircle);
     }
 
     [Fact]
     public void SelectedRectangle_WhenSet_FiresSelectionChanged()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        SelectedState.Self.SelectionChanged += () => fired = true;
+        ctx.SelectedState.SelectionChanged += () => fired = true;
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
 
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
         Assert.True(fired);
     }
@@ -199,12 +208,12 @@ public class SelectedStateTests
     [Fact]
     public void SelectedCircle_WhenSet_FiresSelectionChanged()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        SelectedState.Self.SelectionChanged += () => fired = true;
+        ctx.SelectedState.SelectionChanged += () => fired = true;
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
 
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
         Assert.True(fired);
     }
@@ -214,29 +223,29 @@ public class SelectedStateTests
     [Fact]
     public void SelectedShape_WhenRectangleSelected_ReturnsRectangle()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        SelectedState.Self.SelectedRectangle = rect;
+        ctx.SelectedState.SelectedRectangle = rect;
 
-        Assert.Same(rect, SelectedState.Self.SelectedShape);
+        Assert.Same(rect, ctx.SelectedState.SelectedShape);
     }
 
     [Fact]
     public void SelectedShape_WhenCircleSelected_ReturnsCircle()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        SelectedState.Self.SelectedCircle = circle;
+        ctx.SelectedState.SelectedCircle = circle;
 
-        Assert.Same(circle, SelectedState.Self.SelectedShape);
+        Assert.Same(circle, ctx.SelectedState.SelectedShape);
     }
 
     [Fact]
     public void SelectedShape_WhenNothingSelected_ReturnsNull()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
 
-        Assert.Null(SelectedState.Self.SelectedShape);
+        Assert.Null(ctx.SelectedState.SelectedShape);
     }
 
     // ── SelectedTextureName ───────────────────────────────────────────────────
@@ -244,32 +253,34 @@ public class SelectedStateTests
     [Fact]
     public void SelectedTextureName_WhenFrameSelectedWithTexture_ReturnsFrameTextureName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         chain.Frames[0].TextureName = "hero_run.png";
-        SelectedState.Self.SelectedFrame = chain.Frames[0];
+        ctx.SelectedState.SelectedFrame = chain.Frames[0];
 
-        Assert.Equal("hero_run.png", SelectedState.Self.SelectedTextureName);
+        Assert.Equal("hero_run.png", ctx.SelectedState.SelectedTextureName);
     }
 
     [Fact]
     public void SelectedTextureName_WhenChainSelectedAndHasFrames_ReturnsFirstFrameTexture()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 2);
         chain.Frames[0].TextureName = "sheet.png";
         chain.Frames[1].TextureName = "other.png";
-        SelectedState.Self.SelectedChain = chain;
+        ctx.SelectedState.SelectedChain = chain;
 
-        Assert.Equal("sheet.png", SelectedState.Self.SelectedTextureName);
+        Assert.Equal("sheet.png", ctx.SelectedState.SelectedTextureName);
     }
 
     [Fact]
     public void SelectedTextureName_WhenNothingSelected_ReturnsNull()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
 
-        Assert.Null(SelectedState.Self.SelectedTextureName);
+        Assert.Null(ctx.SelectedState.SelectedTextureName);
     }
 
     // ── SelectedFrames / multi-select ─────────────────────────────────────────
@@ -277,13 +288,14 @@ public class SelectedStateTests
     [Fact]
     public void SelectedFrames_WhenSelectedNodesContainFrames_ReturnsThoseFrames()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 3);
         var f0 = chain.Frames[0];
         var f2 = chain.Frames[2];
-        SelectedState.Self.SelectedNodes = new List<object> { f0, f2 };
+        ctx.SelectedState.SelectedNodes = new List<object> { f0, f2 };
 
-        var frames = SelectedState.Self.SelectedFrames;
+        var frames = ctx.SelectedState.SelectedFrames;
 
         Assert.Contains(f0, frames);
         Assert.Contains(f2, frames);
@@ -292,12 +304,13 @@ public class SelectedStateTests
     [Fact]
     public void SelectedFrames_WhenNodesEmpty_FallsBackToSingleSelectedFrame()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 2);
-        SelectedState.Self.SelectedNodes = new List<object>();
-        SelectedState.Self.SelectedFrame = chain.Frames[1];
+        ctx.SelectedState.SelectedNodes = new List<object>();
+        ctx.SelectedState.SelectedFrame = chain.Frames[1];
 
-        var frames = SelectedState.Self.SelectedFrames;
+        var frames = ctx.SelectedState.SelectedFrames;
 
         Assert.Contains(chain.Frames[1], frames);
     }
@@ -305,10 +318,10 @@ public class SelectedStateTests
     [Fact]
     public void SelectedFrames_WhenNothingSelected_ReturnsEmptyEnumerable()
     {
-        TestHelpers.SetupFreshAcls();
-        SelectedState.Self.SelectedNodes = new List<object>();
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.SelectedState.SelectedNodes = new List<object>();
 
-        var frames = SelectedState.Self.SelectedFrames;
+        var frames = ctx.SelectedState.SelectedFrames;
 
         Assert.Empty(frames);
     }

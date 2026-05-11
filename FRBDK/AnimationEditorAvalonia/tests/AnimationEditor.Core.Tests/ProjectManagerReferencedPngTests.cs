@@ -42,7 +42,7 @@ public class ProjectManagerReferencedPngTests
             </Project>
             """);
 
-        var sut = ProjectManager.Self;
+        var sut = new ProjectManager();
         InvokeTryLoadProjectFile(sut, new FilePath(projectFile));
 
         var fullPaths = sut.ReferencedPngs.Select(p => p.Standardized).ToArray();
@@ -69,7 +69,7 @@ public class ProjectManagerReferencedPngTests
         File.WriteAllText(Path.Combine(contentDir, "Note.txt"), "");
         File.WriteAllText(Path.Combine(contentDir, "Sprites", "C.png"), "");
 
-        var sut = ProjectManager.Self;
+        var sut = new ProjectManager();
         InvokeTryLoadProjectFile(sut, new FilePath(projectFile));
 
         var fullPaths = sut.ReferencedPngs.Select(p => p.Standardized).ToArray();
@@ -83,7 +83,7 @@ public class ProjectManagerReferencedPngTests
     [Fact]
     public void TryLoadProjectFile_WhenProjectDoesNotExist_ClearsReferencedPngs()
     {
-        var sut = ProjectManager.Self;
+        var sut = new ProjectManager();
 
         InvokeTryLoadProjectFile(sut, new FilePath(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".gluj")));
 

@@ -8,8 +8,16 @@ namespace AnimationEditor.Core.CommandsAndState
     /// delegated to WireframeManager or PropertyGridManager are now stored directly
     /// here and raised as events so UI layers can respond.
     /// </summary>
-    public class AppState : Singleton<AppState>
+    public class AppState : IAppState
     {
+        private readonly IApplicationEvents _events;
+        private readonly ISelectedState _selectedState;
+
+        public AppState(IApplicationEvents events, ISelectedState selectedState)
+        {
+            _events = events;
+            _selectedState = selectedState;
+        }
         /// <summary>
         /// The absolute path of the project (.gluj/.glux) that this .achx belongs to.
         /// When set, the tool won't prompt the user to copy files that are part of the project.
@@ -23,7 +31,7 @@ namespace AnimationEditor.Core.CommandsAndState
             set
             {
                 _unitType = value;
-                ApplicationEvents.Self.CallWireframeTextureChange();
+                _events.CallWireframeTextureChange();
             }
         }
 
@@ -34,7 +42,7 @@ namespace AnimationEditor.Core.CommandsAndState
             set
             {
                 _wireframeZoomValue = value;
-                ApplicationEvents.Self.CallAfterZoomChange();
+                _events.CallAfterZoomChange();
             }
         }
 
@@ -52,7 +60,7 @@ namespace AnimationEditor.Core.CommandsAndState
             set => _gridSize = value;
         }
 
-        public AnimationFrameSave? CurrentFrame => SelectedState.Self.SelectedFrame;
+        public AnimationFrameSave? CurrentFrame => _selectedState.SelectedFrame;
 
         // ── PL11: Sprite alignment ────────────────────────────────────────────
 

@@ -13,11 +13,11 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAnimationChainsChanged_FiresEvent()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        ApplicationEvents.Self.AnimationChainsChanged += () => fired = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => fired = true;
 
-        ApplicationEvents.Self.RaiseAnimationChainsChanged();
+        ctx.ApplicationEvents.RaiseAnimationChainsChanged();
 
         Assert.True(fired);
     }
@@ -25,9 +25,9 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAnimationChainsChanged_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         // No subscribers — should silently succeed
-        var ex = Record.Exception(() => ApplicationEvents.Self.RaiseAnimationChainsChanged());
+        var ex = Record.Exception(() => ctx.ApplicationEvents.RaiseAnimationChainsChanged());
 
         Assert.Null(ex);
     }
@@ -35,12 +35,12 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAnimationChainsChanged_NotifiesMultipleSubscribers()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         int count = 0;
-        ApplicationEvents.Self.AnimationChainsChanged += () => count++;
-        ApplicationEvents.Self.AnimationChainsChanged += () => count++;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => count++;
+        ctx.ApplicationEvents.AnimationChainsChanged += () => count++;
 
-        ApplicationEvents.Self.RaiseAnimationChainsChanged();
+        ctx.ApplicationEvents.RaiseAnimationChainsChanged();
 
         Assert.Equal(2, count);
     }
@@ -50,12 +50,12 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAfterAxisAlignedRectangleChanged_PassesRectangleToHandler()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         AxisAlignedRectangleSave? received = null;
-        ApplicationEvents.Self.AfterAxisAlignedRectangleChanged += r => received = r;
+        ctx.ApplicationEvents.AfterAxisAlignedRectangleChanged += r => received = r;
         var rect = new AxisAlignedRectangleSave { Name = "TestRect" };
 
-        ApplicationEvents.Self.RaiseAfterAxisAlignedRectangleChanged(rect);
+        ctx.ApplicationEvents.RaiseAfterAxisAlignedRectangleChanged(rect);
 
         Assert.Same(rect, received);
     }
@@ -63,9 +63,9 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAfterAxisAlignedRectangleChanged_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var ex = Record.Exception(() =>
-            ApplicationEvents.Self.RaiseAfterAxisAlignedRectangleChanged(
+            ctx.ApplicationEvents.RaiseAfterAxisAlignedRectangleChanged(
                 new AxisAlignedRectangleSave()));
 
         Assert.Null(ex);
@@ -76,12 +76,12 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAfterCircleChanged_PassesCircleToHandler()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         CircleSave? received = null;
-        ApplicationEvents.Self.AfterCircleChanged += c => received = c;
+        ctx.ApplicationEvents.AfterCircleChanged += c => received = c;
         var circle = new CircleSave { Name = "TestCircle", Radius = 10 };
 
-        ApplicationEvents.Self.RaiseAfterCircleChanged(circle);
+        ctx.ApplicationEvents.RaiseAfterCircleChanged(circle);
 
         Assert.Same(circle, received);
     }
@@ -89,9 +89,9 @@ public class ApplicationEventsTests
     [Fact]
     public void RaiseAfterCircleChanged_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var ex = Record.Exception(() =>
-            ApplicationEvents.Self.RaiseAfterCircleChanged(new CircleSave()));
+            ctx.ApplicationEvents.RaiseAfterCircleChanged(new CircleSave()));
 
         Assert.Null(ex);
     }
@@ -101,11 +101,11 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAchxLoaded_PassesFileNameToHandler()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         string? received = null;
-        ApplicationEvents.Self.AchxLoaded += f => received = f;
+        ctx.ApplicationEvents.AchxLoaded += f => received = f;
 
-        ApplicationEvents.Self.CallAchxLoaded("C:/Game/hero.achx");
+        ctx.ApplicationEvents.CallAchxLoaded("C:/Game/hero.achx");
 
         Assert.Equal("C:/Game/hero.achx", received);
     }
@@ -113,9 +113,9 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAchxLoaded_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         var ex = Record.Exception(() =>
-            ApplicationEvents.Self.CallAchxLoaded("some.achx"));
+            ctx.ApplicationEvents.CallAchxLoaded("some.achx"));
 
         Assert.Null(ex);
     }
@@ -125,11 +125,11 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAfterZoomChange_FiresEvent()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        ApplicationEvents.Self.AfterZoomChange += () => fired = true;
+        ctx.ApplicationEvents.AfterZoomChange += () => fired = true;
 
-        ApplicationEvents.Self.CallAfterZoomChange();
+        ctx.ApplicationEvents.CallAfterZoomChange();
 
         Assert.True(fired);
     }
@@ -137,8 +137,8 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAfterZoomChange_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
-        var ex = Record.Exception(() => ApplicationEvents.Self.CallAfterZoomChange());
+        var ctx = TestHelpers.SetupFreshAcls();
+        var ex = Record.Exception(() => ctx.ApplicationEvents.CallAfterZoomChange());
 
         Assert.Null(ex);
     }
@@ -148,11 +148,11 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAfterWireframePanning_FiresEvent()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        ApplicationEvents.Self.WireframePanning += () => fired = true;
+        ctx.ApplicationEvents.WireframePanning += () => fired = true;
 
-        ApplicationEvents.Self.CallAfterWireframePanning();
+        ctx.ApplicationEvents.CallAfterWireframePanning();
 
         Assert.True(fired);
     }
@@ -160,8 +160,8 @@ public class ApplicationEventsTests
     [Fact]
     public void CallAfterWireframePanning_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
-        var ex = Record.Exception(() => ApplicationEvents.Self.CallAfterWireframePanning());
+        var ctx = TestHelpers.SetupFreshAcls();
+        var ex = Record.Exception(() => ctx.ApplicationEvents.CallAfterWireframePanning());
 
         Assert.Null(ex);
     }
@@ -171,11 +171,11 @@ public class ApplicationEventsTests
     [Fact]
     public void CallWireframeTextureChange_FiresEvent()
     {
-        TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        ApplicationEvents.Self.WireframeTextureChange += () => fired = true;
+        ctx.ApplicationEvents.WireframeTextureChange += () => fired = true;
 
-        ApplicationEvents.Self.CallWireframeTextureChange();
+        ctx.ApplicationEvents.CallWireframeTextureChange();
 
         Assert.True(fired);
     }
@@ -183,8 +183,8 @@ public class ApplicationEventsTests
     [Fact]
     public void CallWireframeTextureChange_WithNoSubscribers_DoesNotThrow()
     {
-        TestHelpers.SetupFreshAcls();
-        var ex = Record.Exception(() => ApplicationEvents.Self.CallWireframeTextureChange());
+        var ctx = TestHelpers.SetupFreshAcls();
+        var ex = Record.Exception(() => ctx.ApplicationEvents.CallWireframeTextureChange());
 
         Assert.Null(ex);
     }

@@ -12,13 +12,14 @@ public class RenameChainUndoTests
     [Fact]
     public void RenameChain_Undo_RestoresOldName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "OldName");
 
-        AppCommands.Self.RenameChain(chain, "NewName");
+        ctx.AppCommands.RenameChain(chain, "NewName");
         Assert.Equal("NewName", chain.Name);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
 
         Assert.Equal("OldName", chain.Name);
     }
@@ -26,14 +27,15 @@ public class RenameChainUndoTests
     [Fact]
     public void RenameChain_UndoThenRedo_ReappliesNewName()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Alpha");
 
-        AppCommands.Self.RenameChain(chain, "Beta");
-        UndoManager.Self.Undo();
+        ctx.AppCommands.RenameChain(chain, "Beta");
+        ctx.UndoManager.Undo();
         Assert.Equal("Alpha", chain.Name);
 
-        UndoManager.Self.Redo();
+        ctx.UndoManager.Redo();
 
         Assert.Equal("Beta", chain.Name);
     }
@@ -41,16 +43,17 @@ public class RenameChainUndoTests
     [Fact]
     public void RenameChain_MultipleRenames_UndoEachInOrder()
     {
-        var acls = TestHelpers.SetupFreshAcls();
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "A");
 
-        AppCommands.Self.RenameChain(chain, "B");
-        AppCommands.Self.RenameChain(chain, "C");
+        ctx.AppCommands.RenameChain(chain, "B");
+        ctx.AppCommands.RenameChain(chain, "C");
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
         Assert.Equal("B", chain.Name);
 
-        UndoManager.Self.Undo();
+        ctx.UndoManager.Undo();
         Assert.Equal("A", chain.Name);
     }
 }
