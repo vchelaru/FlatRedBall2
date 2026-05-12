@@ -131,13 +131,23 @@ public class OpenAchxWorkflowTests : IDisposable
         Assert.True(fired);
     }
 
-    // ── Non-existent file (graceful no-op) ────────────────────────────────────
+    // ── Load failure (corrupt / missing file) ─────────────────────────────────
 
     [Fact]
-    public void OpenAchxWorkflow_WithNonExistentFile_StillFiresCurrentFileChangedAndAvailableTextures()
+    public void OpenAchxWorkflow_WithNonExistentFile_FiresLoadFailed()
     {
-        // Pre-existing behaviour: LoadAnimationChain silently skips when file is
-        // absent, but the UI still receives the events (keeps parity with old HandleAchxLoaded).
+        var path = Path.Combine(_dir.Path, "ghost.achx");
+        bool loadFailedFired = false;
+        _ctx.AppCommands.LoadFailed += (_, _) => loadFailedFired = true;
+
+        _ctx.AppCommands.OpenAchxWorkflow(path);
+
+        Assert.True(loadFailedFired);
+    }
+
+    [Fact]
+    public void OpenAchxWorkflow_WithNonExistentFile_DoesNotFireSuccessEvents()
+    {
         var path = Path.Combine(_dir.Path, "ghost.achx");
         bool currentFileFired = false;
         bool texturesFired = false;
@@ -146,7 +156,7 @@ public class OpenAchxWorkflowTests : IDisposable
 
         _ctx.AppCommands.OpenAchxWorkflow(path);
 
-        Assert.True(currentFileFired);
-        Assert.True(texturesFired);
+        Assert.False(currentFileFired);
+        Assert.False(texturesFired);
     }
 }

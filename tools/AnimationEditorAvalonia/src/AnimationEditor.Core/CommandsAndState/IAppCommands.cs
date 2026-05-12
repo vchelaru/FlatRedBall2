@@ -25,6 +25,14 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action RefreshWireframeRequested;
         event Action<string>? SaveAsCompleted;
 
+        /// <summary>
+        /// Fired when <see cref="LoadAnimationChain"/> fails — file not found, corrupt XML,
+        /// or any other engine-side throw. The first argument is the attempted file path;
+        /// the second is the exception. <c>RefreshTreeViewRequested</c> is NOT fired when
+        /// this event fires; project state is left unchanged.
+        /// </summary>
+        event Action<string, Exception>? LoadFailed;
+
         // ── Methods ───────────────────────────────────────────────────────────
 
         /// <summary>

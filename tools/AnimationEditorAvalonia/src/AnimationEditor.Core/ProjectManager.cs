@@ -37,21 +37,21 @@ namespace AnimationEditor.Core
 
         public void LoadAnimationChain(FilePath fileName)
         {
-            if (fileName.Exists())
-            {
-                var acls = AnimationChainListSave.FromFile(fileName.FullPath);
+            if (!fileName.Exists())
+                throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
 
-                AddShapeCollectionsToFrames(acls);
+            var acls = AnimationChainListSave.FromFile(fileName.FullPath);
 
-                OnDiskCoordinateType = acls.CoordinateType;
-                NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath);
+            AddShapeCollectionsToFrames(acls);
 
-                AnimationChainListSave = acls;
-                FileName = fileName.FullPath;
+            OnDiskCoordinateType = acls.CoordinateType;
+            NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath);
 
-                if (!string.IsNullOrEmpty(acls.ProjectFile))
-                    TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
-            }
+            AnimationChainListSave = acls;
+            FileName = fileName.FullPath;
+
+            if (!string.IsNullOrEmpty(acls.ProjectFile))
+                TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
         }
 
         /// <summary>
