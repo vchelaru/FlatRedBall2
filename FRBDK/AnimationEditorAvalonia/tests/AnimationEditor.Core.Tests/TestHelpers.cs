@@ -2,8 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -67,7 +66,7 @@ internal static class TestHelpers
     /// </summary>
     public static TestServices SetupFreshAcls() => new TestServices();
 
-    /// <summary>Creates a frame with an initialized ShapeCollectionSave.</summary>
+    /// <summary>Creates a frame with an initialized ShapesSave.</summary>
     public static AnimationFrameSave MakeFrame(string textureName = "Tex.png")
     {
         return new AnimationFrameSave
@@ -78,7 +77,7 @@ internal static class TestHelpers
             TopCoordinate    = 0f,
             BottomCoordinate = 1f,
             FrameLength      = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
     }
 

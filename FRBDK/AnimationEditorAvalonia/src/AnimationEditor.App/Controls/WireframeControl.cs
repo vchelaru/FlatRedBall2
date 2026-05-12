@@ -9,14 +9,14 @@ using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using FilePath = FlatRedBall.IO.FilePath;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.App.Controls;
 
@@ -798,8 +798,11 @@ public class WireframeControl : Control
     /// </summary>
     public void LoadTexture(string? filePath)
     {
-        // Normalise path for comparison
+        // Lowercased + slash-normalized form used only for cache-key comparison and the
+        // _loadedTexturePath identity that downstream filter code keys on. The case-preserving
+        // form is what actually goes to the filesystem (Linux is case-sensitive).
         string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
+        string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
 
         if (_loadedTexturePath == norm)
         {
@@ -819,9 +822,9 @@ public class WireframeControl : Control
         _bitmap = null;
         _inspectableImage = null;
 
-        if (norm != null && File.Exists(norm))
+        if (casePreserved != null && File.Exists(casePreserved))
         {
-            _bitmap = SKBitmap.Decode(norm);
+            _bitmap = SKBitmap.Decode(casePreserved);
             // Upload pixels into an immutable SKImage on the UI thread so the
             // render thread never touches the SKBitmap directly. Without this,
             // SKCanvas.DrawBitmap on the render thread crashes with AV.
@@ -830,7 +833,7 @@ public class WireframeControl : Control
             if (_isMagicWandMode)
                 _inspectableImage = new InspectableImage(_bitmap);
 
-            if (_cameraByTexture.TryGetValue(norm, out var cam))
+            if (_cameraByTexture.TryGetValue(norm!, out var cam))
             {
                 _zoom = cam.z;
                 if (_scrollViewer != null)
@@ -920,7 +923,7 @@ public class WireframeControl : Control
 
         string? achxFolder = string.IsNullOrEmpty(_projectManager?.FileName)
             ? null
-            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
+            : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
 
         IEnumerable<AnimationFrameSave> framesToSnap;
         if (selectedFrame != null)
@@ -942,7 +945,7 @@ public class WireframeControl : Control
 
             if (achxFolder != null && _loadedTexturePath != null)
             {
-                var fp = new FilePath(achxFolder + frame.TextureName);
+                var fp = new FilePath(Path.Combine(achxFolder, frame.TextureName));
                 if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
             }
 
@@ -1884,7 +1887,7 @@ public class WireframeControl : Control
 
         string? achxFolder = string.IsNullOrEmpty(_projectManager!.FileName)
             ? null
-            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
+            : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
 
         IEnumerable<AnimationFrameSave> framesToShow;
         if (selectedFrame != null)
@@ -1906,7 +1909,7 @@ public class WireframeControl : Control
             // Filter to frames that use the currently shown texture
             if (achxFolder != null && _loadedTexturePath != null)
             {
-                var fp = new FilePath(achxFolder + frame.TextureName);
+                var fp = new FilePath(Path.Combine(achxFolder, frame.TextureName));
                 if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
             }
 
@@ -1999,7 +2002,7 @@ public class WireframeControl : Control
         if (string.IsNullOrEmpty(_projectManager!.FileName))
             return textureName;
 
-        return FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName) + textureName;
+        return Path.Combine(Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty, textureName);
     }
 
     /// <summary>

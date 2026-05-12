@@ -46,11 +46,11 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Attack</Name>" +
             "    <Frame><TextureName>a.png</TextureName><FrameLength>0.1</FrameLength>" +
-            "      <ShapesSave>" +
-            "        <AARectSaves>" +
-            "          <AARectSave><Name>Sword</Name><X>5</X><Y>0</Y><ScaleX>15</ScaleX><ScaleY>5</ScaleY></AARectSave>" +
-            "        </AARectSaves>" +
-            "      </ShapesSave>" +
+            "      <ShapeCollectionSave>" +
+            "        <AxisAlignedRectangleSaves>" +
+            "          <AxisAlignedRectangleSave><Name>Sword</Name><X>5</X><Y>0</Y><ScaleX>15</ScaleX><ScaleY>5</ScaleY></AxisAlignedRectangleSave>" +
+            "        </AxisAlignedRectangleSaves>" +
+            "      </ShapeCollectionSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";
@@ -71,11 +71,11 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Hit</Name>" +
             "    <Frame><TextureName>a.png</TextureName><FrameLength>0.1</FrameLength>" +
-            "      <ShapesSave>" +
+            "      <ShapeCollectionSave>" +
             "        <CircleSaves>" +
             "          <CircleSave><Name>Blast</Name><X>3</X><Y>4</Y><Radius>12</Radius></CircleSave>" +
             "        </CircleSaves>" +
-            "      </ShapesSave>" +
+            "      </ShapeCollectionSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";
@@ -167,7 +167,7 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Slash</Name>" +
             "    <Frame><TextureName>s.png</TextureName><FrameLength>0.1</FrameLength>" +
-            "      <ShapesSave>" +
+            "      <ShapeCollectionSave>" +
             "        <PolygonSaves>" +
             "          <PolygonSave><Name>Arc</Name><X>1</X><Y>2</Y>" +
             "            <Points>" +
@@ -177,7 +177,7 @@ public class AnimationChainListSaveLoadingTests
             "            </Points>" +
             "          </PolygonSave>" +
             "        </PolygonSaves>" +
-            "      </ShapesSave>" +
+            "      </ShapeCollectionSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";
@@ -202,11 +202,11 @@ public class AnimationChainListSaveLoadingTests
             "<AnimationChainArraySave>" +
             "  <AnimationChain><Name>Attack</Name>" +
             "    <Frame><FrameLength>0.1</FrameLength>" +
-            "      <ShapesSave>" +
-            "        <AARectSaves>" +
-            "          <AARectSave><Name></Name><ScaleX>5</ScaleX><ScaleY>5</ScaleY></AARectSave>" +
-            "        </AARectSaves>" +
-            "      </ShapesSave>" +
+            "      <ShapeCollectionSave>" +
+            "        <AxisAlignedRectangleSaves>" +
+            "          <AxisAlignedRectangleSave><Name></Name><ScaleX>5</ScaleX><ScaleY>5</ScaleY></AxisAlignedRectangleSave>" +
+            "        </AxisAlignedRectangleSaves>" +
+            "      </ShapeCollectionSave>" +
             "    </Frame>" +
             "  </AnimationChain>" +
             "</AnimationChainArraySave>";

@@ -4,7 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;

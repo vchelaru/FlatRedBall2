@@ -7,6 +7,7 @@ namespace FlatRedBall2.Animation.Content;
 /// converted to runtime <see cref="AnimationShapeFrame"/> instances by
 /// <see cref="AnimationChainListSave.ToAnimationChainList"/>.
 /// </summary>
+/// <remarks>Serialized as <c>&lt;ShapeCollectionSave&gt;</c> in .achx XML.</remarks>
 public class ShapesSave
 {
     /// <summary>Rectangles defined for this frame.</summary>
@@ -20,6 +21,7 @@ public class ShapesSave
 }
 
 /// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>
+/// <remarks>Serialized as <c>&lt;AxisAlignedRectangleSave&gt;</c> inside <c>&lt;AxisAlignedRectangleSaves&gt;</c>.</remarks>
 public class AARectSave
 {
     /// <summary>Shape name; matched by name against entity-attached shapes.</summary>

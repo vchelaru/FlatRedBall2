@@ -4,8 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Threading;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 

@@ -2,8 +2,8 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
-using FlatRedBall.IO;
 using Xunit;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Tests;
 

@@ -1,5 +1,5 @@
-using FlatRedBall.IO;
 using System.IO;
+using AnimationEditor.Core.Paths;
 
 namespace AnimationEditor.Core.IO;
 
@@ -17,15 +17,16 @@ public static class TexturePathHelper
     /// </summary>
     /// <param name="absoluteTexturePath">The absolute path of the texture file.</param>
     /// <param name="achxFolder">
-    /// The directory of the .achx file, as returned by <see cref="FileManager.GetDirectory"/>.
-    /// If empty, <paramref name="absoluteTexturePath"/> is returned unchanged.
+    /// The directory of the .achx file. If empty, <paramref name="absoluteTexturePath"/> is
+    /// returned unchanged.
     /// </param>
     public static string ComputeStorePath(string absoluteTexturePath, string achxFolder)
     {
         if (string.IsNullOrEmpty(achxFolder))
             return absoluteTexturePath;
 
-        return FileManager.MakeRelative(absoluteTexturePath, achxFolder);
+        // Route through FilePath so Windows drive prefixes are recognized as absolute on Linux too.
+        return new FilePath(absoluteTexturePath).RelativeTo(new FilePath(achxFolder));
     }
 
     /// <summary>
@@ -35,7 +36,7 @@ public static class TexturePathHelper
     /// friendlier regardless of how the path was originally stored.
     /// </summary>
     /// <param name="framePath">
-    /// The <see cref="FlatRedBall.Content.AnimationChain.AnimationFrameSave.TextureName"/> value.
+    /// The <see cref="FlatRedBall2.Animation.Content.AnimationFrameSave.TextureName"/> value.
     /// </param>
     /// <param name="achxPath">
     /// The full path to the .achx file, or <see langword="null"/> if the project has not been saved.
@@ -43,16 +44,24 @@ public static class TexturePathHelper
     public static string ComputeDisplayPath(string? framePath, string? achxPath)
     {
         if (string.IsNullOrEmpty(framePath)) return string.Empty;
-        if (!Path.IsPathRooted(framePath)) return framePath;
+        // Use FilePath's drive-aware absoluteness check (Path.IsPathRooted misses C:/... on Linux).
+        var frameFilePath = new FilePath(framePath);
+        if (!IsAbsolute(framePath)) return framePath;
         if (string.IsNullOrEmpty(achxPath)) return framePath;
 
-        string achxFolder = FileManager.GetDirectory(achxPath);
-        if (string.IsNullOrEmpty(achxFolder)) return framePath;
+        var achxFolder = new FilePath(achxPath).GetDirectoryContainingThis();
+        if (string.IsNullOrEmpty(achxFolder.FullPath)) return framePath;
 
-        string rel = FileManager.MakeRelative(framePath, achxFolder);
+        string rel;
+        try { rel = frameFilePath.RelativeTo(achxFolder); }
+        catch (System.ArgumentException) { return framePath; }
 
-        // MakeRelative returns the absolute path unchanged when it cannot make a relative
-        // path (e.g., the texture is on a different drive than the .achx).
-        return Path.IsPathRooted(rel) ? framePath : rel;
+        // RelativeTo returns the absolute path unchanged when it cannot make a relative path
+        // (e.g., the texture is on a different drive than the .achx).
+        return IsAbsolute(rel) ? framePath : rel;
     }
+
+    private static bool IsAbsolute(string path)
+        => Path.IsPathRooted(path)
+           || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':');
 }

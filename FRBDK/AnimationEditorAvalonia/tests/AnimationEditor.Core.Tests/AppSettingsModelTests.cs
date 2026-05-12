@@ -1,6 +1,6 @@
 using AnimationEditor.Core.Models;
-using FlatRedBall.IO;
 using Xunit;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Tests;
 

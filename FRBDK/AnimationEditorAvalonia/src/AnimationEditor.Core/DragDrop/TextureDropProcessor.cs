@@ -1,7 +1,7 @@
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
-using FlatRedBall.IO;
+using AnimationEditor.Core.Paths;
+using FlatRedBall2.Animation.Content;
 using System;
+using System.IO;
 
 namespace AnimationEditor.Core.DragDrop;
 
@@ -17,7 +17,7 @@ public static class TextureDropProcessor
         if (string.IsNullOrWhiteSpace(droppedFilePath))
             return TextureDropResult.NotApplied;
 
-        if (!string.Equals(FileManager.GetExtension(droppedFilePath), "png", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
             return TextureDropResult.NotApplied;
 
         // When no ACHX is saved yet, use the absolute texture path.
@@ -28,8 +28,10 @@ public static class TextureDropProcessor
         }
         else
         {
-            var achxFolder = FileManager.GetDirectory(achxFileName);
-            relativeTexturePath = FileManager.MakeRelative(droppedFilePath, achxFolder);
+            // Route through FilePath so Windows-style drive prefixes are recognized as absolute
+            // on Linux too (stdlib Path.GetDirectoryName/GetRelativePath only honor / on Linux).
+            var achxFolder = new FilePath(achxFileName).GetDirectoryContainingThis();
+            relativeTexturePath = new FilePath(droppedFilePath).RelativeTo(achxFolder);
         }
 
         if (targetFrame is not null)
@@ -51,7 +53,7 @@ public static class TextureDropProcessor
                 RightCoordinate = 1f,
                 BottomCoordinate = 1f,
                 FrameLength = 0.1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             });
 
             return TextureDropResult.CreatedFrame;

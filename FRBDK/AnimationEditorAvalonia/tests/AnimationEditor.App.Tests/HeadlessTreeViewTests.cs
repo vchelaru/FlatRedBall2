@@ -10,8 +10,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -269,7 +268,7 @@ public class HeadlessTreeViewTests
             var tree  = GetTree(window);
             var roots = GetRoots(tree);
 
-            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapeCollectionSave = new ShapeCollectionSave() };
+            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() };
             var vm    = new TreeNodeVm { Header = "Frame 0", Data = frame };
             roots.Add(vm);
             tree.SelectedItem = vm;
@@ -290,7 +289,7 @@ public class HeadlessTreeViewTests
             var tree  = GetTree(window);
             var roots = GetRoots(tree);
 
-            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapeCollectionSave = new ShapeCollectionSave() };
+            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() };
             var vm    = new TreeNodeVm { Header = "Frame 0", Data = frame };
             roots.Add(vm);
             tree.SelectedItem = vm;
@@ -313,7 +312,7 @@ public class HeadlessTreeViewTests
             var tree  = GetTree(window);
             var roots = GetRoots(tree);
 
-            var rect = new AxisAlignedRectangleSave();
+            var rect = new AARectSave();
             var vm   = new TreeNodeVm { Header = "Rect", Data = rect };
             roots.Add(vm);
             tree.SelectedItem = vm;
@@ -376,7 +375,7 @@ public class HeadlessTreeViewTests
             var roots = GetRoots(tree);
 
             var chain   = new AnimationChainSave { Name = "Walk" };
-            var frame   = new AnimationFrameSave { TextureName = "Tex.png", ShapeCollectionSave = new ShapeCollectionSave() };
+            var frame   = new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() };
             var chainVm = new TreeNodeVm { Header = "Walk",    Data = chain };
             var frameVm = new TreeNodeVm { Header = "Frame 0", Data = frame };
             roots.Add(chainVm);
@@ -432,9 +431,9 @@ public class HeadlessTreeViewTests
             var frame  = new AnimationFrameSave
             {
                 TextureName         = "Tex.png",
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
-            frame.ShapeCollectionSave.CircleSaves.Add(circle);
+            frame.ShapesSave.CircleSaves.Add(circle);
             var chain  = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -470,13 +469,13 @@ public class HeadlessTreeViewTests
         var (window, ctx) = CreateWindow();
         try
         {
-            var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
+            var rect  = new AARectSave { Name = "HitBox" };
             var frame = new AnimationFrameSave
             {
                 TextureName         = "Tex.png",
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
-            frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+            frame.ShapesSave.AARectSaves.Add(rect);
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

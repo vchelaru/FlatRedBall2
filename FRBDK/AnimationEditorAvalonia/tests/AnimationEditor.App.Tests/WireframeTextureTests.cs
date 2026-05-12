@@ -3,8 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -102,7 +101,7 @@ public class WireframeTextureTests
                 TextureName     = "red.png", FrameLength = 0.1f,
                 LeftCoordinate  = 0f, TopCoordinate    = 0f,
                 RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
@@ -169,13 +168,13 @@ public class WireframeTextureTests
             {
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var frameGreen = new AnimationFrameSave
             {
                 TextureName = "green.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frameRed);
@@ -244,7 +243,7 @@ public class WireframeTextureTests
                 TextureName      = "sheet.png", FrameLength = 0.1f,
                 LeftCoordinate   = 0f,  TopCoordinate    = 0f,
                 RightCoordinate  = 0.5f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             // Frame 2: right half (UV 0.5–1.0)
             var frame2 = new AnimationFrameSave
@@ -252,7 +251,7 @@ public class WireframeTextureTests
                 TextureName      = "sheet.png", FrameLength = 0.1f,
                 LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f,   BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(frame1);

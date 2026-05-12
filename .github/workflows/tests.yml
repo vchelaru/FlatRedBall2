@@ -8,7 +8,7 @@ on:
 
 jobs:
   engine-tests:
-    name: Engine tests (ubuntu)
+    name: Engine and AnimationEditor tests (ubuntu)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,45 +30,20 @@ jobs:
       - name: Test engine
         run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity normal
 
-  # AnimationEditor still depends on FlatRedBallDesktopGLNet6 (FRB1), whose FileManager
-  # hardcodes Windows backslash paths in SaveText. That makes Save→Load tests fail on
-  # Linux. Run AE tests on windows-latest until the migration to in-tree FRB2 lands
-  # (tracked as a separate issue), at which point this job can move to ubuntu-latest.
-  animationeditor-tests:
-    name: AnimationEditor tests (windows)
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
       - name: Test AnimationEditor.Core
         run: dotnet test FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity normal
 
       # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
-      # headless platform — no display server needed even on the Windows runner.
+      # headless platform — no display server needed.
       - name: Test AnimationEditor.App
         run: dotnet test FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity normal
 
   # Umbrella check that branch protection gates on. Stays named "dotnet test" so the
-  # existing required-status-check entry in the main-protection ruleset keeps matching
-  # after the workflow was split into per-OS jobs. Passes only if every job above passes.
+  # existing required-status-check entry in the main-protection ruleset keeps matching.
   test:
     name: dotnet test
     runs-on: ubuntu-latest
-    needs: [engine-tests, animationeditor-tests]
+    needs: [engine-tests]
     steps:
       - name: All test jobs passed
-        run: echo "engine-tests and animationeditor-tests both succeeded"
+        run: echo "engine-tests succeeded"

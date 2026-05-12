@@ -9,14 +9,13 @@ using Avalonia.Media;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using FilePath = FlatRedBall.IO.FilePath;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.App.Controls;
 
@@ -55,7 +54,7 @@ public class PreviewControl : Control
     private bool _draggingHGuide;                  // true = horizontal guide
 
     // -- Shape drag -----------------------------------------------------------
-    private object?    _draggingShape;   // AxisAlignedRectangleSave or CircleSave
+    private object?    _draggingShape;   // AARectSave or CircleSave
     private float      _shapeDragStartX;
     private float      _shapeDragStartY;
     private Point      _shapeDragAnchor;
@@ -284,7 +283,7 @@ public class PreviewControl : Control
         _draggingShape = _selectedState!.SelectedShape;
         if (_draggingShape is null) return;
 
-        if (_draggingShape is AxisAlignedRectangleSave r)
+        if (_draggingShape is AARectSave r)
         {
             _shapeDragStartX = r.X;
             _shapeDragStartY = r.Y;
@@ -314,7 +313,7 @@ public class PreviewControl : Control
 
         _shapeResizeHandle = handle;
 
-        if (_draggingShape is AxisAlignedRectangleSave r)
+        if (_draggingShape is AARectSave r)
         {
             _shapeDragStartX      = r.X;
             _shapeDragStartY      = r.Y;
@@ -393,8 +392,8 @@ public class PreviewControl : Control
         // Relative path: requires a saved ACHX to derive the base folder.
         if (string.IsNullOrEmpty(_projectManager!.FileName))
             return null;
-        string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(_projectManager!.FileName);
-        string full = new FilePath(achxFolder + frame.TextureName).FullPath;
+        string achxFolder = (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
+        string full = new FilePath(Path.Combine(achxFolder, frame.TextureName)).FullPath;
         if (!File.Exists(full))
             return null;
         return full;
@@ -590,7 +589,7 @@ public class PreviewControl : Control
     private PreviewShapeInfo[] BuildShapeInfos()
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame?.ShapeCollectionSave is null) return Array.Empty<PreviewShapeInfo>();
+        if (frame?.ShapesSave is null) return Array.Empty<PreviewShapeInfo>();
 
         var selectedRects = _selectedState!.SelectedRectangles.ToHashSet();
         if (_selectedState!.SelectedRectangle is { } sr) selectedRects.Add(sr);
@@ -599,10 +598,10 @@ public class PreviewControl : Control
         if (_selectedState!.SelectedCircle is { } sc) selectedCircles.Add(sc);
 
         var list = new List<PreviewShapeInfo>();
-        foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
+        foreach (var r in frame.ShapesSave!.AARectSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
                 selectedRects.Contains(r)));
-        foreach (var c in frame.ShapeCollectionSave.CircleSaves)
+        foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
                 selectedCircles.Contains(c)));
         return list.ToArray();
@@ -650,7 +649,7 @@ public class PreviewControl : Control
     private object? HitTestShape(float px, float py)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame?.ShapeCollectionSave is null) return null;
+        if (frame?.ShapesSave is null) return null;
         if (px < RulerSize || py < RulerSize) return null;
 
         float cx = GetCenterX();
@@ -667,7 +666,7 @@ public class PreviewControl : Control
             if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, selC.Radius * om, tolerance))
                 return selC;
         }
-        else if (sel is AxisAlignedRectangleSave selR)
+        else if (sel is AARectSave selR)
         {
             float sx = cx + selR.X * om;
             float sy = cy - selR.Y * om;
@@ -675,7 +674,7 @@ public class PreviewControl : Control
                 return selR;
         }
 
-        var circles = frame.ShapeCollectionSave.CircleSaves;
+        var circles = frame.ShapesSave!.CircleSaves;
         for (int i = circles.Count - 1; i >= 0; i--)
         {
             var c = circles[i];
@@ -686,7 +685,7 @@ public class PreviewControl : Control
                 return c;
         }
 
-        var rects = frame.ShapeCollectionSave.AxisAlignedRectangleSaves;
+        var rects = frame.ShapesSave!.AARectSaves;
         for (int i = rects.Count - 1; i >= 0; i--)
         {
             var r = rects[i];
@@ -710,7 +709,7 @@ public class PreviewControl : Control
         if (_draggingShape is null) return;
 
         float newX, newY;
-        if (_draggingShape is AxisAlignedRectangleSave r)      { newX = r.X; newY = r.Y; }
+        if (_draggingShape is AARectSave r)      { newX = r.X; newY = r.Y; }
         else { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; }
 
         const float eps = 1e-4f;
@@ -726,7 +725,7 @@ public class PreviewControl : Control
         }
 
         // Re-assign to fire SelectionChanged so the property panel refreshes.
-        if (_draggingShape is AxisAlignedRectangleSave rs) _selectedState!.SelectedRectangle = rs;
+        if (_draggingShape is AARectSave rs) _selectedState!.SelectedRectangle = rs;
         else if (_draggingShape is CircleSave cs)          _selectedState!.SelectedCircle    = cs;
 
         _draggingShape = null;
@@ -749,7 +748,7 @@ public class PreviewControl : Control
         const float Hs = 5f;
 
         float left, top, right, bottom;
-        if (sel is AxisAlignedRectangleSave r)
+        if (sel is AARectSave r)
         {
             float sx = cx + r.X * om;
             float sy = cy - r.Y * om;
@@ -803,7 +802,7 @@ public class PreviewControl : Control
             };
             circle.Radius = MathF.Max(0.5f, _shapeDragStartScaleX + delta);
         }
-        else if (_draggingShape is AxisAlignedRectangleSave r)
+        else if (_draggingShape is AARectSave r)
         {
             float startLeft   = _shapeDragStartX - _shapeDragStartScaleX;
             float startRight  = _shapeDragStartX + _shapeDragStartScaleX;
@@ -858,7 +857,7 @@ public class PreviewControl : Control
         if (_draggingShape is null || _shapeResizeHandle == HandleKind.None) return;
 
         float newX, newY, newP1, newP2;
-        if (_draggingShape is AxisAlignedRectangleSave r)
+        if (_draggingShape is AARectSave r)
             { newX = r.X; newY = r.Y; newP1 = r.ScaleX; newP2 = r.ScaleY; }
         else
             { var c = (CircleSave)_draggingShape; newX = c.X; newY = c.Y; newP1 = c.Radius; newP2 = 0f; }
@@ -882,7 +881,7 @@ public class PreviewControl : Control
             _appCommands!.SaveCurrentAnimationChainList();
         }
 
-        if (_draggingShape is AxisAlignedRectangleSave rs) _selectedState!.SelectedRectangle = rs;
+        if (_draggingShape is AARectSave rs) _selectedState!.SelectedRectangle = rs;
         else if (_draggingShape is CircleSave cs)          _selectedState!.SelectedCircle    = cs;
 
         _shapeResizeHandle = HandleKind.None;
@@ -899,7 +898,7 @@ public class PreviewControl : Control
     private bool TrySelectShapeAt(float px, float py)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame?.ShapeCollectionSave is null) return false;
+        if (frame?.ShapesSave is null) return false;
         if (px < RulerSize || py < RulerSize) return false;
 
         float cx = GetCenterX();
@@ -908,7 +907,7 @@ public class PreviewControl : Control
         const float tolerance = 5f;
 
         // Circles are rendered after rects (on top), so check circles first.
-        var circles = frame.ShapeCollectionSave.CircleSaves;
+        var circles = frame.ShapesSave!.CircleSaves;
         for (int i = circles.Count - 1; i >= 0; i--)
         {
             var c = circles[i];
@@ -921,7 +920,7 @@ public class PreviewControl : Control
             }
         }
 
-        var rects = frame.ShapeCollectionSave.AxisAlignedRectangleSaves;
+        var rects = frame.ShapesSave!.AARectSaves;
         for (int i = rects.Count - 1; i >= 0; i--)
         {
             var r = rects[i];
@@ -1028,7 +1027,7 @@ public class PreviewControl : Control
             var sel = _selectedState!.SelectedShape!;
             _draggingShape   = sel;
             _shapeDragAnchor = pos;
-            if (sel is AxisAlignedRectangleSave dhr)
+            if (sel is AARectSave dhr)
             {
                 _shapeDragStartX      = dhr.X;
                 _shapeDragStartY      = dhr.Y;
@@ -1050,11 +1049,11 @@ public class PreviewControl : Control
         if (hitShape is not null)
         {
             _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
-            if (hitShape is AxisAlignedRectangleSave hr) _selectedState!.SelectedRectangle = hr;
+            if (hitShape is AARectSave hr) _selectedState!.SelectedRectangle = hr;
             else if (hitShape is CircleSave hc)          _selectedState!.SelectedCircle    = hc;
             _draggingShape   = hitShape;
             _shapeDragAnchor = pos;
-            if (hitShape is AxisAlignedRectangleSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
+            if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
             else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
             e.Pointer.Capture(this);
             return;
@@ -1093,7 +1092,7 @@ public class PreviewControl : Control
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
             float newX = _shapeDragStartX + dx;
             float newY = _shapeDragStartY + dy;
-            if (_draggingShape is AxisAlignedRectangleSave r) { r.X = newX; r.Y = newY; }
+            if (_draggingShape is AARectSave r) { r.X = newX; r.Y = newY; }
             else if (_draggingShape is CircleSave c)          { c.X = newX; c.Y = newY; }
             InvalidateVisual();
             return;

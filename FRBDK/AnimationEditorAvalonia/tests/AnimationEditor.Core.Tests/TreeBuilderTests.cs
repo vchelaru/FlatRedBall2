@@ -1,6 +1,5 @@
 using AnimationEditor.Core.ViewModels;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -158,11 +157,11 @@ public class TreeBuilderPureTests
         var frame = new AnimationFrameSave
         {
             TextureName = "Tex.png",
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(
-            new AxisAlignedRectangleSave { Name = "HitBox" });
-        frame.ShapeCollectionSave.CircleSaves.Add(
+        frame.ShapesSave!.AARectSaves.Add(
+            new AARectSave { Name = "HitBox" });
+        frame.ShapesSave!.CircleSaves.Add(
             new CircleSave { Name = "HurtCircle" });
 
         var node = TreeBuilder.BuildFrameNode(frame);
@@ -281,9 +280,9 @@ public class TreeBuilderSingletonTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
-        var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
-        var frame = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+        var rect  = new AARectSave { Name = "HitBox" };
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave!.AARectSaves.Add(rect);
         var chain = new AnimationChainSave { Name = "Idle" };
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
@@ -301,8 +300,8 @@ public class TreeBuilderSingletonTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var circle = new CircleSave { Name = "HurtCircle" };
-        var frame  = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
-        frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave!.CircleSaves.Add(circle);
         var chain = new AnimationChainSave { Name = "Idle" };
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
@@ -359,7 +358,7 @@ public class TreeBuilderSingletonTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Idle", frameCount: 1);
         var frame = chain.Frames[0];
-        var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
+        var rect  = new AARectSave { Name = "HitBox" };
 
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;

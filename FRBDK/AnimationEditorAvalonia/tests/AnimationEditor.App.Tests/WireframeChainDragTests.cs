@@ -3,8 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System.Collections.Generic;
 using Xunit;
@@ -63,7 +62,7 @@ public class WireframeChainDragTests
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f,   TopCoordinate    = 0f,
             RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
-            ShapeCollectionSave = new ShapeCollectionSave(),
+            ShapesSave = new ShapesSave(),
         };
         var frameB = new AnimationFrameSave
         {
@@ -71,7 +70,7 @@ public class WireframeChainDragTests
             FrameLength      = 0.1f,
             LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
             RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
-            ShapeCollectionSave = new ShapeCollectionSave(),
+            ShapesSave = new ShapesSave(),
         };
 
         var chain = new AnimationChainSave { Name = "Walk" };

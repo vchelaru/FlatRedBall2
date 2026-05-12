@@ -1,5 +1,4 @@
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -21,7 +20,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            _frame.ShapeCollectionSave.CircleSaves.Remove(_circle);
+            _frame.ShapesSave!.CircleSaves.Remove(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -30,7 +29,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Redo()
         {
-            _frame.ShapeCollectionSave.CircleSaves.Add(_circle);
+            _frame.ShapesSave!.CircleSaves.Add(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

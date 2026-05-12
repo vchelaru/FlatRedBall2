@@ -1,6 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -51,9 +51,9 @@ public class ApplicationEventsTests
     public void RaiseAfterAxisAlignedRectangleChanged_PassesRectangleToHandler()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        AxisAlignedRectangleSave? received = null;
+        AARectSave? received = null;
         ctx.ApplicationEvents.AfterAxisAlignedRectangleChanged += r => received = r;
-        var rect = new AxisAlignedRectangleSave { Name = "TestRect" };
+        var rect = new AARectSave { Name = "TestRect" };
 
         ctx.ApplicationEvents.RaiseAfterAxisAlignedRectangleChanged(rect);
 
@@ -66,7 +66,7 @@ public class ApplicationEventsTests
         var ctx = TestHelpers.SetupFreshAcls();
         var ex = Record.Exception(() =>
             ctx.ApplicationEvents.RaiseAfterAxisAlignedRectangleChanged(
-                new AxisAlignedRectangleSave()));
+                new AARectSave()));
 
         Assert.Null(ex);
     }

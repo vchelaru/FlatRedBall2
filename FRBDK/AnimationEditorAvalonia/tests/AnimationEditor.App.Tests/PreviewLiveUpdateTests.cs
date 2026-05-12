@@ -6,8 +6,7 @@ using AnimationEditor.Core.Rendering;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -89,7 +88,7 @@ public class PreviewLiveUpdateTests
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

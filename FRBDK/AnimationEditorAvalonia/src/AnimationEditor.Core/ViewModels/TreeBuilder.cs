@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.ViewModels;
 
@@ -51,16 +50,16 @@ public static class TreeBuilder
 
     /// <summary>
     /// Builds a single frame node with any shape children from
-    /// <see cref="AnimationFrameSave.ShapeCollectionSave"/>.
+    /// <see cref="AnimationFrameSave.ShapesSave"/>.
     /// </summary>
     public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame)
     {
         var node = new TreeNodeVm { Header = BuildFrameHeader(frame), Data = frame };
-        if (frame.ShapeCollectionSave is not null)
+        if (frame.ShapesSave is not null)
         {
-            foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
+            foreach (var r in frame.ShapesSave!.AARectSaves)
                 node.Children.Add(new TreeNodeVm { Header = r.Name, Data = r });
-            foreach (var c in frame.ShapeCollectionSave.CircleSaves)
+            foreach (var c in frame.ShapesSave!.CircleSaves)
                 node.Children.Add(new TreeNodeVm { Header = c.Name, Data = c });
         }
         return node;
@@ -121,7 +120,7 @@ public static class TreeBuilder
                     selectedState.SelectedFrame = frame;
                 return true;
             }
-            case AxisAlignedRectangleSave rect:
+            case AARectSave rect:
             {
                 var parentFrame = FindParentFrameFor(rect, acls);
                 if (parentFrame is null) return true; // stale — shape not reachable from live project
@@ -148,7 +147,7 @@ public static class TreeBuilder
 
     /// <summary>
     /// Searches the full animation chain list for the <see cref="AnimationFrameSave"/>
-    /// that owns <paramref name="shape"/> via its <c>ShapeCollectionSave</c>.
+    /// that owns <paramref name="shape"/> via its <c>ShapesSave</c>.
     /// Returns <c>null</c> when the shape cannot be found (e.g. stale node after a test reset).
     /// </summary>
     private static AnimationFrameSave? FindParentFrameFor(object shape, AnimationChainListSave? acls)
@@ -156,9 +155,9 @@ public static class TreeBuilder
         if (acls is null) return null;
         foreach (var chain in acls.AnimationChains)
             foreach (var frame in chain.Frames)
-                if (frame.ShapeCollectionSave is { } scs)
+                if (frame.ShapesSave is { } scs)
                     if ((shape is CircleSave c && scs.CircleSaves.Contains(c)) ||
-                        (shape is AxisAlignedRectangleSave r && scs.AxisAlignedRectangleSaves.Contains(r)))
+                        (shape is AARectSave r && scs.AARectSaves.Contains(r)))
                         return frame;
         return null;
     }

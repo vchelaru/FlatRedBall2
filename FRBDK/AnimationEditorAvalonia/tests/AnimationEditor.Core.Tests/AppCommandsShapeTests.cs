@@ -1,7 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -22,7 +21,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
 
-        Assert.Single(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
+        Assert.Single(frame.ShapesSave!.AARectSaves);
     }
 
     [Fact]
@@ -36,7 +35,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
 
-        var rect = frame.ShapeCollectionSave!.AxisAlignedRectangleSaves[0];
+        var rect = frame.ShapesSave!.AARectSaves[0];
         Assert.Equal(8, rect.ScaleX);
         Assert.Equal(8, rect.ScaleY);
     }
@@ -53,7 +52,7 @@ public class AppCommandsShapeTests
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
 
-        var names = frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Select(r => r.Name).ToList();
+        var names = frame.ShapesSave!.AARectSaves.Select(r => r.Name).ToList();
         Assert.Equal(2, names.Distinct().Count());
     }
 
@@ -70,7 +69,7 @@ public class AppCommandsShapeTests
 
         Assert.NotNull(ctx.SelectedState.SelectedRectangle);
         Assert.Same(
-            frame.ShapeCollectionSave!.AxisAlignedRectangleSaves[0],
+            frame.ShapesSave!.AARectSaves[0],
             ctx.SelectedState.SelectedRectangle);
     }
 
@@ -87,7 +86,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
 
-        var rect = frame.ShapeCollectionSave!.AxisAlignedRectangleSaves[0];
+        var rect = frame.ShapesSave!.AARectSaves[0];
         Assert.Equal(10f, rect.X);
         Assert.Equal(-5f, rect.Y);
     }
@@ -105,7 +104,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddCircle(frame);
 
-        Assert.Single(frame.ShapeCollectionSave!.CircleSaves);
+        Assert.Single(frame.ShapesSave!.CircleSaves);
     }
 
     [Fact]
@@ -119,7 +118,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddCircle(frame);
 
-        Assert.Equal(8, frame.ShapeCollectionSave!.CircleSaves[0].Radius);
+        Assert.Equal(8, frame.ShapesSave!.CircleSaves[0].Radius);
     }
 
     [Fact]
@@ -134,7 +133,7 @@ public class AppCommandsShapeTests
         ctx.AppCommands.AddCircle(frame);
         ctx.AppCommands.AddCircle(frame);
 
-        var names = frame.ShapeCollectionSave!.CircleSaves.Select(c => c.Name).ToList();
+        var names = frame.ShapesSave!.CircleSaves.Select(c => c.Name).ToList();
         Assert.Equal(2, names.Distinct().Count());
     }
 
@@ -150,7 +149,7 @@ public class AppCommandsShapeTests
         ctx.AppCommands.AddCircle(frame);
 
         Assert.NotNull(ctx.SelectedState.SelectedCircle);
-        Assert.Same(frame.ShapeCollectionSave!.CircleSaves[0], ctx.SelectedState.SelectedCircle);
+        Assert.Same(frame.ShapesSave!.CircleSaves[0], ctx.SelectedState.SelectedCircle);
     }
 
     [Fact]
@@ -166,7 +165,7 @@ public class AppCommandsShapeTests
 
         ctx.AppCommands.AddCircle(frame);
 
-        var circle = frame.ShapeCollectionSave!.CircleSaves[0];
+        var circle = frame.ShapesSave!.CircleSaves[0];
         Assert.Equal(3f, circle.X);
         Assert.Equal(-7f, circle.Y);
     }
@@ -181,12 +180,12 @@ public class AppCommandsShapeTests
         ctx.SelectedState.SelectedFrame = frame;
 
         // Add a rect with the default circle name to force a conflict
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(
-            new AxisAlignedRectangleSave { Name = "CircleInstance" });
+        frame.ShapesSave!.AARectSaves.Add(
+            new AARectSave { Name = "CircleInstance" });
 
         ctx.AppCommands.AddCircle(frame);
 
-        Assert.NotEqual("CircleInstance", frame.ShapeCollectionSave!.CircleSaves[0].Name);
+        Assert.NotEqual("CircleInstance", frame.ShapesSave!.CircleSaves[0].Name);
     }
 
     // ── DeleteAxisAlignedRectangle ───────────────────────────────────────────
@@ -198,12 +197,12 @@ public class AppCommandsShapeTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         ctx.AppCommands.DeleteAxisAlignedRectangle(rect, frame);
 
-        Assert.Empty(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
+        Assert.Empty(frame.ShapesSave!.AARectSaves);
     }
 
     [Fact]
@@ -214,13 +213,13 @@ public class AppCommandsShapeTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 2);
         var frame1 = chain.Frames[0];
         var frame2 = chain.Frames[1];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frame1.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frame1.ShapesSave!.AARectSaves.Add(rect);
 
         // Call with wrong owner (frame2 doesn't own rect)
         ctx.AppCommands.DeleteAxisAlignedRectangle(rect, frame2);
 
-        Assert.Single(frame1.ShapeCollectionSave!.AxisAlignedRectangleSaves);
+        Assert.Single(frame1.ShapesSave!.AARectSaves);
     }
 
     [Fact]
@@ -230,8 +229,8 @@ public class AppCommandsShapeTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         bool fired = false;
         void Handler() => fired = true;
@@ -257,11 +256,11 @@ public class AppCommandsShapeTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         ctx.AppCommands.DeleteCircle(circle, frame);
 
-        Assert.Empty(frame.ShapeCollectionSave!.CircleSaves);
+        Assert.Empty(frame.ShapesSave!.CircleSaves);
     }
 
     [Fact]
@@ -273,12 +272,12 @@ public class AppCommandsShapeTests
         var frame1 = chain.Frames[0];
         var frame2 = chain.Frames[1];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame1.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame1.ShapesSave!.CircleSaves.Add(circle);
 
         // Call with wrong owner - should not remove and should not throw
         ctx.AppCommands.DeleteCircle(circle, frame2);
 
-        Assert.Single(frame1.ShapeCollectionSave!.CircleSaves);
+        Assert.Single(frame1.ShapesSave!.CircleSaves);
     }
 
     [Fact]
@@ -289,7 +288,7 @@ public class AppCommandsShapeTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         bool fired = false;
         void Handler() => fired = true;
@@ -314,7 +313,7 @@ public class AppCommandsShapeTests
         var frame = TestHelpers.MakeFrame();
         frame.RelativeX = 12f;
         frame.RelativeY = -4f;
-        var rect = new AxisAlignedRectangleSave();
+        var rect = new AARectSave();
 
         ctx.AppCommands.MatchRectangleToFrame(rect, frame);
 
@@ -328,7 +327,7 @@ public class AppCommandsShapeTests
         var frame = TestHelpers.MakeFrame();
         frame.RelativeX = 3f;
         frame.RelativeY = -9f;
-        var rect = new AxisAlignedRectangleSave();
+        var rect = new AARectSave();
 
         ctx.AppCommands.MatchRectangleToFrame(rect, frame);
 

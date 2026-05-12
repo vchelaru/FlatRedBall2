@@ -8,7 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;

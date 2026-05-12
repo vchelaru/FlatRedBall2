@@ -6,8 +6,7 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -22,16 +21,16 @@ namespace AnimationEditor.App.Tests;
 public class PreviewShapeResizeTests
 {
     private static AnimationFrameSave MakeFrame(
-        AxisAlignedRectangleSave? rect = null,
+        AARectSave? rect = null,
         CircleSave? circle = null)
     {
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        if (rect   is not null) frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
-        if (circle is not null) frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        if (rect   is not null) frame.ShapesSave.AARectSaves.Add(rect);
+        if (circle is not null) frame.ShapesSave.CircleSaves.Add(circle);
         return frame;
     }
 
@@ -44,7 +43,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_MidRight_IncreasesScaleX()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;
@@ -64,7 +63,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_MidLeft_DecreasesScaleX()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;
@@ -83,7 +82,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_TopCenter_IncreasesScaleY()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;
@@ -103,7 +102,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_BotCenter_DecreasesScaleY()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;
@@ -144,7 +143,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_AfterCommit_UndoRestoresDimensions()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;
@@ -170,7 +169,7 @@ public class PreviewShapeResizeTests
     public void ResizeRect_ZeroDelta_DoesNotRecordUndo()
     {
         var ctx   = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 10f, ScaleY = 10f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;

@@ -4,8 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System.IO;
 using System;
@@ -73,7 +72,7 @@ public class ZeroDurationFrameVisualTests
                 FrameLength      = 0f,          // zero duration — the critical case
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
 
             var chain = new AnimationChainSave { Name = "ZeroTest" };
@@ -122,14 +121,14 @@ public class ZeroDurationFrameVisualTests
                 TextureName      = "red.png",  FrameLength = 0f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "green.png", FrameLength = 0f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
 
             var chain = new AnimationChainSave { Name = "ZeroMulti" };
@@ -176,8 +175,8 @@ public class ZeroDurationFrameVisualTests
     {
         var ctx = ResetSingletons();
         var chain = new AnimationChainSave { Name = "ZeroMany" };
-        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapeCollectionSave = new ShapeCollectionSave() });
-        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapeCollectionSave = new ShapeCollectionSave() });
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapesSave = new ShapesSave() });
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0f, ShapesSave = new ShapesSave() });
 
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
@@ -214,14 +213,14 @@ public class ZeroDurationFrameVisualTests
                 TextureName      = "red.png",  FrameLength = 0.1f,
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "blue.png", FrameLength = 0f,   // zero-duration frame 1
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
 
             var chain = new AnimationChainSave { Name = "MixDuration" };

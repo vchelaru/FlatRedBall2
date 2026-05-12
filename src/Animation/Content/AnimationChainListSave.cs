@@ -54,8 +54,25 @@ public class AnimationChainListSave
     /// <summary>The list of animation chains.</summary>
     public List<AnimationChainSave> AnimationChains = new();
 
-    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>.</summary>
-    public string FileName { get; private set; } = string.Empty;
+    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>;
+    /// tooling (Animation Editor) sets this directly when the user picks a Save-As path.</summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Path of the project (.gluj) file the .achx belongs to, relative to the .achx location.
+    /// Persisted in the XML and round-tripped by tooling but ignored at runtime by the engine.
+    /// </summary>
+    public string? ProjectFile { get; set; }
+
+    /// <summary>
+    /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
+    /// for tooling (file pickers in the Animation Editor) where the caller has an absolute path
+    /// and needs to bypass the <see cref="ContentLoader"/> stream seam. Production runtime code
+    /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
+    /// to the other overload.
+    /// </summary>
+    public static AnimationChainListSave FromFile(string path)
+        => FromFile(path, File.OpenRead!);
 
     /// <summary>
     /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer
@@ -65,7 +82,7 @@ public class AnimationChainListSave
     /// </summary>
     /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
     /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
-    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider = null)
+    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider)
     {
         streamProvider ??= XnaTitleContainer.OpenStream;
         using var stream = streamProvider(filePath);
@@ -99,9 +116,124 @@ public class AnimationChainListSave
             result.AnimationChains.Add(chain);
         }
 
+        var projectFileEl = root.Element("ProjectFile");
+        if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
+
         result.FileName = filePath;
         return result;
     }
+
+    /// <summary>
+    /// Writes this save to a .achx file using FRB1's XML element dialect — root
+    /// <c>&lt;AnimationChainArraySave&gt;</c>, shape wrapper <c>&lt;ShapeCollectionSave&gt;</c>,
+    /// rectangle list <c>&lt;AxisAlignedRectangleSaves&gt;</c>/<c>&lt;AxisAlignedRectangleSave&gt;</c>.
+    /// Element names diverge from the C# type names (which stay terse, e.g. <see cref="AARectSave"/>)
+    /// so existing .achx files in the wild keep their byte shape.
+    /// </summary>
+    /// <remarks>
+    /// Frame defaults are omitted to keep diffs small: <c>FlipHorizontal</c>/<c>FlipVertical</c>
+    /// are written only when <c>true</c>; <c>RelativeX</c>/<c>RelativeY</c> only when non-zero.
+    /// FRB1-only fields (Z, ScaleZ, Alpha/Red/Green/Blue on shapes; AxisAlignedCubeSaves;
+    /// SphereSaves) are written as empty list elements for dialect compatibility but their
+    /// values are not preserved.
+    /// </remarks>
+    public void Save(string path)
+    {
+        var root = new XElement("AnimationChainArraySave",
+            new XAttribute(XNamespace.Xmlns + "xsi", "http://www.w3.org/2001/XMLSchema-instance"),
+            new XAttribute(XNamespace.Xmlns + "xsd", "http://www.w3.org/2001/XMLSchema"),
+            new XElement("FileRelativeTextures", FileRelativeTextures ? "true" : "false"),
+            new XElement("TimeMeasurementUnit", TimeMeasurementUnit.ToString()),
+            new XElement("CoordinateType", CoordinateType.ToString()));
+
+        foreach (var chain in AnimationChains)
+        {
+            var chainEl = new XElement("AnimationChain",
+                new XElement("Name", chain.Name));
+            foreach (var frame in chain.Frames)
+                chainEl.Add(WriteFrame(frame));
+            root.Add(chainEl);
+        }
+
+        if (ProjectFile != null)
+            root.Add(new XElement("ProjectFile", ProjectFile));
+
+        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
+        using var stream = File.Create(path);
+        doc.Save(stream);
+    }
+
+    private static XElement WriteFrame(AnimationFrameSave frame)
+    {
+        var el = new XElement("Frame");
+        // Match FRB1's element order — FlipHorizontal appears before TextureName when set.
+        if (frame.FlipHorizontal) el.Add(new XElement("FlipHorizontal", "true"));
+        if (frame.FlipVertical) el.Add(new XElement("FlipVertical", "true"));
+        el.Add(new XElement("TextureName", frame.TextureName));
+        el.Add(new XElement("FrameLength", FloatStr(frame.FrameLength)));
+        el.Add(new XElement("LeftCoordinate", FloatStr(frame.LeftCoordinate)));
+        el.Add(new XElement("RightCoordinate", FloatStr(frame.RightCoordinate)));
+        el.Add(new XElement("TopCoordinate", FloatStr(frame.TopCoordinate)));
+        el.Add(new XElement("BottomCoordinate", FloatStr(frame.BottomCoordinate)));
+        if (frame.RelativeX != 0f) el.Add(new XElement("RelativeX", FloatStr(frame.RelativeX)));
+        if (frame.RelativeY != 0f) el.Add(new XElement("RelativeY", FloatStr(frame.RelativeY)));
+
+        el.Add(WriteShapes(frame.ShapesSave));
+        return el;
+    }
+
+    private static XElement WriteShapes(ShapesSave? shapes)
+    {
+        shapes ??= new ShapesSave();
+        var rects = new XElement("AxisAlignedRectangleSaves");
+        foreach (var r in shapes.AARectSaves)
+        {
+            rects.Add(new XElement("AxisAlignedRectangleSave",
+                new XElement("X", FloatStr(r.X)),
+                new XElement("Y", FloatStr(r.Y)),
+                new XElement("ScaleX", FloatStr(r.ScaleX)),
+                new XElement("ScaleY", FloatStr(r.ScaleY)),
+                new XElement("Name", r.Name)));
+        }
+
+        var circles = new XElement("CircleSaves");
+        foreach (var c in shapes.CircleSaves)
+        {
+            circles.Add(new XElement("CircleSave",
+                new XElement("X", FloatStr(c.X)),
+                new XElement("Y", FloatStr(c.Y)),
+                new XElement("Radius", FloatStr(c.Radius)),
+                new XElement("Name", c.Name)));
+        }
+
+        var polys = new XElement("PolygonSaves");
+        foreach (var p in shapes.PolygonSaves)
+        {
+            var pointsEl = new XElement("Points");
+            foreach (var v in p.Points)
+            {
+                pointsEl.Add(new XElement("Vector2Save",
+                    new XElement("X", FloatStr(v.X)),
+                    new XElement("Y", FloatStr(v.Y))));
+            }
+            polys.Add(new XElement("PolygonSave",
+                new XElement("Name", p.Name),
+                new XElement("X", FloatStr(p.X)),
+                new XElement("Y", FloatStr(p.Y)),
+                pointsEl));
+        }
+
+        // AxisAlignedCubeSaves and SphereSaves are FRB1-era 3D-shape placeholders that FRB2 does
+        // not model. Emit empty elements so the dialect matches what FRB1 readers expect.
+        return new XElement("ShapeCollectionSave",
+            rects,
+            new XElement("AxisAlignedCubeSaves"),
+            polys,
+            circles,
+            new XElement("SphereSaves"));
+    }
+
+    private static string FloatStr(float value) => value.ToString("R", CultureInfo.InvariantCulture);
 
     private static AnimationFrameSave ParseFrame(XElement el)
     {
@@ -117,7 +249,10 @@ public class AnimationChainListSave
         frame.RelativeX = FloatEl(el, "RelativeX");
         frame.RelativeY = FloatEl(el, "RelativeY");
 
-        var shapesEl = el.Element("ShapesSave");
+        // FRB1 dialect: shape wrapper is <ShapeCollectionSave>. FRB2's <ShapesSave> is not
+        // accepted — no .achx files exist in the wild using it (the FRB2 writer didn't exist
+        // before this branch), so the dialect is unified on FRB1's element names.
+        var shapesEl = el.Element("ShapeCollectionSave");
         if (shapesEl != null)
             frame.ShapesSave = ParseShapes(shapesEl);
 
@@ -128,10 +263,10 @@ public class AnimationChainListSave
     {
         var shapes = new ShapesSave();
 
-        var aarctsEl = el.Element("AARectSaves");
+        var aarctsEl = el.Element("AxisAlignedRectangleSaves");
         if (aarctsEl != null)
         {
-            foreach (var r in aarctsEl.Elements("AARectSave"))
+            foreach (var r in aarctsEl.Elements("AxisAlignedRectangleSave"))
             {
                 shapes.AARectSaves.Add(new AARectSave
                 {

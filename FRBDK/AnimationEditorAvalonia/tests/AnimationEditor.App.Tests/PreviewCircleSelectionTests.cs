@@ -4,8 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
 using Xunit;
 
@@ -55,9 +54,9 @@ public class PreviewCircleSelectionTests
         circle = new CircleSave { X = worldX, Y = worldY, Radius = radius };
         var frame = new AnimationFrameSave
         {
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        frame.ShapesSave.CircleSaves.Add(circle);
         return frame;
     }
 
@@ -145,9 +144,9 @@ public class PreviewCircleSelectionTests
         var ctx = ResetSingletons();
         var ctrl = MakeControl(ctx);
 
-        var rect = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
-        var frame = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave.AARectSaves.Add(rect);
         ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);
@@ -164,11 +163,11 @@ public class PreviewCircleSelectionTests
         var ctrl = MakeControl(ctx);
 
         // Both at origin — circle is rendered on top (drawn after rect), so it wins.
-        var rect   = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 30f, ScaleY = 30f };
+        var rect   = new AARectSave { X = 0f, Y = 0f, ScaleX = 30f, ScaleY = 30f };
         var circle = new CircleSave              { X = 0f, Y = 0f, Radius = 20f };
-        var frame  = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
-        frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        var frame  = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave.AARectSaves.Add(rect);
+        frame.ShapesSave.CircleSaves.Add(circle);
         ctx.SelectedState.SelectedFrame = frame;
 
         ctrl.SimulateCanvasClick(CX, CY);

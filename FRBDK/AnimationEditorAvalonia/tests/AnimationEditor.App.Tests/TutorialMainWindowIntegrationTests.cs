@@ -7,8 +7,7 @@ using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -215,8 +214,8 @@ public class TutorialMainWindowIntegrationTests
             // Frame must be added even without a saved project file;
             // TextureName is the absolute path so DetermineTexturePath can resolve it.
             Assert.Single(chain.Frames);
-            Assert.Equal(new FlatRedBall.IO.FilePath(png).Standardized,
-                         new FlatRedBall.IO.FilePath(chain.Frames[0].TextureName).Standardized);
+            Assert.Equal(new AnimationEditor.Core.Paths.FilePath(png).Standardized,
+                         new AnimationEditor.Core.Paths.FilePath(chain.Frames[0].TextureName).Standardized);
         }
         finally
         {
@@ -262,7 +261,7 @@ public class TutorialMainWindowIntegrationTests
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0f,    TopCoordinate    = 0f,
                 RightCoordinate  = 0.25f, BottomCoordinate = 0.25f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
@@ -327,7 +326,7 @@ public class TutorialMainWindowIntegrationTests
             {
                 TextureName = "idle.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -375,7 +374,7 @@ public class TutorialMainWindowIntegrationTests
             {
                 TextureName = "idle.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);

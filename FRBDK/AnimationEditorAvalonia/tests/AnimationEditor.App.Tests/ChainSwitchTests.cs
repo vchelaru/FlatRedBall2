@@ -4,8 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System.IO;
 using System;
@@ -64,7 +63,7 @@ public class ChainSwitchTests
             TextureName      = textureName, FrameLength = length,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
             RightCoordinate  = 1f, BottomCoordinate = 1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
 
     // ── Direct API path ───────────────────────────────────────────────────────

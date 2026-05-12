@@ -1,8 +1,7 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.CommandsAndState;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -17,16 +16,16 @@ namespace AnimationEditor.App.Tests;
 public class PreviewShapeDragTests
 {
     private static AnimationFrameSave MakeFrame(
-        AxisAlignedRectangleSave? rect = null,
+        AARectSave? rect = null,
         CircleSave? circle = null)
     {
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        if (rect   is not null) frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
-        if (circle is not null) frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        if (rect   is not null) frame.ShapesSave.AARectSaves.Add(rect);
+        if (circle is not null) frame.ShapesSave.CircleSaves.Add(circle);
         return frame;
     }
 
@@ -70,7 +69,7 @@ public class PreviewShapeDragTests
     public void DragRectangle_UpdatesXY()
     {
         var ctx  = TestHelpers.BuildServices();
-        var rect  = new AxisAlignedRectangleSave { X = 0f, Y = 0f, ScaleX = 16f, ScaleY = 16f };
+        var rect  = new AARectSave { X = 0f, Y = 0f, ScaleX = 16f, ScaleY = 16f };
         var frame = MakeFrame(rect: rect);
         ctx.SelectedState.SelectedFrame     = frame;
         ctx.SelectedState.SelectedRectangle = rect;

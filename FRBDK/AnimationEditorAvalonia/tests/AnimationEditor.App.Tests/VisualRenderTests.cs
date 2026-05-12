@@ -3,8 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -168,14 +167,14 @@ public class VisualRenderTests
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
                 RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             });
             chain.Frames.Add(new AnimationFrameSave
             {
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f,   BottomCoordinate = 0.5f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             });
 
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -211,7 +210,7 @@ public class VisualRenderTests
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
                 RightCoordinate  = 0.5f, BottomCoordinate = 0.5f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
@@ -267,7 +266,7 @@ public class VisualRenderTests
             chain.Frames.Add(new AnimationFrameSave
             {
                 FrameLength         = 0.1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             });
         ctrl.Playback.SetChain(chain);  // resets to frame 0, keeps IsPlaying=false
 
@@ -291,7 +290,7 @@ public class VisualRenderTests
             chain.Frames.Add(new AnimationFrameSave
             {
                 FrameLength         = 0.1f,  // each frame = 100 ms
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             });
         ctrl.Playback.SetChain(chain);
         ctrl.Playback.Play();   // re-enable playback with timer still stopped
@@ -348,7 +347,7 @@ public class VisualRenderTests
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
@@ -403,14 +402,14 @@ public class VisualRenderTests
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
                 RightCoordinate  = 0.5f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName      = "sheet.png",
                 LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f,   BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Walk" };
             chain.Frames.Add(frame0);
@@ -471,7 +470,7 @@ public class VisualRenderTests
                 TextureName      = "white.png",
                 LeftCoordinate   = 0f,   TopCoordinate    = 0f,
                 RightCoordinate  = 0.5f, BottomCoordinate = 1f,   // left half only
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Half" };
             chain.Frames.Add(frame);
@@ -558,7 +557,7 @@ public class VisualRenderTests
                 LeftCoordinate   = 0f, TopCoordinate    = 0f,
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
                 FrameLength      = 0.1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
@@ -610,7 +609,7 @@ public class VisualRenderTests
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
                 FrameLength      = 0.1f,
                 FlipHorizontal   = true,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
@@ -664,7 +663,7 @@ public class VisualRenderTests
                 RightCoordinate  = 1f, BottomCoordinate = 1f,
                 FrameLength      = 0.1f,
                 FlipVertical     = true,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame);
@@ -726,13 +725,13 @@ public class VisualRenderTests
             {
                 TextureName = "red.png",   FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName = "lime.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame0);
@@ -786,13 +785,13 @@ public class VisualRenderTests
             {
                 TextureName = "red.png",  FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var frame1 = new AnimationFrameSave
             {
                 TextureName = "lime.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var chain = new AnimationChainSave { Name = "Test" };
             chain.Frames.Add(frame0);
@@ -843,7 +842,7 @@ public class VisualRenderTests
             {
                 TextureName = "hsplit.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 0.5f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -884,7 +883,7 @@ public class VisualRenderTests
             {
                 TextureName = "hsplit.png", FrameLength = 0.1f,
                 LeftCoordinate = 0.5f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -926,7 +925,7 @@ public class VisualRenderTests
             {
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -978,7 +977,7 @@ public class VisualRenderTests
             {
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -1076,7 +1075,7 @@ public class VisualRenderTests
                         TopCoordinate    = (float)(row * cellH) / texH,
                         BottomCoordinate = (float)(row * cellH + cellH) / texH,
                         FrameLength      = 0.1f,
-                        ShapeCollectionSave = new ShapeCollectionSave()
+                        ShapesSave = new ShapesSave()
                     });
 
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -1118,7 +1117,7 @@ public class VisualRenderTests
                         TopCoordinate    = (float)(row * cellH) / texH,
                         BottomCoordinate = (float)(row * cellH + cellH) / texH,
                         FrameLength      = 0.1f,
-                        ShapeCollectionSave = new ShapeCollectionSave()
+                        ShapesSave = new ShapesSave()
                     });
 
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -1171,7 +1170,7 @@ public class VisualRenderTests
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 RelativeY = 8f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -1221,7 +1220,7 @@ public class VisualRenderTests
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 RelativeX = 8f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -1272,7 +1271,7 @@ public class VisualRenderTests
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 RelativeY = 8f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             SetupSingleFrame(ctx, dir, frame);
 
@@ -1325,14 +1324,14 @@ public class VisualRenderTests
                 TextureName = "red.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 RelativeY = 8f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
             var mainFrame = new AnimationFrameSave
             {
                 TextureName = "green.png", FrameLength = 0.1f,
                 LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
                 RelativeY = 0f,
-                ShapeCollectionSave = new ShapeCollectionSave()
+                ShapesSave = new ShapesSave()
             };
 
             // index 0 = onion (previous), index 1 = current (main)
@@ -1375,7 +1374,7 @@ public class VisualRenderTests
     // ── Collision shape rendering ─────────────────────────────────────────────
 
     /// <summary>
-    /// A pinned frame containing an AxisAlignedRectangleSave should render a green
+    /// A pinned frame containing an AARectSave should render a green
     /// rectangle outline in the preview. At default zoom=1 and OffsetMultiplier=1,
     /// a rect at world (0,0) with ScaleX=ScaleY=15 on a 100×100 canvas (RulerSize=20)
     /// gives screen centre (60,60) and top edge at y=45. Check that pixel (60,45)
@@ -1388,10 +1387,10 @@ public class VisualRenderTests
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(
-            new AxisAlignedRectangleSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 });
+        frame.ShapesSave.AARectSaves.Add(
+            new AARectSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
         ctx.AppState.OffsetMultiplier = 1f;
@@ -1429,9 +1428,9 @@ public class VisualRenderTests
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        frame.ShapeCollectionSave.CircleSaves.Add(
+        frame.ShapesSave.CircleSaves.Add(
             new CircleSave { Name = "Ring", X = 0, Y = 0, Radius = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -1462,13 +1461,13 @@ public class VisualRenderTests
     public void Preview_SelectedRect_RendersGoldOutline()
     {
         var ctx = ResetSingletons();
-        var rect = new AxisAlignedRectangleSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 };
+        var rect = new AARectSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 };
         var frame = new AnimationFrameSave
         {
             FrameLength = 0.1f,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
-        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+        frame.ShapesSave.AARectSaves.Add(rect);
 
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedRectangle = rect; // mark as selected

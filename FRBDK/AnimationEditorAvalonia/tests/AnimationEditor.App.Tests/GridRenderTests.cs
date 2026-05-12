@@ -3,7 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -29,7 +29,7 @@ public class GridRenderTests
 
     private static TestServices ResetSingletons() {
         var ctx = TestHelpers.BuildServices();
-        ctx.ProjectManager.AnimationChainListSave = new FlatRedBall.Content.AnimationChain.AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
         ctx.ProjectManager.FileName = null;
         ctx.SelectedState.SelectedChain = null;
         ctx.SelectedState.SelectedFrame = null;

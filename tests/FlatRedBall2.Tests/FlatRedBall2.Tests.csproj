@@ -20,4 +20,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Animation\Content\Corpus\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Animation\Content\Snapshot\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

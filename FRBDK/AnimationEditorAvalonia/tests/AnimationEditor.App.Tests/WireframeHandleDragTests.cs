@@ -4,8 +4,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
 
@@ -71,7 +70,7 @@ public class WireframeHandleDragTests
             FrameLength      = 0.1f,
             LeftCoordinate   = 0f, TopCoordinate    = 0f,
             RightCoordinate  = 1f, BottomCoordinate = 1f,
-            ShapeCollectionSave = new ShapeCollectionSave(),
+            ShapesSave = new ShapesSave(),
         };
         var chain = new AnimationChainSave { Name = "Test" };
         chain.Frames.Add(frame);
@@ -195,7 +194,7 @@ public class WireframeHandleDragTests
                 FrameLength      = 0.1f,
                 LeftCoordinate   = 0.25f, TopCoordinate    = 0.25f,
                 RightCoordinate  = 0.75f, BottomCoordinate = 0.75f,
-                ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave(),
+                ShapesSave = new ShapesSave(),
             };
             chain.Frames.Add(frame);
             ctx.SelectedState.SelectedFrame = frame;

@@ -3,8 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using Avalonia.Headless.XUnit;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
 using System.IO;
@@ -123,7 +122,7 @@ public class CtrlClickPlainModeTests
             TopCoordinate       = 0f,
             RightCoordinate     = 0.5f,   // 32px wide
             BottomCoordinate    = 1.0f,   // 64px tall
-            ShapeCollectionSave = new ShapeCollectionSave(),
+            ShapesSave = new ShapesSave(),
         };
         chain.Frames.Add(lastFrame);
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

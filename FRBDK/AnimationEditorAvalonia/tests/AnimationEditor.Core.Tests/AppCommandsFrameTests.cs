@@ -1,6 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -75,7 +75,7 @@ public class AppCommandsFrameTests
     }
 
     [Fact]
-    public void AddFrame_InitializesShapeCollectionSave()
+    public void AddFrame_InitializesShapesSave()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -83,7 +83,7 @@ public class AppCommandsFrameTests
 
         ctx.AppCommands.AddFrame(chain);
 
-        Assert.NotNull(chain.Frames[0].ShapeCollectionSave);
+        Assert.NotNull(chain.Frames[0].ShapesSave);
     }
 
     [Fact]

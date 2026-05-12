@@ -1,7 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -153,13 +152,13 @@ public class AppCommandsDeleteAsyncTests
         ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "HitBox" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
-            new List<AxisAlignedRectangleSave> { rect });
+            new List<AARectSave> { rect });
 
-        Assert.Empty(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
+        Assert.Empty(frame.ShapesSave!.AARectSaves);
     }
 
     [Fact]
@@ -170,13 +169,13 @@ public class AppCommandsDeleteAsyncTests
         ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "HitBox" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
-            new List<AxisAlignedRectangleSave> { rect });
+            new List<AARectSave> { rect });
 
-        Assert.Single(frame.ShapeCollectionSave!.AxisAlignedRectangleSaves);
+        Assert.Single(frame.ShapesSave!.AARectSaves);
     }
 
     [Fact]
@@ -192,11 +191,11 @@ public class AppCommandsDeleteAsyncTests
         };
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "BodyCollision" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "BodyCollision" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
-            new List<AxisAlignedRectangleSave> { rect });
+            new List<AARectSave> { rect });
 
         Assert.NotNull(capturedMessage);
         Assert.Contains("BodyCollision", capturedMessage);
@@ -213,12 +212,12 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
 
-        Assert.Empty(frame.ShapeCollectionSave!.CircleSaves);
+        Assert.Empty(frame.ShapesSave!.CircleSaves);
     }
 
     [Fact]
@@ -230,12 +229,12 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
 
-        Assert.Single(frame.ShapeCollectionSave!.CircleSaves);
+        Assert.Single(frame.ShapesSave!.CircleSaves);
     }
 
     [Fact]
@@ -252,7 +251,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "DetectionArea", Radius = 20 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });

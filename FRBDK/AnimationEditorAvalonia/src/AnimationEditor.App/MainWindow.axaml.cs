@@ -15,9 +15,7 @@ using Avalonia.VisualTree;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
-using Newtonsoft.Json;
+using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -25,9 +23,10 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
-using FilePath = FlatRedBall.IO.FilePath;
-using StringFunctions = FlatRedBall.Utilities.StringFunctions;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
+using StringFunctions = AnimationEditor.Core.Utilities.StringFunctions;
 
 namespace AnimationEditor.App;
 
@@ -49,8 +48,8 @@ public partial class MainWindow : Window
     private bool _suppressPreviewZoomComboChanged;
 
     private FilePath SettingsFilePath =>
-        (FilePath)(Path.GetDirectoryName(
-            System.Reflection.Assembly.GetExecutingAssembly().Location) + "\\AESettings.json");
+        new FilePath((Path.GetDirectoryName(
+            System.Reflection.Assembly.GetExecutingAssembly().Location) ?? string.Empty) + "\\AESettings.json");
 
     public MainWindow(
         IProjectManager projectManager,
@@ -103,7 +102,7 @@ public partial class MainWindow : Window
         else
         {
             _projectManager.AnimationChainListSave =
-                new FlatRedBall.Content.AnimationChain.AnimationChainListSave();
+                new AnimationChainListSave();
         }
     }
 
@@ -174,7 +173,7 @@ public partial class MainWindow : Window
 
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? string.Empty
-            : FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName);
+            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
         string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
         _appCommands.SetFrameTextureName(frame, storePath);
         RefreshPropertyPanel();
@@ -348,9 +347,9 @@ public partial class MainWindow : Window
         // When no file exists yet (unsaved project), keep the absolute path so
         // WireframeControl.DetermineTexturePath can still resolve it for display.
         string relPath = !string.IsNullOrEmpty(_projectManager.FileName)
-            ? FlatRedBall.IO.FileManager.MakeRelative(
-                texPath,
-                FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName))
+            ? Path.GetRelativePath(
+                Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
+                texPath).Replace('\\', '/')
             : texPath;
 
         var frame = new AnimationFrameSave
@@ -361,7 +360,7 @@ public partial class MainWindow : Window
             TopCoordinate      = minY / (float)bitmapH,
             BottomCoordinate   = maxY / (float)bitmapH,
             FrameLength        = 0.1f,
-            ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
 
         chain.Frames.Add(frame);
@@ -415,7 +414,7 @@ public partial class MainWindow : Window
             var acls = _projectManager.AnimationChainListSave;
             if (acls is null || string.IsNullOrEmpty(_projectManager.FileName)) return;
 
-            string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName);
+            string achxFolder = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
             var paths = acls.AnimationChains
                 .SelectMany(c => c.Frames)
@@ -424,7 +423,7 @@ public partial class MainWindow : Window
                 {
                     var abs = System.IO.Path.IsPathRooted(f.TextureName)
                         ? f.TextureName
-                        : achxFolder + f.TextureName;
+                        : Path.Combine(achxFolder, f.TextureName);
                     return new FilePath(abs).Standardized;
                 })
                 .Union(_projectManager.ReferencedPngs.Select(p => p.Standardized))
@@ -455,10 +454,10 @@ public partial class MainWindow : Window
         if (frame != null && !string.IsNullOrEmpty(frame.TextureName) &&
             !string.IsNullOrEmpty(_projectManager.FileName))
         {
-            string achxFolder = FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName);
+            string achxFolder = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
             var abs = System.IO.Path.IsPathRooted(frame.TextureName)
                 ? frame.TextureName
-                : achxFolder + frame.TextureName;
+                : Path.Combine(achxFolder, frame.TextureName);
             texPath = new FilePath(abs).Standardized;
         }
 
@@ -521,7 +520,7 @@ public partial class MainWindow : Window
     private void OnNewClick(object? sender, RoutedEventArgs e)
     {
         _projectManager.AnimationChainListSave =
-            new FlatRedBall.Content.AnimationChain.AnimationChainListSave();
+            new AnimationChainListSave();
         _projectManager.FileName = null;
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
     }
@@ -939,11 +938,11 @@ public partial class MainWindow : Window
             frameNode.Header = TreeBuilder.BuildFrameHeader(frame);
             // Rebuild shape children via TreeBuilder
             frameNode.Children.Clear();
-            if (frame.ShapeCollectionSave is not null)
+            if (frame.ShapesSave is not null)
             {
-                foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
+                foreach (var r in frame.ShapesSave.AARectSaves)
                     frameNode.Children.Add(new TreeNodeVm { Header = r.Name, Data = r });
-                foreach (var c in frame.ShapeCollectionSave.CircleSaves)
+                foreach (var c in frame.ShapesSave.CircleSaves)
                     frameNode.Children.Add(new TreeNodeVm { Header = c.Name, Data = c });
             }
         }
@@ -1011,7 +1010,7 @@ public partial class MainWindow : Window
 
         var vm = AnimTree.SelectedItem as TreeNodeVm;
 
-        if (vm?.Data is AxisAlignedRectangleSave rect)
+        if (vm?.Data is AARectSave rect)
         {
             AddMenuItem("Match Frame Size", () =>
             {
@@ -1647,7 +1646,7 @@ public partial class MainWindow : Window
             if (SettingsFilePath.Exists())
             {
                 var contents = File.ReadAllText(SettingsFilePath.FullPath);
-                _appSettings = JsonConvert.DeserializeObject<AppSettingsModel>(contents)
+                _appSettings = JsonSerializer.Deserialize<AppSettingsModel>(contents)
                                ?? new AppSettingsModel();
             }
         }
@@ -1662,7 +1661,7 @@ public partial class MainWindow : Window
         try
         {
             File.WriteAllText(SettingsFilePath.FullPath,
-                JsonConvert.SerializeObject(_appSettings, Formatting.Indented));
+                JsonSerializer.Serialize(_appSettings, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (IOException)
         {
@@ -1857,7 +1856,7 @@ public partial class MainWindow : Window
             xml = ClipboardPayload.Serialize(new List<AnimationChainSave> { chainToCopy });
         else if (selectedVm?.Data is AnimationFrameSave frameToCopy)
             xml = ClipboardPayload.Serialize(new List<AnimationFrameSave> { frameToCopy });
-        else if (selectedVm?.Data is AxisAlignedRectangleSave rectToCopy)
+        else if (selectedVm?.Data is AARectSave rectToCopy)
             xml = ClipboardPayload.Serialize(rectToCopy);
         else if (selectedVm?.Data is CircleSave circleToCopy)
             xml = ClipboardPayload.Serialize(circleToCopy);
@@ -1910,7 +1909,7 @@ public partial class MainWindow : Window
 
             foreach (var pasted in frames)
             {
-                pasted.ShapeCollectionSave ??= new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave();
+                pasted.ShapesSave ??= new ShapesSave();
                 targetChain.Frames.Add(pasted);
             }
             _selectedState.SelectedFrame = frames[^1];
@@ -1922,14 +1921,14 @@ public partial class MainWindow : Window
         {
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
-            frame.ShapeCollectionSave ??= new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave();
-            var existingNames = frame.ShapeCollectionSave.AxisAlignedRectangleSaves
+            frame.ShapesSave ??= new ShapesSave();
+            var existingNames = frame.ShapesSave.AARectSaves
                 .Select(r => r.Name)
-                .Concat(frame.ShapeCollectionSave.CircleSaves.Select(c => c.Name))
+                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
                 .ToList();
             rectangle.Name = StringFunctions.MakeStringUnique(
                 rectangle.Name, existingNames, 2);
-            frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rectangle);
+            frame.ShapesSave.AARectSaves.Add(rectangle);
             _appCommands.RefreshTreeNode(frame);
             _appCommands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -1938,14 +1937,14 @@ public partial class MainWindow : Window
         {
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
-            frame.ShapeCollectionSave ??= new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave();
-            var existingNames = frame.ShapeCollectionSave.AxisAlignedRectangleSaves
+            frame.ShapesSave ??= new ShapesSave();
+            var existingNames = frame.ShapesSave.AARectSaves
                 .Select(r => r.Name)
-                .Concat(frame.ShapeCollectionSave.CircleSaves.Select(c => c.Name))
+                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
                 .ToList();
             circle.Name = StringFunctions.MakeStringUnique(
                 circle.Name, existingNames, 2);
-            frame.ShapeCollectionSave.CircleSaves.Add(circle);
+            frame.ShapesSave.CircleSaves.Add(circle);
             _appCommands.RefreshTreeNode(frame);
             _appCommands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -1965,7 +1964,7 @@ public partial class MainWindow : Window
             _ = _appCommands.AskToDeleteAnimationChains(new() { chainToDel });
         else if (selectedVm.Data is AnimationFrameSave frameToDel)
             _ = _appCommands.AskToDeleteFrames(new() { frameToDel });
-        else if (selectedVm.Data is AxisAlignedRectangleSave rectToDel)
+        else if (selectedVm.Data is AARectSave rectToDel)
             _ = _appCommands.AskToDeleteRectangles(new() { rectToDel });
         else if (selectedVm.Data is CircleSave circleToDel)
             _ = _appCommands.AskToDeleteCircles(new() { circleToDel });
@@ -2162,7 +2161,7 @@ public partial class MainWindow : Window
 
         string? achxDir = null;
         if (!string.IsNullOrEmpty(_projectManager.FileName))
-            achxDir = FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName);
+            achxDir = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
         var absTexPath = achxDir is not null
             ? Path.GetFullPath(Path.Combine(achxDir, frame.TextureName))
@@ -2265,7 +2264,7 @@ public partial class MainWindow : Window
 
             // Re-reference all modified frames to the new texture file
             string newRelPath = achxDir is not null
-                ? FlatRedBall.IO.FileManager.MakeRelative(newAbsPath, achxDir)
+                ? Path.GetRelativePath(achxDir, newAbsPath).Replace('\\', '/')
                 : newAbsPath;
 
             foreach (var f in modifiedFrames)
@@ -2398,7 +2397,7 @@ public partial class MainWindow : Window
 
         string? achxDir = null;
         if (!string.IsNullOrEmpty(_projectManager.FileName))
-            achxDir = FlatRedBall.IO.FileManager.GetDirectory(_projectManager.FileName);
+            achxDir = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
         var absPath = achxDir is not null
             ? Path.GetFullPath(Path.Combine(achxDir, frame.TextureName))

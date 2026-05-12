@@ -1,6 +1,5 @@
 using AnimationEditor.Core.IO;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -19,7 +18,7 @@ public class TextureResizeAdjusterTests
             RightCoordinate  = right,
             TopCoordinate    = top,
             BottomCoordinate = bottom,
-            ShapeCollectionSave = new ShapeCollectionSave()
+            ShapesSave = new ShapesSave()
         };
 
     // ── AdjustFrame ───────────────────────────────────────────────────────

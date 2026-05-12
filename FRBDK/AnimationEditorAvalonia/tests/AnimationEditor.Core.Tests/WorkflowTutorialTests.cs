@@ -1,7 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Rendering;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -111,7 +111,7 @@ public class WorkflowTutorialTests
                     LeftCoordinate   = l, RightCoordinate  = r,
                     TopCoordinate    = t, BottomCoordinate = b,
                     FrameLength      = 0.1f,
-                    ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
                 });
             }
         }
@@ -174,7 +174,7 @@ public class WorkflowTutorialTests
                     LeftCoordinate   = l, RightCoordinate  = r,
                     TopCoordinate    = t, BottomCoordinate = b,
                     FrameLength      = 0.1f,
-                    ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
                 };
                 chain.Frames.Add(frame);
             }
