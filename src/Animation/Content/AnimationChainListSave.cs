@@ -34,7 +34,7 @@ public enum TextureCoordinateType
 
 /// <summary>
 /// Deserialized representation of a .achx animation file.
-/// Load with <see cref="FromFile"/> and convert to runtime types with
+/// Load with <see cref="FromFile(string)"/> and convert to runtime types with
 /// <see cref="ToAnimationChainList"/>.
 /// </summary>
 public class AnimationChainListSave
@@ -53,7 +53,7 @@ public class AnimationChainListSave
     /// <summary>The list of animation chains.</summary>
     public List<AnimationChainSave> AnimationChains = new();
 
-    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>;
+    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile(string)"/>;
     /// tooling (Animation Editor) sets this directly when the user picks a Save-As path.</summary>
     public string FileName { get; set; } = string.Empty;
 
