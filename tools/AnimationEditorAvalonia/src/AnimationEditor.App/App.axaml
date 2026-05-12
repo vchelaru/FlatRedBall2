@@ -1,0 +1,125 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.App.App"
+             RequestedThemeVariant="Dark">
+             <!-- "Dark" is required so selection highlights and other controls are visible against the app's dark backgrounds. -->
+
+    <!-- Full ButtonSpinner ControlTheme override to show +/- instead of ^/v chevrons.
+         A StreamGeometry resource override doesn't work because {StaticResource} inside
+         the FluentTheme template file resolves within that file's own scope at parse time.
+         Providing a complete ControlTheme in Application.Resources replaces the template
+         before FluentTheme is consulted. -->
+    <Application.Resources>
+        <ControlTheme x:Key="PlusMinusRepeatButton" TargetType="RepeatButton">
+            <Setter Property="MinWidth" Value="28" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource RepeatButtonBackgroundPointerOver}" />
+            </Style>
+            <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource RepeatButtonBackgroundPressed}" />
+            </Style>
+            <Style Selector="^:disabled /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource RepeatButtonBackgroundDisabled}" />
+                <Setter Property="Foreground" Value="{DynamicResource RepeatButtonForegroundDisabled}" />
+            </Style>
+        </ControlTheme>
+
+        <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+            <Setter Property="Padding" Value="10, 0" />
+            <Setter Property="Background" Value="{DynamicResource TextControlBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+            <Setter Property="MinHeight" Value="{DynamicResource TextControlThemeMinHeight}" />
+            <Setter Property="MinWidth" Value="{DynamicResource TextControlThemeMinWidth}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <DataValidationErrors>
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                MinHeight="{TemplateBinding MinHeight}">
+                            <DockPanel>
+                                <StackPanel Name="PART_SpinnerPanel"
+                                            TabIndex="2"
+                                            DockPanel.Dock="Right"
+                                            Orientation="Horizontal"
+                                            IsVisible="{TemplateBinding ShowButtonSpinner}">
+                                    <RepeatButton Name="PART_IncreaseButton"
+                                                  IsTabStop="{TemplateBinding IsTabStop}"
+                                                  Theme="{StaticResource PlusMinusRepeatButton}"
+                                                  Background="{TemplateBinding Background}"
+                                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                                  BorderThickness="1,0,0,0"
+                                                  VerticalAlignment="Stretch"
+                                                  HorizontalContentAlignment="Center"
+                                                  VerticalContentAlignment="Center"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  MinWidth="28">
+                                        <TextBlock Text="+" FontSize="12" />
+                                    </RepeatButton>
+                                    <RepeatButton Name="PART_DecreaseButton"
+                                                  IsTabStop="{TemplateBinding IsTabStop}"
+                                                  Theme="{StaticResource PlusMinusRepeatButton}"
+                                                  Background="{TemplateBinding Background}"
+                                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                                  BorderThickness="1,0,0,0"
+                                                  VerticalAlignment="Stretch"
+                                                  HorizontalContentAlignment="Center"
+                                                  VerticalContentAlignment="Center"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  MinWidth="28">
+                                        <TextBlock Text="−" FontSize="12" />
+                                    </RepeatButton>
+                                </StackPanel>
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  TabIndex="1"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  Content="{TemplateBinding Content}"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  Padding="{TemplateBinding Padding}" />
+                            </DockPanel>
+                        </Border>
+                    </DataValidationErrors>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:left">
+                <Style Selector="^ /template/ StackPanel#PART_SpinnerPanel">
+                    <Setter Property="DockPanel.Dock" Value="Left"/>
+                </Style>
+            </Style>
+            <Style Selector="^:error">
+                <Setter Property="BorderBrush" Value="{DynamicResource SystemErrorTextColor}" />
+            </Style>
+        </ControlTheme>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <!-- Compact buttons: override FluentTheme MinHeight so small +/- buttons aren't stretched -->
+        <Style Selector="Button.compact">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+    </Application.Styles>
+</Application>

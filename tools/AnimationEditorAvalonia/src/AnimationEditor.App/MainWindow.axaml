@@ -1,0 +1,939 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
+        xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
+        xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
+        x:Class="AnimationEditor.App.MainWindow"
+        Title="AnimationEditor"
+        Icon="avares://AnimationEditor.App/Assets/icons/achx-icon-256.png"
+        MinWidth="900" MinHeight="600">
+
+    <DockPanel>
+        <!-- ── Top bar: File/Edit/Help menus in a unified header row ── -->
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource BgRail}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,0,0,1"
+                Height="36">
+            <Menu x:Name="MainMenu"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  VerticalAlignment="Center"
+                  Margin="4,0">
+                <MenuItem Header="_File">
+                    <MenuItem Header="_New"          x:Name="MenuNew"    InputGesture="Ctrl+N" />
+                    <MenuItem Header="_Load..."       x:Name="MenuLoad"   InputGesture="Ctrl+L" />
+                    <MenuItem Header="_Save"          x:Name="MenuSave"   InputGesture="Ctrl+S" />
+                    <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
+                    <Separator />
+                    <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
+                </MenuItem>
+                <MenuItem Header="_Edit">
+                    <MenuItem Header="_Undo"            x:Name="MenuUndo"          InputGesture="Ctrl+Z" />
+                    <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
+                    <Separator />
+                    <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
+                    <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
+                    <Separator />
+                    <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
+                </MenuItem>
+                <MenuItem Header="_View">
+                    <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+=" />
+                    <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+-" />
+                    <Separator />
+                    <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+=" />
+                    <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+-" />
+                </MenuItem>
+                <MenuItem Header="_Help">
+                    <MenuItem Header="_About"         x:Name="MenuAbout" />
+                </MenuItem>
+            </Menu>
+        </Border>
+
+        <!-- ── Status bar ── -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{StaticResource BgRail}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,1,0,0"
+                Height="22">
+            <DockPanel Margin="12,0">
+                <!-- left: save state dot + filename + counts -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="16"
+                            VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <Ellipse x:Name="StatusDot"
+                                 Width="6" Height="6"
+                                 Fill="{StaticResource AccentSoft}" />
+                        <TextBlock x:Name="StatusSaveLabel"
+                                   Text="Not saved"
+                                   FontSize="11"
+                                   FontFamily="Consolas,Menlo,Monospace"
+                                   Foreground="{StaticResource InkMid}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock x:Name="StatusFilename"
+                               FontSize="11"
+                               FontFamily="Consolas,Menlo,Monospace"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusCounts"
+                               FontSize="11"
+                               FontFamily="Consolas,Menlo,Monospace"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <!-- right: cursor, selection -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="16"
+                            VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusCursor"
+                               FontSize="11"
+                               FontFamily="Consolas,Menlo,Monospace"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusSelection"
+                               FontSize="11"
+                               FontFamily="Consolas,Menlo,Monospace"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ── Main content: TreeView | Property Panel | [Wireframe / Preview] ── -->
+        <Grid ColumnDefinitions="260,4,240,4,*">
+
+            <!-- ── Left: Animation tree ── -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
+                  Background="{StaticResource BgApp}">
+
+                <!-- ── Tree pane header ── -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource BgRail}"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="0,0,0,1"
+                        Height="36">
+                    <DockPanel Margin="10,0">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
+                                    VerticalAlignment="Center">
+                            <!-- Search icon button (placeholder — no handler yet) -->
+                            <Button Width="24" Height="24"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Foreground="{StaticResource InkMid}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip.Tip="Search">
+                                <TextBlock Text="&#x1F50D;" FontSize="11" />
+                            </Button>
+                            <Button x:Name="ExpandAllBtn"
+                                    Content="⊞"
+                                    Width="24" Height="24"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Foreground="{StaticResource InkMid}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip.Tip="Expand All" />
+                            <Button x:Name="CollapseAllBtn"
+                                    Content="⊟"
+                                    Width="24" Height="24"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Foreground="{StaticResource InkMid}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip.Tip="Collapse All" />
+                        </StackPanel>
+                        <TextBlock Text="ANIMATIONS"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkMid}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <TreeView x:Name="AnimTree" Grid.Row="1"
+                          Background="{StaticResource BgApp}"
+                          SelectionMode="Multiple">
+                    <TreeView.Styles>
+                        <Style Selector="TreeViewItem">
+                            <Setter Property="IsExpanded"
+                                    Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+                        </Style>
+                        <!-- Inline "Add Frame" button: hidden by default, revealed on row hover -->
+                        <Style Selector="Button.add-frame-btn">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover Button.add-frame-btn">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                    </TreeView.Styles>
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate x:DataType="models:TreeNodeVm"
+                                          ItemsSource="{Binding Children}">
+                            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Node kind icons: SVG files are the single source of truth for path data. -->
+                                    <svg:Svg IsVisible="{Binding IsChainNode}"
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconChain.svg"
+                                             CurrentColor="#9098a4" />
+                                    <svg:Svg IsVisible="{Binding IsFrameNode}"
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconFrame.svg"
+                                             CurrentColor="#5d6573" />
+                                    <svg:Svg IsVisible="{Binding IsRectNode}"
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconShape.svg"
+                                             CurrentColor="#5d6573" />
+                                    <svg:Svg IsVisible="{Binding IsCircleNode}"
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconCircle.svg"
+                                             CurrentColor="#5d6573" />
+                                    <Panel>
+                                        <!-- Display mode -->
+                                        <TextBlock Text="{Binding Header}"
+                                                   Foreground="{StaticResource Ink}"
+                                                   Padding="2,1"
+                                                   VerticalAlignment="Center"
+                                                   IsVisible="{Binding !IsEditing}" />
+                                        <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
+                                        <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                                 IsVisible="{Binding IsEditing}"
+                                                 Background="#2a2e36"
+                                                 Foreground="{StaticResource Ink}"
+                                                 CaretBrush="{StaticResource Ink}"
+                                                 SelectionBrush="#4466aa"
+                                                 BorderThickness="1"
+                                                 Margin="0"
+                                                 Padding="2,1"
+                                                 VerticalAlignment="Stretch"
+                                                 VerticalContentAlignment="Center"
+                                                 HorizontalAlignment="Stretch" />
+                                    </Panel>
+                                    <TextBlock Text="{Binding Meta}"
+                                               Foreground="{StaticResource InkDim}"
+                                               FontSize="10"
+                                               Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                                <!-- Inline "Add Frame" button — only visible on chain nodes; shown on hover -->
+                                <Button Grid.Column="1"
+                                        Classes="add-frame-btn plus"
+                                        IsVisible="{Binding IsChainNode}"
+                                        Width="18" Height="18"
+                                        Padding="0"
+                                        Margin="4,0,4,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Add Frame"
+                                        Click="OnAddFrameBtnClick" />
+                            </Grid>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+
+                <!-- ── Add Chain button ── -->
+                <Border Grid.Row="2"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="0,1,0,0"
+                        Background="{StaticResource BgApp}"
+                        Padding="8,6">
+                    <Button x:Name="AddChainBtn"
+                            Content="+ Add Chain"
+                            HorizontalAlignment="Stretch"
+                            Height="30"
+                            Foreground="{StaticResource Ink}" />
+                </Border>
+            </Grid>
+
+            <!-- ── Splitter (left | middle) ── -->
+            <GridSplitter Grid.Column="1"
+                          ResizeDirection="Columns"
+                          Background="{StaticResource LineStrong}"
+                          HorizontalAlignment="Stretch" />
+
+            <!-- ── Right: Wireframe toolbar + Wireframe + Preview ── -->
+            <Grid Grid.Column="4" RowDefinitions="Auto,*,4,250">
+
+                <!-- ── Wireframe toolbar ── -->
+                <Border Grid.Row="0"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="0,0,0,1"
+                        Background="{StaticResource BgRail}"
+                        Padding="4,3">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                        <!-- Texture label + combo hidden for now — multi-texture support is planned for a future milestone.
+                             Do not remove; set IsVisible="True" and re-enable when the multi-texture feature is implemented. -->
+                        <TextBlock Text="Texture:" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   Foreground="{StaticResource InkMid}" IsVisible="False" />
+                        <ComboBox x:Name="TextureCombo"
+                                  MinWidth="220"
+                                  MaxWidth="400"
+                                  Margin="0,0,12,0"
+                                  PlaceholderText="(none)"
+                                  IsVisible="False" />
+
+                        <ToggleButton x:Name="MagicWandToggle"
+                                      Height="26"
+                                      Foreground="{StaticResource Ink}"
+                                      ToolTip.Tip="Click = set frame; Ctrl+Click = add new frame">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <svg:Svg Width="16" Height="16"
+                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconMagicWand.svg"
+                                         CurrentColor="#e6e8ec"
+                                         VerticalAlignment="Center" />
+                                <TextBlock Text="Magic Wand" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <CheckBox x:Name="SnapToGridCheck"
+                                  Foreground="{StaticResource Ink}"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,4,0"
+                                  ToolTip.Tip="Snap to Grid">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <svg:Svg Width="16" Height="16"
+                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconGrid.svg"
+                                         CurrentColor="#e6e8ec"
+                                         VerticalAlignment="Center" />
+                                <TextBlock Text="Grid" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </CheckBox>
+
+                        <Border BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                Height="26" Margin="0,0,2,0" VerticalAlignment="Center"
+                                IsEnabled="{Binding #SnapToGridCheck.IsChecked}">
+                            <DockPanel>
+                                <Button x:Name="GridSizeMinusBtn" DockPanel.Dock="Left"
+                                        Classes="flanker" Content="−" Width="22"
+                                        BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0" />
+                                <Button x:Name="GridSizePlusBtn" DockPanel.Dock="Right"
+                                        Classes="flanker" Content="+" Width="22"
+                                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0" />
+                                <TextBox x:Name="GridSizeInput" Text="16"
+                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                         Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
+                                         Height="26" VerticalAlignment="Center"
+                                         KeyDown="OnGridSizeInputKeyDown" />
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   Foreground="{StaticResource InkMid}" FontSize="11" />
+                        <Border BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                Height="26" Width="130" VerticalAlignment="Center">
+                            <DockPanel>
+                                <Button x:Name="ZoomMinusBtn" DockPanel.Dock="Left"
+                                        Classes="flanker" Content="−" Width="22"
+                                        BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0"
+                                        ToolTip.Tip="Zoom out to previous preset" />
+                                <Button x:Name="ZoomPlusBtn" DockPanel.Dock="Right"
+                                        Classes="flanker" Content="+" Width="22"
+                                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0"
+                                        ToolTip.Tip="Zoom in to next preset" />
+                                <AutoCompleteBox x:Name="ZoomCombo"
+                                                 Text="100%"
+                                                 MinimumPrefixLength="0" FilterMode="None"
+                                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                                 Height="26" VerticalAlignment="Center" FontSize="11">
+                                    <AutoCompleteBox.Styles>
+                                        <Style Selector="TextBox">
+                                            <Setter Property="TextAlignment" Value="Center"/>
+                                        </Style>
+                                    </AutoCompleteBox.Styles>
+                                </AutoCompleteBox>
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Wireframe panel fills top, with scrollbars -->
+                <ScrollViewer x:Name="WireframeScrollViewer"
+                              Grid.Row="1"
+                              Background="{StaticResource BgCanvas}"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto">
+                    <controls:WireframeControl x:Name="WireframeCtrl" />
+                </ScrollViewer>
+
+                <!-- Horizontal splitter between wireframe and preview -->
+                <GridSplitter Grid.Row="2"
+                              ResizeDirection="Rows"
+                              Background="{StaticResource LineStrong}"
+                              HorizontalAlignment="Stretch" />
+
+                <!-- ── Preview block: toolbar + animated canvas + timeline ── -->
+                <!-- GridSplitter at Row 2 resizes Row 1 (wireframe) and Row 3 (this block). -->
+                <Grid Grid.Row="3" RowDefinitions="Auto,*,52" MinHeight="80">
+
+                    <!-- ── Preview toolbar ── -->
+                    <Border Grid.Row="0"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="0,0,0,1"
+                            Background="{StaticResource BgRail}"
+                            Padding="4,3">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                            <ToggleButton x:Name="OnionSkinToggle"
+                                          Height="26"
+                                          Foreground="{StaticResource Ink}"
+                                          ToolTip.Tip="Show previous frame at 50% alpha">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconOnionSkin.svg"
+                                             CurrentColor="#e6e8ec"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Onion Skin" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <CheckBox x:Name="ShowGuidesCheck"
+                                      Foreground="{StaticResource Ink}"
+                                      VerticalAlignment="Center"
+                                      Margin="4,0,4,0"
+                                      ToolTip.Tip="Show guides">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconGuides.svg"
+                                             CurrentColor="#e6e8ec"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Guides" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <!-- Divider -->
+                            <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
+                                    Margin="4,0" VerticalAlignment="Center" />
+
+                            <TextBlock Text="Zoom:" VerticalAlignment="Center"
+                                       Margin="0,0,4,0" Foreground="{StaticResource InkMid}"
+                                       FontSize="11" />
+                            <Border BorderBrush="{StaticResource LineBrush}"
+                                    BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                    Height="26" Width="130" VerticalAlignment="Center">
+                                <DockPanel>
+                                    <Button x:Name="PreviewZoomMinusBtn" DockPanel.Dock="Left"
+                                            Classes="flanker" Content="−" Width="22"
+                                            BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0"
+                                            ToolTip.Tip="Zoom out to previous preset" />
+                                    <Button x:Name="PreviewZoomPlusBtn" DockPanel.Dock="Right"
+                                            Classes="flanker" Content="+" Width="22"
+                                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0"
+                                            ToolTip.Tip="Zoom in to next preset" />
+                                    <AutoCompleteBox x:Name="PreviewZoomCombo"
+                                                     Text="100%"
+                                                     MinimumPrefixLength="0" FilterMode="None"
+                                                     Background="Transparent" BorderThickness="0" Padding="0"
+                                                     Height="26" VerticalAlignment="Center" FontSize="11">
+                                        <AutoCompleteBox.Styles>
+                                            <Style Selector="TextBox">
+                                                <Setter Property="TextAlignment" Value="Center"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="Padding" Value="4,0"/>
+                                                <Setter Property="MinHeight" Value="0"/>
+                                                <Setter Property="FontSize" Value="11"/>
+                                            </Style>
+                                        </AutoCompleteBox.Styles>
+                                    </AutoCompleteBox>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Divider -->
+                            <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
+                                    Margin="4,0" VerticalAlignment="Center" />
+
+                            <TextBlock Text="Speed:" VerticalAlignment="Center"
+                                       Margin="0,0,4,0" Foreground="{StaticResource InkMid}"
+                                       FontSize="11" />
+                            <Border BorderBrush="{StaticResource LineBrush}"
+                                    BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                    Height="26" Width="110" VerticalAlignment="Center">
+                                <DockPanel>
+                                    <Button x:Name="SpeedDownBtn" DockPanel.Dock="Left"
+                                            Classes="flanker" Content="−" Width="22"
+                                            BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,1,0" />
+                                    <Button x:Name="SpeedUpBtn" DockPanel.Dock="Right"
+                                            Classes="flanker" Content="+" Width="22"
+                                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,0,0" />
+                                    <TextBox x:Name="SpeedInput" Text="1.0"
+                                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                             Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
+                                             Height="26" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Preview panel fills remaining height of the block -->
+                    <controls:PreviewControl x:Name="PreviewCtrl" Grid.Row="1" />
+
+                    <!-- ── Timeline strip ── -->
+                    <Grid Grid.Row="2" RowDefinitions="14,*">
+                        <!-- ruler header -->
+                        <Border Grid.Row="0"
+                                Background="{StaticResource BgCanvas}"
+                                BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="0,1,0,1">
+                            <TextBlock Text="TIMELINE"
+                                       FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkDim}"
+                                       VerticalAlignment="Center"
+                                       Margin="6,0" />
+                        </Border>
+                        <!-- frame cells -->
+                        <Border Grid.Row="1"
+                                Background="{StaticResource BgRail}"
+                                BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="0,0,0,0">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="TimelineStrip">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:Int32">
+                                            <Border Width="36" Height="38"
+                                                    BorderBrush="{StaticResource LineBrush}"
+                                                    BorderThickness="0,0,1,0"
+                                                    Background="Transparent">
+                                                <StackPanel VerticalAlignment="Center"
+                                                            HorizontalAlignment="Center"
+                                                            Spacing="2">
+                                                    <!-- thumbnail placeholder -->
+                                                    <Border Width="22" Height="18"
+                                                            Background="{StaticResource BgCanvas}"
+                                                            BorderBrush="{StaticResource LineStrong}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="2" />
+                                                    <TextBlock Text="{Binding}"
+                                                               HorizontalAlignment="Center"
+                                                               FontSize="9"
+                                                               Foreground="{StaticResource InkDim}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- ── Splitter (middle | right) ── -->
+            <GridSplitter Grid.Column="3"
+                          ResizeDirection="Columns"
+                          Background="{StaticResource LineStrong}"
+                          HorizontalAlignment="Stretch" />
+
+            <!-- ── Middle: Property Inspector ── -->
+            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+
+                <!-- ── Inspector pane header ── -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource BgRail}"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="0,0,0,1"
+                        Height="36">
+                    <TextBlock Text="INSPECTOR"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center"
+                               Margin="10,0" />
+                </Border>
+
+                <Border Grid.Row="1"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="1,0,0,0"
+                        Background="{StaticResource BgPanel}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="0" Spacing="0">
+
+                            <!-- No selection placeholder -->
+                            <TextBlock x:Name="PropNoneLabel"
+                                       Text="No selection"
+                                       Foreground="{StaticResource InkDim}"
+                                       FontStyle="Italic"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,12,0,0" />
+
+                            <!-- ── Frame properties ── -->
+                            <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">
+
+                                <!-- COORDINATES section -->
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="COORDINATES"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,4"
+                                                    HorizontalAlignment="Center">
+                                            <ToggleButton x:Name="UnitPixelBtn"
+                                                          Content="Pixel"
+                                                          CornerRadius="4,0,0,4"
+                                                          Height="26"
+                                                          Padding="8,0"
+                                                          FontSize="11"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center"
+                                                          IsChecked="True"
+                                                          Click="OnUnitPixelBtnClick" />
+                                            <ToggleButton x:Name="UnitTextureBtn"
+                                                          Content="Texture"
+                                                          CornerRadius="0"
+                                                          Height="26"
+                                                          Padding="8,0"
+                                                          FontSize="11"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center"
+                                                          Click="OnUnitTextureBtnClick" />
+                                            <ToggleButton x:Name="UnitSpriteSheetBtn"
+                                                          Content="Sprite Sheet"
+                                                          CornerRadius="0,4,4,0"
+                                                          Height="26"
+                                                          Padding="8,0"
+                                                          FontSize="11"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center"
+                                                          Click="OnUnitSpriteSheetBtnClick" />
+                                        </StackPanel>
+
+                                        <!-- Pixel / SpriteSheet coord fields — 2×2 grid: [X][Y] / [W][H] -->
+                                        <Grid x:Name="PropPixelSection"
+                                              ColumnDefinitions="*,6,*" RowDefinitions="Auto,4,Auto">
+                                            <Grid Grid.Column="0" Grid.Row="0" ColumnDefinitions="18,*">
+                                                <TextBlock Text="X" VerticalAlignment="Center"
+                                                           Foreground="#f48b8b" FontSize="11" FontWeight="SemiBold" />
+                                                <NumericUpDown x:Name="PropPixelX" Grid.Column="1"
+                                                               Minimum="-16384" Maximum="16384" Increment="1" />
+                                            </Grid>
+                                            <Grid Grid.Column="2" Grid.Row="0" ColumnDefinitions="18,*">
+                                                <TextBlock Text="Y" VerticalAlignment="Center"
+                                                           Foreground="#8bb6f4" FontSize="11" FontWeight="SemiBold" />
+                                                <NumericUpDown x:Name="PropPixelY" Grid.Column="1"
+                                                               Minimum="-16384" Maximum="16384" Increment="1" />
+                                            </Grid>
+                                            <Grid Grid.Column="0" Grid.Row="2" ColumnDefinitions="18,*">
+                                                <TextBlock Text="W" VerticalAlignment="Center"
+                                                           Foreground="#f0c674" FontSize="11" FontWeight="SemiBold" />
+                                                <NumericUpDown x:Name="PropPixelW" Grid.Column="1"
+                                                               Minimum="1" Maximum="16384" Increment="1" />
+                                            </Grid>
+                                            <Grid Grid.Column="2" Grid.Row="2" ColumnDefinitions="18,*">
+                                                <TextBlock Text="H" VerticalAlignment="Center"
+                                                           Foreground="#6dd28d" FontSize="11" FontWeight="SemiBold" />
+                                                <NumericUpDown x:Name="PropPixelH" Grid.Column="1"
+                                                               Minimum="1" Maximum="16384" Increment="1" />
+                                            </Grid>
+                                        </Grid>
+
+                                        <!-- Texture Coordinate fields -->
+                                        <StackPanel x:Name="PropTcSection" IsVisible="False" Spacing="4">
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Left" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTcLeft" Grid.Column="1"
+                                                               Minimum="-10" Maximum="10"
+                                                               Increment="0.001" FormatString="0.0000" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Right" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTcRight" Grid.Column="1"
+                                                               Minimum="-10" Maximum="10"
+                                                               Increment="0.001" FormatString="0.0000" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Top" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTcTop" Grid.Column="1"
+                                                               Minimum="-10" Maximum="10"
+                                                               Increment="0.001" FormatString="0.0000" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Bottom" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTcBottom" Grid.Column="1"
+                                                               Minimum="-10" Maximum="10"
+                                                               Increment="0.001" FormatString="0.0000" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <!-- Sprite Sheet tile fields -->
+                                        <StackPanel x:Name="PropTileSection" IsVisible="False" Spacing="4">
+                                            <Border BorderBrush="{StaticResource LineBrush}"
+                                                    BorderThickness="0,1,0,0"
+                                                    Margin="0,2,0,2" Padding="0,4,0,0">
+                                                <TextBlock Text="Tile" Foreground="{StaticResource InkMid}"
+                                                           FontWeight="SemiBold" FontSize="11" />
+                                            </Border>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Span W" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropSpanW" Grid.Column="1"
+                                                               Minimum="1" Maximum="256" Increment="1"
+                                                               FormatString="0" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*" Margin="14,0,0,0">
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkDim}" FontSize="10" FontStyle="Italic" />
+                                                <TextBox x:Name="PropCellWPx" Grid.Column="1"
+                                                         FontSize="10" IsReadOnly="True" IsEnabled="False"
+                                                         Opacity="0.6" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Span H" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropSpanH" Grid.Column="1"
+                                                               Minimum="1" Maximum="256" Increment="1"
+                                                               FormatString="0" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*" Margin="14,0,0,0">
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkDim}" FontSize="10" FontStyle="Italic" />
+                                                <TextBox x:Name="PropCellHPx" Grid.Column="1"
+                                                         FontSize="10" IsReadOnly="True" IsEnabled="False"
+                                                         Opacity="0.6" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Tile X" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTileX" Grid.Column="1"
+                                                               Minimum="0" Maximum="4096" Increment="1" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="78,*">
+                                                <TextBlock Text="Tile Y" VerticalAlignment="Center"
+                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
+                                                <NumericUpDown x:Name="PropTileY" Grid.Column="1"
+                                                               Minimum="0" Maximum="4096" Increment="1" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- TIMING section -->
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="TIMING"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <Grid ColumnDefinitions="78,*,Auto">
+                                            <TextBlock Text="Length" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropFrameLen" Grid.Column="1"
+                                                           ShowButtonSpinner="True"
+                                                           Minimum="0.001" Maximum="60"
+                                                           Increment="0.05" FormatString="0.000" />
+                                            <TextBlock Text="s" Grid.Column="2"
+                                                       VerticalAlignment="Center" Margin="4,0,0,0"
+                                                       Foreground="{StaticResource InkDim}" FontSize="11" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- TRANSFORM section -->
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="TRANSFORM"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Relative X" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRelX" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Relative Y" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRelY" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <ToggleButton x:Name="PropFlipH"
+                                                          ToolTip.Tip="Flip Horizontal"
+                                                          Width="32" Height="26"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center">
+                                                <svg:Svg Width="16" Height="16"
+                                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconFlipH.svg"
+                                                         CurrentColor="#e6e8ec"
+                                                         VerticalAlignment="Center" />
+                                            </ToggleButton>
+                                            <ToggleButton x:Name="PropFlipV"
+                                                          ToolTip.Tip="Flip Vertical"
+                                                          Width="32" Height="26"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center">
+                                                <svg:Svg Width="16" Height="16"
+                                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconFlipV.svg"
+                                                         CurrentColor="#e6e8ec"
+                                                         VerticalAlignment="Center" />
+                                            </ToggleButton>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- TEXTURE section -->
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="TEXTURE"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <Grid ColumnDefinitions="*,24">
+                                            <TextBox x:Name="PropTextureName" Grid.Column="0"
+                                                     FontSize="10" IsReadOnly="True" Opacity="0.7" />
+                                            <Button x:Name="PropTextureBrowseBtn" Grid.Column="1"
+                                                    Content="…" FontSize="10"
+                                                    Width="24" Height="22"
+                                                    Padding="0" HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Margin="4,0,0,0"
+                                                    ToolTip.Tip="Browse for texture file" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- ── Rectangle properties ── -->
+                            <StackPanel x:Name="PropRectPanel" IsVisible="False" Spacing="0">
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="RECTANGLE"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Name" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <TextBox x:Name="PropRectName" Grid.Column="1" FontSize="11" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="X" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRectX" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Y" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRectY" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Scale X" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRectScaleX" Grid.Column="1"
+                                                           Minimum="0.001" Maximum="10000"
+                                                           Increment="0.5" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Scale Y" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropRectScaleY" Grid.Column="1"
+                                                           Minimum="0.001" Maximum="10000"
+                                                           Increment="0.5" FormatString="0.000" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- ── Circle properties ── -->
+                            <StackPanel x:Name="PropCirclePanel" IsVisible="False" Spacing="0">
+                                <Border BorderBrush="{StaticResource LineBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,8,12,10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="CIRCLE"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkMid}" />
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Name" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <TextBox x:Name="PropCircleName" Grid.Column="1" FontSize="11" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="X" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropCircleX" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Y" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropCircleY" Grid.Column="1"
+                                                           Minimum="-10000" Maximum="10000"
+                                                           Increment="1" FormatString="0.000" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="78,*">
+                                            <TextBlock Text="Radius" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource InkMid}" FontSize="11" />
+                                            <NumericUpDown x:Name="PropCircleRadius" Grid.Column="1"
+                                                           Minimum="0.001" Maximum="10000"
+                                                           Increment="0.5" FormatString="0.000" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>
