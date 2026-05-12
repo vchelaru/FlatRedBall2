@@ -9,48 +9,114 @@
         x:Class="AnimationEditor.App.MainWindow"
         Title="AnimationEditor"
         Icon="avares://AnimationEditor.App/Assets/icons/achx-icon-256.png"
-        MinWidth="900" MinHeight="600">
+        MinWidth="900" MinHeight="600"
+        WindowDecorations="None">
 
-    <DockPanel>
-        <!-- ── Top bar: File/Edit/Help menus in a unified header row ── -->
+    <Grid>
+        <DockPanel>
+        <!-- ── Title bar: app icon + name + menus + drag region + window controls ── -->
         <Border DockPanel.Dock="Top"
+                x:Name="TitleBarBorder"
                 Background="{StaticResource BgRail}"
                 BorderBrush="{StaticResource LineBrush}"
                 BorderThickness="0,0,0,1"
                 Height="36">
-            <Menu x:Name="MainMenu"
-                  Background="Transparent"
-                  BorderThickness="0"
-                  VerticalAlignment="Center"
-                  Margin="4,0">
-                <MenuItem Header="_File">
-                    <MenuItem Header="_New"          x:Name="MenuNew"    InputGesture="Ctrl+N" />
-                    <MenuItem Header="_Load..."       x:Name="MenuLoad"   InputGesture="Ctrl+L" />
-                    <MenuItem Header="_Save"          x:Name="MenuSave"   InputGesture="Ctrl+S" />
-                    <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
-                    <Separator />
-                    <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
-                </MenuItem>
-                <MenuItem Header="_Edit">
-                    <MenuItem Header="_Undo"            x:Name="MenuUndo"          InputGesture="Ctrl+Z" />
-                    <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
-                    <Separator />
-                    <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
-                    <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
-                    <Separator />
-                    <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
-                </MenuItem>
-                <MenuItem Header="_View">
-                    <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+OemPlus" />
-                    <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+OemMinus" />
-                    <Separator />
-                    <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+OemPlus" />
-                    <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+OemMinus" />
-                </MenuItem>
-                <MenuItem Header="_Help">
-                    <MenuItem Header="_About"         x:Name="MenuAbout" />
-                </MenuItem>
-            </Menu>
+            <DockPanel>
+                <!-- Window controls: minimize, maximize, close (right) -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Stretch">
+                    <Button x:Name="MinimizeBtn"
+                            Content="−"
+                            Width="46" Height="36"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            Foreground="{StaticResource InkMid}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontSize="16"
+                            ToolTip.Tip="Minimize"
+                            Click="OnMinimizeBtnClick" />
+                    <Button x:Name="MaximizeBtn"
+                            Content="□"
+                            Width="46" Height="36"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            Foreground="{StaticResource InkMid}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontSize="13"
+                            ToolTip.Tip="Maximize / Restore"
+                            Click="OnMaximizeBtnClick" />
+                    <Button x:Name="CloseBtn"
+                            Content="✕"
+                            Width="46" Height="36"
+                            Padding="0" BorderThickness="0"
+                            Background="Transparent"
+                            Foreground="{StaticResource InkMid}"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            FontSize="12"
+                            ToolTip.Tip="Close"
+                            Click="OnCloseBtnClick">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="#c42b1c" />
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </StackPanel>
+                <!-- App identity: icon + name (far left, draggable) -->
+                <StackPanel DockPanel.Dock="Left"
+                            Orientation="Horizontal" Spacing="6"
+                            VerticalAlignment="Center" Margin="10,0,4,0"
+                            PointerPressed="OnTitleBarPointerPressed"
+                            DoubleTapped="OnTitleBarDoubleTapped">
+                    <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
+                           Width="16" Height="16" VerticalAlignment="Center" />
+                    <TextBlock Text="AnimationEditor"
+                               FontSize="12"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <!-- Menus: File, Edit, View, Help (left, after identity) -->
+                <Menu DockPanel.Dock="Left"
+                      x:Name="MainMenu"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      VerticalAlignment="Center"
+                      Margin="4,0">
+                    <MenuItem Header="_File">
+                        <MenuItem Header="_New"          x:Name="MenuNew"    InputGesture="Ctrl+N" />
+                        <MenuItem Header="_Load..."       x:Name="MenuLoad"   InputGesture="Ctrl+L" />
+                        <MenuItem Header="_Save"          x:Name="MenuSave"   InputGesture="Ctrl+S" />
+                        <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
+                        <Separator />
+                        <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
+                    </MenuItem>
+                    <MenuItem Header="_Edit">
+                        <MenuItem Header="_Undo"            x:Name="MenuUndo"          InputGesture="Ctrl+Z" />
+                        <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
+                        <Separator />
+                        <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
+                        <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
+                        <Separator />
+                        <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
+                    </MenuItem>
+                    <MenuItem Header="_View">
+                        <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+OemPlus" />
+                        <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+OemMinus" />
+                        <Separator />
+                        <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+OemPlus" />
+                        <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+OemMinus" />
+                    </MenuItem>
+                    <MenuItem Header="_Help">
+                        <MenuItem Header="_About"         x:Name="MenuAbout" />
+                    </MenuItem>
+                </Menu>
+                <!-- Drag region: fills remaining space, handles window move and maximize toggle -->
+                <Border Background="Transparent"
+                        PointerPressed="OnTitleBarPointerPressed"
+                        DoubleTapped="OnTitleBarDoubleTapped" />
+            </DockPanel>
         </Border>
 
         <!-- ── Status bar ── -->
@@ -949,4 +1015,14 @@
             </Grid>
         </Grid>
     </DockPanel>
+        <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
+        <Border x:Name="GripN"  Height="4" VerticalAlignment="Top"    Background="Transparent" Cursor="TopSide"         PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripS"  Height="4" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomSide"      PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripW"  Width="4"  HorizontalAlignment="Left"  Background="Transparent" Cursor="LeftSide"        PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripE"  Width="4"  HorizontalAlignment="Right" Background="Transparent" Cursor="RightSide"       PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripNW" Width="8" Height="8" HorizontalAlignment="Left"  VerticalAlignment="Top"    Background="Transparent" Cursor="TopLeftCorner"     PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripNE" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top"    Background="Transparent" Cursor="TopRightCorner"    PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripSW" Width="8" Height="8" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomLeftCorner"  PointerPressed="OnResizeGrip" />
+        <Border x:Name="GripSE" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomRightCorner" PointerPressed="OnResizeGrip" />
+    </Grid>
 </Window>

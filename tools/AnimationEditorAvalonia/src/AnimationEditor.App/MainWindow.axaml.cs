@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         _undoManager = undoManager;
 
         InitializeComponent();
+        PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
         WireframeCtrl.AttachScrollViewer(WireframeScrollViewer);
 
         WireAppCommands();
@@ -478,6 +479,42 @@ public partial class MainWindow : Window
         {
             WireframeCtrl.LoadTexture(texPath);
         }
+    }
+
+    // ── Custom title bar ─────────────────────────────────────────────────────
+
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
+    }
+
+    private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnMinimizeBtnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void OnMaximizeBtnClick(object? sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void OnCloseBtnClick(object? sender, RoutedEventArgs e) => Close();
+
+    private void OnResizeGrip(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        var edge = (sender as Control)?.Name switch
+        {
+            "GripN"  => WindowEdge.North,
+            "GripS"  => WindowEdge.South,
+            "GripE"  => WindowEdge.East,
+            "GripW"  => WindowEdge.West,
+            "GripNE" => WindowEdge.NorthEast,
+            "GripNW" => WindowEdge.NorthWest,
+            "GripSE" => WindowEdge.SouthEast,
+            "GripSW" => WindowEdge.SouthWest,
+            _        => (WindowEdge?)null,
+        };
+        if (edge.HasValue) BeginResizeDrag(edge.Value, e);
     }
 
     // ── Menu wiring ───────────────────────────────────────────────────────────
