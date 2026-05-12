@@ -14,7 +14,7 @@ public class MainWindowChromeTests
         window.Show();
         try
         {
-            Assert.Equal(WindowDecorations.BorderOnly, window.WindowDecorations);
+            Assert.Equal(WindowDecorations.None, window.WindowDecorations);
         }
         finally
         {

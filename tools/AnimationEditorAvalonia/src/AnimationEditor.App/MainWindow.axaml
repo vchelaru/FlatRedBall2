@@ -5,14 +5,16 @@
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+        xmlns:chrome="clr-namespace:Avalonia.Controls.Chrome;assembly=Avalonia.Controls"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="AnimationEditor.App.MainWindow"
         Title="AnimationEditor"
         Icon="avares://AnimationEditor.App/Assets/icons/achx-icon-256.png"
         MinWidth="900" MinHeight="600"
-        WindowDecorations="BorderOnly">
+        WindowDecorations="None">
 
-    <DockPanel>
+    <Grid>
+        <DockPanel>
         <!-- ── Title bar: app icon + name + menus + drag region + window controls ── -->
         <Border DockPanel.Dock="Top"
                 x:Name="TitleBarBorder"
@@ -1014,4 +1016,22 @@
             </Grid>
         </Grid>
     </DockPanel>
+        <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
+        <Border Height="4" VerticalAlignment="Top" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeN" />
+        <Border Height="4" VerticalAlignment="Bottom" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeS" />
+        <Border Width="4" HorizontalAlignment="Left" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeW" />
+        <Border Width="4" HorizontalAlignment="Right" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeE" />
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeNW" />
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeNE" />
+        <Border Width="8" Height="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeSW" />
+        <Border Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="Transparent"
+                chrome:WindowDecorationProperties.ElementRole="ResizeSE" />
+    </Grid>
 </Window>
