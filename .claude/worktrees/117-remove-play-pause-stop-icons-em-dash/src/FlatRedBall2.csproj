@@ -1,0 +1,87 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <!--
+      Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
+      of the eventual NuGet package. CS1591 ("missing XML comment for publicly visible type
+      or member") is intentionally left as a warning — visible in build output as a tracked
+      metric so the doc-coverage gap is obvious, but not failing the build during preview.
+      Promote to error before the first stable (non-preview) NuGet ships.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- NuGet Metadata -->
+    <Authors>Victor Chelaru</Authors>
+    <Description>A modern, lightweight 2D game engine built on MonoGame and KNI.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    
+    <!-- SourceLink and Symbols (for debugging inside the NuGet package) -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <!--
+      Backend is selected by TargetFramework (so NuGet restore picks the right packages):
+        net8.0  -> Kni      (browser via Blazor WASM, plus future KNI mobile targets)
+        net10.0 -> MonoGame (desktop)
+      We tie Backend to TFM rather than expose it as a free property because
+      AdditionalProperties on ProjectReference doesn't propagate through NuGet restore,
+      so a free property silently gets the wrong package set.
+    -->
+    <Backend Condition="'$(TargetFramework)' == 'net8.0'">Kni</Backend>
+    <Backend Condition="'$(TargetFramework)' == 'net10.0'">MonoGame</Backend>
+    <DefineConstants Condition="'$(Backend)' == 'Kni'">$(DefineConstants);KNI</DefineConstants>
+    <DefineConstants Condition="'$(Backend)' == 'MonoGame'">$(DefineConstants);MONOGAME</DefineConstants>
+
+    <!--
+      The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
+      this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
+      compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
+      reference the AspNetCore.Components / JSInterop assemblies.
+    -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- Backend-agnostic packages -->
+  <ItemGroup>
+    <PackageReference Include="AsepriteDotNet" Version="1.9.1" />
+    <PackageReference Include="FlatRedBall.InterpolationCore" Version="2025.4.22.1" />
+  </ItemGroup>
+
+  <!-- MonoGame backend -->
+  <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
+    <PackageReference Include="Apos.Shapes" Version="*" />
+    <PackageReference Include="Gum.MonoGame" Version="2026.5.8.1" />
+    <PackageReference Include="Gum.Shapes.MonoGame" Version="2026.5.8.1" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="MonoGame.Extended" Version="6.0.0-preview.*" />
+  </ItemGroup>
+
+  <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
+  <ItemGroup Condition="'$(Backend)' == 'Kni'">
+    <PackageReference Include="Apos.Shapes.KNI" Version="*" />
+    <PackageReference Include="Gum.KNI" Version="2026.5.8.1" />
+    <PackageReference Include="Gum.Shapes.KNI" Version="2026.5.8.1" />
+    <PackageReference Include="KNI.Extended" Version="6.0.0-preview.*" />
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Media" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Input" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Game" Version="4.2.9001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -71,5 +71,27 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// </summary>
     public bool IsChainNode { get; set; }
 
+    /// <summary>Short metadata string displayed beside the node header (e.g. frame count or duration).</summary>
+    public string Meta { get; set; } = string.Empty;
+
+    /// <summary>Discriminator for the icon shown in the tree item template.</summary>
+    public NodeKind Kind { get; set; } = NodeKind.Frame;
+
+    /// <summary>True when this node represents an animation frame. Set once at construction time.</summary>
+    public bool IsFrameNode  { get; set; }
+    /// <summary>True when this node represents an AxisAlignedRectangleSave shape. Set once at construction time.</summary>
+    public bool IsRectNode   { get; set; }
+    /// <summary>True when this node represents a CircleSave shape. Set once at construction time.</summary>
+    public bool IsCircleNode { get; set; }
+
     public ObservableCollection<TreeNodeVm> Children { get; } = new();
+}
+
+/// <summary>Identifies the type of data a <see cref="TreeNodeVm"/> represents, for icon selection.</summary>
+public enum NodeKind
+{
+    Chain,
+    Frame,
+    RectShape,
+    CircleShape,
 }

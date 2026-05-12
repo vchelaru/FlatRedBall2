@@ -11,10 +11,10 @@ public class AddChainUndoTests
     // ── AddAnimationChain + Undo ──────────────────────────────────────────────
 
     [Fact]
-    public async Task AddAnimationChain_Undo_FiresAnimationChainsChanged()
+    public void AddAnimationChain_Undo_FiresAnimationChainsChanged()
     {
         var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
 
         bool fired = false;
         void Handler() => fired = true;
@@ -31,10 +31,10 @@ public class AddChainUndoTests
     }
 
     [Fact]
-    public async Task AddAnimationChain_Undo_RemovesChainFromAcls()
+    public void AddAnimationChain_Undo_RemovesChainFromAcls()
     {
         var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         Assert.Single(acls.AnimationChains);
 
         UndoManager.Self.Undo();
@@ -43,10 +43,10 @@ public class AddChainUndoTests
     }
 
     [Fact]
-    public async Task AddAnimationChain_UndoThenRedo_ReAddsChain()
+    public void AddAnimationChain_UndoThenRedo_ReAddsChain()
     {
         var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         UndoManager.Self.Undo();
         Assert.Empty(acls.AnimationChains);
 

@@ -20,11 +20,11 @@ public class WorkflowTutorialTests
     // Docs: "Click the + icon … Enter the name 'Idle' and click OK."
 
     [Fact]
-    public async Task Step1_CreateIdleChain_RenameToIdle_ChainNameIsIdle()
+    public void Step1_CreateIdleChain_RenameToIdle_ChainNameIsIdle()
     {
         var acls = TestHelpers.SetupFreshAcls();
 
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         var chain = SelectedState.Self.SelectedChain!;
         bool renamed = AppCommands.Self.RenameChain(chain, "Idle");
 
@@ -193,15 +193,15 @@ public class WorkflowTutorialTests
     // Docs: "Add Animation … Enter the name 'Run' … Add Frame … change 'Sprite Sheet' to 'Pixel'."
 
     [Fact]
-    public async Task Step7_CreateRunAnimation_AclsNowHasTwoChains()
+    public void Step7_CreateRunAnimation_AclsNowHasTwoChains()
     {
         var acls = TestHelpers.SetupFreshAcls();
 
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         var idle = SelectedState.Self.SelectedChain!;
         AppCommands.Self.RenameChain(idle, "Idle");
 
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         var run = SelectedState.Self.SelectedChain!;
         AppCommands.Self.RenameChain(run, "Run");
 

@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall.Content.AnimationChain;
@@ -240,25 +241,30 @@ public class UnitTypePropPanelTests
         finally { window.Close(); }
     }
 
-    // ── Combo drives AppState ─────────────────────────────────────────────────
+    // ── Unit toggle buttons drive AppState ───────────────────────────────────
 
     [AvaloniaFact]
-    public void UnitTypeCombo_SelectedIndex_MapsToCorrectUnitType()
+    public void UnitToggleButtons_Click_MapsToCorrectUnitType()
     {
         var window = CreateWindowWithFrame(out _);
         try
         {
-            var combo = FindCtrl<ComboBox>(window, "UnitTypeCombo");
+            var pixelBtn       = FindCtrl<ToggleButton>(window, "UnitPixelBtn");
+            var textureBtn     = FindCtrl<ToggleButton>(window, "UnitTextureBtn");
+            var spriteSheetBtn = FindCtrl<ToggleButton>(window, "UnitSpriteSheetBtn");
 
-            combo.SelectedIndex = (int)UnitType.Pixel;
+            pixelBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
+                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(UnitType.Pixel, AppState.Self.UnitType);
 
-            combo.SelectedIndex = (int)UnitType.TextureCoordinate;
+            textureBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
+                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(UnitType.TextureCoordinate, AppState.Self.UnitType);
 
-            combo.SelectedIndex = (int)UnitType.SpriteSheet;
+            spriteSheetBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
+                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(UnitType.SpriteSheet, AppState.Self.UnitType);
         }
@@ -266,22 +272,22 @@ public class UnitTypePropPanelTests
     }
 
     [AvaloniaFact]
-    public void UnitTypeCombo_SpriteSheet_ShowsTileSection_EndToEnd()
+    public void UnitSpriteSheetBtn_Click_ShowsTileSection_EndToEnd()
     {
-        // This test drives the actual UnitTypeCombo control (not AppState directly) and
-        // verifies that PropTileSection becomes visible — covering the full path from the
-        // toolbar combo change through OnUnitTypeComboChanged to RefreshPropertyPanel.
+        // Drives the UnitSpriteSheetBtn ToggleButton and verifies that PropTileSection
+        // becomes visible — covering the full path from OnUnitSpriteSheetBtnClick to RefreshPropertyPanel.
         var window = CreateWindowWithFrame(out _);
         try
         {
-            var combo     = FindCtrl<ComboBox>(window, "UnitTypeCombo");
-            var tilePanel = FindCtrl<StackPanel>(window, "PropTileSection");
+            var spriteSheetBtn = FindCtrl<ToggleButton>(window, "UnitSpriteSheetBtn");
+            var tilePanel      = FindCtrl<StackPanel>(window, "PropTileSection");
 
-            combo.SelectedIndex = (int)UnitType.SpriteSheet;
+            spriteSheetBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
+                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
             Dispatcher.UIThread.RunJobs();
 
             Assert.True(tilePanel.IsVisible,
-                "PropTileSection must be visible when UnitTypeCombo is set to SpriteSheet with a frame selected");
+                "PropTileSection must be visible when UnitSpriteSheetBtn is clicked with a frame selected");
         }
         finally { window.Close(); }
     }

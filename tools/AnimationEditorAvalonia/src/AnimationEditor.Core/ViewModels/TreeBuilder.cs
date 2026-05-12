@@ -43,9 +43,17 @@ public static class TreeBuilder
     /// <summary>Builds a single chain node with all its frame children.</summary>
     public static TreeNodeVm BuildChainNode(AnimationChainSave chain)
     {
-        var node = new TreeNodeVm { Header = chain.Name, Data = chain, IsExpanded = true, IsChainNode = true };
-        foreach (var frame in chain.Frames)
-            node.Children.Add(BuildFrameNode(frame));
+        var node = new TreeNodeVm
+        {
+            Header = chain.Name,
+            Data = chain,
+            IsExpanded = true,
+            IsChainNode = true,
+            Kind = NodeKind.Chain,
+            Meta = $"{chain.Frames.Count} fr",
+        };
+        for (int i = 0; i < chain.Frames.Count; i++)
+            node.Children.Add(BuildFrameNode(chain.Frames[i], i));
         return node;
     }
 
@@ -53,24 +61,31 @@ public static class TreeBuilder
     /// Builds a single frame node with any shape children from
     /// <see cref="AnimationFrameSave.ShapeCollectionSave"/>.
     /// </summary>
-    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame)
+    public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
     {
-        var node = new TreeNodeVm { Header = BuildFrameHeader(frame), Data = frame };
+        var node = new TreeNodeVm
+        {
+            Header = BuildFrameHeader(frame, index),
+            Data = frame,
+            Kind = NodeKind.Frame,
+            IsFrameNode = true,
+            Meta = $"{frame.FrameLength:0.00}s",
+        };
         if (frame.ShapeCollectionSave is not null)
         {
             foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
-                node.Children.Add(new TreeNodeVm { Header = r.Name, Data = r });
+                node.Children.Add(new TreeNodeVm { Header = r.Name, Data = r, Kind = NodeKind.RectShape, IsRectNode = true });
             foreach (var c in frame.ShapeCollectionSave.CircleSaves)
-                node.Children.Add(new TreeNodeVm { Header = c.Name, Data = c });
+                node.Children.Add(new TreeNodeVm { Header = c.Name, Data = c, Kind = NodeKind.CircleShape, IsCircleNode = true });
         }
         return node;
     }
 
     /// <summary>Returns the display label for a frame node.</summary>
-    public static string BuildFrameHeader(AnimationFrameSave frame)
+    public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
     {
         if (string.IsNullOrEmpty(frame.TextureName))
-            return "<UNTEXTURED>";
+            return $"Frame {index}";
         return Path.GetFileName(frame.TextureName);
     }
 

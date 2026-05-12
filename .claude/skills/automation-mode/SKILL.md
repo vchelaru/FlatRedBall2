@@ -1,6 +1,6 @@
 ---
 name: automation-mode
-description: Automation mode in FlatRedBall2. Use when an external agent (AI or script) needs to drive a running game: stepping frames, injecting input, querying entity state, or forcing entity values over stdin/stdout. Covers EnableAutomationMode, the NDJSON command protocol, reflection-based entity introspection, and optional RegisterStateProvider for derived state.
+description: "Automation mode in FlatRedBall2. Use when an external agent (AI or script) needs to drive a running game: stepping frames, injecting input, querying entity state, or forcing entity values over stdin/stdout. Covers EnableAutomationMode, the NDJSON command protocol, reflection-based entity introspection, and optional RegisterStateProvider for derived state."
 ---
 
 # Automation Mode in FlatRedBall2

@@ -1,0 +1,24 @@
+{
+  "movement": {
+    "ground": {
+      "maxSpeedX": 40,
+      "accelerationTimeX": 0.3,
+      "decelerationTimeX": 0.4,
+      "gravity": 180,
+      "maxFallSpeed": 50,
+      "minJumpHeight": 12,
+      "maxJumpHeight": 24,
+      "coyoteTime": 0.1,
+      "jumpInputBufferDuration": 0.1
+    },
+    "air": {
+      "maxSpeedX": 40,
+      "accelerationTimeX": 0.3,
+      "decelerationTimeX": 0.4,
+      "gravity": 180,
+      "maxFallSpeed": 50,
+      "minJumpHeight": 12,
+      "maxJumpHeight": 24
+    }
+  }
+}

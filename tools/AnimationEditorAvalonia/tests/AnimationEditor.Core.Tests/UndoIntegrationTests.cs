@@ -13,12 +13,12 @@ public class UndoIntegrationTests
     // ── Multi-step ordering ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task MultiStep_AddChainThenAddFrame_UndoInOrder()
+    public void MultiStep_AddChainThenAddFrame_UndoInOrder()
     {
         var acls = TestHelpers.SetupFreshAcls();
 
         // Step 1: add a chain
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         var chain = acls.AnimationChains[0];
 
         // Step 2: add a frame to it
@@ -36,11 +36,11 @@ public class UndoIntegrationTests
     }
 
     [Fact]
-    public async Task MultiStep_UndoThenRedo_RestoresFullHistory()
+    public void MultiStep_UndoThenRedo_RestoresFullHistory()
     {
         var acls = TestHelpers.SetupFreshAcls();
 
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         var chain = acls.AnimationChains[0];
         AppCommands.Self.AddFrame(chain, "a.png");
         AppCommands.Self.AddFrame(chain, "b.png");
@@ -79,10 +79,10 @@ public class UndoIntegrationTests
     // ── NewFile clears history ────────────────────────────────────────────────
 
     [Fact]
-    public async Task NewFile_ClearsUndoStack()
+    public void NewFile_ClearsUndoStack()
     {
         var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         Assert.True(UndoManager.Self.CanUndo);
 
         AppCommands.Self.NewFile();
@@ -91,10 +91,10 @@ public class UndoIntegrationTests
     }
 
     [Fact]
-    public async Task NewFile_ClearsRedoStack()
+    public void NewFile_ClearsRedoStack()
     {
         var acls = TestHelpers.SetupFreshAcls();
-        await AppCommands.Self.AddAnimationChain();
+        AppCommands.Self.AddAnimationChain();
         UndoManager.Self.Undo(); // moves to redo stack
         Assert.True(UndoManager.Self.CanRedo);
 
