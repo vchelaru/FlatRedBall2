@@ -20,6 +20,11 @@ CLAUDE.local.md
 /design/edc
 /out
 
+# Per-issue launch script — created fresh by the agent for each issue worktree.
+# Never commit: each issue needs its own content and a tracked version would
+# reappear as a stale "previous issue" file in every new worktree.
+/run.ps1
+
 # Sample folders intentionally excluded from source control
 /samples/auto
 /samples/SlopesSample
