@@ -226,7 +226,8 @@
 
                 <TreeView x:Name="AnimTree" Grid.Row="1"
                           Background="{StaticResource BgApp}"
-                          SelectionMode="Multiple">
+                          SelectionMode="Multiple"
+                          ScrollViewer.VerticalScrollBarVisibility="Visible">
                     <TreeView.Styles>
                         <Style Selector="TreeViewItem">
                             <Setter Property="IsExpanded"
