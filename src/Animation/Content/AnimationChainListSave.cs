@@ -71,7 +71,7 @@ public class AnimationChainListSave
     /// to the other overload.
     /// </summary>
     public static AnimationChainListSave FromFile(string path)
-        => FromFile(path, File.OpenRead);
+        => FromFile(path, File.OpenRead!);
 
     /// <summary>
     /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer

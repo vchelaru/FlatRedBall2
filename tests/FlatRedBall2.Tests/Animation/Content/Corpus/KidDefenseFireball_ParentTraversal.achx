@@ -1,0 +1,1203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FileRelativeTextures>true</FileRelativeTextures>
+  <TimeMeasurementUnit>Undefined</TimeMeasurementUnit>
+  <CoordinateType>Pixel</CoordinateType>
+  <AnimationChain>
+    <Name>IdleDown</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-5.0416665</X>
+            <Y>-14.958333</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>160</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-21.822916</X>
+            <Y>-6.802083</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleUp</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>224</LeftCoordinate>
+      <RightCoordinate>256</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>6.0000005</X>
+            <Y>7.8333335</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkDown</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>256</LeftCoordinate>
+      <RightCoordinate>288</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-6.791666</X>
+            <Y>-19.083332</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>288</LeftCoordinate>
+      <RightCoordinate>320</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-6.9166665</X>
+            <Y>-16.208332</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>320</LeftCoordinate>
+      <RightCoordinate>352</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-7.0416665</X>
+            <Y>-18.833332</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>352</LeftCoordinate>
+      <RightCoordinate>384</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-6.6666665</X>
+            <Y>-16.708332</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkUp</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1152</LeftCoordinate>
+      <RightCoordinate>1184</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>5.875001</X>
+            <Y>15.375</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1184</LeftCoordinate>
+      <RightCoordinate>1216</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>7.375001</X>
+            <Y>11.75</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1216</LeftCoordinate>
+      <RightCoordinate>1248</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>8.000001</X>
+            <Y>15.875</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1248</LeftCoordinate>
+      <RightCoordinate>1280</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>7.000001</X>
+            <Y>11.375</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkDownLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>384</LeftCoordinate>
+      <RightCoordinate>448</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.374999</X>
+            <Y>-12.541668</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>448</LeftCoordinate>
+      <RightCoordinate>512</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-13.124997</X>
+            <Y>-13.125001</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>512</LeftCoordinate>
+      <RightCoordinate>576</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-12.958333</X>
+            <Y>-10.041669</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>576</LeftCoordinate>
+      <RightCoordinate>640</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-13.041665</X>
+            <Y>-12.958334</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>640</LeftCoordinate>
+      <RightCoordinate>704</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-24.9375</X>
+            <Y>-1.9791679</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>704</LeftCoordinate>
+      <RightCoordinate>768</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-22.8125</X>
+            <Y>-4.854168</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>768</LeftCoordinate>
+      <RightCoordinate>832</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-21.9375</X>
+            <Y>-3.604168</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>832</LeftCoordinate>
+      <RightCoordinate>896</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-22.4375</X>
+            <Y>-4.854168</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleDownLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>32</LeftCoordinate>
+      <RightCoordinate>96</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-12.437499</X>
+            <Y>-11.979167</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleRight</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>160</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>22.020834</X>
+            <Y>-7.020834</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleUpRight</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1280</LeftCoordinate>
+      <RightCoordinate>1344</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>17.895836</X>
+            <Y>4.9374986</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkUpRight</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1344</LeftCoordinate>
+      <RightCoordinate>1408</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>20.22917</X>
+            <Y>5.9374986</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1408</LeftCoordinate>
+      <RightCoordinate>1472</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>20.312504</X>
+            <Y>2.1874988</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1472</LeftCoordinate>
+      <RightCoordinate>1536</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>19.645836</X>
+            <Y>5.3541656</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1536</LeftCoordinate>
+      <RightCoordinate>1600</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>20.645836</X>
+            <Y>3.1041653</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkRight</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>640</LeftCoordinate>
+      <RightCoordinate>704</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>25.145838</X>
+            <Y>-1.8541682</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>704</LeftCoordinate>
+      <RightCoordinate>768</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>23.312498</X>
+            <Y>-4.9791675</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>768</LeftCoordinate>
+      <RightCoordinate>832</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>22.0625</X>
+            <Y>-3.8541684</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>832</LeftCoordinate>
+      <RightCoordinate>896</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>23.395836</X>
+            <Y>-4.6250014</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleDownRight</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1600</LeftCoordinate>
+      <RightCoordinate>1664</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>5.3958364</X>
+            <Y>-16.437504</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkDownRight</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1664</LeftCoordinate>
+      <RightCoordinate>1728</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>6.9375033</X>
+            <Y>-17.770834</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1728</LeftCoordinate>
+      <RightCoordinate>1792</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>6.6875033</X>
+            <Y>-18.770836</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1792</LeftCoordinate>
+      <RightCoordinate>1856</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>6.770836</X>
+            <Y>-16.020836</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1856</LeftCoordinate>
+      <RightCoordinate>1920</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>6.4375024</X>
+            <Y>-19.020834</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>IdleUpLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>224</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.4375</X>
+            <Y>3.520832</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>WalkUpLeft</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>896</LeftCoordinate>
+      <RightCoordinate>960</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.4375</X>
+            <Y>3.520832</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>960</LeftCoordinate>
+      <RightCoordinate>1024</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.4375</X>
+            <Y>6.520832</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1024</LeftCoordinate>
+      <RightCoordinate>1088</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.4375</X>
+            <Y>6.520832</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>1088</LeftCoordinate>
+      <RightCoordinate>1152</RightCoordinate>
+      <TopCoordinate>384</TopCoordinate>
+      <BottomCoordinate>432</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves>
+          <CircleSave>
+            <X>-14.4375</X>
+            <Y>8.020832</Y>
+            <Z>0</Z>
+            <Radius>2</Radius>
+            <Name>BulletOrigin</Name>
+            <Alpha>1</Alpha>
+            <Red>1</Red>
+            <Green>1</Green>
+            <Blue>1</Blue>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Poof</Name>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.06</FrameLength>
+      <LeftCoordinate>2064</LeftCoordinate>
+      <RightCoordinate>2096</RightCoordinate>
+      <TopCoordinate>1760</TopCoordinate>
+      <BottomCoordinate>1808</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.06</FrameLength>
+      <LeftCoordinate>2096</LeftCoordinate>
+      <RightCoordinate>2128</RightCoordinate>
+      <TopCoordinate>1760</TopCoordinate>
+      <BottomCoordinate>1808</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.06</FrameLength>
+      <LeftCoordinate>2128</LeftCoordinate>
+      <RightCoordinate>2160</RightCoordinate>
+      <TopCoordinate>1760</TopCoordinate>
+      <BottomCoordinate>1808</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>../../../Entity_Sheet.png</TextureName>
+      <FrameLength>0.06</FrameLength>
+      <LeftCoordinate>2160</LeftCoordinate>
+      <RightCoordinate>2192</RightCoordinate>
+      <TopCoordinate>1760</TopCoordinate>
+      <BottomCoordinate>1808</BottomCoordinate>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves />
+        <AxisAlignedCubeSaves />
+        <PolygonSaves />
+        <CircleSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <ProjectFile>../../../../kiddefense.gluj</ProjectFile>
+</AnimationChainArraySave>

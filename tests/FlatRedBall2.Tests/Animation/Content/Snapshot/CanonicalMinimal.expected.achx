@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FileRelativeTextures>true</FileRelativeTextures>
+  <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+  <CoordinateType>UV</CoordinateType>
+  <AnimationChain>
+    <Name>OneOfEach</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>Sheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>0.5</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>0.5</BottomCoordinate>
+      <RelativeX>5</RelativeX>
+      <ShapeCollectionSave>
+        <AxisAlignedRectangleSaves>
+          <AxisAlignedRectangleSave>
+            <X>1</X>
+            <Y>2</Y>
+            <ScaleX>3</ScaleX>
+            <ScaleY>4</ScaleY>
+            <Name>Hit</Name>
+          </AxisAlignedRectangleSave>
+        </AxisAlignedRectangleSaves>
+        <AxisAlignedCubeSaves />
+        <PolygonSaves>
+          <PolygonSave>
+            <Name>Edge</Name>
+            <X>0</X>
+            <Y>0</Y>
+            <Points>
+              <Vector2Save>
+                <X>0</X>
+                <Y>0</Y>
+              </Vector2Save>
+              <Vector2Save>
+                <X>10</X>
+                <Y>0</Y>
+              </Vector2Save>
+            </Points>
+          </PolygonSave>
+        </PolygonSaves>
+        <CircleSaves>
+          <CircleSave>
+            <X>5</X>
+            <Y>6</Y>
+            <Radius>7</Radius>
+            <Name>Origin</Name>
+          </CircleSave>
+        </CircleSaves>
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <ProjectFile>../project.gluj</ProjectFile>
+</AnimationChainArraySave>
