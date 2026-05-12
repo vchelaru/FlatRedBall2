@@ -58,6 +58,12 @@ public class AnimationChainListSave
     public string FileName { get; private set; } = string.Empty;
 
     /// <summary>
+    /// Path of the project (.gluj) file the .achx belongs to, relative to the .achx location.
+    /// Persisted in the XML and round-tripped by tooling but ignored at runtime by the engine.
+    /// </summary>
+    public string? ProjectFile { get; set; }
+
+    /// <summary>
     /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer
     /// <c>ContentLoader.LoadAnimationChainList(path)</c>, which routes the read through
     /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
@@ -99,6 +105,9 @@ public class AnimationChainListSave
             result.AnimationChains.Add(chain);
         }
 
+        var projectFileEl = root.Element("ProjectFile");
+        if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
+
         result.FileName = filePath;
         return result;
     }
@@ -134,6 +143,9 @@ public class AnimationChainListSave
                 chainEl.Add(WriteFrame(frame));
             root.Add(chainEl);
         }
+
+        if (ProjectFile != null)
+            root.Add(new XElement("ProjectFile", ProjectFile));
 
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
         using var stream = File.Create(path);
