@@ -63,6 +63,27 @@ public class AnimationChainListSaveProjectFileTests
     }
 
     [Fact]
+    public void FromFile_AbsolutePath_OpensFromDiskWithoutTitleContainer()
+    {
+        // Tooling overload — file pickers hand AE an absolute path, so the read needs to bypass
+        // TitleContainer (which would try to interpret the path as relative to the working dir).
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave><AnimationChain><Name>X</Name></AnimationChain></AnimationChainArraySave>";
+
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".achx");
+        File.WriteAllText(tempPath, xml);
+        try
+        {
+            var save = AnimationChainListSave.FromFile(tempPath);
+
+            save.FileName.ShouldBe(tempPath);
+            save.AnimationChains.Count.ShouldBe(1);
+        }
+        finally { File.Delete(tempPath); }
+    }
+
+    [Fact]
     public void Save_WithProjectFile_EmitsAsLastChildOfRoot()
     {
         var save = new AnimationChainListSave { ProjectFile = "../../../game.gluj" };

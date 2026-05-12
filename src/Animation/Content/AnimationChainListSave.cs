@@ -64,6 +64,16 @@ public class AnimationChainListSave
     public string? ProjectFile { get; set; }
 
     /// <summary>
+    /// Loads a .achx file directly from disk via <see cref="File.OpenRead(string)"/>. Intended
+    /// for tooling (file pickers in the Animation Editor) where the caller has an absolute path
+    /// and needs to bypass the <see cref="ContentLoader"/> stream seam. Production runtime code
+    /// should call <c>ContentLoader.LoadAnimationChainList</c> or pass a <c>streamProvider</c>
+    /// to the other overload.
+    /// </summary>
+    public static AnimationChainListSave FromFile(string path)
+        => FromFile(path, File.OpenRead);
+
+    /// <summary>
     /// Loads a .achx file via manual XML parsing (AOT-safe). Production code should prefer
     /// <c>ContentLoader.LoadAnimationChainList(path)</c>, which routes the read through
     /// the service's stream seam (TitleContainer on DesktopGL, HTTP fetch on Blazor). This
@@ -71,7 +81,7 @@ public class AnimationChainListSave
     /// </summary>
     /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
     /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
-    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider = null)
+    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider)
     {
         streamProvider ??= XnaTitleContainer.OpenStream;
         using var stream = streamProvider(filePath);
