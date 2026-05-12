@@ -281,8 +281,13 @@ public class TreeBuilderSingletonTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
-        var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
-        var vm   = new TreeNodeVm { Data = rect };
+        var rect  = new AxisAlignedRectangleSave { Name = "HitBox" };
+        var frame = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
+        frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rect);
+        var chain = new AnimationChainSave { Name = "Idle" };
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+        var vm = new TreeNodeVm { Data = rect };
 
         var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 
@@ -296,7 +301,12 @@ public class TreeBuilderSingletonTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var circle = new CircleSave { Name = "HurtCircle" };
-        var vm     = new TreeNodeVm { Data = circle };
+        var frame  = new AnimationFrameSave { ShapeCollectionSave = new ShapeCollectionSave() };
+        frame.ShapeCollectionSave.CircleSaves.Add(circle);
+        var chain = new AnimationChainSave { Name = "Idle" };
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+        var vm = new TreeNodeVm { Data = circle };
 
         var handled = TreeBuilder.RouteNodeSelection(vm.Data, ctx.SelectedState, acls);
 

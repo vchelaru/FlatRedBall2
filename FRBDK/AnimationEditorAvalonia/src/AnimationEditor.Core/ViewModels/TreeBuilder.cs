@@ -122,16 +122,45 @@ public static class TreeBuilder
                 return true;
             }
             case AxisAlignedRectangleSave rect:
+            {
+                var parentFrame = FindParentFrameFor(rect, acls);
+                if (parentFrame is null) return true; // stale — shape not reachable from live project
+                if (selectedState.SelectedFrame != parentFrame)
+                    selectedState.SelectedFrame = parentFrame; // stops playback; clears previous shape
                 if (selectedState.SelectedRectangle != rect)
                     selectedState.SelectedRectangle = rect;
                 return true;
+            }
             case CircleSave circle:
+            {
+                var parentFrame = FindParentFrameFor(circle, acls);
+                if (parentFrame is null) return true; // stale — shape not reachable from live project
+                if (selectedState.SelectedFrame != parentFrame)
+                    selectedState.SelectedFrame = parentFrame; // stops playback; clears previous shape
                 if (selectedState.SelectedCircle != circle)
                     selectedState.SelectedCircle = circle;
                 return true;
+            }
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Searches the full animation chain list for the <see cref="AnimationFrameSave"/>
+    /// that owns <paramref name="shape"/> via its <c>ShapeCollectionSave</c>.
+    /// Returns <c>null</c> when the shape cannot be found (e.g. stale node after a test reset).
+    /// </summary>
+    private static AnimationFrameSave? FindParentFrameFor(object shape, AnimationChainListSave? acls)
+    {
+        if (acls is null) return null;
+        foreach (var chain in acls.AnimationChains)
+            foreach (var frame in chain.Frames)
+                if (frame.ShapeCollectionSave is { } scs)
+                    if ((shape is CircleSave c && scs.CircleSaves.Contains(c)) ||
+                        (shape is AxisAlignedRectangleSave r && scs.AxisAlignedRectangleSaves.Contains(r)))
+                        return frame;
+        return null;
     }
 
     // ── Node search ───────────────────────────────────────────────────────────

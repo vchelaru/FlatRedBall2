@@ -50,7 +50,7 @@ internal sealed class TestServices
     public PreviewControl CreatePreviewControl()
     {
         var ctrl = new PreviewControl();
-        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager);
+        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager);
         return ctrl;
     }
 }

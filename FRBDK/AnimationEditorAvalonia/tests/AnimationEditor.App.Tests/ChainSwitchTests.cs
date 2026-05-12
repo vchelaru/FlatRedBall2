@@ -171,7 +171,6 @@ public class ChainSwitchTests
 
             // Create control FIRST so its SelectionChanged subscription is active
             var ctrl = ctx.CreatePreviewControl();
-            ctrl.InitializeServices(ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents, ctx.ProjectManager);
             ctrl.PauseAutoPlayback();
 
             // Now set chain A — fires SelectionChanged, which the control handles via InvokeAsync
