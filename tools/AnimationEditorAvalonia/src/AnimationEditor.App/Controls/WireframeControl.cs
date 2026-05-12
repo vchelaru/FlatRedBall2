@@ -812,8 +812,11 @@ public class WireframeControl : Control
     /// </summary>
     public void LoadTexture(string? filePath)
     {
-        // Normalise path for comparison
+        // Lowercased + slash-normalized form used only for cache-key comparison and the
+        // _loadedTexturePath identity that downstream filter code keys on. The case-preserving
+        // form is what actually goes to the filesystem (Linux is case-sensitive).
         string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
+        string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
 
         if (_loadedTexturePath == norm)
         {
@@ -833,9 +836,9 @@ public class WireframeControl : Control
         _bitmap = null;
         _inspectableImage = null;
 
-        if (norm != null && File.Exists(norm))
+        if (casePreserved != null && File.Exists(casePreserved))
         {
-            _bitmap = SKBitmap.Decode(norm);
+            _bitmap = SKBitmap.Decode(casePreserved);
             // Upload pixels into an immutable SKImage on the UI thread so the
             // render thread never touches the SKBitmap directly. Without this,
             // SKCanvas.DrawBitmap on the render thread crashes with AV.
@@ -844,7 +847,7 @@ public class WireframeControl : Control
             if (_isMagicWandMode)
                 _inspectableImage = new InspectableImage(_bitmap);
 
-            if (_cameraByTexture.TryGetValue(norm, out var cam))
+            if (_cameraByTexture.TryGetValue(norm!, out var cam))
             {
                 _zoom = cam.z;
                 if (_scrollViewer != null)
