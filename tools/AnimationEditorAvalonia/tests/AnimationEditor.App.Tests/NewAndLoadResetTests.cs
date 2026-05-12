@@ -159,8 +159,9 @@ public class NewAndLoadResetTests
                 .Invoke(window, [path]);
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Null(ctx.SelectedState.SelectedChain);
             Assert.Null(ctx.SelectedState.SelectedFrame);
+            // SelectedChain should be the first chain of the *new* file, not the old one
+            Assert.Equal("NewRun", ctx.SelectedState.SelectedChain?.Name);
         }
         finally
         {

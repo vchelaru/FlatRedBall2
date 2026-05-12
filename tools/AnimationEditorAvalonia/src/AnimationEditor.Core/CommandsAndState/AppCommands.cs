@@ -135,6 +135,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             _undoManager.Clear();
             _selectedState.Reset();
+            _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
             RefreshTreeViewRequested?.Invoke();
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
