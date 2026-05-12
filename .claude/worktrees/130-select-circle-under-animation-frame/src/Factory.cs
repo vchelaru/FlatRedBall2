@@ -1,0 +1,454 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using FlatRedBall2.Collision;
+using FlatRedBall2.Tiled;
+
+namespace FlatRedBall2;
+
+/// <summary>Non-generic interface used by <see cref="FlatRedBallService"/> to destroy all factory instances on screen exit.</summary>
+internal interface IFactory
+{
+    void DestroyAll();
+    Axis? PartitionAxis { get; }
+    void SortForPartition();
+    System.Type EntityType { get; }
+    System.Collections.Generic.IReadOnlyList<Entity> EntityInstances { get; }
+}
+
+/// <summary>
+/// Creates, tracks, and destroys entities of type <typeparamref name="T"/> for a single screen.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <c>Factory&lt;T&gt;</c> is the standard way to create entities — use it even when you only need
+/// one instance. It registers the entity with the engine, wires up the activity loop, and ensures
+/// automatic cleanup when the screen exits.
+/// </para>
+/// <para>
+/// Declare one factory per entity type as a field on your <see cref="Screen"/>, construct it in
+/// <see cref="Screen.CustomInitialize"/>, and call <see cref="Create()"/> to spawn instances:
+/// <code>
+/// private Factory&lt;Player&gt; _playerFactory = null!;
+///
+/// public override void CustomInitialize()
+/// {
+///     _playerFactory = new Factory&lt;Player&gt;(this);
+///     var player = _playerFactory.Create();
+/// }
+/// </code>
+/// </para>
+/// </remarks>
+public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : Entity, new()
+{
+    private readonly Screen _screen;
+    private readonly List<T> _instances = new();
+
+    // Pooling state — only populated while pooling is enabled.
+    private bool _poolingEnabled;
+    private Stack<T>? _freeList;
+
+    // IsSolidGrid state — only populated while IsSolidGrid = true.
+    private readonly Dictionary<(int col, int row), T> _grid = new();
+    private readonly Dictionary<T, (int col, int row)> _entityCells = new();
+    private readonly HashSet<T> _gridMembers = new();
+    private float? _cellWidth;
+    private float? _cellHeight;
+    private int _batchDepth;
+
+    /// <summary>
+    /// Constructs a factory and registers it with <paramref name="screen"/>. Typically called from
+    /// <see cref="Screen.CustomInitialize"/>: <c>_enemyFactory = new Factory&lt;Enemy&gt;(this);</c>.
+    /// The factory is automatically destroyed when the screen ends.
+    /// </summary>
+    public Factory(Screen screen)
+    {
+        _screen = screen;
+        screen.Engine.RegisterFactory(this);
+    }
+
+    /// <summary>
+    /// Enables object pooling on this factory. When enabled, calling <see cref="Entity.Destroy"/>
+    /// on a created instance returns it to a free list instead of tearing it down; the next
+    /// <see cref="Create()"/> reuses that instance. <see cref="Entity.CustomInitialize"/> runs
+    /// exactly once per instance (on first creation); on every subsequent recycle the engine
+    /// resets per-life state and the entity's <see cref="Entity.Reset"/> override is called.
+    /// <see cref="Entity.CustomDestroy"/> does <b>not</b> run on pooled destroys.
+    /// </summary>
+    /// <remarks>
+    /// Must be called before the factory has produced any live instances; otherwise throws
+    /// <see cref="InvalidOperationException"/>. Returns <c>this</c> for fluent chaining with
+    /// <see cref="Prewarm(int)"/>.
+    /// </remarks>
+    public Factory<T> EnablePooling()
+    {
+        if (_instances.Count > 0)
+            throw new InvalidOperationException(
+                $"Factory<{typeof(T).Name}>.EnablePooling must be called before any Create() call.");
+        if (_poolingEnabled) return this;
+        _poolingEnabled = true;
+        _freeList = new Stack<T>();
+        return this;
+    }
+
+    /// <summary>
+    /// Pre-allocates <paramref name="count"/> instances and returns them to the pool's free list,
+    /// so the first <paramref name="count"/> <see cref="Create()"/> calls reuse those instances
+    /// instead of allocating. Each pre-warmed instance has <see cref="Entity.CustomInitialize"/>
+    /// called once during prewarm. Requires <see cref="EnablePooling"/> first.
+    /// </summary>
+    public Factory<T> Prewarm(int count)
+    {
+        if (!_poolingEnabled)
+            throw new InvalidOperationException(
+                $"Factory<{typeof(T).Name}>.Prewarm requires EnablePooling() first.");
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+        for (int i = 0; i < count; i++)
+        {
+            var instance = Create();
+            instance.Destroy();
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// When <c>true</c>, entities created by this factory are treated as cells of a regular grid
+    /// of solid blocks (e.g., rows of destructible bricks). Each entity's first
+    /// <see cref="AARect"/> child has its <c>SolidSides</c> maintained
+    /// automatically so adjacent cells share suppressed interior faces — identical to
+    /// <see cref="TileShapes"/>'s seam-suppression, but for entity factories.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Cell size is inferred from the first entity added after the flag is set (body width and
+    /// height). Subsequent entities must match — a mismatched body throws
+    /// <see cref="InvalidOperationException"/>.
+    /// </para>
+    /// <para>
+    /// The grid is indexed from the body's world-space position (cell origin at world 0, 0).
+    /// When bulk-spawning via <c>TileMap.CreateEntities</c> the engine automatically wraps the
+    /// spawn in <see cref="BeginGridBatch"/> so reposition-direction recomputation happens once
+    /// at the end. For hand-authored grids, wrap the spawn loop in a <c>using</c> block around
+    /// <see cref="BeginGridBatch"/> to avoid O(N) per-add recomputation.
+    /// </para>
+    /// <para>
+    /// Default is <c>false</c> — factories that don't opt in behave exactly as before with zero
+    /// overhead.
+    /// </para>
+    /// <para>
+    /// <b>Do not combine with <see cref="LazySpawn"/>.</b> Seam-suppression is computed when each
+    /// cell is added; lazy spawn means neighbors don't exist yet at insertion, so the adjacency
+    /// state ends up wrong. Solid-grid factories must populate eagerly.
+    /// </para>
+    /// </remarks>
+    public bool IsSolidGrid { get; set; }
+
+    /// <summary>
+    /// Begins a batch in which grid reposition-direction updates are suspended. Returns a
+    /// disposable that resumes updates and performs a single full recompute on dispose. Nested
+    /// batches are supported — only the outermost dispose flushes.
+    /// </summary>
+    public IDisposable BeginGridBatch()
+    {
+        _batchDepth++;
+        return new GridBatch(this);
+    }
+
+    private sealed class GridBatch : IDisposable
+    {
+        private Factory<T>? _owner;
+        public GridBatch(Factory<T> owner) { _owner = owner; }
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            var o = _owner; if (o == null) return;
+            _owner = null;
+            o._batchDepth--;
+            if (o._batchDepth == 0 && o.IsSolidGrid)
+                o.FlushGrid();
+        }
+    }
+
+    /// <summary>
+    /// Live list of every entity the factory has created and not yet destroyed. Iterate to apply
+    /// per-frame logic across the entire population (e.g., enemies). Add via <see cref="Create()"/>;
+    /// remove via <see cref="Entity.Destroy"/>.
+    /// </summary>
+    public IReadOnlyList<T> Instances => _instances;
+
+    Type IFactory.EntityType => typeof(T);
+    IReadOnlyList<Entity> IFactory.EntityInstances => _instances;
+
+    /// <summary>
+    /// When set, this factory's entity list is sorted along the chosen axis once per frame before
+    /// collision relationships run. Any <see cref="Collision.CollisionRelationship{A,B}"/> whose both
+    /// lists are factories sharing the same non-null <see cref="PartitionAxis"/> will automatically use
+    /// broad-phase culling — no extra setup needed.
+    /// Set to <c>null</c> (default) to disable sorting and broad-phase for this factory.
+    /// </summary>
+    public Axis? PartitionAxis { get; set; }
+
+    /// <summary>
+    /// Controls SNES-style lazy-spawn behavior when this factory is the target of
+    /// <see cref="Tiled.TileMap.CreateEntities{T}"/>. Default <see cref="LazySpawnMode.Disabled"/>
+    /// preserves the eager-instantiate behavior — every Tiled placement spawns at TMX load.
+    /// <para>
+    /// <see cref="LazySpawnMode.OneShot"/> and <see cref="LazySpawnMode.Reloadable"/> defer spawn
+    /// until the camera's activation rect (camera bounds expanded by <see cref="LazySpawnBuffer"/>)
+    /// reaches the placement. This setting is ignored by direct <see cref="Create()"/> calls — only
+    /// the TileMap-driven spawn path consults it.
+    /// </para>
+    /// <para>
+    /// <b>Do not combine with <see cref="IsSolidGrid"/>.</b> Solid-grid factories precompute
+    /// neighbor seam-suppression at the moment each cell is added; lazy spawn means neighbors
+    /// haven't been created yet when an entity comes in, so adjacency is wrong (interior faces
+    /// stay reposition-active and produce visible seams under collision response). Use lazy
+    /// spawn for enemies, pickups, and one-off props; keep <c>IsSolidGrid</c> factories eager.
+    /// </para>
+    /// </summary>
+    public LazySpawnMode LazySpawn { get; set; } = LazySpawnMode.Disabled;
+
+    /// <summary>
+    /// World-unit margin added to the activation rect on all four sides for lazy-spawn checks.
+    /// Default 0. Use a positive value (e.g. half a tile) to spawn entities slightly before they
+    /// scroll into view. Ignored when <see cref="LazySpawn"/> is <see cref="LazySpawnMode.Disabled"/>.
+    /// </summary>
+    public float LazySpawnBuffer { get; set; }
+
+    void IFactory.SortForPartition()
+    {
+        if (PartitionAxis == null) return;
+        bool byX = PartitionAxis == Axis.X;
+        // Insertion sort — O(n) on nearly-sorted data (entities move slowly relative to sort order).
+        for (int i = 1; i < _instances.Count; i++)
+        {
+            var key = _instances[i];
+            float keyVal = byX ? key.AbsoluteX : key.AbsoluteY;
+            int j = i - 1;
+            while (j >= 0)
+            {
+                float jVal = byX ? _instances[j].AbsoluteX : _instances[j].AbsoluteY;
+                if (jVal <= keyVal) break;
+                _instances[j + 1] = _instances[j];
+                j--;
+            }
+            _instances[j + 1] = key;
+        }
+    }
+
+    // IReadOnlyList<T> — allows SelfCollisionRelationship to iterate by index without GetEnumerator.
+    /// <summary>Number of live entities; equivalent to <c>Instances.Count</c>.</summary>
+    public int Count => _instances.Count;
+    /// <summary>Indexer into <see cref="Instances"/>.</summary>
+    public T this[int index] => _instances[index];
+
+    /// <summary>
+    /// Creates a new <typeparamref name="T"/>, injects <see cref="Entity.Engine"/>, registers
+    /// it with the screen, and calls <see cref="Entity.CustomInitialize"/>. The returned entity
+    /// is fully wired into rendering, physics, and (if <see cref="IsSolidGrid"/> is set) the
+    /// solid-grid index.
+    /// </summary>
+    public T Create() => CreateCore(null);
+
+    /// <summary>
+    /// Creates a new <typeparamref name="T"/> and runs <paramref name="configure"/> against it
+    /// <em>before</em> <see cref="Entity.CustomInitialize"/> — so init-only fields the entity
+    /// reads in its initializer (size variant, spawn color, lifetime, etc.) are guaranteed-set
+    /// when the initializer runs. Use this in place of "create, then assign properties" when
+    /// the data is consumed only by <c>CustomInitialize</c> and has no meaningful post-spawn
+    /// reactive behavior.
+    /// </summary>
+    public T Create(Action<T> configure)
+    {
+        if (configure == null) throw new ArgumentNullException(nameof(configure));
+        return CreateCore(configure);
+    }
+
+    private T CreateCore(Action<T>? configure)
+    {
+        if (_poolingEnabled && _freeList!.Count > 0)
+        {
+            var recycled = _freeList.Pop();
+            _screen.AddEntity(recycled);
+            _instances.Add(recycled);
+            recycled.AttachRenderablesToScreen();
+            recycled.ResetEngineState();
+            if (_screen.Layer != null)
+                recycled.Layer = _screen.Layer;
+            configure?.Invoke(recycled);
+            recycled.InvokeResetForPool();
+            if (IsSolidGrid)
+            {
+                _gridMembers.Add(recycled);
+                if (_batchDepth == 0)
+                    IndexEntity(recycled);
+            }
+            return recycled;
+        }
+
+        var entity = new T();
+        entity.Engine = _screen.Engine;
+        if (_poolingEnabled)
+            entity._isPooled = true;
+        _screen.AddEntity(entity);
+        _instances.Add(entity);
+        entity._onDestroy = () =>
+        {
+            _instances.Remove(entity);
+            _screen.RemoveEntity(entity);
+            if (IsSolidGrid && _gridMembers.Remove(entity))
+                OnGridEntityDestroyed(entity);
+            if (_poolingEnabled)
+            {
+                entity.DetachRenderablesFromScreen();
+                _freeList!.Push(entity);
+            }
+        };
+        if (_screen.Layer != null)
+            entity.Layer = _screen.Layer;
+        configure?.Invoke(entity);
+        entity.CustomInitialize();
+        if (IsSolidGrid)
+        {
+            _gridMembers.Add(entity);
+            if (_batchDepth == 0)
+                IndexEntity(entity);
+        }
+        return entity;
+    }
+
+    private static AARect FindBody(T entity)
+    {
+        foreach (var child in entity.Children)
+        {
+            if (child is AARect rect)
+                return rect;
+        }
+        throw new InvalidOperationException(
+            $"Factory<{typeof(T).Name}>.IsSolidGrid requires each entity to have an " +
+            $"AARect child, but none was found.");
+    }
+
+    private (int col, int row) CellOf(AARect body)
+    {
+        float cw = _cellWidth!.Value;
+        float ch = _cellHeight!.Value;
+        // Floor, not Round. Round uses banker's rounding (ties-to-even), so bodies at half-cell
+        // offsets (e.g. X = 8, 24, 40 with cell width 16) collapse to the same cell index.
+        // Floor is stable under any consistent sub-cell offset — the cell origin becomes the
+        // implicit offset of the first entity, and every subsequent body spaced cellWidth apart
+        // yields a distinct integer index.
+        int col = (int)MathF.Floor(body.AbsoluteX / cw);
+        int row = (int)MathF.Floor(body.AbsoluteY / ch);
+        return (col, row);
+    }
+
+    private void IndexEntity(T entity)
+    {
+        var body = FindBody(entity);
+        if (_cellWidth is float cw && _cellHeight is float ch)
+        {
+            if (!FloatsEqual(body.Width, cw) || !FloatsEqual(body.Height, ch))
+                throw new InvalidOperationException(
+                    $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
+                    $"cell size. Expected {cw}x{ch} but got {body.Width}x{body.Height}.");
+        }
+        else
+        {
+            _cellWidth = body.Width;
+            _cellHeight = body.Height;
+        }
+
+        var cell = CellOf(body);
+        _grid[cell] = entity;
+        _entityCells[entity] = cell;
+        UpdateCellDirections(cell);
+        UpdateCellDirections((cell.col - 1, cell.row));
+        UpdateCellDirections((cell.col + 1, cell.row));
+        UpdateCellDirections((cell.col, cell.row - 1));
+        UpdateCellDirections((cell.col, cell.row + 1));
+    }
+
+    private void OnGridEntityDestroyed(T entity)
+    {
+        // Entity.Destroy clears child shapes before firing _onDestroy, so we cannot read the body
+        // here — we rely on the cell index recorded when the entity was added to the grid.
+        if (!_entityCells.TryGetValue(entity, out var cell))
+            return;
+        _entityCells.Remove(entity);
+
+        if (_grid.TryGetValue(cell, out var stored) && ReferenceEquals(stored, entity))
+            _grid.Remove(cell);
+
+        if (_batchDepth > 0) return;
+
+        UpdateCellDirections((cell.col - 1, cell.row));
+        UpdateCellDirections((cell.col + 1, cell.row));
+        UpdateCellDirections((cell.col, cell.row - 1));
+        UpdateCellDirections((cell.col, cell.row + 1));
+    }
+
+    private void UpdateCellDirections((int col, int row) cell)
+    {
+        if (!_grid.TryGetValue(cell, out var entity)) return;
+        var body = FindBody(entity);
+        var dirs = SolidSides.All;
+        if (_grid.ContainsKey((cell.col - 1, cell.row))) dirs &= ~SolidSides.Left;
+        if (_grid.ContainsKey((cell.col + 1, cell.row))) dirs &= ~SolidSides.Right;
+        if (_grid.ContainsKey((cell.col, cell.row - 1))) dirs &= ~SolidSides.Down;
+        if (_grid.ContainsKey((cell.col, cell.row + 1))) dirs &= ~SolidSides.Up;
+        body.SolidSides = dirs;
+    }
+
+    // Flushes all pending members into _grid and recomputes SolidSides in one pass.
+    // Rebuilds from scratch so membership matches the authoritative _gridMembers set.
+    private void FlushGrid()
+    {
+        _grid.Clear();
+        _entityCells.Clear();
+        foreach (var entity in _gridMembers)
+        {
+            var body = FindBody(entity);
+            if (_cellWidth is float cw && _cellHeight is float ch)
+            {
+                if (!FloatsEqual(body.Width, cw) || !FloatsEqual(body.Height, ch))
+                    throw new InvalidOperationException(
+                        $"Factory<{typeof(T).Name}>.IsSolidGrid requires all entities to share the same " +
+                        $"cell size. Expected {cw}x{ch} but got {body.Width}x{body.Height}.");
+            }
+            else
+            {
+                _cellWidth = body.Width;
+                _cellHeight = body.Height;
+            }
+            var cell = CellOf(body);
+            _grid[cell] = entity;
+            _entityCells[entity] = cell;
+        }
+
+        foreach (var cell in _grid.Keys)
+            UpdateCellDirections(cell);
+    }
+
+    private static bool FloatsEqual(float a, float b) => MathF.Abs(a - b) < 1e-4f;
+
+    /// <summary>Destroys the entity. Equivalent to calling <see cref="Entity.Destroy"/> directly.</summary>
+    public void Destroy(T instance) => instance.Destroy();
+
+    /// <summary>
+    /// Destroys every instance this factory has created. Iterates over a snapshot, so each
+    /// <see cref="Entity.Destroy"/> call freely mutates <see cref="Instances"/>.
+    /// </summary>
+    public void DestroyAll()
+    {
+        foreach (var instance in new List<T>(_instances))
+            Destroy(instance);
+    }
+
+    /// <summary>
+    /// Enumerates a snapshot of current instances. Safe to call <see cref="Destroy"/> on any
+    /// instance during enumeration — the live list can be modified without affecting the iterator.
+    /// </summary>
+    public IEnumerator<T> GetEnumerator() => new List<T>(_instances).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}

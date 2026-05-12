@@ -87,7 +87,7 @@ Do not attempt to use these — they exist as API placeholders:
 
 ## Test-First Discipline (Repo-Wide, Non-Negotiable)
 
-**Every code change that alters behavior must either (a) start with a failing test that the change makes pass, or (b) include an explicit, written explanation of why a test was not feasible.** This applies to the entire repository — engine (`src/`), tools (`FRBDK/`), samples, anything. There is no third option. Silently skipping tests is not allowed.
+**Every code change that alters behavior must either (a) start with a failing test that the change makes pass, or (b) include an explicit, written explanation of why a test was not feasible.** This applies to the entire repository — engine (`src/`), tools (`tools/`), samples, anything. There is no third option. Silently skipping tests is not allowed.
 
 The `engine-tdd` skill spells out the discipline for `src/`; the same rule applies everywhere else. Hard-to-test surfaces (UI cursor changes, render output, third-party-library wiring) are not exemptions — they are a prompt to **extract the testable core** (a pure mapping function, a state computation, a hit-test) and test that, then leave a thin untested wiring layer.
 

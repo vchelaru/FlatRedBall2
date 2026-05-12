@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ComponentSave xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>CardGum</Name>
+  <BaseType>Container</BaseType>
+  <State>
+    <Name>Default</Name>
+    <Variable Type="int" Name="Back.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">143</Value>
+    </Variable>
+    <Variable Type="float" Name="Back.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="int" Name="Back.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">60</Value>
+    </Variable>
+    <Variable Type="float" Name="Back.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Back.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="int" Name="Back.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">32</Value>
+    </Variable>
+    <Variable Type="bool" Name="Back.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="Back.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Back.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="Back.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Back.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Back.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Back.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Back.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Back.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Background.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Background.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Background.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Background.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Background.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Background.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="int" Name="BackInnerBorder.Alpha" SetsValue="true">
+      <Value xsi:type="xsd:int">100</Value>
+    </Variable>
+    <Variable Type="int" Name="BackInnerBorder.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">5</Value>
+    </Variable>
+    <Variable Type="int" Name="BackInnerBorder.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-28</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="BackInnerBorder.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="bool" Name="BackInnerBorder.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="int" Name="BackInnerBorder.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">255</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">1</Value>
+    </Variable>
+    <Variable Type="bool" Name="BackInnerBorder.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-28</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="BackInnerBorder.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="BackInnerBorder.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="BackInnerBorder.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="BackInnerBorder.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="BackInnerBorder.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="BackInnerBorder.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="int" Name="BackOuterBorder.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">112</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="int" Name="BackOuterBorder.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">47</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="BackOuterBorder.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="bool" Name="BackOuterBorder.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="int" Name="BackOuterBorder.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">26</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">1</Value>
+    </Variable>
+    <Variable Type="bool" Name="BackOuterBorder.Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="BackOuterBorder.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="BackOuterBorder.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="BackOuterBorder.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="BackOuterBorder.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="BackOuterBorder.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="BackOuterBorder.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="int" Name="Border.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">230</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.CornerRadius" SetsValue="true">
+      <Value xsi:type="xsd:float">10</Value>
+    </Variable>
+    <Variable Type="int" Name="Border.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">230</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Border.HeightUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="bool" Name="Border.IsFilled" SetsValue="true">
+      <Value xsi:type="xsd:boolean">false</Value>
+    </Variable>
+    <Variable Type="int" Name="Border.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">230</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.StrokeWidth" SetsValue="true">
+      <Value xsi:type="xsd:float">1</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">-0</Value>
+    </Variable>
+    <Variable Type="DimensionUnitType" Name="Border.WidthUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="Border.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Border.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="Border.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="Border.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="Border.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="Facing" Name="FacingState" SetsValue="true" />
+    <Variable Type="float" Name="Height" SetsValue="true">
+      <Value xsi:type="xsd:float">112</Value>
+    </Variable>
+    <Variable Type="Rank" Name="RankState" SetsValue="true" />
+    <Variable Type="int" Name="RankText1.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText1.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">26</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText1.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText1.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">2</Value>
+    </Variable>
+    <Variable Type="float" Name="RankText1.X" SetsValue="true">
+      <Value xsi:type="xsd:float">9</Value>
+    </Variable>
+    <Variable Type="float" Name="RankText1.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">4</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText2.Blue" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText2.FontSize" SetsValue="true">
+      <Value xsi:type="xsd:int">26</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText2.Green" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="RankText2.HorizontalAlignment" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="int" Name="RankText2.Red" SetsValue="true">
+      <Value xsi:type="xsd:int">0</Value>
+    </Variable>
+    <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+      <Value xsi:type="xsd:string">2</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="RankText2.VerticalAlignment" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="float" Name="RankText2.X" SetsValue="true">
+      <Value xsi:type="xsd:float">-7</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="RankText2.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="RankText2.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">4</Value>
+    </Variable>
+    <Variable Type="float" Name="RankText2.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">-4</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="RankText2.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">2</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="RankText2.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">5</Value>
+    </Variable>
+    <Variable Type="State" Name="State" Category="States and Visibility" SetsValue="false">
+      <Value xsi:type="xsd:string">Default</Value>
+    </Variable>
+    <Variable Type="float" Name="SuitIcon.Height" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable IsFile="true" Type="string" Name="SuitIcon.SourceFile" SetsValue="true">
+      <Value xsi:type="xsd:string">heart.png</Value>
+    </Variable>
+    <Variable Type="float" Name="SuitIcon.Width" SetsValue="true">
+      <Value xsi:type="xsd:float">20</Value>
+    </Variable>
+    <Variable Type="float" Name="SuitIcon.X" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="HorizontalAlignment" Name="SuitIcon.XOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="SuitIcon.XUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">6</Value>
+    </Variable>
+    <Variable Type="float" Name="SuitIcon.Y" SetsValue="true">
+      <Value xsi:type="xsd:float">0</Value>
+    </Variable>
+    <Variable Type="VerticalAlignment" Name="SuitIcon.YOrigin" SetsValue="true">
+      <Value xsi:type="xsd:int">1</Value>
+    </Variable>
+    <Variable Type="PositionUnitType" Name="SuitIcon.YUnits" SetsValue="true">
+      <Value xsi:type="xsd:int">7</Value>
+    </Variable>
+    <Variable Type="Suit" Name="SuitState" SetsValue="true" />
+    <Variable Type="bool" Name="Visible" SetsValue="true">
+      <Value xsi:type="xsd:boolean">true</Value>
+    </Variable>
+    <Variable Type="float" Name="Width" SetsValue="true">
+      <Value xsi:type="xsd:float">80</Value>
+    </Variable>
+  </State>
+  <Category>
+    <Name>Suit</Name>
+    <State>
+      <Name>Spades</Name>
+      <Variable Type="int" Name="RankText1.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">0</Value>
+      </Variable>
+      <Variable Type="int" Name="RankText2.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">0</Value>
+      </Variable>
+      <Variable IsFile="true" Type="string" Name="SuitIcon.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">spade.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Hearts</Name>
+      <Variable Type="int" Name="RankText1.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">203</Value>
+      </Variable>
+      <Variable Type="int" Name="RankText2.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">203</Value>
+      </Variable>
+      <Variable IsFile="true" Type="string" Name="SuitIcon.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">heart.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Clubs</Name>
+      <Variable Type="int" Name="RankText1.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">0</Value>
+      </Variable>
+      <Variable Type="int" Name="RankText2.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">0</Value>
+      </Variable>
+      <Variable IsFile="true" Type="string" Name="SuitIcon.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">club.png</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Diamonds</Name>
+      <Variable Type="int" Name="RankText1.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">203</Value>
+      </Variable>
+      <Variable Type="int" Name="RankText2.Red" SetsValue="true">
+        <Value xsi:type="xsd:int">203</Value>
+      </Variable>
+      <Variable IsFile="true" Type="string" Name="SuitIcon.SourceFile" SetsValue="true">
+        <Value xsi:type="xsd:string">diamond.png</Value>
+      </Variable>
+    </State>
+  </Category>
+  <Category>
+    <Name>Rank</Name>
+    <State>
+      <Name>Ace</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">A</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">A</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_2</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">2</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">2</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_3</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">3</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">3</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_4</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">4</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">4</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_5</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">5</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">5</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_6</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">6</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">6</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_7</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">7</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">7</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_8</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">8</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">8</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_9</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">9</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">9</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>_10</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">10</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">10</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Jack</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">J</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">J</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Queen</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">Q</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">Q</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>King</Name>
+      <Variable Type="string" Name="RankText1.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">K</Value>
+      </Variable>
+      <Variable Type="string" Name="RankText2.Text" SetsValue="true">
+        <Value xsi:type="xsd:string">K</Value>
+      </Variable>
+    </State>
+  </Category>
+  <Category>
+    <Name>Facing</Name>
+    <State>
+      <Name>Up</Name>
+      <Variable Type="bool" Name="Back.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="bool" Name="BackInnerBorder.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="bool" Name="BackOuterBorder.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="bool" Name="Border.Visible" Category="States and Visibility" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+    </State>
+    <State>
+      <Name>Down</Name>
+      <Variable Type="bool" Name="Back.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="bool" Name="Background.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+      <Variable Type="bool" Name="BackInnerBorder.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="bool" Name="BackOuterBorder.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">true</Value>
+      </Variable>
+      <Variable Type="bool" Name="Border.Visible" SetsValue="true">
+        <Value xsi:type="xsd:boolean">false</Value>
+      </Variable>
+    </State>
+  </Category>
+  <Instance Name="Background" BaseType="RoundedRectangle" />
+  <Instance Name="Border" BaseType="RoundedRectangle" />
+  <Instance Name="RankText1" BaseType="Text" />
+  <Instance Name="RankText2" BaseType="Text" />
+  <Instance Name="SuitIcon" BaseType="Sprite" />
+  <Instance Name="Back" BaseType="RoundedRectangle" />
+  <Instance Name="BackOuterBorder" BaseType="RoundedRectangle" />
+  <Instance Name="BackInnerBorder" BaseType="RoundedRectangle" />
+  <Behaviors />
+</ComponentSave>

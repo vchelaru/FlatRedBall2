@@ -8,17 +8,15 @@ description: "Location and layout of the FlatRedBall2 Animation Editor (Avalonia
 The Animation Editor is the desktop tool that lets users edit `.achx` animation chain files (frames, regions, shapes, onion-skinning, preview playback). It is being rewritten on top of Avalonia and lives **inside this repository** at:
 
 ```
-FRBDK/AnimationEditorAvalonia/
+tools/AnimationEditorAvalonia/
 ```
 
 > The legacy WinForms version (`FlatRedBall.AnimationEditorForms`) lives in the separate `FlatRedBall` (FRB1) repo at `FRBDK/FlatRedBall.AnimationEditorForms/`. Do **not** edit it for FRB2 issues — that codebase is being replaced. Issues filed in `vchelaru/FlatRedBall2` always refer to the Avalonia version.
 
-> The `FRBDK/` folder is expected to move to a top-level `tools/` folder later. If `FRBDK/AnimationEditorAvalonia/` no longer exists, look under `tools/`.
-
 ## Project layout
 
 ```
-FRBDK/AnimationEditorAvalonia/
+tools/AnimationEditorAvalonia/
 ├── AnimationEditorAvalonia.slnx
 ├── docs/
 │   ├── DEVELOPMENT.md            ← read first when starting work
@@ -42,9 +40,9 @@ FRBDK/AnimationEditorAvalonia/
 ## Build & test
 
 ```
-dotnet build FRBDK/AnimationEditorAvalonia/AnimationEditorAvalonia.slnx
-dotnet test  FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
-dotnet test  FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
+dotnet build tools/AnimationEditorAvalonia/AnimationEditorAvalonia.slnx
+dotnet test  tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
+dotnet test  tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
 ```
 
 App tests use `[AvaloniaFact]` from `Avalonia.Headless.XUnit`; they construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions. See `WireframePanZoomTests.cs` for the established pattern (singletons reset, tmp-dir PNG fixture, `FindCtrl<T>` helper).

@@ -1,0 +1,37 @@
+{
+  "movement": {
+    "ground": {
+      "maxSpeedX": 150,
+      "accelerationTimeX": 0.5,
+      "decelerationTimeX": 0.25,
+      "gravity": 700,
+      "maxFallSpeed": 800,
+      "minJumpHeight": 24,
+      "maxJumpHeight": 48,
+      "coyoteTime": 0.1,
+      "jumpInputBufferDuration": 0.1
+    },
+    "air": {
+      "maxSpeedX": 150,
+      "accelerationTimeX": 0.5,
+      "decelerationTimeX": 0.25,
+      "gravity": 700,
+      "maxFallSpeed": 800,
+      "minJumpHeight": 24,
+      "maxJumpHeight": 24
+    },
+    "afterDoubleJump": {
+      "maxSpeedX": 150,
+      "accelerationTimeX": 0.5,
+      "decelerationTimeX": 0.25,
+      "gravity": 700,
+      "maxFallSpeed": 800,
+      "jumpVelocity": 0
+    },
+    "climbing": {
+      "maxSpeedX": 60,
+      "climbingSpeed": 100,
+      "jumpVelocity": 300
+    }
+  }
+}

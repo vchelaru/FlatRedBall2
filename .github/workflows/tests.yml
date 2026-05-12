@@ -55,12 +55,12 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Test AnimationEditor.Core
-        run: dotnet test FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity normal
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity normal
 
       # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
       # headless platform — no display server needed even on the Windows runner.
       - name: Test AnimationEditor.App
-        run: dotnet test FRBDK/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity normal
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity normal
 
   # Umbrella check that branch protection gates on. Stays named "dotnet test" so the
   # existing required-status-check entry in the main-protection ruleset keeps matching

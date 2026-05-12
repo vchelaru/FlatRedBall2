@@ -1,0 +1,186 @@
+@design/TODOS.md
+
+# Repository Guidelines
+
+## What Is This?
+
+FlatRedBall2 is a 2D game engine/framework written in C# on .NET, built on top of MonoGame. It integrates Gum (UI) and Tiled (level editing) as dependencies.
+
+## Prerelease Status — Breaking Changes Are Free
+
+**FlatRedBall2 is in active prerelease development. There are no shipping consumers, no public API surface to preserve, and no backwards-compatibility obligations.** Anything in the engine — type names, method signatures, namespaces, defaults, semantics — can be changed at any time if a better design exists.
+
+When proposing or evaluating a change:
+- **Do not** raise "this will break existing code" as a concern. It is not a concern. Existing call sites in samples and tests are part of this codebase and will be updated alongside the change.
+- **Do not** add deprecation shims, `[Obsolete]` attributes, alias members, or "kept for compatibility" wrappers. Just change the thing.
+- **Do** propose the cleanest API; if a rename or restructuring makes the engine clearer, it is on the table.
+
+The only relevant question is "is this the right design?" — never "will this break someone?"
+
+## Key Files
+
+- Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL 3.8.*)
+- Code style: `.claude/code-style.md`
+- Deferred items: `design/TODOS.md`
+- Test project: `tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj`
+
+## Build & Test
+
+```
+dotnet build src/FlatRedBall2.csproj
+dotnet test tests/FlatRedBall2.Tests/
+```
+
+## Available Skills
+
+Skills live in two locations, by audience:
+- **`/frb-skills/`** — 3rd-party skills for game developers using FlatRedBall2 (entities, collision, physics, animation, etc.). These are the public, distributable skill set.
+- **`/.claude/skills/`** — 1st-party skills for engine contributors only (TDD discipline, skill authoring, sample-project bootstrap, content-boundary philosophy, orchestrator).
+
+The 3rd-party skills are also surfaced under `/.claude/skills/<name>` via local symlinks (gitignored) so Claude Code's auto-discovery picks them up while working on the engine. Edit the canonical copy under `/frb-skills/`.
+
+Invoke these with the Skill tool when working on specific topics:
+- `entities-and-factories` — Entity lifecycle, Add (shapes/Gum), Factory<T>, spawning
+- `collision-relationships` — AddCollisionRelationship, move/bounce semantics
+- `physics-and-movement` — Y+ up, gravity, Drag, GameRandom
+- `timing` — Cooldown gates, repeating timers, entity lifetimes, FrameTime.DeltaSeconds
+- `shapes` — AARect, Circle, Polygon, visual properties
+- `input-system` — Keyboard, gamepad, input binding
+- `camera` — Camera setup and transforms
+- `screens` — Screen lifecycle and transitions
+- `gumcli` — **Ask first** before any Gum UI code: use gumcli tool or code-only? Covers gumcli new, .csproj content includes, codegen
+- `gum-integration` — UI with Gum (runtime usage; use `gumcli` skill first if user chose Gum tool)
+- `gum-packaging` — Bundle a `.gumx` Gum project into a single `.gumpkg` (tar+brotli) for distribution; toggle loose-vs-bundle in csproj for diagnostics
+- `content-and-assets` — Asset loading
+- `content-hot-reload` — `Screen.WatchContent`, `ContentWatcher`, debouncing, in-place vs screen-restart decision
+- `engine-overview` — **Start here.** What the engine does automatically, what game code must implement, what is stubbed, and critical gotchas
+- `engine-tdd` — **Load before editing `src/`.** Failing test in `tests/FlatRedBall2.Tests/` required before any behavior change in `src/`
+- `skill-creator` — **Load before editing any skill's `SKILL.md`.** Applies the deletion test, 8-line code-block cap, and shared-context budget discipline
+- `content-boundary` — **AI/human split of labor.** Load before adding levels/UI/sprites/tunable values, or when designing engine APIs — defines what AI scaffolds vs what the human authors
+- `levels` — Level data layout and progression
+- `tmx` — TMX map file creation/editing: base template, StandardTileset tile IDs, layer conventions, CSV data
+- `top-down-movement` — Top-down movement with `TopDownBehavior`/`TopDownValues`, 4/8-way directions, speed multiplier
+- `grid-movement` — Tile-by-tile grid movement (Pokémon/dungeon-crawler/roguelike): one key = one tile, input gate during tween, pre-move collision check
+- `path-and-pathfollower` — `Path` (line/arc segments, rendering) and `PathFollower` (entity movement, FaceDirection, waypoint events)
+- `tile-node-network` — A* pathfinding: `TileNodeNetwork`, `TileNode`, grid setup aligned with `TileShapes`, enemy navigation pattern
+- `animation` — Sprite animation: AnimationChain, AnimationChainList, .achx loading, PlayAnimation, looping/non-looping, AnimationFinished
+- `audio` — AudioManager, loading SoundEffect/Song, music, volume
+- `shaders` — Custom .fx shaders, precompiled XNBs, Wine/libmojoshader setup, version guard
+- `tweening` — `Entity.Tween` / `Screen.Tween` for animating floats with an easing curve (juice, UI slide-in, hit-flash)
+- `sample-project-setup` — How to create a new sample `.csproj` (dotnet-tools.json, mgcb, project structure)
+- `multiplatform-conversion` — Convert a single-target desktop sample into a dual-target desktop + KNI BlazorGL (web/WASM) project
+
+## Key Architecture Decisions
+
+- **Physics**: Second-order kinematic — `pos += vel*dt + acc*(dt²/2)`, `vel += acc*dt`, `vel -= vel*drag*dt`
+- **Y-axis**: World space Y+ up; Camera transform flips Y for screen-space rendering
+- **No static state**: Only `FlatRedBallService.Default` is static
+- **Entity.Engine**: `internal set` — injected by Factory before `CustomInitialize`; throws `InvalidOperationException` if accessed before injection
+- **InternalsVisibleTo**: `FlatRedBall2.Tests` accesses internal members (PhysicsUpdate, AddEntity, etc.)
+- **CollisionDispatcher**: `internal static` class — shape-pair resolution uses concrete type matching
+
+## Known Stubs (Not Yet Implemented)
+
+Do not attempt to use these — they exist as API placeholders:
+- DebugRenderer: All draw methods are no-ops
+- Tiled integration: `TileMapCollisions` uses MonoGame.Extended 6.0 preview
+
+## Test-First Discipline (Repo-Wide, Non-Negotiable)
+
+**Every code change that alters behavior must either (a) start with a failing test that the change makes pass, or (b) include an explicit, written explanation of why a test was not feasible.** This applies to the entire repository — engine (`src/`), tools (`FRBDK/`), samples, anything. There is no third option. Silently skipping tests is not allowed.
+
+The `engine-tdd` skill spells out the discipline for `src/`; the same rule applies everywhere else. Hard-to-test surfaces (UI cursor changes, render output, third-party-library wiring) are not exemptions — they are a prompt to **extract the testable core** (a pure mapping function, a state computation, a hit-test) and test that, then leave a thin untested wiring layer.
+
+When (b) applies, the explanation must be in the PR/commit body and must say:
+1. What specifically blocked a test (e.g., "Avalonia `Cursor` exposes no equality on `StandardCursorType`").
+2. What testable core *was* extracted and covered, if any.
+3. What's left untested and why that residue is acceptable.
+
+If you cannot honestly write (1)-(3), the answer is: write the test.
+
+## AI-Usability Goals
+
+This project serves dual purposes: building a game engine AND evaluating how well AI assistants can work with it. **Game samples are not just games — they are AI usability tests for FlatRedBall2.**
+
+Three layers of AI-usability (in priority order):
+
+1. **API design** — Is the API clear, intuitive, and hard to misuse?
+2. **XML documentation** — Is it succinct, adds clarification beyond the name, avoids redundancy, and calls out gotchas?
+3. **Skill files** — Do they guide to the right location, explain high-level concepts, and flag gotchas?
+
+### Post-Task Reflection (Required for Game Dev Tasks)
+
+After completing a task where you are **using the engine as an end user** (building a game, writing a sample, implementing a game mechanic), reflect and suggest concrete improvements:
+- Did completing this task require excessive context or guesswork?
+- Would a cleaner API design have prevented confusion?
+- Are there missing, unclear, or redundant XML doc comments?
+- Should a skill file be created or updated?
+
+**Do not give this reflection when working on the engine itself** (fixing engine bugs, implementing engine features, writing engine tests). Those tasks are about the internals, not about the end-user experience of the API.
+
+Make suggestions even if minor. **High churn on docs and skills is expected and desired — we want it perfect.**
+
+### Keeping Docs and Skills Accurate (Critical)
+
+Because churn is high, XML docs and skill files can easily become out-of-date. **If you ever encounter anything inaccurate or outdated in XML docs or skill files while working on any task, flag it immediately and fix it.** Stale guidance is worse than no guidance — it actively misleads future AI sessions.
+
+### Responding to Friction Points
+
+When you hit friction working on any task, respond at the appropriate scope:
+
+1. **Skill files** — Fix immediately. No need to ask.
+2. **XML doc comments** — Fix immediately. No need to ask.
+3. **API design issues** — Flag and suggest; don't unilaterally change the API.
+
+### Skill File Quality Bar
+
+Skill files are loaded into a limited context window — every line costs budget. Keep them lean and generalizable.
+
+**Include:**
+- Engine behaviors that are non-obvious or contradict intuition (gotchas, footguns)
+- API patterns that apply across many game types
+- Correct order-of-operations for lifecycle hooks
+
+**Do not include:**
+- Game-specific logic (score systems, enemy AI, wave spawning, upgrade trees) — the agent should implement these without guidance
+- Anything that is obvious from the method name or standard C# patterns
+- Step-by-step walkthroughs for common programming tasks
+
+**Calibration:** A reasonable amount of implementation work is expected from the agent. If the friction was "I had to write a state machine" or "I had to calculate screen bounds arithmetic" — that is normal work, not a gap in documentation. Only document things the engine makes unexpectedly hard or behaves unexpectedly.
+
+## Agent Workflow
+
+**Step 0 — Scope the task first**: Before invoking any agent or reading skill files, determine what kind of task this is:
+- **Game creation** (random or specific vision) → invoke the `orchestrator` skill. It handles both random game selection and user-provided designs, then delegates implementation to a coder sub-agent. Only skip the orchestrator if the user explicitly asks to (e.g., wants to use the game-designer agent for a longer design conversation instead).
+- **Engine feature or bug** → identify which subsystem (collision, rendering, input, etc.) to know which skill files are relevant
+- **Docs or refactor** → docs-writer or refactoring-specialist agent
+
+This scoping step keeps context lean — only load the skills and files that are actually needed.
+
+**Step 0b — Load all relevant skills before touching any source files.** Decompose the task into every concern it touches, and load a skill for each one. A task that involves creating an entity, giving it a shape, and setting up collision requires `entities-and-factories` + `shapes` + `collision-relationships` — all three, up front. Skills are cheap to load and save enormous amounts of time; reading source to compensate for a missing skill is always the wrong trade. If in doubt, load the skill.
+
+For every task, one of the following must happen before you proceed:
+
+1. **Spawn the matching agent from `.claude/agents/`** and transfer the relevant context in the prompt. Preferred when the agent would need to explore files you haven't already loaded, or when the task is self-contained enough to brief in a short prompt. Announce the spawn: "Invoking coder agent for this task..."
+2. **Or, do it inline yourself — but first read the agent's `.md` file** (e.g. `.claude/agents/coder.md`) at the start of the task and follow its rules. Preferred when you already have the relevant context loaded and the transfer cost to a sub-agent would be high.
+
+This keeps the agent files as the single source of truth for how each kind of work is done (TDD discipline, file-reading order, code-style enforcement, etc.) — CLAUDE.md does not duplicate those rules, so they can't drift.
+
+Re-read the agent file at the **start of each new coding task**, not just once per session. Context drifts across long sessions; fresh load each task keeps the discipline active. Inline work without reading the agent file first is not an option.
+
+Available agents:
+- **game-designer** — Leads a feel-first design conversation when the user has a **specific game vision** they want to workshop (e.g., "I want to make a game like X", "let's build a platformer"). Produces a Game Design Document before any code is written.
+- **coder** — Writing or modifying code and unit tests for new features or bugs
+- **qa** — Reviewing production code for correctness, edge cases, and regressions (does not write tests); also assists with manual testing and playtest checklists
+- **refactoring-specialist** — Refactoring and improving code structure
+- **docs-writer** — Writing or updating documentation
+- **product-manager** — Breaking down tasks and tracking progress
+- **security-auditor** — Security reviews and vulnerability assessments
+
+Select the agent that best matches the task at hand. For tasks that span multiple concerns (e.g., implement a feature and write tests), invoke the relevant agents in sequence.
+
+**Game creation rule**: For any game creation task — random or specific vision — invoke the **orchestrator** skill unless the user explicitly opts out. The orchestrator accepts user-provided designs (Step 1A) as well as picking random games. Only use the **game-designer** agent instead if the user specifically asks for a longer design conversation.
+
+## Code Style
+
+See `.claude/code-style.md` for all code style rules. Read that file before writing or editing any code.

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>FlatRedBall2.Templates</PackageId>
+    <Description>dotnet new templates for FlatRedBall2 game projects.</Description>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="frb2-desktop\**\*" />
+    <!-- frb2-skills: template.json lives in the directory; skill files
+         are pulled directly from the canonical source to avoid duplication. -->
+    <Content Include="frb2-skills\.template.config\**\*" />
+    <Content Include="..\frb-skills\**\*">
+      <PackagePath>content/frb2-skills/frb-skills/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+    </Content>
+  </ItemGroup>
+</Project>

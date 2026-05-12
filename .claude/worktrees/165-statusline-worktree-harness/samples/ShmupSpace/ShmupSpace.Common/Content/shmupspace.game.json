@@ -1,0 +1,23 @@
+{
+  // Everything-but-movement game coefficients. Edited while the game is running will
+  // hot-reload in place (GameScreen watches this file). Add fields here instead of
+  // sprinkling consts across entity classes.
+  "player": {
+    "FireInterval": 0.17,   // seconds between shots while Space is held
+    "BulletSpeed": 300,     // world units/sec, upward
+    "EdgeMargin": 8         // pixels the ship stops short of the camera edges
+  },
+  "enemy": {
+    "FallSpeed": -60,       // world units/sec, Y+ up so negative = descending
+    "ZigSpeed": 45,         // horizontal speed during zig-zag
+    "ZigInterval": 0.9      // seconds between horizontal direction flips
+  },
+  "spawn": {
+    "EnemyInterval": 1.1,         // seconds between enemy spawns
+    "EnemyEdgeMargin": 50,        // pixels of horizontal margin at spawn (> ZigSpeed*ZigInterval)
+    "PlayerRespawnDelay": 1.25    // seconds after player death before respawn
+  },
+  "scoring": {
+    "PerEnemyKill": 100
+  }
+}

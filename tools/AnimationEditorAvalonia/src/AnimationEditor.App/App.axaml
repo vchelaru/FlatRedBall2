@@ -1,0 +1,161 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             x:Class="AnimationEditor.App.App"
+             RequestedThemeVariant="Dark">
+             <!-- "Dark" is required so selection highlights and other controls are visible against the app's dark backgrounds. -->
+
+    <Application.Resources>
+        <!-- ── Design token palette ──────────────────────────────────────────── -->
+        <SolidColorBrush x:Key="BgCanvas"    Color="#0e0f12" />
+        <SolidColorBrush x:Key="BgApp"       Color="#15171b" />
+        <SolidColorBrush x:Key="BgPanel"     Color="#1b1e23" />
+        <SolidColorBrush x:Key="BgRail"      Color="#1f232a" />
+        <SolidColorBrush x:Key="BgHover"     Color="#262b34" />
+        <SolidColorBrush x:Key="BgActive"    Color="#2f3641" />
+        <SolidColorBrush x:Key="LineBrush"   Color="#2a2e36" />
+        <SolidColorBrush x:Key="LineStrong"  Color="#383d47" />
+        <SolidColorBrush x:Key="Ink"         Color="#e6e8ec" />
+        <SolidColorBrush x:Key="InkMid"      Color="#9098a4" />
+        <SolidColorBrush x:Key="InkDim"      Color="#5d6573" />
+        <SolidColorBrush x:Key="Accent"      Color="#d83a3a" />
+        <SolidColorBrush x:Key="AccentSoft"  Color="#f0c674" />
+        <SolidColorBrush x:Key="AccentCool"  Color="#5fb6e8" />
+        <SolidColorBrush x:Key="Ok"          Color="#6dd28d" />
+
+        <!-- ── Override Fluent accent to red ────────────────────────────────── -->
+        <Color x:Key="SystemAccentColor">#d83a3a</Color>
+        <Color x:Key="SystemAccentColorLight1">#e05050</Color>
+        <Color x:Key="SystemAccentColorLight2">#e86868</Color>
+        <Color x:Key="SystemAccentColorLight3">#f08080</Color>
+        <Color x:Key="SystemAccentColorDark1">#b52e2e</Color>
+        <Color x:Key="SystemAccentColorDark2">#922424</Color>
+        <Color x:Key="SystemAccentColorDark3">#6f1a1a</Color>
+
+        <!-- Compact stacked chevron spinner — replaces Fluent default for all ButtonSpinner/NumericUpDown.
+             Safe because every NumericUpDown except PropFrameLen has ShowButtonSpinner="False". -->
+        <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
+            <Setter Property="Foreground"   Value="{DynamicResource TextControlForeground}" />
+            <Setter Property="Background"   Value="{DynamicResource TextControlBackground}" />
+            <Setter Property="BorderBrush"  Value="{DynamicResource TextControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+            <Setter Property="MinHeight"    Value="0" />
+            <Setter Property="Padding"      Value="8,0,4,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment"   Value="Center" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="ButtonSpinner">
+                    <DataValidationErrors>
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <DockPanel>
+                                <!-- Compact stacked ▲/▼ chevron panel on the right -->
+                                <StackPanel Name="PART_SpinnerPanel"
+                                            DockPanel.Dock="Right"
+                                            Orientation="Vertical"
+                                            Width="18"
+                                            VerticalAlignment="Center"
+                                            Spacing="1"
+                                            IsVisible="{TemplateBinding ShowButtonSpinner}">
+                                    <RepeatButton Name="PART_IncreaseButton"
+                                                  HorizontalAlignment="Stretch"
+                                                  HorizontalContentAlignment="Center"
+                                                  VerticalContentAlignment="Center"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  MinWidth="0" MinHeight="0" Padding="2">
+                                        <svg:Svg Width="7" Height="7"
+                                                 Path="avares://AnimationEditor.App/Assets/icons/svg/IconChevronUp.svg"
+                                                 CurrentColor="#9098a4" />
+                                    </RepeatButton>
+                                    <RepeatButton Name="PART_DecreaseButton"
+                                                  HorizontalAlignment="Stretch"
+                                                  HorizontalContentAlignment="Center"
+                                                  VerticalContentAlignment="Center"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  MinWidth="0" MinHeight="0" Padding="2">
+                                        <svg:Svg Width="7" Height="7"
+                                                 Path="avares://AnimationEditor.App/Assets/icons/svg/IconChevronDown.svg"
+                                                 CurrentColor="#9098a4" />
+                                    </RepeatButton>
+                                </StackPanel>
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  Padding="{TemplateBinding Padding}" />
+                            </DockPanel>
+                        </Border>
+                    </DataValidationErrors>
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <!-- Compact buttons: override FluentTheme MinHeight so small +/- buttons aren't stretched -->
+        <Style Selector="Button.compact">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <!-- Flanker buttons: sit inside a bordered field on left/right of a value (Grid, Zoom, Speed) -->
+        <Style Selector="Button.flanker">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource InkMid}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.flanker /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.flanker:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource BgHover}"/>
+        </Style>
+        <Style Selector="Button.flanker:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource BgActive}"/>
+        </Style>
+        <!-- NumericUpDown: compact, no spinners by default. Set ShowButtonSpinner="True" individually where needed. -->
+        <Style Selector="NumericUpDown">
+            <Setter Property="ShowButtonSpinner" Value="False"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <!-- Strip the Fluent TextBox inner border inside ButtonSpinner so only the outer border is visible. -->
+        <Style Selector="ButtonSpinner TextBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
+        <Style Selector="Button.plus">
+            <Setter Property="ContentTemplate">
+                <DataTemplate>
+                    <svg:Svg Width="10" Height="10"
+                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconPlus.svg"
+                             CurrentColor="#e6e8ec" />
+                </DataTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.minus">
+            <Setter Property="ContentTemplate">
+                <DataTemplate>
+                    <svg:Svg Width="10" Height="10"
+                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconMinus.svg"
+                             CurrentColor="#e6e8ec" />
+                </DataTemplate>
+            </Setter>
+        </Style>
+    </Application.Styles>
+</Application>

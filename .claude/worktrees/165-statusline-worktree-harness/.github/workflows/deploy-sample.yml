@@ -1,0 +1,76 @@
+name: Deploy Sample to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: 'Sample to deploy'
+        required: true
+        default: 'ShmupSpace'
+        type: choice
+        options:
+          - ShmupSpace
+          - PlatformKing
+          - Solitaire
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Publish ${{ inputs.sample }}.BlazorGL
+        run: >
+          dotnet publish
+          samples/${{ inputs.sample }}/${{ inputs.sample }}.BlazorGL/${{ inputs.sample }}.BlazorGL.csproj
+          -c Release
+          -o publish
+
+      - name: Diagnose published content (TEMP)
+        shell: bash
+        run: |
+          echo "=== publish/wwwroot/Content (final, deployed) ==="
+          find publish/wwwroot/Content -type f 2>/dev/null | sort || echo "(no Content/ dir)"
+          echo
+          echo "=== source wwwroot/Content (where MGCB writes) ==="
+          find samples/${{ inputs.sample }}/${{ inputs.sample }}.BlazorGL/wwwroot/Content -type f 2>/dev/null | sort || echo "(empty)"
+
+      - name: Rewrite base href for GitHub Pages subpath
+        shell: bash
+        run: |
+          sed -i 's|<base href="\./" />|<base href="/FlatRedBall2/${{ inputs.sample }}/" />|' \
+            publish/wwwroot/index.html
+          grep -q '<base href="/FlatRedBall2/${{ inputs.sample }}/"' publish/wwwroot/index.html
+
+      - name: Add .nojekyll
+        shell: bash
+        run: touch publish/wwwroot/.nojekyll
+
+      # peaceiris/actions-gh-pages does `git add` inside the publish dir, which honors any
+      # .gitignore files it finds. The source projects keep a wwwroot/Content/.gitignore to
+      # exclude generated XNBs from source control — that file gets copied into publish/ and
+      # would silently strip every asset from the deploy. Remove all .gitignore files from
+      # publish/ before handing off.
+      - name: Strip .gitignore files from publish output
+        shell: bash
+        run: find publish/wwwroot -name .gitignore -delete
+
+      - name: Deploy to gh-pages/${{ inputs.sample }}
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./publish/wwwroot
+          destination_dir: ${{ inputs.sample }}
+          keep_files: true
+          commit_message: 'Deploy ${{ inputs.sample }} (${{ github.sha }})'

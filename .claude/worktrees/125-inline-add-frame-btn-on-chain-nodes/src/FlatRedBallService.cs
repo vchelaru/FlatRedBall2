@@ -1,0 +1,970 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using FlatRedBall2.Audio;
+using FlatRedBall2.Diagnostics;
+using FlatRedBall2.UI;
+using FlatRedBall2.Input;
+using FlatRedBall2.Rendering;
+using FlatRedBall2.Rendering.Batches;
+using FlatRedBall2.Utilities;
+using Gum.Forms;
+using Gum.Wireframe;
+using MonoGameGum;
+using MonoGameAndGum.Renderables;
+using Microsoft.Xna.Framework.Content;
+
+namespace FlatRedBall2;
+
+/// <summary>
+/// The engine root. Owns the <see cref="CurrentScreen"/>, the per-engine subsystems
+/// (<see cref="Input"/>, <see cref="Audio"/>, <see cref="Content"/>, <see cref="Time"/>,
+/// <see cref="Random"/>, <see cref="RenderDiagnostics"/>), and the integration with the
+/// MonoGame <see cref="Microsoft.Xna.Framework.Game"/> loop.
+/// <para>
+/// Most games access the engine through <see cref="Default"/>, the single static instance,
+/// and call <see cref="Initialize"/>, <see cref="Update"/>, and <see cref="Draw"/> from the
+/// matching <c>Game</c> hooks.
+/// </para>
+/// </summary>
+public class FlatRedBallService
+{
+    /// <summary>The shared engine instance used by every screen, entity, and factory.</summary>
+    public static FlatRedBallService Default { get; } = new FlatRedBallService();
+
+    // In-progress profile being filled during the current frame. Mutated in place by Screen.Update
+    // and the engine's Update/Draw methods. NOT user-visible — reads during the frame would mix
+    // current-frame phase values against previous-frame totals. Committed to _lastFrame at the
+    // end of Draw, when the frame's measurements are all populated.
+    internal FrameProfile _frameProfile;
+    private FrameProfile _lastFrame;
+
+    /// <summary>
+    /// Snapshot of the most recently completed frame's timing breakdown. Coherent by design —
+    /// every field comes from the same frame, captured at end-of-Draw. Read at any point in the
+    /// next frame (e.g. in <see cref="Screen.CustomActivity"/>) for HUD / profiling output.
+    /// See <see cref="FrameProfile"/> for what each field measures.
+    /// </summary>
+    public FrameProfile LastFrame => _lastFrame;
+
+    private Game? _game;
+    private GraphicsDeviceManager? _graphicsManager;
+    private SpriteBatch? _spriteBatch;
+    private Texture2D? _whitePixel;
+    private Action? _pendingScreenChange;
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
+    private Type? _lastScreenType;
+    private Action<Screen>? _lastScreenConfigure;
+    private readonly List<GraphicalUiElement> _gumUpdateList = new();
+    private readonly GameSynchronizationContext _syncContext = new();
+    private readonly GumService _gum = new GumService();
+    // Overlay is full-window screen-space UI that must NOT inherit any specific camera's Zoom.
+    // We use a dedicated pixel-space camera (Zoom=1, OrthoSize=back-buffer pixels) so
+    // PixelsPerUnit==1 — the Gum batch's scale matrix becomes identity, and OverlayRoot's
+    // pixel-sized canvas renders 1:1.
+    private readonly Camera _overlayCamera = new Camera();
+
+    /// <summary>
+    /// Constructs an engine instance and auto-detects <see cref="SourceContentRoots"/>. Most
+    /// games use <see cref="Default"/> rather than constructing their own — multi-instance
+    /// engines are only useful for advanced testing scenarios.
+    /// </summary>
+    public FlatRedBallService()
+    {
+        SourceContentRoots = new List<string>(DetectSourceContentRoots(AppContext.BaseDirectory));
+        OutputContentRoot = AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// Absolute paths to the project's source content folders, used by
+    /// <see cref="Screen.WatchContent(string, Action, string?)"/> and
+    /// <see cref="Screen.WatchContentDirectory(string, Action{string}, string?)"/> to locate the
+    /// files the user actually edits (vs the copies MSBuild dropped into the build output).
+    /// <para>
+    /// Auto-detected at construction by walking up from <see cref="AppContext.BaseDirectory"/>:
+    /// if a solution file (<c>.sln</c>/<c>.slnx</c>) is found, every referenced project that has
+    /// a <c>Content/</c> subdirectory is added to this list (so multi-project samples like
+    /// <c>Common</c>+<c>Desktop</c> just work). Otherwise we fall back to the first <c>.csproj</c>
+    /// directory found going up. In a shipping build neither is found and the list is empty —
+    /// <c>WatchContent</c>* overloads silently no-op.
+    /// </para>
+    /// <para>
+    /// The list is mutable: clear and add to override auto-detection (e.g. unusual project
+    /// layouts, content outside any <c>Content/</c> folder).
+    /// </para>
+    /// </summary>
+    public IList<string> SourceContentRoots { get; }
+
+    /// <summary>
+    /// Absolute path to the build-output folder where copied content lives at runtime. Defaults
+    /// to <see cref="AppContext.BaseDirectory"/>. Override only if your build pipeline writes
+    /// content to a directory other than the executable's folder.
+    /// </summary>
+    public string OutputContentRoot { get; set; } = AppContext.BaseDirectory;
+
+    /// <summary>
+    /// Walks up from <paramref name="startDirectory"/> looking for a solution file
+    /// (<c>.sln</c>/<c>.slnx</c>) within ~10 levels. If found, returns every referenced
+    /// project directory that has a <c>Content/</c> subdirectory. If no solution is found,
+    /// falls back to the first <c>.csproj</c> directory found going up (single element).
+    /// Returns an empty sequence if neither is found. Public for testing.
+    /// </summary>
+    public static IReadOnlyList<string> DetectSourceContentRoots(string startDirectory)
+    {
+        // Walk up looking for a solution file first — multi-project samples usually have
+        // their content in a sibling project (e.g. Common) rather than the head project (Desktop).
+        var dir = new DirectoryInfo(startDirectory);
+        for (int i = 0; i < 10 && dir != null; i++)
+        {
+            var slnFiles = dir.GetFiles("*.sln").Concat(dir.GetFiles("*.slnx")).ToArray();
+            if (slnFiles.Length > 0)
+            {
+                var roots = ParseSolutionForContentRoots(slnFiles[0].FullName);
+                if (roots.Count > 0) return roots;
+                // Solution found but no project under it has a Content/ folder — fall through
+                // to the .csproj fallback so we still return *something* useful.
+                break;
+            }
+            dir = dir.Parent;
+        }
+
+        // Fallback: nearest .csproj going up. Matches the historical single-root behavior.
+        dir = new DirectoryInfo(startDirectory);
+        for (int i = 0; i < 10 && dir != null; i++)
+        {
+            if (dir.GetFiles("*.csproj").Length > 0)
+                return new[] { dir.FullName };
+            dir = dir.Parent;
+        }
+        return Array.Empty<string>();
+    }
+
+    // Parse a .sln (text) or .slnx (XML) for project relative paths, return absolute project
+    // directories that contain a Content/ subdirectory. Capped at 50 projects to keep monorepo
+    // scans fast — projects without Content/ are filtered before counting.
+    private static IReadOnlyList<string> ParseSolutionForContentRoots(string solutionPath)
+    {
+        const int MaxProjectsScanned = 50;
+        var solutionDir = Path.GetDirectoryName(solutionPath)!;
+        var ext = Path.GetExtension(solutionPath).ToLowerInvariant();
+        IEnumerable<string> relativePaths;
+
+        if (ext == ".slnx")
+        {
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(solutionPath);
+                relativePaths = doc.Descendants("Project")
+                    .Select(p => (string?)p.Attribute("Path"))
+                    .Where(p => !string.IsNullOrEmpty(p))!;
+            }
+            catch
+            {
+                relativePaths = Array.Empty<string>();
+            }
+        }
+        else
+        {
+            // .sln format: Project("{type-guid}") = "Name", "Relative\Path.csproj", "{guid}"
+            var text = File.ReadAllText(solutionPath);
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                text, @"^Project\([^)]*\)\s*=\s*""[^""]*""\s*,\s*""([^""]+\.csproj)""",
+                System.Text.RegularExpressions.RegexOptions.Multiline);
+            relativePaths = matches.Cast<System.Text.RegularExpressions.Match>()
+                .Select(m => m.Groups[1].Value);
+        }
+
+        var roots = new List<string>();
+        int scanned = 0;
+        foreach (var rel in relativePaths)
+        {
+            if (scanned++ >= MaxProjectsScanned) break;
+            var projAbs = Path.GetFullPath(Path.Combine(solutionDir, rel.Replace('\\', Path.DirectorySeparatorChar)));
+            var projDir = Path.GetDirectoryName(projAbs);
+            if (projDir != null && Directory.Exists(Path.Combine(projDir, "Content")) && !roots.Contains(projDir))
+                roots.Add(projDir);
+        }
+        return roots;
+    }
+
+    /// <summary>
+    /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize"/>.
+    /// Use this to call <see cref="Microsoft.Xna.Framework.Game.Exit"/> or access window/graphics properties.
+    /// Throws if accessed before <see cref="Initialize"/> is called.
+    /// </summary>
+    public Game Game => _game ?? throw new InvalidOperationException(
+        "FlatRedBallService has not been initialized. Call Initialize() first.");
+
+    /// <summary>
+    /// Initializes the engine. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
+    /// </summary>
+    /// <remarks>
+    /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
+    /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
+    /// MonoGame defaults the property to <c>false</c>.
+    /// </remarks>
+    public void Initialize(Game game, EngineInitSettings? settings = null)
+    {
+        _game = game;
+        _graphicsManager = game.Services.GetService(typeof(IGraphicsDeviceManager)) as GraphicsDeviceManager;
+        _spriteBatch = new SpriteBatch(game.GraphicsDevice);
+        _whitePixel = new Texture2D(game.GraphicsDevice, 1, 1);
+        _whitePixel.SetData(new[] { Color.White });
+        SynchronizationContext.SetSynchronizationContext(_syncContext);
+        Content.Initialize(game.Content, game.GraphicsDevice);
+        ShapesBatch.Instance.Initialize(game.GraphicsDevice, game.Content);
+
+        var bounds = game.Window.ClientBounds;
+        ApplyCameraSettings(Camera, bounds.Width, bounds.Height);
+        // Screen.Cameras is typed IList<Camera> for game-code mutation; this cast is safe because the
+        // backing instance is Collection<Camera>, which implements both IList<T> and IReadOnlyList<T>.
+        // If Screen.Cameras' backing type ever changes, this cast must be revisited.
+        Input.SetCameras((IReadOnlyList<Rendering.Camera>)CurrentScreen.Cameras);
+
+        game.Window.ClientSizeChanged += HandleClientSizeChanged;
+
+#if KNI
+        // KNI/Blazor has no real filesystem — content lives behind TitleContainer (HTTP on
+        // BlazorGL, AssetManager on Android, NSBundle on iOS). Gum's FileManager only auto-
+        // routes to TitleContainer on Android/iOS; on every other KNI target we install the
+        // hook explicitly so Gum reads (loose .gumx, .gumpkg, textures, fonts, CSV/RESX)
+        // resolve against deployed content. Compose with any pre-existing host hook so we
+        // don't clobber a game that has set up its own asset bundling.
+        if (ToolsUtilities.FileManager.CustomGetStreamFromFile == null)
+        {
+            // TitleContainer.OpenStream rejects paths with a leading '/' or '\' as rooted, but
+            // Gum's FileManager.MakeAbsolute can produce strings like "/Content/GumProject/..."
+            // when normalizing relative input against RelativeDirectory. Strip the leading
+            // separator so the host doesn't see a "rooted" path it refuses to open.
+            ToolsUtilities.FileManager.CustomGetStreamFromFile = path =>
+            {
+                // Strip ALL leading separators — Gum's path normalization on WASM can
+                // produce "/Content/..." or even "//Content/..." in some code paths.
+                int trim = 0;
+                while (trim < path.Length && (path[trim] == '/' || path[trim] == '\\'))
+                {
+                    trim++;
+                }
+                if (trim > 0)
+                {
+                    path = path.Substring(trim);
+                }
+                return Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
+            };
+        }
+#endif
+
+        if (settings?.GumProjectFile is string gumProjectFile)
+        {
+            _gum.Initialize(game, gumProjectFile);
+#pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
+            _gum.LoadAnimations();
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+        else
+        {
+            _gum.Initialize(game, DefaultVisualsVersion.V3);
+        }
+        GumRenderBatch.Instance.Initialize();
+        ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
+        System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
+    }
+
+    // Screen management
+    /// <summary>
+    /// The screen currently being updated and drawn. Replaced by <see cref="Start{T}"/> /
+    /// <c>RequestScreenChange</c> at the next frame boundary — never mid-frame.
+    /// </summary>
+    public Screen CurrentScreen { get; private set; } = new Screen();
+
+    /// <param name="configure">
+    /// Optional callback invoked on the new screen instance before <see cref="Screen.CustomInitialize"/> runs.
+    /// Use this to set public properties that <c>CustomInitialize</c> depends on.
+    /// <para>
+    /// <b>Avoid closing over mutable locals here.</b> The engine retains this callback to replay it
+    /// on <see cref="Screen.RestartScreen()"/>; mutating a captured local after this call changes what
+    /// restart sees. Pass values directly rather than via captured locals.
+    /// </para>
+    /// </param>
+    public void Start<T>(Action<T>? configure = null) where T : Screen, new()
+    {
+        var screen = new T();
+        _lastScreenType = typeof(T);
+        _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+        _lastScreenConfigure?.Invoke(screen);
+        ActivateScreen(screen, applyWindowSettings: true);
+    }
+
+    internal void RequestScreenChange<T>(Action<T>? configure = null) where T : Screen, new()
+    {
+        _pendingScreenChange = () =>
+        {
+            TeardownCurrentScreen();
+
+            var screen = new T();
+            _lastScreenType = typeof(T);
+            _lastScreenConfigure = configure == null ? null : s => configure((T)s);
+            _lastScreenConfigure?.Invoke(screen);
+            ActivateScreen(screen, applyWindowSettings: false);
+        };
+    }
+
+    internal void RequestScreenRestart(Action<Screen>? newConfigure, RestartMode mode)
+    {
+        _pendingScreenChange = () =>
+        {
+            HotReloadState? state = null;
+            if (mode == RestartMode.HotReload)
+            {
+                state = new HotReloadState();
+                CurrentScreen.SaveHotReloadState(state);
+            }
+
+            TeardownCurrentScreen();
+
+            // If a new configure was supplied, it REPLACES the retained one — both for this
+            // restart and for any future restart that doesn't supply its own. There is one
+            // configure slot on the engine; whoever set it last wins.
+            if (newConfigure != null)
+                _lastScreenConfigure = newConfigure;
+
+            var screen = (Screen)Activator.CreateInstance(_lastScreenType!)!;
+            _lastScreenConfigure?.Invoke(screen);
+            ActivateScreen(screen, applyWindowSettings: false);
+
+            if (state != null)
+                screen.RestoreHotReloadState(state);
+        };
+    }
+
+    private void TeardownCurrentScreen()
+    {
+        CurrentScreen.DisposeContentWatchers();
+        CurrentScreen.CustomDestroy();
+        CurrentScreen._tweens.Clear();
+        CurrentScreen.ContentLoader.UnloadAll();
+
+        // Cancel all async work that was started on the old screen.
+        // ClearTasks cancels pending delay/predicate tasks (triggering TaskCanceledException
+        // in any awaiting code); Clear discards stale continuations from the sync context queue.
+        CurrentScreen._cts.Cancel();
+        Time.ClearTasks();
+        _syncContext.Clear();
+    }
+
+    private void ActivateScreen(Screen screen, bool applyWindowSettings)
+    {
+        foreach (var factory in _factories.Values)
+            factory.DestroyAll();
+        _factories.Clear();
+
+        // Clear any Gum elements left over from the previous screen.
+        // This covers controls added via AddToRoot() as well as screen-specific GumRenderables,
+        // which are abandoned with the old Screen object.
+        _gum.Root.Children.Clear();
+
+        // Apply the screen's preferred display settings. Camera properties always apply;
+        // window properties (size, resizing) only apply on Start to avoid mid-game window pops.
+        var pref = screen.PreferredDisplaySettings;
+        if (pref != null)
+            ApplyCameraSettingsFrom(pref);
+
+        if (applyWindowSettings)
+            ApplyWindowSettings(pref ?? DisplaySettings);
+
+        screen.Engine = this;
+        if (_game != null)
+        {
+            // Each screen gets its own ContentLoader so UnloadAll() only disposes that screen's
+            // assets without touching engine-level content (e.g., the Apos.Shapes shader effect).
+            screen.ContentLoader.Initialize(new ContentManager(_game.Services, _game.Content.RootDirectory), _game.GraphicsDevice);
+
+            var bounds = _game.Window.ClientBounds;
+            for (int i = 0; i < screen.Cameras.Count; i++)
+                ApplyCameraSettings(screen.Cameras[i], bounds.Width, bounds.Height);
+        }
+        // See cast note in Initialize: Screen.Cameras' backing Collection<Camera> implements IReadOnlyList<T>.
+        Input.SetCameras((IReadOnlyList<Rendering.Camera>)screen.Cameras);
+        Time.ResetScreen();
+
+        CurrentScreen = screen;
+        screen.CustomInitialize();
+
+        // Snap every CameraControllingEntity to its target now that CustomInitialize has
+        // wired up Targets. Without this, frame 1's lazy-spawn tick runs against the camera's
+        // default (0, 0) — Screen.Update calls lazy-spawn before any entity CustomActivity,
+        // and CameraControllingEntity's first-frame Immediate snap lives in CustomActivity.
+        // Hard-coupled to the type rather than via a virtual hook because this is the only
+        // entity that needs a post-init lifecycle moment; rule of 3, generalize when a second
+        // case appears.
+        foreach (var entity in screen.Entities)
+        {
+            if (entity is Entities.CameraControllingEntity cam && cam.Targets.Count > 0)
+                cam.ForceToTarget();
+        }
+    }
+
+    private void ApplyCameraSettingsFrom(DisplaySettings source)
+    {
+        DisplaySettings.ResizeMode = source.ResizeMode;
+        DisplaySettings.AspectPolicy = source.AspectPolicy;
+        DisplaySettings.FixedAspectRatio = source.FixedAspectRatio;
+        DisplaySettings.DominantAxis = source.DominantAxis;
+        DisplaySettings.ResolutionWidth = source.ResolutionWidth;
+        DisplaySettings.ResolutionHeight = source.ResolutionHeight;
+        DisplaySettings.LetterboxColor = source.LetterboxColor;
+        DisplaySettings.WindowMode = source.WindowMode;
+    }
+
+    /// <summary>
+    /// Applies window settings immediately at runtime. Safe to call at any time — not just at startup.
+    /// <para>
+    /// To toggle fullscreen: pass <see cref="DisplaySettings"/> with <see cref="DisplaySettings.WindowMode"/>
+    /// set to <see cref="Rendering.WindowMode.FullscreenBorderless"/> or <see cref="Rendering.WindowMode.Windowed"/>.
+    /// </para>
+    /// <para>
+    /// To apply windowed-only changes (size, resizing) without touching fullscreen state, pass
+    /// <see cref="Rendering.WindowMode.Windowed"/> with the desired <see cref="DisplaySettings.PreferredWindowWidth"/>
+    /// and <see cref="DisplaySettings.PreferredWindowHeight"/>.
+    /// </para>
+    /// </summary>
+    public void ApplyWindowSettings(DisplaySettings source)
+    {
+        if (_graphicsManager == null) return;
+
+#if KNI
+        // Browser host (KNI BlazorGL): the canvas DOM owns the back-buffer size; touching
+        // PreferredBackBufferWidth/Height would fight the canvas. OS window position is meaningless.
+        // We still propagate AllowUserResizing in case the host honors it.
+        if (_game != null)
+            _game.Window.AllowUserResizing = source.AllowUserResizing;
+        DisplaySettings.WindowMode = source.WindowMode;
+#else
+        if (source.WindowMode == Rendering.WindowMode.FullscreenBorderless)
+        {
+            _graphicsManager.HardwareModeSwitch = false;
+            var mode = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+            _graphicsManager.PreferredBackBufferWidth  = mode.Width;
+            _graphicsManager.PreferredBackBufferHeight = mode.Height;
+            _graphicsManager.IsFullScreen = true;
+            _graphicsManager.ApplyChanges();
+            if (_game != null)
+                _game.Window.Position = Point.Zero;
+        }
+        else
+        {
+            _graphicsManager.IsFullScreen = false;
+
+            if (source.PreferredWindowWidth.HasValue)
+            {
+                _graphicsManager.PreferredBackBufferWidth  = source.PreferredWindowWidth.Value;
+                _graphicsManager.PreferredBackBufferHeight = source.PreferredWindowHeight!.Value;
+            }
+            else
+            {
+                // No explicit size requested — restore to the design resolution so the window
+                // doesn't remain at the native fullscreen back-buffer size (which would overflow
+                // onto other monitors or appear borderless at full screen size).
+                _graphicsManager.PreferredBackBufferWidth  = DisplaySettings.ResolutionWidth;
+                _graphicsManager.PreferredBackBufferHeight = DisplaySettings.ResolutionHeight;
+            }
+
+            _graphicsManager.ApplyChanges();
+
+            if (_game != null)
+            {
+                _game.Window.AllowUserResizing = source.AllowUserResizing;
+
+                // Re-center the window. When entering fullscreen we set Position = (0,0);
+                // without a reset the title bar stays above the visible screen area and the
+                // window appears borderless even though it is not.
+                var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+                int cx = (display.Width  - _graphicsManager.PreferredBackBufferWidth)  / 2;
+                int cy = (display.Height - _graphicsManager.PreferredBackBufferHeight) / 2;
+                _game.Window.Position = new Point(System.Math.Max(0, cx), System.Math.Max(30, cy));
+            }
+        }
+
+        DisplaySettings.WindowMode = source.WindowMode;
+#endif
+    }
+
+    // Factory registry — populated automatically when a Factory<T> is constructed
+    private readonly Dictionary<Type, IFactory> _factories = new();
+
+    /// <summary>Registers a factory so entities can retrieve it via <see cref="GetFactory{T}"/>.</summary>
+    /// <remarks>Called automatically by <see cref="Factory{T}"/>; you should not need to call this directly.</remarks>
+    public void RegisterFactory<T>(Factory<T> factory) where T : Entity, new()
+        => _factories[typeof(T)] = factory;
+
+    /// <summary>Returns the factory registered for <typeparamref name="T"/>.</summary>
+    /// <exception cref="InvalidOperationException">Thrown when no factory for <typeparamref name="T"/> has been created yet.</exception>
+    public Factory<T> GetFactory<T>() where T : Entity, new()
+    {
+        if (_factories.TryGetValue(typeof(T), out var factory))
+            return (Factory<T>)factory;
+        throw new InvalidOperationException(
+            $"No factory registered for {typeof(T).Name}. Create a Factory<{typeof(T).Name}> in CustomInitialize before calling GetFactory.");
+    }
+
+    internal IEnumerable<IFactory> EnumerateFactories() => _factories.Values;
+
+    internal void SortPartitionedFactories()
+    {
+        foreach (var factory in _factories.Values)
+            factory.SortForPartition();
+    }
+
+    /// <summary>
+    /// The engine's default display configuration. Applied to every screen that does not declare
+    /// its own <see cref="Screen.PreferredDisplaySettings"/>.
+    /// Set camera properties here once at startup; they carry through every screen transition.
+    /// Window properties (<see cref="DisplaySettings.PreferredWindowWidth"/> etc.) on this instance
+    /// are applied by <see cref="Start{T}"/> when no per-screen override exists.
+    /// </summary>
+    public DisplaySettings DisplaySettings { get; } = new DisplaySettings();
+
+    /// <summary>
+    /// Configures the <see cref="GraphicsDeviceManager"/> with the starting screen's preferred window
+    /// settings <em>before</em> <c>base.Initialize()</c> is called, so the window appears at the
+    /// correct size (or in fullscreen) without any visible flicker on startup.
+    /// Handles both <see cref="Rendering.WindowMode.Windowed"/> and
+    /// <see cref="Rendering.WindowMode.FullscreenBorderless"/>.
+    /// Call this from <c>Game1</c>'s constructor, passing the same screen type you will pass to
+    /// <see cref="Start{T}"/>.
+    /// <para>
+    /// On browser hosts (KNI BlazorGL) this is a no-op — the canvas DOM (sized by your
+    /// <c>index.html</c>/<c>Index.razor</c>) drives the back-buffer size automatically. Same Game1
+    /// code works on both backends.
+    /// </para>
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// public Game1()
+    /// {
+    ///     _graphics = new GraphicsDeviceManager(this);
+    ///     FlatRedBallService.Default.PrepareWindow&lt;MyStartScreen&gt;(_graphics);
+    /// }
+    /// </code>
+    /// </example>
+    public void PrepareWindow<T>(GraphicsDeviceManager graphics) where T : Screen, new()
+    {
+#if KNI
+        // Browser host: the canvas DOM owns the back-buffer size. Setting
+        // PreferredBackBufferWidth/Height here clamps the buffer before the canvas can drive it,
+        // producing the cursor-coordinate offset bug that motivated the externally-managed escape
+        // hatch. Skip entirely on KNI; the browser canvas is sized by index.html / Index.razor.
+        _ = graphics;
+#else
+        var settings = new T().PreferredDisplaySettings ?? DisplaySettings;
+        if (settings.WindowMode == Rendering.WindowMode.FullscreenBorderless)
+        {
+            graphics.HardwareModeSwitch = false;
+            var mode = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+            graphics.PreferredBackBufferWidth  = mode.Width;
+            graphics.PreferredBackBufferHeight = mode.Height;
+            graphics.IsFullScreen = true;
+        }
+        else if (settings.PreferredWindowWidth.HasValue)
+        {
+            graphics.PreferredBackBufferWidth  = settings.PreferredWindowWidth.Value;
+            graphics.PreferredBackBufferHeight = settings.PreferredWindowHeight!.Value;
+        }
+#endif
+    }
+
+    private void ApplyCameraSettings(Camera camera, int windowWidth, int windowHeight)
+    {
+        // Reset runtime zoom to 1 at screen activation BEFORE UpdateCameraViewportAndExtents
+        // sizes UiRoot, so UiRoot reflects the new screen's orthogonal extents at Zoom=1
+        // rather than carrying a stale Zoom value from the previous screen. Screens that
+        // want a non-default starting zoom assign Camera.Zoom in CustomInitialize.
+        camera.Zoom = 1f;
+        UpdateCameraViewportAndExtents(camera, windowWidth, windowHeight);
+    }
+
+    private void HandleClientSizeChanged(object? sender, EventArgs e)
+    {
+        var bounds = _game!.Window.ClientBounds;
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+            ApplyClientSizeChange(bounds.Width, bounds.Height, _game!.Window.AllowUserResizing, CurrentScreen.Cameras[i]);
+    }
+
+    /// <summary>
+    /// Test seam for the client-size-changed handler. Recomputes the camera viewport and orthogonal
+    /// extents from the new surface dimensions, unless <paramref name="allowUserResizing"/> is false —
+    /// in which case the surface dimensions are owned by the host and the event is ignored. Use case:
+    /// fixed-size canvas on KNI BlazorGL, where browser-window resizes echo through ClientSizeChanged
+    /// with the browser's dimensions even though the canvas DOM stays at its CSS-pinned size.
+    /// </summary>
+    internal void ApplyClientSizeChange(int width, int height, bool allowUserResizing, Camera camera)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        // Fixed-size surface (host-managed): ignore resize echoes.
+        if (!allowUserResizing)
+            return;
+
+        UpdateCameraViewportAndExtents(camera, width, height);
+    }
+
+    /// <summary>
+    /// Resolves the camera's viewport rectangle (letterbox/pillarbox under <see cref="AspectPolicy.Locked"/>,
+    /// full window under <see cref="AspectPolicy.Free"/>) and the orthogonal world extents from the
+    /// current <see cref="DisplaySettings"/>. Does not touch <see cref="Camera.Zoom"/> — runtime zoom is
+    /// preserved across resizes.
+    /// </summary>
+    private void UpdateCameraViewportAndExtents(Camera camera, int windowWidth, int windowHeight)
+    {
+        var ds = DisplaySettings;
+        var hostRect = ds.ComputeDestinationViewport(windowWidth, windowHeight);
+
+        // Sub-viewport (split-screen / picture-in-picture): apply normalized rect, derive orthoW
+        // from the resulting pixel aspect with orthoH pinned to the design height. Single-camera
+        // games with NormalizedViewport at its default (full host rect) fall through to the
+        // existing ResizeMode/DominantAxis logic below so their behavior is unchanged.
+        if (camera.NormalizedViewport != Rendering.NormalizedRectangle.FullViewport)
+        {
+            camera.ApplyToHostRect(hostRect, ds.ResolutionHeight);
+            return;
+        }
+
+        camera.SetViewport(hostRect);
+
+        int orthoW, orthoH;
+
+        if (ds.ResizeMode == Rendering.ResizeMode.IncreaseVisibleArea)
+        {
+            // Pixels-per-world-unit fixed by Zoom: orthogonal extents track the viewport pixel size,
+            // so a larger window reveals more world. Aspect is enforced by the viewport itself under
+            // Locked, or by the window itself under Free.
+            orthoW = hostRect.Width;
+            orthoH = hostRect.Height;
+        }
+        else // StretchVisibleArea
+        {
+            // The dominant axis is pinned to its design Resolution* value; the non-dominant axis
+            // is derived from the viewport's aspect so the world is rendered without distortion.
+            // Under Locked, the viewport's aspect equals the effective ratio (resolution-derived or
+            // explicit FixedAspectRatio). Under Free, the viewport's aspect equals the window's, and
+            // the non-dominant world extent grows or shrinks with the window.
+            float vpAspect = hostRect.Height > 0 ? hostRect.Width / (float)hostRect.Height : ds.GetEffectiveAspectRatio();
+            if (ds.DominantAxis == DominantAxis.Height)
+            {
+                orthoH = ds.ResolutionHeight;
+                orthoW = (int)(orthoH * vpAspect);
+            }
+            else
+            {
+                orthoW = ds.ResolutionWidth;
+                orthoH = vpAspect > 0 ? (int)(orthoW / vpAspect) : ds.ResolutionHeight;
+            }
+        }
+
+        camera.OrthogonalWidth = orthoW;
+        camera.OrthogonalHeight = orthoH;
+        camera.SizeUiRootToOrthogonalExtents();
+    }
+
+    // Sub-systems
+    /// <summary>The MonoGame graphics device. Throws if accessed before <see cref="Initialize"/>.</summary>
+    public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
+    /// <summary>
+    /// Engine-owned random number source — used by gameplay systems that want a seedable shared instance.
+    /// Time-seeded by default; <see cref="EnableAutomationMode(int?)"/> replaces it with a deterministic
+    /// instance so recorded automation runs reproduce exactly.
+    /// </summary>
+    public GameRandom Random { get; private set; } = new GameRandom();
+    /// <summary>Polled keyboard, mouse, and gamepad state. Updated once per frame at the top of <see cref="Update"/>.</summary>
+    public InputManager Input { get; } = new InputManager();
+    /// <summary>Sound effect and music playback service.</summary>
+    public AudioManager Audio { get; } = new AudioManager();
+    /// <summary>The active screen's content loader. Auto-recreated each screen change.</summary>
+    public ContentLoader Content { get; } = new ContentLoader();
+    /// <summary>Engine clocks and async delay primitives. See <see cref="TimeManager"/>.</summary>
+    public TimeManager Time { get; } = new TimeManager();
+    /// <summary>Per-frame draw-call instrumentation. Off by default — see <see cref="Diagnostics.RenderDiagnostics.IsEnabled"/>.</summary>
+    public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
+
+    /// <summary>
+    /// The Gum UI service owned by this engine instance. Use this to access the root element,
+    /// load Gum projects, or configure themes.
+    /// </summary>
+    public GumService Gum => _gum;
+
+    /// <summary>
+    /// True when the engine has enabled Gum's hot-reload pipeline for a project under
+    /// a watched directory. Auto-set by <see cref="Screen.WatchContentDirectory(string, System.Action{string}, string?)"/>
+    /// when a <c>.gumx</c> file is found beneath the source directory it's pointed at —
+    /// callers don't need to call <see cref="GumService.EnableHotReload"/> themselves.
+    /// </summary>
+    public bool IsGumHotReloadEnabled { get; private set; }
+
+    internal void EnableGumHotReload(string absoluteGumxSourcePath)
+    {
+        if (IsGumHotReloadEnabled) return;
+        _gum.EnableHotReload(absoluteGumxSourcePath);
+        _gum.HotReloadCompleted += () => GumHotReloadCompleted?.Invoke();
+        IsGumHotReloadEnabled = true;
+        System.Diagnostics.Debug.WriteLine($"FlatRedBall2: Gum hot-reload enabled for {absoluteGumxSourcePath}");
+    }
+
+    /// <summary>
+    /// Raised after Gum's hot-reload pass completes — a project file changed on disk and
+    /// Gum has rebuilt the UI root's children from the updated <c>ElementSave</c>s.
+    /// <para>
+    /// Subscribe from your screen's <c>CustomInitialize</c> to react to project changes that
+    /// Gum's in-place patch can't reach — e.g. entity-attached Gum visuals (cards, HUD elements
+    /// owned by entities) whose <c>GraphicalUiElement</c> isn't a child of Gum's root and so
+    /// is skipped by the in-place reload. The simplest reaction is <c>RestartScreen(HotReload)</c>;
+    /// finer-grained handlers can rebuild only the affected entity visuals.
+    /// </para>
+    /// </summary>
+    public event Action? GumHotReloadCompleted;
+
+    /// <summary>The active screen's camera. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Camera"/>.</summary>
+    public Camera Camera => CurrentScreen.Camera;
+
+    /// <summary>The active screen's overlay. Shortcut for <see cref="CurrentScreen"/>.<see cref="Screen.Overlay"/>.</summary>
+    public Overlay Overlay => CurrentScreen.Overlay;
+
+#if DEBUG
+    private Automation.AutomationMode? _automationMode;
+
+    /// <summary>
+    /// Activates automation mode when the game is launched with --frb-auto. No-op otherwise.
+    /// Call in Game.Initialize after base.Initialize(). In Release builds this is a no-op.
+    /// <para>
+    /// When automation activates, <see cref="Random"/> is replaced with a deterministic
+    /// <see cref="GameRandom"/> so recorded NDJSON runs reproduce exactly.
+    /// </para>
+    /// </summary>
+    /// <param name="seed">
+    /// Seed for <see cref="Random"/> when automation activates. Ignored entirely when
+    /// --frb-auto is absent — the call is a no-op in that case and <see cref="Random"/>
+    /// keeps its default time-based seed. When --frb-auto is present, omitting this
+    /// parameter (or passing <c>null</c>) seeds <see cref="Random"/> with <c>0</c>.
+    /// </param>
+    public void EnableAutomationMode(int? seed = null)
+    {
+        if (System.Environment.GetCommandLineArgs().Contains("--frb-auto"))
+            StartAutomationMode(seed);
+    }
+
+    /// <summary>
+    /// Activates automation mode unconditionally — bypassing the --frb-auto flag check.
+    /// Internal entry point for tests and any future programmatic activation path.
+    /// </summary>
+    internal void StartAutomationMode(int? seed = null, System.IO.TextReader? input = null, System.IO.TextWriter? output = null)
+    {
+        Random = new GameRandom(seed ?? 0);
+        _automationMode = new Automation.AutomationMode(this, output);
+        _automationMode.Start(input);
+    }
+
+    /// <summary>
+    /// Registers a named state provider for automation-mode queries: {"cmd":"query","target":"name"}.
+    /// No-op if automation mode is not active.
+    /// </summary>
+    public void RegisterStateProvider(string name, Func<object> provider)
+        => _automationMode?.RegisterStateProvider(name, provider);
+
+    /// <summary>
+    /// Registers a value setter for automation-mode set commands: {"cmd":"set","entity":"name","prop":"X","value":...}.
+    /// No-op if automation mode is not active.
+    /// </summary>
+    public void RegisterValueSetter(string entityName, string propName, Action<double> setter)
+        => _automationMode?.RegisterValueSetter(entityName, propName, setter);
+#else
+    public void EnableAutomationMode(int? seed = null) { }
+    public void RegisterStateProvider(string name, Func<object> provider) { }
+    public void RegisterValueSetter(string entityName, string propName, Action<double> setter) { }
+#endif
+
+    /// <summary>
+    /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
+    /// polling, content hot-reload, time accumulation, async continuations, and the active
+    /// screen's <see cref="Screen.CustomActivity"/> in that order.
+    /// </summary>
+    public void Update(GameTime gameTime)
+    {
+        long updateStart = System.Diagnostics.Stopwatch.GetTimestamp();
+#if DEBUG
+        if (_automationMode != null)
+        {
+            if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
+            {
+                _game!.SuppressDraw();
+                return;
+            }
+        }
+#endif
+
+        // Apply pending screen transition at start of frame
+        if (_pendingScreenChange != null)
+        {
+            var change = _pendingScreenChange;
+            _pendingScreenChange = null;
+            change();
+        }
+
+        // Drain any pending content reloads BEFORE entity / collision / activity passes so the
+        // reloaded content (configs, textures, etc.) is in place for the rest of the frame.
+        long tWatch = System.Diagnostics.Stopwatch.GetTimestamp();
+        CurrentScreen.TickContentWatchers(DateTime.UtcNow);
+        _frameProfile.ContentWatcherMs = ProfileClock.Ms(tWatch, System.Diagnostics.Stopwatch.GetTimestamp());
+
+        Time.Update(gameTime, CurrentScreen.IsPaused);
+
+        long tInput = System.Diagnostics.Stopwatch.GetTimestamp();
+        Input.Update(Time.UnscaledTimeSinceStart);
+        _frameProfile.InputMs = ProfileClock.Ms(tInput, System.Diagnostics.Stopwatch.GetTimestamp());
+
+        _frameProfile.AudioMs = 0;
+        _frameProfile.GumUpdateMs = 0;
+        if (_spriteBatch != null)
+        {
+            long tAudio = System.Diagnostics.Stopwatch.GetTimestamp();
+            Audio.Update();
+            _frameProfile.AudioMs = ProfileClock.Ms(tAudio, System.Diagnostics.Stopwatch.GetTimestamp());
+
+            CurrentScreen.Overlay.BeginFrame();
+
+            // Build the input/animation update list: legacy global root, every camera's UiRoot
+            // (for split-screen UI), and the screen-level overlay root. UpdateLayout is NOT
+            // called here — layout is the Draw loop's responsibility (it sets each root's
+            // Width/Height each frame; Gum gates internally on equality and triggers its own
+            // UpdateLayout when dims change).
+            _gumUpdateList.Clear();
+            _gumUpdateList.Add(_gum.Root);
+            // EntityVisualsRoot sits between _gum.Root and the per-camera UiRoots so that
+            // entity-attached visuals have lower cursor priority than HUD elements (which
+            // live on Camera.UiRoot) and far lower than modal overlays (OverlayRoot, last).
+            // This matches the visual stacking: world-projected entity Gum draws beneath HUD,
+            // so its input dispatch should also lose to HUD on overlap.
+            _gumUpdateList.Add(CurrentScreen.EntityVisualsRoot);
+            for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+                _gumUpdateList.Add(CurrentScreen.Cameras[i].UiRoot);
+            _gumUpdateList.Add(CurrentScreen.OverlayRoot);
+
+            long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
+            _gum.Update(gameTime, _gumUpdateList);
+            _frameProfile.GumUpdateMs = ProfileClock.Ms(tGum, System.Diagnostics.Stopwatch.GetTimestamp());
+        }
+
+        // Complete any delay tasks whose conditions are now met, then flush their
+        // continuations onto the game thread. This runs before CustomActivity so
+        // screen/entity code sees the results of completed tasks in the same frame.
+        Time.DoTaskLogic();
+        _syncContext.Update();
+
+        CurrentScreen.Update(Time.CurrentFrameTime);
+
+        _frameProfile.UpdateTotalMs = ProfileClock.Ms(updateStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        // FrameTotalMs is finalized at end of Draw (when both Update and Draw measurements exist
+        // for this same frame); writing it here would mix this-frame Update with last-frame Draw.
+    }
+
+    /// <summary>
+    /// Per-frame engine draw. Call from <c>Game.Draw</c>. Clears the full back buffer once
+    /// (with <see cref="DisplaySettings"/>.<c>LetterboxColor</c> under
+    /// <see cref="Rendering.AspectPolicy.Locked"/>, or with the first camera's
+    /// <see cref="Camera.BackgroundColor"/> under <see cref="Rendering.AspectPolicy.Free"/>),
+    /// then iterates <see cref="Screen.Cameras"/> and runs the screen's draw pass once per camera —
+    /// each pass sets <see cref="GraphicsDevice.Viewport"/> to that camera's pixel viewport and
+    /// uses its transform. Single-camera games pay no extra cost; split-screen games get one pass
+    /// per player.
+    /// </summary>
+    public void Draw()
+    {
+        long drawStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_spriteBatch == null) return;
+
+        RenderDiagnostics.BeginFrame();
+
+        var gd = _spriteBatch.GraphicsDevice;
+        var pp = gd.PresentationParameters;
+        var primaryCamera = CurrentScreen.Camera;
+
+        // Recompute every camera's pixel viewport from the current window dimensions. This picks up
+        // NormalizedViewport changes made in CustomInitialize (after ApplyCameraSettings already ran)
+        // and cameras added to Cameras at any point during the screen's lifetime, and keeps splits
+        // correct on window resize without per-camera ClientSizeChanged plumbing.
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+            UpdateCameraViewportAndExtents(CurrentScreen.Cameras[i], pp.BackBufferWidth, pp.BackBufferHeight);
+
+        // Single full-window clear: letterbox color under Locked (gutter color stays in place even
+        // when cameras don't cover the locked rect), or the primary camera's BackgroundColor under
+        // Free where the cameras are expected to cover the whole window.
+        gd.Viewport = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+        gd.Clear(DisplaySettings.AspectPolicy == Rendering.AspectPolicy.Locked
+            ? DisplaySettings.LetterboxColor
+            : primaryCamera.BackgroundColor);
+
+        for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
+        {
+            var camera = CurrentScreen.Cameras[i];
+
+            // Paint each camera's BackgroundColor INSIDE its viewport via a SpriteBatch quad.
+            // GraphicsDevice.Clear is not reliably viewport-respecting across backends; SpriteBatch.Draw
+            // runs through the rasterizer with the active viewport.
+            gd.Viewport = camera.Viewport;
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_whitePixel, new Rectangle(0, 0, camera.Viewport.Width, camera.Viewport.Height), camera.BackgroundColor);
+            _spriteBatch.End();
+
+            // Set this camera's UI root to its visible world extents. We do NOT touch
+            // _gum.CanvasWidth/Height: the Gum global is only consulted to lay out elements that
+            // have no parent, and FlatRedBall2 always parents UI under a UiRoot or OverlayRoot,
+            // so children resolve against the immediate parent — the global is never read on our
+            // code paths. Gum's Width/Height setters gate on equality and trigger their own
+            // UpdateLayout when changed; no explicit gating needed here.
+            camera.UiRoot.Width  = camera.OrthogonalWidth  / camera.Zoom;
+            camera.UiRoot.Height = camera.OrthogonalHeight / camera.Zoom;
+
+            CurrentScreen.Draw(_spriteBatch, RenderDiagnostics, camera);
+        }
+
+        // Post-camera overlay pass: full back-buffer viewport, full-window canvas. The screen's
+        // OverlayRoot lays out against these dims and draws once, regardless of how many cameras
+        // are on the screen — so pause menus and title cards span the whole window in split-screen.
+        if (CurrentScreen.GumRenderables.Count > 0)
+        {
+            var fullWindow = new Viewport(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+            gd.Viewport = fullWindow;
+            // Configure the overlay camera as a 1:1 pixel-space camera spanning the full back buffer.
+            // ApplyToHostRect with NormalizedViewport=FullViewport and orthoH=BackBufferHeight gives
+            // OrthogonalWidth=BackBufferWidth (derived from pixel aspect), and with Zoom=1 (default)
+            // PixelsPerUnit = BackBufferHeight/BackBufferHeight*1 = 1. The Gum batch's world-to-screen
+            // scale matrix becomes identity, so OverlayRoot's pixel-sized canvas renders 1:1
+            // regardless of any in-world camera's Zoom.
+            _overlayCamera.ApplyToHostRect(fullWindow, pp.BackBufferHeight);
+            CurrentScreen.OverlayRoot.Width  = pp.BackBufferWidth;
+            CurrentScreen.OverlayRoot.Height = pp.BackBufferHeight;
+            // Entity visuals are world-projected; their canvas position is written each frame
+            // by GumRenderable.Draw. Size their root to the back buffer so children laid out
+            // in canvas pixels are not clipped/culled by the parent's bounds.
+            CurrentScreen.EntityVisualsRoot.Width  = pp.BackBufferWidth;
+            CurrentScreen.EntityVisualsRoot.Height = pp.BackBufferHeight;
+            CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, _overlayCamera);
+        }
+
+#if DEBUG
+        _automationMode?.FlushStepResponse(Time.CurrentFrame);
+#endif
+
+        _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
+        _frameProfile.RenderMs = _frameProfile.DrawTotalMs;
+        _frameProfile.FrameTotalMs = _frameProfile.UpdateTotalMs + _frameProfile.DrawTotalMs;
+
+        // Commit the in-progress profile — this is the only point where every field is populated
+        // and consistent. Reads of LastFrame during the next frame see this coherent snapshot.
+        _lastFrame = _frameProfile;
+    }
+}

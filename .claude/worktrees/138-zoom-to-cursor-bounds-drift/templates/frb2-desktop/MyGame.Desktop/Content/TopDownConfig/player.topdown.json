@@ -1,0 +1,21 @@
+{
+  // Top-down movement config. Unlike platformer (which has ground/air/climbing slots),
+  // top-down is a flat parameter set — no jumping, no slope handling, no airborne state.
+  // Omitted fields fall back to engine defaults.
+  "movement": {
+    "maxSpeed": 150,            // world units/sec at full input
+    "accelerationTime": 0.25,   // seconds from rest to maxSpeed (0 = instant snap)
+    "decelerationTime": 0.15,   // seconds from maxSpeed to rest when input released (0 = instant)
+
+    // Facing direction — pick at most one. If both are false, DirectionFacing is left untouched
+    // (set it manually in code, e.g. from aim/look input).
+    "updateDirectionFromInput": true,    // facing follows input axis (responsive — usual choice)
+    // "updateDirectionFromVelocity": false  // facing follows actual velocity (lags during accel)
+
+    // Knockback / impulse handling — when entity is faster than maxSpeed (e.g. just got hit),
+    // use a fixed deceleration rate instead of one derived from decelerationTime. Lets a fast
+    // knockback decay at a tunable rate without affecting normal stop-from-input feel.
+    // "isUsingCustomDeceleration": true,
+    // "customDecelerationValue": 400      // units/s² applied while currentSpeed > maxSpeed
+  }
+}

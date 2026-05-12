@@ -1,0 +1,70 @@
+<Project>
+  <!--
+    Precompiled Apos.Shapes shader XNBs.
+
+    Apos.Shapes ships an .fx shader that must be compiled by the MonoGame/KNI content pipeline.
+    On macOS and Linux, this requires Wine. To avoid that dependency, we ship precompiled XNBs
+    for known platforms and skip Apos.Shapes' built-in shader compilation.
+
+    Unknown platforms fall back to normal compilation (Apos.Shapes' own MSBuild targets handle it).
+
+    ALLOWLIST: Only platforms with a verified precompiled XNB in this directory are listed.
+    To add a new platform:
+      1. Build a sample on that platform so the content pipeline compiles apos-shapes.xnb
+      2. Copy the resulting .xnb into a new subfolder here (e.g. DirectX/)
+      3. Add the platform to the condition below
+      4. Update AposShapesVersion in FlatRedBall2's source to match (see ShapesBatch.cs)
+  -->
+
+  <PropertyGroup>
+    <_FRB2PrecompiledShadersDir>$(MSBuildThisFileDirectory)</_FRB2PrecompiledShadersDir>
+  </PropertyGroup>
+
+  <!-- MonoGame DesktopGL -->
+  <PropertyGroup Condition="'$(MonoGamePlatform)' == 'DesktopGL'">
+    <_FRB2HasPrecompiledAposShapes>true</_FRB2HasPrecompiledAposShapes>
+    <_FRB2AposShapesPlatformDir>DesktopGL</_FRB2AposShapesPlatformDir>
+  </PropertyGroup>
+
+  <!-- KNI BlazorGL -->
+  <PropertyGroup Condition="'$(KniPlatform)' == 'BlazorGL'">
+    <_FRB2HasPrecompiledAposShapes>true</_FRB2HasPrecompiledAposShapes>
+    <_FRB2AposShapesPlatformDir>BlazorGL</_FRB2AposShapesPlatformDir>
+  </PropertyGroup>
+
+  <!--
+    When we have a precompiled XNB, skip Apos.Shapes' own shader compilation and copy ours.
+    SkipAposShapeContent works for MonoGame (its props are evaluated after the project body).
+    For KNI, the buildTransitive props run BEFORE the project body, so SkipAposShapeContent
+    is too late — we also remove the KniContentReference that was already added.
+  -->
+  <PropertyGroup Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true'">
+    <SkipAposShapeContent>true</SkipAposShapeContent>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true' and '$(KniPlatform)' != ''">
+    <KniContentReference Remove="$(AposShapesPath)" />
+  </ItemGroup>
+
+  <!-- Desktop (MonoGame): copy precompiled XNB to Content/ in build output -->
+  <ItemGroup Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true' and '$(KniPlatform)' == ''">
+    <Content Include="$(_FRB2PrecompiledShadersDir)$(_FRB2AposShapesPlatformDir)\apos-shapes.xnb">
+      <Link>Content\apos-shapes.xnb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    BlazorGL (KNI): copy precompiled XNB to wwwroot/Content/ so Blazor's static asset
+    pipeline serves it. Uses a Copy target (not a Content item) to avoid conflicting with
+    Blazor's auto-discovered wwwroot assets.
+  -->
+  <Target Name="_FRB2CopyPrecompiledAposShapesToWwwroot"
+          Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true' and '$(KniPlatform)' != ''"
+          BeforeTargets="GenerateStaticWebAssetsManifest;AssignTargetPaths">
+    <Copy SourceFiles="$(_FRB2PrecompiledShadersDir)$(_FRB2AposShapesPlatformDir)\apos-shapes.xnb"
+          DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\Content\"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

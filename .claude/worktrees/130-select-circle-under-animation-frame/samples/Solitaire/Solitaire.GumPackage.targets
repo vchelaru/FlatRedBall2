@@ -1,0 +1,61 @@
+<Project>
+  <!--
+    ================================================================
+    Gum content deployment mode (loose vs. .gumpkg)
+    ================================================================
+    Imported by every Solitaire .csproj. Centralizes the toggle so
+    Common, Desktop, and BlazorGL all flip together.
+
+    Toggle:
+      dotnet build -p:UseGumPackage=true   # ship .gumpkg only
+      dotnet build -p:UseGumPackage=false  # ship loose files (default)
+
+    Default is loose so the Gum editor's saved files round-trip
+    cleanly during authoring (and FRB2 hot reload sees them).
+    Switch to true to test the bundled load path or to produce a
+    leaner publish. Runtime code does not change either way: the
+    engine looks for a sibling .gumpkg when the loose .gumx is
+    absent, so we exclude the loose files from output in bundle
+    mode.
+
+    See frb-skills/gum-packaging/SKILL.md for the full story.
+    ================================================================
+  -->
+
+  <PropertyGroup>
+    <UseGumPackage Condition="'$(UseGumPackage)' == ''">true</UseGumPackage>
+
+    <!-- Common owns the canonical Gum project; everyone else links to it. -->
+    <SolitaireCommonDir>$(MSBuildThisFileDirectory)Solitaire.Common\</SolitaireCommonDir>
+    <GumProjectDir>$(SolitaireCommonDir)Content\GumProject\</GumProjectDir>
+    <GumProjectFile>$(GumProjectDir)GumProject.gumx</GumProjectFile>
+    <GumPackageFile>$(GumProjectDir)GumProject.gumpkg</GumPackageFile>
+
+    <!-- gumcli lives in the sibling Gum repo. Override on the command line if it lives elsewhere. -->
+    <GumCliPath Condition="'$(GumCliPath)' == ''">$(MSBuildThisFileDirectory)..\..\..\Gum\Tools\Gum.Cli\bin\Debug\net8.0\gumcli.exe</GumCliPath>
+  </PropertyGroup>
+
+  <!--
+    Run pack only in the project that owns the source files (Common). The
+    BeforeTargets="AssignTargetPaths" hook ensures the .gumpkg exists
+    before Content items are resolved into the build. Inputs/Outputs
+    keep the target incremental — pack only re-runs when something in
+    the Gum project changed. Desktop and BlazorGL pick up the .gumpkg
+    via their ProjectReference chain (Common builds first).
+  -->
+  <ItemGroup Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' == 'Solitaire.Common'">
+    <GumPackInputs Include="$(GumProjectDir)**\*.*" Exclude="$(GumPackageFile)" />
+  </ItemGroup>
+
+  <Target Name="PackGumProject"
+          BeforeTargets="AssignTargetPaths"
+          Condition="'$(UseGumPackage)' == 'true' AND '$(MSBuildProjectName)' == 'Solitaire.Common'"
+          Inputs="@(GumPackInputs)"
+          Outputs="$(GumPackageFile)">
+    <Error Condition="!Exists('$(GumCliPath)')"
+           Text="gumcli.exe not found at '$(GumCliPath)'. Build Gum/Tools/Gum.Cli (Debug, net8.0) or pass -p:GumCliPath=&lt;path&gt;." />
+    <Message Importance="high" Text="Packing Gum project: $(GumProjectFile) -> $(GumPackageFile)" />
+    <Exec Command="&quot;$(GumCliPath)&quot; pack &quot;$(GumProjectFile)&quot; -o &quot;$(GumPackageFile)&quot;"
+          WorkingDirectory="$(SolitaireCommonDir)" />
+  </Target>
+</Project>
