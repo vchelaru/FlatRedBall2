@@ -1,13 +1,12 @@
 using AnimationEditor.Core.Data;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Graphics;
-using FlatRedBall.IO;
+using AnimationEditor.Core.IO;
+using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using FilePath = FlatRedBall.IO.FilePath;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core
 {
@@ -50,7 +49,8 @@ namespace AnimationEditor.Core
                 AnimationChainListSave = acls;
                 FileName = fileName.FullPath;
 
-                TryLoadProjectFile(fileName.GetDirectoryContainingThis() + acls.ProjectFile);
+                if (!string.IsNullOrEmpty(acls.ProjectFile))
+                    TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
             }
         }
 
@@ -185,7 +185,7 @@ namespace AnimationEditor.Core
             {
                 foreach (var frame in chain.Frames)
                 {
-                    frame.ShapeCollectionSave ??= new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave();
+                    frame.ShapesSave ??= new FlatRedBall2.Animation.Content.ShapesSave();
                 }
             }
         }
@@ -199,7 +199,7 @@ namespace AnimationEditor.Core
             }
 
             // Assume content folder; adjust for Android if needed
-            var projectDirectory = projectFile.GetDirectoryContainingThis() + "Content/";
+            var projectDirectory = projectFile.GetDirectoryContainingThis().FullPath + "Content/";
 
             var files = new HashSet<FilePath>();
 
@@ -213,9 +213,9 @@ namespace AnimationEditor.Core
                         if (nameDescendant != null)
                         {
                             var name = nameDescendant.Value;
-                            if (FileManager.GetExtension(name) == "png")
+                            if (Path.GetExtension(name).TrimStart('.').ToLowerInvariant() == "png")
                             {
-                                files.Add(projectDirectory + name);
+                                files.Add(new FilePath(projectDirectory + name));
                             }
                         }
                     }
@@ -259,16 +259,17 @@ namespace AnimationEditor.Core
             else
             {
                 // No parseable project file — fall back to all .png files relative to project dir
-                ReferencedPngs = FileManager
-                    .GetAllFilesInDirectory(projectDirectory, "png")
-                    .Select(item => new FilePath(item))
-                    .ToArray();
+                ReferencedPngs = Directory.Exists(projectDirectory)
+                    ? Directory.EnumerateFiles(projectDirectory, "*.png", SearchOption.AllDirectories)
+                        .Select(item => new FilePath(item))
+                        .ToArray()
+                    : new FilePath[0];
             }
         }
 
         internal void LoadTileMapInformation(string fileName)
         {
-            TileMapInformationList = FileManager.XmlDeserialize<TileMapInformationList>(fileName);
+            TileMapInformationList = XmlFile.Deserialize<TileMapInformationList>(fileName);
         }
     }
 }

@@ -1,5 +1,5 @@
 using AnimationEditor.Core.DragDrop;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;

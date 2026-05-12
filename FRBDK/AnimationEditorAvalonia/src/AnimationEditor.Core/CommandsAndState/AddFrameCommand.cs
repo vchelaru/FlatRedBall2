@@ -1,4 +1,4 @@
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using System;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands

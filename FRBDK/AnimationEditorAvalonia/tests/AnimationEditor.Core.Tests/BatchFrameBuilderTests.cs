@@ -1,5 +1,5 @@
 using AnimationEditor.Core.Rendering;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -19,7 +19,7 @@ public class BatchFrameBuilderTests
             RightCoordinate  = right,
             TopCoordinate    = top,
             BottomCoordinate = bottom,
-            ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+            ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
         };
 
     // ── Count / no-op ─────────────────────────────────────────────────────
@@ -151,12 +151,12 @@ public class BatchFrameBuilderTests
         Assert.False(result.ExceededTextureBounds);
     }
 
-    // ── ShapeCollectionSave initialised ──────────────────────────────────
+    // ── ShapesSave initialised ──────────────────────────────────
 
     [Fact]
-    public void AllFrames_HaveInitialisedShapeCollectionSave()
+    public void AllFrames_HaveInitialisedShapesSave()
     {
         var result = BatchFrameBuilder.BuildBatch(null, 4, incrementUV: false);
-        Assert.All(result.Frames, f => Assert.NotNull(f.ShapeCollectionSave));
+        Assert.All(result.Frames, f => Assert.NotNull(f.ShapesSave));
     }
 }

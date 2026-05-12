@@ -1,7 +1,6 @@
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -39,11 +38,11 @@ namespace AnimationEditor.Core.CommandsAndState
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);
-        void MatchRectangleToFrame(AxisAlignedRectangleSave rectangle, AnimationFrameSave animationFrame);
+        void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame);
         void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame);
         void DeleteCircle(CircleSave circle, AnimationFrameSave owner);
-        void DeleteAxisAlignedRectangle(AxisAlignedRectangleSave rectangle, AnimationFrameSave owner);
-        Task AskToDeleteRectangles(List<AxisAlignedRectangleSave> rectangles);
+        void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
+        Task AskToDeleteRectangles(List<AARectSave> rectangles);
         Task AskToDeleteCircles(List<CircleSave> circles);
         Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains);
         Task AskToDeleteFrames(List<AnimationFrameSave> frames);

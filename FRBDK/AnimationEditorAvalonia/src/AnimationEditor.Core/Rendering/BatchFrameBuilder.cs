@@ -1,4 +1,4 @@
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.Rendering;
 
@@ -98,7 +98,7 @@ public static class BatchFrameBuilder
                 RightCoordinate  = currentRight,
                 TopCoordinate    = currentTop,
                 BottomCoordinate = currentBottom,
-                ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
 
             result.Add(frame);

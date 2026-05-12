@@ -1,6 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -11,7 +10,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     public sealed class MoveShapeCommand : IUndoableCommand
     {
         private readonly AnimationFrameSave _frame;
-        private readonly object _shape;   // AxisAlignedRectangleSave | CircleSave
+        private readonly object _shape;   // AARectSave | CircleSave
         private readonly float _oldX, _oldY;
         private readonly float _newX, _newY;
         private readonly IAppCommands _commands;
@@ -37,7 +36,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private void Apply(float x, float y)
         {
-            if (_shape is AxisAlignedRectangleSave r) { r.X = x; r.Y = y; }
+            if (_shape is AARectSave r) { r.X = x; r.Y = y; }
             else if (_shape is CircleSave c)          { c.X = x; c.Y = y; }
 
             _commands.RefreshTreeNode(_frame);

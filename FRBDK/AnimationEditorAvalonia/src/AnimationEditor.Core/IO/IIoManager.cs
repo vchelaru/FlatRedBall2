@@ -1,6 +1,6 @@
 using AnimationEditor.Core.Data;
-using FlatRedBall.IO;
 using System;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
 {

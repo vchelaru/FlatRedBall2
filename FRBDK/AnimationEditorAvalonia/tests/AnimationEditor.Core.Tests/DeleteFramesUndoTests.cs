@@ -1,6 +1,6 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
 using Xunit;
 

@@ -54,8 +54,9 @@ public class AnimationChainListSave
     /// <summary>The list of animation chains.</summary>
     public List<AnimationChainSave> AnimationChains = new();
 
-    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>.</summary>
-    public string FileName { get; private set; } = string.Empty;
+    /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile"/>;
+    /// tooling (Animation Editor) sets this directly when the user picks a Save-As path.</summary>
+    public string FileName { get; set; } = string.Empty;
 
     /// <summary>
     /// Path of the project (.gluj) file the .achx belongs to, relative to the .achx location.

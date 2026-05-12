@@ -1,13 +1,12 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using StringFunctions = FlatRedBall.Utilities.StringFunctions;
+using StringFunctions = AnimationEditor.Core.Utilities.StringFunctions;
 
 namespace AnimationEditor.Core.CommandsAndState
 {
@@ -104,7 +103,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void LoadAnimationChain(string fileName)
         {
             var selectedTextureFilePath = string.Empty;
-            _pm.LoadAnimationChain(fileName);
+            _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(fileName));
             _undoManager.Clear();
             RefreshTreeViewRequested?.Invoke();
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
@@ -179,7 +178,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
         {
-            var rectangleSave = new AxisAlignedRectangleSave
+            var rectangleSave = new AARectSave
             {
                 ScaleX = 8,
                 ScaleY = 8,
@@ -188,7 +187,7 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             MatchRectangleToFrame(rectangleSave, frame);
-            frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(rectangleSave);
+            frame.ShapesSave!.AARectSaves.Add(rectangleSave);
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
             RefreshFrameNodeRequested?.Invoke(frame);
@@ -207,7 +206,7 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             MatchCircleToFrame(circleSave, frame);
-            frame.ShapeCollectionSave.CircleSaves.Add(circleSave);
+            frame.ShapesSave!.CircleSaves.Add(circleSave);
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
             RefreshFrameNodeRequested?.Invoke(frame);
@@ -216,7 +215,7 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Record(new AddCircleCommand(circleSave, frame, this, _events));
         }
 
-        public void MatchRectangleToFrame(AxisAlignedRectangleSave rectangle, AnimationFrameSave animationFrame)
+        public void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
             // Texture width/height are not available at Core layer; the rendering layer should
             // override via AfterMatchRectangleToFrame if it wants pixel-accurate sizing.
@@ -232,7 +231,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
         {
-            var circles = owner.ShapeCollectionSave.CircleSaves;
+            var circles = owner.ShapesSave!.CircleSaves;
             int idx = circles.IndexOf(circle);
             if (idx < 0) return;
 
@@ -243,9 +242,9 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Record(new DeleteCircleCommand(circle, owner, idx, this, _events));
         }
 
-        public void DeleteAxisAlignedRectangle(AxisAlignedRectangleSave rectangle, AnimationFrameSave owner)
+        public void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner)
         {
-            var rects = owner.ShapeCollectionSave.AxisAlignedRectangleSaves;
+            var rects = owner.ShapesSave!.AARectSaves;
             int idx = rects.IndexOf(rectangle);
             if (idx < 0) return;
 
@@ -256,7 +255,7 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Record(new DeleteAxisAlignedRectangleCommand(rectangle, owner, idx, this, _events));
         }
 
-        public async Task AskToDeleteRectangles(List<AxisAlignedRectangleSave> rectangles)
+        public async Task AskToDeleteRectangles(List<AARectSave> rectangles)
         {
             var message = "Delete the following rectangle(s)?\n\n" +
                 string.Join("\n", rectangles.Select(r => r.Name));
@@ -330,11 +329,11 @@ namespace AnimationEditor.Core.CommandsAndState
         private List<string> GetSelectedFrameShapeNames()
         {
             var frame = _selectedState.SelectedFrame;
-            if (frame?.ShapeCollectionSave == null) return new List<string>();
+            if (frame?.ShapesSave == null) return new List<string>();
 
-            return frame.ShapeCollectionSave.AxisAlignedRectangleSaves
+            return frame.ShapesSave!.AARectSaves
                 .Select(r => r.Name)
-                .Concat(frame.ShapeCollectionSave.CircleSaves.Select(c => c.Name))
+                .Concat(frame.ShapesSave!.CircleSaves.Select(c => c.Name))
                 .ToList();
         }
 
@@ -411,7 +410,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 TopCoordinate    = 0f,
                 BottomCoordinate = 1f,
                 FrameLength      = 0.1f,
-                ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
             chain.Frames.Add(frame);
             int insertedAtIndex = chain.Frames.Count - 1;
@@ -585,16 +584,16 @@ namespace AnimationEditor.Core.CommandsAndState
                     FlipVertical     = flipV ? !frame.FlipVertical   : frame.FlipVertical,
                     RelativeX        = frame.RelativeX,
                     RelativeY        = frame.RelativeY,
-                    ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
                 };
-                if (frame.ShapeCollectionSave != null)
+                if (frame.ShapesSave != null)
                 {
-                    foreach (var r in frame.ShapeCollectionSave.AxisAlignedRectangleSaves)
-                        fCopy.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(
-                            new AxisAlignedRectangleSave
+                    foreach (var r in frame.ShapesSave!.AARectSaves)
+                        fCopy.ShapesSave!.AARectSaves.Add(
+                            new AARectSave
                             { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                    foreach (var c in frame.ShapeCollectionSave.CircleSaves)
-                        fCopy.ShapeCollectionSave.CircleSaves.Add(
+                    foreach (var c in frame.ShapesSave!.CircleSaves)
+                        fCopy.ShapesSave!.CircleSaves.Add(
                             new CircleSave
                             { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
                 }
@@ -771,7 +770,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             _pm.AnimationChainListSave = new AnimationChainListSave();
             _pm.FileName = string.Empty;
-            _pm.OnDiskCoordinateType = FlatRedBall.Graphics.TextureCoordinateType.Pixel;
+            _pm.OnDiskCoordinateType = FlatRedBall2.Animation.Content.TextureCoordinateType.Pixel;
             _selectedState.SelectedChain = null;
             _selectedState.SelectedFrame = null;
             _undoManager.Clear();
@@ -808,7 +807,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 TopCoordinate       = minY / (float)bitmapHeight,
                 BottomCoordinate    = maxY / (float)bitmapHeight,
                 FrameLength         = 0.1f,
-                ShapeCollectionSave = new FlatRedBall.Content.Math.Geometry.ShapeCollectionSave()
+                ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
 
             chain.Frames.Add(frame);

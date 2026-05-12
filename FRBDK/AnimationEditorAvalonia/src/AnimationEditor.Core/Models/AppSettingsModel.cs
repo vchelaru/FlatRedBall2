@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using FilePath = FlatRedBall.IO.FilePath;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.Models
 {

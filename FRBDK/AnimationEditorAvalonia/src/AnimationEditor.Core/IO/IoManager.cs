@@ -1,8 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
-using FlatRedBall.IO;
 using System;
-using FilePath = FlatRedBall.IO.FilePath;
+using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
 {
@@ -19,7 +18,7 @@ namespace AnimationEditor.Core.IO
 
         private FilePath GetCompanionFileFor(FilePath fileName)
         {
-            return (FilePath)(fileName.RemoveExtension() + ".aeproperties");
+            return new FilePath(fileName.RemoveExtension().FullPath + ".aeproperties");
         }
 
         public void SaveCompanionFileFor(FilePath fileName, AESettingsSave settings)
@@ -27,7 +26,7 @@ namespace AnimationEditor.Core.IO
             var location = GetCompanionFileFor(fileName);
             try
             {
-                FileManager.XmlSerialize(settings, location.FullPath);
+                XmlFile.Serialize(settings, location.FullPath);
             }
             catch (Exception e)
             {
@@ -37,14 +36,14 @@ namespace AnimationEditor.Core.IO
 
         public void LoadAndApplyCompanionFileFor(string achxFile)
         {
-            var fileToLoad = GetCompanionFileFor(achxFile);
+            var fileToLoad = GetCompanionFileFor(new FilePath(achxFile));
 
             if (!fileToLoad.Exists()) return;
 
             AESettingsSave? loadedInstance = null;
             try
             {
-                loadedInstance = FileManager.XmlDeserialize<AESettingsSave>(fileToLoad.FullPath);
+                loadedInstance = XmlFile.Deserialize<AESettingsSave>(fileToLoad.FullPath);
             }
             catch
             {

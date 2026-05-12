@@ -1,6 +1,5 @@
 using AnimationEditor.Core.IO;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -19,7 +18,7 @@ public class ClipboardPayloadTests
         TopCoordinate    = 0f,
         BottomCoordinate = 1f,
         FrameLength      = 0.1f,
-        ShapeCollectionSave = new ShapeCollectionSave()
+        ShapesSave = new ShapesSave()
     };
 
     // ── AnimationChainSave list ───────────────────────────────────────────
@@ -71,12 +70,12 @@ public class ClipboardPayloadTests
         Assert.StartsWith("List<AnimationFrameSave>:", text);
     }
 
-    // ── AxisAlignedRectangleSave ──────────────────────────────────────────
+    // ── AARectSave ──────────────────────────────────────────
 
     [Fact]
     public void RoundTrip_Rectangle_RestoresProperties()
     {
-        var rect = new AxisAlignedRectangleSave { Name = "HitBox", ScaleX = 8, ScaleY = 16, X = 1, Y = 2 };
+        var rect = new AARectSave { Name = "HitBox", ScaleX = 8, ScaleY = 16, X = 1, Y = 2 };
         var text = ClipboardPayload.Serialize(rect);
 
         bool ok = ClipboardPayload.TryDeserialize(text,
@@ -92,8 +91,8 @@ public class ClipboardPayloadTests
     [Fact]
     public void Serialize_Rectangle_StartsWithCorrectPrefix()
     {
-        var text = ClipboardPayload.Serialize(new AxisAlignedRectangleSave { Name = "R" });
-        Assert.StartsWith("AxisAlignedRectangleSave:", text);
+        var text = ClipboardPayload.Serialize(new AARectSave { Name = "R" });
+        Assert.StartsWith("AARectSave:", text);
     }
 
     // ── CircleSave ────────────────────────────────────────────────────────

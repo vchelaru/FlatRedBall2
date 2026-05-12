@@ -1,5 +1,4 @@
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core
 {
@@ -11,13 +10,13 @@ namespace AnimationEditor.Core
         {
             _pm = pm;
         }
-        public AnimationFrameSave? GetAnimationFrameContaining(AxisAlignedRectangleSave rectangle)
+        public AnimationFrameSave? GetAnimationFrameContaining(AARectSave rectangle)
         {
             foreach (var chain in _pm.AnimationChainListSave?.AnimationChains ?? [])
             {
                 foreach (var frame in chain.Frames)
                 {
-                    if (frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Contains(rectangle))
+                    if (frame.ShapesSave!.AARectSaves.Contains(rectangle))
                         return frame;
                 }
             }
@@ -30,7 +29,7 @@ namespace AnimationEditor.Core
             {
                 foreach (var frame in chain.Frames)
                 {
-                    if (frame.ShapeCollectionSave.CircleSaves.Contains(circle))
+                    if (frame.ShapesSave!.CircleSaves.Contains(circle))
                         return frame;
                 }
             }

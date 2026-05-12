@@ -1,6 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -13,7 +12,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     public sealed class ResizeShapeCommand : IUndoableCommand
     {
         private readonly AnimationFrameSave _frame;
-        private readonly object _shape;   // AxisAlignedRectangleSave | CircleSave
+        private readonly object _shape;   // AARectSave | CircleSave
         private readonly float _oldX, _oldY, _oldParam1, _oldParam2;
         private readonly float _newX, _newY, _newParam1, _newParam2;
         private readonly IAppCommands _commands;
@@ -41,7 +40,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private void Apply(float x, float y, float p1, float p2)
         {
-            if (_shape is AxisAlignedRectangleSave r)
+            if (_shape is AARectSave r)
             {
                 r.X = x; r.Y = y; r.ScaleX = p1; r.ScaleY = p2;
             }

@@ -1,6 +1,4 @@
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
-using FlatRedBall.IO;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.IO;
 
@@ -10,8 +8,8 @@ namespace AnimationEditor.Core.IO;
 /// Format:  "TypeName:&lt;xml&gt;"
 ///   • TypeName is the simple C# type name, e.g.
 ///     "List&lt;AnimationChainSave&gt;", "List&lt;AnimationFrameSave&gt;",
-///     "AxisAlignedRectangleSave", or "CircleSave".
-///   • The XML is produced by <see cref="FlatRedBall.IO.FileManager.XmlSerialize"/>.
+///     "AARectSave", or "CircleSave".
+///   • The XML is produced by <see cref="XmlFile.SerializeToString"/>.
 ///
 /// This class handles only serialization/deserialization — clipboard I/O is the
 /// responsibility of the app layer.
@@ -26,7 +24,7 @@ public static class ClipboardPayload
     public static string Serialize(List<AnimationFrameSave> frames)
         => Encode(frames);
 
-    public static string Serialize(AxisAlignedRectangleSave rectangle)
+    public static string Serialize(AARectSave rectangle)
         => Encode(rectangle);
 
     public static string Serialize(CircleSave circle)
@@ -44,7 +42,7 @@ public static class ClipboardPayload
         string? text,
         out List<AnimationChainSave>? chains,
         out List<AnimationFrameSave>? frames,
-        out AxisAlignedRectangleSave? rectangle,
+        out AARectSave? rectangle,
         out CircleSave? circle)
     {
         chains    = null;
@@ -63,22 +61,22 @@ public static class ClipboardPayload
         {
             if (typeName == TypeName<List<AnimationChainSave>>())
             {
-                chains = FileManager.XmlDeserializeFromString<List<AnimationChainSave>>(xml);
+                chains = XmlFile.DeserializeFromString<List<AnimationChainSave>>(xml);
                 return chains != null;
             }
             if (typeName == TypeName<List<AnimationFrameSave>>())
             {
-                frames = FileManager.XmlDeserializeFromString<List<AnimationFrameSave>>(xml);
+                frames = XmlFile.DeserializeFromString<List<AnimationFrameSave>>(xml);
                 return frames != null;
             }
-            if (typeName == nameof(AxisAlignedRectangleSave))
+            if (typeName == nameof(AARectSave))
             {
-                rectangle = FileManager.XmlDeserializeFromString<AxisAlignedRectangleSave>(xml);
+                rectangle = XmlFile.DeserializeFromString<AARectSave>(xml);
                 return rectangle != null;
             }
             if (typeName == nameof(CircleSave))
             {
-                circle = FileManager.XmlDeserializeFromString<CircleSave>(xml);
+                circle = XmlFile.DeserializeFromString<CircleSave>(xml);
                 return circle != null;
             }
         }
@@ -94,7 +92,7 @@ public static class ClipboardPayload
 
     private static string Encode<T>(T obj)
     {
-        FileManager.XmlSerialize(obj, out string xml);
+        XmlFile.SerializeToString(obj, out string xml);
         return $"{TypeName<T>()}:{xml}";
     }
 

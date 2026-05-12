@@ -1,7 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -380,13 +379,13 @@ public class AppCommandsChainTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
-        source.Frames[0].ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(
-            new AxisAlignedRectangleSave { Name = "HitBox", ScaleX = 5, ScaleY = 5 });
+        source.Frames[0].ShapesSave!.AARectSaves.Add(
+            new AARectSave { Name = "HitBox", ScaleX = 5, ScaleY = 5 });
 
         var copy = ctx.AppCommands.DuplicateChain(source);
 
-        Assert.Single(copy!.Frames[0].ShapeCollectionSave!.AxisAlignedRectangleSaves);
-        Assert.Equal("HitBox", copy.Frames[0].ShapeCollectionSave!.AxisAlignedRectangleSaves[0].Name);
+        Assert.Single(copy!.Frames[0].ShapesSave!.AARectSaves);
+        Assert.Equal("HitBox", copy.Frames[0].ShapesSave!.AARectSaves[0].Name);
     }
 
     [Fact]
@@ -709,7 +708,7 @@ public class AppCommandsChainTests
     public void RenameFrame_SetsTextureNameOnFrame()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall.Content.AnimationChain.AnimationFrameSave
+        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave
             { TextureName = "old.png" };
 
         ctx.AppCommands.RenameFrame(frame, "new.png");
@@ -721,7 +720,7 @@ public class AppCommandsChainTests
     public void RenameFrame_RaisesAnimationChainsChanged()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall.Content.AnimationChain.AnimationFrameSave();
+        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave();
         bool fired = false;
         void Handler() => fired = true;
         ctx.ApplicationEvents.AnimationChainsChanged += Handler;
@@ -740,7 +739,7 @@ public class AppCommandsChainTests
     public void RenameFrame_EmptyString_SetsEmptyTextureName()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall.Content.AnimationChain.AnimationFrameSave
+        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave
             { TextureName = "something.png" };
 
         ctx.AppCommands.RenameFrame(frame, string.Empty);

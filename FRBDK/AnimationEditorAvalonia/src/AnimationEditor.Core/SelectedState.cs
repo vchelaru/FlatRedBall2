@@ -1,6 +1,5 @@
 using AnimationEditor.Core.Data;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,7 +22,7 @@ namespace AnimationEditor.Core
         }
         private AnimationChainSave? _selectedChain;
         private AnimationFrameSave? _selectedFrame;
-        private AxisAlignedRectangleSave? _selectedRectangle;
+        private AARectSave? _selectedRectangle;
         private CircleSave? _selectedCircle;
         private List<object> _selectedNodes = new List<object>();
 
@@ -64,7 +63,7 @@ namespace AnimationEditor.Core
             }
         }
 
-        public AxisAlignedRectangleSave? SelectedRectangle
+        public AARectSave? SelectedRectangle
         {
             get => _selectedRectangle;
             set
@@ -101,15 +100,15 @@ namespace AnimationEditor.Core
             }
         }
 
-        public List<AxisAlignedRectangleSave> SelectedRectangles =>
-            _selectedNodes.OfType<AxisAlignedRectangleSave>().ToList();
+        public List<AARectSave> SelectedRectangles =>
+            _selectedNodes.OfType<AARectSave>().ToList();
 
         public List<CircleSave> SelectedCircles =>
             _selectedNodes.OfType<CircleSave>().ToList();
 
         /// <summary>
         /// Multi-selection bag. Can hold AnimationChainSave, AnimationFrameSave,
-        /// AxisAlignedRectangleSave, or CircleSave objects.
+        /// AARectSave, or CircleSave objects.
         /// </summary>
         public List<object> SelectedNodes
         {

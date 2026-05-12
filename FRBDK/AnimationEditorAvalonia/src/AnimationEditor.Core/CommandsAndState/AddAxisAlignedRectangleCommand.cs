@@ -1,16 +1,15 @@
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     internal sealed class AddAxisAlignedRectangleCommand : IUndoableCommand
     {
-        private readonly AxisAlignedRectangleSave _rect;
+        private readonly AARectSave _rect;
         private readonly AnimationFrameSave _frame;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
-        public AddAxisAlignedRectangleCommand(AxisAlignedRectangleSave rect, AnimationFrameSave frame,
+        public AddAxisAlignedRectangleCommand(AARectSave rect, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events)
         {
             _rect = rect;
@@ -21,7 +20,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            _frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Remove(_rect);
+            _frame.ShapesSave!.AARectSaves.Remove(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -30,7 +29,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Redo()
         {
-            _frame.ShapeCollectionSave.AxisAlignedRectangleSaves.Add(_rect);
+            _frame.ShapesSave!.AARectSaves.Add(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

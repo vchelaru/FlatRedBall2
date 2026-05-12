@@ -1,5 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -75,11 +75,11 @@ public class AppCommandsFrameFromPixelBoundsTests
     }
 
     [Fact]
-    public void Frame_ShapeCollectionSave_IsInitialised()
+    public void Frame_ShapesSave_IsInitialised()
     {
         var chain = MakeChain();
         ctx.AppCommands.AddFrameFromPixelBounds(chain, "t.png", 0, 0, 64, 64, 128, 128);
-        Assert.NotNull(chain.Frames[0].ShapeCollectionSave);
+        Assert.NotNull(chain.Frames[0].ShapesSave);
     }
 
     // ── Selection ─────────────────────────────────────────────────────────

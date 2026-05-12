@@ -1,7 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -33,8 +32,8 @@ public class SelectedStateTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
         ctx.SelectedState.SelectedRectangle = rect;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
@@ -51,7 +50,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
         ctx.SelectedState.SelectedCircle = circle;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
@@ -111,8 +110,8 @@ public class SelectedStateTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
         ctx.SelectedState.SelectedRectangle = rect;
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -128,7 +127,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
         ctx.SelectedState.SelectedCircle = circle;
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -171,7 +170,7 @@ public class SelectedStateTests
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
         ctx.SelectedState.SelectedCircle = circle;
 
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
+        var rect = new AARectSave { Name = "Box" };
         ctx.SelectedState.SelectedRectangle = rect;
 
         Assert.Null(ctx.SelectedState.SelectedCircle);
@@ -182,7 +181,7 @@ public class SelectedStateTests
     public void SelectedCircle_WhenSet_ClearsSelectedRectangle()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
+        var rect = new AARectSave { Name = "Box" };
         ctx.SelectedState.SelectedRectangle = rect;
 
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
@@ -198,7 +197,7 @@ public class SelectedStateTests
         var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
         ctx.SelectedState.SelectionChanged += () => fired = true;
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
+        var rect = new AARectSave { Name = "Box" };
 
         ctx.SelectedState.SelectedRectangle = rect;
 
@@ -224,7 +223,7 @@ public class SelectedStateTests
     public void SelectedShape_WhenRectangleSelected_ReturnsRectangle()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
+        var rect = new AARectSave { Name = "Box" };
         ctx.SelectedState.SelectedRectangle = rect;
 
         Assert.Same(rect, ctx.SelectedState.SelectedShape);

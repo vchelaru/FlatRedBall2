@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.ViewModels;
 /// <summary>
 /// Lightweight view-model for a single node in the animation tree.
 /// The <see cref="Data"/> field holds the underlying data object
-/// (AnimationChainSave, AnimationFrameSave, AxisAlignedRectangleSave, CircleSave).
+/// (AnimationChainSave, AnimationFrameSave, AARectSave, CircleSave).
 /// </summary>
 public class TreeNodeVm : INotifyPropertyChanged
 {
@@ -66,7 +66,7 @@ public class TreeNodeVm : INotifyPropertyChanged
     public object? Data { get; set; }
 
     /// <summary>
-    /// True when this node represents an <see cref="FlatRedBall.Content.AnimationChain.AnimationChainSave"/>.
+    /// True when this node represents an <see cref="FlatRedBall2.Animation.Content.AnimationChainSave"/>.
     /// Used by the tree item template to show the inline Add Frame button only on chain nodes.
     /// </summary>
     public bool IsChainNode { get; set; }

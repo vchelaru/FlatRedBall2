@@ -1,6 +1,5 @@
 using AnimationEditor.Core;
-using FlatRedBall.Content.AnimationChain;
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -8,7 +7,7 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class ObjectFinderTests
 {
-    // ── GetAnimationFrameContaining(AxisAlignedRectangleSave) ─────────────────
+    // ── GetAnimationFrameContaining(AARectSave) ─────────────────
 
     [Fact]
     public void GetAnimationFrameContaining_Rectangle_ReturnsOwningFrame()
@@ -17,8 +16,8 @@ public class ObjectFinderTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "HitBox" };
-        frame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "HitBox" };
+        frame.ShapesSave!.AARectSaves.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -31,7 +30,7 @@ public class ObjectFinderTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         TestHelpers.MakeChain(acls, "Run", 2);
-        var orphanRect = new AxisAlignedRectangleSave { Name = "Orphan" };
+        var orphanRect = new AARectSave { Name = "Orphan" };
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(orphanRect);
 
@@ -46,8 +45,8 @@ public class ObjectFinderTests
         TestHelpers.MakeChain(acls, "Chain1", 2);
         var chain2 = TestHelpers.MakeChain(acls, "Chain2", 3);
         var targetFrame = chain2.Frames[2];
-        var rect = new AxisAlignedRectangleSave { Name = "DeepBox" };
-        targetFrame.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "DeepBox" };
+        targetFrame.ShapesSave!.AARectSaves.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -61,8 +60,8 @@ public class ObjectFinderTests
         var acls = ctx.Acls;
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frameWithRect = chain.Frames[0];
-        var rect = new AxisAlignedRectangleSave { Name = "Box" };
-        frameWithRect.ShapeCollectionSave!.AxisAlignedRectangleSaves.Add(rect);
+        var rect = new AARectSave { Name = "Box" };
+        frameWithRect.ShapesSave!.AARectSaves.Add(rect);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 
@@ -79,7 +78,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Halo", Radius = 12 };
-        frame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.CircleSaves.Add(circle);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(circle);
 
@@ -107,7 +106,7 @@ public class ObjectFinderTests
         var chain = TestHelpers.MakeChain(acls, "Attack", 4);
         var targetFrame = chain.Frames[3];
         var circle = new CircleSave { Name = "DeepCircle", Radius = 8 };
-        targetFrame.ShapeCollectionSave!.CircleSaves.Add(circle);
+        targetFrame.ShapesSave!.CircleSaves.Add(circle);
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(circle);
 
@@ -174,7 +173,7 @@ public class ObjectFinderTests
     public void GetAnimationFrameContaining_Rectangle_WhenAclsEmpty_ReturnsNull()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var rect = new AxisAlignedRectangleSave { Name = "LonelyRect" };
+        var rect = new AARectSave { Name = "LonelyRect" };
 
         var result = ctx.ObjectFinder.GetAnimationFrameContaining(rect);
 

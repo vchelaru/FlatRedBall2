@@ -7,8 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FlatRedBallDesktopGLNet6" Version="2025.9.23.733" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\FlatRedBall2.csproj" />
   </ItemGroup>
 
 </Project>

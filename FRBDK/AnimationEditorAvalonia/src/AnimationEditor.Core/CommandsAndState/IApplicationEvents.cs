@@ -1,4 +1,4 @@
-using FlatRedBall.Content.Math.Geometry;
+using FlatRedBall2.Animation.Content;
 using System;
 
 namespace AnimationEditor.Core.CommandsAndState
@@ -9,11 +9,11 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action WireframePanning;
         event Action WireframeTextureChange;
         event Action<string> AchxLoaded;
-        event Action<AxisAlignedRectangleSave> AfterAxisAlignedRectangleChanged;
+        event Action<AARectSave> AfterAxisAlignedRectangleChanged;
         event Action<CircleSave> AfterCircleChanged;
         event Action AnimationChainsChanged;
 
-        void RaiseAfterAxisAlignedRectangleChanged(AxisAlignedRectangleSave rectangle);
+        void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);
         void RaiseAnimationChainsChanged();
         void CallAchxLoaded(string newFileName);
