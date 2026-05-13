@@ -249,6 +249,22 @@ public class PreviewControl : Control
     /// <summary>Current zoom factor (1.0 = 100 %).</summary>
     public float Zoom => _zoom;
 
+    /// <summary>Current pan offset (panX, panY).</summary>
+    public (float X, float Y) PanOffset => (_panX, _panY);
+
+    /// <summary>
+    /// Pans the preview so the entity-space point (<paramref name="entityX"/>,
+    /// <paramref name="entityY"/>) appears at the canvas centre.
+    /// The current zoom and <see cref="IAppState.OffsetMultiplier"/> are preserved.
+    /// </summary>
+    public void CenterOnEntityPoint(float entityX, float entityY)
+    {
+        float offMult = _appState!.OffsetMultiplier;
+        _panX = -entityX * offMult * _zoom;
+        _panY =  entityY * offMult * _zoom;
+        InvalidateVisual();
+    }
+
     /// <summary>Test-only: adds a horizontal guide at the given world-Y coordinate.</summary>
     public void AddHGuide(float worldY) { _hGuides.Add(worldY); InvalidateVisual(); }
 

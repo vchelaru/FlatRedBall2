@@ -2483,9 +2483,33 @@ public partial class MainWindow : Window
         if (e.Source is not Control src) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
-        if (vm.Data is not AnimationChainSave chain) return;
+        if (!HandleAnimTreeNodeDoubleTap(vm)) return;
         e.Handled = true;
-        BeginInlineRename(vm, chain.Name);
+    }
+
+    /// <summary>
+    /// Routes a double-tap on a tree node to the appropriate action.
+    /// Returns <c>true</c> when a recognised action was performed.
+    /// </summary>
+    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm)
+    {
+        switch (vm.Data)
+        {
+            case AnimationChainSave chain:
+                BeginInlineRename(vm, chain.Name);
+                return true;
+            case AnimationFrameSave frame:
+                WireframeCtrl.CenterOnFrame(frame);
+                return true;
+            case AARectSave rect:
+                PreviewCtrl.CenterOnEntityPoint(rect.X, rect.Y);
+                return true;
+            case CircleSave circle:
+                PreviewCtrl.CenterOnEntityPoint(circle.X, circle.Y);
+                return true;
+            default:
+                return false;
+        }
     }
 
     private void OnInlineRenameKeyDown(object? sender, KeyEventArgs e)
