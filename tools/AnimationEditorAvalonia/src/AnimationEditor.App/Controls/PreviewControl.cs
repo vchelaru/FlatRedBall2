@@ -1407,7 +1407,7 @@ public class PreviewControl : Control
             float tickH = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
             canvas.DrawLine(sx, RulerSize - tickH, sx, RulerSize, tickPaint);
             if (isMajor)
-                canvas.DrawText(((int)MathF.Round(wx)).ToString(), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wx), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
         }
 
         // Left (vertical) ruler - ticks at world-Y positions.
@@ -1425,7 +1425,7 @@ public class PreviewControl : Control
                 canvas.Save();
                 canvas.Translate(RulerSize - tickW - 1f, sy);
                 canvas.RotateDegrees(-90f);
-                canvas.DrawText(((int)MathF.Round(wy)).ToString(), 0f, 0f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wy), 0f, 0f, labelFont, labelPaint);
                 canvas.Restore();
             }
         }
@@ -1456,14 +1456,19 @@ public class PreviewControl : Control
         canvas.DrawLine(0, RulerSize, s.Width, RulerSize, borderPaint);
     }
 
-    private static float GetRulerStep(float zoom)
+    internal static float GetRulerStep(float zoom)
     {
         float targetWorld = 50f / zoom; // target ~50 screen px per major tick
-        float[] candidates = { 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000 };
+        float[] candidates = { 0.125f, 0.25f, 0.5f, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000 };
         foreach (float c in candidates)
             if (c >= targetWorld) return c;
         return 1000f;
     }
+
+    internal static string FormatRulerLabel(float majorStep, float worldValue) =>
+        majorStep >= 1f
+            ? ((int)MathF.Round(worldValue)).ToString()
+            : worldValue.ToString("0.###");
 
     private static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, SKBitmap bm,
