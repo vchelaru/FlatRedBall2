@@ -323,14 +323,14 @@
                     </TreeView.ItemTemplate>
                 </TreeView>
 
-                <!-- ── Add Chain button ── -->
+                <!-- ── Add Animation button ── -->
                 <Border Grid.Row="2"
                         BorderBrush="{StaticResource LineBrush}"
                         BorderThickness="0,1,0,0"
                         Background="{StaticResource BgApp}"
                         Padding="8,6">
                     <Button x:Name="AddChainBtn"
-                            Content="+ Add Chain"
+                            Content="+ Add Animation"
                             HorizontalAlignment="Stretch"
                             Height="30"
                             Foreground="{StaticResource Ink}" />
