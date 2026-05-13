@@ -1,0 +1,89 @@
+name: Build and Release Animation Editor
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_kind:
+        description: 'Type'
+        type: choice
+        options: [release, prerelease, test]   # test = draft
+        default: test
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version + tag + title
+        id: meta
+        shell: pwsh
+        run: |
+          $version = (Get-Date).ToString('yyyy.MM.dd')
+          $kind = "${{ github.event.inputs.release_kind }}"
+          switch ($kind) {
+            'release'    { $prefix='Release';    $prerelease='false'; $draft='false' }
+            'prerelease' { $prefix='PreRelease'; $prerelease='true';  $draft='false' }
+            'test'       { $prefix='Test';       $prerelease='true';  $draft='true'  }
+          }
+          $title = "$prefix " + (Get-Date).ToString('MMMM d, yyyy')
+          $tag   = "ae-${prefix}_" + (Get-Date).ToString('MMMM_dd_yyyy')
+          if ($kind -eq 'test') { $tag = "$tag-$($env:GITHUB_RUN_NUMBER)" }
+          "version=$version"       >> $env:GITHUB_OUTPUT
+          "tag=$tag"               >> $env:GITHUB_OUTPUT
+          "title=Animation Editor $title" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+          "draft=$draft"           >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
+
+      - name: Publish Animation Editor (Windows, self-contained)
+        run: >
+          dotnet publish
+          tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained
+          -p:Version=${{ steps.meta.outputs.version }}
+          -o dist/publish
+
+      - name: Package release zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $zip = "dist/AnimationEditor.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist/publish/*" -DestinationPath $zip
+
+      - name: Create tag (release only)
+        if: github.event.inputs.release_kind == 'release'
+        shell: pwsh
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git tag -a "${{ steps.meta.outputs.tag }}" -m "${{ steps.meta.outputs.title }}"
+          git push origin "${{ steps.meta.outputs.tag }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name:     ${{ steps.meta.outputs.title }}
+          generate_release_notes: true
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          draft:      ${{ steps.meta.outputs.draft }}
+          files: dist/AnimationEditor.zip
