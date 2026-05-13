@@ -409,11 +409,12 @@
                         <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
                                 Margin="4,0" VerticalAlignment="Center" />
 
-                        <CheckBox x:Name="SnapToGridCheck"
-                                  Foreground="{StaticResource Ink}"
-                                  VerticalAlignment="Center"
-                                  Margin="0,0,4,0"
-                                  ToolTip.Tip="Snap to Grid">
+                        <ToggleButton x:Name="SnapToGridCheck"
+                                      Height="26"
+                                      Foreground="{StaticResource Ink}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,4,0"
+                                      ToolTip.Tip="Snap to Grid">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <svg:Svg Width="16" Height="16"
                                          Path="avares://AnimationEditor.App/Assets/icons/svg/IconGrid.svg"
@@ -421,7 +422,7 @@
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="Grid" VerticalAlignment="Center" />
                             </StackPanel>
-                        </CheckBox>
+                        </ToggleButton>
 
                         <Border BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"
