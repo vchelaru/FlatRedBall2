@@ -59,9 +59,17 @@ public static class TreeBuilder
     /// <summary>
     /// Builds a single frame node with any shape children from
     /// <see cref="AnimationFrameSave.ShapesSave"/>.
+    /// Sets <see cref="AnimationFrameSave.Name"/> once for unnamed frames so the
+    /// label survives copy/paste and full tree rebuilds.
     /// </summary>
     public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
     {
+        // Persist the display label into the data model on first creation so that
+        // copy/paste (which serializes the frame) and RefreshTreeView (full rebuild)
+        // reproduce the same label regardless of the frame's new position.
+        if (string.IsNullOrEmpty(frame.TextureName) && string.IsNullOrEmpty(frame.Name))
+            frame.Name = $"Frame {index + 1}";
+
         var node = new TreeNodeVm
         {
             Header = BuildFrameHeader(frame, index),
@@ -99,9 +107,11 @@ public static class TreeBuilder
     /// <summary>Returns the display label for a frame node.</summary>
     public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
     {
-        if (string.IsNullOrEmpty(frame.TextureName))
-            return $"Frame {index + 1}";
-        return Path.GetFileName(frame.TextureName);
+        if (!string.IsNullOrEmpty(frame.TextureName))
+            return Path.GetFileName(frame.TextureName);
+        if (!string.IsNullOrEmpty(frame.Name))
+            return frame.Name;
+        return $"Frame {index + 1}";
     }
 
     // ── Diff-update helpers ───────────────────────────────────────────────────
@@ -169,44 +179,51 @@ public static class TreeBuilder
 
     /// <summary>
     /// Diff-updates the frame children of <paramref name="chainNode"/> to match
-    /// <paramref name="frames"/> without replacing existing VMs.
-    /// <para>
-    /// Frame VMs are matched by <see cref="TreeNodeVm.Data"/> reference.
-    /// Surviving VMs have their header and meta resynced and their shape children
-    /// recursively diff-updated via <see cref="SyncShapesInto"/>.
-    /// <see cref="TreeNodeVm.IsExpanded"/> is preserved on retained VMs.
-    /// </para>
+    /// <paramref name="frames"/> without replacing existing <see cref="TreeNodeVm"/>
+    /// instances.  Retained VMs keep their <see cref="TreeNodeVm.IsExpanded"/> state
+    /// (and Avalonia's TreeView keeps them in its <c>SelectedItems</c> because selection
+    /// uses object identity).  Headers and Meta are always refreshed; label stability
+    /// for unnamed frames is provided by <see cref="AnimationFrameSave.Name"/> which is
+    /// set once at creation time by <see cref="BuildFrameNode"/>.
     /// </summary>
-    public static void SyncFramesInto(TreeNodeVm chainNode, System.Collections.Generic.IList<AnimationFrameSave> frames)
+    public static void SyncFramesInto(TreeNodeVm chainNode, IList<AnimationFrameSave> frames)
     {
-        // Remove frame VMs whose data is no longer in the list.
-        for (int i = chainNode.Children.Count - 1; i >= 0; i--)
-        {
-            var child = chainNode.Children[i];
-            if (child.Data is AnimationFrameSave f && !frames.Contains(f))
-                chainNode.Children.RemoveAt(i);
-        }
+        var children = chainNode.Children;
 
-        // Ensure every desired frame has a VM at the correct index.
+        // Build a lookup of existing VMs keyed by frame reference.
+        var existingByFrame = new Dictionary<AnimationFrameSave, TreeNodeVm>(
+            ReferenceEqualityComparer.Instance);
+        foreach (var child in children)
+            if (child.Data is AnimationFrameSave f)
+                existingByFrame[f] = child;
+
+        // Step 1: Remove VMs whose frame is no longer in the list.
+        var frameSet = new HashSet<AnimationFrameSave>(frames, ReferenceEqualityComparer.Instance);
+        for (int i = children.Count - 1; i >= 0; i--)
+            if (children[i].Data is AnimationFrameSave f && !frameSet.Contains(f))
+                children.RemoveAt(i);
+
+        // Step 2: Append new VMs for frames not yet represented (step 3 reorders them).
+        for (int i = 0; i < frames.Count; i++)
+            if (!existingByFrame.ContainsKey(frames[i]))
+                children.Add(BuildFrameNode(frames[i], i));
+
+        // Step 3: Reorder children to match the target frame order, then refresh
+        //         Header and Meta.  Label stability comes from AnimationFrameSave.Name
+        //         (set once in BuildFrameNode) so BuildFrameHeader returns the same
+        //         value regardless of the frame's current position index.
         for (int i = 0; i < frames.Count; i++)
         {
-            var frame = frames[i];
-            var vm    = chainNode.Children.FirstOrDefault(n => ReferenceEquals(n.Data, frame));
-            if (vm is null)
+            var target = frames[i];
+            if (!ReferenceEquals(children[i].Data, target))
             {
-                chainNode.Children.Insert(i, BuildFrameNode(frame, i));
+                for (int j = i + 1; j < children.Count; j++)
+                    if (ReferenceEquals(children[j].Data, target))
+                    { children.Move(j, i); break; }
             }
-            else
-            {
-                // Only update header for named frames — unnamed "Frame N" labels stay
-                // stable across reorder so the user can visually track which frame moved.
-                if (!string.IsNullOrEmpty(frame.TextureName))
-                    vm.Header = BuildFrameHeader(frame, i);
-                vm.Meta   = $"{frame.FrameLength:0.00}s";
-                int cur   = chainNode.Children.IndexOf(vm);
-                if (cur != i) { chainNode.Children.RemoveAt(cur); chainNode.Children.Insert(i, vm); }
-                SyncShapesInto(vm, frame.ShapesSave);
-            }
+            children[i].Header = BuildFrameHeader(target, i);
+            children[i].Meta   = $"{target.FrameLength:0.00}s";
+            SyncShapesInto(children[i], target.ShapesSave);
         }
     }
 

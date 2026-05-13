@@ -390,6 +390,54 @@ public class TreeBuilderPureTests
         Assert.Equal("Frame 1", chainNode.Children[1].Header);
         Assert.Equal("Frame 2", chainNode.Children[2].Header);
     }
+
+    [Fact]
+    public void BuildFrameNode_SetsNameForUnnamedFrame()
+    {
+        // BuildFrameNode must persist the display label into AnimationFrameSave.Name
+        // so copy/paste (which serializes the frame) and RefreshTreeView (full rebuild)
+        // reproduce the same label regardless of the frame's new position.
+        var frame = new AnimationFrameSave { TextureName = "" };
+
+        TreeBuilder.BuildFrameNode(frame, 2);  // position 2 → "Frame 3"
+
+        Assert.Equal("Frame 3", frame.Name);
+    }
+
+    [Fact]
+    public void BuildFrameNode_DoesNotOverwriteExistingName()
+    {
+        // When copying a chain the copied frames already have Name set.
+        // BuildFrameNode must not overwrite it with a position-based label.
+        var frame = new AnimationFrameSave { TextureName = "", Name = "Frame 3" };
+
+        TreeBuilder.BuildFrameNode(frame, 0);  // index 0, but Name already set
+
+        Assert.Equal("Frame 3", frame.Name);
+    }
+
+    [Fact]
+    public void BuildTree_ReorderedChainWithNamesSet_PreservesLabels()
+    {
+        // Simulates paste: deserialised frames carry their Name values from the original.
+        // BuildTree must use Name, not recompute from position.
+        var frameA = new AnimationFrameSave { TextureName = "", Name = "Frame 1" };
+        var frameB = new AnimationFrameSave { TextureName = "", Name = "Frame 2" };
+        var frameC = new AnimationFrameSave { TextureName = "", Name = "Frame 3" };
+
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(frameC);  // reordered: C first
+        chain.Frames.Add(frameA);
+        chain.Frames.Add(frameB);
+        acls.AnimationChains.Add(chain);
+
+        var nodes = TreeBuilder.BuildTree(acls);
+
+        Assert.Equal("Frame 3", nodes[0].Children[0].Header);
+        Assert.Equal("Frame 1", nodes[0].Children[1].Header);
+        Assert.Equal("Frame 2", nodes[0].Children[2].Header);
+    }
 }
 
 // ── SyncShapesInto tests ──────────────────────────────────────────────────────

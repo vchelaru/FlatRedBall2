@@ -35,6 +35,15 @@ public class AnimationFrameSave
     /// <summary>The frame's offset along the Y axis.</summary>
     public float RelativeY;
 
+    /// <summary>
+    /// User-visible display label for this frame in the Animation Editor tree.
+    /// Set once on creation for unnamed frames (e.g. "Frame 3") so the label
+    /// survives reorders, copy/paste, and full tree rebuilds.
+    /// Empty for frames loaded from files that pre-date this field; the editor
+    /// falls back to a position-based label in that case.
+    /// </summary>
+    public string Name = string.Empty;
+
     /// <summary>Per-frame shape definitions. Empty by default.</summary>
     public ShapesSave? ShapesSave;
 }
