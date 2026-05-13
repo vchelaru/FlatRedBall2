@@ -90,6 +90,16 @@ public class TreeNodeVm : INotifyPropertyChanged
     public bool IsCircleNode { get; set; }
 
     public ObservableCollection<TreeNodeVm> Children { get; } = new();
+
+    /// <summary>
+    /// Sets <see cref="IsExpanded"/> on <paramref name="node"/> and every descendant.
+    /// </summary>
+    public static void SetExpandedRecursive(TreeNodeVm node, bool expanded)
+    {
+        node.IsExpanded = expanded;
+        foreach (var child in node.Children)
+            SetExpandedRecursive(child, expanded);
+    }
 }
 
 /// <summary>Identifies the type of data a <see cref="TreeNodeVm"/> represents, for icon selection.</summary>

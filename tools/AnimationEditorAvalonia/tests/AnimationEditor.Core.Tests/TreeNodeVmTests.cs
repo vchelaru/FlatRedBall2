@@ -128,4 +128,75 @@ public class TreeNodeVmTests
         vm.CancelEdit();
         Assert.Equal("Run", vm.Header);
     }
+
+    // ── SetExpandedRecursive ──────────────────────────────────────────────────
+
+    [Fact]
+    public void SetExpandedRecursive_SetsRootNode()
+    {
+        var root = new TreeNodeVm { IsExpanded = false };
+
+        TreeNodeVm.SetExpandedRecursive(root, true);
+
+        Assert.True(root.IsExpanded);
+    }
+
+    [Fact]
+    public void SetExpandedRecursive_SetsDirectChildren()
+    {
+        var root = new TreeNodeVm();
+        var child1 = new TreeNodeVm { IsExpanded = false };
+        var child2 = new TreeNodeVm { IsExpanded = false };
+        root.Children.Add(child1);
+        root.Children.Add(child2);
+
+        TreeNodeVm.SetExpandedRecursive(root, true);
+
+        Assert.True(child1.IsExpanded);
+        Assert.True(child2.IsExpanded);
+    }
+
+    [Fact]
+    public void SetExpandedRecursive_SetsGrandchildren()
+    {
+        // chain → frame → rect  (3-level tree)
+        var chain = new TreeNodeVm { IsChainNode = true };
+        var frame = new TreeNodeVm { IsFrameNode = true };
+        var rect  = new TreeNodeVm { IsRectNode  = true };
+        frame.Children.Add(rect);
+        chain.Children.Add(frame);
+
+        TreeNodeVm.SetExpandedRecursive(chain, true);
+
+        Assert.True(chain.IsExpanded);
+        Assert.True(frame.IsExpanded);
+        Assert.True(rect.IsExpanded);
+    }
+
+    [Fact]
+    public void SetExpandedRecursive_CollapseAll_SetsAllFalse()
+    {
+        var chain = new TreeNodeVm { IsExpanded = true };
+        var frame = new TreeNodeVm { IsExpanded = true };
+        var rect  = new TreeNodeVm { IsExpanded = true };
+        frame.Children.Add(rect);
+        chain.Children.Add(frame);
+
+        TreeNodeVm.SetExpandedRecursive(chain, false);
+
+        Assert.False(chain.IsExpanded);
+        Assert.False(frame.IsExpanded);
+        Assert.False(rect.IsExpanded);
+    }
+
+    [Fact]
+    public void SetExpandedRecursive_LeafNode_IsHarmlessNoop()
+    {
+        var leaf = new TreeNodeVm { IsRectNode = true };  // no children
+
+        var ex = Record.Exception(() => TreeNodeVm.SetExpandedRecursive(leaf, true));
+
+        Assert.Null(ex);
+        Assert.True(leaf.IsExpanded);
+    }
 }

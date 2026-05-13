@@ -797,7 +797,7 @@ public partial class MainWindow : Window
     private void SetAllExpanded(bool expanded)
     {
         foreach (var node in _treeRoots)
-            node.IsExpanded = expanded;
+            TreeNodeVm.SetExpandedRecursive(node, expanded);
     }
 
     private void AddAnimationChainAndBeginInlineRename()
