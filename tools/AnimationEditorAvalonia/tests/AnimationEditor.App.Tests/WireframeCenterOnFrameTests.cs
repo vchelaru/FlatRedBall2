@@ -3,6 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -13,8 +14,8 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Tests for WireframeControl.CenterOnFrame — scrolls the wireframe panel
-/// so the specified frame's region is centred in the viewport.
+/// Tests for WireframeControl.CenterOnFrame — zooms to fit the frame and scrolls
+/// so the frame region is centred in the viewport.
 /// </summary>
 public class WireframeCenterOnFrameTests
 {
@@ -51,26 +52,27 @@ public class WireframeCenterOnFrameTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// CenterOnFrame scrolls the wireframe so the frame's centre is in
-    /// the middle of the viewport.  Uses a 500×500 texture at 300% zoom so
-    /// the image overflows and the expected scroll value is positive and not
-    /// clamped to zero for any realistic headless viewport size.
+    /// CenterOnFrame zooms to fit the frame's bounding box at 85 % of the viewport
+    /// and scrolls so the frame centre lands at the viewport centre.
     /// </summary>
     [AvaloniaFact]
-    public void CenterOnFrame_FrameAtKnownUV_ScrollsToFrameCenter()
+    public void CenterOnFrame_ZoomsToFitFrameAndCenters()
     {
         var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            // 500×500 so the image overflows at 300% zoom
-            var texPath = WriteSolidPng(dir, "tex.png", 500, 500);
+            // 500×500 texture; frame UV (0.6–0.8, 0.6–0.8) → 100×100 pixel region,
+            // centre at pixel (350, 350).
+            const float bmpW   = 500f;
+            const float bmpH   = 500f;
+            const float frameW = 100f;
+            const float frameH = 100f;
+            const float texCX  = 350f;
+            const float texCY  = 350f;
 
-            // Frame with UV centre at (0.7, 0.7) → texture-space pixel centre = (350, 350)
-            float expectedTexCX = 350f;
-            float expectedTexCY = 350f;
-
+            var texPath = WriteSolidPng(dir, "tex.png", (int)bmpW, (int)bmpH);
             var frame = new AnimationFrameSave
             {
                 LeftCoordinate   = 0.6f,
@@ -89,25 +91,33 @@ public class WireframeCenterOnFrameTests
             ctrl.LoadTexture(texPath);
             Dispatcher.UIThread.RunJobs();
 
-            // Zoom to 300% so the 500px image (1500px rendered) overflows the viewport,
-            // guaranteeing the expected scroll values are positive.
-            ctrl.SetZoomPercent(300);
-            Dispatcher.UIThread.RunJobs();
-
-            var (panX, panY, zoom) = ctrl.CameraState;
-            double vpW = sv.Viewport.Width;
-            double vpH = sv.Viewport.Height;
-
-            float expectedScrollX = Math.Max(0f, panX + expectedTexCX * zoom - (float)vpW / 2f);
-            float expectedScrollY = Math.Max(0f, panY + expectedTexCY * zoom - (float)vpH / 2f);
-
-            // Sanity: expected scroll must be positive for the test to be meaningful
-            Assert.True(expectedScrollX > 0,
-                $"Test precondition failed: expectedScrollX={expectedScrollX:F1} must be > 0 " +
-                $"(panX={panX:F1} zoom={zoom:F2} vpW={vpW:F1})");
+            // Capture any ZoomChanged notification.
+            float? zoomChangedValue = null;
+            ctrl.ZoomChanged += v => zoomChangedValue = v;
 
             ctrl.CenterOnFrame(frame);
             Dispatcher.UIThread.RunJobs();
+
+            float vpW = (float)sv.Viewport.Width;
+            float vpH = (float)sv.Viewport.Height;
+
+            // Zoom should fit the frame at 85 % of the viewport.
+            float expectedZoom = Math.Clamp(
+                Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
+                WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+
+            Assert.True(Math.Abs(ctrl.Zoom - expectedZoom) < 0.01f,
+                $"Zoom should fit frame; expected≈{expectedZoom:F3} actual={ctrl.Zoom:F3}");
+
+            // ZoomChanged event must have fired with the new percentage.
+            Assert.NotNull(zoomChangedValue);
+            Assert.True(Math.Abs(zoomChangedValue!.Value - expectedZoom * 100f) < 1f,
+                $"ZoomChanged value should be {expectedZoom * 100f:F1}%; got {zoomChangedValue.Value:F1}%");
+
+            // Scroll should centre the frame in the viewport.
+            var (panX, panY, zoom) = ctrl.CameraState;
+            float expectedScrollX = Math.Max(0f, panX + texCX * zoom - vpW / 2f);
+            float expectedScrollY = Math.Max(0f, panY + texCY * zoom - vpH / 2f);
 
             Assert.True(Math.Abs(sv.Offset.X - expectedScrollX) < 2.0,
                 $"Scroll X should centre frame; expected≈{expectedScrollX:F1} actual={sv.Offset.X:F1}");
@@ -120,11 +130,11 @@ public class WireframeCenterOnFrameTests
     }
 
     /// <summary>
-    /// CenterOnFrame called with a frame near the far edge of the texture
-    /// must clamp to max scroll and not leave the pending-scroll flag stuck.
+    /// CenterOnFrame on a tiny frame near the texture corner zooms in,
+    /// clamps to max scroll, and does not leave the pending-scroll flag stuck.
     /// </summary>
     [AvaloniaFact]
-    public void CenterOnFrame_FrameNearFarEdge_ClampsToMaxScroll()
+    public void CenterOnFrame_FrameNearFarEdge_ZoomsAndClampsToMaxScroll()
     {
         var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -133,7 +143,8 @@ public class WireframeCenterOnFrameTests
         {
             var texPath = WriteSolidPng(dir, "tex.png", 500, 500);
 
-            // Frame at the far corner [0.95, 0.95, 1.0, 1.0] → centre at (487.5, 487.5)
+            // Frame at the far corner [0.95, 0.95, 1.0, 1.0] — 25×25 pixels.
+            // CenterOnFrame should zoom in significantly and clamp scroll to max.
             var frame = new AnimationFrameSave
             {
                 LeftCoordinate   = 0.95f,
@@ -152,23 +163,29 @@ public class WireframeCenterOnFrameTests
             ctrl.LoadTexture(texPath);
             Dispatcher.UIThread.RunJobs();
 
-            ctrl.SetZoomPercent(300);
-            Dispatcher.UIThread.RunJobs();
-
             ctrl.CenterOnFrame(frame);
             Dispatcher.UIThread.RunJobs();
 
-            // Pending flag must be cleared — scroll was either applied or clamped
+            // Pending flag must be cleared — scroll was either applied or clamped.
             Assert.False(ctrl.PendingScrollApply,
                 "PendingScrollApply must be false after CenterOnFrame + RunJobs");
 
-            // Scroll must not exceed max
+            // Scroll must not exceed max.
             double maxScrollX = Math.Max(0, sv.Extent.Width  - sv.Viewport.Width);
             double maxScrollY = Math.Max(0, sv.Extent.Height - sv.Viewport.Height);
             Assert.True(sv.Offset.X <= maxScrollX + 1.0,
                 $"Scroll X must not exceed max; offset={sv.Offset.X:F1} max={maxScrollX:F1}");
             Assert.True(sv.Offset.Y <= maxScrollY + 1.0,
                 $"Scroll Y must not exceed max; offset={sv.Offset.Y:F1} max={maxScrollY:F1}");
+
+            // Zoom should be meaningfully higher than the default fit-to-whole-image zoom.
+            float vpW = (float)sv.Viewport.Width;
+            float vpH = (float)sv.Viewport.Height;
+            float frameFitZoom = Math.Clamp(
+                Math.Min(vpW / 25f, vpH / 25f) * 0.85f,
+                WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+            Assert.True(Math.Abs(ctrl.Zoom - frameFitZoom) < 0.01f,
+                $"Zoom should fit 25×25 frame; expected≈{frameFitZoom:F3} actual={ctrl.Zoom:F3}");
 
             window.Close();
         }

@@ -1233,6 +1233,11 @@ public class WireframeControl : Control
     /// Does nothing when no bitmap is loaded or no ScrollViewer is attached.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Zooms to fit the frame's bounding box at 85 % of the viewport (same fraction
+    /// as <see cref="WireframeTransform.CenterFit"/> uses for the whole bitmap), then
+    /// scrolls so the frame centre lands at the viewport centre.
+    /// </summary>
     public void CenterOnFrame(AnimationFrameSave frame)
     {
         if (_bitmap is null || _scrollViewer is null) return;
@@ -1240,24 +1245,39 @@ public class WireframeControl : Control
         float bmpW = _bitmap.Width;
         float bmpH = _bitmap.Height;
 
-        float texCX = ((frame.LeftCoordinate + frame.RightCoordinate)  / 2f) * bmpW;
-        float texCY = ((frame.TopCoordinate  + frame.BottomCoordinate) / 2f) * bmpH;
+        float pixL = frame.LeftCoordinate  * bmpW;
+        float pixT = frame.TopCoordinate   * bmpH;
+        float pixR = frame.RightCoordinate * bmpW;
+        float pixB = frame.BottomCoordinate * bmpH;
+
+        float frameW = Math.Max(1f, pixR - pixL);
+        float frameH = Math.Max(1f, pixB - pixT);
+        float texCX  = (pixL + pixR) / 2f;
+        float texCY  = (pixT + pixB) / 2f;
 
         float vpW = (float)_scrollViewer.Viewport.Width;
         float vpH = (float)_scrollViewer.Viewport.Height;
 
-        float scrollX = Math.Max(0f, _panX + texCX * _zoom - vpW / 2f);
-        float scrollY = Math.Max(0f, _panY + texCY * _zoom - vpH / 2f);
+        // Zoom so the frame fills 85 % of the viewport.
+        _zoom = Math.Clamp(
+            Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
+            WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
 
-        // Clamp to the current max scroll so TryApplyPendingScroll's extent guard
-        // does not defer the scroll indefinitely when the frame is near the far edge.
-        if (_scrollViewer.Extent.Width > 0)
-            scrollX = Math.Min(scrollX, (float)Math.Max(0, _scrollViewer.Extent.Width  - vpW));
-        if (_scrollViewer.Extent.Height > 0)
-            scrollY = Math.Min(scrollY, (float)Math.Max(0, _scrollViewer.Extent.Height - vpH));
+        // In scroll mode panX/Y must always equal EffectivePaddingX/Y.
+        // Update them now — EffectivePaddingX/Y read _zoom which we just set.
+        _panX = EffectivePaddingX();
+        _panY = EffectivePaddingY();
+
+        float maxScrollX = Math.Max(0f, bmpW * _zoom + 2f * _panX - vpW);
+        float maxScrollY = Math.Max(0f, bmpH * _zoom + 2f * _panY - vpH);
+        float scrollX    = Math.Min(Math.Max(0f, _panX + texCX * _zoom - vpW / 2f), maxScrollX);
+        float scrollY    = Math.Min(Math.Max(0f, _panY + texCY * _zoom - vpH / 2f), maxScrollY);
 
         CancelPendingScrollApply(x: scrollX, y: scrollY);
         QueueScrollAfterLayout(scrollX, scrollY);
+        InvalidateMeasure();
+        InvalidateVisual();
+        ZoomChanged?.Invoke(_zoom * 100f);
     }
 
     /// <summary>
