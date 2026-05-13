@@ -635,22 +635,29 @@
                                                     <StackPanel VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center"
                                                                 Spacing="2">
-                                                        <!-- thumbnail placeholder -->
+                                                        <!-- frame thumbnail (texture crop, no shapes) -->
                                                         <Border Width="22" Height="18"
                                                                 Background="{StaticResource BgCanvas}"
                                                                 BorderBrush="{StaticResource LineStrong}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="2" />
+                                                                CornerRadius="2">
+                                                            <Image Source="{Binding Thumbnail}"
+                                                                   Stretch="Uniform" />
+                                                        </Border>
                                                         <TextBlock Text="{Binding IndexLabel}"
                                                                    HorizontalAlignment="Center"
                                                                    FontSize="9"
                                                                    Foreground="{StaticResource InkDim}" />
                                                     </StackPanel>
                                                 </Border>
-                                                <Border Height="2"
-                                                        VerticalAlignment="Top"
-                                                        Background="{StaticResource Accent}"
-                                                        IsVisible="{Binding IsCurrent}" />
+                                                <Canvas ClipToBounds="True"
+                                                        IsHitTestVisible="False"
+                                                        IsVisible="{Binding IsCurrent}">
+                                                    <Border Width="2"
+                                                            Height="38"
+                                                            Background="{StaticResource Accent}"
+                                                            Canvas.Left="{Binding ScrubberOffset}" />
+                                                </Canvas>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

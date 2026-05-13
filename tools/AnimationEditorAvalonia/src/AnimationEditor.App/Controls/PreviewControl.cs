@@ -162,6 +162,48 @@ public class PreviewControl : Control
         return bitmap;
     }
 
+    /// <summary>
+    /// Returns an Avalonia Bitmap of the frame's texture region, scaled to fit within
+    /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (preserving aspect ratio).
+    /// Returns null if the texture cannot be resolved, is not loaded, or the frame has no valid UV region.
+    /// </summary>
+    public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(AnimationFrameSave frame, int maxWidth, int maxHeight)
+    {
+        var path = ResolveTexturePath(frame);
+        var bm = GetBitmap(path);
+        if (bm is null) return null;
+
+        float uvW = frame.RightCoordinate  - frame.LeftCoordinate;
+        float uvH = frame.BottomCoordinate - frame.TopCoordinate;
+        if (uvW <= 0f || uvH <= 0f) return null;
+
+        int tw = bm.Width, th = bm.Height;
+        int sx = Math.Clamp((int)(frame.LeftCoordinate * tw), 0, tw - 1);
+        int sy = Math.Clamp((int)(frame.TopCoordinate  * th), 0, th - 1);
+        int sw = Math.Clamp((int)(uvW * tw), 1, tw - sx);
+        int sh = Math.Clamp((int)(uvH * th), 1, th - sy);
+
+        float scale = Math.Min((float)maxWidth / sw, (float)maxHeight / sh);
+        int finalW = Math.Max(1, (int)(sw * scale));
+        int finalH = Math.Max(1, (int)(sh * scale));
+
+        using var thumb  = new SKBitmap(finalW, finalH);
+        using var canvas = new SKCanvas(thumb);
+        canvas.Clear(SKColors.Transparent);
+        using var img    = SKImage.FromBitmap(bm);
+        using var paint  = new SKPaint { Color = SKColors.White };
+        canvas.DrawImage(img,
+            SKRectI.Create(sx, sy, sw, sh),
+            SKRect.Create(0, 0, finalW, finalH),
+            new SKSamplingOptions(SKFilterMode.Linear),
+            paint);
+
+        using var ms = new MemoryStream();
+        thumb.Encode(ms, SKEncodedImageFormat.Png, 100);
+        ms.Position = 0;
+        return new Avalonia.Media.Imaging.Bitmap(ms);
+    }
+
     // -- Injected services -----------------------------------------------------
 
     private ISelectedState? _selectedState;

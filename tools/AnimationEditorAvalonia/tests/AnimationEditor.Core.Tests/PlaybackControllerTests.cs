@@ -285,4 +285,150 @@ public class PlaybackControllerTests
 
         Assert.Equal(0, ctrl.CurrentFrameIndex);
     }
+
+    // ── FrameElapsed ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FrameElapsed_IsZero_AfterSetChain()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        Assert.Equal(0.0, ctrl.FrameElapsed);
+    }
+
+    [Fact]
+    public void FrameElapsed_IsZero_AfterReset()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Advance(0.05);
+
+        ctrl.Reset();
+
+        Assert.Equal(0.0, ctrl.FrameElapsed);
+    }
+
+    [Fact]
+    public void FrameElapsed_ReturnsElapsedWithinCurrentFrame()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+
+        ctrl.Advance(0.05); // 0.05s into frame 0 (which spans 0.0–0.1)
+
+        Assert.Equal(0.05, ctrl.FrameElapsed, precision: 6);
+    }
+
+    [Fact]
+    public void FrameElapsed_ResetsToSmallValue_WhenFrameChanges()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Advance(0.05); // mid frame 0
+
+        ctrl.Advance(0.1); // advances to frame 1; anim time = 0.15, frame 1 starts at 0.1 → elapsed = 0.05
+
+        Assert.Equal(1, ctrl.CurrentFrameIndex);
+        Assert.Equal(0.05, ctrl.FrameElapsed, precision: 6);
+    }
+
+    [Fact]
+    public void FrameElapsed_IsCorrectForNonFirstFrame()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+
+        ctrl.Advance(0.25); // anim time = 0.25, frame 2 starts at 0.2 → elapsed = 0.05
+
+        Assert.Equal(2, ctrl.CurrentFrameIndex);
+        Assert.Equal(0.05, ctrl.FrameElapsed, precision: 6);
+    }
+
+    // ── PlaybackTicked ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void PlaybackTicked_FiresOnEveryAdvance_EvenWithoutFrameChange()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        int tickCount = 0;
+        ctrl.PlaybackTicked += () => tickCount++;
+
+        ctrl.Advance(0.01);
+        ctrl.Advance(0.01);
+        ctrl.Advance(0.01);
+
+        Assert.Equal(3, tickCount);
+    }
+
+    [Fact]
+    public void PlaybackTicked_FiresOnAdvance_WhenFrameChanges()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        int tickCount = 0;
+        ctrl.PlaybackTicked += () => tickCount++;
+
+        ctrl.Advance(0.15); // crosses frame boundary
+
+        Assert.Equal(1, tickCount);
+    }
+
+    [Fact]
+    public void PlaybackTicked_DoesNotFire_WhenPaused()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Pause();
+        int tickCount = 0;
+        ctrl.PlaybackTicked += () => tickCount++;
+
+        ctrl.Advance(0.15);
+
+        Assert.Equal(0, tickCount);
+    }
+
+    [Fact]
+    public void PlaybackTicked_DoesNotFire_ForSingleFrameChain()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(1, 0.1f));
+        int tickCount = 0;
+        ctrl.PlaybackTicked += () => tickCount++;
+
+        ctrl.Advance(0.5);
+
+        Assert.Equal(0, tickCount);
+    }
+
+    [Fact]
+    public void PlaybackTicked_FiresOnReset()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Advance(0.05);
+        int tickCount = 0;
+        ctrl.PlaybackTicked += () => tickCount++;
+
+        ctrl.Reset();
+
+        Assert.Equal(1, tickCount);
+    }
+
+    [Fact]
+    public void FrameElapsed_IsAlreadyUpdated_WhenFrameIndexChangedFires()
+    {
+        // FrameElapsed for the NEW frame must be correct inside FrameIndexChanged,
+        // not the stale value from the old frame.
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Advance(0.05); // mid frame 0
+
+        double elapsedAtFrameChange = -1;
+        ctrl.FrameIndexChanged += _ => elapsedAtFrameChange = ctrl.FrameElapsed;
+
+        ctrl.Advance(0.1); // crosses into frame 1 at anim time 0.15; frame 1 starts at 0.1 → elapsed = 0.05
+
+        Assert.Equal(0.05, elapsedAtFrameChange, precision: 6);
+    }
 }

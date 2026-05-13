@@ -18,6 +18,8 @@ public class PlaybackController
     private int _currentFrameIndex;
     private AnimationChainSave? _chain;
 
+    private double _frameStartTime;
+
     // ── Public state ──────────────────────────────────────────────────────────
 
     /// <summary>Current frame index into the active chain.</summary>
@@ -25,6 +27,12 @@ public class PlaybackController
 
     /// <summary>Accumulated playback time in seconds (wraps at chain total time).</summary>
     public double AnimTime => _animTime;
+
+    /// <summary>
+    /// Elapsed time within the current frame, in seconds. Resets to zero each time
+    /// the frame advances or <see cref="Reset"/> is called.
+    /// </summary>
+    public double FrameElapsed => _animTime - _frameStartTime;
 
     /// <summary>
     /// When <c>false</c>, <see cref="Advance"/> is a no-op so the animation is paused.
@@ -45,6 +53,12 @@ public class PlaybackController
     /// The argument is the new frame index.
     /// </summary>
     public event Action<int>? FrameIndexChanged;
+
+    /// <summary>
+    /// Fired on every <see cref="Advance"/> call while playing, and on <see cref="Reset"/>.
+    /// Subscribers can read <see cref="FrameElapsed"/> to drive smooth per-frame UI.
+    /// </summary>
+    public event Action? PlaybackTicked;
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
@@ -68,8 +82,10 @@ public class PlaybackController
     public void Reset()
     {
         _animTime = 0;
+        _frameStartTime = 0;
         _currentFrameIndex = 0;
         FrameIndexChanged?.Invoke(0);
+        PlaybackTicked?.Invoke();
     }
 
     /// <summary>
@@ -95,17 +111,24 @@ public class PlaybackController
 
         double t = 0;
         int newIdx = chain.Frames.Count - 1;
+        double newFrameStart = 0;
         for (int i = 0; i < chain.Frames.Count; i++)
         {
             double fl = chain.Frames[i].FrameLength > 0 ? chain.Frames[i].FrameLength : 0.1;
-            if (_animTime < t + fl) { newIdx = i; break; }
+            if (_animTime < t + fl) { newIdx = i; newFrameStart = t; break; }
             t += fl;
         }
+
+        // Update _frameStartTime before events so FrameElapsed is already correct
+        // when FrameIndexChanged and PlaybackTicked handlers run.
+        _frameStartTime = newFrameStart;
 
         if (newIdx != _currentFrameIndex)
         {
             _currentFrameIndex = newIdx;
             FrameIndexChanged?.Invoke(newIdx);
         }
+
+        PlaybackTicked?.Invoke();
     }
 }
