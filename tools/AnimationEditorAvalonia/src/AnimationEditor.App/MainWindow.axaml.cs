@@ -744,7 +744,7 @@ public partial class MainWindow : Window
             OnTreePointerPressed,
             RoutingStrategies.Tunnel);
 
-        // "Add Chain" button under the tree
+        // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) =>
         {
             if (_projectManager.AnimationChainListSave is null)
@@ -1213,7 +1213,7 @@ public partial class MainWindow : Window
             AddMenuItem("Flip Vertically",    () => _appCommands.FlipChainVertically(chain));
             AddMenuItem("Invert Frame Order", () => _appCommands.InvertFrameOrder(chain));
             AddSeparator();
-            AddMenuItem("Add AnimationChain", AddAnimationChainAndBeginInlineRename);
+            AddMenuItem("Add Animation", AddAnimationChainAndBeginInlineRename);
             AddMenuItem("Add Frame",          () => _appCommands.AddFrame(chain));
             AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
             AddSeparator();
@@ -1227,12 +1227,12 @@ public partial class MainWindow : Window
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
-            AddMenuItem("Delete AnimationChain",
+            AddMenuItem("Delete Animation",
                 () => _ = _appCommands.AskToDeleteAnimationChains(new() { chain }));
         }
         else
         {
-            AddMenuItem("Add AnimationChain", () =>
+            AddMenuItem("Add Animation", () =>
             {
                 if (_projectManager.AnimationChainListSave is null)
                     _projectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -1461,18 +1461,18 @@ public partial class MainWindow : Window
         var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 10 };
         panel.Children.Add(new TextBlock
         {
-            Text = $"The selected file:\n\n{absoluteTexturePath}\n\nis not relative to the Animation Chain file.  What would you like to do?",
+            Text = $"The selected file:\n\n{absoluteTexturePath}\n\nis not relative to the Animation file.  What would you like to do?",
             TextWrapping = Avalonia.Media.TextWrapping.Wrap
         });
 
         var copyBtn = new Button
         {
-            Content = "Copy the file to the same folder as the Animation Chain",
+            Content = "Copy the file to the same folder as the Animation",
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
         };
         var keepBtn = new Button
         {
-            Content = "Keep the file where it is (this may limit the portability of the Animation Chain file)",
+            Content = "Keep the file where it is (this may limit the portability of the Animation file)",
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch
         };
 
@@ -2562,12 +2562,12 @@ public partial class MainWindow : Window
 
     private async Task AskRenameChainAsync(AnimationChainSave chain)
     {
-        var name = await ShowStringInputDialogAsync("Rename Animation Chain", "New name:", chain.Name);
+        var name = await ShowStringInputDialogAsync("Rename Animation", "New name:", chain.Name);
         if (name is null) return;
         name = name.Trim();
         if (string.IsNullOrEmpty(name))
         {
-            await ShowMessageAsync("Chain name cannot be empty.");
+            await ShowMessageAsync("Animation name cannot be empty.");
             return;
         }
         _appCommands.RenameChain(chain, name);

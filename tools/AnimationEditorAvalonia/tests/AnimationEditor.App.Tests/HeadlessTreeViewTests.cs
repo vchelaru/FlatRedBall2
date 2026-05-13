@@ -188,7 +188,7 @@ public class HeadlessTreeViewTests
 
             TriggerContextMenuOpening(window);
 
-            Assert.Contains("Add AnimationChain", ContextMenuHeaders(window));
+            Assert.Contains("Add Animation", ContextMenuHeaders(window));
         }
         finally { window.Close(); }
     }
@@ -231,7 +231,7 @@ public class HeadlessTreeViewTests
 
             TriggerContextMenuOpening(window);
 
-            Assert.Contains("Delete AnimationChain", ContextMenuHeaders(window));
+            Assert.Contains("Delete Animation", ContextMenuHeaders(window));
         }
         finally { window.Close(); }
     }
@@ -414,7 +414,7 @@ public class HeadlessTreeViewTests
             TriggerContextMenuOpening(window);
 
             var headers = ContextMenuHeaders(window);
-            Assert.Contains("Delete AnimationChain", headers);
+            Assert.Contains("Delete Animation", headers);
             Assert.DoesNotContain("Delete Frame", headers);
         }
         finally { window.Close(); }
