@@ -620,20 +620,57 @@ public partial class MainWindow : Window
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) =>
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
 
+    internal const string GitHubUrl = "https://github.com/vchelaru/FlatRedBall2";
+
     private void OnAboutClick(object? sender, RoutedEventArgs e)
-    {
-        _ = new Window
+        => _ = BuildAboutWindow().ShowDialog(this);
+
+    /// <summary>
+    /// Returns a fully-configured About window centered on its owner.
+    /// Extracted for testability.
+    /// </summary>
+    internal static Window BuildAboutWindow() =>
+        new Window
         {
             Title = "About AnimationEditor",
-            Width = 320,
-            Height = 130,
-            Content = new TextBlock
+            Width = 420,
+            Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = BuildAboutContent(),
+        };
+
+    /// <summary>
+    /// Builds the content panel for the About dialog.
+    /// Extracted for testability.
+    /// </summary>
+    internal static Control BuildAboutContent()
+    {
+        var ver = typeof(MainWindow).Assembly.GetName().Version;
+        var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+
+        var linkButton = new Button { Content = GitHubUrl };
+        linkButton.Click += (_, _) =>
+        {
+            try
             {
-                Text = "AnimationEditor: Avalonia Port\n© FlatRedBall Contributors",
-                Margin = new Avalonia.Thickness(16),
-                TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                Process.Start(new ProcessStartInfo(GitHubUrl) { UseShellExecute = true });
             }
-        }.ShowDialog(this);
+            catch { }
+        };
+
+        return new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock { Text = "AnimationEditor", FontSize = 16 },
+                new TextBlock { Text = $"Version {versionText}" },
+                new TextBlock { Text = "© FlatRedBall Contributors" },
+                linkButton,
+            }
+        };
     }
 
     // ── Preview controls wiring ───────────────────────────────────────────────
