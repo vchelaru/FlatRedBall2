@@ -15,7 +15,7 @@ namespace AnimationEditor.Core
         AARectSave? SelectedRectangle { get; set; }
         CircleSave? SelectedCircle { get; set; }
         object? SelectedShape { get; }
-        List<AnimationChainSave> SelectedChains { get; set; }
+        List<AnimationChainSave> SelectedChains { get; }
         List<AnimationFrameSave> SelectedFrames { get; }
         List<AARectSave> SelectedRectangles { get; }
         List<CircleSave> SelectedCircles { get; }

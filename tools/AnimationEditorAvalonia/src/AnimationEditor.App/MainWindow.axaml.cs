@@ -346,8 +346,9 @@ public partial class MainWindow : Window
 
     private void OnFrameCreatedFromRegion(int minX, int minY, int maxX, int maxY)
     {
-        var chain = _selectedState.SelectedChain;
-        if (chain is null) return;
+        var selectedChains = _selectedState.SelectedChains;
+        var primaryChain = selectedChains.Count > 0 ? selectedChains[0] : _selectedState.SelectedChain;
+        if (primaryChain is null) return;
 
         var texPath = WireframeCtrl.LoadedTexturePath;
         if (string.IsNullOrEmpty(texPath)) return;
@@ -364,20 +365,34 @@ public partial class MainWindow : Window
                 texPath).Replace('\\', '/')
             : texPath;
 
-        var frame = new AnimationFrameSave
-        {
-            TextureName        = relPath,
-            LeftCoordinate     = minX / (float)bitmapW,
-            RightCoordinate    = maxX / (float)bitmapW,
-            TopCoordinate      = minY / (float)bitmapH,
-            BottomCoordinate   = maxY / (float)bitmapH,
-            FrameLength        = 0.1f,
-            ShapesSave = new ShapesSave()
-        };
+        // When multiple chains are selected, add a distinct frame to each one.
+        // When only one chain is in scope, behave as before and select the new frame.
+        var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
-        chain.Frames.Add(frame);
-        _appCommands.RefreshTreeNode(chain);
-        _selectedState.SelectedFrame = frame;
+        AnimationFrameSave? primaryFrame = null;
+        foreach (var chain in chainsToAddTo)
+        {
+            var frame = new AnimationFrameSave
+            {
+                TextureName        = relPath,
+                LeftCoordinate     = minX / (float)bitmapW,
+                RightCoordinate    = maxX / (float)bitmapW,
+                TopCoordinate      = minY / (float)bitmapH,
+                BottomCoordinate   = maxY / (float)bitmapH,
+                FrameLength        = 0.1f,
+                ShapesSave = new ShapesSave()
+            };
+            chain.Frames.Add(frame);
+            _appCommands.RefreshTreeNode(chain);
+            if (chain == primaryChain)
+                primaryFrame = frame;
+        }
+
+        // In single-chain mode select the new frame (preserves existing UX).
+        // In multi-chain mode leave selection unchanged so the multi-chain view is preserved.
+        if (chainsToAddTo.Count == 1 && primaryFrame != null)
+            _selectedState.SelectedFrame = primaryFrame;
+
         _events.RaiseAnimationChainsChanged();
     }
 
@@ -455,7 +470,11 @@ public partial class MainWindow : Window
     {
         string? texPath = null;
 
-        var frame = _selectedState.SelectedFrame;
+        // Prefer selected frame, then fall back to selected chains/chain for texture lookup.
+        var frame = _selectedState.SelectedFrame
+            ?? _selectedState.SelectedChains.SelectMany(c => c.Frames).FirstOrDefault()
+            ?? _selectedState.SelectedChain?.Frames?.FirstOrDefault();
+
         if (frame != null && !string.IsNullOrEmpty(frame.TextureName) &&
             !string.IsNullOrEmpty(_projectManager.FileName))
         {
@@ -2145,7 +2164,11 @@ public partial class MainWindow : Window
         if (selectedVm is null) return;
 
         if (selectedVm.Data is AnimationChainSave chainToDel)
-            _ = _appCommands.AskToDeleteAnimationChains(new() { chainToDel });
+        {
+            var chains = _selectedState.SelectedChains;
+            _ = _appCommands.AskToDeleteAnimationChains(
+                chains.Count > 0 ? chains : new() { chainToDel });
+        }
         else if (selectedVm.Data is AnimationFrameSave frameToDel)
             _ = _appCommands.AskToDeleteFrames(new() { frameToDel });
         else if (selectedVm.Data is AARectSave rectToDel)

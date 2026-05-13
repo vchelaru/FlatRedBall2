@@ -388,6 +388,11 @@ public class WireframeControl : Control
     private bool _draggingChain;
     private readonly List<(FrameRect Rect, SKRect StartBounds)> _chainDragStarts = new();
 
+    // Bulk handle-drag state: populated at drag-start when multiple chains are selected.
+    // Holds the before-state and start bounds of ALL visible frames so ApplyHandleDrag
+    // can apply a uniform delta and OnPointerReleased can record a single undo entry.
+    private readonly List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> _bulkHandleDragStarts = new();
+
     // Before-UV snapshot captured at drag start for undo recording
     private float _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB;
 
@@ -883,6 +888,9 @@ public class WireframeControl : Control
     /// </summary>
     public void RefreshFrames() => RefreshFramesInternal();
 
+    /// <summary>Number of frame rects currently visible in the wireframe. For tests only.</summary>
+    public int FrameRectCount => _frameRects.Count;
+
     /// <summary>Re-detect the current texture from the selection, reload it, and refresh frames.</summary>
     public void RefreshAll()
     {
@@ -1047,6 +1055,7 @@ public class WireframeControl : Control
         _dragBeforeT = sel.Frame.TopCoordinate;
         _dragBeforeR = sel.Frame.RightCoordinate;
         _dragBeforeB = sel.Frame.BottomCoordinate;
+        _bulkHandleDragStarts.Clear();
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
@@ -1057,6 +1066,54 @@ public class WireframeControl : Control
             sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
             sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate,
             _appCommands!, _events!));
+        _draggingRect   = null;
+        _draggingHandle = HandleKind.None;
+    }
+
+    /// <summary>
+    /// Test-only: simulates a bulk handle-drag gesture for multi-chain mode.
+    /// Applies the same handle delta to <paramref name="targetFrame"/> and every
+    /// other visible frame rect, then records a single <see cref="BulkFrameRegionChangedCommand"/>.
+    /// No-op when the target frame is not found in the visible rects, no bitmap is loaded,
+    /// or fewer than two frame rects are visible.
+    /// </summary>
+    public void SimulateBulkHandleDrag(AnimationFrameSave targetFrame,
+        HandleKind handle,
+        float startScreenX, float startScreenY,
+        float endScreenX,   float endScreenY)
+    {
+        var primary = _frameRects.FirstOrDefault(fr => fr.Frame == targetFrame);
+        if (primary is null || _bitmap is null) return;
+
+        _draggingRect    = primary;
+        _draggingHandle  = handle;
+        _dragStartWorld  = ScreenToTexture(startScreenX, startScreenY);
+        _dragStartBounds = primary.Bounds;
+        _dragBeforeL = primary.Frame.LeftCoordinate;
+        _dragBeforeT = primary.Frame.TopCoordinate;
+        _dragBeforeR = primary.Frame.RightCoordinate;
+        _dragBeforeB = primary.Frame.BottomCoordinate;
+
+        _bulkHandleDragStarts.Clear();
+        foreach (var fr in _frameRects)
+            _bulkHandleDragStarts.Add((fr, fr.Bounds,
+                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+
+        ApplyHandleDrag(new Point(endScreenX, endScreenY));
+
+        var snapshots = _bulkHandleDragStarts
+            .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                s.Rect.Frame,
+                s.BL, s.BT, s.BR, s.BB,
+                s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+            .ToList();
+        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+        foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+            FrameRegionChanged?.Invoke(fr.Frame);
+
+        _bulkHandleDragStarts.Clear();
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1364,7 +1421,7 @@ public class WireframeControl : Control
             {
                 if (hitFrame != null)
                 {
-                    // Single-frame drag
+                    // Single-frame drag (or bulk handle drag when multi-chain selected)
                     _draggingRect = hitFrame;
                     _draggingHandle = hitHandle;
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
@@ -1373,6 +1430,17 @@ public class WireframeControl : Control
                     _dragBeforeT = hitFrame.Frame.TopCoordinate;
                     _dragBeforeR = hitFrame.Frame.RightCoordinate;
                     _dragBeforeB = hitFrame.Frame.BottomCoordinate;
+
+                    // In multi-chain mode, capture before-state of ALL visible frames for
+                    // bulk apply and a single atomic undo command.
+                    _bulkHandleDragStarts.Clear();
+                    if ((_selectedState?.SelectedChains?.Count ?? 0) > 1)
+                    {
+                        foreach (var fr in _frameRects)
+                            _bulkHandleDragStarts.Add((fr, fr.Bounds,
+                                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                    }
                 }
                 else
                 {
@@ -1561,13 +1629,32 @@ public class WireframeControl : Control
 
         if (_draggingRect != null)
         {
-            FrameRegionChanged?.Invoke(_draggingRect.Frame);
-            _undoManager!.Record(new FrameRegionChangedCommand(
-                _draggingRect.Frame,
-                _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-                _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
-                _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate,
-                _appCommands!, _events!));
+            if (_bulkHandleDragStarts.Count > 0)
+            {
+                // Bulk drag: record one atomic undo command covering all affected frames,
+                // then notify listeners for each changed frame.
+                var snapshots = _bulkHandleDragStarts
+                    .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                        s.Rect.Frame,
+                        s.BL, s.BT, s.BR, s.BB,
+                        s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                        s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+                    .ToList();
+                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+                    FrameRegionChanged?.Invoke(fr.Frame);
+                _bulkHandleDragStarts.Clear();
+            }
+            else
+            {
+                FrameRegionChanged?.Invoke(_draggingRect.Frame);
+                _undoManager!.Record(new FrameRegionChangedCommand(
+                    _draggingRect.Frame,
+                    _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                    _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
+                    _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate,
+                    _appCommands!, _events!));
+            }
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
             e.Pointer.Capture(null);
@@ -1730,13 +1817,32 @@ public class WireframeControl : Control
 
         _draggingRect.Bounds = new SKRect(nb.Left, nb.Top, nb.Right, nb.Bottom);
 
-        // Write UV coords back to the frame
+        // Write UV coords back to the primary frame
         var (l, t, r, b) = DragHandleApplier.ToUvCoords(nb, _bitmap.Width, _bitmap.Height);
         var f = _draggingRect.Frame;
         f.LeftCoordinate   = l;
         f.RightCoordinate  = r;
         f.TopCoordinate    = t;
         f.BottomCoordinate = b;
+
+        // Apply the same delta to all other frames in bulk mode
+        if (_bulkHandleDragStarts.Count > 0)
+        {
+            float texW = _bitmap.Width, texH = _bitmap.Height;
+            foreach (var (fr, startB, _, _, _, _) in _bulkHandleDragStarts)
+            {
+                if (fr == _draggingRect) continue;
+                var sb = new BoundsRect(startB.Left, startB.Top, startB.Right, startB.Bottom);
+                var nb2 = DragHandleApplier.Apply(_draggingHandle, dx, dy, sb);
+                nb2 = DragHandleApplier.SnapEdges(nb2, _draggingHandle, snapSize);
+                fr.Bounds = new SKRect(nb2.Left, nb2.Top, nb2.Right, nb2.Bottom);
+                var (l2, t2, r2, b2) = DragHandleApplier.ToUvCoords(nb2, texW, texH);
+                fr.Frame.LeftCoordinate   = l2;
+                fr.Frame.RightCoordinate  = r2;
+                fr.Frame.TopCoordinate    = t2;
+                fr.Frame.BottomCoordinate = b2;
+            }
+        }
 
         // Live update for the property panel (no save / tree refresh yet)
         FrameLiveUpdated?.Invoke(_draggingRect.Frame);
@@ -1833,8 +1939,25 @@ public class WireframeControl : Control
             return kind == HandleKind.None ? (null, HandleKind.None) : (sel, kind);
         }
 
-        // Chain selected (no individual frame): test against the composite bounding rect.
-        // All hits are treated as Move since resizing the group is not supported.
+        // Multi-chain mode: test handles on every individual frame rect so bulk resize
+        // (uniform delta) is accessible even when no single frame is selected.
+        if ((_selectedState?.SelectedChains?.Count ?? 0) > 1 && _frameRects.Count > 0)
+        {
+            foreach (var fr in _frameRects)
+            {
+                var sr = ToScreen(fr.Bounds);
+                var kind = DragHandleHitTester.GetHandleAt(
+                    (float)pos.X, (float)pos.Y,
+                    sr.Left, sr.Top, sr.Right, sr.Bottom,
+                    handleOffset: 5f);
+                if (kind != HandleKind.None)
+                    return (fr, kind);
+            }
+            // No per-frame handle hit — fall through to composite Move.
+        }
+
+        // Single chain or multi-chain composite Move handle.
+        // All hits are treated as Move since resizing the group via the bounding rect is not supported.
         if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
         {
             var chainRect = ComputeChainBoundingRect();

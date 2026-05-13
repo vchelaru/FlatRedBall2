@@ -87,7 +87,8 @@ namespace AnimationEditor.Core
 
         public object? SelectedShape => (object?)_selectedRectangle ?? _selectedCircle;
 
-        public List<AnimationChainSave> SelectedChains { get; set; } = new List<AnimationChainSave>();
+        public List<AnimationChainSave> SelectedChains =>
+            _selectedNodes.OfType<AnimationChainSave>().ToList();
 
         public List<AnimationFrameSave> SelectedFrames
         {
@@ -171,7 +172,6 @@ namespace AnimationEditor.Core
             _selectedRectangle = null;
             _selectedCircle = null;
             _selectedNodes = new List<object>();
-            SelectedChains = new List<AnimationChainSave>();
             SelectionChanged?.Invoke();
         }
     }

@@ -282,6 +282,43 @@ public class SelectedStateTests
         Assert.Null(ctx.SelectedState.SelectedTextureName);
     }
 
+    // ── SelectedChains computed ───────────────────────────────────────────────
+
+    [Fact]
+    public void SelectedChains_ReturnsChainNodesFromSelectedNodes()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var c1 = TestHelpers.MakeChain(acls, "Run");
+        var c2 = TestHelpers.MakeChain(acls, "Idle");
+        ctx.SelectedState.SelectedNodes = new List<object> { c1, c2 };
+
+        var chains = ctx.SelectedState.SelectedChains;
+
+        Assert.Contains(c1, chains);
+        Assert.Contains(c2, chains);
+    }
+
+    [Fact]
+    public void SelectedChains_EmptyWhenNoChainNodes()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.SelectedState.SelectedNodes = new List<object>();
+
+        Assert.Empty(ctx.SelectedState.SelectedChains);
+    }
+
+    [Fact]
+    public void SelectedChains_IgnoresNonChainNodes()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Run", 1);
+        ctx.SelectedState.SelectedNodes = new List<object> { chain.Frames[0] };
+
+        Assert.Empty(ctx.SelectedState.SelectedChains);
+    }
+
     // ── SelectedFrames / multi-select ─────────────────────────────────────────
 
     [Fact]
