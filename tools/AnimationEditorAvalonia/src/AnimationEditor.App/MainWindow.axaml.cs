@@ -90,7 +90,12 @@ public partial class MainWindow : Window
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
 
         Opened += OnOpened;
-        Closed += (_, _) => PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
+        Closed += (_, _) =>
+        {
+            PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
+            foreach (var vm in _timelineFrames)
+                (vm.Thumbnail as IDisposable)?.Dispose();
+        };
     }
 
     // ── Startup ───────────────────────────────────────────────────────────────
@@ -1097,9 +1102,22 @@ public partial class MainWindow : Window
     {
         var chain = GetTimelineChain();
 
+        // Capture old thumbnails before clearing so we dispose after the collection is empty
+        // (avoids briefly holding disposed Bitmaps in bound Image controls)
+        var oldThumbnails = _timelineFrames.Select(vm => vm.Thumbnail as IDisposable).ToList();
         _timelineFrames.Clear();
+        foreach (var d in oldThumbnails)
+            d?.Dispose();
+
         foreach (var item in TimelineBuilder.BuildFrameItems(chain))
             _timelineFrames.Add(item);
+
+        // Populate frame thumbnails (texture crop, no shapes)
+        if (chain is not null)
+        {
+            for (int i = 0; i < chain.Frames.Count && i < _timelineFrames.Count; i++)
+                _timelineFrames[i].Thumbnail = PreviewCtrl.GetFrameThumbnail(chain.Frames[i], 22, 18);
+        }
 
         _currentTimelineFrameIndex = -1;
         UpdateTimelineScrubber(GetPreferredTimelineFrameIndex(chain));

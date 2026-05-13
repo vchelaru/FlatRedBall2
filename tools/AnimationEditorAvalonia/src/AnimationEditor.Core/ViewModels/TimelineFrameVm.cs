@@ -32,6 +32,24 @@ public sealed class TimelineFrameVm : INotifyPropertyChanged
         }
     }
 
+    private object? _thumbnail;
+    /// <summary>
+    /// Thumbnail image for this frame cell, set by the App layer after the texture is resolved.
+    /// Holds an <c>Avalonia.Media.Imaging.Bitmap</c> at runtime; null until populated.
+    /// </summary>
+    public object? Thumbnail
+    {
+        get => _thumbnail;
+        set
+        {
+            if (!ReferenceEquals(_thumbnail, value))
+            {
+                _thumbnail = value;
+                Notify();
+            }
+        }
+    }
+
     private double _scrubberOffset;
     /// <summary>
     /// X offset of the playhead within this frame cell (0..Width-PlayheadWidth).

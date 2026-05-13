@@ -635,12 +635,15 @@
                                                     <StackPanel VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center"
                                                                 Spacing="2">
-                                                        <!-- thumbnail placeholder -->
+                                                        <!-- frame thumbnail (texture crop, no shapes) -->
                                                         <Border Width="22" Height="18"
                                                                 Background="{StaticResource BgCanvas}"
                                                                 BorderBrush="{StaticResource LineStrong}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="2" />
+                                                                CornerRadius="2">
+                                                            <Image Source="{Binding Thumbnail}"
+                                                                   Stretch="Uniform" />
+                                                        </Border>
                                                         <TextBlock Text="{Binding IndexLabel}"
                                                                    HorizontalAlignment="Center"
                                                                    FontSize="9"

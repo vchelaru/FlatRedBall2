@@ -3,10 +3,13 @@ using AnimationEditor.Core.Data;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
+using SkiaSharp;
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -194,6 +197,62 @@ public class TimelineScrubberTests
         finally
         {
             window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void Thumbnail_IsAvaloniaBitmap_WhenFrameHasValidTexture()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var pngPath = Path.Combine(dir, "sprite.png");
+        using (var bm = new SKBitmap(64, 64))
+        {
+            bm.Erase(SKColors.Red);
+            using var data = bm.Encode(SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(pngPath, data.ToArray());
+        }
+
+        try
+        {
+            var ctx = TestHelpers.BuildServices();
+            var chain = new AnimationChainSave { Name = "Idle" };
+            chain.Frames.Add(new AnimationFrameSave
+            {
+                TextureName         = pngPath,
+                FrameLength         = 0.1f,
+                LeftCoordinate      = 0f,
+                TopCoordinate       = 0f,
+                RightCoordinate     = 1f,
+                BottomCoordinate    = 1f,
+                ShapesSave          = new ShapesSave()
+            });
+            var acls = new AnimationChainListSave();
+            acls.AnimationChains.Add(chain);
+            ctx.ProjectManager.AnimationChainListSave = acls;
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+
+            try
+            {
+                ctx.SelectedState.SelectedChain = chain;
+                Dispatcher.UIThread.RunJobs();
+
+                var timeline = window.FindControl<ItemsControl>("TimelineStrip")
+                    ?? throw new InvalidOperationException("TimelineStrip not found");
+                var items = Assert.IsType<ObservableCollection<TimelineFrameVm>>(timeline.ItemsSource);
+                Assert.Single(items);
+                Assert.IsType<Bitmap>(items[0].Thumbnail);
+            }
+            finally
+            {
+                window.Close();
+            }
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
         }
     }
 }
