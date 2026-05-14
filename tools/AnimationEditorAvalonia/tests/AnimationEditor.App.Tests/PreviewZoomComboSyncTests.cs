@@ -1,7 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
@@ -32,7 +31,6 @@ public class PreviewZoomComboSyncTests
         ctx.AppCommands.DoOnUiThread              = a => a();
         ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
         ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
-        ctx.AppState.UnitType                     = UnitType.Pixel;
         return ctx;
     }
 
@@ -71,13 +69,12 @@ public class PreviewZoomComboSyncTests
         var preview = FindCtrl<PreviewControl>(window, "PreviewCtrl");
         var combo   = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
 
-        // One wheel-in notch from 100 % lands at 125 % — explicitly NOT in the
-        // preset list { 10, 25, 50, 100, 200, 400 }. The combo must display
-        // the live value, not snap to "100%".
+        // One wheel-in notch from 100 % steps to the next preset (150 %).
+        // The combo must display the live value exactly.
         preview.SimulateWheelZoom(100, 100, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("125%", combo.Text);
+        Assert.Equal("150%", combo.Text);
 
         window.Close();
     }
@@ -94,10 +91,10 @@ public class PreviewZoomComboSyncTests
         var combo   = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
         var plusBtn = FindCtrl<Button>(window, "PreviewZoomPlusBtn");
 
-        // 100 → 125 (between 100 and 200). + must jump to 200, not back to 100.
+        // 100 → 150 (next preset above 100). + must jump to 200, not back to 100.
         preview.SimulateWheelZoom(100, 100, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("125%", combo.Text);
+        Assert.Equal("150%", combo.Text);
 
         // Buttons are wired via the Click event; raise it directly to drive the handler.
         plusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -121,12 +118,12 @@ public class PreviewZoomComboSyncTests
 
         preview.SimulateWheelZoom(100, 100, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("125%", combo.Text);
+        Assert.Equal("150%", combo.Text);
 
         minusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
-        // 125 → previous preset strictly less = 100.
+        // 150 → previous preset strictly less = 100.
         Assert.Equal("100%", combo.Text);
         window.Close();
     }
@@ -149,8 +146,8 @@ public class PreviewZoomComboSyncTests
         plusBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
-        // From exactly 100 (a preset), + must jump to the strictly-greater one (200), not stay at 100.
-        Assert.Equal("200%", combo.Text);
+        // From exactly 100 (a preset), + must jump to the strictly-greater one (150), not stay at 100.
+        Assert.Equal("150%", combo.Text);
         window.Close();
     }
 

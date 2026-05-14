@@ -24,17 +24,6 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public string? ProjectFolder { get; set; }
 
-        private UnitType _unitType;
-        public UnitType UnitType
-        {
-            get => _unitType;
-            set
-            {
-                _unitType = value;
-                _events.CallWireframeTextureChange();
-            }
-        }
-
         private int _wireframeZoomValue = 100;
         public int WireframeZoomValue
         {

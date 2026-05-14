@@ -7,12 +7,6 @@ namespace AnimationEditor.Core.Data
     {
     }
 
-    public class AnimationChainSettingSave
-    {
-        public string? Name { get; set; }
-        public UnitType UnitType { get; set; }
-    }
-
     public class AESettingsSave
     {
         public float OffsetMultiplier = 1;
@@ -29,9 +23,6 @@ namespace AnimationEditor.Core.Data
         [XmlElement("ExpandedNode")]
         public List<string> ExpandedNodes { get; set; } = new List<string>();
 
-        public List<AnimationChainSettingSave> AnimationChainSettings = new List<AnimationChainSettingSave>();
-
-        public UnitType UnitType { get; set; }
         public bool SnapToGrid { get; set; }
         public int GridSize { get; set; } = 16;
     }

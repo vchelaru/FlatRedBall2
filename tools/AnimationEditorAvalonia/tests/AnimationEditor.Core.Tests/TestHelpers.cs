@@ -52,7 +52,6 @@ internal sealed class TestServices
         AppState.GridSize           = 16;
         AppState.IsSnapToGridChecked = false;
         AppState.WireframeZoomValue = 100;
-        AppState.UnitType           = AnimationEditor.Core.Data.UnitType.Pixel;
         AppState.ProjectFolder      = null;
     }
 }

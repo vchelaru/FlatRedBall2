@@ -101,7 +101,6 @@ namespace AnimationEditor.Core.IO
 
         private void ApplySettings(AESettingsSave settings)
         {
-            _appState.UnitType = settings.UnitType;
             _appState.IsSnapToGridChecked = settings.SnapToGrid;
             _appState.GridSize = settings.GridSize;
 

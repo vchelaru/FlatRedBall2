@@ -1,7 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
@@ -29,7 +28,6 @@ public class HeaderTextDoubleTapTests
         ctx.SelectedState.SelectedFrame           = null;
         ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
         ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
-        ctx.AppState.UnitType                     = UnitType.Pixel;
         return ctx;
     }
 

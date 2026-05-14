@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
 using FlatRedBall2.Animation.Content;
 
@@ -61,14 +60,15 @@ public static class TreeBuilder
     /// Builds a single frame node with any shape children from
     /// <see cref="AnimationFrameSave.ShapesSave"/>.
     /// Sets <see cref="AnimationFrameSave.Name"/> once for unnamed frames so the
-    /// label survives copy/paste and full tree rebuilds.
+    /// label survives copy/paste and full tree rebuilds, regardless of whether the
+    /// frame has a texture assigned.
     /// </summary>
     public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
     {
         // Persist the display label into the data model on first creation so that
         // copy/paste (which serializes the frame) and RefreshTreeView (full rebuild)
         // reproduce the same label regardless of the frame's new position.
-        if (string.IsNullOrEmpty(frame.TextureName) && string.IsNullOrEmpty(frame.Name))
+        if (string.IsNullOrEmpty(frame.Name))
             frame.Name = $"Frame {index + 1}";
 
         var node = new TreeNodeVm
@@ -107,16 +107,13 @@ public static class TreeBuilder
 
     /// <summary>
     /// Returns the display label for a frame node.
-    /// Priority: explicit <see cref="AnimationFrameSave.Name"/> (user-assigned) >
-    /// <see cref="Path.GetFileName"/> of <see cref="AnimationFrameSave.TextureName"/> >
-    /// position-based fallback "Frame N".
+    /// Priority: explicit <see cref="AnimationFrameSave.Name"/> (user-assigned or
+    /// auto-assigned by <see cref="BuildFrameNode"/>) > position-based "Frame N".
     /// </summary>
     public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
     {
         if (!string.IsNullOrEmpty(frame.Name))
             return frame.Name;
-        if (!string.IsNullOrEmpty(frame.TextureName))
-            return Path.GetFileName(frame.TextureName);
         return $"Frame {index + 1}";
     }
 

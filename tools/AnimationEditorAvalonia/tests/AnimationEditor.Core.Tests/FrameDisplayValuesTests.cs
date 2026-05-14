@@ -116,73 +116,6 @@ public class FrameDisplayValuesTests
         // (0.75 - 0.25) * 64 = 32.0
         => Assert.Equal(32, FrameDisplayValues.GetPixelHeight(Frame(0f, 1f, 0.25f, 0.75f), 64));
 
-    // ── GetTileX ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void GetTileX_FirstTile_ReturnsZero()
-        // tile 0: left = 0
-        => Assert.Equal(0, FrameDisplayValues.GetTileX(Frame(0f, 0.125f, 0f, 0.125f), cellWidth: 16, textureWidth: 128));
-
-    [Fact]
-    public void GetTileX_SecondTile_ReturnsOne()
-        // tile 1: left = 16/128 = 0.125
-        => Assert.Equal(1, FrameDisplayValues.GetTileX(Frame(0.125f, 0.25f, 0f, 0.125f), cellWidth: 16, textureWidth: 128));
-
-    [Fact]
-    public void GetTileX_LastTile_ReturnsCorrectIndex()
-        // 7th tile (index 7): left = 7*16/128 = 0.875
-        => Assert.Equal(7, FrameDisplayValues.GetTileX(Frame(0.875f, 1f, 0f, 0.125f), cellWidth: 16, textureWidth: 128));
-
-    [Fact]
-    public void GetTileX_Truncates_NotRounds()
-        // left = 0.1249: 0.1249 * 128 / 16 = 0.9992 → truncates to 0 (not round to 1)
-        => Assert.Equal(0, FrameDisplayValues.GetTileX(Frame(0.1249f, 0.25f, 0f, 0.125f), cellWidth: 16, textureWidth: 128));
-
-    [Fact]
-    public void GetTileX_ZeroCellWidth_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetTileX(Frame(0.5f, 1f, 0f, 1f), cellWidth: 0, textureWidth: 128));
-
-    [Fact]
-    public void GetTileX_ZeroTextureWidth_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetTileX(Frame(0.5f, 1f, 0f, 1f), cellWidth: 16, textureWidth: 0));
-
-    [Fact]
-    public void GetTileX_LargeTexture_ReturnsCorrectIndex()
-        // 512px texture, 32px cells → 16 tiles per row; tile 10: left = 320/512 = 0.625
-        => Assert.Equal(10, FrameDisplayValues.GetTileX(Frame(0.625f, 0.6875f, 0f, 0.125f), cellWidth: 32, textureWidth: 512));
-
-    // ── GetTileY ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void GetTileY_FirstRow_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetTileY(Frame(0f, 0.125f, 0f, 0.125f), cellHeight: 16, textureHeight: 128));
-
-    [Fact]
-    public void GetTileY_SecondRow_ReturnsOne()
-        => Assert.Equal(1, FrameDisplayValues.GetTileY(Frame(0f, 0.125f, 0.125f, 0.25f), cellHeight: 16, textureHeight: 128));
-
-    [Fact]
-    public void GetTileY_LastRow_ReturnsCorrectIndex()
-        // row 7: top = 7*16/128 = 0.875
-        => Assert.Equal(7, FrameDisplayValues.GetTileY(Frame(0f, 0.125f, 0.875f, 1f), cellHeight: 16, textureHeight: 128));
-
-    [Fact]
-    public void GetTileY_Truncates_NotRounds()
-        => Assert.Equal(0, FrameDisplayValues.GetTileY(Frame(0f, 0.125f, 0.1249f, 0.25f), cellHeight: 16, textureHeight: 128));
-
-    [Fact]
-    public void GetTileY_ZeroCellHeight_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetTileY(Frame(0f, 1f, 0.5f, 1f), cellHeight: 0, textureHeight: 128));
-
-    [Fact]
-    public void GetTileY_ZeroTextureHeight_ReturnsZero()
-        => Assert.Equal(0, FrameDisplayValues.GetTileY(Frame(0f, 1f, 0.5f, 1f), cellHeight: 16, textureHeight: 0));
-
-    [Fact]
-    public void GetTileY_LargeTexture_ReturnsCorrectIndex()
-        // 512px texture, 32px cells → tile row 5: top = 160/512 = 0.3125
-        => Assert.Equal(5, FrameDisplayValues.GetTileY(Frame(0f, 0.0625f, 0.3125f, 0.375f), cellHeight: 32, textureHeight: 512));
-
     // ── Round-trip consistency ────────────────────────────────────────────────
 
     [Fact]
@@ -196,15 +129,4 @@ public class FrameDisplayValuesTests
         Assert.Equal(32,  FrameDisplayValues.GetPixelHeight(frame, 256));
     }
 
-    [Fact]
-    public void TileXY_ThenPixelXY_Consistent()
-    {
-        // tile (3, 2) on 256×256 texture with 32×32 cells
-        // pixel position: X=96, Y=64
-        var frame = Frame(96f/256, 128f/256, 64f/256, 96f/256);
-        Assert.Equal(3, FrameDisplayValues.GetTileX(frame, cellWidth: 32, textureWidth: 256));
-        Assert.Equal(2, FrameDisplayValues.GetTileY(frame, cellHeight: 32, textureHeight: 256));
-        Assert.Equal(96, FrameDisplayValues.GetPixelX(frame, 256));
-        Assert.Equal(64, FrameDisplayValues.GetPixelY(frame, 256));
-    }
 }

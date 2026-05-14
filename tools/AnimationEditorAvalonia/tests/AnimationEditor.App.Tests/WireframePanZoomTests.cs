@@ -1,7 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
@@ -39,7 +38,6 @@ public class WireframePanZoomTests
         ctx.AppCommands.DoOnUiThread              = a => a();
         ctx.AppCommands.ConfirmAsync              = (_, _) => Task.FromResult(true);
         ctx.AppCommands.FileDialogService         = NullFileDialogService.Instance;
-        ctx.AppState.UnitType                     = UnitType.Pixel;
         return ctx;
     }
 

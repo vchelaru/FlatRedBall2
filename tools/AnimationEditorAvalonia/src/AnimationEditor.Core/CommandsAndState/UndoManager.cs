@@ -11,11 +11,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly Stack<IUndoableCommand> _undoStack = new();
         private readonly Stack<IUndoableCommand> _redoStack = new();
+        private SaveState _saveState = SaveState.Unsaved;
 
         public bool CanUndo => _undoStack.Count > 0;
         public bool CanRedo => _redoStack.Count > 0;
+        public SaveState SaveState => _saveState;
 
-        /// <summary>Raised after <see cref="Execute"/>, <see cref="Undo"/>, <see cref="Redo"/>, or <see cref="Clear"/>.</summary>
+        /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         public event Action? StackChanged;
 
         /// <inheritdoc cref="IUndoManager.Execute"/>
@@ -57,6 +59,21 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             _undoStack.Clear();
             _redoStack.Clear();
+            _saveState = SaveState.Unsaved;
+            StackChanged?.Invoke();
+        }
+
+        /// <summary>Marks the last auto-save as successful, setting <see cref="SaveState"/> to <see cref="SaveState.AutoSaveOn"/>.</summary>
+        public void MarkSaved()
+        {
+            _saveState = SaveState.AutoSaveOn;
+            StackChanged?.Invoke();
+        }
+
+        /// <summary>Marks the last auto-save as failed, setting <see cref="SaveState"/> to <see cref="SaveState.Failed"/>.</summary>
+        public void MarkSaveFailed()
+        {
+            _saveState = SaveState.Failed;
             StackChanged?.Invoke();
         }
     }

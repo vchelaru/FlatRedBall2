@@ -28,6 +28,21 @@ public class AESettingsSaveRoundTripTests
     // ── Guides ────────────────────────────────────────────────────────────────
 
     [Fact]
+    public void HorizontalAndVertical_RoundTrip_StoredIndependently()
+    {
+        var s = new AESettingsSave();
+        s.HorizontalGuides.Add(10f);
+        s.VerticalGuides.Add(20f);
+
+        var loaded = Deserialize(Serialize(s));
+
+        Assert.Single(loaded.HorizontalGuides);
+        Assert.Single(loaded.VerticalGuides);
+        Assert.Equal(10f, loaded.HorizontalGuides[0]);
+        Assert.Equal(20f, loaded.VerticalGuides[0]);
+    }
+
+    [Fact]
     public void HorizontalGuides_RoundTrip_PreservesValuesAndOrder()
     {
         var s = new AESettingsSave();
@@ -55,21 +70,6 @@ public class AESettingsSaveRoundTripTests
         Assert.Equal(2,      loaded.VerticalGuides.Count);
         Assert.Equal(50f,    loaded.VerticalGuides[0]);
         Assert.Equal(75.25f, loaded.VerticalGuides[1]);
-    }
-
-    [Fact]
-    public void HorizontalAndVertical_RoundTrip_StoredIndependently()
-    {
-        var s = new AESettingsSave();
-        s.HorizontalGuides.Add(10f);
-        s.VerticalGuides.Add(20f);
-
-        var loaded = Deserialize(Serialize(s));
-
-        Assert.Single(loaded.HorizontalGuides);
-        Assert.Single(loaded.VerticalGuides);
-        Assert.Equal(10f, loaded.HorizontalGuides[0]);
-        Assert.Equal(20f, loaded.VerticalGuides[0]);
     }
 
     // ── Expanded nodes ────────────────────────────────────────────────────────
@@ -105,27 +105,12 @@ public class AESettingsSaveRoundTripTests
         Assert.Equal("B", loaded.ExpandedNodes[2]);
     }
 
-    // ── UnitType / grid settings ──────────────────────────────────────────────
+    // ── Grid settings ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void UnitType_RoundTrip()
+    public void GridSize_DefaultIs16()
     {
-        var s = new AESettingsSave { UnitType = UnitType.TextureCoordinate };
-        Assert.Equal(UnitType.TextureCoordinate, Deserialize(Serialize(s)).UnitType);
-    }
-
-    [Fact]
-    public void UnitType_SpriteSheet_RoundTrip()
-    {
-        var s = new AESettingsSave { UnitType = UnitType.SpriteSheet };
-        Assert.Equal(UnitType.SpriteSheet, Deserialize(Serialize(s)).UnitType);
-    }
-
-    [Fact]
-    public void SnapToGrid_True_RoundTrip()
-    {
-        var s = new AESettingsSave { SnapToGrid = true };
-        Assert.True(Deserialize(Serialize(s)).SnapToGrid);
+        Assert.Equal(16, new AESettingsSave().GridSize);
     }
 
     [Fact]
@@ -136,42 +121,10 @@ public class AESettingsSaveRoundTripTests
     }
 
     [Fact]
-    public void GridSize_DefaultIs16()
+    public void SnapToGrid_True_RoundTrip()
     {
-        Assert.Equal(16, new AESettingsSave().GridSize);
-    }
-
-    // ── AnimationChainSettings ────────────────────────────────────────────────
-
-    [Fact]
-    public void AnimationChainSettings_RoundTrip_NameAndUnitType()
-    {
-        var s = new AESettingsSave();
-        s.AnimationChainSettings.Add(new AnimationChainSettingSave
-        {
-            Name     = "Walk",
-            UnitType = UnitType.SpriteSheet
-        });
-
-        var loaded = Deserialize(Serialize(s));
-
-        Assert.Single(loaded.AnimationChainSettings);
-        Assert.Equal("Walk",           loaded.AnimationChainSettings[0].Name);
-        Assert.Equal(UnitType.SpriteSheet, loaded.AnimationChainSettings[0].UnitType);
-    }
-
-    [Fact]
-    public void AnimationChainSettings_MultipleEntries_RoundTrip()
-    {
-        var s = new AESettingsSave();
-        s.AnimationChainSettings.Add(new AnimationChainSettingSave { Name = "A", UnitType = UnitType.Pixel });
-        s.AnimationChainSettings.Add(new AnimationChainSettingSave { Name = "B", UnitType = UnitType.TextureCoordinate });
-
-        var loaded = Deserialize(Serialize(s));
-
-        Assert.Equal(2, loaded.AnimationChainSettings.Count);
-        Assert.Equal("A", loaded.AnimationChainSettings[0].Name);
-        Assert.Equal("B", loaded.AnimationChainSettings[1].Name);
+        var s = new AESettingsSave { SnapToGrid = true };
+        Assert.True(Deserialize(Serialize(s)).SnapToGrid);
     }
 
     // ── Empty round-trip ──────────────────────────────────────────────────────
@@ -184,7 +137,6 @@ public class AESettingsSaveRoundTripTests
         Assert.Empty(loaded.HorizontalGuides);
         Assert.Empty(loaded.VerticalGuides);
         Assert.Empty(loaded.ExpandedNodes);
-        Assert.Empty(loaded.AnimationChainSettings);
     }
 
     // ── Combined ─────────────────────────────────────────────────────────────
@@ -194,7 +146,6 @@ public class AESettingsSaveRoundTripTests
     {
         var s = new AESettingsSave
         {
-            UnitType    = UnitType.TextureCoordinate,
             SnapToGrid  = true,
             GridSize    = 8,
             OffsetMultiplier = 2f
@@ -202,16 +153,13 @@ public class AESettingsSaveRoundTripTests
         s.HorizontalGuides.Add(50f);
         s.VerticalGuides.Add(75f);
         s.ExpandedNodes.Add("Walk");
-        s.AnimationChainSettings.Add(new AnimationChainSettingSave { Name = "Walk", UnitType = UnitType.Pixel });
 
         var loaded = Deserialize(Serialize(s));
 
-        Assert.Equal(UnitType.TextureCoordinate, loaded.UnitType);
         Assert.True(loaded.SnapToGrid);
         Assert.Equal(8,  loaded.GridSize);
         Assert.Single(loaded.HorizontalGuides);
         Assert.Single(loaded.VerticalGuides);
         Assert.Single(loaded.ExpandedNodes);
-        Assert.Single(loaded.AnimationChainSettings);
     }
 }

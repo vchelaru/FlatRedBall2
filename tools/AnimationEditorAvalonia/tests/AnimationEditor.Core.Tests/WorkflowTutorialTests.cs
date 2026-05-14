@@ -1,6 +1,5 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
 using Xunit;
 
@@ -67,121 +66,7 @@ public class WorkflowTutorialTests
         Assert.Equal("Idle.png", frame.TextureName);
     }
 
-    // ── Step 4: SpriteSheet cell-size calculation ─────────────────────────────
-    // Docs: "Set the cell height to '2 cells'. The plugin automatically calculates
-    //         this value as 64 pixels." (texture is 128 px tall)
-    // Docs: "Set the cell width to '4 cells'."  (texture is 128 px wide → 32 px)
-
-    [Fact]
-    public void Step4_SpriteSheet_2CellHeight_On128pxTexture_CellHeightIs64px()
-    {
-        int cellHeight = TileCoordinateCalculator.CellSizeFromCount(2, 128);
-        Assert.Equal(64, cellHeight);
-    }
-
-    [Fact]
-    public void Step4_SpriteSheet_4CellWidth_On128pxTexture_CellWidthIs32px()
-    {
-        int cellWidth = TileCoordinateCalculator.CellSizeFromCount(4, 128);
-        Assert.Equal(32, cellWidth);
-    }
-
-    // ── Step 5: Eight frames — each mapped to a different spritesheet cell ────
-    // Docs: "Try adding more frames so that your animation includes all 8 idle frames."
-    // Grid layout: 4 columns × 2 rows, each cell = 32 × 64 px on a 128 × 128 texture.
-
-    [Fact]
-    public void Step5_IdleAnimation_8SpriteSheetFrames_AllHaveUniqueUVRects()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var acls = ctx.Acls;
-        var chain = TestHelpers.MakeChain(acls, "Idle");
-
-        int cellW = 32, cellH = 64, texW = 128, texH = 128;
-        // 4 columns × 2 rows = 8 cells
-        for (int row = 0; row < 2; row++)
-        {
-            for (int col = 0; col < 4; col++)
-            {
-                var (l, r) = TileCoordinateCalculator.GetLeftRight(col, cellW, texW);
-                var (t, b) = TileCoordinateCalculator.GetTopBottom(row, cellH, texH);
-                chain.Frames.Add(new AnimationFrameSave
-                {
-                    TextureName      = "Idle.png",
-                    LeftCoordinate   = l, RightCoordinate  = r,
-                    TopCoordinate    = t, BottomCoordinate = b,
-                    FrameLength      = 0.1f,
-                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
-                });
-            }
-        }
-
-        Assert.Equal(8, chain.Frames.Count);
-
-        // All 8 UV rects must be unique (no two frames cover the same cell)
-        var uvKeys = chain.Frames
-            .Select(f => $"{f.LeftCoordinate:F4},{f.TopCoordinate:F4},{f.RightCoordinate:F4},{f.BottomCoordinate:F4}")
-            .ToList();
-        Assert.Equal(8, uvKeys.Distinct().Count());
-    }
-
-    [Fact]
-    public void Step5_IdleAnimation_Frame0_TopLeftCell_CorrectUV()
-    {
-        // Cell (col=0, row=0): left=0, right=32/128=0.25, top=0, bottom=64/128=0.5
-        var (left,  right)  = TileCoordinateCalculator.GetLeftRight(0, 32, 128);
-        var (top,   bottom) = TileCoordinateCalculator.GetTopBottom(0, 64, 128);
-
-        Assert.Equal(0f,        left,   precision: 5);
-        Assert.Equal(0.25f,     right,  precision: 5);
-        Assert.Equal(0f,        top,    precision: 5);
-        Assert.Equal(0.5f,      bottom, precision: 5);
-    }
-
-    [Fact]
-    public void Step5_IdleAnimation_Frame7_BottomRightCell_CorrectUV()
-    {
-        // Cell (col=3, row=1): left=96/128=0.75, right=1.0, top=64/128=0.5, bottom=1.0
-        var (left,  right)  = TileCoordinateCalculator.GetLeftRight(3, 32, 128);
-        var (top,   bottom) = TileCoordinateCalculator.GetTopBottom(1, 64, 128);
-
-        Assert.Equal(0.75f,     left,   precision: 5);
-        Assert.Equal(1f,        right,  precision: 5);
-        Assert.Equal(0.5f,      top,    precision: 5);
-        Assert.Equal(1f,        bottom, precision: 5);
-    }
-
-    // ── Step 6: All 8 frames carry the same texture and default duration ────────
-    // Docs: "the plugin remembers the cell settings, additional frames can be added
-    //         with just a few mouse clicks … view the animation … clicking on the animation"
-
-    [Fact]
-    public void Step6_IdleAnimation_AllEightFrames_HaveSameTextureAndDefaultDuration()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var acls = ctx.Acls;
-        var chain = TestHelpers.MakeChain(acls, "Idle");
-
-        int cellW = 32, cellH = 64, texW = 128, texH = 128;
-        for (int row = 0; row < 2; row++)
-            for (int col = 0; col < 4; col++)
-            {
-                var (l, r) = TileCoordinateCalculator.GetLeftRight(col, cellW, texW);
-                var (t, b) = TileCoordinateCalculator.GetTopBottom(row, cellH, texH);
-                var frame = new AnimationFrameSave
-                {
-                    TextureName      = "Idle.png",
-                    LeftCoordinate   = l, RightCoordinate  = r,
-                    TopCoordinate    = t, BottomCoordinate = b,
-                    FrameLength      = 0.1f,
-                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
-                };
-                chain.Frames.Add(frame);
-            }
-
-        Assert.All(chain.Frames, f => Assert.Equal("Idle.png", f.TextureName));
-        Assert.All(chain.Frames, f => Assert.Equal(0.1f, f.FrameLength, precision: 5));
-    }
+    // ── Step 6: Update all frame durations ────────────────────────────────────
 
     [Fact]
     public void Step6_SetAllFrameLengths_AllFramesUpdatedToNewDuration()

@@ -39,25 +39,6 @@ public class IoManagerTests
     }
 
     [Fact]
-    public void SaveCompanionFileFor_RoundTrip_PreservesUnitType()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        using var dir = new TestHelpers.TempDir();
-        var achxPath = new FilePath(dir.Path + "/hero.achx");
-        var settings = new AESettingsSave
-        {
-            UnitType = UnitType.TextureCoordinate,
-            SnapToGrid = true,
-            GridSize = 24
-        };
-
-        ctx.IoManager.SaveCompanionFileFor(achxPath, settings);
-        ctx.IoManager.LoadAndApplyCompanionFileFor(achxPath.FullPath);
-
-        Assert.Equal(UnitType.TextureCoordinate, ctx.AppState.UnitType);
-    }
-
-    [Fact]
     public void SaveCompanionFileFor_RoundTrip_PreservesSnapToGrid()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -86,20 +67,6 @@ public class IoManagerTests
     }
 
     // ── LoadAndApplyCompanionFileFor ──────────────────────────────────────────
-
-    [Fact]
-    public void LoadAndApplyCompanionFileFor_WhenFileExists_SetsAppStateUnitType()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        using var dir = new TestHelpers.TempDir();
-        var achxPath = new FilePath(dir.Path + "/test.achx");
-        var settings = new AESettingsSave { UnitType = UnitType.TextureCoordinate };
-        ctx.IoManager.SaveCompanionFileFor(achxPath, settings);
-
-        ctx.IoManager.LoadAndApplyCompanionFileFor(achxPath.FullPath);
-
-        Assert.Equal(UnitType.TextureCoordinate, ctx.AppState.UnitType);
-    }
 
     [Fact]
     public void LoadAndApplyCompanionFileFor_WhenFileExists_SetsSnapToGrid()

@@ -1,9 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
@@ -13,19 +11,7 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Headless integration tests that verify the property panel reacts correctly when
-/// the user changes the Units dropdown (Pixel / TextureCoordinate / SpriteSheet).
-///
-/// Each test:
-///   1. Creates a headless MainWindow and selects a frame.
-///   2. Changes <see cref="UnitType"/> by updating <see cref="ctx.AppState.UnitType"/>
-///      directly, then raises <see cref="ApplicationEvents.RaiseAnimationChainsChanged"/>
-///      and flushes the dispatcher so the async InvokeAsync completes.
-///   3. Asserts the visibility of <c>PropPixelSection</c>, <c>PropTcSection</c>,
-///      and <c>PropTileSection</c> matches the expected layout for that unit type.
-///
-/// Why this matters: The section visibility is controlled entirely in
-/// <c>RefreshPropertyPanel</c> in MainWindow.axaml.cs and was previously untested at
-/// the UI layer. A regression here would silently show/hide the wrong input fields.
+/// a frame is selected.
 /// </summary>
 public class UnitTypePropPanelTests
 {
@@ -59,7 +45,6 @@ public class UnitTypePropPanelTests
         ctx.AppCommands.DoOnUiThread = a => a();
         ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
         ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
-        ctx.AppState.UnitType = UnitType.Pixel;
 
         // Create and show FIRST so the window subscribes to SelectionChanged.
         var window = ctx.CreateMainWindow();
@@ -70,19 +55,6 @@ public class UnitTypePropPanelTests
         Dispatcher.UIThread.RunJobs();   // flush InvokeAsync(RefreshPropertyPanel)
 
         return window;
-    }
-
-    /// <summary>
-    /// Changes the unit type and re-triggers property panel refresh via the normal
-    /// SelectionChanged pathway (same sequence as the toolbar combo firing OnUnitTypeComboChanged).
-    /// </summary>
-    private void SetUnitAndRefresh(UnitType unitType)
-    {
-        ctx.AppState.UnitType = unitType;
-        // Re-assign the selected frame — fires SelectionChanged →
-        // HandleSelectionChanged → InvokeAsync(RefreshPropertyPanel)
-        ctx.SelectedState.SelectedFrame = ctx.SelectedState.SelectedFrame;
-        Dispatcher.UIThread.RunJobs();
     }
 
     private static T FindCtrl<T>(MainWindow w, string name) where T : Control
@@ -100,6 +72,23 @@ public class UnitTypePropPanelTests
             // Frame was selected in CreateWindowWithFrame + RunJobs — panel must be visible.
             var panel = FindCtrl<StackPanel>(window, "PropFramePanel");
             Assert.True(panel.IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void PropNoneLabel_WhenChainSelected_ShowsContextHint()
+    {
+        var window = CreateWindowWithFrame(out _);
+        try
+        {
+            // Directly set a chain with no frame — SelectedChain setter clears frame/rect/circ
+            ctx.SelectedState.SelectedChain = new AnimationChainSave { Name = "Walk" };
+            Dispatcher.UIThread.RunJobs();
+
+            var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
+            Assert.True(label.IsVisible);
+            Assert.Equal("Select a frame or shape to edit its properties.", label.Text);
         }
         finally { window.Close(); }
     }
@@ -124,23 +113,6 @@ public class UnitTypePropPanelTests
     }
 
     [AvaloniaFact]
-    public void PropNoneLabel_WhenChainSelected_ShowsContextHint()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            // Directly set a chain with no frame — SelectedChain setter clears frame/rect/circ
-            ctx.SelectedState.SelectedChain = new AnimationChainSave { Name = "Walk" };
-            Dispatcher.UIThread.RunJobs();
-
-            var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
-            Assert.True(label.IsVisible);
-            Assert.Equal("Select a frame or shape to edit its properties.", label.Text);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
     public void PropNoneLabel_WhenNothingSelected_ShowsNoSelection()
     {
         var window = CreateWindowWithFrame(out _);
@@ -157,174 +129,48 @@ public class UnitTypePropPanelTests
         finally { window.Close(); }
     }
 
-    // ── Pixel mode ────────────────────────────────────────────────────────────
+    // ── Pixel section always visible ──────────────────────────────────────────
 
     [AvaloniaFact]
-    public void Pixel_ShowsPixelSection_HidesTcAndTileSections()
+    public void PropPixelSection_WhenFrameSelected_IsVisible()
     {
         var window = CreateWindowWithFrame(out _);
         try
         {
-            SetUnitAndRefresh(UnitType.Pixel);
-
-            Assert.True (FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for Pixel");
-            Assert.False(FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for Pixel");
-            Assert.False(FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for Pixel");
+            Assert.True(FindCtrl<Control>(window, "PropPixelSection").IsVisible,
+                "PropPixelSection should always be visible when a frame is selected");
         }
         finally { window.Close(); }
     }
 
-    // ── TextureCoordinate mode ────────────────────────────────────────────────
+    // ── Shape selection ───────────────────────────────────────────────────────
 
     [AvaloniaFact]
-    public void TextureCoordinate_ShowsTcSection_HidesPixelAndTileSections()
+    public void CircleSelection_ShowsOnlyCircleInspector()
     {
-        var window = CreateWindowWithFrame(out _);
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+        var circle = new CircleSave { Name = "HurtCircle", X = 6, Y = 2, Radius = 7 };
+        frame.ShapesSave!.CircleSaves.Add(circle);
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+
         try
         {
-            SetUnitAndRefresh(UnitType.TextureCoordinate);
-
-            Assert.False(FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be hidden for TC");
-            Assert.True (FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be visible for TC");
-            Assert.False(FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be hidden for TC");
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void TextureCoordinate_PopulatesUvValuesInTcFields()
-    {
-        var window = CreateWindowWithFrame(out var frame);
-        try
-        {
-            SetUnitAndRefresh(UnitType.TextureCoordinate);
-
-            var left   = FindCtrl<NumericUpDown>(window, "PropTcLeft");
-            var right  = FindCtrl<NumericUpDown>(window, "PropTcRight");
-            var top    = FindCtrl<NumericUpDown>(window, "PropTcTop");
-            var bottom = FindCtrl<NumericUpDown>(window, "PropTcBottom");
-
-            Assert.Equal((decimal)frame.LeftCoordinate,   left.Value);
-            Assert.Equal((decimal)frame.RightCoordinate,  right.Value);
-            Assert.Equal((decimal)frame.TopCoordinate,    top.Value);
-            Assert.Equal((decimal)frame.BottomCoordinate, bottom.Value);
-        }
-        finally { window.Close(); }
-    }
-
-    // ── SpriteSheet mode ──────────────────────────────────────────────────────
-
-    [AvaloniaFact]
-    public void SpriteSheet_ShowsPixelAndTileSections_HidesTcSection()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            SetUnitAndRefresh(UnitType.SpriteSheet);
-
-            Assert.True (FindCtrl<Control>(window, "PropPixelSection").IsVisible, "PropPixelSection should be visible for SpriteSheet");
-            Assert.False(FindCtrl<Control>(window, "PropTcSection"   ).IsVisible, "PropTcSection should be hidden for SpriteSheet");
-            Assert.True (FindCtrl<Control>(window, "PropTileSection" ).IsVisible, "PropTileSection should be visible for SpriteSheet");
-        }
-        finally { window.Close(); }
-    }
-
-    // ── Switching between modes ────────────────────────────────────────────────
-
-    [AvaloniaFact]
-    public void SwitchFromPixelToTc_UpdatesSectionsCorrectly()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            SetUnitAndRefresh(UnitType.Pixel);
-            Assert.True(FindCtrl<Control>(window, "PropPixelSection").IsVisible);
-            Assert.False(FindCtrl<Control>(window, "PropTcSection").IsVisible);
-
-            SetUnitAndRefresh(UnitType.TextureCoordinate);
-            Assert.False(FindCtrl<Control>(window, "PropPixelSection").IsVisible);
-            Assert.True(FindCtrl<Control>(window, "PropTcSection").IsVisible);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void SwitchFromTcToSpriteSheet_ShowsTileSection()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            SetUnitAndRefresh(UnitType.TextureCoordinate);
-            Assert.False(FindCtrl<Control>(window, "PropTileSection").IsVisible);
-
-            SetUnitAndRefresh(UnitType.SpriteSheet);
-            Assert.True(FindCtrl<Control>(window, "PropTileSection").IsVisible);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void SwitchFromSpriteSheetBackToPixel_HidesTileSection()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            SetUnitAndRefresh(UnitType.SpriteSheet);
-            Assert.True(FindCtrl<Control>(window, "PropTileSection").IsVisible);
-
-            SetUnitAndRefresh(UnitType.Pixel);
-            Assert.False(FindCtrl<Control>(window, "PropTileSection").IsVisible);
-        }
-        finally { window.Close(); }
-    }
-
-    // ── Unit toggle buttons drive AppState ───────────────────────────────────
-
-    [AvaloniaFact]
-    public void UnitToggleButtons_Click_MapsToCorrectUnitType()
-    {
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            var pixelBtn       = FindCtrl<ToggleButton>(window, "UnitPixelBtn");
-            var textureBtn     = FindCtrl<ToggleButton>(window, "UnitTextureBtn");
-            var spriteSheetBtn = FindCtrl<ToggleButton>(window, "UnitSpriteSheetBtn");
-
-            pixelBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
-                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
+            ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.Pixel, ctx.AppState.UnitType);
-
-            textureBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
-                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.TextureCoordinate, ctx.AppState.UnitType);
-
-            spriteSheetBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
-                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal(UnitType.SpriteSheet, ctx.AppState.UnitType);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void UnitSpriteSheetBtn_Click_ShowsTileSection_EndToEnd()
-    {
-        // Drives the UnitSpriteSheetBtn ToggleButton and verifies that PropTileSection
-        // becomes visible — covering the full path from OnUnitSpriteSheetBtnClick to RefreshPropertyPanel.
-        var window = CreateWindowWithFrame(out _);
-        try
-        {
-            var spriteSheetBtn = FindCtrl<ToggleButton>(window, "UnitSpriteSheetBtn");
-            var tilePanel      = FindCtrl<Control>(window, "PropTileSection");
-
-            spriteSheetBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(
-                Avalonia.Controls.Primitives.ToggleButton.ClickEvent));
+            ctx.SelectedState.SelectedCircle = circle;
             Dispatcher.UIThread.RunJobs();
 
-            Assert.True(tilePanel.IsVisible,
-                "PropTileSection must be visible when UnitSpriteSheetBtn is clicked with a frame selected");
+            Assert.False(FindCtrl<StackPanel>(window, "PropFramePanel").IsVisible);
+            Assert.False(FindCtrl<StackPanel>(window, "PropRectPanel").IsVisible);
+            Assert.True(FindCtrl<StackPanel>(window, "PropCirclePanel").IsVisible);
         }
         finally { window.Close(); }
     }
@@ -355,36 +201,6 @@ public class UnitTypePropPanelTests
             Assert.False(FindCtrl<StackPanel>(window, "PropFramePanel").IsVisible);
             Assert.True(FindCtrl<StackPanel>(window, "PropRectPanel").IsVisible);
             Assert.False(FindCtrl<StackPanel>(window, "PropCirclePanel").IsVisible);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void CircleSelection_ShowsOnlyCircleInspector()
-    {
-        var acls = new AnimationChainListSave();
-        var chain = new AnimationChainSave { Name = "Walk" };
-        var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
-        var circle = new CircleSave { Name = "HurtCircle", X = 6, Y = 2, Radius = 7 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
-        chain.Frames.Add(frame);
-        acls.AnimationChains.Add(chain);
-
-        ctx = TestHelpers.BuildServices();
-        ctx.ProjectManager.AnimationChainListSave = acls;
-        var window = ctx.CreateMainWindow();
-        window.Show();
-
-        try
-        {
-            ctx.SelectedState.SelectedFrame = frame;
-            Dispatcher.UIThread.RunJobs();
-            ctx.SelectedState.SelectedCircle = circle;
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.False(FindCtrl<StackPanel>(window, "PropFramePanel").IsVisible);
-            Assert.False(FindCtrl<StackPanel>(window, "PropRectPanel").IsVisible);
-            Assert.True(FindCtrl<StackPanel>(window, "PropCirclePanel").IsVisible);
         }
         finally { window.Close(); }
     }

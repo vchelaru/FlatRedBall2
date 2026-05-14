@@ -185,6 +185,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             _undoManager.Clear();
+            _undoManager.MarkSaved();
             _selectedState.Reset();
             _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
             // Rebuild (not refresh): a freshly-opened file should present a collapsed,
@@ -215,7 +216,15 @@ namespace AnimationEditor.Core.CommandsAndState
             var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
-                _pm.SaveAnimationChainList(target);
+                try
+                {
+                    _pm.SaveAnimationChainList(target);
+                    _undoManager.MarkSaved();
+                }
+                catch
+                {
+                    _undoManager.MarkSaveFailed();
+                }
             }
             else
             {

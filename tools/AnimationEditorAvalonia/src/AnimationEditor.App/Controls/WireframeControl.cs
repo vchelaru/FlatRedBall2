@@ -55,7 +55,7 @@ public class WireframeControl : Control
         public float PanX, PanY, Zoom;
         public bool ShowGrid;
         public int GridSize;
-        public List<(SKRect Bounds, bool IsSelected, string Name)> Frames = new();
+        public List<(SKRect Bounds, bool IsSelected)> Frames = new();
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
@@ -123,14 +123,7 @@ public class WireframeControl : Control
             using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
             using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
-            using var labelPaint = new SKPaint
-            {
-                Color = new SKColor(0xe6, 0xe8, 0xec, 0xaa),
-                IsAntialias = true,
-            };
-            using var labelFont = new SKFont { Size = 11 };
-
-            foreach (var (bounds, isSelected, name) in s.Frames)
+            foreach (var (bounds, isSelected) in s.Frames)
             {
                 var sr = ToScreen(bounds, s);
                 if (isSelected)
@@ -145,13 +138,6 @@ public class WireframeControl : Control
                 }
                 canvas.DrawRect(sr, frameFill);
                 canvas.DrawRect(sr, frameStroke);
-
-                if (!string.IsNullOrEmpty(name))
-                {
-                    float labelY = sr.Top - 3f;
-                    if (labelY > 0)
-                        canvas.DrawText(name, sr.Left, labelY, SKTextAlign.Left, labelFont, labelPaint);
-                }
             }
 
             // Resize handles on selected frame
@@ -458,6 +444,16 @@ public class WireframeControl : Control
     /// Fired after every zoom change. Payload is the new zoom as a percentage (e.g. 100f = 100 %).
     /// </summary>
     public event Action<float>? ZoomChanged;
+
+    /// <summary>
+    /// When non-null, mouse-wheel zoom steps through these preset percentages instead of
+    /// applying a raw ×1.25 / ÷1.25 multiplier.  Set by <c>MainWindow</c> on startup.
+    /// <para>
+    /// Standalone controls (no <c>MainWindow</c>) leave this null and retain the legacy
+    /// multiplier behaviour, which is still useful in precision-zoom tests.
+    /// </para>
+    /// </summary>
+    public int[]? WheelZoomPresets { get; set; }
 
     /// <summary>
     /// Fired when the user ctrl+clicks to add a new frame
@@ -1222,13 +1218,27 @@ public class WireframeControl : Control
     /// exactly: converts the viewport-space pivot to content-space by adding
     /// <c>_scrollTargetX/Y</c>, then calls <see cref="ZoomToward"/>.
     /// <para><paramref name="factor"/> is the zoom scale factor (e.g. 1.25 to
-    /// zoom in by one wheel notch, 1/1.25 to zoom out).</para>
+    /// zoom in by one wheel notch, 1/1.25 to zoom out).  This overload always
+    /// applies the raw factor regardless of <see cref="WheelZoomPresets"/> — use
+    /// it in tests that need deterministic pivot-point math.</para>
     /// </summary>
     public void SimulateWheelZoom(float vpX, float vpY, float factor)
     {
         float scrollOffX = _scrollViewer is not null ? _scrollTargetX : 0f;
         float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
         ZoomToward(vpX + scrollOffX, vpY + scrollOffY, factor);
+    }
+
+    /// <summary>
+    /// Test-only: simulates a single mouse-wheel zoom event toward the given
+    /// <b>viewport-space</b> point, using preset stepping when <see cref="WheelZoomPresets"/>
+    /// is set.  Mirrors <see cref="OnPointerWheelChanged"/> exactly.
+    /// </summary>
+    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn)
+    {
+        float scrollOffX = _scrollViewer is not null ? _scrollTargetX : 0f;
+        float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
+        ZoomToward(vpX + scrollOffX, vpY + scrollOffY, ComputeWheelFactor(zoomIn));
     }
 
     /// <summary>Exposed for tests: the synchronous scroll-target maintained by ZoomToward.</summary>
@@ -1364,12 +1374,7 @@ public class WireframeControl : Control
         };
 
         foreach (var fr in _frameRects)
-        {
-            var frameName = string.IsNullOrEmpty(fr.Frame.TextureName)
-                ? string.Empty
-                : Path.GetFileName(fr.Frame.TextureName);
-            snap.Frames.Add((fr.Bounds, fr.IsSelected, frameName));
-        }
+            snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
         var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
         if (sel != null)
@@ -1396,7 +1401,7 @@ public class WireframeControl : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        float factor = e.Delta.Y > 0 ? 1.25f : 1f / 1.25f;
+        float factor = ComputeWheelFactor(e.Delta.Y > 0);
         // e.GetPosition(this) returns content-space coords inside a ScrollViewer
         // (viewport position + scroll offset).  Using the ScrollViewer as the reference
         // gives stable viewport-space coords that are independent of the current offset.
@@ -1406,6 +1411,17 @@ public class WireframeControl : Control
         float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
         ZoomToward((float)pivotVp.X + scrollOffX, (float)pivotVp.Y + scrollOffY, factor);
         e.Handled = true;
+    }
+
+    /// <summary>Computes the zoom factor for one wheel notch, using preset stepping when available.</summary>
+    private float ComputeWheelFactor(bool zoomIn)
+    {
+        if (WheelZoomPresets is { Length: > 0 } presets)
+        {
+            int newPct = ZoomPresetStepper.StepToNextPreset(_zoom * 100f, presets, zoomIn ? +1 : -1);
+            return newPct / 100f / _zoom;
+        }
+        return zoomIn ? 1.25f : 1f / 1.25f;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)

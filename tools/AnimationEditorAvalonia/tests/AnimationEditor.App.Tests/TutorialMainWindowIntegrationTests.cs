@@ -2,7 +2,6 @@ using System.Reflection;
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -252,7 +251,6 @@ public class TutorialMainWindowIntegrationTests
             var png  = WriteSolidPng(dir, "sprite.png", SKColors.Red, size: 64);
             var achx = System.IO.Path.Combine(dir, "test.achx");
             ctx.ProjectManager.FileName = achx;
-            ctx.AppState.UnitType = UnitType.Pixel;
 
             // Frame: pixel (0,0,16,16) on a 64×64 texture → UV (0, 0, 0.25, 0.25)
             var frame = new AnimationFrameSave

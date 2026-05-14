@@ -233,11 +233,19 @@ public class PreviewControl : Control
 
     /// <summary>
     /// Fired after every zoom change. Payload is the new zoom as a percentage
-    /// (e.g. 100f = 100 %). Wheel-zoom can land on values that are not present
-    /// in any preset combo box bound to this control; subscribers should be
-    /// prepared to display arbitrary percentages.
+    /// (e.g. 100f = 100 %).
     /// </summary>
     public event Action<float>? ZoomChanged;
+
+    /// <summary>
+    /// When non-null, mouse-wheel zoom steps through these preset percentages instead
+    /// of applying a raw ×1.25/×0.8 multiplier.  Set by <c>MainWindow</c> on startup.
+    /// <para>
+    /// Standalone controls (no <c>MainWindow</c>) leave this null and retain the legacy
+    /// multiplier behaviour, which is still useful in precision-zoom tests.
+    /// </para>
+    /// </summary>
+    public int[]? WheelZoomPresets { get; set; }
 
     public void SetZoomPercent(int pct)
     {
@@ -355,13 +363,21 @@ public class PreviewControl : Control
     /// </summary>
     public void SimulateWheelZoom(double x, double y, bool zoomIn)
     {
-        ApplyWheelZoom(x, y, zoomIn ? 1.25f : 0.8f);
+        ApplyWheelZoom(x, y, zoomIn);
     }
 
-    private void ApplyWheelZoom(double x, double y, float factor)
+    private void ApplyWheelZoom(double x, double y, bool zoomIn)
     {
         float oldZoom = _zoom;
-        _zoom = Math.Clamp(_zoom * factor, 0.05f, 32f);
+        if (WheelZoomPresets is { Length: > 0 } presets)
+        {
+            int newPct = ZoomPresetStepper.StepToNextPreset(_zoom * 100f, presets, zoomIn ? +1 : -1);
+            _zoom = Math.Clamp(newPct / 100f, 0.05f, 32f);
+        }
+        else
+        {
+            _zoom = Math.Clamp(_zoom * (zoomIn ? 1.25f : 0.8f), 0.05f, 32f);
+        }
         float ratio = _zoom / oldZoom;
         float cx0 = (float)((Bounds.Width  - RulerSize) / 2f + RulerSize);
         float cy0 = (float)((Bounds.Height - RulerSize) / 2f + RulerSize);
@@ -937,10 +953,8 @@ public class PreviewControl : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        float factor = e.Delta.Y > 0 ? 1.25f : 0.8f;
         var pt = e.GetPosition(this);
-        // Zoom toward the cursor: the world coordinate under pt must stay fixed.
-        ApplyWheelZoom(pt.X, pt.Y, factor);
+        ApplyWheelZoom(pt.X, pt.Y, e.Delta.Y > 0);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
