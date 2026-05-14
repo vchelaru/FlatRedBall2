@@ -1455,15 +1455,28 @@ public class PreviewControl : Control
             ? ((int)MathF.Round(worldValue)).ToString()
             : worldValue.ToString("0.###");
 
+    /// <summary>
+    /// Converts the UV coordinates of <paramref name="frame"/> to a pixel source rect for a
+    /// texture of size (<paramref name="texW"/>, <paramref name="texH"/>).
+    /// Uses <see cref="FrameDisplayValues"/> (Math.Round) instead of plain <c>(int)</c>
+    /// truncation so that the returned dimensions are stable across drag positions on
+    /// non-power-of-2 textures (fixes preview jitter — issue #260).
+    /// </summary>
+    internal static (int sx, int sy, int sw, int sh) ComputeSourceRect(
+        AnimationFrameSave frame, int texW, int texH)
+    {
+        int sx = FrameDisplayValues.GetPixelX(frame, texW);
+        int sy = FrameDisplayValues.GetPixelY(frame, texH);
+        int sw = FrameDisplayValues.GetPixelWidth(frame, texW);
+        int sh = FrameDisplayValues.GetPixelHeight(frame, texH);
+        return (sx, sy, sw, sh);
+    }
+
     private static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, SKBitmap bm,
         float cx, float cy, float zoom, float alpha)
     {
-        int tw = bm.Width, th = bm.Height;
-        int sx = (int)(frame.LeftCoordinate   * tw);
-        int sy = (int)(frame.TopCoordinate    * th);
-        int sw = (int)Math.Max(1, (frame.RightCoordinate  - frame.LeftCoordinate)  * tw);
-        int sh = (int)Math.Max(1, (frame.BottomCoordinate - frame.TopCoordinate)   * th);
+        var (sx, sy, sw, sh) = ComputeSourceRect(frame, bm.Width, bm.Height);
 
         var src = SKRectI.Create(sx, sy, sw, sh);
         float dw = sw * zoom;
