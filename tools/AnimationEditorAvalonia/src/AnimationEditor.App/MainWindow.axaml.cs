@@ -2169,13 +2169,7 @@ public partial class MainWindow : Window
 
         if (chains is { Count: > 0 })
         {
-            var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
-            foreach (var chain in chains)
-            {
-                chain.Name = StringFunctions.MakeStringUnique(chain.Name, existingNames, 2);
-                existingNames.Add(chain.Name);
-                acls.AnimationChains.Add(chain);
-            }
+            ChainPasteLogic.InsertPastedChains(acls, chains);
             _selectedState.SelectedChain = chains[^1];
             RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
