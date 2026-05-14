@@ -1283,7 +1283,6 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSeparator();
-            AddMenuItem("Rename (texture path)", () => BeginInlineRenameSelected(frame2));
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
@@ -2570,13 +2569,12 @@ public partial class MainWindow : Window
         await ShowMessageAsync($"Resized texture saved to:\n{newAbsPath}");
     }
 
-    // ── Rename Chain / Frame ──────────────────────────────────────────────────
-
     // ── Inline rename helpers ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Double-tap on the text label of a tree node → inline rename.
-    /// Marks the event handled so it does not bubble to <see cref="OnAnimTreeDoubleTapped"/>.
+    /// Double-tap on the text label of a tree node. Marks the event handled so it does
+    /// not bubble to <see cref="OnAnimTreeDoubleTapped"/>, then routes the gesture
+    /// through <see cref="HandleHeaderTextDoubleTap"/>.
     /// </summary>
     private void OnHeaderTextDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -2584,12 +2582,19 @@ public partial class MainWindow : Window
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
         e.Handled = true;
-
-        if (vm.Data is AnimationChainSave chain)
-            BeginInlineRename(vm, chain.Name);
-        else if (vm.Data is AnimationFrameSave)
-            BeginInlineRename(vm, vm.Header);
+        HandleHeaderTextDoubleTap(vm);
     }
+
+    /// <summary>
+    /// Routes a double-tap on a tree node's text <em>label</em>. A chain inline-renames
+    /// (its name is meaningful and used to look the chain up); every other node type —
+    /// frame, rect, circle — routes to <see cref="HandleAnimTreeNodeDoubleTap"/>, so a
+    /// frame centers the wireframe on itself. <see cref="AnimationFrameSave.Name"/> is
+    /// only a tree display label and is not referenced anywhere else, so the more useful
+    /// center-on-frame gesture wins the text-label real estate over an inline rename.
+    /// </summary>
+    internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
+        => HandleAnimTreeNodeDoubleTap(vm);
 
     /// <summary>
     /// Double-tap on blank space in a tree row (not the text label, not a Button) →
@@ -2684,68 +2689,18 @@ public partial class MainWindow : Window
         BeginInlineRename(vm, chain.Name);
     }
 
-    private void BeginInlineRenameSelected(AnimationFrameSave frame)
-    {
-        var vm = TreeBuilder.FindNodeForData(_treeRoots, frame);
-        if (vm is null) return;
-        BeginInlineRename(vm, vm.Header);
-    }
-
     private void CommitInlineRename(TreeNodeVm vm, string newName)
     {
         newName = newName.Trim();
         vm.IsEditing = false;
 
-        if (vm.Data is AnimationChainSave chain)
+        if (vm.Data is AnimationChainSave chain &&
+            !string.IsNullOrEmpty(newName) && newName != chain.Name)
         {
-            if (!string.IsNullOrEmpty(newName) && newName != chain.Name)
-                _appCommands.RenameChain(chain, newName);
-        }
-        else if (vm.Data is AnimationFrameSave frame)
-        {
-            // Rename updates frame.Name (the display label) — never frame.TextureName,
-            // which holds the actual texture path and must not be cleared.
-            if (newName != frame.Name)
-            {
-                frame.Name = newName;
-                _appCommands.RefreshTreeNode(frame);
-                _appCommands.SaveCurrentAnimationChainList();
-            }
+            _appCommands.RenameChain(chain, newName);
         }
 
         AnimTree.Focus();
-    }
-
-    private async Task AskRenameChainAsync(AnimationChainSave chain)
-    {
-        var name = await ShowStringInputDialogAsync("Rename Animation", "New name:", chain.Name);
-        if (name is null) return;
-        name = name.Trim();
-        if (string.IsNullOrEmpty(name))
-        {
-            await ShowMessageAsync("Animation name cannot be empty.");
-            return;
-        }
-        _appCommands.RenameChain(chain, name);
-        _appCommands.RefreshTreeNode(chain);
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.SaveCurrentAnimationChainList();
-    }
-
-    private async Task AskRenameFrameAsync(AnimationFrameSave frame)
-    {
-        var name = await ShowStringInputDialogAsync(
-            "Change Texture Path",
-            "New texture path (relative to ACHX):",
-            frame.TextureName ?? "");
-        if (name is null) return;
-        _appCommands.RenameFrame(frame, name);
-        var chain = _objectFinder.GetAnimationChainContaining(frame);
-        if (chain is not null) _appCommands.RefreshTreeNode(chain);
-        _appCommands.RefreshWireframe();
-        RefreshTextureCombo();
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.SaveCurrentAnimationChainList();
     }
 
     // ── View Texture in Explorer ──────────────────────────────────────────────

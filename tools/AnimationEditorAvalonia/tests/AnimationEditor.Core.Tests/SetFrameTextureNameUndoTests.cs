@@ -43,23 +43,4 @@ public class SetFrameTextureNameUndoTests
 
         Assert.Equal("updated.png", frame.TextureName);
     }
-
-    // ── RenameFrame + Undo ────────────────────────────────────────────────────
-
-    [Fact]
-    public void RenameFrame_Undo_RestoresOldTextureName()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var acls = ctx.Acls;
-        var chain = TestHelpers.MakeChain(acls, "Walk");
-        var frame = TestHelpers.MakeFrame("before.png");
-        chain.Frames.Add(frame);
-
-        ctx.AppCommands.RenameFrame(frame, "after.png");
-        Assert.Equal("after.png", frame.TextureName);
-
-        ctx.UndoManager.Undo();
-
-        Assert.Equal("before.png", frame.TextureName);
-    }
 }

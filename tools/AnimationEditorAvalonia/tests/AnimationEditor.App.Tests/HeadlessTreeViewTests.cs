@@ -1005,11 +1005,11 @@ public class HeadlessTreeViewTests
     }
 
     [AvaloniaFact]
-    public void RenameFrameLabel_DoesNotCollapseParentChainNode()
+    public void RefreshTreeNode_ForFrame_DoesNotCollapseParentChainNode()
     {
-        // Regression: after committing a frame inline rename the parent chain was
-        // collapsing. This test verifies that setting frame.Name + RefreshTreeNode
-        // (the CommitInlineRename path for frames) leaves the parent IsExpanded intact.
+        // Regression: refreshing a frame's tree node was collapsing its parent chain.
+        // RefreshTreeNode(frame) runs from many live paths (here driven via
+        // SetFrameTextureName) and must leave the parent's IsExpanded intact.
         var (window, ctx) = CreateWindow();
         try
         {
@@ -1024,13 +1024,12 @@ public class HeadlessTreeViewTests
             var chainNode = GetRoots(GetTree(window))[0];
             chainNode.IsExpanded = true;
 
-            // Simulate CommitInlineRename for a frame: set Name + RefreshTreeNode
-            frame.Name = "My Frame";
-            ctx.AppCommands.RefreshTreeNode(frame);
+            ctx.AppCommands.SetFrameTextureName(frame, "renamed.png");
             Dispatcher.UIThread.RunJobs();
 
-            Assert.True(chainNode.IsExpanded, "Parent chain node must stay expanded after frame label rename.");
-            Assert.Equal("My Frame", chainNode.Children[0].Header);
+            Assert.True(chainNode.IsExpanded,
+                "Parent chain node must stay expanded after a frame node refresh.");
+            Assert.Equal("renamed.png", chainNode.Children[0].Header);
         }
         finally { window.Close(); }
     }
