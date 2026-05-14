@@ -28,6 +28,22 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events    = events;
         }
 
+        public bool Do()
+        {
+            foreach (var s in _snapshots)
+            {
+                s.Frame.LeftCoordinate   = s.AL;
+                s.Frame.TopCoordinate    = s.AT;
+                s.Frame.RightCoordinate  = s.AR;
+                s.Frame.BottomCoordinate = s.AB;
+                _commands.RefreshTreeNode(s.Frame);
+            }
+            _events.RaiseAnimationChainsChanged();
+            _commands.RefreshWireframe();
+            _commands.SaveCurrentAnimationChainList();
+            return true;
+        }
+
         public void Undo()
         {
             foreach (var s in _snapshots)
@@ -36,21 +52,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 s.Frame.TopCoordinate    = s.BT;
                 s.Frame.RightCoordinate  = s.BR;
                 s.Frame.BottomCoordinate = s.BB;
-                _commands.RefreshTreeNode(s.Frame);
-            }
-            _events.RaiseAnimationChainsChanged();
-            _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
-        }
-
-        public void Redo()
-        {
-            foreach (var s in _snapshots)
-            {
-                s.Frame.LeftCoordinate   = s.AL;
-                s.Frame.TopCoordinate    = s.AT;
-                s.Frame.RightCoordinate  = s.AR;
-                s.Frame.BottomCoordinate = s.AB;
                 _commands.RefreshTreeNode(s.Frame);
             }
             _events.RaiseAnimationChainsChanged();
