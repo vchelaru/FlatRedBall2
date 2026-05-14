@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private System.Threading.CancellationTokenSource? _toastCts;
     private List<AnimationChainSave>? _pendingDeleteChains;
+    private double _savedTreeColumnWidth;
 
     private FilePath SettingsFilePath =>
         new FilePath((Path.GetDirectoryName(
@@ -2348,6 +2349,8 @@ public partial class MainWindow : Window
     private void ShowDeleteChainConfirm(AnimationChainSave chain) =>
         ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
 
+    private const double ConfirmPanelMinWidth = 360;
+
     private void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
     {
         _pendingDeleteChains = chains;
@@ -2355,6 +2358,12 @@ public partial class MainWindow : Window
             ? $"Delete \"{chains[0].Name}\"?"
             : $"Delete {chains.Count} animations?";
         DeleteChainConfirmLabel.Text = label;
+
+        var col = MainContentGrid.ColumnDefinitions[0];
+        _savedTreeColumnWidth = col.Width.Value;
+        if (_savedTreeColumnWidth < ConfirmPanelMinWidth)
+            col.Width = new GridLength(ConfirmPanelMinWidth);
+
         DeleteChainConfirmPanel.IsVisible = true;
     }
 
@@ -2364,6 +2373,7 @@ public partial class MainWindow : Window
         List<AnimationChainSave> chains = _pendingDeleteChains;
         _pendingDeleteChains = null;
         DeleteChainConfirmPanel.IsVisible = false;
+        RestoreTreeColumnWidth();
         _appCommands.DeleteAnimationChains(chains);
     }
 
@@ -2371,6 +2381,13 @@ public partial class MainWindow : Window
     {
         _pendingDeleteChains = null;
         DeleteChainConfirmPanel.IsVisible = false;
+        RestoreTreeColumnWidth();
+    }
+
+    private void RestoreTreeColumnWidth()
+    {
+        if (_savedTreeColumnWidth > 0 && MainContentGrid.ColumnDefinitions[0].Width.Value > _savedTreeColumnWidth)
+            MainContentGrid.ColumnDefinitions[0].Width = new GridLength(_savedTreeColumnWidth);
     }
 
     internal void ShowDeleteChainConfirmForTest(AnimationChainSave chain) =>

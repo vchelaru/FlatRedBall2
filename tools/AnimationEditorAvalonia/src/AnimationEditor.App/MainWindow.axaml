@@ -168,7 +168,7 @@
         </Border>
 
         <!-- ── Main content: TreeView | Property Panel | [Wireframe / Preview] ── -->
-        <Grid ColumnDefinitions="260,4,240,4,*">
+        <Grid x:Name="MainContentGrid" ColumnDefinitions="260,4,240,4,*">
 
             <!-- ── Left: Animation tree ── -->
             <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*,Auto"
