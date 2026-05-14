@@ -498,8 +498,19 @@ public partial class MainWindow : Window
     {
         HistorySplitter.IsVisible = visible;
         HistorySectionGrid.IsVisible = visible;
-        InspectorColumnGrid.RowDefinitions[2].Height = visible ? new GridLength(4) : new GridLength(0);
-        InspectorColumnGrid.RowDefinitions[3].Height = visible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        if (visible)
+        {
+            // Share space: inspector content gets 2/3, history list gets 1/3
+            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(2, GridUnitType.Star);
+            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(4);
+            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
+        }
+        else
+        {
+            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(0);
+            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(0);
+        }
         MenuShowHistory.IsEnabled = !visible;
     }
 

@@ -740,7 +740,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Middle: Property Inspector ── -->
-            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,*,4,*">
+            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,2*,4,*">
 
                 <!-- ── Inspector pane header ── -->
                 <Border Grid.Row="0"
