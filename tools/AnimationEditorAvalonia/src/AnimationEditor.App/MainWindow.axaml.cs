@@ -932,11 +932,11 @@ public partial class MainWindow : Window
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
         var firstFile = GetFirstDroppedFilePath(e);
-        Console.WriteLine($"[DragDrop] OnTreeDrop: firstFile={firstFile ?? "(null)"}, FileName={_projectManager.FileName ?? "(null)"}");
+        Trace.WriteLine($"[DragDrop] OnTreeDrop: firstFile={firstFile ?? "(null)"}, FileName={_projectManager.FileName ?? "(null)"}");
 
         if (string.IsNullOrEmpty(firstFile))
         {
-            Console.WriteLine("[DragDrop] Aborted: no file found in drop data");
+            Trace.WriteLine("[DragDrop] Aborted: no file found in drop data");
             return;
         }
 
@@ -944,7 +944,7 @@ public partial class MainWindow : Window
         // Relative-path conversion requires a base directory; without one we fall back to absolute.
         if (string.IsNullOrEmpty(_projectManager.FileName))
         {
-            Console.WriteLine("[DragDrop] Warning: no ACHX file saved yet — texture path will be absolute");
+            Trace.WriteLine("[DragDrop] Warning: no ACHX file saved yet — texture path will be absolute");
         }
 
         var targetNode = AnimTree.SelectedItem as TreeNodeVm;
@@ -957,7 +957,7 @@ public partial class MainWindow : Window
             targetChain = _objectFinder.GetAnimationChainContaining(targetFrame);
         }
 
-        Console.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
+        Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
         var result = TextureDropProcessor.ApplyPngDrop(
             targetChain,
@@ -966,11 +966,11 @@ public partial class MainWindow : Window
             _projectManager.FileName,
             e.KeyModifiers.HasFlag(KeyModifiers.Control));
 
-        Console.WriteLine($"[DragDrop] Result={result}");
+        Trace.WriteLine($"[DragDrop] Result={result}");
 
         if (result == TextureDropResult.NotApplied)
         {
-            Console.WriteLine("[DragDrop] NotApplied — no chain or frame targeted, or non-PNG dropped");
+            Trace.WriteLine("[DragDrop] NotApplied — no chain or frame targeted, or non-PNG dropped");
             return;
         }
 
@@ -1007,29 +1007,29 @@ public partial class MainWindow : Window
         var itemFormats = e.DataTransfer.Items?
             .Select(i => "[" + string.Join(",", i.Formats) + "]")
             .ToList();
-        Console.WriteLine($"[DragDrop] Items and their formats: {(itemFormats == null ? "(null)" : string.Join(" ", itemFormats))}");
-        Console.WriteLine($"[DragDrop] Contains(DataFormat.File)={e.DataTransfer.Contains(DataFormat.File)}");
+        Trace.WriteLine($"[DragDrop] Items and their formats: {(itemFormats == null ? "(null)" : string.Join(" ", itemFormats))}");
+        Trace.WriteLine($"[DragDrop] Contains(DataFormat.File)={e.DataTransfer.Contains(DataFormat.File)}");
 
         // Correct Avalonia 12 API for OS file drops
         var files = e.DataTransfer.TryGetFiles()?.ToList();
-        Console.WriteLine($"[DragDrop] TryGetFiles() count={files?.Count ?? -1}");
+        Trace.WriteLine($"[DragDrop] TryGetFiles() count={files?.Count ?? -1}");
         if (files?.Count > 0)
         {
             var path = files[0].Path.LocalPath;
-            Console.WriteLine($"[DragDrop] resolved path={path}");
+            Trace.WriteLine($"[DragDrop] resolved path={path}");
             return path;
         }
 
         // Fallback: per-item TryGetFile()
         var items = e.DataTransfer.Items?.ToList();
-        Console.WriteLine($"[DragDrop] Items count={items?.Count ?? -1}");
+        Trace.WriteLine($"[DragDrop] Items count={items?.Count ?? -1}");
         foreach (var item in items ?? new())
-            Console.WriteLine($"[DragDrop] Item: Formats=[{string.Join(",", item.Formats)}] TryGetFile={item.TryGetFile()?.Path?.LocalPath ?? "(null)"}");
+            Trace.WriteLine($"[DragDrop] Item: Formats=[{string.Join(",", item.Formats)}] TryGetFile={item.TryGetFile()?.Path?.LocalPath ?? "(null)"}");
 
         var fallback = items?
             .Select(item => item.TryGetFile())
             .FirstOrDefault(f => f is not null);
-        Console.WriteLine($"[DragDrop] Items fallback resolved={fallback?.Path.LocalPath ?? "(null)"}");
+        Trace.WriteLine($"[DragDrop] Items fallback resolved={fallback?.Path.LocalPath ?? "(null)"}");
         return fallback?.Path.LocalPath;
     }
 
