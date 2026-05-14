@@ -474,6 +474,16 @@ public partial class MainWindow : Window
 
 
 
+    private void RefreshHistoryPanel()
+    {
+        var items = new ObservableCollection<Models.HistoryEntryVm>();
+        foreach (var cmd in _undoManager.UndoHistory)
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec"));
+        foreach (var cmd in _undoManager.RedoHistory)
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#6a6e76"));
+        HistoryList.ItemsSource = items;
+    }
+
     // ── Texture combo helpers ─────────────────────────────────────────────────
 
     /// <summary>Rebuild the texture dropdown from all frames in the loaded .achx.</summary>
@@ -621,7 +631,9 @@ public partial class MainWindow : Window
         {
             MenuUndo.IsEnabled = _undoManager.CanUndo;
             MenuRedo.IsEnabled = _undoManager.CanRedo;
+            RefreshHistoryPanel();
         };
+        RefreshHistoryPanel();
 
         RefreshRecentFiles();
     }

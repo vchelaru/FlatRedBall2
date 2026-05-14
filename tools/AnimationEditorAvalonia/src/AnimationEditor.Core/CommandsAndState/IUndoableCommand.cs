@@ -10,6 +10,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     public interface IUndoableCommand
     {
         /// <summary>
+        /// Short human-readable label shown in the History panel (e.g. "Add Frame",
+        /// "Rename 'Walk' → 'Run'"). Should be set at construction time so it is
+        /// readable before and after <see cref="Do"/> is called.
+        /// </summary>
+        string Description { get; }
+
+        /// <summary>
         /// Performs the mutation for the first time. Returns <c>false</c> when the command
         /// turned out to be a no-op (e.g. a reorder that produced an identical list), so
         /// <see cref="IUndoManager.Execute"/> can skip recording an empty undo entry.

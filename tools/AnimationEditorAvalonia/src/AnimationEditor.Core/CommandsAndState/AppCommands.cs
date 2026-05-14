@@ -354,7 +354,12 @@ namespace AnimationEditor.Core.CommandsAndState
                         commands.Add(new DeleteAxisAlignedRectangleCommand(rectangle, frame, this, _events));
                 }
                 if (commands.Count > 0)
-                    _undoManager.Execute(new CompositeCommand(commands));
+                {
+                    var desc = rectangles.Count == 1
+                        ? $"Delete Rectangle '{rectangles[0].Name}'"
+                        : $"Delete {rectangles.Count} Rectangles";
+                    _undoManager.Execute(new CompositeCommand(commands, desc));
+                }
             }
         }
 
@@ -374,7 +379,12 @@ namespace AnimationEditor.Core.CommandsAndState
                         commands.Add(new DeleteCircleCommand(circle, frame, this, _events));
                 }
                 if (commands.Count > 0)
-                    _undoManager.Execute(new CompositeCommand(commands));
+                {
+                    var desc = circles.Count == 1
+                        ? $"Delete Circle '{circles[0].Name}'"
+                        : $"Delete {circles.Count} Circles";
+                    _undoManager.Execute(new CompositeCommand(commands, desc));
+                }
             }
         }
 
@@ -491,7 +501,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.RemoveAt(idx); chains.Insert(newIdx, chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                delta > 0 ? "Move Animation Down" : "Move Animation Up"));
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
@@ -501,7 +512,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.Remove(chain); chains.Insert(0, chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Move Animation to Top"));
         }
 
         public void MoveChainToBottom(AnimationChainSave chain)
@@ -511,7 +523,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.Remove(chain); chains.Add(chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Move Animation to Bottom"));
         }
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
@@ -522,7 +535,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.RemoveAt(idx); chain.Frames.Insert(newIdx, frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                delta > 0 ? "Move Frame Down" : "Move Frame Up"));
         }
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
@@ -530,7 +544,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Insert(0, frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Move Frame to Top"));
         }
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
@@ -538,7 +553,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Add(frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Move Frame to Bottom"));
         }
 
         /// <summary>
@@ -589,7 +605,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => chain.Frames.Reverse(),
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Invert Frame Order"));
         }
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
@@ -597,7 +614,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => { foreach (var frame in chain.Frames) frame.FrameLength = frameLength; },
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Set All Frame Lengths"));
         }
 
         public AnimationChainSave? DuplicateChain(
@@ -662,7 +680,8 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var c in sorted)
                         acls.AnimationChains.Add(c);
                 },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Sort Animations"));
         }
 
         // ── A16: Adjust Offsets ───────────────────────────────────────────────
@@ -695,7 +714,8 @@ namespace AnimationEditor.Core.CommandsAndState
                             AdjustOffsetCalculator.ApplyJustifyBottom([frame], height.Value, offsetMultiplier);
                     }
                 },
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Justify Bottom"));
         }
 
         /// <summary>
@@ -711,7 +731,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative),
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Adjust Offsets"));
         }
 
         // ── A17: Scale Frame Times ────────────────────────────────────────────
@@ -727,7 +748,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration),
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Scale Frame Times"));
         }
 
         /// <summary>
@@ -741,7 +763,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration),
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Scale Frame Times"));
         }
 
         // ── F12: Add Multiple Frames ──────────────────────────────────────────
@@ -801,7 +824,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 () => modified = TextureResizeAdjuster.AdjustAll(
                     acls, aclsDir, absoluteTextureFilePath,
                     oldWidth, oldHeight, newWidth, newHeight),
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Adjust UV After Resize"));
 
             return modified;
         }

@@ -14,7 +14,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IReadOnlyList<IUndoableCommand> _commands;
         private IReadOnlyList<IUndoableCommand> _executed = [];
 
-        public CompositeCommand(IReadOnlyList<IUndoableCommand> commands) => _commands = commands;
+        public string Description { get; }
+
+        public CompositeCommand(IReadOnlyList<IUndoableCommand> commands, string description = "Composite Action")
+        {
+            _commands = commands;
+            Description = description;
+        }
 
         public bool Do()
         {

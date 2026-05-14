@@ -23,15 +23,19 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private T[] _before = [];
         private T[] _after = [];
 
+        public string Description { get; }
+
         public ReorderCommand(
             IList<T> list, Action reorder,
-            IAppCommands commands, IApplicationEvents events, Action refresh)
+            IAppCommands commands, IApplicationEvents events, Action refresh,
+            string description = "Reorder")
         {
             _list = list;
             _reorder = reorder;
             _commands = commands;
             _events = events;
             _refresh = refresh;
+            Description = description;
         }
 
         public bool Do()

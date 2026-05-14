@@ -51,15 +51,19 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private FrameFieldSnapshot[] _before = [];
         private FrameFieldSnapshot[] _after = [];
 
+        public string Description { get; }
+
         public BulkFrameEditCommand(
             IReadOnlyList<AnimationFrameSave> frames, Action mutate,
-            IAppCommands commands, IApplicationEvents events, bool refreshWireframe)
+            IAppCommands commands, IApplicationEvents events, bool refreshWireframe,
+            string description = "Edit Frames")
         {
             _frames = frames;
             _mutate = mutate;
             _commands = commands;
             _events = events;
             _refreshWireframe = refreshWireframe;
+            Description = description;
         }
 
         public bool Do()

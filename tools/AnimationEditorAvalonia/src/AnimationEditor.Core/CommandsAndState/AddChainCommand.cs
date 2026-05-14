@@ -9,6 +9,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description { get; }
+
         public AddChainCommand(AnimationChainSave chain, AnimationChainListSave acls,
             IAppCommands commands, IApplicationEvents events)
         {
@@ -16,6 +18,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _acls = acls;
             _commands = commands;
             _events = events;
+            Description = $"Add Animation '{chain.Name}'";
         }
 
         public bool Do()

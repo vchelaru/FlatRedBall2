@@ -14,6 +14,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         // Captured by Do(): the chains actually removed, paired with where they were.
         private (AnimationChainSave Chain, int OriginalIndex)[] _removed = [];
 
+        public string Description { get; }
+
         public DeleteChainsCommand(
             IReadOnlyList<AnimationChainSave> chains,
             AnimationChainListSave acls,
@@ -24,6 +26,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _acls = acls;
             _commands = commands;
             _events = events;
+            Description = chains.Count == 1
+                ? $"Delete '{chains[0].Name}'"
+                : $"Delete {chains.Count} Animations";
         }
 
         public bool Do()

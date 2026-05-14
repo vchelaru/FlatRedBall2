@@ -12,6 +12,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private int _originalIndex = -1;  // captured by Do()
 
+        public string Description { get; }
+
         public DeleteCircleCommand(CircleSave circle, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events)
         {
@@ -19,6 +21,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _frame = frame;
             _commands = commands;
             _events = events;
+            Description = $"Delete Circle '{circle.Name}'";
         }
 
         public bool Do()

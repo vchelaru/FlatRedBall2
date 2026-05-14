@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
+        xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="AnimationEditor.App.MainWindow"
@@ -737,7 +738,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Middle: Property Inspector ── -->
-            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+            <Grid Grid.Column="2" RowDefinitions="Auto,2*,4,Auto,*">
 
                 <!-- ── Inspector pane header ── -->
                 <Border Grid.Row="0"
@@ -999,6 +1000,47 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
+
+                <!-- ── History pane splitter ── -->
+                <GridSplitter Grid.Row="2"
+                              ResizeDirection="Rows"
+                              Background="{StaticResource LineBrush}"
+                              HorizontalAlignment="Stretch"
+                              Height="4" />
+
+                <!-- ── History pane header ── -->
+                <Border Grid.Row="3"
+                        Background="{StaticResource BgRail}"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="1,0,0,1"
+                        Height="36">
+                    <TextBlock Text="HISTORY"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkMid}"
+                               VerticalAlignment="Center"
+                               Margin="10,0" />
+                </Border>
+
+                <!-- ── History list ── -->
+                <ListBox x:Name="HistoryList"
+                         Grid.Row="4"
+                         Background="{StaticResource BgPanel}"
+                         BorderBrush="{StaticResource LineBrush}"
+                         BorderThickness="1,0,0,0"
+                         Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="appModels:HistoryEntryVm">
+                            <TextBlock Text="{Binding Description}"
+                                       FontSize="11"
+                                       Foreground="{Binding Foreground}"
+                                       Padding="8,3"
+                                       TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
             </Grid>
         </Grid>
     </DockPanel>

@@ -125,6 +125,7 @@ public class UndoManagerTests
 
     private sealed class StubCommand : IUndoableCommand
     {
+        public string Description => "Stub";
         public int UndoCalls { get; private set; }
         public int RedoCalls { get; private set; }
         public bool Do() => true;

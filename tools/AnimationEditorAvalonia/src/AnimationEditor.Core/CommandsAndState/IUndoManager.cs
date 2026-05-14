@@ -13,6 +13,18 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         bool CanRedo { get; }
 
         /// <summary>
+        /// Undo-stack entries in chronological order (oldest first, newest last).
+        /// Rebuilt on every <see cref="StackChanged"/> event.
+        /// </summary>
+        IReadOnlyList<IUndoableCommand> UndoHistory { get; }
+
+        /// <summary>
+        /// Redo-stack entries in the order they would be re-applied (first-to-redo first,
+        /// last-to-redo last). Rebuilt on every <see cref="StackChanged"/> event.
+        /// </summary>
+        IReadOnlyList<IUndoableCommand> RedoHistory { get; }
+
+        /// <summary>
         /// Current save state of the open document.
         /// Updated by <see cref="MarkSaved"/>, <see cref="MarkSaveFailed"/>, and <see cref="Clear"/>.
         /// </summary>

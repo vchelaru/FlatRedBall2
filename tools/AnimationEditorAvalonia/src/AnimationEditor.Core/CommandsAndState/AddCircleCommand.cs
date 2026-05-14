@@ -9,6 +9,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description => "Add Circle";
+
         public AddCircleCommand(CircleSave circle, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events)
         {

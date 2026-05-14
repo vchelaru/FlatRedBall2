@@ -14,6 +14,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         // Captured by Do(): the frames actually removed, paired with where they were.
         private (AnimationFrameSave Frame, int OriginalIndex)[] _removed = [];
 
+        public string Description { get; }
+
         public DeleteFramesCommand(
             IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave chain,
@@ -24,6 +26,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain = chain;
             _commands = commands;
             _events = events;
+            Description = frames.Count == 1 ? "Delete Frame" : $"Delete {frames.Count} Frames";
         }
 
         public bool Do()

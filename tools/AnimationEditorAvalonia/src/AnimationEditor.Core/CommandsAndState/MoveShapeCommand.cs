@@ -31,6 +31,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events   = events;
         }
 
+        public string Description => "Move Shape";
+
         public bool Do() { Apply(_newX, _newY); return true; }
         public void Undo() => Apply(_oldX, _oldY);
 

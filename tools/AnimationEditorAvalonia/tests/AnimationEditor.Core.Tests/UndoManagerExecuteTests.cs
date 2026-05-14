@@ -52,6 +52,7 @@ public class UndoManagerExecuteTests
     {
         private readonly bool _doResult;
 
+        public string Description => "Spy";
         public SpyCommand(bool doResult) => _doResult = doResult;
 
         public int DoCalls { get; private set; }

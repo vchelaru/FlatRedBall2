@@ -10,6 +10,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description => "Edit Frame Region";
+
         public FrameRegionChangedCommand(
             AnimationFrameSave frame,
             float bL, float bT, float bR, float bB,

@@ -12,6 +12,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private int _originalIndex = -1;  // captured by Do()
 
+        public string Description { get; }
+
         public DeleteAxisAlignedRectangleCommand(
             AARectSave rect,
             AnimationFrameSave frame,
@@ -22,6 +24,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _frame = frame;
             _commands = commands;
             _events = events;
+            Description = $"Delete Rectangle '{rect.Name}'";
         }
 
         public bool Do()

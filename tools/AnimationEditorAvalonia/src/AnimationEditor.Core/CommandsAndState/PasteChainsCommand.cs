@@ -22,6 +22,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private int[] _insertedIndices = [];
 
+        public string Description { get; }
+
         public PasteChainsCommand(
             AnimationChainListSave acls,
             IReadOnlyList<AnimationChainSave> chains,
@@ -32,6 +34,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chains = chains;
             _commands = commands;
             _events = events;
+            Description = chains.Count == 1 ? "Paste Animation" : $"Paste {chains.Count} Animations";
         }
 
         public bool Do()

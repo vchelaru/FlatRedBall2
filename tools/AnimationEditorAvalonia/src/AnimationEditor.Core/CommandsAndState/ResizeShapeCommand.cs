@@ -35,6 +35,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events    = events;
         }
 
+        public string Description => "Resize Shape";
+
         public bool Do() { Apply(_newX, _newY, _newParam1, _newParam2); return true; }
         public void Undo() => Apply(_oldX, _oldY, _oldParam1, _oldParam2);
 

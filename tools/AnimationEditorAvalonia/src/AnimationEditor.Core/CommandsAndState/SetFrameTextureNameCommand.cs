@@ -10,6 +10,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description => "Set Texture";
+
         public SetFrameTextureNameCommand(AnimationFrameSave frame, string? oldName, string? newName,
             IAppCommands commands, IApplicationEvents events)
         {

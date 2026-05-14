@@ -14,6 +14,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description { get; }
+
         public AddFramesCommand(
             AnimationFrameSave[] frames, AnimationChainSave chain,
             IAppCommands commands, IApplicationEvents events)
@@ -22,6 +24,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _chain = chain;
             _commands = commands;
             _events = events;
+            Description = frames.Length == 1
+                ? $"Add Frame to '{chain.Name}'"
+                : $"Add {frames.Length} Frames to '{chain.Name}'";
         }
 
         public bool Do()

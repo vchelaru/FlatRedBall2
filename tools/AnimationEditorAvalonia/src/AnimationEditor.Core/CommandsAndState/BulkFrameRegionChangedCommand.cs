@@ -18,6 +18,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description { get; }
+
         public BulkFrameRegionChangedCommand(
             IReadOnlyList<FrameSnapshot> snapshots,
             IAppCommands commands,
@@ -26,6 +28,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _snapshots = snapshots;
             _commands  = commands;
             _events    = events;
+            Description = snapshots.Count == 1 ? "Edit Frame Region" : $"Edit {snapshots.Count} Frame Regions";
         }
 
         public bool Do()
