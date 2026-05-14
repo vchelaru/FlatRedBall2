@@ -18,18 +18,19 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
         }
 
-        public void Undo()
+        public bool Do()
         {
-            _frame.ShapesSave!.AARectSaves.Remove(_rect);
+            _frame.ShapesSave!.AARectSaves.Add(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            return true;
         }
 
-        public void Redo()
+        public void Undo()
         {
-            _frame.ShapesSave!.AARectSaves.Add(_rect);
+            _frame.ShapesSave!.AARectSaves.Remove(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

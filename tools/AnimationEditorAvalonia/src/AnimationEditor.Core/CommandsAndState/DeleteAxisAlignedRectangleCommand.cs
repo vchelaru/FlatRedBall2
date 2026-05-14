@@ -7,22 +7,34 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly AARectSave _rect;
         private readonly AnimationFrameSave _frame;
-        private readonly int _originalIndex;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
+
+        private int _originalIndex = -1;  // captured by Do()
 
         public DeleteAxisAlignedRectangleCommand(
             AARectSave rect,
             AnimationFrameSave frame,
-            int originalIndex,
             IAppCommands commands,
             IApplicationEvents events)
         {
             _rect = rect;
             _frame = frame;
-            _originalIndex = originalIndex;
             _commands = commands;
             _events = events;
+        }
+
+        public bool Do()
+        {
+            _originalIndex = _frame.ShapesSave!.AARectSaves.IndexOf(_rect);
+            if (_originalIndex < 0) return false;
+
+            _frame.ShapesSave!.AARectSaves.RemoveAt(_originalIndex);
+            _commands.RefreshTreeNode(_frame);
+            _commands.RefreshAnimationFrameDisplay();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
+            return true;
         }
 
         public void Undo()

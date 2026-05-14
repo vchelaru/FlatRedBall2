@@ -1,5 +1,4 @@
 using FlatRedBall2.Animation.Content;
-using System;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -12,35 +11,34 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly AnimationFrameSave[] _frames;
         private readonly AnimationChainSave _chain;
-        private readonly int _insertedAtIndex;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
         public AddFramesCommand(
-            AnimationFrameSave[] frames, AnimationChainSave chain, int insertedAtIndex,
+            AnimationFrameSave[] frames, AnimationChainSave chain,
             IAppCommands commands, IApplicationEvents events)
         {
             _frames = frames;
             _chain = chain;
-            _insertedAtIndex = insertedAtIndex;
             _commands = commands;
             _events = events;
+        }
+
+        public bool Do()
+        {
+            if (_frames.Length == 0) return false;
+            foreach (var frame in _frames)
+                _chain.Frames.Add(frame);
+            _commands.RefreshTreeNode(_chain);
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
+            return true;
         }
 
         public void Undo()
         {
             foreach (var frame in _frames)
                 _chain.Frames.Remove(frame);
-            _commands.RefreshTreeNode(_chain);
-            _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
-        }
-
-        public void Redo()
-        {
-            int idx = Math.Min(_insertedAtIndex, _chain.Frames.Count);
-            for (int i = 0; i < _frames.Length; i++)
-                _chain.Frames.Insert(idx + i, _frames[i]);
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();

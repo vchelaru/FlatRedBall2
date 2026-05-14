@@ -127,6 +127,7 @@ public class UndoManagerTests
     {
         public int UndoCalls { get; private set; }
         public int RedoCalls { get; private set; }
+        public bool Do() => true;
         public void Undo() => UndoCalls++;
         public void Redo() => RedoCalls++;
     }

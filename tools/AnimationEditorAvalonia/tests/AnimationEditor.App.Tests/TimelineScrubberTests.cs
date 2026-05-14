@@ -95,12 +95,15 @@ public class TimelineScrubberTests
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
-            // Advance halfway through frame 0 (0.05 of 0.1s)
-            preview.Playback.Advance(0.05);
+            // Derive the effective PPS from the cell width (cell = frameDuration * effectivePps).
+            double effectivePps = items[0].Width / 0.1;
+
+            // Advance halfway through frame 0.
+            const double elapsed = 0.05;
+            preview.Playback.Advance(elapsed);
 
             // ScrubberOffset is updated synchronously from PlaybackTicked — no RunJobs needed
-            double travelWidth = items[0].Width - TimelineFrameVm.PlayheadWidth;
-            double expectedOffset = 0.5 * travelWidth;
+            double expectedOffset = elapsed * effectivePps;
             Assert.Equal(expectedOffset, items[0].ScrubberOffset, precision: 6);
             Assert.True(items[0].ScrubberOffset > 0);
             Assert.True(items[0].ScrubberOffset < items[0].Width);
@@ -186,7 +189,7 @@ public class TimelineScrubberTests
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
-            // Advance just before the frame boundary — ratio ≈ 1.0
+            // Advance just before the frame boundary — elapsed * PixelsPerSecond would exceed travelWidth
             preview.Playback.Advance(0.0999);
 
             double travelWidth = items[0].Width - TimelineFrameVm.PlayheadWidth;

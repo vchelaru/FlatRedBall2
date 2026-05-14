@@ -20,18 +20,18 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
         }
 
-        public void Undo()
-        {
-            _frame.TextureName = _oldName ?? string.Empty;
-            _commands.RefreshTreeNode(_frame);
-            _events.RaiseAnimationChainsChanged();
-        }
+        public bool Do()  => Apply(_newName);
+        public void Undo() => Apply(_oldName);
 
-        public void Redo()
+        // Assigns the name verbatim — null stays null, "" stays "" — so "clear the
+        // texture" round-trips exactly. Always returns true: a same-value reassignment
+        // is filtered out by the caller before a command is ever constructed.
+        private bool Apply(string? name)
         {
-            _frame.TextureName = _newName ?? string.Empty;
+            _frame.TextureName = name!;
             _commands.RefreshTreeNode(_frame);
             _events.RaiseAnimationChainsChanged();
+            return true;
         }
     }
 }

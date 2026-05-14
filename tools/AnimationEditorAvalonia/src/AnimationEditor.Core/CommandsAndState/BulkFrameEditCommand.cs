@@ -1,5 +1,7 @@
 using FlatRedBall2.Animation.Content;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -31,28 +33,45 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     }
 
     /// <summary>
-    /// Undo/redo record for an operation that edits numeric fields across many frames
+    /// Do/undo/redo record for an operation that edits numeric fields across many frames
     /// at once — set-all-frame-lengths, adjust-offsets, scale-frame-times,
-    /// adjust-UV-after-resize. The caller snapshots the affected frames before and
-    /// after running the operation; this command just replays whichever snapshot set.
+    /// adjust-UV-after-resize. <see cref="Do"/> snapshots the affected frames, runs the
+    /// supplied mutation, and snapshots them again; undo and redo just replay whichever
+    /// snapshot set. <see cref="Do"/> returns <c>false</c> when the mutation changed
+    /// nothing, so no empty undo entry is recorded.
     /// </summary>
     internal sealed class BulkFrameEditCommand : IUndoableCommand
     {
-        private readonly FrameFieldSnapshot[] _before;
-        private readonly FrameFieldSnapshot[] _after;
+        private readonly IReadOnlyList<AnimationFrameSave> _frames;
+        private readonly Action _mutate;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
         private readonly bool _refreshWireframe;
 
+        private FrameFieldSnapshot[] _before = [];
+        private FrameFieldSnapshot[] _after = [];
+
         public BulkFrameEditCommand(
-            FrameFieldSnapshot[] before, FrameFieldSnapshot[] after,
+            IReadOnlyList<AnimationFrameSave> frames, Action mutate,
             IAppCommands commands, IApplicationEvents events, bool refreshWireframe)
         {
-            _before = before;
-            _after = after;
+            _frames = frames;
+            _mutate = mutate;
             _commands = commands;
             _events = events;
             _refreshWireframe = refreshWireframe;
+        }
+
+        public bool Do()
+        {
+            _before = _frames.Select(FrameFieldSnapshot.Capture).ToArray();
+            _mutate();
+            _after = _frames.Select(FrameFieldSnapshot.Capture).ToArray();
+
+            if (_before.SequenceEqual(_after)) return false;
+
+            RaiseSideEffects();
+            return true;
         }
 
         public void Undo() => Apply(_before);
@@ -62,6 +81,11 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             foreach (var snapshot in snapshots)
                 snapshot.RestoreToFrame();
+            RaiseSideEffects();
+        }
+
+        private void RaiseSideEffects()
+        {
             _events.RaiseAnimationChainsChanged();
             if (_refreshWireframe)
                 _commands.RefreshWireframe();

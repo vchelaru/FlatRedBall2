@@ -4,7 +4,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Unlimited undo/redo history for the animation editor.
-    /// Call <see cref="Record"/> after every mutating operation.
+    /// <see cref="Execute"/> is the standard path for every project mutation;
+    /// <see cref="Record"/> exists only for interactive-gesture commands.
     /// </summary>
     public interface IUndoManager
     {
@@ -17,12 +18,23 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         /// </summary>
         SaveState SaveState { get; }
 
-        /// <summary>Raised after <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
+        /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         event Action? StackChanged;
 
         /// <summary>
-        /// Records a command in the undo history and clears the redo stack.
-        /// Call this immediately after a mutating operation completes.
+        /// Runs <see cref="IUndoableCommand.Do"/> and, if it reported a real change,
+        /// records the command in the undo history (clearing the redo stack).
+        /// This is the chokepoint for project mutation — call it instead of mutating
+        /// state directly and then calling <see cref="Record"/>.
+        /// </summary>
+        void Execute(IUndoableCommand cmd);
+
+        /// <summary>
+        /// Records an <em>already-applied</em> command in the undo history and clears the
+        /// redo stack. Reserved for interactive-gesture commands (shape drag/resize, region
+        /// drag) whose mutation is applied incrementally during the gesture and committed on
+        /// release — for those, <see cref="Execute"/> does not fit. Everything else must go
+        /// through <see cref="Execute"/>.
         /// </summary>
         void Record(IUndoableCommand cmd);
 
