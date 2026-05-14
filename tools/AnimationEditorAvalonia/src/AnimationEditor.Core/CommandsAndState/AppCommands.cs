@@ -95,6 +95,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public IFileDialogService FileDialogService { get; set; } = NullFileDialogService.Instance;
 
+        public event Action<string>? FramesDeleted;
+
         /// <summary>
         /// Fired after <see cref="SaveCurrentAnimationChainListAsync"/> successfully saves a file.
         /// The argument is the full path of the saved file.
@@ -437,34 +439,32 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        public async Task AskToDeleteFrames(List<AnimationFrameSave> frames)
+        public void DeleteFrames(List<AnimationFrameSave> frames)
         {
-            var message = $"Delete the following {frames.Count} frame(s)?\n\n" +
-                string.Join("\n", frames.Select(f => $"Frame {f.TextureName}"));
-
-            if (await ConfirmAsync(message, "Delete?"))
+            var chain = _selectedState.SelectedChain;
+            if (chain != null)
             {
-                var chain = _selectedState.SelectedChain;
-                if (chain != null)
-                {
-                    // Capture original indices before removal
-                    var entries = frames
-                        .Select(f => (Frame: f, OriginalIndex: chain.Frames.IndexOf(f)))
-                        .Where(e => e.OriginalIndex >= 0)
-                        .ToArray();
+                var entries = frames
+                    .Select(f => (Frame: f, OriginalIndex: chain.Frames.IndexOf(f)))
+                    .Where(e => e.OriginalIndex >= 0)
+                    .ToArray();
 
-                    foreach (var (frame, _) in entries)
-                        chain.Frames.Remove(frame);
+                foreach (var (frame, _) in entries)
+                    chain.Frames.Remove(frame);
 
-                    if (entries.Length > 0)
-                        _undoManager.Record(new DeleteFramesCommand(entries, chain, this, _events));
+                if (entries.Length > 0)
+                    _undoManager.Record(new DeleteFramesCommand(entries, chain, this, _events));
 
-                    RefreshChainNodeRequested?.Invoke(chain);
-                }
+                RefreshChainNodeRequested?.Invoke(chain);
 
-                RefreshWireframeRequested?.Invoke();
-                _events.RaiseAnimationChainsChanged();
+                string label = entries.Length == 1
+                    ? $"Frame {entries[0].OriginalIndex + 1}"
+                    : $"{entries.Length} frames";
+                FramesDeleted?.Invoke(label);
             }
+
+            RefreshWireframeRequested?.Invoke();
+            _events.RaiseAnimationChainsChanged();
         }
 
         private List<string> GetSelectedFrameShapeNames()

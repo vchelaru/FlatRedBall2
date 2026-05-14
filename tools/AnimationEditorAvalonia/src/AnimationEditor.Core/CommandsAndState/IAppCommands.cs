@@ -33,6 +33,7 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action RefreshAnimationFrameDisplayRequested;
         event Action RefreshWireframeRequested;
         event Action<string>? SaveAsCompleted;
+        event Action<string>? FramesDeleted;
 
         /// <summary>
         /// Fired when <see cref="LoadAnimationChain"/> fails — file not found, corrupt XML,
@@ -71,7 +72,7 @@ namespace AnimationEditor.Core.CommandsAndState
         Task AskToDeleteRectangles(List<AARectSave> rectangles);
         Task AskToDeleteCircles(List<CircleSave> circles);
         Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains);
-        Task AskToDeleteFrames(List<AnimationFrameSave> frames);
+        void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
         bool RenameChain(AnimationChainSave chain, string newName);

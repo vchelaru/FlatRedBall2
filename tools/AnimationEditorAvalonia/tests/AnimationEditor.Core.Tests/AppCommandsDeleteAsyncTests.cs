@@ -70,61 +70,42 @@ public class AppCommandsDeleteAsyncTests
         }
     }
 
-    // ── AskToDeleteFrames ─────────────────────────────────────────────────────
+    // ── DeleteFrames ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task AskToDeleteFrames_WhenConfirmed_DeletesFramesFromSelectedChain()
+    public void DeleteFrames_DeletesFrameFromSelectedChain()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
-        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 3);
         ctx.SelectedState.SelectedChain = chain;
         var frameToDelete = chain.Frames[1];
 
-        await ctx.AppCommands.AskToDeleteFrames(
-            new List<AnimationFrameSave> { frameToDelete });
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { frameToDelete });
 
         Assert.Equal(2, chain.Frames.Count);
         Assert.DoesNotContain(frameToDelete, chain.Frames);
     }
 
     [Fact]
-    public async Task AskToDeleteFrames_WhenCancelled_DoesNotDeleteAnyFrames()
+    public void DeleteFrames_DeletesMultipleFrames()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
-        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
-        var chain = TestHelpers.MakeChain(acls, "Run", 3);
-        ctx.SelectedState.SelectedChain = chain;
-
-        await ctx.AppCommands.AskToDeleteFrames(
-            new List<AnimationFrameSave> { chain.Frames[0] });
-
-        Assert.Equal(3, chain.Frames.Count);
-    }
-
-    [Fact]
-    public async Task AskToDeleteFrames_WhenConfirmed_DeletesMultipleFrames()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var acls = ctx.Acls;
-        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 4);
         ctx.SelectedState.SelectedChain = chain;
         var toDelete = new List<AnimationFrameSave> { chain.Frames[0], chain.Frames[2] };
 
-        await ctx.AppCommands.AskToDeleteFrames(toDelete);
+        ctx.AppCommands.DeleteFrames(toDelete);
 
         Assert.Equal(2, chain.Frames.Count);
     }
 
     [Fact]
-    public async Task AskToDeleteFrames_WhenConfirmed_FiresAnimationChainsChanged()
+    public void DeleteFrames_FiresAnimationChainsChanged()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
-        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
         var chain = TestHelpers.MakeChain(acls, "Run", 2);
         ctx.SelectedState.SelectedChain = chain;
         bool fired = false;
@@ -132,14 +113,55 @@ public class AppCommandsDeleteAsyncTests
         ctx.ApplicationEvents.AnimationChainsChanged += Handler;
         try
         {
-            await ctx.AppCommands.AskToDeleteFrames(
-                new List<AnimationFrameSave> { chain.Frames[0] });
+            ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { chain.Frames[0] });
             Assert.True(fired);
         }
-        finally
-        {
-            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
-        }
+        finally { ctx.ApplicationEvents.AnimationChainsChanged -= Handler; }
+    }
+
+    [Fact]
+    public void DeleteFrames_FiresFramesDeleted_MultiFrameLabel()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Run", 4);
+        ctx.SelectedState.SelectedChain = chain;
+        string? capturedLabel = null;
+        ctx.AppCommands.FramesDeleted += label => capturedLabel = label;
+        var toDelete = new List<AnimationFrameSave> { chain.Frames[0], chain.Frames[2] };
+
+        ctx.AppCommands.DeleteFrames(toDelete);
+
+        Assert.Equal("2 frames", capturedLabel);
+    }
+
+    [Fact]
+    public void DeleteFrames_FiresFramesDeleted_SingleFrameLabel()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Run", 3);
+        ctx.SelectedState.SelectedChain = chain;
+        string? capturedLabel = null;
+        ctx.AppCommands.FramesDeleted += label => capturedLabel = label;
+
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { chain.Frames[0] });
+
+        Assert.NotNull(capturedLabel);
+        Assert.Contains("1", capturedLabel);
+    }
+
+    [Fact]
+    public void DeleteFrames_RecordsUndoCommand()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Run", 2);
+        ctx.SelectedState.SelectedChain = chain;
+
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { chain.Frames[0] });
+
+        Assert.True(ctx.UndoManager.CanUndo);
     }
 
     // ── AskToDeleteRectangles ─────────────────────────────────────────────────

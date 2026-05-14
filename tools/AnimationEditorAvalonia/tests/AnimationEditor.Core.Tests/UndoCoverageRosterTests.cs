@@ -61,7 +61,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AskToDeleteRectangles)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.AskToDeleteCircles)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.AskToDeleteAnimationChains)]   = Category.MutatingUndoable,
-        [nameof(IAppCommands.AskToDeleteFrames)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.DeleteFrames)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChain)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChainWithName)]    = Category.MutatingUndoable,
         [nameof(IAppCommands.RenameChain)]                  = Category.MutatingUndoable,
@@ -177,8 +177,8 @@ public class UndoCoverageRosterTests
             ctx => ctx.AppCommands.AskToDeleteCircles(new() { Circle(ctx) }));
         yield return Row(nameof(IAppCommands.AskToDeleteAnimationChains),
             ctx => ctx.AppCommands.AskToDeleteAnimationChains(new() { Alpha(ctx) }));
-        yield return Row(nameof(IAppCommands.AskToDeleteFrames),
-            ctx => ctx.AppCommands.AskToDeleteFrames(new() { Zebra(ctx).Frames[1] }));
+        yield return Row(nameof(IAppCommands.DeleteFrames),
+            ctx => Sync(() => ctx.AppCommands.DeleteFrames(new() { Zebra(ctx).Frames[1] })));
         yield return Row(nameof(IAppCommands.AddAnimationChain),
             ctx => ctx.AppCommands.AddAnimationChain());
         yield return Row(nameof(IAppCommands.AddAnimationChainWithName),

@@ -47,6 +47,8 @@ public partial class MainWindow : Window
     private bool _suppressZoomComboChanged;
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressTreeSelectionHandling;
+    private System.Threading.CancellationTokenSource? _toastCts;
+    private List<AnimationChainSave>? _pendingDeleteChains;
 
     private FilePath SettingsFilePath =>
         new FilePath((Path.GetDirectoryName(
@@ -151,6 +153,28 @@ public partial class MainWindow : Window
         _undoManager.StackChanged         += () => Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
         _events.AnimationChainsChanged    += HandleAnimationChainsChanged;
         _selectedState.SelectionChanged   += HandleSelectionChanged;
+
+        _appCommands.FramesDeleted += label =>
+            Dispatcher.UIThread.InvokeAsync(() => ShowFrameDeletedToast(label));
+
+        FrameDeletedToastUndoBtn.Click += (_, _) =>
+        {
+            _toastCts?.Cancel();
+            FrameDeletedToastPanel.IsVisible = false;
+            _undoManager.Undo();
+        };
+
+        DeleteChainConfirmBtn.Click += (_, _) => CommitDeleteChain();
+        DeleteChainCancelBtn.Click  += (_, _) => CancelDeleteChain();
+
+        PointerPressed += (_, e) =>
+        {
+            if (_pendingDeleteChains is not null &&
+                !DeleteChainConfirmPanel.IsPointerOver)
+            {
+                CancelDeleteChain();
+            }
+        };
     }
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
@@ -1392,7 +1416,7 @@ public partial class MainWindow : Window
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
-                _ = _appCommands.AskToDeleteFrames(new() { frame2 }));
+                _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
         }
         else if (vm?.Data is AnimationChainSave chain)
         {
@@ -1427,8 +1451,13 @@ public partial class MainWindow : Window
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
-            AddMenuItem("Delete Animation",
-                () => _ = _appCommands.AskToDeleteAnimationChains(new() { chain }));
+            AddMenuItem("Delete Animation", () =>
+            {
+                if (chain.Frames.Count > 0)
+                    ShowDeleteChainConfirm(chain);
+                else
+                    _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain });
+            });
         }
         else
         {
@@ -2285,16 +2314,67 @@ public partial class MainWindow : Window
         if (selectedVm.Data is AnimationChainSave chainToDel)
         {
             var chains = _selectedState.SelectedChains;
-            _ = _appCommands.AskToDeleteAnimationChains(
-                chains.Count > 0 ? chains : new() { chainToDel });
+            List<AnimationChainSave> toDelete = chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel };
+            if (toDelete.Any(c => c.Frames.Count > 0))
+                ShowDeleteChainConfirm(toDelete);
+            else
+                _appCommands.DeleteAnimationChains(toDelete);
         }
         else if (selectedVm.Data is AnimationFrameSave frameToDel)
-            _ = _appCommands.AskToDeleteFrames(new() { frameToDel });
+            _appCommands.DeleteFrames(new List<AnimationFrameSave> { frameToDel });
         else if (selectedVm.Data is AARectSave rectToDel)
             _ = _appCommands.AskToDeleteRectangles(new() { rectToDel });
         else if (selectedVm.Data is CircleSave circleToDel)
             _ = _appCommands.AskToDeleteCircles(new() { circleToDel });
     }
+
+    private async void ShowFrameDeletedToast(string label)
+    {
+        _toastCts?.Cancel();
+        _toastCts = new System.Threading.CancellationTokenSource();
+        System.Threading.CancellationToken token = _toastCts.Token;
+
+        FrameDeletedToastLabel.Text = $"\"{label}\" deleted";
+        FrameDeletedToastPanel.IsVisible = true;
+
+        try
+        {
+            await System.Threading.Tasks.Task.Delay(4000, token);
+            FrameDeletedToastPanel.IsVisible = false;
+        }
+        catch (System.Threading.Tasks.TaskCanceledException) { }
+    }
+
+    private void ShowDeleteChainConfirm(AnimationChainSave chain) =>
+        ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
+
+    private void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
+    {
+        _pendingDeleteChains = chains;
+        string label = chains.Count == 1
+            ? $"Delete \"{chains[0].Name}\"?"
+            : $"Delete {chains.Count} animations?";
+        DeleteChainConfirmLabel.Text = label;
+        DeleteChainConfirmPanel.IsVisible = true;
+    }
+
+    private void CommitDeleteChain()
+    {
+        if (_pendingDeleteChains is null) return;
+        List<AnimationChainSave> chains = _pendingDeleteChains;
+        _pendingDeleteChains = null;
+        DeleteChainConfirmPanel.IsVisible = false;
+        _appCommands.DeleteAnimationChains(chains);
+    }
+
+    private void CancelDeleteChain()
+    {
+        _pendingDeleteChains = null;
+        DeleteChainConfirmPanel.IsVisible = false;
+    }
+
+    internal void ShowDeleteChainConfirmForTest(AnimationChainSave chain) =>
+        ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
 
     // ── Add Multiple Frames ───────────────────────────────────────────────────
 

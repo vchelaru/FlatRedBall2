@@ -9,10 +9,10 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class DeleteFramesUndoTests
 {
-    // ── AskToDeleteFrames + Undo ──────────────────────────────────────────────
+    // ── DeleteFrames + Undo ───────────────────────────────────────────────────
 
     [Fact]
-    public async Task DeleteFrames_Undo_RestoresFrameAtOriginalIndex()
+    public void DeleteFrames_Undo_RestoresFrameAtOriginalIndex()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -20,7 +20,7 @@ public class DeleteFramesUndoTests
         ctx.SelectedState.SelectedChain = chain;
         var middle = chain.Frames[1];
 
-        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { middle });
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { middle });
         Assert.Equal(2, chain.Frames.Count);
 
         ctx.UndoManager.Undo();
@@ -30,7 +30,7 @@ public class DeleteFramesUndoTests
     }
 
     [Fact]
-    public async Task DeleteFrames_UndoThenRedo_RemovesFrameAgain()
+    public void DeleteFrames_UndoThenRedo_RemovesFrameAgain()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -38,7 +38,7 @@ public class DeleteFramesUndoTests
         ctx.SelectedState.SelectedChain = chain;
         var first = chain.Frames[0];
 
-        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { first });
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { first });
         ctx.UndoManager.Undo();
         Assert.Equal(2, chain.Frames.Count);
 
@@ -49,7 +49,7 @@ public class DeleteFramesUndoTests
     }
 
     [Fact]
-    public async Task DeleteMultipleFrames_Undo_RestoresAllAtOriginalPositions()
+    public void DeleteMultipleFrames_Undo_RestoresAllAtOriginalPositions()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -58,7 +58,7 @@ public class DeleteFramesUndoTests
         var f0 = chain.Frames[0];
         var f2 = chain.Frames[2];
 
-        await ctx.AppCommands.AskToDeleteFrames(new List<AnimationFrameSave> { f0, f2 });
+        ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { f0, f2 });
         Assert.Equal(2, chain.Frames.Count);
 
         ctx.UndoManager.Undo();
