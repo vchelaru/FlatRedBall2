@@ -2301,6 +2301,7 @@ public partial class MainWindow : Window
             foreach (var pasted in frames)
                 pasted.ShapesSave ??= new ShapesSave();
 
+            FramePasteLogic.AssignUniqueNames(targetChain.Frames, frames);
             _appCommands.PasteFrames(targetChain, frames);
             _selectedState.SelectedFrame = frames[^1];
             _appCommands.RefreshWireframe();
