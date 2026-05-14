@@ -726,39 +726,7 @@
                                                    FontSize="11"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource InkMid}" />
-                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,4"
-                                                    HorizontalAlignment="Center">
-                                            <ToggleButton x:Name="UnitPixelBtn"
-                                                          Content="Pixel"
-                                                          CornerRadius="4,0,0,4"
-                                                          Height="26"
-                                                          Padding="8,0"
-                                                          FontSize="11"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center"
-                                                          IsChecked="True"
-                                                          Click="OnUnitPixelBtnClick" />
-                                            <ToggleButton x:Name="UnitTextureBtn"
-                                                          Content="Texture"
-                                                          CornerRadius="0"
-                                                          Height="26"
-                                                          Padding="8,0"
-                                                          FontSize="11"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center"
-                                                          Click="OnUnitTextureBtnClick" />
-                                            <ToggleButton x:Name="UnitSpriteSheetBtn"
-                                                          Content="Sprite Sheet"
-                                                          CornerRadius="0,4,4,0"
-                                                          Height="26"
-                                                          Padding="8,0"
-                                                          FontSize="11"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center"
-                                                          Click="OnUnitSpriteSheetBtnClick" />
-                                        </StackPanel>
-
-                                        <!-- Pixel / SpriteSheet coord fields — 2×2 grid: [X][Y] / [W][H] -->
+                                        <!-- Pixel coord fields — 2×2 grid: [X][Y] / [W][H] -->
                                         <Grid x:Name="PropPixelSection"
                                               ColumnDefinitions="*,6,*" RowDefinitions="Auto,4,Auto">
                                             <Grid Grid.Column="0" Grid.Row="0" ColumnDefinitions="18,*">
@@ -787,87 +755,6 @@
                                             </Grid>
                                         </Grid>
 
-                                        <!-- Texture Coordinate fields -->
-                                        <StackPanel x:Name="PropTcSection" IsVisible="False" Spacing="4">
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Left" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTcLeft" Grid.Column="1"
-                                                               Minimum="-10" Maximum="10"
-                                                               Increment="0.001" FormatString="0.0000" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Right" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTcRight" Grid.Column="1"
-                                                               Minimum="-10" Maximum="10"
-                                                               Increment="0.001" FormatString="0.0000" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Top" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTcTop" Grid.Column="1"
-                                                               Minimum="-10" Maximum="10"
-                                                               Increment="0.001" FormatString="0.0000" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Bottom" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTcBottom" Grid.Column="1"
-                                                               Minimum="-10" Maximum="10"
-                                                               Increment="0.001" FormatString="0.0000" />
-                                            </Grid>
-                                        </StackPanel>
-
-                                        <!-- Sprite Sheet tile fields -->
-                                        <StackPanel x:Name="PropTileSection" IsVisible="False" Spacing="4">
-                                            <Border BorderBrush="{StaticResource LineBrush}"
-                                                    BorderThickness="0,1,0,0"
-                                                    Margin="0,2,0,2" Padding="0,4,0,0">
-                                                <TextBlock Text="Tile" Foreground="{StaticResource InkMid}"
-                                                           FontWeight="SemiBold" FontSize="11" />
-                                            </Border>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Span W" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropSpanW" Grid.Column="1"
-                                                               Minimum="1" Maximum="256" Increment="1"
-                                                               FormatString="0" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*" Margin="14,0,0,0">
-                                                <TextBlock VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkDim}" FontSize="10" FontStyle="Italic" />
-                                                <TextBox x:Name="PropCellWPx" Grid.Column="1"
-                                                         FontSize="10" IsReadOnly="True" IsEnabled="False"
-                                                         Opacity="0.6" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Span H" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropSpanH" Grid.Column="1"
-                                                               Minimum="1" Maximum="256" Increment="1"
-                                                               FormatString="0" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*" Margin="14,0,0,0">
-                                                <TextBlock VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkDim}" FontSize="10" FontStyle="Italic" />
-                                                <TextBox x:Name="PropCellHPx" Grid.Column="1"
-                                                         FontSize="10" IsReadOnly="True" IsEnabled="False"
-                                                         Opacity="0.6" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Tile X" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTileX" Grid.Column="1"
-                                                               Minimum="0" Maximum="4096" Increment="1" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="78,*">
-                                                <TextBlock Text="Tile Y" VerticalAlignment="Center"
-                                                           Foreground="{StaticResource InkMid}" FontSize="11" />
-                                                <NumericUpDown x:Name="PropTileY" Grid.Column="1"
-                                                               Minimum="0" Maximum="4096" Increment="1" />
-                                            </Grid>
-                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
 

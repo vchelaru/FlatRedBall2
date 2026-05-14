@@ -1,7 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
-using AnimationEditor.Core.Data;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -171,7 +170,6 @@ public partial class MainWindow : Window
 
         // Apply initial grid state
         WireframeCtrl.SetGrid(false, 16);
-        SetUnitType(_appState.UnitType);
     }
 
     private void OnTextureComboChanged(object? sender, SelectionChangedEventArgs e)
@@ -226,7 +224,6 @@ public partial class MainWindow : Window
         GridSizeInput.Text = size.ToString();
         if (SnapToGridCheck.IsChecked == true)
             WireframeCtrl.SetGrid(true, size);
-        if (PropTileSection.IsVisible) UpdateCellPxDisplays();
     }
 
     private void OnGridSizePlusBtnClick(object? sender, RoutedEventArgs e)
@@ -235,7 +232,6 @@ public partial class MainWindow : Window
         GridSizeInput.Text = size.ToString();
         if (SnapToGridCheck.IsChecked == true)
             WireframeCtrl.SetGrid(true, size);
-        if (PropTileSection.IsVisible) UpdateCellPxDisplays();
     }
 
     private void OnGridSizeMinusBtnClick(object? sender, RoutedEventArgs e)
@@ -244,7 +240,6 @@ public partial class MainWindow : Window
         GridSizeInput.Text = size.ToString();
         if (SnapToGridCheck.IsChecked == true)
             WireframeCtrl.SetGrid(true, size);
-        if (PropTileSection.IsVisible) UpdateCellPxDisplays();
     }
 
     // ── Editable zoom combo (top wireframe) ──────────────────────────────────
@@ -305,24 +300,6 @@ public partial class MainWindow : Window
     {
         var trimmed = text.Trim().TrimEnd('%').Trim();
         return int.TryParse(trimmed, out pct);
-    }
-
-    private void OnUnitPixelBtnClick(object? sender, RoutedEventArgs e) =>
-        SetUnitType(UnitType.Pixel);
-
-    private void OnUnitTextureBtnClick(object? sender, RoutedEventArgs e) =>
-        SetUnitType(UnitType.TextureCoordinate);
-
-    private void OnUnitSpriteSheetBtnClick(object? sender, RoutedEventArgs e) =>
-        SetUnitType(UnitType.SpriteSheet);
-
-    private void SetUnitType(UnitType unitType)
-    {
-        _appState.UnitType = unitType;
-        UnitPixelBtn.IsChecked = unitType == UnitType.Pixel;
-        UnitTextureBtn.IsChecked = unitType == UnitType.TextureCoordinate;
-        UnitSpriteSheetBtn.IsChecked = unitType == UnitType.SpriteSheet;
-        Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
     }
 
     // ── WireframeControl event wiring ─────────────────────────────────────────
@@ -1539,15 +1516,6 @@ public partial class MainWindow : Window
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelH.ValueChanged    += (_, _) => ApplyFramePixelCoords();
-        PropTcLeft.ValueChanged    += (_, _) => ApplyFrameTcCoords();
-        PropTcRight.ValueChanged   += (_, _) => ApplyFrameTcCoords();
-        PropTcTop.ValueChanged     += (_, _) => ApplyFrameTcCoords();
-        PropTcBottom.ValueChanged  += (_, _) => ApplyFrameTcCoords();
-        PropSpanW.ValueChanged     += (_, _) => { UpdateCellPxDisplays(); ApplyFrameCellSize(); };
-        PropSpanH.ValueChanged     += (_, _) => { UpdateCellPxDisplays(); ApplyFrameCellSize(); };
-        PropTileX.ValueChanged     += (_, _) => ApplyFrameTileCoords();
-        PropTileY.ValueChanged     += (_, _) => ApplyFrameTileCoords();
-
         PropRectName.LostFocus     += (_, _) => ApplyRectProps();
         PropRectX.ValueChanged     += (_, _) => ApplyRectProps();
         PropRectY.ValueChanged     += (_, _) => ApplyRectProps();
@@ -1710,48 +1678,13 @@ public partial class MainWindow : Window
                 PropTextureName.Text = TexturePathHelper.ComputeDisplayPath(
                     frame.TextureName, _projectManager.FileName);
 
-                var unitType = _appState.UnitType;
-                PropPixelSection.IsVisible = unitType != UnitType.TextureCoordinate;
-                PropTcSection.IsVisible    = unitType == UnitType.TextureCoordinate;
-                PropTileSection.IsVisible  = unitType == UnitType.SpriteSheet;
-
-                if (unitType == UnitType.TextureCoordinate)
+                var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
+                if (bmpW > 0 && bmpH > 0)
                 {
-                    PropTcLeft.Value   = (decimal)frame.LeftCoordinate;
-                    PropTcRight.Value  = (decimal)frame.RightCoordinate;
-                    PropTcTop.Value    = (decimal)frame.TopCoordinate;
-                    PropTcBottom.Value = (decimal)frame.BottomCoordinate;
-                }
-                else
-                {
-                    var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
-                    if (bmpW > 0 && bmpH > 0)
-                    {
-                        PropPixelX.Value = FrameDisplayValues.GetPixelX(frame, bmpW);
-                        PropPixelY.Value = FrameDisplayValues.GetPixelY(frame, bmpH);
-                        PropPixelW.Value = FrameDisplayValues.GetPixelWidth(frame, bmpW);
-                        PropPixelH.Value = FrameDisplayValues.GetPixelHeight(frame, bmpH);
-                    }
-
-                    if (unitType == UnitType.SpriteSheet)
-                    {
-                        var tmi = _selectedState.SelectedTileMapInformation;
-                        int cellW = tmi?.TileWidth  > 0 ? tmi.TileWidth  : 16;
-                        int cellH = tmi?.TileHeight > 0 ? tmi.TileHeight : 16;
-
-                        int gridSize = GetGridSizeFromInput();
-                        if (gridSize < 1) gridSize = 1;
-                        PropSpanW.Value = Math.Max(1, (int)Math.Round(cellW / (float)gridSize));
-                        PropSpanH.Value = Math.Max(1, (int)Math.Round(cellH / (float)gridSize));
-                        UpdateCellPxDisplays();
-
-                        var (bmpW2, bmpH2) = WireframeCtrl.BitmapSize;
-                        if (bmpW2 > 0 && bmpH2 > 0 && cellW > 0 && cellH > 0)
-                        {
-                            PropTileX.Value = FrameDisplayValues.GetTileX(frame, cellW, bmpW2);
-                            PropTileY.Value = FrameDisplayValues.GetTileY(frame, cellH, bmpH2);
-                        }
-                    }
+                    PropPixelX.Value = FrameDisplayValues.GetPixelX(frame, bmpW);
+                    PropPixelY.Value = FrameDisplayValues.GetPixelY(frame, bmpH);
+                    PropPixelW.Value = FrameDisplayValues.GetPixelWidth(frame, bmpW);
+                    PropPixelH.Value = FrameDisplayValues.GetPixelHeight(frame, bmpH);
                 }
             }
 
@@ -1830,75 +1763,6 @@ public partial class MainWindow : Window
         WireframeCtrl.RefreshFrames();
     }
 
-    private void ApplyFrameTcCoords()
-    {
-        if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-        if (PropTcLeft.Value.HasValue)   frame.LeftCoordinate   = (float)PropTcLeft.Value.Value;
-        if (PropTcRight.Value.HasValue)  frame.RightCoordinate  = (float)PropTcRight.Value.Value;
-        if (PropTcTop.Value.HasValue)    frame.TopCoordinate    = (float)PropTcTop.Value.Value;
-        if (PropTcBottom.Value.HasValue) frame.BottomCoordinate = (float)PropTcBottom.Value.Value;
-        _events.RaiseAnimationChainsChanged();
-        WireframeCtrl.RefreshFrames();
-    }
-
-    private void UpdateCellPxDisplays()
-    {
-        int gridSize = GetGridSizeFromInput();
-        if (gridSize < 1) gridSize = 1;
-        int spanW = PropSpanW.Value.HasValue ? (int)PropSpanW.Value.Value : 1;
-        int spanH = PropSpanH.Value.HasValue ? (int)PropSpanH.Value.Value : 1;
-        PropCellWPx.Text = $"{spanW * gridSize} px";
-        PropCellHPx.Text = $"{spanH * gridSize} px";
-    }
-
-    private void ApplyFrameCellSize()
-    {
-        if (_suppressPropRefresh) return;
-        if (!PropSpanW.Value.HasValue || !PropSpanH.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null || string.IsNullOrEmpty(frame.TextureName)) return;
-
-        int gridSize = GetGridSizeFromInput();
-        if (gridSize < 1) gridSize = 1;
-
-        var tmi = _selectedState.SelectedTileMapInformation;
-        if (tmi is null)
-        {
-            tmi = new TileMapInformation { Name = frame.TextureName };
-            _projectManager.TileMapInformationList.TileMapInfos.Add(tmi);
-        }
-        tmi.TileWidth  = (int)PropSpanW.Value.Value * gridSize;
-        tmi.TileHeight = (int)PropSpanH.Value.Value * gridSize;
-        // Recompute frame UV bounds so the selection box reflects the new cell size.
-        ApplyFrameTileCoords();
-    }
-
-    private void ApplyFrameTileCoords()
-    {
-        if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-        if (!PropTileX.Value.HasValue || !PropTileY.Value.HasValue) return;
-        var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
-        if (bmpW <= 0 || bmpH <= 0) return;
-
-        int gridSize = GetGridSizeFromInput();
-        if (gridSize < 1) gridSize = 1;
-        int cellW = PropSpanW.Value.HasValue ? (int)PropSpanW.Value.Value * gridSize : 16;
-        int cellH = PropSpanH.Value.HasValue ? (int)PropSpanH.Value.Value * gridSize : 16;
-        if (cellW <= 0 || cellH <= 0) return;
-
-        var (left, right) = TileCoordinateCalculator.GetLeftRight((int)PropTileX.Value.Value, cellW, bmpW);
-        var (top,  bot)   = TileCoordinateCalculator.GetTopBottom((int)PropTileY.Value.Value, cellH, bmpH);
-        frame.LeftCoordinate   = left;
-        frame.RightCoordinate  = right;
-        frame.TopCoordinate    = top;
-        frame.BottomCoordinate = bot;
-        _events.RaiseAnimationChainsChanged();
-        WireframeCtrl.RefreshFrames();
-    }
 
     private void ApplyRectProps()
     {

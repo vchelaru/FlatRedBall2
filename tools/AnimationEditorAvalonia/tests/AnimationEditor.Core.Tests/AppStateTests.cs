@@ -1,6 +1,5 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
-using AnimationEditor.Core.Data;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -34,28 +33,6 @@ public class AppStateTests
         ctx.ApplicationEvents.AfterZoomChange += () => fired = true;
 
         ctx.AppState.WireframeZoomValue = 150;
-
-        Assert.True(fired);
-    }
-
-    [Fact]
-    public void UnitType_WhenSet_StoresValue()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-
-        ctx.AppState.UnitType = UnitType.TextureCoordinate;
-
-        Assert.Equal(UnitType.TextureCoordinate, ctx.AppState.UnitType);
-    }
-
-    [Fact]
-    public void UnitType_WhenSet_FiresWireframeTextureChange()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        bool fired = false;
-        ctx.ApplicationEvents.WireframeTextureChange += () => fired = true;
-
-        ctx.AppState.UnitType = UnitType.TextureCoordinate;
 
         Assert.True(fired);
     }
