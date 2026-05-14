@@ -1366,11 +1366,11 @@ public class PreviewControl : Control
         {
             float sx = cx + wx * s.Zoom;
             if (sx < RulerSize || sx > s.Width) continue;
-            bool isMajor = MathF.Abs(wx % majorStep) < minorStep * 0.4f;
+            bool isMajor = IsMajorTick(wx, majorStep, minorStep);
             float tickH = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
             canvas.DrawLine(sx, RulerSize - tickH, sx, RulerSize, tickPaint);
             if (isMajor)
-                canvas.DrawText(((int)MathF.Round(wx)).ToString(), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wx), sx + 1f, RulerSize - tickH - 1f, labelFont, labelPaint);
         }
 
         // Left (vertical) ruler - ticks at world-Y positions.
@@ -1380,7 +1380,7 @@ public class PreviewControl : Control
         {
             float sy = cy + wy * s.Zoom;
             if (sy < RulerSize || sy > s.Height) continue;
-            bool isMajor = MathF.Abs(wy % majorStep) < minorStep * 0.4f;
+            bool isMajor = IsMajorTick(wy, majorStep, minorStep);
             float tickW = isMajor ? RulerSize * 0.55f : RulerSize * 0.30f;
             canvas.DrawLine(RulerSize - tickW, sy, RulerSize, sy, tickPaint);
             if (isMajor)
@@ -1388,7 +1388,7 @@ public class PreviewControl : Control
                 canvas.Save();
                 canvas.Translate(RulerSize - tickW - 1f, sy);
                 canvas.RotateDegrees(-90f);
-                canvas.DrawText(((int)MathF.Round(wy)).ToString(), 0f, 0f, labelFont, labelPaint);
+                canvas.DrawText(FormatRulerLabel(majorStep, wy), 0f, 0f, labelFont, labelPaint);
                 canvas.Restore();
             }
         }
@@ -1419,14 +1419,27 @@ public class PreviewControl : Control
         canvas.DrawLine(0, RulerSize, s.Width, RulerSize, borderPaint);
     }
 
-    private static float GetRulerStep(float zoom)
+    internal static bool IsMajorTick(float value, float majorStep, float minorStep)
+    {
+        // Use nearest-multiple distance instead of % to correctly handle negative values.
+        // C# % truncates toward zero, so e.g. -3.9999998 % 2 ≈ -2 (not ≈ 0).
+        float distToNearest = value - MathF.Round(value / majorStep) * majorStep;
+        return MathF.Abs(distToNearest) < minorStep * 0.4f;
+    }
+
+    internal static float GetRulerStep(float zoom)
     {
         float targetWorld = 50f / zoom; // target ~50 screen px per major tick
-        float[] candidates = { 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000 };
+        float[] candidates = { 0.125f, 0.25f, 0.5f, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000 };
         foreach (float c in candidates)
             if (c >= targetWorld) return c;
         return 1000f;
     }
+
+    internal static string FormatRulerLabel(float majorStep, float worldValue) =>
+        majorStep >= 1f
+            ? ((int)MathF.Round(worldValue)).ToString()
+            : worldValue.ToString("0.###");
 
     private static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, SKBitmap bm,
