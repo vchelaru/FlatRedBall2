@@ -2364,7 +2364,7 @@ public partial class MainWindow : Window
         bool confirmed = false;
         var ok = new Button { Content = "OK", IsDefault = true };
         ok.Click += (_, _) => { confirmed = true; dialog.Close(); };
-        var cancel = new Button { Content = "Cancel" };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
         cancel.Click += (_, _) => dialog.Close();
 
         var btns = new StackPanel
@@ -2499,7 +2499,7 @@ public partial class MainWindow : Window
 
         bool confirmed = false;
         var ok     = new Button { Content = "OK", IsDefault = true };
-        var cancel = new Button { Content = "Cancel" };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
         ok.Click     += (_, _) => { confirmed = true; dialog.Close(); };
         cancel.Click += (_, _) => dialog.Close();
 
