@@ -229,7 +229,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     GetSelectedFrameShapeNames())
             };
 
-            MatchRectangleToFrame(rectangleSave, frame);
+            ApplyRectangleMatch(rectangleSave, frame);
             frame.ShapesSave!.AARectSaves.Add(rectangleSave);
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
@@ -248,7 +248,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     GetSelectedFrameShapeNames())
             };
 
-            MatchCircleToFrame(circleSave, frame);
+            ApplyCircleMatch(circleSave, frame);
             frame.ShapesSave!.CircleSaves.Add(circleSave);
 
             RefreshAnimationFrameDisplayRequested?.Invoke();
@@ -258,18 +258,67 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Record(new AddCircleCommand(circleSave, frame, this, _events));
         }
 
+        /// <summary>
+        /// Moves <paramref name="rectangle"/> to <paramref name="animationFrame"/>'s offset
+        /// (the "Match Frame Size" command). Records an undo entry; callers refresh the UI.
+        /// </summary>
         public void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
-            // Texture width/height are not available at Core layer; the rendering layer should
-            // override via AfterMatchRectangleToFrame if it wants pixel-accurate sizing.
+            float oldX = rectangle.X, oldY = rectangle.Y;
+            ApplyRectangleMatch(rectangle, animationFrame);
+            _undoManager.Record(new MoveShapeCommand(
+                animationFrame, rectangle, oldX, oldY, rectangle.X, rectangle.Y, this, _events));
+        }
+
+        /// <summary>
+        /// Moves <paramref name="circle"/> to <paramref name="animationFrame"/>'s offset.
+        /// Records an undo entry; callers refresh the UI.
+        /// </summary>
+        public void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame)
+        {
+            float oldX = circle.X, oldY = circle.Y;
+            ApplyCircleMatch(circle, animationFrame);
+            _undoManager.Record(new MoveShapeCommand(
+                animationFrame, circle, oldX, oldY, circle.X, circle.Y, this, _events));
+        }
+
+        // Raw position assignment shared by the public Match* commands and the internal
+        // shape-creation paths (which record their own combined undo entry instead).
+        private static void ApplyRectangleMatch(AARectSave rectangle, AnimationFrameSave animationFrame)
+        {
             rectangle.X = animationFrame.RelativeX;
             rectangle.Y = animationFrame.RelativeY;
         }
 
-        public void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame)
+        private static void ApplyCircleMatch(CircleSave circle, AnimationFrameSave animationFrame)
         {
             circle.X = animationFrame.RelativeX;
             circle.Y = animationFrame.RelativeY;
+        }
+
+        // ── Undo recording helpers ────────────────────────────────────────────
+
+        /// <summary>
+        /// Records a <see cref="ReorderCommand{T}"/> capturing the list's order before
+        /// (passed in) and after (read from <paramref name="list"/> now). No-op when the
+        /// order is unchanged, so callers can invoke it unconditionally.
+        /// </summary>
+        private void RecordReorder<T>(IList<T> list, T[] before, Action refresh)
+        {
+            var after = list.ToArray();
+            if (before.SequenceEqual(after)) return;
+            _undoManager.Record(new ReorderCommand<T>(list, before, after, this, _events, refresh));
+        }
+
+        /// <summary>
+        /// Records a <see cref="BulkFrameEditCommand"/> capturing the frames' numeric fields
+        /// before (passed in) and after (read from <paramref name="frames"/> now).
+        /// </summary>
+        private void RecordBulkFrameEdit(
+            FrameFieldSnapshot[] before, IEnumerable<AnimationFrameSave> frames, bool refreshWireframe)
+        {
+            var after = frames.Select(FrameFieldSnapshot.Capture).ToArray();
+            _undoManager.Record(new BulkFrameEditCommand(before, after, this, _events, refreshWireframe));
         }
 
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
@@ -466,33 +515,39 @@ namespace AnimationEditor.Core.CommandsAndState
             int idx    = chains.IndexOf(chain);
             int newIdx = Math.Clamp(idx + delta, 0, chains.Count - 1);
             if (newIdx == idx) return;
+            var before = chains.ToArray();
             chains.RemoveAt(idx);
             chains.Insert(newIdx, chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chains, before, RefreshTreeView);
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
             if (chains is null) return;
+            var before = chains.ToArray();
             chains.Remove(chain);
             chains.Insert(0, chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chains, before, RefreshTreeView);
         }
 
         public void MoveChainToBottom(AnimationChainSave chain)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
             if (chains is null) return;
+            var before = chains.ToArray();
             chains.Remove(chain);
             chains.Add(chain);
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chains, before, RefreshTreeView);
         }
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
@@ -500,29 +555,35 @@ namespace AnimationEditor.Core.CommandsAndState
             int idx    = chain.Frames.IndexOf(frame);
             int newIdx = Math.Clamp(idx + delta, 0, chain.Frames.Count - 1);
             if (newIdx == idx) return;
+            var before = chain.Frames.ToArray();
             chain.Frames.RemoveAt(idx);
             chain.Frames.Insert(newIdx, frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chain.Frames, before, () => RefreshTreeNode(chain));
         }
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
         {
+            var before = chain.Frames.ToArray();
             chain.Frames.Remove(frame);
             chain.Frames.Insert(0, frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chain.Frames, before, () => RefreshTreeNode(chain));
         }
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
         {
+            var before = chain.Frames.ToArray();
             chain.Frames.Remove(frame);
             chain.Frames.Add(frame);
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chain.Frames, before, () => RefreshTreeNode(chain));
         }
 
         /// <summary>
@@ -548,6 +609,8 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            _undoManager.Record(new FlipCommand(
+                new[] { frame }, horizontal: true, this, _events, RefreshWireframe));
         }
 
         public void FlipFrameVertically(AnimationFrameSave frame)
@@ -556,6 +619,8 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            _undoManager.Record(new FlipCommand(
+                new[] { frame }, horizontal: false, this, _events, RefreshWireframe));
         }
 
         public void FlipChainHorizontally(AnimationChainSave chain)
@@ -566,6 +631,9 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            _undoManager.Record(new FlipCommand(
+                chain.Frames.ToArray(), horizontal: true, this, _events,
+                () => { RefreshTreeNode(chain); RefreshWireframe(); }));
         }
 
         public void FlipChainVertically(AnimationChainSave chain)
@@ -576,22 +644,29 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            _undoManager.Record(new FlipCommand(
+                chain.Frames.ToArray(), horizontal: false, this, _events,
+                () => { RefreshTreeNode(chain); RefreshWireframe(); }));
         }
 
         public void InvertFrameOrder(AnimationChainSave chain)
         {
+            var before = chain.Frames.ToArray();
             chain.Frames.Reverse();
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(chain.Frames, before, () => RefreshTreeNode(chain));
         }
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
         {
+            var before = chain.Frames.Select(FrameFieldSnapshot.Capture).ToArray();
             foreach (var frame in chain.Frames)
                 frame.FrameLength = frameLength;
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordBulkFrameEdit(before, chain.Frames, refreshWireframe: false);
         }
 
         public AnimationChainSave? DuplicateChain(
@@ -639,10 +714,12 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             acls.AnimationChains.Add(copy);
+            int insertedAtIndex = acls.AnimationChains.Count - 1;
             RefreshTreeViewRequested?.Invoke();
             _selectedState.SelectedChain = copy;
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            _undoManager.Record(new AddChainCommand(copy, acls, insertedAtIndex, this, _events));
             return copy;
         }
 
@@ -650,6 +727,7 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null) return;
+            var before = acls.AnimationChains.ToArray();
             var sorted = acls.AnimationChains.OrderBy(c => c.Name).ToList();
             acls.AnimationChains.Clear();
             foreach (var c in sorted)
@@ -657,6 +735,7 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshTreeViewRequested?.Invoke();
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordReorder(acls.AnimationChains, before, RefreshTreeView);
         }
 
         // ── A16: Adjust Offsets ───────────────────────────────────────────────
@@ -678,6 +757,7 @@ namespace AnimationEditor.Core.CommandsAndState
             Func<AnimationFrameSave, float?> getTextureHeight,
             float offsetMultiplier = 1f)
         {
+            var before = chain.Frames.Select(FrameFieldSnapshot.Capture).ToArray();
             foreach (var frame in chain.Frames)
             {
                 var height = getTextureHeight(frame);
@@ -687,6 +767,7 @@ namespace AnimationEditor.Core.CommandsAndState
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            RecordBulkFrameEdit(before, chain.Frames, refreshWireframe: true);
         }
 
         /// <summary>
@@ -699,10 +780,12 @@ namespace AnimationEditor.Core.CommandsAndState
             float? deltaY,
             bool relative)
         {
+            var before = chain.Frames.Select(FrameFieldSnapshot.Capture).ToArray();
             AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
             RefreshWireframeRequested?.Invoke();
+            RecordBulkFrameEdit(before, chain.Frames, refreshWireframe: true);
         }
 
         // ── A17: Scale Frame Times ────────────────────────────────────────────
@@ -715,9 +798,11 @@ namespace AnimationEditor.Core.CommandsAndState
             AnimationChainSave chain,
             float targetTotalDuration)
         {
+            var before = chain.Frames.Select(FrameFieldSnapshot.Capture).ToArray();
             FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordBulkFrameEdit(before, chain.Frames, refreshWireframe: false);
         }
 
         /// <summary>
@@ -728,9 +813,11 @@ namespace AnimationEditor.Core.CommandsAndState
             AnimationChainSave chain,
             float targetTotalDuration)
         {
+            var before = chain.Frames.Select(FrameFieldSnapshot.Capture).ToArray();
             FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+            RecordBulkFrameEdit(before, chain.Frames, refreshWireframe: false);
         }
 
         // ── F12: Add Multiple Frames ──────────────────────────────────────────
@@ -749,7 +836,9 @@ namespace AnimationEditor.Core.CommandsAndState
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
             var result    = BatchFrameBuilder.BuildBatch(lastFrame, count, incrementUV);
 
-            foreach (var frame in result.Frames)
+            int insertedAtIndex = chain.Frames.Count;
+            var added = result.Frames.ToArray();
+            foreach (var frame in added)
             {
                 chain.Frames.Add(frame);
                 _selectedState.SelectedFrame = frame;
@@ -758,6 +847,9 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshChainNodeRequested?.Invoke(chain);
             SaveCurrentAnimationChainList();
             _events.RaiseAnimationChainsChanged();
+
+            if (added.Length > 0)
+                _undoManager.Record(new AddFramesCommand(added, chain, insertedAtIndex, this, _events));
 
             return result.ExceededTextureBounds;
         }
@@ -783,6 +875,11 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? string.Empty
                 : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
 
+            // Snapshot every frame before the resize; unmodified frames have identical
+            // before/after snapshots and are harmless no-ops on undo/redo.
+            var allFrames = acls.AnimationChains.SelectMany(c => c.Frames).ToArray();
+            var before = allFrames.Select(FrameFieldSnapshot.Capture).ToArray();
+
             var modified = TextureResizeAdjuster.AdjustAll(
                 acls, aclsDir, absoluteTextureFilePath,
                 oldWidth, oldHeight, newWidth, newHeight);
@@ -792,6 +889,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 SaveCurrentAnimationChainList();
                 _events.RaiseAnimationChainsChanged();
                 RefreshWireframeRequested?.Invoke();
+                var after = allFrames.Select(FrameFieldSnapshot.Capture).ToArray();
+                _undoManager.Record(new BulkFrameEditCommand(
+                    before, after, this, _events, refreshWireframe: true));
             }
 
             return modified;
