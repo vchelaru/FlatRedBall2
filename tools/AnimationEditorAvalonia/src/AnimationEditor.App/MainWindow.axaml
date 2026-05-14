@@ -65,16 +65,7 @@
                         </Button.Styles>
                     </Button>
                 </StackPanel>
-                <!-- App icon (far left, draggable) -->
-                <StackPanel DockPanel.Dock="Left"
-                            Orientation="Horizontal" Spacing="6"
-                            VerticalAlignment="Center" Margin="10,0,4,0"
-                            PointerPressed="OnTitleBarPointerPressed"
-                            DoubleTapped="OnTitleBarDoubleTapped">
-                    <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
-                           Width="16" Height="16" VerticalAlignment="Center" />
-                </StackPanel>
-                <!-- Menus: File, Edit, View, Help (left, after identity) -->
+                <!-- Menus: File, Edit, View, Help (left) -->
                 <Menu DockPanel.Dock="Left"
                       x:Name="MainMenu"
                       Background="Transparent"
@@ -115,12 +106,17 @@
                         DoubleTapped="OnTitleBarDoubleTapped" />
             </DockPanel>
             <!-- Centered title overlay: IsHitTestVisible="False" lets drag region underneath work -->
-            <TextBlock Text="AnimationEditor"
-                       FontSize="12"
-                       Foreground="{StaticResource InkMid}"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       IsHitTestVisible="False" />
+            <StackPanel Orientation="Horizontal" Spacing="6"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False">
+                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
+                       Width="16" Height="16" VerticalAlignment="Center" />
+                <TextBlock Text="AnimationEditor"
+                           FontSize="12"
+                           Foreground="{StaticResource InkMid}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
             </Grid>
         </Border>
         <Border DockPanel.Dock="Bottom"
