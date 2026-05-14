@@ -38,7 +38,7 @@ public class UndoCoverageRosterTests
     private static readonly Dictionary<string, Category> Roster = new()
     {
         // Mutating, deliberately NOT undoable -------------------------------------
-        [nameof(IAppCommands.OpenAchxWorkflow)]                   = Category.MutatingNotUndoable, // loads a file; clears the undo stack
+        [nameof(IAppCommands.OpenAchxWorkflowAsync)]              = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.LoadAnimationChain)]                 = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.NewFile)]                            = Category.MutatingNotUndoable, // resets the project; clears the undo stack
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
