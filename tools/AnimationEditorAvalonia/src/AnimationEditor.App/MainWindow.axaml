@@ -111,7 +111,7 @@
                         VerticalAlignment="Center"
                         IsHitTestVisible="False">
                 <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
-                       Width="16" Height="16" />
+                       Width="16" Height="16" VerticalAlignment="Center" />
                 <TextBlock Text="AnimationEditor"
                            FontSize="12"
                            Foreground="{StaticResource InkMid}" />
