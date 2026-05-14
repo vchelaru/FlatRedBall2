@@ -74,6 +74,7 @@ public partial class MainWindow : Window
         _thumbnailService = thumbnailService;
 
         InitializeComponent();
+        InitToast();
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
         WireframeCtrl.AttachScrollViewer(WireframeScrollViewer);
 
@@ -1628,7 +1629,22 @@ public partial class MainWindow : Window
                     }
                     catch (Exception ex)
                     {
-                        await ShowConfirmDialogAsync($"Could not copy the file:\n{ex.Message}", "Copy Failed");
+                        var capturedSource = pickedPath;
+                        var capturedDest   = destination;
+                        ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+                        {
+                            try
+                            {
+                                File.Copy(capturedSource, capturedDest, overwrite: true);
+                                _appCommands.SetFrameTextureName(frame, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder));
+                                WireframeCtrl.LoadTexture(capturedDest);
+                                RefreshPropertyPanel();
+                            }
+                            catch (Exception retryEx)
+                            {
+                                ShowToast($"Retry failed: {retryEx.Message}");
+                            }
+                        });
                     }
                 }
             }
@@ -1925,32 +1941,11 @@ public partial class MainWindow : Window
 
     // ── Load-failed error dialog ──────────────────────────────────────────────
 
-    private async Task ShowLoadFailedDialogAsync(string filePath, Exception ex)
+    private Task ShowLoadFailedDialogAsync(string filePath, Exception ex)
     {
         var fileName = Path.GetFileName(filePath);
-        var dialog = new Window
-        {
-            Title = "Load Failed",
-            Width = 440,
-            Height = 180,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 12 };
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"Could not load '{fileName}':\n{ex.Message}",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-        });
-
-        var okBtn = new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
-        okBtn.Click += (_, _) => dialog.Close();
-        panel.Children.Add(okBtn);
-
-        dialog.Content = panel;
-        dialog.Closed += (_, _) => { };
-
-        await dialog.ShowDialog(this);
+        ShowStatusMessage($"⚠ Could not load '{fileName}': {ex.Message}", isError: true);
+        return Task.CompletedTask;
     }
 
     private async Task<bool> ShowConfirmDialogAsync(string message, string title)
@@ -2087,25 +2082,61 @@ public partial class MainWindow : Window
         return await tcs.Task;
     }
 
-    // ── Message dialog helper ─────────────────────────────────────────────────
+    // ── Status bar message ────────────────────────────────────────────────────
 
-    private async Task ShowMessageAsync(string message, string title = "Animation Editor")
+    private DispatcherTimer? _statusMessageTimer;
+
+    private void ShowStatusMessage(string text, bool isError = false)
     {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 400,
-            Height = 145,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
+        StatusMessage.Text = text;
+        StatusMessage.Foreground = isError
+            ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(220, 80, 60))
+            : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromArgb(255, 160, 160, 160));
+        StatusMessage.IsVisible = true;
 
-        var ok = new Button { Content = "OK", IsDefault = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(16), Spacing = 12 };
-        panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-        panel.Children.Add(ok);
-        dialog.Content = panel;
-        ok.Click += (_, _) => dialog.Close();
-        await dialog.ShowDialog(this);
+        _statusMessageTimer?.Stop();
+        _statusMessageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _statusMessageTimer.Tick += (_, _) =>
+        {
+            _statusMessageTimer.Stop();
+            StatusMessage.IsVisible = false;
+            StatusMessage.Text = string.Empty;
+        };
+        _statusMessageTimer.Start();
+    }
+
+    // ── Toast notification ────────────────────────────────────────────────────
+
+    private DispatcherTimer? _toastTimer;
+    private Action? _toastRetryAction;
+
+    private void InitToast()
+    {
+        ToastDismissBtn.Click += (_, _) => HideToast();
+        ToastRetryBtn.Click   += (_, _) =>
+        {
+            HideToast();
+            _toastRetryAction?.Invoke();
+        };
+    }
+
+    private void ShowToast(string message, Action? retryAction = null)
+    {
+        _toastRetryAction = retryAction;
+        ToastMessage.Text = message;
+        ToastRetryBtn.IsVisible = retryAction is not null;
+        ToastPanel.IsVisible = true;
+
+        _toastTimer?.Stop();
+        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        _toastTimer.Tick += (_, _) => HideToast();
+        _toastTimer.Start();
+    }
+
+    private void HideToast()
+    {
+        _toastTimer?.Stop();
+        ToastPanel.IsVisible = false;
     }
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
@@ -2350,7 +2381,7 @@ public partial class MainWindow : Window
             chain, count, incrToggle.IsChecked == true);
 
         if (exceededBounds)
-            await ShowMessageAsync("Some frames were clipped because they exceeded the texture bounds.");
+            ShowStatusMessage("Some frames were clipped — exceeded texture bounds.");
 
         _appCommands.RefreshTreeNode(chain);
         _events.RaiseAnimationChainsChanged();
@@ -2489,7 +2520,7 @@ public partial class MainWindow : Window
         var frame = _selectedState.SelectedFrame;
         if (frame is null || string.IsNullOrEmpty(frame.TextureName))
         {
-            await ShowMessageAsync("Select a frame with a texture before resizing.");
+            ShowStatusMessage("Select a frame with a texture before resizing.", isError: true);
             return;
         }
 
@@ -2503,7 +2534,7 @@ public partial class MainWindow : Window
 
         if (!File.Exists(absTexPath))
         {
-            await ShowMessageAsync($"Texture file not found:\n{absTexPath}");
+            ShowStatusMessage($"⚠ Texture file not found: {absTexPath}", isError: true);
             return;
         }
 
@@ -2513,7 +2544,7 @@ public partial class MainWindow : Window
         {
             if (bmp is null)
             {
-                await ShowMessageAsync("Could not read texture file.");
+                ShowStatusMessage("⚠ Could not read texture file.", isError: true);
                 return;
             }
             oldW = bmp.Width;
@@ -2574,7 +2605,7 @@ public partial class MainWindow : Window
 
         if (newW == oldW && newH == oldH)
         {
-            await ShowMessageAsync("New size is the same as current size. No changes made.");
+            ShowStatusMessage("New size is the same as current — no changes made.");
             return;
         }
 
@@ -2615,7 +2646,7 @@ public partial class MainWindow : Window
         _appCommands.SaveCurrentAnimationChainList();
         _events.RaiseAnimationChainsChanged();
 
-        await ShowMessageAsync($"Resized texture saved to:\n{newAbsPath}");
+        ShowStatusMessage($"Texture resized and saved to: {newAbsPath}");
     }
 
     // ── Inline rename helpers ─────────────────────────────────────────────────
@@ -2746,14 +2777,25 @@ public partial class MainWindow : Window
         newName = newName.Trim();
         vm.IsEditing = false;
 
-        if (vm.Data is AnimationChainSave chain &&
-            !string.IsNullOrEmpty(newName) && newName != chain.Name)
+        if (vm.Data is AnimationChainSave chain)
         {
-            _appCommands.RenameChain(chain, newName);
+            if (string.IsNullOrEmpty(newName))
+            {
+                ShowStatusMessage("Chain name cannot be empty.", isError: true);
+            }
+            else if (newName != chain.Name)
+            {
+                _appCommands.RenameChain(chain, newName);
+            }
         }
 
         AnimTree.Focus();
     }
+
+    internal void CommitInlineRenamePublic(TreeNodeVm vm, string newName) =>
+        CommitInlineRename(vm, newName);
+
+    internal IReadOnlyList<TreeNodeVm> GetTreeRoots() => _treeRoots;
 
     // ── View Texture in Explorer ──────────────────────────────────────────────
 
@@ -2761,7 +2803,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(frame.TextureName))
         {
-            _ = ShowMessageAsync("This frame has no texture path set.");
+            ShowStatusMessage("This frame has no texture path set.", isError: true);
             return;
         }
 
@@ -2775,7 +2817,7 @@ public partial class MainWindow : Window
 
         if (!File.Exists(absPath))
         {
-            _ = ShowMessageAsync($"Texture file not found:\n{absPath}");
+            ShowStatusMessage($"⚠ Texture file not found: {absPath}", isError: true);
             return;
         }
 
@@ -2785,7 +2827,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            _ = ShowMessageAsync($"Could not open Explorer:\n{ex.Message}");
+            ShowStatusMessage($"⚠ Could not open Explorer: {ex.Message}", isError: true);
         }
     }
 }

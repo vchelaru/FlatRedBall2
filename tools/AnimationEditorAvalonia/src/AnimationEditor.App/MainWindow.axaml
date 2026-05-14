@@ -164,6 +164,14 @@
                                Foreground="{StaticResource InkMid}"
                                VerticalAlignment="Center" />
                 </StackPanel>
+                <!-- center: transient status message (last child — fills remaining space) -->
+                <TextBlock x:Name="StatusMessage"
+                           FontSize="11"
+                           FontFamily="Consolas,Menlo,Monospace"
+                           Foreground="{StaticResource InkMid}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           IsVisible="False" />
             </DockPanel>
         </Border>
 
@@ -958,6 +966,40 @@
             </Grid>
         </Grid>
     </DockPanel>
+        <!-- ── Toast notification overlay ── -->
+        <Border x:Name="ToastPanel"
+                IsVisible="False"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Stretch"
+                Margin="0,0,0,22"
+                Background="{StaticResource BgRail}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,1,0,0"
+                Height="36"
+                ZIndex="10">
+            <DockPanel Margin="16,0">
+                <Button x:Name="ToastDismissBtn"
+                        DockPanel.Dock="Right"
+                        Content="✕"
+                        Width="28" Height="22"
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        Foreground="{StaticResource InkMid}"
+                        VerticalAlignment="Center" />
+                <Button x:Name="ToastRetryBtn"
+                        DockPanel.Dock="Right"
+                        Content="Retry"
+                        Height="22"
+                        Padding="8,0"
+                        Margin="0,0,4,0"
+                        VerticalAlignment="Center" />
+                <TextBlock x:Name="ToastMessage"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{StaticResource InkMid}"
+                           TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
         <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
         <Border x:Name="GripN"  Height="4" VerticalAlignment="Top"    Background="Transparent" Cursor="TopSide"         PointerPressed="OnResizeGrip" />
         <Border x:Name="GripS"  Height="4" VerticalAlignment="Bottom" Background="Transparent" Cursor="BottomSide"      PointerPressed="OnResizeGrip" />
