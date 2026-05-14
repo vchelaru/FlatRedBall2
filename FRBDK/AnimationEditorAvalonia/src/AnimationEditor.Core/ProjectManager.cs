@@ -39,18 +39,21 @@ namespace AnimationEditor.Core
         {
             if (fileName.Exists())
             {
-                var acls = AnimationChainListSave.FromFile(fileName.FullPath);
 
-                AddShapeCollectionsToFrames(acls);
+                    var acls = AnimationChainListSave.FromFile(fileName.FullPath);
 
-                OnDiskCoordinateType = acls.CoordinateType;
-                NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath);
+                    AddShapeCollectionsToFrames(acls);
 
-                AnimationChainListSave = acls;
-                FileName = fileName.FullPath;
+                    OnDiskCoordinateType = acls.CoordinateType;
+                    NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath);
 
-                if (!string.IsNullOrEmpty(acls.ProjectFile))
-                    TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
+                    AnimationChainListSave = acls;
+                    FileName = fileName.FullPath;
+
+                    if (!string.IsNullOrEmpty(acls.ProjectFile))
+                        TryLoadProjectFile(new FilePath(fileName.GetDirectoryContainingThis().FullPath + acls.ProjectFile));
+
+
             }
         }
 

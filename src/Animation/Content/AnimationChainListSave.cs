@@ -5,7 +5,6 @@ using System.IO;
 using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using XnaTitleContainer = Microsoft.Xna.Framework.TitleContainer;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -81,10 +80,11 @@ public class AnimationChainListSave
     /// overload exists for tooling and tests that work without a <see cref="ContentLoader"/>.
     /// </summary>
     /// <param name="filePath">Path to the .achx file, relative to the title container.</param>
-    /// <param name="streamProvider">Optional byte source. Defaults to <c>TitleContainer.OpenStream</c>.</param>
-    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream>? streamProvider)
+    /// <param name="streamProvider">Byte source. Required — there is no default, so consumers
+    /// that don't link MonoGame (the Animation Editor) don't pay a JIT-time assembly load on
+    /// <c>TitleContainer</c>.</param>
+    public static AnimationChainListSave FromFile(string filePath, Func<string, Stream> streamProvider)
     {
-        streamProvider ??= XnaTitleContainer.OpenStream;
         using var stream = streamProvider(filePath);
         var doc = XDocument.Load(stream);
         var root = doc.Root!;

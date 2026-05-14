@@ -9,11 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- FRB2 marks MonoGame.Framework.DesktopGL PrivateAssets=All to keep it out
-         of the engine NuGet's transitive set. The Animation Editor links FRB2 by
-         project ref and ends up calling APIs whose JIT-resolution pulls in
-         MonoGame.Framework, so we restore the reference here. -->
-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+    <!-- No MonoGame.Framework.DesktopGL PackageReference. AnimationEditor.Core (and the
+         live AE app) does not link MonoGame, so this test project must not either —
+         otherwise FRB2 APIs that accidentally introduce a JIT-time MonoGame dependency
+         pass tests here but blow up in the live app with a TypeLoadException. -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
