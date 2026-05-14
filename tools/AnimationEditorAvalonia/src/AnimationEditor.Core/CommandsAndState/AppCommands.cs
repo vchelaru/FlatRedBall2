@@ -557,18 +557,59 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Frame to Bottom"));
         }
 
+        public void MoveRectangle(AARectSave rectangle, AnimationFrameSave frame, int delta)
+        {
+            var rects = frame.ShapesSave?.AARectSaves;
+            if (rects is null) return;
+            int idx    = rects.IndexOf(rectangle);
+            int newIdx = Math.Clamp(idx + delta, 0, rects.Count - 1);
+            if (newIdx == idx) return;
+            _undoManager.Execute(new ReorderCommand<AARectSave>(
+                rects,
+                () => { rects.RemoveAt(idx); rects.Insert(newIdx, rectangle); },
+                this, _events, () => RefreshTreeNode(frame),
+                delta > 0 ? "Move Rectangle Down" : "Move Rectangle Up"));
+        }
+
+        public void MoveCircle(CircleSave circle, AnimationFrameSave frame, int delta)
+        {
+            var circles = frame.ShapesSave?.CircleSaves;
+            if (circles is null) return;
+            int idx    = circles.IndexOf(circle);
+            int newIdx = Math.Clamp(idx + delta, 0, circles.Count - 1);
+            if (newIdx == idx) return;
+            _undoManager.Execute(new ReorderCommand<CircleSave>(
+                circles,
+                () => { circles.RemoveAt(idx); circles.Insert(newIdx, circle); },
+                this, _events, () => RefreshTreeNode(frame),
+                delta > 0 ? "Move Circle Down" : "Move Circle Up"));
+        }
+
         /// <summary>
-        /// Moves the currently-selected frame or chain up (<paramref name="delta"/> = -1)
+        /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
         /// or down (<paramref name="delta"/> = +1) in the tree.
-        /// Frame selection takes priority: if a frame is selected its parent chain is used.
+        /// Shape selection takes highest priority: if a shape is selected it is reordered within
+        /// its frame's shape list. Frame selection takes next priority; chain is last.
         /// No-op when nothing is selected or when the item is already at the boundary.
         /// </summary>
         public void HandleReorder(int delta)
         {
-            var frame = _selectedState.SelectedFrame;
-            var chain = _selectedState.SelectedChain;
+            var rect   = _selectedState.SelectedRectangle;
+            var circle = _selectedState.SelectedCircle;
+            var frame  = _selectedState.SelectedFrame;
+            var chain  = _selectedState.SelectedChain;
 
-            if (frame is not null && chain is not null)
+            if (rect is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (ownerFrame is not null) MoveRectangle(rect, ownerFrame, delta);
+            }
+            else if (circle is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (ownerFrame is not null) MoveCircle(circle, ownerFrame, delta);
+            }
+            else if (frame is not null && chain is not null)
                 MoveFrame(frame, chain, delta);
             else if (chain is not null)
                 MoveChain(chain, delta);

@@ -98,4 +98,243 @@ public class AppCommandsReorderTests
 
         Assert.Null(ex);
     }
+
+    // ── HandleReorder — rectangle selected ───────────────────────────────────
+
+    [Fact]
+    public void HandleReorder_RectangleSelected_DeltaPos1_MovesRectDown()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+        ctx.SelectedState.SelectedFrame     = frame;
+        ctx.SelectedState.SelectedRectangle = rectA;
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        Assert.Equal(rectB, frame.ShapesSave.AARectSaves[0]);
+        Assert.Equal(rectA, frame.ShapesSave.AARectSaves[1]);
+    }
+
+    [Fact]
+    public void HandleReorder_RectangleSelected_DeltaNeg1_MovesRectUp()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+        ctx.SelectedState.SelectedFrame     = frame;
+        ctx.SelectedState.SelectedRectangle = rectB;
+
+        ctx.AppCommands.HandleReorder(-1);
+
+        Assert.Equal(rectB, frame.ShapesSave.AARectSaves[0]);
+        Assert.Equal(rectA, frame.ShapesSave.AARectSaves[1]);
+    }
+
+    [Fact]
+    public void HandleReorder_RectangleSelected_DoesNotReorderChain()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var walk  = TestHelpers.MakeChain(acls, "Walk", 1);
+        var run   = TestHelpers.MakeChain(acls, "Run", 1);
+        var frame = walk.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+        ctx.SelectedState.SelectedFrame     = frame;
+        ctx.SelectedState.SelectedRectangle = rectA;
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        // Chain order must be untouched
+        Assert.Equal(walk, acls.AnimationChains[0]);
+        Assert.Equal(run,  acls.AnimationChains[1]);
+    }
+
+    // ── HandleReorder — circle selected ──────────────────────────────────────
+
+    [Fact]
+    public void HandleReorder_CircleSelected_DeltaPos1_MovesCircleDown()
+    {
+        var ctx    = TestHelpers.SetupFreshAcls();
+        var acls   = ctx.Acls;
+        var chain  = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame  = chain.Frames[0];
+        var circA  = new CircleSave { Name = "A" };
+        var circB  = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+        ctx.SelectedState.SelectedFrame  = frame;
+        ctx.SelectedState.SelectedCircle = circA;
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        Assert.Equal(circB, frame.ShapesSave.CircleSaves[0]);
+        Assert.Equal(circA, frame.ShapesSave.CircleSaves[1]);
+    }
+
+    [Fact]
+    public void HandleReorder_CircleSelected_DeltaNeg1_MovesCircleUp()
+    {
+        var ctx    = TestHelpers.SetupFreshAcls();
+        var acls   = ctx.Acls;
+        var chain  = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame  = chain.Frames[0];
+        var circA  = new CircleSave { Name = "A" };
+        var circB  = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+        ctx.SelectedState.SelectedFrame  = frame;
+        ctx.SelectedState.SelectedCircle = circB;
+
+        ctx.AppCommands.HandleReorder(-1);
+
+        Assert.Equal(circB, frame.ShapesSave.CircleSaves[0]);
+        Assert.Equal(circA, frame.ShapesSave.CircleSaves[1]);
+    }
+
+    [Fact]
+    public void HandleReorder_CircleSelected_DoesNotReorderChain()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var walk  = TestHelpers.MakeChain(acls, "Walk", 1);
+        var run   = TestHelpers.MakeChain(acls, "Run", 1);
+        var frame = walk.Frames[0];
+        var circA = new CircleSave { Name = "A" };
+        var circB = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+        ctx.SelectedState.SelectedFrame  = frame;
+        ctx.SelectedState.SelectedCircle = circA;
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        Assert.Equal(walk, acls.AnimationChains[0]);
+        Assert.Equal(run,  acls.AnimationChains[1]);
+    }
+
+    // ── MoveRectangle ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void MoveRectangle_Delta1_MovesRectDown()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+
+        ctx.AppCommands.MoveRectangle(rectA, frame, +1);
+
+        Assert.Equal(rectB, frame.ShapesSave.AARectSaves[0]);
+        Assert.Equal(rectA, frame.ShapesSave.AARectSaves[1]);
+    }
+
+    [Fact]
+    public void MoveRectangle_DeltaNeg1_MovesRectUp()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+
+        ctx.AppCommands.MoveRectangle(rectB, frame, -1);
+
+        Assert.Equal(rectB, frame.ShapesSave.AARectSaves[0]);
+        Assert.Equal(rectA, frame.ShapesSave.AARectSaves[1]);
+    }
+
+    [Fact]
+    public void MoveRectangle_AtBottom_DoesNotMoveBelowEnd()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        frame.ShapesSave!.AARectSaves.Add(rectA);
+        frame.ShapesSave!.AARectSaves.Add(rectB);
+
+        ctx.AppCommands.MoveRectangle(rectB, frame, +1);
+
+        Assert.Equal(rectA, frame.ShapesSave.AARectSaves[0]);
+        Assert.Equal(rectB, frame.ShapesSave.AARectSaves[1]);
+    }
+
+    // ── MoveCircle ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void MoveCircle_Delta1_MovesCircleDown()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var circA = new CircleSave { Name = "A" };
+        var circB = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+
+        ctx.AppCommands.MoveCircle(circA, frame, +1);
+
+        Assert.Equal(circB, frame.ShapesSave.CircleSaves[0]);
+        Assert.Equal(circA, frame.ShapesSave.CircleSaves[1]);
+    }
+
+    [Fact]
+    public void MoveCircle_DeltaNeg1_MovesCircleUp()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var circA = new CircleSave { Name = "A" };
+        var circB = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+
+        ctx.AppCommands.MoveCircle(circB, frame, -1);
+
+        Assert.Equal(circB, frame.ShapesSave.CircleSaves[0]);
+        Assert.Equal(circA, frame.ShapesSave.CircleSaves[1]);
+    }
+
+    [Fact]
+    public void MoveCircle_AtBottom_DoesNotMoveBelowEnd()
+    {
+        var ctx   = TestHelpers.SetupFreshAcls();
+        var acls  = ctx.Acls;
+        var chain = TestHelpers.MakeChain(acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var circA = new CircleSave { Name = "A" };
+        var circB = new CircleSave { Name = "B" };
+        frame.ShapesSave!.CircleSaves.Add(circA);
+        frame.ShapesSave!.CircleSaves.Add(circB);
+
+        ctx.AppCommands.MoveCircle(circB, frame, +1);
+
+        Assert.Equal(circA, frame.ShapesSave.CircleSaves[0]);
+        Assert.Equal(circB, frame.ShapesSave.CircleSaves[1]);
+    }
 }

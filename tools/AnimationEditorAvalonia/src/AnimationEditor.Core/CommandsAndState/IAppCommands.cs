@@ -83,6 +83,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);
         void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain);
         void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain);
+        void MoveRectangle(AARectSave rectangle, AnimationFrameSave frame, int delta);
+        void MoveCircle(CircleSave circle, AnimationFrameSave frame, int delta);
         void HandleReorder(int delta);
         void FlipFrameHorizontally(AnimationFrameSave frame);
         void FlipFrameVertically(AnimationFrameSave frame);
