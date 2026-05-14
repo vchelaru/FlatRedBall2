@@ -45,7 +45,13 @@ dotnet test  tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 dotnet test  tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
 ```
 
-App tests use `[AvaloniaFact]` from `Avalonia.Headless.XUnit`; they construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions. See `WireframePanZoomTests.cs` for the established pattern (per-test service graph via `TestHelpers.BuildServices()`, tmp-dir PNG fixture, `FindCtrl<T>` helper).
+## `[AvaloniaFact]` is a last resort
+
+`[AvaloniaFact]` (from `Avalonia.Headless.XUnit`) runs the test on a headless Avalonia UI thread. It is slow and **deadlocks** on anything that blocks the UI thread waiting for the UI — a code path reaching `Window.ShowDialog` hangs forever with nothing to close the dialog. The `MainWindow` constructor also overwrites injected delegates (`AppCommands.ConfirmAsync`, `PromptStringAsync`, `FileDialogService`), so a stub installed *before* construction is silently lost.
+
+Default to a plain `[Fact]` against `AnimationEditor.Core` (`AppCommands`, commands, `SelectedState`, `AppState`). Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI — layout, control templates, input routing, visual tree. Logic reachable only by reflecting into a private `MainWindow` method is a signal to move it into Core, not to write an `[AvaloniaFact]`.
+
+Tests that do need it construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions — see `WireframePanZoomTests.cs` for the established pattern.
 
 ## Two-panel mental model
 
