@@ -55,7 +55,7 @@ public class WireframeControl : Control
         public float PanX, PanY, Zoom;
         public bool ShowGrid;
         public int GridSize;
-        public List<(SKRect Bounds, bool IsSelected, string Name)> Frames = new();
+        public List<(SKRect Bounds, bool IsSelected)> Frames = new();
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
@@ -123,14 +123,7 @@ public class WireframeControl : Control
             using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
             using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
-            using var labelPaint = new SKPaint
-            {
-                Color = new SKColor(0xe6, 0xe8, 0xec, 0xaa),
-                IsAntialias = true,
-            };
-            using var labelFont = new SKFont { Size = 11 };
-
-            foreach (var (bounds, isSelected, name) in s.Frames)
+            foreach (var (bounds, isSelected) in s.Frames)
             {
                 var sr = ToScreen(bounds, s);
                 if (isSelected)
@@ -145,13 +138,6 @@ public class WireframeControl : Control
                 }
                 canvas.DrawRect(sr, frameFill);
                 canvas.DrawRect(sr, frameStroke);
-
-                if (!string.IsNullOrEmpty(name))
-                {
-                    float labelY = sr.Top - 3f;
-                    if (labelY > 0)
-                        canvas.DrawText(name, sr.Left, labelY, SKTextAlign.Left, labelFont, labelPaint);
-                }
             }
 
             // Resize handles on selected frame
@@ -1364,12 +1350,7 @@ public class WireframeControl : Control
         };
 
         foreach (var fr in _frameRects)
-        {
-            var frameName = string.IsNullOrEmpty(fr.Frame.TextureName)
-                ? string.Empty
-                : Path.GetFileName(fr.Frame.TextureName);
-            snap.Frames.Add((fr.Bounds, fr.IsSelected, frameName));
-        }
+            snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
         var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
         if (sel != null)

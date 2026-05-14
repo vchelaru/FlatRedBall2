@@ -486,6 +486,16 @@ public partial class MainWindow : Window
         {
             WireframeCtrl.LoadTexture(texPath);
         }
+
+        RefreshTextureNameLabel();
+    }
+
+    private void RefreshTextureNameLabel()
+    {
+        string? name = _selectedState.SelectedTextureName;
+        string label = string.IsNullOrEmpty(name) ? string.Empty : Path.GetFileName(name);
+        TextureNameLabel.Text = label;
+        TextureNameLabel.IsVisible = label.Length > 0;
     }
 
     // ── Custom title bar ─────────────────────────────────────────────────────

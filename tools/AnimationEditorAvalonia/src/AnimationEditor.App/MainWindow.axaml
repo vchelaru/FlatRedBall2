@@ -485,6 +485,17 @@
                                 </AutoCompleteBox>
                             </DockPanel>
                         </Border>
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <TextBlock x:Name="TextureNameLabel"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   Foreground="{StaticResource InkMid}"
+                                   Margin="4,0,0,0"
+                                   IsVisible="False" />
                     </StackPanel>
                 </Border>
 
