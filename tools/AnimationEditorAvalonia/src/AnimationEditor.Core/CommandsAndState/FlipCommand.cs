@@ -6,7 +6,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     /// <summary>
     /// Undo/redo record for toggling the horizontal or vertical flip flag on a set
     /// of frames (frame flip, or whole-chain flip). A flip is its own inverse, so
-    /// <see cref="Undo"/> and <see cref="Redo"/> both re-toggle the same frames.
+    /// <see cref="Do"/>, <see cref="Undo"/>, and Redo all re-toggle the same frames.
     /// </summary>
     internal sealed class FlipCommand : IUndoableCommand
     {
@@ -27,8 +27,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _refresh = refresh;
         }
 
+        public bool Do() { Toggle(); return true; }
         public void Undo() => Toggle();
-        public void Redo() => Toggle();
 
         private void Toggle()
         {

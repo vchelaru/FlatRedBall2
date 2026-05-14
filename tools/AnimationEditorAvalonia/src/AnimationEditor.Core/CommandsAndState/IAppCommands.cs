@@ -100,5 +100,20 @@ namespace AnimationEditor.Core.CommandsAndState
         void NewFile();
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
+
+        /// <summary>
+        /// Pastes clipboard chains into the project: renames each to be unique and inserts
+        /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>). Undoable.
+        /// </summary>
+        void PasteChains(IReadOnlyList<AnimationChainSave> chains);
+
+        /// <summary>Appends clipboard frames to <paramref name="chain"/>. Undoable.</summary>
+        void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames);
+
+        /// <summary>Adds a clipboard rectangle to <paramref name="frame"/>. Undoable.</summary>
+        void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle);
+
+        /// <summary>Adds a clipboard circle to <paramref name="frame"/>. Undoable.</summary>
+        void PasteCircle(AnimationFrameSave frame, CircleSave circle);
     }
 }

@@ -35,8 +35,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events    = events;
         }
 
+        public bool Do() { Apply(_newX, _newY, _newParam1, _newParam2); return true; }
         public void Undo() => Apply(_oldX, _oldY, _oldParam1, _oldParam2);
-        public void Redo() => Apply(_newX, _newY, _newParam1, _newParam2);
 
         private void Apply(float x, float y, float p1, float p2)
         {

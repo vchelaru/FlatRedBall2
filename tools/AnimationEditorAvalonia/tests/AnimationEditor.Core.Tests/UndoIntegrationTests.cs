@@ -176,6 +176,7 @@ public class UndoIntegrationTests
 
     private sealed class StubCmd : IUndoableCommand
     {
+        public bool Do() => true;
         public void Undo() { }
         public void Redo() { }
     }

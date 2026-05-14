@@ -89,6 +89,10 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AdjustUVAfterResize)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrameFromPixelBounds)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameTextureName)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteChains)]                  = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteCircle)]                  = Category.MutatingUndoable,
     };
 
     // ── Reflection guardrails ─────────────────────────────────────────────────
@@ -233,6 +237,18 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddFrameFromPixelBounds(Zebra(ctx), "sheet.png", 0, 0, 8, 8, 64, 64)));
         yield return Row(nameof(IAppCommands.SetFrameTextureName),
             ctx => Sync(() => ctx.AppCommands.SetFrameTextureName(Zebra(ctx).Frames[0], "set.png")));
+        yield return Row(nameof(IAppCommands.PasteChains),
+            ctx => Sync(() => ctx.AppCommands.PasteChains(
+                new List<AnimationChainSave> { new() { Name = "Pasted" } })));
+        yield return Row(nameof(IAppCommands.PasteFrames),
+            ctx => Sync(() => ctx.AppCommands.PasteFrames(Zebra(ctx),
+                new List<AnimationFrameSave> { new() { ShapesSave = new ShapesSave() } })));
+        yield return Row(nameof(IAppCommands.PasteRectangle),
+            ctx => Sync(() => ctx.AppCommands.PasteRectangle(
+                Zebra(ctx).Frames[1], new AARectSave { Name = "Pasted" })));
+        yield return Row(nameof(IAppCommands.PasteCircle),
+            ctx => Sync(() => ctx.AppCommands.PasteCircle(
+                Zebra(ctx).Frames[1], new CircleSave { Name = "Pasted" })));
     }
 
     // ── Fixture ───────────────────────────────────────────────────────────────

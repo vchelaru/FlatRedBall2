@@ -6,32 +6,32 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
     {
         private readonly AnimationChainSave _chain;
         private readonly AnimationChainListSave _acls;
-        private readonly int _insertedAtIndex;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
-        public AddChainCommand(AnimationChainSave chain, AnimationChainListSave acls, int insertedAtIndex,
+        public AddChainCommand(AnimationChainSave chain, AnimationChainListSave acls,
             IAppCommands commands, IApplicationEvents events)
         {
             _chain = chain;
             _acls = acls;
-            _insertedAtIndex = insertedAtIndex;
             _commands = commands;
             _events = events;
+        }
+
+        public bool Do()
+        {
+            // Appended at the end; redo (after an undo) re-appends — correct because the
+            // undo stack is LIFO, so the list is in the same shape it was the first time.
+            _acls.AnimationChains.Add(_chain);
+            _commands.RefreshTreeView();
+            _events.RaiseAnimationChainsChanged();
+            _commands.SaveCurrentAnimationChainList();
+            return true;
         }
 
         public void Undo()
         {
             _acls.AnimationChains.Remove(_chain);
-            _commands.RefreshTreeView();
-            _events.RaiseAnimationChainsChanged();
-            _commands.SaveCurrentAnimationChainList();
-        }
-
-        public void Redo()
-        {
-            int idx = System.Math.Min(_insertedAtIndex, _acls.AnimationChains.Count);
-            _acls.AnimationChains.Insert(idx, _chain);
             _commands.RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();

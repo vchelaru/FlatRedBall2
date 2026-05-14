@@ -24,24 +24,15 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
         }
 
-        public void Undo()
-        {
-            _frame.LeftCoordinate   = _bL;
-            _frame.TopCoordinate    = _bT;
-            _frame.RightCoordinate  = _bR;
-            _frame.BottomCoordinate = _bB;
-            _commands.RefreshTreeNode(_frame);
-            _events.RaiseAnimationChainsChanged();
-            _commands.RefreshWireframe();
-            _commands.SaveCurrentAnimationChainList();
-        }
+        public bool Do() { Apply(_aL, _aT, _aR, _aB); return true; }
+        public void Undo() => Apply(_bL, _bT, _bR, _bB);
 
-        public void Redo()
+        private void Apply(float left, float top, float right, float bottom)
         {
-            _frame.LeftCoordinate   = _aL;
-            _frame.TopCoordinate    = _aT;
-            _frame.RightCoordinate  = _aR;
-            _frame.BottomCoordinate = _aB;
+            _frame.LeftCoordinate   = left;
+            _frame.TopCoordinate    = top;
+            _frame.RightCoordinate  = right;
+            _frame.BottomCoordinate = bottom;
             _commands.RefreshTreeNode(_frame);
             _events.RaiseAnimationChainsChanged();
             _commands.RefreshWireframe();

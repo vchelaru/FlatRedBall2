@@ -20,17 +20,18 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
         }
 
-        public void Undo()
+        public bool Do()
         {
-            _chain.Name = _oldName;
+            _chain.Name = _newName;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            return true;
         }
 
-        public void Redo()
+        public void Undo()
         {
-            _chain.Name = _newName;
+            _chain.Name = _oldName;
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();

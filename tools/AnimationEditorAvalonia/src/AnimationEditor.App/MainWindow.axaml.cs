@@ -398,6 +398,9 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        // Re-sync the property inspector so its values (flip toggles, frame length,
+        // offsets, …) reflect the model after any mutation — including undo/redo.
+        Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
         Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
     }
 
@@ -1784,10 +1787,12 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frame = _selectedState.SelectedFrame;
         if (frame is null) return;
-        frame.FlipHorizontal = PropFlipH.IsChecked == true;
-        frame.FlipVertical   = PropFlipV.IsChecked == true;
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.RefreshWireframe();
+        // Route through the undoable flip commands. FlipFrame* toggles, so only call
+        // it when the toggle button's state actually differs from the model.
+        if (frame.FlipHorizontal != (PropFlipH.IsChecked == true))
+            _appCommands.FlipFrameHorizontally(frame);
+        if (frame.FlipVertical != (PropFlipV.IsChecked == true))
+            _appCommands.FlipFrameVertically(frame);
     }
 
     private void ApplyFrameLen()
@@ -2240,12 +2245,13 @@ public partial class MainWindow : Window
 
         var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
 
+        // Each branch hands the mutation to an undoable command via _appCommands;
+        // the read-side prep (target resolution, ShapesSave init, name uniquing)
+        // stays here. The commands raise refresh/save events themselves.
         if (chains is { Count: > 0 })
         {
-            ChainPasteLogic.InsertPastedChains(acls, chains);
+            _appCommands.PasteChains(chains);
             _selectedState.SelectedChain = chains[^1];
-            RefreshTreeView();
-            _events.RaiseAnimationChainsChanged();
         }
         else if (frames is { Count: > 0 })
         {
@@ -2260,14 +2266,11 @@ public partial class MainWindow : Window
             if (targetChain is null) return;
 
             foreach (var pasted in frames)
-            {
                 pasted.ShapesSave ??= new ShapesSave();
-                targetChain.Frames.Add(pasted);
-            }
+
+            _appCommands.PasteFrames(targetChain, frames);
             _selectedState.SelectedFrame = frames[^1];
-            _appCommands.RefreshTreeNode(targetChain);
             _appCommands.RefreshWireframe();
-            _events.RaiseAnimationChainsChanged();
         }
         else if (rectangle is not null)
         {
@@ -2280,10 +2283,7 @@ public partial class MainWindow : Window
                 .ToList();
             rectangle.Name = StringFunctions.MakeStringUnique(
                 rectangle.Name, existingNames, 2);
-            frame.ShapesSave.AARectSaves.Add(rectangle);
-            _appCommands.RefreshTreeNode(frame);
-            _appCommands.RefreshAnimationFrameDisplay();
-            _events.RaiseAnimationChainsChanged();
+            _appCommands.PasteRectangle(frame, rectangle);
         }
         else if (circle is not null)
         {
@@ -2296,13 +2296,8 @@ public partial class MainWindow : Window
                 .ToList();
             circle.Name = StringFunctions.MakeStringUnique(
                 circle.Name, existingNames, 2);
-            frame.ShapesSave.CircleSaves.Add(circle);
-            _appCommands.RefreshTreeNode(frame);
-            _appCommands.RefreshAnimationFrameDisplay();
-            _events.RaiseAnimationChainsChanged();
+            _appCommands.PasteCircle(frame, circle);
         }
-
-        _appCommands.SaveCurrentAnimationChainList();
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────
@@ -2312,6 +2307,8 @@ public partial class MainWindow : Window
         var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
         if (selectedVm is null) return;
 
+        // Delete the whole multi-selection of the focused node's kind, not just the
+        // focused node — AskToDelete* batches them into a single undo step.
         if (selectedVm.Data is AnimationChainSave chainToDel)
         {
             var chains = _selectedState.SelectedChains;
@@ -2319,11 +2316,23 @@ public partial class MainWindow : Window
                 chains.Count > 0 ? chains : new() { chainToDel });
         }
         else if (selectedVm.Data is AnimationFrameSave frameToDel)
-            _ = _appCommands.AskToDeleteFrames(new() { frameToDel });
+        {
+            var frames = _selectedState.SelectedFrames;
+            _ = _appCommands.AskToDeleteFrames(
+                frames.Count > 0 ? frames : new() { frameToDel });
+        }
         else if (selectedVm.Data is AARectSave rectToDel)
-            _ = _appCommands.AskToDeleteRectangles(new() { rectToDel });
+        {
+            var rects = _selectedState.SelectedRectangles;
+            _ = _appCommands.AskToDeleteRectangles(
+                rects.Count > 0 ? rects : new() { rectToDel });
+        }
         else if (selectedVm.Data is CircleSave circleToDel)
-            _ = _appCommands.AskToDeleteCircles(new() { circleToDel });
+        {
+            var circles = _selectedState.SelectedCircles;
+            _ = _appCommands.AskToDeleteCircles(
+                circles.Count > 0 ? circles : new() { circleToDel });
+        }
     }
 
     // ── Add Multiple Frames ───────────────────────────────────────────────────

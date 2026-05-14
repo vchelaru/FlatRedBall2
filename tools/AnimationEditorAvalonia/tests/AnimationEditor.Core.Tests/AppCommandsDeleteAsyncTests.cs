@@ -70,6 +70,25 @@ public class AppCommandsDeleteAsyncTests
         }
     }
 
+    [Fact]
+    public async Task AskToDeleteAnimationChains_DeletingMultiple_RecordsSingleUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var a = TestHelpers.MakeChain(ctx.Acls, "A");
+        var b = TestHelpers.MakeChain(ctx.Acls, "B");
+
+        await ctx.AppCommands.AskToDeleteAnimationChains(
+            new List<AnimationChainSave> { a, b });
+        Assert.Empty(ctx.Acls.AnimationChains);
+
+        // One user action is one undo step, and the single undo restores both
+        // chains to their original positions.
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { a, b }, ctx.Acls.AnimationChains);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
     // ── AskToDeleteFrames ─────────────────────────────────────────────────────
 
     [Fact]
@@ -201,6 +220,30 @@ public class AppCommandsDeleteAsyncTests
         Assert.Contains("BodyCollision", capturedMessage);
     }
 
+    [Fact]
+    public async Task AskToDeleteRectangles_DeletingMultiple_RecordsSingleUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var r1 = new AARectSave { Name = "R1" };
+        var r2 = new AARectSave { Name = "R2" };
+        frame.ShapesSave!.AARectSaves.Add(r1);
+        frame.ShapesSave!.AARectSaves.Add(r2);
+
+        await ctx.AppCommands.AskToDeleteRectangles(
+            new List<AARectSave> { r1, r2 });
+        Assert.Empty(frame.ShapesSave!.AARectSaves);
+
+        // One user action is one undo step, and the single undo restores both
+        // rectangles to their original positions (verifies the composite undoes
+        // its sub-commands in reverse so indices stay correct).
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { r1, r2 }, frame.ShapesSave!.AARectSaves);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
     // ── AskToDeleteCircles ────────────────────────────────────────────────────
 
     [Fact]
@@ -258,5 +301,29 @@ public class AppCommandsDeleteAsyncTests
 
         Assert.NotNull(capturedMessage);
         Assert.Contains("DetectionArea", capturedMessage);
+    }
+
+    [Fact]
+    public async Task AskToDeleteCircles_DeletingMultiple_RecordsSingleUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Jump", 1);
+        var frame = chain.Frames[0];
+        var c1 = new CircleSave { Name = "C1", Radius = 5 };
+        var c2 = new CircleSave { Name = "C2", Radius = 5 };
+        frame.ShapesSave!.CircleSaves.Add(c1);
+        frame.ShapesSave!.CircleSaves.Add(c2);
+
+        await ctx.AppCommands.AskToDeleteCircles(
+            new List<CircleSave> { c1, c2 });
+        Assert.Empty(frame.ShapesSave!.CircleSaves);
+
+        // One user action is one undo step, and the single undo restores both
+        // circles to their original positions (verifies the composite undoes
+        // its sub-commands in reverse so indices stay correct).
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { c1, c2 }, frame.ShapesSave!.CircleSaves);
+        Assert.False(ctx.UndoManager.CanUndo);
     }
 }

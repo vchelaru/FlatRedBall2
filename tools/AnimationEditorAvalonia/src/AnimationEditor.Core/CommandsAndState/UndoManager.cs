@@ -5,7 +5,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 {
     /// <summary>
     /// Manages unlimited undo/redo history for the animation editor.
-    /// Call <see cref="Record"/> after every mutating operation.
+    /// Mutate project state by passing a command to <see cref="Execute"/>.
     /// </summary>
     public class UndoManager : IUndoManager
     {
@@ -17,13 +17,17 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public bool CanRedo => _redoStack.Count > 0;
         public SaveState SaveState => _saveState;
 
-        /// <summary>Raised after <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
+        /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         public event Action? StackChanged;
 
-        /// <summary>
-        /// Records a command in the undo history and clears the redo stack.
-        /// Call this immediately after a mutating operation completes.
-        /// </summary>
+        /// <inheritdoc cref="IUndoManager.Execute"/>
+        public void Execute(IUndoableCommand cmd)
+        {
+            if (cmd.Do())
+                Record(cmd);
+        }
+
+        /// <inheritdoc cref="IUndoManager.Record"/>
         public void Record(IUndoableCommand cmd)
         {
             _undoStack.Push(cmd);
