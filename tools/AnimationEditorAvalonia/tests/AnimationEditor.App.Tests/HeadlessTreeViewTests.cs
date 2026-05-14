@@ -1029,7 +1029,7 @@ public class HeadlessTreeViewTests
 
             Assert.True(chainNode.IsExpanded,
                 "Parent chain node must stay expanded after a frame node refresh.");
-            Assert.Equal("renamed.png", chainNode.Children[0].Header);
+            Assert.Equal("Frame 1", chainNode.Children[0].Header);
         }
         finally { window.Close(); }
     }

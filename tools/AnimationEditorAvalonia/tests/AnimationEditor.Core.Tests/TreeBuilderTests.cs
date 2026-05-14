@@ -47,8 +47,8 @@ public class TreeBuilderPureTests
         var root = TreeBuilder.BuildTree(acls)[0];
 
         Assert.Equal(2, root.Children.Count);
-        Assert.Equal("run1.png", root.Children[0].Header);
-        Assert.Equal("run2.png", root.Children[1].Header);
+        Assert.Equal("Frame 1", root.Children[0].Header);
+        Assert.Equal("Frame 2", root.Children[1].Header);
     }
 
     [Fact]
@@ -139,10 +139,10 @@ public class TreeBuilderPureTests
     // ── BuildFrameNode & BuildFrameHeader ─────────────────────────────────────
 
     [Fact]
-    public void BuildFrameHeader_WithTexturePath_ReturnsFileNameOnly()
+    public void BuildFrameHeader_WithTextureNameButNoExplicitName_ReturnsFrameIndex()
     {
         var frame = new AnimationFrameSave { TextureName = "sprites/player/walk1.png" };
-        Assert.Equal("walk1.png", TreeBuilder.BuildFrameHeader(frame));
+        Assert.Equal("Frame 1", TreeBuilder.BuildFrameHeader(frame));
     }
 
     [Fact]
@@ -366,7 +366,7 @@ public class TreeBuilderPureTests
         Assert.Equal("Walk Renamed", roots[0].Header);
         Assert.Equal("1 fr", roots[0].Meta);
         Assert.Single(roots[0].Children);
-        Assert.Equal("a.png", roots[0].Children[0].Header);
+        Assert.Equal("Frame 1", roots[0].Children[0].Header);
     }
 
     // ── SyncFramesInto ────────────────────────────────────────────────────────
@@ -510,6 +510,18 @@ public class TreeBuilderPureTests
         TreeBuilder.BuildFrameNode(frame, 2);  // position 2 → "Frame 3"
 
         Assert.Equal("Frame 3", frame.Name);
+    }
+
+    [Fact]
+    public void BuildFrameNode_SetsNameForTexturedUnnamedFrame()
+    {
+        // Textured frames must also get a persisted "Frame N" label so that
+        // drag-and-drop frames use the same auto-naming scheme as + button frames.
+        var frame = new AnimationFrameSave { TextureName = "sprites/walk1.png" };
+
+        TreeBuilder.BuildFrameNode(frame, 0);
+
+        Assert.Equal("Frame 1", frame.Name);
     }
 
     [Fact]
