@@ -717,48 +717,4 @@ public class AppCommandsChainTests
         }
     }
 
-    // ── RenameFrame / SetFrameTextureName (TV08) ───────────────────────────────
-
-    [Fact]
-    public void RenameFrame_SetsTextureNameOnFrame()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave
-            { TextureName = "old.png" };
-
-        ctx.AppCommands.RenameFrame(frame, "new.png");
-
-        Assert.Equal("new.png", frame.TextureName);
-    }
-
-    [Fact]
-    public void RenameFrame_RaisesAnimationChainsChanged()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave();
-        bool fired = false;
-        void Handler() => fired = true;
-        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
-        try
-        {
-            ctx.AppCommands.RenameFrame(frame, "hero.png");
-            Assert.True(fired);
-        }
-        finally
-        {
-            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
-        }
-    }
-
-    [Fact]
-    public void RenameFrame_EmptyString_SetsEmptyTextureName()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new FlatRedBall2.Animation.Content.AnimationFrameSave
-            { TextureName = "something.png" };
-
-        ctx.AppCommands.RenameFrame(frame, string.Empty);
-
-        Assert.Equal(string.Empty, frame.TextureName);
-    }
 }

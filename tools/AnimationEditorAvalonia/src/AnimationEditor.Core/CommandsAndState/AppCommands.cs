@@ -433,20 +433,6 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
-        /// <summary>
-        /// Set the texture name (file path) of a frame — the in-tree rename action (TV08).
-        /// Fires <see cref="ApplicationEvents.AnimationChainsChanged"/> and saves.
-        /// </summary>
-        public void RenameFrame(AnimationFrameSave frame, string newTextureName)
-        {
-            string? oldName = frame.TextureName;
-            frame.TextureName = newTextureName;
-            RefreshFrameNodeRequested?.Invoke(frame);
-            SaveCurrentAnimationChainList();
-            _events.RaiseAnimationChainsChanged();
-            _undoManager.Record(new SetFrameTextureNameCommand(frame, oldName, newTextureName, this, _events));
-        }
-
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             var frame = new AnimationFrameSave
