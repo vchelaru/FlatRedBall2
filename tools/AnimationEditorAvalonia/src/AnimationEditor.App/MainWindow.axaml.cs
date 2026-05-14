@@ -1128,6 +1128,14 @@ public partial class MainWindow : Window
         _treeRoots.FirstOrDefault(n => n.Data is AnimationChainSave c && c == chain);
 
     /// <summary>
+    /// Pixel size the chain first-frame thumbnail bitmap is baked at. Kept at twice the
+    /// displayed icon size (the <c>TreeNodeIconSize</c> resource in MainWindow.axaml, 28px)
+    /// so the <c>Image</c> control downsamples — which is crisp — instead of upscaling a
+    /// too-small bitmap, which looks blurry. The 2× headroom also covers high-DPI displays.
+    /// </summary>
+    private const int TreeChainThumbnailPixelSize = 56;
+
+    /// <summary>
     /// Regenerates each chain node's first-frame icon when its <see cref="ThumbnailSource"/>
     /// has changed — a frame reorder, first-frame texture swap, first-frame region edit, or
     /// first-frame delete. Chains with no frames fall back to the generic chain icon.
@@ -1152,7 +1160,8 @@ public partial class MainWindow : Window
             (node.Thumbnail as IDisposable)?.Dispose();
             node.Thumbnail = source is null
                 ? null
-                : _thumbnailService.GetFrameThumbnail(chain.Frames[0], 14, 14);
+                : _thumbnailService.GetFrameThumbnail(
+                    chain.Frames[0], TreeChainThumbnailPixelSize, TreeChainThumbnailPixelSize);
             node.ThumbnailSource = source;
         }
     }

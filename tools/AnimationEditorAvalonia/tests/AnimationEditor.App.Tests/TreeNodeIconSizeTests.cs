@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FlatRedBall2.Animation.Content;
+using SkiaSharp;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -92,6 +93,55 @@ public class TreeNodeIconSizeTests
                     $"Node icon height {svg.Height} must not exceed the {RowHeight}px row height.");
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ChainThumbnail_IsBakedAtLeastAtDisplaySize_SoItIsNotUpscaledAndBlurry()
+    {
+        // Regression: the chain first-frame thumbnail used to be baked at 14x14 and then
+        // displayed at the (now larger) icon size, so the Image control upscaled it — blurry.
+        // It must be baked at no smaller than the displayed icon size.
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var pngPath = Path.Combine(dir, "red.png");
+            using (var bm = new SKBitmap(64, 64))
+            {
+                bm.Erase(SKColors.Red);
+                using var data = bm.Encode(SKEncodedImageFormat.Png, 100);
+                File.WriteAllBytes(pngPath, data.ToArray());
+            }
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave
+            {
+                TextureName     = "red.png",
+                LeftCoordinate  = 0f, TopCoordinate    = 0f,
+                RightCoordinate = 1f, BottomCoordinate = 1f,
+            });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            typeof(MainWindow)
+                .GetMethod("RefreshTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, null);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var chainNode = ((System.Collections.ObjectModel.ObservableCollection<TreeNodeVm>)tree.ItemsSource!)[0];
+            var thumbnail = Assert.IsType<Avalonia.Media.Imaging.Bitmap>(chainNode.Thumbnail);
+            Assert.True(thumbnail.PixelSize.Width >= 28,
+                $"Thumbnail baked at {thumbnail.PixelSize.Width}px — must be >= the 28px display size so it is downsampled, not upscaled.");
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
     }
 
     [AvaloniaFact]
