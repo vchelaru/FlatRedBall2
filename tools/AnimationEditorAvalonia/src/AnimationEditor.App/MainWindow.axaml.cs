@@ -759,7 +759,7 @@ public partial class MainWindow : Window
         // Move the playhead at a constant PixelsPerSecond rate.
         // For clamped cells (shorter than natural proportional width) the playhead parks
         // at the right edge until the frame advances rather than speeding up.
-        double offset = Math.Min(elapsed * TimelineBuilder.PixelsPerSecond, travelWidth);
+        double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
         _timelineFrames[idx].ScrubberOffset = offset;
     }
 
@@ -830,6 +830,7 @@ public partial class MainWindow : Window
 
     private readonly ObservableCollection<TreeNodeVm> _treeRoots = new();
     private readonly ObservableCollection<TimelineFrameVm> _timelineFrames = new();
+    private double _timelineEffectivePps = TimelineBuilder.PixelsPerSecond;
     private int _currentTimelineFrameIndex = -1;
 
     private void WireTreeView()
@@ -1241,6 +1242,7 @@ public partial class MainWindow : Window
 
         foreach (var item in TimelineBuilder.BuildFrameItems(chain))
             _timelineFrames.Add(item);
+        _timelineEffectivePps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
 
         // Populate frame thumbnails (texture crop, no shapes)
         if (chain is not null)

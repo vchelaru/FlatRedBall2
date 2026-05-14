@@ -95,12 +95,15 @@ public class TimelineScrubberTests
             preview.Playback.Play();
             Dispatcher.UIThread.RunJobs();
 
-            // Advance 0.05s into a 0.1s frame → playhead should be at 0.05 * PixelsPerSecond px
+            // Derive the effective PPS from the cell width (cell = frameDuration * effectivePps).
+            double effectivePps = items[0].Width / 0.1;
+
+            // Advance halfway through frame 0.
             const double elapsed = 0.05;
             preview.Playback.Advance(elapsed);
 
             // ScrubberOffset is updated synchronously from PlaybackTicked — no RunJobs needed
-            double expectedOffset = elapsed * AnimationEditor.Core.ViewModels.TimelineBuilder.PixelsPerSecond;
+            double expectedOffset = elapsed * effectivePps;
             Assert.Equal(expectedOffset, items[0].ScrubberOffset, precision: 6);
             Assert.True(items[0].ScrubberOffset > 0);
             Assert.True(items[0].ScrubberOffset < items[0].Width);
