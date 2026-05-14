@@ -60,6 +60,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.DeleteAxisAlignedRectangle)]   = Category.MutatingUndoable,
         [nameof(IAppCommands.AskToDeleteRectangles)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.AskToDeleteCircles)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.AskToDeleteShapes)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.AskToDeleteAnimationChains)]   = Category.MutatingUndoable,
         [nameof(IAppCommands.DeleteFrames)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChain)]            = Category.MutatingUndoable,
@@ -179,6 +180,8 @@ public class UndoCoverageRosterTests
             ctx => ctx.AppCommands.AskToDeleteRectangles(new() { Rect(ctx) }));
         yield return Row(nameof(IAppCommands.AskToDeleteCircles),
             ctx => ctx.AppCommands.AskToDeleteCircles(new() { Circle(ctx) }));
+        yield return Row(nameof(IAppCommands.AskToDeleteShapes),
+            ctx => ctx.AppCommands.AskToDeleteShapes(new() { Rect(ctx) }, new() { Circle(ctx) }));
         yield return Row(nameof(IAppCommands.AskToDeleteAnimationChains),
             ctx => ctx.AppCommands.AskToDeleteAnimationChains(new() { Alpha(ctx) }));
         yield return Row(nameof(IAppCommands.DeleteFrames),

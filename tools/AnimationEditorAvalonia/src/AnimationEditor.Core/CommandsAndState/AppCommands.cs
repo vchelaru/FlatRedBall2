@@ -378,6 +378,32 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
+        public async Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
+        {
+            var allNames = rectangles.Select(r => r.Name).Concat(circles.Select(c => c.Name));
+            var message = "Delete the following shape(s)?\n\n" +
+                string.Join("\n", allNames);
+
+            if (await ConfirmAsync(message, "Delete?"))
+            {
+                var commands = new List<IUndoableCommand>();
+                foreach (var rect in rectangles.ToArray())
+                {
+                    var frame = _objectFinder.GetAnimationFrameContaining(rect);
+                    if (frame != null)
+                        commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events));
+                }
+                foreach (var circle in circles.ToArray())
+                {
+                    var frame = _objectFinder.GetAnimationFrameContaining(circle);
+                    if (frame != null)
+                        commands.Add(new DeleteCircleCommand(circle, frame, this, _events));
+                }
+                if (commands.Count > 0)
+                    _undoManager.Execute(new CompositeCommand(commands));
+            }
+        }
+
         public async Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains)
         {
             var message = "Delete the following animation(s)?\n\n" +

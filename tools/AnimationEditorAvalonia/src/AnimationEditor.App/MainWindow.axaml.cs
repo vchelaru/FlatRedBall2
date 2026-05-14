@@ -1263,7 +1263,7 @@ public partial class MainWindow : Window
 
         var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
-        if (target is not null && !ReferenceEquals(AnimTree.SelectedItem, target))
+        if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
             AnimTree.SelectedItem = target;
     }
 
@@ -2359,14 +2359,22 @@ public partial class MainWindow : Window
         else if (selectedVm.Data is AARectSave rectToDel)
         {
             var rects = _selectedState.SelectedRectangles;
-            _ = _appCommands.AskToDeleteRectangles(
-                rects.Count > 0 ? rects : new() { rectToDel });
+            var circles = _selectedState.SelectedCircles;
+            var rectList = rects.Count > 0 ? rects : new() { rectToDel };
+            if (circles.Count > 0)
+                _ = _appCommands.AskToDeleteShapes(rectList, circles);
+            else
+                _ = _appCommands.AskToDeleteRectangles(rectList);
         }
         else if (selectedVm.Data is CircleSave circleToDel)
         {
             var circles = _selectedState.SelectedCircles;
-            _ = _appCommands.AskToDeleteCircles(
-                circles.Count > 0 ? circles : new() { circleToDel });
+            var rects = _selectedState.SelectedRectangles;
+            var circleList = circles.Count > 0 ? circles : new() { circleToDel };
+            if (rects.Count > 0)
+                _ = _appCommands.AskToDeleteShapes(rects, circleList);
+            else
+                _ = _appCommands.AskToDeleteCircles(circleList);
         }
     }
 
