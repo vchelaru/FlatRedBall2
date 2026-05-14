@@ -1466,14 +1466,7 @@ public partial class MainWindow : Window
         float totalDuration = chain.Frames.Sum(f => f.FrameLength);
         bool  canProportional = totalDuration > 0f;
 
-        var dialog = new Window
-        {
-            Title  = "Adjust All Frame Time",
-            Width  = 360,
-            Height = 240,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false
-        };
+        var dialog = BuildAdjustFrameTimeWindow();
 
         var durationInput = new NumericUpDown
         {
@@ -2520,6 +2513,20 @@ public partial class MainWindow : Window
 
         return (grid, relXInput, relYInput);
     }
+
+    /// <summary>
+    /// Creates the shell <see cref="Window"/> for the Adjust Frame Time dialog.
+    /// The height is left unset so <see cref="SizeToContent.Height"/> can size
+    /// the window to fit whichever radio-option layout is currently shown.
+    /// </summary>
+    public static Window BuildAdjustFrameTimeWindow() => new Window
+    {
+        Title  = "Adjust All Frame Time",
+        Width  = 360,
+        SizeToContent = SizeToContent.Height,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        CanResize = false
+    };
 
     // ── Resize Texture ────────────────────────────────────────────────────────
 
