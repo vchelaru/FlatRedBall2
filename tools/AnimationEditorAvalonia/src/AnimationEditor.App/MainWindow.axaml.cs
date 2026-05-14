@@ -2611,12 +2611,15 @@ public partial class MainWindow : Window
     private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
     {
         // If the TextBlock's DoubleTapped handler already handled the event (inline rename),
-        // skip expand/collapse. Belt-and-suspenders: also bail if source is a TextBlock in
-        // case Avalonia gesture routing raises a fresh event instance per subscriber.
+        // skip. Belt-and-suspenders: also bail if source is a TextBlock in case Avalonia
+        // gesture routing raises a fresh event instance per subscriber.
         if (e.Handled) return;
-        if (e.Source is TextBlock) return;
-        if (e.Source is Button) return;
         if (e.Source is not Control src) return;
+        if (src is TextBlock) return;
+        // Exclude clicks that originated from inside a Button (e.g. the Add Frame + button).
+        // The event source is often a visual child of the button (ContentPresenter, SVG icon,
+        // etc.), not the Button itself, so a simple `is Button` check is insufficient.
+        if (src.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
         if (!HandleAnimTreeNodeDoubleTap(vm)) return;

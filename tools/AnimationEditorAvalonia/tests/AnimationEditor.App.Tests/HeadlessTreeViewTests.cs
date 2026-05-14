@@ -1035,6 +1035,65 @@ public class HeadlessTreeViewTests
     }
 
     [AvaloniaFact]
+    public void DoubleTapOnPlusButtonDescendant_DoesNotTriggerChainRename()
+    {
+        // Regression (#218): rapid double-clicks on the Add Frame (+) button were misinterpreted
+        // as a double-click on the chain row. The button uses a ContentTemplate (SVG icon), so
+        // the DoubleTapped event source is the SVG — a visual child of the Button, not the
+        // Button itself — meaning `if (e.Source is Button) return;` did not filter it out.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var chainNode = GetRoots(tree)[0];
+            chainNode.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+
+            // Find the Add Frame (+) button inside the chain row.
+            var addBtn = tree.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(b => b.Classes.Contains("add-frame-btn"));
+            Assert.NotNull(addBtn);
+
+            // Use the button's first visual descendant (ContentPresenter / SVG) as the
+            // event source. If the template hasn't been applied, fall back to the button
+            // itself — FindAncestorOfType with includeSelf: true still catches it.
+            Control innerControl = addBtn.GetVisualDescendants().OfType<Control>().FirstOrDefault()
+                ?? addBtn;
+
+            // Preconditions: innerControl really is under the Button and the chain's TreeViewItem.
+            Assert.Same(addBtn, innerControl.FindAncestorOfType<Button>(includeSelf: true));
+            var tvi = innerControl.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+            Assert.NotNull(tvi);
+            Assert.Same(chainNode, tvi.DataContext);
+
+            // Construct TappedEventArgs without calling the constructor (which requires a live
+            // PointerEventArgs). The handler only reads e.Handled and e.Source.
+            var fakeArgs = (TappedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers
+                .GetUninitializedObject(typeof(TappedEventArgs));
+            fakeArgs.Source = innerControl;
+
+            var handler = typeof(MainWindow).GetMethod(
+                "OnAnimTreeDoubleTapped",
+                BindingFlags.NonPublic | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("OnAnimTreeDoubleTapped not found");
+            handler.Invoke(window, [null, fakeArgs]);
+            Dispatcher.UIThread.RunJobs();
+
+            // The chain must NOT have been put into inline-rename mode.
+            Assert.False(chainNode.IsEditing,
+                "Double-tap from inside the Add Frame + button must not start an inline rename.");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public void PressEnterToConfirmRename_DoesNotCollapseChainNode()
     {
             // Regression: Avalonia 12.x TreeViewItem.OnKeyDown handles Key.Enter by toggling
