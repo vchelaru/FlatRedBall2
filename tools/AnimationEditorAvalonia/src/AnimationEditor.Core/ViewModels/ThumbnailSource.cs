@@ -7,7 +7,7 @@ namespace AnimationEditor.Core.ViewModels;
 /// Two equal <see cref="ThumbnailSource"/> values produce an identical thumbnail, so the
 /// animation tree only regenerates a chain icon when this changes — which happens on a
 /// frame reorder, a first-frame texture swap, a first-frame region edit, a first-frame
-/// delete, or a first-frame flip.
+/// flip toggle, or a first-frame delete.
 /// </summary>
 public readonly record struct ThumbnailSource(
     string? TextureName,

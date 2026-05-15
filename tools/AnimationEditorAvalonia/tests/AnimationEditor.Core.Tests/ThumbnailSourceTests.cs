@@ -35,28 +35,6 @@ public class ThumbnailSourceTests
     }
 
     [Fact]
-    public void FromChain_FirstFrameFlipHorizontal_ProducesUnequalSignature()
-    {
-        var unflipped = new AnimationChainSave { Name = "A" };
-        unflipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png" });
-        var flipped = new AnimationChainSave { Name = "B" };
-        flipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FlipHorizontal = true });
-
-        Assert.NotEqual(ThumbnailSource.FromChain(unflipped), ThumbnailSource.FromChain(flipped));
-    }
-
-    [Fact]
-    public void FromChain_FirstFrameFlipVertical_ProducesUnequalSignature()
-    {
-        var unflipped = new AnimationChainSave { Name = "A" };
-        unflipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png" });
-        var flipped = new AnimationChainSave { Name = "B" };
-        flipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FlipVertical = true });
-
-        Assert.NotEqual(ThumbnailSource.FromChain(unflipped), ThumbnailSource.FromChain(flipped));
-    }
-
-    [Fact]
     public void FromChain_DifferentFirstFrameTexture_ProducesUnequalSignature()
     {
         var red = new AnimationChainSave { Name = "Red" };
@@ -84,5 +62,41 @@ public class ThumbnailSourceTests
         });
 
         Assert.NotEqual(ThumbnailSource.FromChain(leftHalf), ThumbnailSource.FromChain(rightHalf));
+    }
+
+    [Fact]
+    public void FromChain_FlipHorizontalChange_ProducesUnequalSignature()
+    {
+        // A flip toggle on the first frame must invalidate the cached chain icon.
+        var normal = new AnimationChainSave { Name = "Normal" };
+        normal.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipHorizontal = false,
+        });
+        var flipped = new AnimationChainSave { Name = "Flipped" };
+        flipped.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipHorizontal = true,
+        });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(normal), ThumbnailSource.FromChain(flipped));
+    }
+
+    [Fact]
+    public void FromChain_FlipVerticalChange_ProducesUnequalSignature()
+    {
+        // A vertical flip toggle on the first frame must also invalidate the cached chain icon.
+        var normal = new AnimationChainSave { Name = "Normal" };
+        normal.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipVertical = false,
+        });
+        var flipped = new AnimationChainSave { Name = "Flipped" };
+        flipped.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipVertical = true,
+        });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(normal), ThumbnailSource.FromChain(flipped));
     }
 }
