@@ -310,6 +310,14 @@
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
                         </Style>
+                        <!-- The Fluent theme's :empty style overrides the panel width to 12px for
+                             leaf items, causing their content to start ~20px left of non-leaf items.
+                             Override it here with the same full width so leaf and non-leaf items
+                             always indent identically.  The ToggleButton inside is already hidden for
+                             :empty items by the Fluent theme; the panel becomes an invisible spacer. -->
+                        <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
+                            <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
+                        </Style>
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
                             <Setter Property="VerticalAlignment" Value="Stretch" />
                             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -348,7 +356,7 @@
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
                             <Grid ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Stretch">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Node kind icons: SVG files are the single source of truth for path data. -->
                                     <!-- Chain node: first-frame thumbnail when the chain has frames, generic glyph
                                          otherwise. Only the chain ("animation") icon is enlarged so the first-frame

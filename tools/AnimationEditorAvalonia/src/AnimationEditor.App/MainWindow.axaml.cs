@@ -1323,6 +1323,19 @@ public partial class MainWindow : Window
 
         var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
+        // When a shape is selected, ensure its parent frame node is expanded so
+        // the shape node is visible in the tree (Avalonia does not auto-expand parents).
+        if (sel is AARectSave or CircleSave)
+        {
+            var frame = _selectedState.SelectedFrame;
+            if (frame is not null)
+            {
+                var frameNode = TreeBuilder.FindNodeForData(_treeRoots, frame);
+                if (frameNode is not null)
+                    frameNode.IsExpanded = true;
+            }
+        }
+
         if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
             AnimTree.SelectedItem = target;
     }

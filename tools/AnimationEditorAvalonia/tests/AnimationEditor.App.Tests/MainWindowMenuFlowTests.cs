@@ -308,6 +308,68 @@ public class MainWindowMenuFlowTests
         }
         finally { window.Close(); }
     }
+
+    // ── Expand + select after adding shape (issue #273) ───────────────────────
+
+    [AvaloniaFact]
+    public void ContextMenu_AddRect_ExpandsFrameNodeAndSelectsShape()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() };
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            var chainVm = new TreeNodeVm { Header = "Walk", Data = chain, IsChainNode = true, IsExpanded = true };
+            var frameVm = new TreeNodeVm { Header = "Frame 1", Data = frame, IsFrameNode = true };
+            chainVm.Children.Add(frameVm);
+            GetRoots(GetTree(window)).Add(chainVm);
+            GetTree(window).SelectedItem = frameVm;
+            ctx.SelectedState.SelectedFrame = frame;
+
+            TriggerContextMenuOpening(window);
+            ClickContextMenuItem(window, "Add AxisAlignedRectangle");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(frameVm.IsExpanded, "frame node should be expanded after adding a rectangle");
+            var selectedNode = GetTree(window).SelectedItem as TreeNodeVm;
+            Assert.NotNull(selectedNode);
+            Assert.IsType<AARectSave>(selectedNode.Data);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ContextMenu_AddCircle_ExpandsFrameNodeAndSelectsShape()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var frame = new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() };
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            var chainVm = new TreeNodeVm { Header = "Walk", Data = chain, IsChainNode = true, IsExpanded = true };
+            var frameVm = new TreeNodeVm { Header = "Frame 1", Data = frame, IsFrameNode = true };
+            chainVm.Children.Add(frameVm);
+            GetRoots(GetTree(window)).Add(chainVm);
+            GetTree(window).SelectedItem = frameVm;
+            ctx.SelectedState.SelectedFrame = frame;
+
+            TriggerContextMenuOpening(window);
+            ClickContextMenuItem(window, "Add Circle");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(frameVm.IsExpanded, "frame node should be expanded after adding a circle");
+            var selectedNode = GetTree(window).SelectedItem as TreeNodeVm;
+            Assert.NotNull(selectedNode);
+            Assert.IsType<CircleSave>(selectedNode.Data);
+        }
+        finally { window.Close(); }
+    }
 }
 
 /// <summary>Test double that returns a pre-configured path (or null) from every dialog.</summary>
