@@ -199,4 +199,55 @@ public class TreeNodeVmTests
         Assert.Null(ex);
         Assert.True(leaf.IsExpanded);
     }
+
+    // ── IsLeafFrameNode ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsLeafFrameNode_TrueWhenFrameNodeWithNoChildren()
+    {
+        var vm = new TreeNodeVm { IsFrameNode = true };
+        Assert.True(vm.IsLeafFrameNode);
+    }
+
+    [Fact]
+    public void IsLeafFrameNode_FalseWhenFrameNodeHasChildren()
+    {
+        var vm = new TreeNodeVm { IsFrameNode = true };
+        vm.Children.Add(new TreeNodeVm { IsRectNode = true });
+        Assert.False(vm.IsLeafFrameNode);
+    }
+
+    [Fact]
+    public void IsLeafFrameNode_FalseForNonFrameNode()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+        Assert.False(vm.IsLeafFrameNode);
+    }
+
+    [Fact]
+    public void IsLeafFrameNode_FiresPropertyChangedWhenChildAdded()
+    {
+        var vm = new TreeNodeVm { IsFrameNode = true };
+        var fired = new System.Collections.Generic.List<string?>();
+        vm.PropertyChanged += (_, e) => fired.Add(e.PropertyName);
+
+        vm.Children.Add(new TreeNodeVm { IsRectNode = true });
+
+        Assert.Contains(nameof(TreeNodeVm.IsLeafFrameNode), fired);
+    }
+
+    [Fact]
+    public void IsLeafFrameNode_FiresPropertyChangedWhenChildRemoved()
+    {
+        var vm = new TreeNodeVm { IsFrameNode = true };
+        var child = new TreeNodeVm { IsRectNode = true };
+        vm.Children.Add(child);
+
+        var fired = new System.Collections.Generic.List<string?>();
+        vm.PropertyChanged += (_, e) => fired.Add(e.PropertyName);
+
+        vm.Children.Remove(child);
+
+        Assert.Contains(nameof(TreeNodeVm.IsLeafFrameNode), fired);
+    }
 }
