@@ -2537,6 +2537,9 @@ public partial class MainWindow : Window
     internal void ShowDeleteShapeConfirmForTest(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles) =>
         ShowDeleteShapeConfirm(frame, rects, circles);
 
+    /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>
+    internal void HandleDeleteForTest() => HandleDelete();
+
     // ── Add Multiple Frames ───────────────────────────────────────────────────
 
     private async Task AskAddMultipleFramesAsync(AnimationChainSave chain)
