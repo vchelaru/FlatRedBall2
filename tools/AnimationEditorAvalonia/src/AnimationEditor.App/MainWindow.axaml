@@ -189,7 +189,7 @@
         <Grid x:Name="MainContentGrid" ColumnDefinitions="280,4,240,4,*">
 
             <!-- ── Left: Animation tree ── -->
-            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*,Auto"
+            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,*,Auto"
                   Background="{StaticResource BgApp}">
 
                 <!-- ── Tree pane header ── -->
@@ -268,7 +268,34 @@
                     </DockPanel>
                 </Border>
 
-                <TreeView x:Name="AnimTree" Grid.Row="2"
+                <!-- Delete shape confirm -->
+                <Border x:Name="DeleteShapeConfirmPanel"
+                        Grid.Row="2"
+                        IsVisible="False"
+                        Background="{StaticResource BgRail}"
+                        BorderBrush="{StaticResource LineBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="10,5">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                            <Button x:Name="DeleteShapeConfirmBtn"
+                                    Content="Confirm"
+                                    Padding="8,3"
+                                    FontSize="11" />
+                            <Button x:Name="DeleteShapeCancelBtn"
+                                    Content="Cancel"
+                                    Padding="8,3"
+                                    FontSize="11" />
+                        </StackPanel>
+                        <TextBlock x:Name="DeleteShapeConfirmLabel"
+                                   Foreground="{StaticResource InkMid}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontSize="11" />
+                    </DockPanel>
+                </Border>
+
+                <TreeView x:Name="AnimTree" Grid.Row="3"
                           Background="{StaticResource BgApp}"
                           SelectionMode="Multiple"
                           ScrollViewer.VerticalScrollBarVisibility="Visible"
@@ -406,7 +433,7 @@
                 </TreeView>
 
                 <!-- ── Add Animation button ── -->
-                <Border Grid.Row="3"
+                <Border Grid.Row="4"
                         BorderBrush="{StaticResource LineBrush}"
                         BorderThickness="0,1,0,0"
                         Background="{StaticResource BgApp}"

@@ -1,4 +1,4 @@
-using AnimationEditor.Core;
+﻿using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.DragDrop;
@@ -49,6 +49,9 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private System.Threading.CancellationTokenSource? _toastCts;
     private List<AnimationChainSave>? _pendingDeleteChains;
+    private List<AARectSave>?      _pendingDeleteShapeRects;
+    private List<CircleSave>?      _pendingDeleteShapeCircles;
+    private AnimationFrameSave?    _pendingDeleteShapeFrame;
 
     private FilePath SettingsFilePath =>
         new FilePath((Path.GetDirectoryName(
@@ -168,12 +171,20 @@ public partial class MainWindow : Window
         DeleteChainConfirmBtn.Click += (_, _) => CommitDeleteChain();
         DeleteChainCancelBtn.Click  += (_, _) => CancelDeleteChain();
 
+        DeleteShapeConfirmBtn.Click += (_, _) => CommitDeleteShape();
+        DeleteShapeCancelBtn.Click  += (_, _) => CancelDeleteShape();
+
         PointerPressed += (_, e) =>
         {
             if (_pendingDeleteChains is not null &&
                 !DeleteChainConfirmPanel.IsPointerOver)
             {
                 CancelDeleteChain();
+            }
+            if (_pendingDeleteShapeRects is not null &&
+                !DeleteShapeConfirmPanel.IsPointerOver)
+            {
+                CancelDeleteShape();
             }
         };
     }
@@ -1312,7 +1323,7 @@ public partial class MainWindow : Window
 
         var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
-        if (target is not null && !ReferenceEquals(AnimTree.SelectedItem, target))
+        if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
             AnimTree.SelectedItem = target;
     }
 
@@ -2408,14 +2419,22 @@ public partial class MainWindow : Window
         }
         else if (selectedVm.Data is AARectSave rectToDel)
         {
-            var rects = _selectedState.SelectedRectangles;
-            _ = _appCommands.AskToDeleteRectangles(
-                rects.Count > 0 ? rects : new() { rectToDel });
+            var frame   = _selectedState.SelectedFrame!;
+            var rects   = _selectedState.SelectedRectangles;
+            var circles = _selectedState.SelectedCircles;
+            ShowDeleteShapeConfirm(
+                frame,
+                rects.Count > 0 ? rects : new() { rectToDel },
+                circles);
         }
         else if (selectedVm.Data is CircleSave circleToDel)
         {
+            var frame   = _selectedState.SelectedFrame!;
             var circles = _selectedState.SelectedCircles;
-            _ = _appCommands.AskToDeleteCircles(
+            var rects   = _selectedState.SelectedRectangles;
+            ShowDeleteShapeConfirm(
+                frame,
+                rects,
                 circles.Count > 0 ? circles : new() { circleToDel });
         }
     }
@@ -2467,6 +2486,43 @@ public partial class MainWindow : Window
 
     internal void ShowDeleteChainConfirmForTest(AnimationChainSave chain) =>
         ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
+
+    private void ShowDeleteShapeConfirm(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles)
+    {
+        _pendingDeleteShapeFrame   = frame;
+        _pendingDeleteShapeRects   = rects;
+        _pendingDeleteShapeCircles = circles;
+        int total = rects.Count + circles.Count;
+        string label = total == 1
+            ? $"Delete \"{(rects.Count > 0 ? rects[0].Name : circles[0].Name)}\"?"
+            : $"Delete {total} shape(s)?";
+        DeleteShapeConfirmLabel.Text  = label;
+        DeleteShapeConfirmPanel.IsVisible = true;
+    }
+
+    private void CommitDeleteShape()
+    {
+        if (_pendingDeleteShapeRects is null || _pendingDeleteShapeFrame is null) return;
+        var frame   = _pendingDeleteShapeFrame;
+        var rects   = _pendingDeleteShapeRects;
+        var circles = _pendingDeleteShapeCircles ?? new();
+        _pendingDeleteShapeFrame   = null;
+        _pendingDeleteShapeRects   = null;
+        _pendingDeleteShapeCircles = null;
+        DeleteShapeConfirmPanel.IsVisible = false;
+        _appCommands.DeleteShapes(frame, rects, circles);
+    }
+
+    private void CancelDeleteShape()
+    {
+        _pendingDeleteShapeFrame   = null;
+        _pendingDeleteShapeRects   = null;
+        _pendingDeleteShapeCircles = null;
+        DeleteShapeConfirmPanel.IsVisible = false;
+    }
+
+    internal void ShowDeleteShapeConfirmForTest(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles) =>
+        ShowDeleteShapeConfirm(frame, rects, circles);
 
     // ── Add Multiple Frames ───────────────────────────────────────────────────
 

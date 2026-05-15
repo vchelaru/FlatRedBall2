@@ -348,4 +348,98 @@ public class AppCommandsDeleteAsyncTests
         Assert.Equal(new[] { c1, c2 }, frame.ShapesSave!.CircleSaves);
         Assert.False(ctx.UndoManager.CanUndo);
     }
+
+    // ── AskToDeleteShapes ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AskToDeleteShapes_WhenConfirmed_DeletesBothRectanglesAndCircles()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "Hitbox" };
+        var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
+        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.CircleSaves.Add(circle);
+
+        await ctx.AppCommands.AskToDeleteShapes(
+            new List<AARectSave> { rect },
+            new List<CircleSave> { circle });
+
+        Assert.Empty(frame.ShapesSave!.AARectSaves);
+        Assert.Empty(frame.ShapesSave!.CircleSaves);
+    }
+
+    [Fact]
+    public async Task AskToDeleteShapes_WhenCancelled_DeletesNothing()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(false);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "Hitbox" };
+        var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
+        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.CircleSaves.Add(circle);
+
+        await ctx.AppCommands.AskToDeleteShapes(
+            new List<AARectSave> { rect },
+            new List<CircleSave> { circle });
+
+        Assert.Single(frame.ShapesSave!.AARectSaves);
+        Assert.Single(frame.ShapesSave!.CircleSaves);
+    }
+
+    [Fact]
+    public async Task AskToDeleteShapes_RecordsSingleUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.AppCommands.ConfirmAsync = (_, __) => Task.FromResult(true);
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "Hitbox" };
+        var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
+        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.CircleSaves.Add(circle);
+
+        await ctx.AppCommands.AskToDeleteShapes(
+            new List<AARectSave> { rect },
+            new List<CircleSave> { circle });
+
+        Assert.Empty(frame.ShapesSave!.AARectSaves);
+        Assert.Empty(frame.ShapesSave!.CircleSaves);
+
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(new[] { rect }, frame.ShapesSave!.AARectSaves);
+        Assert.Equal(new[] { circle }, frame.ShapesSave!.CircleSaves);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public async Task AskToDeleteShapes_ConfirmMessageContainsAllShapeNames()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        string? capturedMessage = null;
+        ctx.AppCommands.ConfirmAsync = (msg, _) =>
+        {
+            capturedMessage = msg;
+            return Task.FromResult(false);
+        };
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "BodyHitbox" };
+        var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
+        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.CircleSaves.Add(circle);
+
+        await ctx.AppCommands.AskToDeleteShapes(
+            new List<AARectSave> { rect },
+            new List<CircleSave> { circle });
+
+        Assert.NotNull(capturedMessage);
+        Assert.Contains("BodyHitbox", capturedMessage);
+        Assert.Contains("AttackRadius", capturedMessage);
+    }
 }

@@ -1,4 +1,4 @@
-using AnimationEditor.Core.CommandsAndState.Commands;
+﻿using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
@@ -386,6 +386,35 @@ namespace AnimationEditor.Core.CommandsAndState
                     _undoManager.Execute(new CompositeCommand(commands, desc));
                 }
             }
+        }
+
+        public async Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
+        {
+            var allNames = rectangles.Select(r => r.Name).Concat(circles.Select(c => c.Name));
+            var message = "Delete the following shape(s)?\n\n" +
+                string.Join("\n", allNames);
+
+            if (!await ConfirmAsync(message, "Delete?")) return;
+
+            AnimationFrameSave? frame = null;
+            if (rectangles.Count > 0)
+                frame = _objectFinder.GetAnimationFrameContaining(rectangles[0]);
+            if (frame == null && circles.Count > 0)
+                frame = _objectFinder.GetAnimationFrameContaining(circles[0]);
+            if (frame == null) return;
+
+            DeleteShapes(frame, rectangles, circles);
+        }
+
+        public void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles)
+        {
+            var commands = new List<IUndoableCommand>();
+            foreach (var rect in rectangles.ToArray())
+                commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events));
+            foreach (var circle in circles.ToArray())
+                commands.Add(new DeleteCircleCommand(circle, frame, this, _events));
+            if (commands.Count > 0)
+                _undoManager.Execute(new CompositeCommand(commands));
         }
 
         public async Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains)
