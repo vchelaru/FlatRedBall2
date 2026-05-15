@@ -2262,16 +2262,19 @@ public partial class MainWindow : Window
 
             if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 _ = HandleCopyAsync();
             }
             else if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 _ = HandlePasteAsync();
             }
             else if (e.Key == Key.Delete)
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 HandleDelete();
             }
@@ -2311,10 +2314,17 @@ public partial class MainWindow : Window
         }), RoutingStrategies.Tunnel);
     }
 
+    // Returns true when a text-editing control (TextBox) owns keyboard focus.
+    // Used to gate frame/shape copy-paste and Delete so those keys still reach
+    // the text control instead of being swallowed by the window-level handler.
+    private bool IsTextInputFocused()
+        => FocusManager?.GetFocusedElement() is TextBox;
+
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
     private async Task HandleCopyAsync()
     {
+        if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
@@ -2336,6 +2346,7 @@ public partial class MainWindow : Window
 
     private async Task HandlePasteAsync()
     {
+        if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
