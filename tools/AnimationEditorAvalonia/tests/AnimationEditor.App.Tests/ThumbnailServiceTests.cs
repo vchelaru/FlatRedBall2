@@ -93,4 +93,54 @@ public class ThumbnailServiceTests
                     $"Pixel ({x},{y}) = {p} — point sampling should leave a hard seam, not a blended pixel.");
             }
     }
+
+    [Fact]
+    public void RenderFrameThumbnail_WithFlipHorizontal_MirrorsLeftAndRight()
+    {
+        // Left half red, right half green. With FlipHorizontal the left side must
+        // become green and the right side must become red.
+        using var source = SplitSheet(16, 16, SKColors.Red, SKColors.Green);
+        var frame = Frame();
+        frame.FlipHorizontal = true;
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, frame, 16, 16);
+
+        Assert.NotNull(thumb);
+        var pxLeft  = thumb!.GetPixel(4,  8);
+        var pxRight = thumb.GetPixel(12,  8);
+        Assert.True(pxLeft.Green  > pxLeft.Red,
+            $"After H-flip: left expected green; R={pxLeft.Red} G={pxLeft.Green}");
+        Assert.True(pxRight.Red  > pxRight.Green,
+            $"After H-flip: right expected red; R={pxRight.Red} G={pxRight.Green}");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_WithFlipVertical_MirrorsTopAndBottom()
+    {
+        // Top half red, bottom half blue. With FlipVertical the top must become
+        // blue and the bottom must become red.
+        using var source = TopBottomSheet(16, 16, SKColors.Red, SKColors.Blue);
+        var frame = Frame();
+        frame.FlipVertical = true;
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, frame, 16, 16);
+
+        Assert.NotNull(thumb);
+        var pxTop    = thumb!.GetPixel(8, 4);
+        var pxBottom = thumb.GetPixel(8, 12);
+        Assert.True(pxTop.Blue  > pxTop.Red,
+            $"After V-flip: top expected blue; R={pxTop.Red} B={pxTop.Blue}");
+        Assert.True(pxBottom.Red > pxBottom.Blue,
+            $"After V-flip: bottom expected red; R={pxBottom.Red} B={pxBottom.Blue}");
+    }
+
+    /// <summary>A sprite sheet whose top half is <paramref name="top"/> and bottom half <paramref name="bottom"/>.</summary>
+    private static SKBitmap TopBottomSheet(int width, int height, SKColor top, SKColor bottom)
+    {
+        var bm = new SKBitmap(width, height);
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                bm.SetPixel(x, y, y < height / 2 ? top : bottom);
+        return bm;
+    }
 }

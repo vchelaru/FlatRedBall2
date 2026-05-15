@@ -31,7 +31,29 @@ public class ThumbnailSourceTests
 
         var source = ThumbnailSource.FromChain(chain);
 
-        Assert.Equal(new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f), source);
+        Assert.Equal(new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false), source);
+    }
+
+    [Fact]
+    public void FromChain_FirstFrameFlipHorizontal_ProducesUnequalSignature()
+    {
+        var unflipped = new AnimationChainSave { Name = "A" };
+        unflipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png" });
+        var flipped = new AnimationChainSave { Name = "B" };
+        flipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FlipHorizontal = true });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(unflipped), ThumbnailSource.FromChain(flipped));
+    }
+
+    [Fact]
+    public void FromChain_FirstFrameFlipVertical_ProducesUnequalSignature()
+    {
+        var unflipped = new AnimationChainSave { Name = "A" };
+        unflipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png" });
+        var flipped = new AnimationChainSave { Name = "B" };
+        flipped.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", FlipVertical = true });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(unflipped), ThumbnailSource.FromChain(flipped));
     }
 
     [Fact]

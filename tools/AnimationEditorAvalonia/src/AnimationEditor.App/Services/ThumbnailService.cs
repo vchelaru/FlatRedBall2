@@ -125,6 +125,10 @@ public sealed class ThumbnailService
         var thumb = new SKBitmap(finalW, finalH);
         using var canvas = new SKCanvas(thumb);
         canvas.Clear(SKColors.Transparent);
+        if (frame.FlipHorizontal)
+            canvas.Scale(-1f, 1f, finalW / 2f, finalH / 2f);
+        if (frame.FlipVertical)
+            canvas.Scale(1f, -1f, finalW / 2f, finalH / 2f);
         using var paint  = new SKPaint { Color = SKColors.White };
         // Nearest-neighbour ("point") sampling: keeps sprite-sheet art crisp/pixellated
         // instead of the blurry smear linear filtering produces on game art.
