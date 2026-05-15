@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MyGame</RootNamespace>
+    <!-- Use the precompiled apos-shapes.xnb shipped in Content/ instead of compiling
+         the shader from source (which requires Wine on macOS/Linux). -->
+    <SkipAposShapeContent>true</SkipAposShapeContent>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Apos.Shapes" Version="0.6.8" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyGame.Common\MyGame.Common.csproj" />
+  </ItemGroup>
+
+  <!-- Link Common's raw runtime-loaded assets (achx, tmx, tsx, json, png) into the
+       Desktop output's Content/ folder. Content.mgcb is handled by MonoGame.Content.Builder.Task. -->
+  <ItemGroup>
+    <Content Include="..\MyGame.Common\Content\**\*.*"
+             Exclude="..\MyGame.Common\Content\**\*.mgcb;..\MyGame.Common\Content\bin\**;..\MyGame.Common\Content\obj\**"
+             Link="Content\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <!-- Local-to-Desktop content (apos-shapes.xnb shipped precompiled). -->
+    <Content Include="Content\**\*.*"
+             Exclude="Content\Content.mgcb"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
