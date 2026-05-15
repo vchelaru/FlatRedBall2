@@ -33,7 +33,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Box" };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
         ctx.SelectedState.SelectedRectangle = rect;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
@@ -50,7 +50,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Run", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
         ctx.SelectedState.SelectedCircle = circle;
 
         var otherChain = TestHelpers.MakeChain(acls, "Idle");
@@ -111,7 +111,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Box" };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
         ctx.SelectedState.SelectedRectangle = rect;
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -127,7 +127,7 @@ public class SelectedStateTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "Ring", Radius = 5 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
         ctx.SelectedState.SelectedCircle = circle;
 
         ctx.SelectedState.SelectedFrame = frame;

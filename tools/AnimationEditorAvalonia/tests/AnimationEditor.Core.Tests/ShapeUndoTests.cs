@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -37,13 +38,13 @@ public class ShapeUndoTests
         chain.Frames.Add(frame);
 
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
-        var originalRect = frame.ShapesSave!.AARectSaves[0];
+        var originalRect = frame.ShapesSave!.AARectSaves.First();
         ctx.UndoManager.Undo();
 
         ctx.UndoManager.Redo();
 
         Assert.Single(frame.ShapesSave!.AARectSaves);
-        Assert.Same(originalRect, frame.ShapesSave!.AARectSaves[0]);
+        Assert.Same(originalRect, frame.ShapesSave!.AARectSaves.First());
     }
 
     // ── DeleteAxisAlignedRectangle + Undo ─────────────────────────────────────
@@ -59,16 +60,15 @@ public class ShapeUndoTests
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
         ctx.UndoManager.Clear(); // clear add history — we're testing delete
-        var rects = frame.ShapesSave!.AARectSaves;
-        var first = rects[0];
+        var first = frame.ShapesSave!.AARectSaves.First();
 
         ctx.AppCommands.DeleteAxisAlignedRectangle(first, frame);
-        Assert.Single(rects);
+        Assert.Single(frame.ShapesSave!.AARectSaves);
 
         ctx.UndoManager.Undo();
 
-        Assert.Equal(2, rects.Count);
-        Assert.Same(first, rects[0]);
+        Assert.Equal(2, frame.ShapesSave!.AARectSaves.Count());
+        Assert.Same(first, frame.ShapesSave!.AARectSaves.First());
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class ShapeUndoTests
         chain.Frames.Add(frame);
         ctx.AppCommands.AddAxisAlignedRectangle(frame);
         ctx.UndoManager.Clear();
-        var rect = frame.ShapesSave!.AARectSaves[0];
+        var rect = frame.ShapesSave!.AARectSaves.First();
 
         ctx.AppCommands.DeleteAxisAlignedRectangle(rect, frame);
         ctx.UndoManager.Undo();
@@ -121,13 +121,13 @@ public class ShapeUndoTests
         chain.Frames.Add(frame);
 
         ctx.AppCommands.AddCircle(frame);
-        var originalCircle = frame.ShapesSave!.CircleSaves[0];
+        var originalCircle = frame.ShapesSave!.CircleSaves.First();
         ctx.UndoManager.Undo();
 
         ctx.UndoManager.Redo();
 
         Assert.Single(frame.ShapesSave!.CircleSaves);
-        Assert.Same(originalCircle, frame.ShapesSave!.CircleSaves[0]);
+        Assert.Same(originalCircle, frame.ShapesSave!.CircleSaves.First());
     }
 
     // ── DeleteCircle + Undo ───────────────────────────────────────────────────
@@ -143,16 +143,15 @@ public class ShapeUndoTests
         ctx.AppCommands.AddCircle(frame);
         ctx.AppCommands.AddCircle(frame);
         ctx.UndoManager.Clear();
-        var circles = frame.ShapesSave!.CircleSaves;
-        var first = circles[0];
+        var first = frame.ShapesSave!.CircleSaves.First();
 
         ctx.AppCommands.DeleteCircle(first, frame);
-        Assert.Single(circles);
+        Assert.Single(frame.ShapesSave!.CircleSaves);
 
         ctx.UndoManager.Undo();
 
-        Assert.Equal(2, circles.Count);
-        Assert.Same(first, circles[0]);
+        Assert.Equal(2, frame.ShapesSave!.CircleSaves.Count());
+        Assert.Same(first, frame.ShapesSave!.CircleSaves.First());
     }
 
     [Fact]
@@ -165,7 +164,7 @@ public class ShapeUndoTests
         chain.Frames.Add(frame);
         ctx.AppCommands.AddCircle(frame);
         ctx.UndoManager.Clear();
-        var circle = frame.ShapesSave!.CircleSaves[0];
+        var circle = frame.ShapesSave!.CircleSaves.First();
 
         ctx.AppCommands.DeleteCircle(circle, frame);
         ctx.UndoManager.Undo();

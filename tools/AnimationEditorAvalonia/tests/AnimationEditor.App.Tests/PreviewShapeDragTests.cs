@@ -24,8 +24,8 @@ public class PreviewShapeDragTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        if (rect   is not null) frame.ShapesSave.AARectSaves.Add(rect);
-        if (circle is not null) frame.ShapesSave.CircleSaves.Add(circle);
+        if (rect   is not null) frame.ShapesSave.Shapes.Add(rect);
+        if (circle is not null) frame.ShapesSave.Shapes.Add(circle);
         return frame;
     }
 

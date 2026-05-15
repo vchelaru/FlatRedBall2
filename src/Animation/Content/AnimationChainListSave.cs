@@ -185,51 +185,49 @@ public class AnimationChainListSave
     private static XElement WriteShapes(ShapesSave? shapes)
     {
         shapes ??= new ShapesSave();
-        var rects = new XElement("AxisAlignedRectangleSaves");
-        foreach (var r in shapes.AARectSaves)
-        {
-            rects.Add(new XElement("AxisAlignedRectangleSave",
-                new XElement("X", FloatStr(r.X)),
-                new XElement("Y", FloatStr(r.Y)),
-                new XElement("ScaleX", FloatStr(r.ScaleX)),
-                new XElement("ScaleY", FloatStr(r.ScaleY)),
-                new XElement("Name", r.Name)));
-        }
 
-        var circles = new XElement("CircleSaves");
-        foreach (var c in shapes.CircleSaves)
+        var shapesEl = new XElement("Shapes");
+        foreach (var shape in shapes.Shapes)
         {
-            circles.Add(new XElement("CircleSave",
-                new XElement("X", FloatStr(c.X)),
-                new XElement("Y", FloatStr(c.Y)),
-                new XElement("Radius", FloatStr(c.Radius)),
-                new XElement("Name", c.Name)));
-        }
-
-        var polys = new XElement("PolygonSaves");
-        foreach (var p in shapes.PolygonSaves)
-        {
-            var pointsEl = new XElement("Points");
-            foreach (var v in p.Points)
+            switch (shape)
             {
-                pointsEl.Add(new XElement("Vector2Save",
-                    new XElement("X", FloatStr(v.X)),
-                    new XElement("Y", FloatStr(v.Y))));
+                case AARectSave r:
+                    shapesEl.Add(new XElement("AxisAlignedRectangleSave",
+                        new XElement("X", FloatStr(r.X)),
+                        new XElement("Y", FloatStr(r.Y)),
+                        new XElement("ScaleX", FloatStr(r.ScaleX)),
+                        new XElement("ScaleY", FloatStr(r.ScaleY)),
+                        new XElement("Name", r.Name)));
+                    break;
+                case CircleSave c:
+                    shapesEl.Add(new XElement("CircleSave",
+                        new XElement("X", FloatStr(c.X)),
+                        new XElement("Y", FloatStr(c.Y)),
+                        new XElement("Radius", FloatStr(c.Radius)),
+                        new XElement("Name", c.Name)));
+                    break;
+                case PolygonSave p:
+                    var pointsEl = new XElement("Points");
+                    foreach (var v in p.Points)
+                    {
+                        pointsEl.Add(new XElement("Vector2Save",
+                            new XElement("X", FloatStr(v.X)),
+                            new XElement("Y", FloatStr(v.Y))));
+                    }
+                    shapesEl.Add(new XElement("PolygonSave",
+                        new XElement("Name", p.Name),
+                        new XElement("X", FloatStr(p.X)),
+                        new XElement("Y", FloatStr(p.Y)),
+                        pointsEl));
+                    break;
             }
-            polys.Add(new XElement("PolygonSave",
-                new XElement("Name", p.Name),
-                new XElement("X", FloatStr(p.X)),
-                new XElement("Y", FloatStr(p.Y)),
-                pointsEl));
         }
 
         // AxisAlignedCubeSaves and SphereSaves are FRB1-era 3D-shape placeholders that FRB2 does
         // not model. Emit empty elements so the dialect matches what FRB1 readers expect.
         return new XElement("ShapeCollectionSave",
-            rects,
+            shapesEl,
             new XElement("AxisAlignedCubeSaves"),
-            polys,
-            circles,
             new XElement("SphereSaves"));
     }
 
@@ -263,12 +261,66 @@ public class AnimationChainListSave
     {
         var shapes = new ShapesSave();
 
+        // New format: <Shapes> with type-tagged children in unified insertion order.
+        var newShapesEl = el.Element("Shapes");
+        if (newShapesEl != null)
+        {
+            foreach (var child in newShapesEl.Elements())
+            {
+                switch (child.Name.LocalName)
+                {
+                    case "AxisAlignedRectangleSave":
+                        shapes.Shapes.Add(new AARectSave
+                        {
+                            Name = (string?)child.Element("Name") ?? string.Empty,
+                            X = FloatEl(child, "X"),
+                            Y = FloatEl(child, "Y"),
+                            ScaleX = FloatEl(child, "ScaleX", 16f),
+                            ScaleY = FloatEl(child, "ScaleY", 16f),
+                        });
+                        break;
+                    case "CircleSave":
+                        shapes.Shapes.Add(new CircleSave
+                        {
+                            Name = (string?)child.Element("Name") ?? string.Empty,
+                            X = FloatEl(child, "X"),
+                            Y = FloatEl(child, "Y"),
+                            Radius = FloatEl(child, "Radius", 16f),
+                        });
+                        break;
+                    case "PolygonSave":
+                        var poly = new PolygonSave
+                        {
+                            Name = (string?)child.Element("Name") ?? string.Empty,
+                            X = FloatEl(child, "X"),
+                            Y = FloatEl(child, "Y"),
+                        };
+                        var polyPointsEl = child.Element("Points");
+                        if (polyPointsEl != null)
+                        {
+                            foreach (var v in polyPointsEl.Elements("Vector2Save"))
+                            {
+                                poly.Points.Add(new Vector2Save
+                                {
+                                    X = FloatEl(v, "X"),
+                                    Y = FloatEl(v, "Y"),
+                                });
+                            }
+                        }
+                        shapes.Shapes.Add(poly);
+                        break;
+                }
+            }
+            return shapes;
+        }
+
+        // Old format fallback: separate typed containers (rects, then circles, then polygons).
         var aarctsEl = el.Element("AxisAlignedRectangleSaves");
         if (aarctsEl != null)
         {
             foreach (var r in aarctsEl.Elements("AxisAlignedRectangleSave"))
             {
-                shapes.AARectSaves.Add(new AARectSave
+                shapes.Shapes.Add(new AARectSave
                 {
                     Name = (string?)r.Element("Name") ?? string.Empty,
                     X = FloatEl(r, "X"),
@@ -284,7 +336,7 @@ public class AnimationChainListSave
         {
             foreach (var c in circlesEl.Elements("CircleSave"))
             {
-                shapes.CircleSaves.Add(new CircleSave
+                shapes.Shapes.Add(new CircleSave
                 {
                     Name = (string?)c.Element("Name") ?? string.Empty,
                     X = FloatEl(c, "X"),
@@ -319,7 +371,7 @@ public class AnimationChainListSave
                     }
                 }
 
-                shapes.PolygonSaves.Add(poly);
+                shapes.Shapes.Add(poly);
             }
         }
 
@@ -427,44 +479,45 @@ public class AnimationChainListSave
     {
         if (shapes == null) return;
 
-        foreach (var rect in shapes.AARectSaves)
+        foreach (var shape in shapes.Shapes)
         {
-            ValidateName(rect.Name, "AARectSave");
-            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationAARectFrame
+            switch (shape)
             {
-                Name = rect.Name,
-                RelativeX = rect.X,
-                RelativeY = rect.Y,
-                Width = rect.ScaleX * 2f,
-                Height = rect.ScaleY * 2f,
-            });
-        }
-
-        foreach (var circle in shapes.CircleSaves)
-        {
-            ValidateName(circle.Name, "CircleSave");
-            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationCircleFrame
-            {
-                Name = circle.Name,
-                RelativeX = circle.X,
-                RelativeY = circle.Y,
-                Radius = circle.Radius,
-            });
-        }
-
-        foreach (var poly in shapes.PolygonSaves)
-        {
-            ValidateName(poly.Name, "PolygonSave");
-            var points = new System.Numerics.Vector2[poly.Points.Count];
-            for (int i = 0; i < poly.Points.Count; i++)
-                points[i] = new System.Numerics.Vector2(poly.Points[i].X, poly.Points[i].Y);
-            frame.Shapes.Add(new FlatRedBall2.Animation.AnimationPolygonFrame
-            {
-                Name = poly.Name,
-                RelativeX = poly.X,
-                RelativeY = poly.Y,
-                Points = points,
-            });
+                case AARectSave rect:
+                    ValidateName(rect.Name, "AARectSave");
+                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationAARectFrame
+                    {
+                        Name = rect.Name,
+                        RelativeX = rect.X,
+                        RelativeY = rect.Y,
+                        Width = rect.ScaleX * 2f,
+                        Height = rect.ScaleY * 2f,
+                    });
+                    break;
+                case CircleSave circle:
+                    ValidateName(circle.Name, "CircleSave");
+                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationCircleFrame
+                    {
+                        Name = circle.Name,
+                        RelativeX = circle.X,
+                        RelativeY = circle.Y,
+                        Radius = circle.Radius,
+                    });
+                    break;
+                case PolygonSave poly:
+                    ValidateName(poly.Name, "PolygonSave");
+                    var points = new System.Numerics.Vector2[poly.Points.Count];
+                    for (int i = 0; i < poly.Points.Count; i++)
+                        points[i] = new System.Numerics.Vector2(poly.Points[i].X, poly.Points[i].Y);
+                    frame.Shapes.Add(new FlatRedBall2.Animation.AnimationPolygonFrame
+                    {
+                        Name = poly.Name,
+                        RelativeX = poly.X,
+                        RelativeY = poly.Y,
+                        Points = points,
+                    });
+                    break;
+            }
         }
     }
 

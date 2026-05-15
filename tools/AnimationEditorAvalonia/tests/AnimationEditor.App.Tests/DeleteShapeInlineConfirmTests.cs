@@ -1,4 +1,4 @@
-﻿using AnimationEditor.Core.IO;
+using AnimationEditor.Core.IO;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
@@ -48,7 +48,7 @@ public class DeleteShapeInlineConfirmTests
         try
         {
             var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-            frame.ShapesSave!.CircleSaves.Add(circle);
+            frame.ShapesSave!.Shapes.Add(circle);
 
             window.ShowDeleteShapeConfirmForTest(frame, new(), new() { circle });
             Dispatcher.UIThread.RunJobs();
@@ -66,7 +66,7 @@ public class DeleteShapeInlineConfirmTests
         try
         {
             var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-            frame.ShapesSave!.CircleSaves.Add(circle);
+            frame.ShapesSave!.Shapes.Add(circle);
 
             window.ShowDeleteShapeConfirmForTest(frame, new(), new() { circle });
             Dispatcher.UIThread.RunJobs();
@@ -89,7 +89,7 @@ public class DeleteShapeInlineConfirmTests
         try
         {
             var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-            frame.ShapesSave!.CircleSaves.Add(circle);
+            frame.ShapesSave!.Shapes.Add(circle);
 
             window.ShowDeleteShapeConfirmForTest(frame, new(), new() { circle });
             Dispatcher.UIThread.RunJobs();
@@ -113,8 +113,8 @@ public class DeleteShapeInlineConfirmTests
         {
             var rect   = new AARectSave { Name = "Hitbox" };
             var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-            frame.ShapesSave!.AARectSaves.Add(rect);
-            frame.ShapesSave!.CircleSaves.Add(circle);
+            frame.ShapesSave!.Shapes.Add(rect);
+            frame.ShapesSave!.Shapes.Add(circle);
 
             window.ShowDeleteShapeConfirmForTest(frame, new() { rect }, new() { circle });
             Dispatcher.UIThread.RunJobs();

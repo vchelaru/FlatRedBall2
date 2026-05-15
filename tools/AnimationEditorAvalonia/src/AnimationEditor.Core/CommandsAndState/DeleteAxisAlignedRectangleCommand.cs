@@ -29,10 +29,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _originalIndex = _frame.ShapesSave!.AARectSaves.IndexOf(_rect);
+            _originalIndex = _frame.ShapesSave!.Shapes.IndexOf(_rect);
             if (_originalIndex < 0) return false;
 
-            _frame.ShapesSave!.AARectSaves.RemoveAt(_originalIndex);
+            _frame.ShapesSave!.Shapes.RemoveAt(_originalIndex);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -42,8 +42,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            int idx = Math.Min(_originalIndex, _frame.ShapesSave!.AARectSaves.Count);
-            _frame.ShapesSave!.AARectSaves.Insert(idx, _rect);
+            int idx = Math.Min(_originalIndex, _frame.ShapesSave!.Shapes.Count);
+            _frame.ShapesSave!.Shapes.Insert(idx, _rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -52,7 +52,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Redo()
         {
-            _frame.ShapesSave!.AARectSaves.Remove(_rect);
+            _frame.ShapesSave!.Shapes.Remove(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

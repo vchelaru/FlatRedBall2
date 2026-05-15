@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -21,10 +22,10 @@ public class PreviewPlaybackShapesTests
         var rect1 = new AARectSave { X = 20f, Y = 0f, ScaleX = 5f, ScaleY = 5f };
 
         var frame0 = new AnimationFrameSave { FrameLength = frame0Length, ShapesSave = new ShapesSave() };
-        frame0.ShapesSave.AARectSaves.Add(rect0);
+        frame0.ShapesSave.Shapes.Add(rect0);
 
         var frame1 = new AnimationFrameSave { FrameLength = frame1Length, ShapesSave = new ShapesSave() };
-        frame1.ShapesSave.AARectSaves.Add(rect1);
+        frame1.ShapesSave.Shapes.Add(rect1);
 
         var chain = new AnimationChainSave { Name = "Walk" };
         chain.Frames.Add(frame0);
@@ -60,7 +61,7 @@ public class PreviewPlaybackShapesTests
 
         Assert.Single(shapes);
         Assert.Equal(PreviewControl.PreviewShapeKind.Rect, shapes[0].Kind);
-        Assert.Equal(frame1.ShapesSave!.AARectSaves[0].X, shapes[0].X);
+        Assert.Equal(frame1.ShapesSave!.AARectSaves.First().X, shapes[0].X);
     }
 
     /// <summary>
@@ -86,7 +87,7 @@ public class PreviewPlaybackShapesTests
         var shapes = ctrl.GetShapeInfosForTest();
 
         Assert.Single(shapes);
-        Assert.Equal(frame0.ShapesSave!.AARectSaves[0].X, shapes[0].X);
+        Assert.Equal(frame0.ShapesSave!.AARectSaves.First().X, shapes[0].X);
     }
 
     /// <summary>
@@ -109,7 +110,7 @@ public class PreviewPlaybackShapesTests
         var shapes = ctrl.GetShapeInfosForTest();
 
         Assert.Single(shapes);
-        Assert.Equal(frame0.ShapesSave!.AARectSaves[0].X, shapes[0].X);
+        Assert.Equal(frame0.ShapesSave!.AARectSaves.First().X, shapes[0].X);
     }
 
     /// <summary>

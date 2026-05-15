@@ -22,7 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _frame.ShapesSave!.AARectSaves.Add(_rect);
+            _frame.ShapesSave!.Shapes.Add(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -32,7 +32,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            _frame.ShapesSave!.AARectSaves.Remove(_rect);
+            _frame.ShapesSave!.Shapes.Remove(_rect);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

@@ -194,7 +194,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "HitBox" };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
             new List<AARectSave> { rect });
@@ -211,7 +211,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "HitBox" };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
             new List<AARectSave> { rect });
@@ -233,7 +233,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Walk", 1);
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "BodyCollision" };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
 
         await ctx.AppCommands.AskToDeleteRectangles(
             new List<AARectSave> { rect });
@@ -251,8 +251,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var r1 = new AARectSave { Name = "R1" };
         var r2 = new AARectSave { Name = "R2" };
-        frame.ShapesSave!.AARectSaves.Add(r1);
-        frame.ShapesSave!.AARectSaves.Add(r2);
+        frame.ShapesSave!.Shapes.Add(r1);
+        frame.ShapesSave!.Shapes.Add(r2);
 
         await ctx.AppCommands.AskToDeleteRectangles(
             new List<AARectSave> { r1, r2 });
@@ -277,7 +277,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
@@ -294,7 +294,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
@@ -316,7 +316,7 @@ public class AppCommandsDeleteAsyncTests
         var chain = TestHelpers.MakeChain(acls, "Jump", 1);
         var frame = chain.Frames[0];
         var circle = new CircleSave { Name = "DetectionArea", Radius = 20 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { circle });
@@ -334,8 +334,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var c1 = new CircleSave { Name = "C1", Radius = 5 };
         var c2 = new CircleSave { Name = "C2", Radius = 5 };
-        frame.ShapesSave!.CircleSaves.Add(c1);
-        frame.ShapesSave!.CircleSaves.Add(c2);
+        frame.ShapesSave!.Shapes.Add(c1);
+        frame.ShapesSave!.Shapes.Add(c2);
 
         await ctx.AppCommands.AskToDeleteCircles(
             new List<CircleSave> { c1, c2 });
@@ -360,8 +360,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteShapes(
             new List<AARectSave> { rect },
@@ -380,8 +380,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteShapes(
             new List<AARectSave> { rect },
@@ -400,8 +400,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "Hitbox" };
         var circle = new CircleSave { Name = "Hurtbox", Radius = 10 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteShapes(
             new List<AARectSave> { rect },
@@ -431,8 +431,8 @@ public class AppCommandsDeleteAsyncTests
         var frame = chain.Frames[0];
         var rect = new AARectSave { Name = "BodyHitbox" };
         var circle = new CircleSave { Name = "AttackRadius", Radius = 10 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Shapes.Add(circle);
 
         await ctx.AppCommands.AskToDeleteShapes(
             new List<AARectSave> { rect },

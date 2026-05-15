@@ -16,7 +16,7 @@ namespace AnimationEditor.Core
             {
                 foreach (var frame in chain.Frames)
                 {
-                    if (frame.ShapesSave!.AARectSaves.Contains(rectangle))
+                    if (frame.ShapesSave?.Shapes.Contains(rectangle) == true)
                         return frame;
                 }
             }
@@ -29,7 +29,7 @@ namespace AnimationEditor.Core
             {
                 foreach (var frame in chain.Frames)
                 {
-                    if (frame.ShapesSave!.CircleSaves.Contains(circle))
+                    if (frame.ShapesSave?.Shapes.Contains(circle) == true)
                         return frame;
                 }
             }

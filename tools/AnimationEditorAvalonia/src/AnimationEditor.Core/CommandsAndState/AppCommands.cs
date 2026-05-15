@@ -451,9 +451,9 @@ namespace AnimationEditor.Core.CommandsAndState
             var frame = _selectedState.SelectedFrame;
             if (frame?.ShapesSave == null) return new List<string>();
 
-            return frame.ShapesSave!.AARectSaves
-                .Select(r => r.Name)
-                .Concat(frame.ShapesSave!.CircleSaves.Select(c => c.Name))
+            return frame.ShapesSave!.Shapes
+                .Select(s => s switch { AARectSave r => r.Name, CircleSave c => c.Name, _ => null })
+                .OfType<string>()
                 .ToList();
         }
 
@@ -586,18 +586,46 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Frame to Bottom"));
         }
 
+        public void MoveShape(object shape, AnimationFrameSave frame, int delta)
+        {
+            var shapes = frame.ShapesSave?.Shapes;
+            if (shapes is null) return;
+            int idx    = shapes.IndexOf(shape);
+            if (idx < 0) return;
+            int newIdx = Math.Clamp(idx + delta, 0, shapes.Count - 1);
+            if (newIdx == idx) return;
+            _undoManager.Execute(new ReorderCommand<object>(
+                shapes,
+                () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
+                this, _events, () => RefreshTreeNode(frame),
+                delta > 0 ? "Move Shape Down" : "Move Shape Up"));
+        }
+
         /// <summary>
-        /// Moves the currently-selected frame or chain up (<paramref name="delta"/> = -1)
+        /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
         /// or down (<paramref name="delta"/> = +1) in the tree.
-        /// Frame selection takes priority: if a frame is selected its parent chain is used.
+        /// Shape selection takes highest priority: if a shape is selected it is reordered within
+        /// its frame's shape list. Frame selection takes next priority; chain is last.
         /// No-op when nothing is selected or when the item is already at the boundary.
         /// </summary>
         public void HandleReorder(int delta)
         {
-            var frame = _selectedState.SelectedFrame;
-            var chain = _selectedState.SelectedChain;
+            var rect   = _selectedState.SelectedRectangle;
+            var circle = _selectedState.SelectedCircle;
+            var frame  = _selectedState.SelectedFrame;
+            var chain  = _selectedState.SelectedChain;
 
-            if (frame is not null && chain is not null)
+            if (rect is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (ownerFrame is not null) MoveShape(rect, ownerFrame, delta);
+            }
+            else if (circle is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (ownerFrame is not null) MoveShape(circle, ownerFrame, delta);
+            }
+            else if (frame is not null && chain is not null)
                 MoveFrame(frame, chain, delta);
             else if (chain is not null)
                 MoveChain(chain, delta);
@@ -679,14 +707,20 @@ namespace AnimationEditor.Core.CommandsAndState
                 };
                 if (frame.ShapesSave != null)
                 {
-                    foreach (var r in frame.ShapesSave!.AARectSaves)
-                        fCopy.ShapesSave!.AARectSaves.Add(
-                            new AARectSave
-                            { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                    foreach (var c in frame.ShapesSave!.CircleSaves)
-                        fCopy.ShapesSave!.CircleSaves.Add(
-                            new CircleSave
-                            { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                    foreach (var shape in frame.ShapesSave!.Shapes)
+                    {
+                        switch (shape)
+                        {
+                            case AARectSave r:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
+                                break;
+                            case CircleSave c:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                                break;
+                        }
+                    }
                 }
                 copy.Frames.Add(fCopy);
             }

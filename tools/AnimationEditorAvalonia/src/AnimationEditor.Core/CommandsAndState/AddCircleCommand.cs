@@ -22,7 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public bool Do()
         {
-            _frame.ShapesSave!.CircleSaves.Add(_circle);
+            _frame.ShapesSave!.Shapes.Add(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
@@ -32,7 +32,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Undo()
         {
-            _frame.ShapesSave!.CircleSaves.Remove(_circle);
+            _frame.ShapesSave!.Shapes.Remove(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();

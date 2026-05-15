@@ -1389,7 +1389,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.AARectSaves.Add(
+        frame.ShapesSave.Shapes.Add(
             new AARectSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -1430,7 +1430,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.CircleSaves.Add(
+        frame.ShapesSave.Shapes.Add(
             new CircleSave { Name = "Ring", X = 0, Y = 0, Radius = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -1467,7 +1467,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.AARectSaves.Add(rect);
+        frame.ShapesSave.Shapes.Add(rect);
 
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedRectangle = rect; // mark as selected

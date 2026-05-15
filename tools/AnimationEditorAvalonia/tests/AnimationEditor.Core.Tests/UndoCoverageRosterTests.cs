@@ -74,6 +74,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveFrame)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrameToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrameToBottom)]            = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipFrameHorizontally)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipFrameVertically)]          = Category.MutatingUndoable,
@@ -209,6 +210,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveFrameToTop(Zebra(ctx).Frames[2], Zebra(ctx))));
         yield return Row(nameof(IAppCommands.MoveFrameToBottom),
             ctx => Sync(() => ctx.AppCommands.MoveFrameToBottom(Zebra(ctx).Frames[0], Zebra(ctx))));
+        yield return Row(nameof(IAppCommands.MoveShape),
+            ctx => Sync(() => ctx.AppCommands.MoveShape(Rect(ctx), Zebra(ctx).Frames[0], +1)));
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
         yield return Row(nameof(IAppCommands.FlipFrameHorizontally),
@@ -284,10 +287,14 @@ public class UndoCoverageRosterTests
                 ShapesSave       = new ShapesSave(),
             });
         }
-        zebra.Frames[0].ShapesSave!.AARectSaves.Add(
+        zebra.Frames[0].ShapesSave!.Shapes.Add(
             new AARectSave { Name = "Rect", X = 0f, Y = 0f, ScaleX = 4f, ScaleY = 4f });
-        zebra.Frames[0].ShapesSave!.CircleSaves.Add(
+        zebra.Frames[0].ShapesSave!.Shapes.Add(
+            new AARectSave { Name = "Rect2", X = 8f, Y = 8f, ScaleX = 2f, ScaleY = 2f });
+        zebra.Frames[0].ShapesSave!.Shapes.Add(
             new CircleSave { Name = "Circle", X = 0f, Y = 0f, Radius = 4f });
+        zebra.Frames[0].ShapesSave!.Shapes.Add(
+            new CircleSave { Name = "Circle2", X = 8f, Y = 8f, Radius = 2f });
 
         var alpha = new AnimationChainSave { Name = "Alpha" };
         alpha.Frames.Add(new AnimationFrameSave
@@ -310,8 +317,8 @@ public class UndoCoverageRosterTests
 
     private static AnimationChainSave Zebra(TestServices ctx) => ctx.Acls.AnimationChains[0];
     private static AnimationChainSave Alpha(TestServices ctx) => ctx.Acls.AnimationChains[1];
-    private static AARectSave Rect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves[0];
-    private static CircleSave Circle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves[0];
+    private static AARectSave Rect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.First();
+    private static CircleSave Circle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.First();
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

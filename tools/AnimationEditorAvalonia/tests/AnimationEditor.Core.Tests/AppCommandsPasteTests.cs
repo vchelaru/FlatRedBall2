@@ -2,6 +2,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -60,7 +61,7 @@ public class AppCommandsPasteTests
 
         ctx.AppCommands.PasteRectangle(frame, rect);
 
-        Assert.Same(rect, frame.ShapesSave!.AARectSaves[0]);
+        Assert.Same(rect, frame.ShapesSave!.AARectSaves.First());
 
         ctx.UndoManager.Undo();
         Assert.Empty(frame.ShapesSave!.AARectSaves);
@@ -76,7 +77,7 @@ public class AppCommandsPasteTests
 
         ctx.AppCommands.PasteCircle(frame, circle);
 
-        Assert.Same(circle, frame.ShapesSave!.CircleSaves[0]);
+        Assert.Same(circle, frame.ShapesSave!.CircleSaves.First());
 
         ctx.UndoManager.Undo();
         Assert.Empty(frame.ShapesSave!.CircleSaves);

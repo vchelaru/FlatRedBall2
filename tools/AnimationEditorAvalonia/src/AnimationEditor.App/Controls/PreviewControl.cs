@@ -688,7 +688,7 @@ public class PreviewControl : Control
                 return selR;
         }
 
-        var circles = frame.ShapesSave!.CircleSaves;
+        var circles = frame.ShapesSave!.CircleSaves.ToList();
         for (int i = circles.Count - 1; i >= 0; i--)
         {
             var c = circles[i];
@@ -699,7 +699,7 @@ public class PreviewControl : Control
                 return c;
         }
 
-        var rects = frame.ShapesSave!.AARectSaves;
+        var rects = frame.ShapesSave!.AARectSaves.ToList();
         for (int i = rects.Count - 1; i >= 0; i--)
         {
             var r = rects[i];
@@ -921,7 +921,7 @@ public class PreviewControl : Control
         const float tolerance = 5f;
 
         // Circles are rendered after rects (on top), so check circles first.
-        var circles = frame.ShapesSave!.CircleSaves;
+        var circles = frame.ShapesSave!.CircleSaves.ToList();
         for (int i = circles.Count - 1; i >= 0; i--)
         {
             var c = circles[i];
@@ -934,7 +934,7 @@ public class PreviewControl : Control
             }
         }
 
-        var rects = frame.ShapesSave!.AARectSaves;
+        var rects = frame.ShapesSave!.AARectSaves.ToList();
         for (int i = rects.Count - 1; i >= 0; i--)
         {
             var r = rects[i];
