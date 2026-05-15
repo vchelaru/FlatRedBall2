@@ -283,6 +283,16 @@
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
                         </Style>
+                        <!-- For leaf items the Fluent theme keeps the chevron container visible but
+                             sets its Width=12 (TreeViewItemExpandCollapseChevronSize) via a more-
+                             specific :empty style.  The Panel has no IsVisible binding in the Avalonia
+                             12 template, so hiding it here is unconditional and wins the value race.
+                             The spacer in the TreeDataTemplate (bound to IsLeafFrameNode) then adds
+                             TreeViewItemMinHeight of space, giving leaf frame rows the same indent as
+                             non-leaf frame rows. -->
+                        <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </Style>
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
                             <Setter Property="VerticalAlignment" Value="Stretch" />
                             <Setter Property="HorizontalAlignment" Value="Stretch" />
