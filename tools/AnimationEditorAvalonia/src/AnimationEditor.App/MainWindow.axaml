@@ -120,7 +120,7 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         IsHitTestVisible="False">
-                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
+                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-32.png"
                        Width="16" Height="16" />
                 <TextBlock Text="AnimationEditor"
                            FontSize="12"
