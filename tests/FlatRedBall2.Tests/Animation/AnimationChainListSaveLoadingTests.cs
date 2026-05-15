@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
@@ -59,8 +60,8 @@ public class AnimationChainListSaveLoadingTests
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
         save.AnimationChains[0].Frames[0].ShapesSave.ShouldNotBeNull();
-        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.Count.ShouldBe(1);
-        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves[0].Name.ShouldBe("Sword");
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.Count().ShouldBe(1);
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe("Sword");
     }
 
     [Fact]
@@ -83,7 +84,7 @@ public class AnimationChainListSaveLoadingTests
         var save = AnimationChainListSave.FromFile("any.achx",
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
-        var circle = save.AnimationChains[0].Frames[0].ShapesSave!.CircleSaves[0];
+        var circle = save.AnimationChains[0].Frames[0].ShapesSave!.CircleSaves.First();
         circle.Name.ShouldBe("Blast");
         circle.X.ShouldBe(3f);
         circle.Y.ShouldBe(4f);
@@ -185,7 +186,7 @@ public class AnimationChainListSaveLoadingTests
         var save = AnimationChainListSave.FromFile("any.achx",
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
-        var poly = save.AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves[0];
+        var poly = save.AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.First();
         poly.Name.ShouldBe("Arc");
         poly.X.ShouldBe(1f);
         poly.Y.ShouldBe(2f);
