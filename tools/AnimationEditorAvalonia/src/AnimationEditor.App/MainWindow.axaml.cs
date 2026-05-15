@@ -433,6 +433,7 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        Dispatcher.UIThread.InvokeAsync(RefreshTreeThumbnails);
         // Re-sync the property inspector so its values (flip toggles, frame length,
         // offsets, …) reflect the model after any mutation — including undo/redo.
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
