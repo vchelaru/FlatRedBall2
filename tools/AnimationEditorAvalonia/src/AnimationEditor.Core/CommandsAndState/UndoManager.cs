@@ -64,9 +64,6 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         public void Clear()
         {
-            System.Diagnostics.Trace.WriteLine(
-                $"[UndoManager.Clear] called — stack depth was {_undoStack.Count}\n" +
-                System.Environment.StackTrace);
             _undoStack.Clear();
             _redoStack.Clear();
             _saveState = SaveState.Unsaved;

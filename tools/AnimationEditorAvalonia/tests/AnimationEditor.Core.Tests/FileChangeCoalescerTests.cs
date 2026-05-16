@@ -127,6 +127,20 @@ public class FileChangeCoalescerTests
         Assert.Empty(afterCooldown);
     }
 
+    // 6c. Path separator mismatch (forward vs back slash) does not prevent own-save suppression.
+    [Fact]
+    public void Cooldown_PathSeparatorMismatch_StillDiscarded()
+    {
+        var c = Make(debounceMs: 50, cooldownMs: 500);
+        c.RecordOwnSave("D:/Downloads/asd.achx", 0);           // forward slashes (from FileName)
+        c.Record(@"D:\Downloads\asd.achx", WatcherChangeType.Modified, 10); // backslashes (from FSW)
+        // The coalescer receives normalized paths from HotReloadWatcher, but verify the
+        // coalescer itself is also resilient to this — if callers normalize, this passes.
+        // This test documents the contract: same logical path must not fire.
+        var result = c.Flush(100);
+        Assert.Empty(result);
+    }
+
     // 7. Multiple files tracked independently.
     [Fact]
     public void MultipleFiles_TrackedIndependently()
