@@ -249,6 +249,13 @@ public class Sprite : IRenderable, IAttachable
     public bool Animate { get; set; }
 
     /// <summary>
+    /// When <c>true</c>, this sprite's animation continues to advance even while
+    /// <see cref="Screen.IsPaused"/> is <c>true</c>. Default <c>false</c>.
+    /// Use for UI animations or effects that must keep running during gameplay pause.
+    /// </summary>
+    public bool ShouldAnimationAdvanceOnPause { get; set; }
+
+    /// <summary>
     /// Whether the current animation loops. Defaults to <c>true</c>.
     /// When <c>false</c>, the animation stops on its last frame and fires <see cref="AnimationFinished"/>.
     /// </summary>

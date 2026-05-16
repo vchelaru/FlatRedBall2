@@ -32,6 +32,9 @@ public class ContentLoader
     private readonly Dictionary<string, Texture2D> _textureRegistry =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // Type-keyed registry for custom asset loaders registered via RegisterLoader<T>.
+    private static readonly Dictionary<Type, object> _loaders = new();
+
     /// <summary>
     /// Loader used by <see cref="Load{T}"/> when routing a texture-from-file call.
     /// Production default: <c>Texture2D.FromFile</c> against the engine's
@@ -129,6 +132,30 @@ public class ContentLoader
     /// and want it cleaned up automatically with the rest of the screen's content.
     /// </summary>
     public void Track(IDisposable resource) => _tracked.Add(resource);
+
+    /// <summary>
+    /// Registers a custom loader for assets of type <typeparamref name="T"/>.
+    /// The loader is stored globally and used by <see cref="LoadCustom{T}"/>.
+    /// Calling this a second time with the same <typeparamref name="T"/> replaces the previous loader.
+    /// </summary>
+    public static void RegisterLoader<T>(IAssetLoader<T> loader)
+        => _loaders[typeof(T)] = loader;
+
+    /// <summary>
+    /// Loads an asset of type <typeparamref name="T"/> using a loader previously registered via
+    /// <see cref="RegisterLoader{T}"/>. Throws <see cref="InvalidOperationException"/> if no
+    /// loader has been registered for <typeparamref name="T"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when no <see cref="IAssetLoader{T}"/> has been registered for <typeparamref name="T"/>.
+    /// </exception>
+    public T LoadCustom<T>(ContentManager content, string assetPath)
+    {
+        if (!_loaders.TryGetValue(typeof(T), out var loaderObj))
+            throw new InvalidOperationException(
+                $"No loader registered for type {typeof(T).FullName}. Call ContentLoader.RegisterLoader<{typeof(T).Name}> first.");
+        return ((IAssetLoader<T>)loaderObj).Load(content, assetPath);
+    }
 
     /// <summary>
     /// Creates a solid-color texture and registers it for automatic disposal on <see cref="UnloadAll"/>.

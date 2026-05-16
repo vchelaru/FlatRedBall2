@@ -11,9 +11,17 @@ namespace FlatRedBall2.Tweening;
 /// after its final <c>PositionChanged</c> fires, so without this guarantee the setter would
 /// otherwise land on the second-to-last interpolated value.
 /// </summary>
-internal sealed class TweenList
+internal sealed class TweenList : IPauseAware
 {
     private readonly List<TweenEntry> _entries = new();
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// When <c>true</c>, <see cref="Screen.Update"/> advances this tween list even while
+    /// <see cref="Screen.IsPaused"/> is <c>true</c>. Useful for pause-menu tweens and UI
+    /// animations that must keep running during gameplay pause.
+    /// </remarks>
+    public bool ShouldAdvanceOnPause { get; set; }
 
     /// <summary>Number of currently tracked tweens.</summary>
     public int Count => _entries.Count;

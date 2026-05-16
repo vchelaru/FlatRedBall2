@@ -819,11 +819,10 @@ public class Screen : ILifecycleEvents
     /// <remarks>
     /// Quick overload guide:
     /// <para>- Two groups: <c>AddCollisionRelationship&lt;A, B&gt;(listA, listB)</c></para>
-    /// <para>- Self-collision: <c>AddCollisionRelationship&lt;A&gt;(list)</c></para>
+    /// <para>- Self-collision: <c>AddSelfCollisionRelationship&lt;A&gt;(list)</c></para>
     /// <para>- Tiles: <c>AddCollisionRelationship(entities, tiles)</c> (no explicit type args)</para>
     /// Common mistake: <c>AddCollisionRelationship&lt;Enemy&gt;(_enemies, _players)</c>.
-    /// With one type argument, the compiler chooses the self-collision overload,
-    /// so the second argument is invalid for that method.
+    /// With one type argument, the compiler chooses the two-arg overload only if both lists are supplied.
     /// </remarks>
     /// <summary>
     /// Registers a collision relationship between a single entity and a group of entities.
@@ -856,7 +855,7 @@ public class Screen : ILifecycleEvents
     /// is tested each frame. Equivalent to passing the same list for both arguments, but
     /// clearer at the call site.
     /// </summary>
-    public CollisionRelationship<A, A> AddCollisionRelationship<A>(IReadOnlyList<A> list)
+    public CollisionRelationship<A, A> AddSelfCollisionRelationship<A>(IReadOnlyList<A> list)
         where A : ICollidable
     {
         var rel = new CollisionRelationship<A, A>(list, list);
@@ -910,8 +909,9 @@ public class Screen : ILifecycleEvents
         if (IsPaused)
         {
             // While paused: only entities with PauseMode.Always tick physics + CustomActivity.
-            // Collision, lazy-spawn, partition sort, tweens, sprite animation, and fire-and-forget
-            // lifetimes all stay frozen — those are deeper changes deferred for now.
+            // Collision, lazy-spawn, partition sort, and fire-and-forget lifetimes stay frozen.
+            // Tweens and sprite animations may opt in via ShouldAdvanceOnPause /
+            // ShouldAnimationAdvanceOnPause.
             long tPaused = System.Diagnostics.Stopwatch.GetTimestamp();
             for (int i = _entityManager.Entities.Count - 1; i >= 0; i--)
             {
@@ -925,6 +925,19 @@ public class Screen : ILifecycleEvents
             }
             if (engine != null)
                 engine._frameProfile.ActivityMs = ProfileClock.Ms(tPaused, System.Diagnostics.Stopwatch.GetTimestamp());
+
+            // Opt-in screen tweens — run even while paused when ShouldAdvanceOnPause is true.
+            if (ShouldAdvanceTweens && _tweens.ShouldAdvanceOnPause)
+                _tweens.Update(frameTime.DeltaSeconds);
+
+            // Opt-in sprite animations — run even while paused per-sprite.
+            double animDtPaused = frameTime.DeltaSeconds;
+            for (int i = _renderList.Count - 1; i >= 0; i--)
+            {
+                if (i >= _renderList.Count) continue;
+                if (_renderList[i] is Sprite sprite && sprite.ShouldAnimationAdvanceOnPause)
+                    sprite.AnimateSelf(animDtPaused);
+            }
         }
         else
         {
