@@ -377,7 +377,7 @@ public class WireframeControl : Control
 
     // Chain-drag state: set when the user drags the composite chain bounding rect
     private bool _draggingChain;
-    private readonly List<(FrameRect Rect, SKRect StartBounds)> _chainDragStarts = new();
+    private readonly List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> _chainDragStarts = new();
 
     // Bulk handle-drag state: populated at drag-start when multiple chains are selected.
     // Holds the before-state and start bounds of ALL visible frames so ApplyHandleDrag
@@ -1093,10 +1093,24 @@ public class WireframeControl : Control
         _draggingChain = true;
         _chainDragStarts.Clear();
         foreach (var fr in _frameRects)
-            _chainDragStarts.Add((fr, fr.Bounds));
+            _chainDragStarts.Add((fr, fr.Bounds,
+                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
         _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
 
         ApplyChainDrag(new Point(endScreenX, endScreenY));
+
+        if (_chainDragStarts.Count > 0)
+        {
+            var snapshots = _chainDragStarts
+                .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                    s.Rect.Frame,
+                    s.BL, s.BT, s.BR, s.BB,
+                    s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                    s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+                .ToList();
+            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+        }
 
         ChainRegionChanged?.Invoke(chain);
         _draggingChain = false;
@@ -1442,7 +1456,9 @@ public class WireframeControl : Control
                     _draggingChain = true;
                     _chainDragStarts.Clear();
                     foreach (var fr in _frameRects)
-                        _chainDragStarts.Add((fr, fr.Bounds));
+                        _chainDragStarts.Add((fr, fr.Bounds,
+                            fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                            fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 e.Pointer.Capture(this);
@@ -1658,7 +1674,20 @@ public class WireframeControl : Control
         {
             var chain = _selectedState!.SelectedChain;
             if (chain != null)
+            {
+                if (_chainDragStarts.Count > 0)
+                {
+                    var snapshots = _chainDragStarts
+                        .Select(s => new BulkFrameRegionChangedCommand.FrameSnapshot(
+                            s.Rect.Frame,
+                            s.BL, s.BT, s.BR, s.BB,
+                            s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
+                            s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
+                        .ToList();
+                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                }
                 ChainRegionChanged?.Invoke(chain);
+            }
             _draggingChain = false;
             _chainDragStarts.Clear();
             e.Pointer.Capture(null);
@@ -1878,7 +1907,7 @@ public class WireframeControl : Control
         float texW = _bitmap.Width;
         float texH = _bitmap.Height;
 
-        foreach (var (fr, startBounds) in _chainDragStarts)
+        foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
             float newL = startBounds.Left   + dx;
             float newT = startBounds.Top    + dy;

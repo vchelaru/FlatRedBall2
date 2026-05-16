@@ -35,7 +35,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events    = events;
         }
 
-        public string Description => "Resize Shape";
+        public string Description => $"Resize {ShapeLabel(_shape)}";
+
+        private static string ShapeLabel(object shape) => shape switch
+        {
+            AARectSave r  => string.IsNullOrEmpty(r.Name) ? "Rect"   : $"Rect '{r.Name}'",
+            CircleSave c  => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
+            _             => "Shape"
+        };
 
         public bool Do() { Apply(_newX, _newY, _newParam1, _newParam2); return true; }
         public void Undo() => Apply(_oldX, _oldY, _oldParam1, _oldParam2);

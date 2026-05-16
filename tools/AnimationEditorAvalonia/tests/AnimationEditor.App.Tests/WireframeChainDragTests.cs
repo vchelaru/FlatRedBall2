@@ -181,4 +181,53 @@ public class WireframeChainDragTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    // ── Undo / redo after chain drag ──────────────────────────────────────────
+
+    /// <summary>
+    /// After a chain drag via <see cref="WireframeControl.SimulateChainDrag"/>,
+    /// the undo manager must hold an entry so the user can undo back to the
+    /// original UV coordinates and redo to the dragged position.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateChainDrag_RecordsUndoEntry_CanUndoAndRedo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, frameA, frameB, dir) = BuildCtrlWithChainSelected(ctx);
+        try
+        {
+            // Capture original UV coords before the drag
+            float origAL = frameA.LeftCoordinate, origAT = frameA.TopCoordinate;
+            float origAR = frameA.RightCoordinate, origAB = frameA.BottomCoordinate;
+            float origBL = frameB.LeftCoordinate, origBT = frameB.TopCoordinate;
+            float origBR = frameB.RightCoordinate, origBB = frameB.BottomCoordinate;
+
+            // Drag +16px right, +16px down (UV delta = 16/64 = 0.25)
+            ctrl.SimulateChainDrag(startScreenX: 0f, startScreenY: 0f,
+                                   endScreenX:   16f, endScreenY:   16f);
+
+            float afterAL = frameA.LeftCoordinate;
+
+            // Undo manager must have recorded an entry
+            Assert.True(ctx.UndoManager.CanUndo, "SimulateChainDrag should have pushed an undo entry");
+
+            // Undo: all UV coords must be back to original values
+            ctx.UndoManager.Undo();
+
+            Assert.Equal(origAL, frameA.LeftCoordinate,   precision: 4);
+            Assert.Equal(origAT, frameA.TopCoordinate,    precision: 4);
+            Assert.Equal(origAR, frameA.RightCoordinate,  precision: 4);
+            Assert.Equal(origAB, frameA.BottomCoordinate, precision: 4);
+            Assert.Equal(origBL, frameB.LeftCoordinate,   precision: 4);
+            Assert.Equal(origBT, frameB.TopCoordinate,    precision: 4);
+            Assert.Equal(origBR, frameB.RightCoordinate,  precision: 4);
+            Assert.Equal(origBB, frameB.BottomCoordinate, precision: 4);
+
+            // Redo: must restore the dragged position
+            ctx.UndoManager.Redo();
+
+            Assert.Equal(afterAL, frameA.LeftCoordinate, precision: 4);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }

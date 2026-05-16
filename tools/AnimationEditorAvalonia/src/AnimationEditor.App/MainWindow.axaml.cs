@@ -378,44 +378,27 @@ public partial class MainWindow : Window
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
 
-        // When an .achx project file is open, make the path relative to it.
-        // When no file exists yet (unsaved project), keep the absolute path so
-        // WireframeControl.DetermineTexturePath can still resolve it for display.
         string relPath = !string.IsNullOrEmpty(_projectManager.FileName)
             ? Path.GetRelativePath(
                 Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
                 texPath).Replace('\\', '/')
             : texPath;
 
-        // When multiple chains are selected, add a distinct frame to each one.
-        // When only one chain is in scope, behave as before and select the new frame.
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
-        AnimationFrameSave? primaryFrame = null;
-        foreach (var chain in chainsToAddTo)
+        if (chainsToAddTo.Count == 1)
         {
-            var frame = new AnimationFrameSave
-            {
-                TextureName        = relPath,
-                LeftCoordinate     = minX / (float)bitmapW,
-                RightCoordinate    = maxX / (float)bitmapW,
-                TopCoordinate      = minY / (float)bitmapH,
-                BottomCoordinate   = maxY / (float)bitmapH,
-                FrameLength        = 0.1f,
-                ShapesSave = new ShapesSave()
-            };
-            chain.Frames.Add(frame);
-            _appCommands.RefreshTreeNode(chain);
-            if (chain == primaryChain)
-                primaryFrame = frame;
+            // AddFrameFromPixelBounds selects the new frame — desired behavior for single-chain.
+            _appCommands.AddFrameFromPixelBounds(primaryChain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
         }
-
-        // In single-chain mode select the new frame (preserves existing UX).
-        // In multi-chain mode leave selection unchanged so the multi-chain view is preserved.
-        if (chainsToAddTo.Count == 1 && primaryFrame != null)
-            _selectedState.SelectedFrame = primaryFrame;
-
-        _events.RaiseAnimationChainsChanged();
+        else
+        {
+            // Multi-chain: add to each chain but preserve the current selection.
+            var priorFrame = _selectedState.SelectedFrame;
+            foreach (var chain in chainsToAddTo)
+                _appCommands.AddFrameFromPixelBounds(chain, relPath, minX, minY, maxX, maxY, bitmapW, bitmapH);
+            _selectedState.SelectedFrame = priorFrame;
+        }
     }
 
     // ── Core event handlers ───────────────────────────────────────────────────
@@ -498,10 +481,25 @@ public partial class MainWindow : Window
             firstUndo = false;
         }
         HistoryList.ItemsSource = items;
-        HistoryScrollViewer.Offset = new Avalonia.Vector(0, 0);
+        int currentIndex = redoHistory.Count;
+        ScrollHistoryToCurrent(currentIndex, items.Count);
 
         HistoryUndoButton.IsEnabled = _undoManager.CanUndo;
         HistoryRedoButton.IsEnabled = _undoManager.CanRedo;
+    }
+
+    private void ScrollHistoryToCurrent(int currentIndex, int totalCount)
+    {
+        if (totalCount == 0) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            double extent   = HistoryScrollViewer.Extent.Height;
+            double viewport = HistoryScrollViewer.Viewport.Height;
+            double newOffset = Helpers.HistoryScrollHelper.ComputeScrollOffset(
+                currentIndex, totalCount, extent, viewport,
+                HistoryScrollViewer.Offset.Y) ?? HistoryScrollViewer.Offset.Y;
+            HistoryScrollViewer.Offset = new Avalonia.Vector(0, newOffset);
+        }, Avalonia.Threading.DispatcherPriority.Render);
     }
 
     private void SetHistoryVisible(bool visible)
@@ -1082,7 +1080,7 @@ public partial class MainWindow : Window
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
-        var result = TextureDropProcessor.ApplyPngDrop(
+        var (result, relPath) = TextureDropProcessor.ComputePngDrop(
             targetChain,
             targetFrame,
             firstFile,
@@ -1097,25 +1095,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (targetFrame is not null)
+        switch (result)
         {
-            _appCommands.RefreshTreeNode(targetFrame);
-            _selectedState.SelectedFrame = targetFrame;
-        }
-        else if (targetChain is not null)
-        {
-            _appCommands.RefreshTreeNode(targetChain);
+            case TextureDropResult.UpdatedFrame:
+                _appCommands.SetFrameTextureName(targetFrame!, relPath);
+                _appCommands.RefreshTreeNode(targetFrame!);
+                _selectedState.SelectedFrame = targetFrame!;
+                break;
 
-            if (result == TextureDropResult.CreatedFrame)
-            {
-                var createdFrame = targetChain.Frames.LastOrDefault();
+            case TextureDropResult.CreatedFrame:
+                _appCommands.AddFrame(targetChain!, relPath);
+                var createdFrame = targetChain!.Frames.LastOrDefault();
                 if (createdFrame is not null)
                     _selectedState.SelectedFrame = createdFrame;
-            }
-            else
-            {
+                break;
+
+            case TextureDropResult.UpdatedChainFrames:
+                _appCommands.SetAllFramesTextureName(targetChain!, relPath);
+                _appCommands.RefreshTreeNode(targetChain!);
                 _selectedState.SelectedChain = targetChain;
-            }
+                break;
         }
 
         RefreshTextureCombo();
@@ -1984,20 +1983,15 @@ public partial class MainWindow : Window
         if (_suppressPropRefresh) return;
         var frame = _selectedState.SelectedFrame;
         if (frame is null || !PropFrameLen.Value.HasValue) return;
-        frame.FrameLength = (float)PropFrameLen.Value.Value;
-        _appCommands.RefreshTreeNode(frame);
-        _events.RaiseAnimationChainsChanged();
+        _appCommands.SetFrameLength(frame, (float)PropFrameLen.Value.Value);
     }
 
     private void ApplyFrameRelative()
     {
         if (_suppressPropRefresh) return;
         var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-        if (PropRelX.Value.HasValue) frame.RelativeX = (float)PropRelX.Value.Value;
-        if (PropRelY.Value.HasValue) frame.RelativeY = (float)PropRelY.Value.Value;
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.RefreshWireframe();
+        if (frame is null || !PropRelX.Value.HasValue || !PropRelY.Value.HasValue) return;
+        _appCommands.SetFrameRelative(frame, (float)PropRelX.Value.Value, (float)PropRelY.Value.Value);
     }
 
     private void ApplyFramePixelCoords()
@@ -2009,12 +2003,10 @@ public partial class MainWindow : Window
         if (bmpW <= 0 || bmpH <= 0) return;
         if (!PropPixelX.Value.HasValue || !PropPixelY.Value.HasValue ||
             !PropPixelW.Value.HasValue || !PropPixelH.Value.HasValue) return;
-
-        PixelFrameEditor.SetX(frame,      (int)PropPixelX.Value.Value, bmpW);
-        PixelFrameEditor.SetY(frame,      (int)PropPixelY.Value.Value, bmpH);
-        PixelFrameEditor.SetWidth(frame,  (int)PropPixelW.Value.Value, bmpW);
-        PixelFrameEditor.SetHeight(frame, (int)PropPixelH.Value.Value, bmpH);
-        _events.RaiseAnimationChainsChanged();
+        _appCommands.SetFramePixelRegion(frame,
+            (int)PropPixelX.Value.Value, (int)PropPixelY.Value.Value,
+            (int)PropPixelW.Value.Value, (int)PropPixelH.Value.Value,
+            bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
     }
 
@@ -2023,31 +2015,26 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh) return;
         var rect = _selectedState.SelectedRectangle;
-        if (rect is null) return;
-        rect.Name = PropRectName.Text ?? "";
-        if (PropRectX.Value.HasValue)      rect.X      = (float)PropRectX.Value.Value;
-        if (PropRectY.Value.HasValue)      rect.Y      = (float)PropRectY.Value.Value;
-        if (PropRectScaleX.Value.HasValue) rect.ScaleX = (float)PropRectScaleX.Value.Value;
-        if (PropRectScaleY.Value.HasValue) rect.ScaleY = (float)PropRectScaleY.Value.Value;
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.RefreshWireframe();
+        if (rect is null || !PropRectX.Value.HasValue || !PropRectY.Value.HasValue ||
+            !PropRectScaleX.Value.HasValue || !PropRectScaleY.Value.HasValue) return;
         var frame = _selectedState.SelectedFrame;
-        if (frame is not null) _appCommands.RefreshTreeNode(frame);
+        _appCommands.SetRectProps(frame, rect,
+            PropRectName.Text ?? "",
+            (float)PropRectX.Value.Value, (float)PropRectY.Value.Value,
+            (float)PropRectScaleX.Value.Value, (float)PropRectScaleY.Value.Value);
     }
 
     private void ApplyCircleProps()
     {
         if (_suppressPropRefresh) return;
         var circ = _selectedState.SelectedCircle;
-        if (circ is null) return;
-        circ.Name = PropCircleName.Text ?? "";
-        if (PropCircleX.Value.HasValue)      circ.X      = (float)PropCircleX.Value.Value;
-        if (PropCircleY.Value.HasValue)      circ.Y      = (float)PropCircleY.Value.Value;
-        if (PropCircleRadius.Value.HasValue) circ.Radius = (float)PropCircleRadius.Value.Value;
-        _events.RaiseAnimationChainsChanged();
-        _appCommands.RefreshWireframe();
+        if (circ is null || !PropCircleX.Value.HasValue || !PropCircleY.Value.HasValue ||
+            !PropCircleRadius.Value.HasValue) return;
         var frame = _selectedState.SelectedFrame;
-        if (frame is not null) _appCommands.RefreshTreeNode(frame);
+        _appCommands.SetCircleProps(frame, circ,
+            PropCircleName.Text ?? "",
+            (float)PropCircleX.Value.Value, (float)PropCircleY.Value.Value,
+            (float)PropCircleRadius.Value.Value);
     }
 
     // ── Playback controls wiring ──────────────────────────────────────────────

@@ -118,6 +118,18 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
+        /// <summary>
+        /// Assigns <paramref name="textureName"/> to every frame in <paramref name="chain"/>
+        /// as a single undoable operation. No-op when the chain has no frames.
+        /// </summary>
+        void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
+
+        void SetFrameLength(AnimationFrameSave frame, float newLength);
+        void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY);
+        void SetFramePixelRegion(AnimationFrameSave frame, int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH);
+        void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
+        void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
+
         // ── Hot Reload ────────────────────────────────────────────────────────────
 
         /// <summary>

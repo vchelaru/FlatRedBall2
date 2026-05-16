@@ -122,7 +122,7 @@ namespace AnimationEditor.Core.HotReload
 
         public void RecordOwnSave(string filePath)
         {
-            _coalescer.RecordOwnSave(filePath,
+            _coalescer.RecordOwnSave(filePath.Replace('\\', '/'),
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
@@ -138,28 +138,29 @@ namespace AnimationEditor.Core.HotReload
             };
 
             long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            static string Norm(string p) => p.Replace('\\', '/');
 
             fsw.Changed += (_, e) =>
             {
                 if (!IsEnabled) return;
-                _coalescer.Record(e.FullPath, WatcherChangeType.Modified, Now());
+                _coalescer.Record(Norm(e.FullPath), WatcherChangeType.Modified, Now());
             };
             fsw.Created += (_, e) =>
             {
                 if (!IsEnabled) return;
-                _coalescer.Record(e.FullPath, WatcherChangeType.Created, Now());
+                _coalescer.Record(Norm(e.FullPath), WatcherChangeType.Created, Now());
             };
             fsw.Deleted += (_, e) =>
             {
                 if (!IsEnabled) return;
-                _coalescer.Record(e.FullPath, WatcherChangeType.Deleted, Now());
+                _coalescer.Record(Norm(e.FullPath), WatcherChangeType.Deleted, Now());
             };
             fsw.Renamed += (_, e) =>
             {
                 if (!IsEnabled) return;
                 // Renamed is another form of atomic-write on some tools
-                _coalescer.Record(e.OldFullPath, WatcherChangeType.Deleted, Now());
-                _coalescer.Record(e.FullPath, WatcherChangeType.Created, Now());
+                _coalescer.Record(Norm(e.OldFullPath), WatcherChangeType.Deleted, Now());
+                _coalescer.Record(Norm(e.FullPath), WatcherChangeType.Created, Now());
             };
 
             _watchers[directory] = fsw;

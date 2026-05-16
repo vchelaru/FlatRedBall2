@@ -1,4 +1,5 @@
 using FlatRedBall2.Animation.Content;
+using System;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -10,7 +11,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
-        public string Description => "Edit Frame Region";
+        public string Description { get; }
 
         public FrameRegionChangedCommand(
             AnimationFrameSave frame,
@@ -24,6 +25,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _aL = aL; _aT = aT; _aR = aR; _aB = aB;
             _commands = commands;
             _events = events;
+            float bW = bR - bL, bH = bB - bT;
+            float aW = aR - aL, aH = aB - aT;
+            bool sizeChanged = Math.Abs(bW - aW) > 0.0001f || Math.Abs(bH - aH) > 0.0001f;
+            Description = sizeChanged ? "Resize Frame" : "Move Frame";
         }
 
         public bool Do() { Apply(_aL, _aT, _aR, _aB); return true; }

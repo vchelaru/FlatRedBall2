@@ -90,6 +90,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         private void RaiseSideEffects()
         {
+            foreach (var f in _frames)
+                _commands.RefreshTreeNode(f);
             _events.RaiseAnimationChainsChanged();
             if (_refreshWireframe)
                 _commands.RefreshWireframe();
