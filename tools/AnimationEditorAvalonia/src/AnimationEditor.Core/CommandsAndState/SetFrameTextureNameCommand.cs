@@ -22,7 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             string? name = newName ?? oldName;
             Description = name is not null
-                ? $"Set Texture: {System.IO.Path.GetFileName(name)}"
+                ? $"Set Texture: {System.IO.Path.GetFileName(name.Replace('\\', '/'))}"
                 : "Set Texture";
         }
 
