@@ -1,4 +1,4 @@
-using AnimationEditor.App.Services;
+﻿using AnimationEditor.App.Services;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
@@ -45,6 +45,7 @@ public class PreviewControl : Control
 
     // -- Rulers / guides -------------------------------------------------------
     private const float RulerSize = 20f;
+    private const float PanPadding = 0f;
 
     // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
     internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
@@ -386,6 +387,7 @@ public class PreviewControl : Control
         float cy0 = (float)((Bounds.Height - RulerSize) / 2f + RulerSize);
         _panX = (float)((x - cx0) - (x - cx0 - _panX) * ratio);
         _panY = (float)((y - cy0) - (y - cy0 - _panY) * ratio);
+        ClampPan();
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
     }
@@ -397,6 +399,20 @@ public class PreviewControl : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Keeps the entity origin within the visible viewport so it never drifts fully off-screen.
+    /// No-op until layout has run (<c>Bounds.Width > 1</c>).
+    /// </summary>
+    private void ClampPan()
+    {
+        if (Bounds.Width <= 1) return;
+
+        float viewW = (float)(Bounds.Width  - RulerSize);
+        float viewH = (float)(Bounds.Height - RulerSize);
+
+        _panX = Math.Clamp(_panX, -(viewW / 2f + PanPadding), viewW / 2f + PanPadding);
+        _panY = Math.Clamp(_panY, -(viewH / 2f + PanPadding), viewH / 2f + PanPadding);
+    }
     // -- Avalonia rendering ----------------------------------------------------
 
     public override void Render(DrawingContext ctx)
@@ -1087,6 +1103,7 @@ public class PreviewControl : Control
         {
             _panX      += (float)(pos.X - _lastMousePt.X);
             _panY      += (float)(pos.Y - _lastMousePt.Y);
+            ClampPan();
             _lastMousePt = pos;
             InvalidateVisual();
             return;
@@ -1572,3 +1589,6 @@ public class PreviewControl : Control
         }
     }
 }
+
+
+

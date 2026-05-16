@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
@@ -282,8 +283,9 @@ public class WireframeControl : Control
     private static readonly string _debugLogPath =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wireframe_debug.log");
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
-    private static readonly ISolidColorBrush _dbgBg = new SolidColorBrush(Color.FromArgb(210, 0, 0, 0));
-    private static readonly ISolidColorBrush _dbgFg = new SolidColorBrush(Color.FromRgb(0, 255, 80));
+    // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
+    private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
+    private static readonly IImmutableBrush _dbgFg = new ImmutableSolidColorBrush(Color.FromRgb(0, 255, 80));
 
     // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
     internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
@@ -1789,8 +1791,27 @@ public class WireframeControl : Control
             float newScrollY = Math.Min(rawScrollY, maxScrollY);
 
             // _panX absorbs the clamped overflow so the cursor pivot is preserved.
-            _panX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
-            _panY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
+            // When zooming toward blank space far from the image the raw value can go
+            // negative, placing the sprite to the left of scroll-origin-0.  Since scroll
+            // cannot go below 0, a negative _panX makes the image permanently unreachable
+            // (#319).  Clamp to 0 and pull newScrollX back so the image right/bottom edge
+            // stays visible at the post-zoom viewport position.
+            float rawPanX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
+            float rawPanY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
+
+            if (overflowX && _bitmap != null && rawPanX < 0f)
+            {
+                _panX      = 0f;
+                newScrollX = Math.Max(0f, Math.Min(newScrollX, _bitmap.Width  * _zoom - 1f));
+            }
+            else { _panX = rawPanX; }
+
+            if (overflowY && _bitmap != null && rawPanY < 0f)
+            {
+                _panY      = 0f;
+                newScrollY = Math.Max(0f, Math.Min(newScrollY, _bitmap.Height * _zoom - 1f));
+            }
+            else { _panY = rawPanY; }
 
             DebugLog("ZOOM_TOWARD",
                 $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +

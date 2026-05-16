@@ -1229,18 +1229,27 @@ public partial class MainWindow : Window
 
     private void RefreshChainNode(AnimationChainSave chain)
     {
-        var node = FindChainNode(chain);
-        if (node is null)
+        _suppressTreeSelectionHandling = true;
+        try
         {
-            _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
+            var node = FindChainNode(chain);
+            if (node is null)
+            {
+                _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
+            }
+            else
+            {
+                node.Header = chain.Name;
+                node.Meta   = $"{chain.Frames.Count} fr";
+                TreeBuilder.SyncFramesInto(node, chain.Frames);
+            }
+            RefreshTreeThumbnails();
+            SyncTreeSelection();
         }
-        else
+        finally
         {
-            node.Header = chain.Name;
-            node.Meta   = $"{chain.Frames.Count} fr";
-            TreeBuilder.SyncFramesInto(node, chain.Frames);
+            _suppressTreeSelectionHandling = false;
         }
-        RefreshTreeThumbnails();
     }
 
     private void RefreshFrameNode(AnimationFrameSave frame)
@@ -1541,6 +1550,8 @@ public partial class MainWindow : Window
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
+            AddMenuItem("Rename…", () =>
+                BeginInlineRename(vm!, frame2.HasCustomName ? frame2.Name : string.Empty));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
                 _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
@@ -1728,7 +1739,32 @@ public partial class MainWindow : Window
         PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
 
+        PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
         PropTextureBrowseBtn.Click += async (_, _) => await BrowseForFrameTexture();
+    }
+
+    private void ApplyTextureName()
+    {
+        if (_suppressPropRefresh) return;
+        var frame = _selectedState.SelectedFrame;
+        if (frame is null) return;
+
+        var inputText = PropTextureName.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(inputText)) return;
+
+        var currentDisplay = TexturePathHelper.ComputeDisplayPath(frame.TextureName, _projectManager.FileName);
+        if (inputText == currentDisplay) return;
+
+        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+
+        string absolutePath = TexturePathHelper.ResolveDisplayPath(inputText, achxFolder);
+        string storePath    = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
+
+        _appCommands.SetFrameTextureName(frame, storePath);
+        WireframeCtrl.LoadTexture(absolutePath);
+        RefreshPropertyPanel();
     }
 
     private async Task BrowseForFrameTexture()
@@ -2380,13 +2416,21 @@ public partial class MainWindow : Window
             else if (e.Key == Key.F2)
             {
                 e.Handled = true;
-                if (AnimTree.IsKeyboardFocusWithin &&
-                    AnimTree.SelectedItem is TreeNodeVm vm)
+                // Prefer the tree's SelectedItem, fall back to _selectedState when the tree
+                // has temporarily lost focus (e.g. immediately after ALT+arrow reorder, where
+                // focus shifts before our Background-priority re-focus post runs).
+                var vm = AnimTree.SelectedItem as TreeNodeVm
+                      ?? (_selectedState.SelectedFrame is { } sf
+                              ? TreeBuilder.FindNodeForData(_treeRoots, sf) : null)
+                      ?? (_selectedState.SelectedChain is { } sc
+                              ? TreeBuilder.FindNodeForData(_treeRoots, sc) : null);
+
+                if (vm is not null)
                 {
                     if (vm.Data is AnimationChainSave chain)
                         BeginInlineRename(vm, chain.Name);
                     else if (vm.Data is AnimationFrameSave frame)
-                        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+                        BeginInlineRename(vm, frame.HasCustomName ? frame.Name : string.Empty);
                 }
                 else
                     WireframeCtrl.ToggleDebugMode();
@@ -2409,6 +2453,11 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 int delta = e.Key == Key.Up ? -1 : +1;
                 _appCommands.HandleReorder(delta);
+                // Restore focus to the tree — reorder can cause Avalonia to shift focus
+                // away, which would make F2 fall through to WireframeCtrl.ToggleDebugMode.
+                Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
+                if (_selectedState.SelectedFrame is { HasCustomName: false })
+                    ShowStatusMessage("Frame labels updated to reflect new positions  ·  F2 to assign a custom name");
             }
         }), RoutingStrategies.Tunnel);
     }
@@ -3085,6 +3134,11 @@ public partial class MainWindow : Window
             {
                 _appCommands.RenameChain(chain, newName);
             }
+        }
+        else if (vm.Data is AnimationFrameSave frame)
+        {
+            if (!string.IsNullOrEmpty(newName))
+                _appCommands.RenameFrame(frame, newName);
         }
 
         AnimTree.Focus();

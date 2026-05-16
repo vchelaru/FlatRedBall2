@@ -59,18 +59,13 @@ public static class TreeBuilder
     /// <summary>
     /// Builds a single frame node with any shape children from
     /// <see cref="AnimationFrameSave.ShapesSave"/>.
-    /// Sets <see cref="AnimationFrameSave.Name"/> once for unnamed frames so the
-    /// label survives copy/paste and full tree rebuilds, regardless of whether the
-    /// frame has a texture assigned.
+    /// Auto-named frames (those without a user-set name) are NOT given a
+    /// persisted name — they display a dynamic position-based label ("Frame N")
+    /// computed at display time. Custom-named frames (<see cref="AnimationFrameSave.HasCustomName"/>
+    /// = <c>true</c>) keep their name regardless of position.
     /// </summary>
     public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
     {
-        // Persist the display label into the data model on first creation so that
-        // copy/paste (which serializes the frame) and RefreshTreeView (full rebuild)
-        // reproduce the same label regardless of the frame's new position.
-        if (string.IsNullOrEmpty(frame.Name))
-            frame.Name = $"Frame {index + 1}";
-
         var node = new TreeNodeVm
         {
             Header = BuildFrameHeader(frame, index),
@@ -111,12 +106,14 @@ public static class TreeBuilder
 
     /// <summary>
     /// Returns the display label for a frame node.
-    /// Priority: explicit <see cref="AnimationFrameSave.Name"/> (user-assigned or
-    /// auto-assigned by <see cref="BuildFrameNode"/>) > position-based "Frame N".
+    /// When <see cref="AnimationFrameSave.HasCustomName"/> is <c>true</c>, the
+    /// user-assigned <see cref="AnimationFrameSave.Name"/> is returned as-is.
+    /// Otherwise a dynamic position-based label "Frame N" is returned based on
+    /// <paramref name="index"/>, so labels update automatically on reorder.
     /// </summary>
     public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
     {
-        if (!string.IsNullOrEmpty(frame.Name))
+        if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
             return frame.Name;
         return $"Frame {index + 1}";
     }
@@ -196,9 +193,13 @@ public static class TreeBuilder
     /// <paramref name="frames"/> without replacing existing <see cref="TreeNodeVm"/>
     /// instances.  Retained VMs keep their <see cref="TreeNodeVm.IsExpanded"/> state
     /// (and Avalonia's TreeView keeps them in its <c>SelectedItems</c> because selection
-    /// uses object identity).  Headers and Meta are always refreshed; label stability
-    /// for unnamed frames is provided by <see cref="AnimationFrameSave.Name"/> which is
-    /// set once at creation time by <see cref="BuildFrameNode"/>.
+    /// uses object identity).  Headers and Meta are always refreshed.
+    /// <para>
+    /// Dynamic frames (those with <see cref="AnimationFrameSave.HasCustomName"/> = <c>false</c>)
+    /// display "Frame N" based on their current position — labels update automatically on reorder.
+    /// Custom-named frames (<see cref="AnimationFrameSave.HasCustomName"/> = <c>true</c>) always
+    /// display their user-assigned <see cref="AnimationFrameSave.Name"/> regardless of position.
+    /// </para>
     /// </summary>
     public static void SyncFramesInto(TreeNodeVm chainNode, IList<AnimationFrameSave> frames)
     {
@@ -223,9 +224,8 @@ public static class TreeBuilder
                 children.Add(BuildFrameNode(frames[i], i));
 
         // Step 3: Reorder children to match the target frame order, then refresh
-        //         Header and Meta.  Label stability comes from AnimationFrameSave.Name
-        //         (set once in BuildFrameNode) so BuildFrameHeader returns the same
-        //         value regardless of the frame's current position index.
+        //         Header and Meta.  Dynamic frames get positional labels; custom-named
+        //         frames keep their user-assigned name regardless of position.
         for (int i = 0; i < frames.Count; i++)
         {
             var target = frames[i];
@@ -233,7 +233,15 @@ public static class TreeBuilder
             {
                 for (int j = i + 1; j < children.Count; j++)
                     if (ReferenceEquals(children[j].Data, target))
-                    { children.Move(j, i); break; }
+                    {
+                        // Use RemoveAt+Insert instead of Move to avoid triggering
+                        // Avalonia's Move-action CollectionChanged path, which can
+                        // cause SelectionChanged to fire and corrupt tree state.
+                        var nodeVm = children[j];
+                        children.RemoveAt(j);
+                        children.Insert(i, nodeVm);
+                        break;
+                    }
             }
             children[i].Header = BuildFrameHeader(target, i);
             children[i].Meta   = $"{target.FrameLength:0.00}s";
