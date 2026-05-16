@@ -62,4 +62,47 @@ public class ProjectManagerLoadTests : IDisposable
 
         Assert.Same(sentinel, pm.AnimationChainListSave);
     }
+
+    // ── Git conflict markers ──────────────────────────────────────────────────
+
+    [Fact]
+    public void LoadAnimationChain_ConflictMarkerFile_ThrowsInvalidDataException()
+    {
+        var pm = new ProjectManager();
+        var path = Path.Combine(_dir.Path, "conflict.achx");
+        File.WriteAllText(path,
+            "<<<<<<< HEAD\n<?xml version=\"1.0\"?><AnimationChainList />\n=======\n<?xml version=\"1.0\"?><AnimationChainList />\n>>>>>>>");
+
+        Assert.Throws<System.IO.InvalidDataException>(
+            () => pm.LoadAnimationChain(new FilePath(path)));
+    }
+
+    [Fact]
+    public void LoadAnimationChain_ConflictMarkerFile_MessageMentionsGitConflict()
+    {
+        var pm = new ProjectManager();
+        var path = Path.Combine(_dir.Path, "conflict2.achx");
+        File.WriteAllText(path,
+            "<<<<<<< HEAD\n<?xml version=\"1.0\"?><AnimationChainList />\n=======\n<?xml version=\"1.0\"?><AnimationChainList />\n>>>>>>>");
+
+        var ex = Assert.Throws<System.IO.InvalidDataException>(
+            () => pm.LoadAnimationChain(new FilePath(path)));
+        Assert.Contains("conflict", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LoadAnimationChain_ConflictMarkerFile_DoesNotChangeAnimationChainListSave()
+    {
+        var pm = new ProjectManager();
+        var sentinel = new AnimationChainListSave();
+        pm.AnimationChainListSave = sentinel;
+        var path = Path.Combine(_dir.Path, "conflict3.achx");
+        File.WriteAllText(path,
+            "<<<<<<< HEAD\n<?xml version=\"1.0\"?><AnimationChainList />\n=======\n<?xml version=\"1.0\"?><AnimationChainList />\n>>>>>>>");
+
+        try { pm.LoadAnimationChain(new FilePath(path)); }
+        catch { }
+
+        Assert.Same(sentinel, pm.AnimationChainListSave);
+    }
 }

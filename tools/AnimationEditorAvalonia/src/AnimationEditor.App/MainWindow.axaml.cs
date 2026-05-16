@@ -133,6 +133,10 @@ public partial class MainWindow : Window
         _appCommands.LoadFailed += (path, ex) =>
             Dispatcher.UIThread.InvokeAsync(() => ShowLoadFailedDialogAsync(path, ex));
 
+        _appCommands.HotReloadFailed += (path, reason) =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
+
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
         _appCommands.RebuildTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RebuildTreeView);

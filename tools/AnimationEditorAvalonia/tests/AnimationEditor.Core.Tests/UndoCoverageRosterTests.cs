@@ -40,6 +40,7 @@ public class UndoCoverageRosterTests
         // Mutating, deliberately NOT undoable -------------------------------------
         [nameof(IAppCommands.OpenAchxWorkflowAsync)]              = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.LoadAnimationChain)]                 = Category.MutatingNotUndoable, // loads a file; clears the undo stack
+        [nameof(IAppCommands.ReloadAchxFromDisk)]                 = Category.MutatingNotUndoable, // hot-reload; clears the undo stack on success
         [nameof(IAppCommands.NewFile)]                            = Category.MutatingNotUndoable, // resets the project; clears the undo stack
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change

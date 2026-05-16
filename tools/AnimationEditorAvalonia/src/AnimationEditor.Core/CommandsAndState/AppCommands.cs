@@ -114,6 +114,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
 
+        /// <inheritdoc cref="IAppCommands.HotReloadFailed"/>
+        public event Action<string, string>? HotReloadFailed;
+
         // ── Open workflow ─────────────────────────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.OpenAchxWorkflowAsync"/>
@@ -196,6 +199,29 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
+        }
+
+        /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
+        public void ReloadAchxFromDisk(string path)
+        {
+            try
+            {
+                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(path));
+            }
+            catch (Exception ex)
+            {
+                HotReloadFailed?.Invoke(path, ex.Message);
+                return;
+            }
+
+            _undoManager.Clear();
+            _undoManager.MarkSaved();
+            _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
+            RebuildTreeViewRequested?.Invoke();
+            RefreshWireframeRequested?.Invoke();
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+            _events.CallAchxLoaded(path);
+            _events.RaiseAvailableTexturesChanged();
         }
 
         public void RefreshTreeNode(AnimationChainSave animationChain) =>

@@ -40,6 +40,11 @@ namespace AnimationEditor.Core
             if (!fileName.Exists())
                 throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
 
+            var rawContent = File.ReadAllText(fileName.FullPath);
+            if (IO.AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
+                throw new System.IO.InvalidDataException(
+                    $"{IO.AchxConflictMarkerDetector.ConflictMarkerMessage} ({fileName.FullPath})");
+
             var acls = AnimationChainListSave.FromFile(fileName.FullPath);
 
             AddShapeCollectionsToFrames(acls);

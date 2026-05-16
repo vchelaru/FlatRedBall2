@@ -43,6 +43,14 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         event Action<string, Exception>? LoadFailed;
 
+        /// <summary>
+        /// Fired when <see cref="ReloadAchxFromDisk"/> detects a mangled file (bad XML,
+        /// Git conflict markers, etc.). The first argument is the file path; the second is
+        /// a user-readable reason. Project state is left unchanged and the undo stack is
+        /// not cleared. Use this to surface a toast rather than a blocking error dialog.
+        /// </summary>
+        event Action<string, string>? HotReloadFailed;
+
         // ── Methods ───────────────────────────────────────────────────────────
 
         /// <summary>
@@ -55,6 +63,15 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         Task OpenAchxWorkflowAsync(string path);
         void LoadAnimationChain(string fileName);
+
+        /// <summary>
+        /// Reloads the open .achx from disk without resetting the UI state. Intended
+        /// for use by the hot-reload pipeline: on success it replaces the in-memory
+        /// model and fires <c>AchxLoaded</c>; on failure (bad XML, conflict markers) it
+        /// fires <see cref="HotReloadFailed"/> and leaves the current state untouched.
+        /// Unlike <see cref="LoadAnimationChain"/>, this never fires <see cref="LoadFailed"/>.
+        /// </summary>
+        void ReloadAchxFromDisk(string path);
         void RefreshTreeNode(AnimationChainSave animationChain);
         void RefreshTreeNode(AnimationFrameSave animationFrame);
         void RefreshAnimationFrameDisplay();
