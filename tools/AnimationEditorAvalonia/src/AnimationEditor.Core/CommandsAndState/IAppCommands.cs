@@ -1,3 +1,4 @@
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
@@ -105,8 +106,39 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
+        // ── Hot Reload ────────────────────────────────────────────────────────────
+
         /// <summary>
-        /// Pastes clipboard chains into the project: renames each to be unique and inserts
+        /// Hot-reload watcher. Wired to a real <see cref="HotReloadWatcher"/> by the app layer;
+        /// defaults to <see cref="NullHotReloadWatcher"/> so tests don't need to stub it.
+        /// </summary>
+        IHotReloadWatcher HotReloadWatcher { get; set; }
+
+        /// <summary>
+        /// Subscribe to the hot-reload watcher after it's injected by the app layer.
+        /// </summary>
+        void WireHotReloadWatcher();
+
+        /// <summary>
+        /// Hot-reload: reloads the .achx from disk, preserving selection state.
+        /// Clears the undo stack. Fires <see cref="IApplicationEvents.AchxReloadedFromDisk"/>.
+        /// </summary>
+        void ReloadAchxFromDisk(string path);
+
+        /// <summary>
+        /// Hot-reload: notifies consumers that a PNG has changed on disk.
+        /// </summary>
+        void ReloadPngFromDisk(string absolutePngPath);
+
+        /// <summary>
+        /// Synchronizes the hot-reload watcher with the current project state.
+        /// Starts (or restarts) watching PNG directories and (if saved) the .achx file.
+        /// Safe to call for unsaved projects — uses <see cref="string.Empty"/> as achxPath.
+        /// Call after any operation that adds or changes PNG references (drag-drop, Save As).
+        /// </summary>
+        void SyncHotReloadWatcher();
+
+        /// <summary>Pastes clipboard chains into the project: renames each to be unique and inserts
         /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>). Undoable.
         /// </summary>
         void PasteChains(IReadOnlyList<AnimationChainSave> chains);

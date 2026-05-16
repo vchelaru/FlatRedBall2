@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
@@ -103,6 +104,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public IFileDialogService FileDialogService { get; set; } = NullFileDialogService.Instance;
 
+        /// <inheritdoc cref="IAppCommands.HotReloadWatcher"/>
+        public IHotReloadWatcher HotReloadWatcher { get; set; } = NullHotReloadWatcher.Instance;
+
         public event Action<string>? FramesDeleted;
 
         /// <summary>
@@ -196,6 +200,11 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
+
+            // Start watching the loaded file and its referenced PNGs
+            var achxDir = System.IO.Path.GetDirectoryName(fileName) ?? string.Empty;
+            var pngPaths = GetReferencedAbsolutePngPaths(fileName, achxDir);
+            HotReloadWatcher.StartWatching(fileName, pngPaths);
         }
 
         public void RefreshTreeNode(AnimationChainSave animationChain) =>
@@ -218,6 +227,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
+                HotReloadWatcher.RecordOwnSave(target);
                 try
                 {
                     _pm.SaveAnimationChainList(target);
@@ -250,6 +260,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             SaveCurrentAnimationChainList(path);
             _pm.FileName = path;
+            SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
@@ -977,5 +988,111 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.PasteCircle"/>
         public void PasteCircle(AnimationFrameSave frame, CircleSave circle) =>
             _undoManager.Execute(new AddCircleCommand(circle, frame, this, _events, _selectedState));
+
+        // ── Hot Reload ────────────────────────────────────────────────────────────
+
+        /// <inheritdoc cref="IAppCommands.WireHotReloadWatcher"/>
+        public void WireHotReloadWatcher()
+        {
+            HotReloadWatcher.AchxChangedOnDisk += path =>
+                DoOnUiThread(() => ReloadAchxFromDisk(path));
+
+            HotReloadWatcher.PngChangedOnDisk += path =>
+                DoOnUiThread(() => ReloadPngFromDisk(path));
+
+            HotReloadWatcher.AchxDeletedOnDisk += path =>
+                DoOnUiThread(() => _events.RaiseAchxDeletedOnDisk(path));
+        }
+
+        /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
+        public void ReloadAchxFromDisk(string path)
+        {
+            // Capture selection state before reload
+            string? selectedChainName = _selectedState.SelectedChain?.Name;
+            int? selectedFrameIndex = _selectedState.SelectedFrame != null
+                ? _selectedState.SelectedChain?.Frames.IndexOf(_selectedState.SelectedFrame)
+                : null;
+
+            try
+            {
+                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(path));
+            }
+            catch (Exception ex)
+            {
+                LoadFailed?.Invoke(path, ex);
+                return;
+            }
+
+            _undoManager.Clear();
+            _undoManager.MarkSaved();
+
+            // Restore selection
+            _selectedState.Reset();
+            var acls = _pm.AnimationChainListSave;
+            if (acls != null && selectedChainName != null)
+            {
+                var restoredChain = acls.AnimationChains
+                    .FirstOrDefault(c => c.Name == selectedChainName);
+                if (restoredChain != null)
+                {
+                    _selectedState.SelectedChain = restoredChain;
+                    if (selectedFrameIndex.HasValue &&
+                        selectedFrameIndex.Value >= 0 &&
+                        selectedFrameIndex.Value < restoredChain.Frames.Count)
+                    {
+                        _selectedState.SelectedFrame = restoredChain.Frames[selectedFrameIndex.Value];
+                    }
+                }
+                else
+                {
+                    _selectedState.SelectedChain = acls.AnimationChains.FirstOrDefault();
+                }
+            }
+
+            // Refresh tree without collapsing (preserves expanded nodes)
+            RefreshTreeViewRequested?.Invoke();
+
+            // Update PNG watch list for new references
+            var achxDir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
+            var newPngs = GetReferencedAbsolutePngPaths(path, achxDir);
+            HotReloadWatcher.UpdatePngList(newPngs);
+
+            _ioManager.LoadAndApplyCompanionFileFor(path);
+            RefreshWireframeRequested?.Invoke();
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+
+            _events.RaiseAchxReloadedFromDisk(path);
+        }
+
+        /// <inheritdoc cref="IAppCommands.ReloadPngFromDisk"/>
+        public void ReloadPngFromDisk(string absolutePngPath) =>
+            _events.RaisePngChangedOnDisk(absolutePngPath);
+
+        /// <inheritdoc cref="IAppCommands.SyncHotReloadWatcher"/>
+        public void SyncHotReloadWatcher()
+        {
+            var achxPath = _pm.FileName ?? string.Empty;
+            var achxDir  = !string.IsNullOrEmpty(achxPath)
+                ? System.IO.Path.GetDirectoryName(achxPath) ?? string.Empty
+                : string.Empty;
+            HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir));
+        }
+
+        private IEnumerable<string> GetReferencedAbsolutePngPaths(string _, string achxDir)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null) yield break;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var chain in acls.AnimationChains)
+            foreach (var frame in chain.Frames)
+            {
+                if (string.IsNullOrEmpty(frame.TextureName)) continue;
+                var abs = System.IO.Path.IsPathRooted(frame.TextureName)
+                    ? frame.TextureName
+                    : System.IO.Path.Combine(achxDir, frame.TextureName);
+                if (seen.Add(abs)) yield return abs;
+            }
+        }
     }
 }

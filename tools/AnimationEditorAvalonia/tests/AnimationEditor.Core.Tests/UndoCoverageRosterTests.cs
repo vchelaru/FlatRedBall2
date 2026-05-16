@@ -96,6 +96,12 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteCircle)]                  = Category.MutatingUndoable,
+
+        // Hot reload — mutates the project but deliberately not undoable (reloads from disk)
+        [nameof(IAppCommands.WireHotReloadWatcher)]    = Category.NonMutating,
+        [nameof(IAppCommands.ReloadAchxFromDisk)]      = Category.MutatingNotUndoable,
+        [nameof(IAppCommands.ReloadPngFromDisk)]       = Category.NonMutating,
+        [nameof(IAppCommands.SyncHotReloadWatcher)]    = Category.NonMutating,
     };
 
     // ── Reflection guardrails ─────────────────────────────────────────────────

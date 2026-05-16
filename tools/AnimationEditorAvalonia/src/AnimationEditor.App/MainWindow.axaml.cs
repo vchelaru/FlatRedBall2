@@ -2,6 +2,7 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.DragDrop;
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
@@ -97,6 +98,7 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Closed += (_, _) =>
         {
+            _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
             foreach (var vm in _timelineFrames)
                 (vm.Thumbnail as IDisposable)?.Dispose();
@@ -138,7 +140,7 @@ public partial class MainWindow : Window
         _appCommands.RebuildTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RebuildTreeView);
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
-        _appCommands.RefreshAnimationFrameDisplayRequested += () => { };
+        _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
         // RefreshWireframeRequested is handled by WireframeControl directly
 
         _events.CurrentFileChanged     += path => Dispatcher.UIThread.InvokeAsync(() =>
@@ -165,6 +167,18 @@ public partial class MainWindow : Window
             _undoManager.Undo();
         };
 
+        // Wire hot reload watcher
+        _appCommands.HotReloadWatcher = new HotReloadWatcher();
+        _appCommands.WireHotReloadWatcher();
+
+        _events.PngChangedOnDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() => OnPngChangedOnDisk(path));
+        _events.AchxDeletedOnDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowToast($"'{System.IO.Path.GetFileName(path)}' was deleted from disk."));
+        _events.AchxReloadedFromDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowToast($"Reloaded {System.IO.Path.GetFileName(path)}"));
     }
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
@@ -644,6 +658,16 @@ public partial class MainWindow : Window
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
+        MenuReloadFromDisk.Click += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(_projectManager.FileName))
+                _appCommands.ReloadAchxFromDisk(_projectManager.FileName);
+        };
+        MenuEnableHotReload.Click += (_, _) =>
+        {
+            _appCommands.HotReloadWatcher.IsEnabled = MenuEnableHotReload.IsChecked == true;
+        };
+
         MenuUndo.IsEnabled = _undoManager.CanUndo;
         MenuRedo.IsEnabled = _undoManager.CanRedo;
         MenuUndo.Click += (_, _) => _undoManager.Undo();
@@ -1092,6 +1116,7 @@ public partial class MainWindow : Window
         RefreshTextureCombo();
         _appCommands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
+        _appCommands.SyncHotReloadWatcher();  // watch the newly-referenced PNG directory
         e.Handled = true;
     }
 
@@ -1243,6 +1268,39 @@ public partial class MainWindow : Window
 
     private TreeNodeVm? FindChainNode(AnimationChainSave chain) =>
         _treeRoots.FirstOrDefault(n => n.Data is AnimationChainSave c && c == chain);
+
+    // ── Hot reload ────────────────────────────────────────────────────────────
+
+    private void OnPngChangedOnDisk(string absolutePath)
+    {
+        _thumbnailService.InvalidatePath(absolutePath);
+
+        // Force-reload the wireframe texture if it matches the changed PNG
+        if (string.Equals(WireframeCtrl.LoadedTexturePath,
+            new FilePath(absolutePath).Standardized,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            WireframeCtrl.ForceReloadTexture();
+        }
+
+        // Invalidate all cached thumbnails for this path and rebuild tree icons
+        foreach (var node in _treeRoots)
+        {
+            if (node.Data is AnimationChainSave chain &&
+                chain.Frames.Count > 0 &&
+                !string.IsNullOrEmpty(chain.Frames[0].TextureName))
+            {
+                // Force thumbnail regeneration regardless of source equality
+                (node.Thumbnail as IDisposable)?.Dispose();
+                node.Thumbnail = null;
+                node.ThumbnailSource = null;
+            }
+        }
+        RefreshTreeThumbnails();
+        RefreshTimelineStrip();
+        _appCommands.RefreshAnimationFrameDisplay();
+        ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
+    }
 
     /// <summary>
     /// Pixel size the chain first-frame thumbnail bitmap is baked at. Kept at twice the

@@ -897,6 +897,19 @@ public class WireframeControl : Control
         LoadTexture(path);
     }
 
+    /// <summary>
+    /// Force-reload the currently displayed texture from disk, bypassing the identity check.
+    /// Use for PNG hot-reload when the file content changed but the path did not.
+    /// Must be called on the UI thread.
+    /// </summary>
+    public void ForceReloadTexture()
+    {
+        var path = _loadedTexturePath;
+        if (path == null) return;
+        _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
+        LoadTexture(new FilePath(path).StandardizedCaseSensitive);
+    }
+
     /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit).</summary>
     public void SetZoomPercent(int percent)
     {

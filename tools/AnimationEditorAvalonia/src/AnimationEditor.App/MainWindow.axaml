@@ -95,6 +95,9 @@
                         <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
                         <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
                         <Separator />
+                        <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
+                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />
+                        <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                     </MenuItem>
                     <MenuItem Header="_View">

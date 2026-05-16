@@ -1,4 +1,5 @@
 using AnimationEditor.App.Services;
+using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
@@ -115,6 +116,97 @@ public class ThumbnailServiceTests
         var rightPx = thumb.GetPixel(thumb.Width - 1, 4);
         Assert.True(rightPx.Red > rightPx.Blue,
             $"Right edge pixel {rightPx} should be red after horizontal flip.");
+    }
+
+    // -- InvalidatePath path-normalization tests (Issue #310) -----------------
+
+    private static ThumbnailService MakeSvc() => new(new TestServices().ProjectManager);
+
+    /// <summary>
+    /// BitmapCache stores paths in forward-slash format (from FilePath.Standardized).
+    /// FSW e.FullPath on Windows uses backslashes. InvalidatePath must evict the cache
+    /// entry regardless of which separator style the caller passes.
+    /// </summary>
+    [Fact]
+    public void InvalidatePath_BackslashPath_EvictsForwardSlashCacheKey()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["D:/Downloads/capybara.png"] = null;
+
+        svc.InvalidatePath(@"D:\Downloads\capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("D:/Downloads/capybara.png"),
+            "InvalidatePath with backslash path must evict the forward-slash cache key.");
+    }
+
+    [Fact]
+    public void InvalidatePath_ForwardSlashPath_EvictsForwardSlashCacheKey()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["D:/Downloads/capybara.png"] = null;
+
+        svc.InvalidatePath("D:/Downloads/capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("D:/Downloads/capybara.png"));
+    }
+
+    [Fact]
+    public void InvalidatePath_MixedCase_EvictsCacheKeyRegardlessOfCase()
+    {
+        var svc = MakeSvc();
+        svc.BitmapCache["d:/downloads/capybara.png"] = null;
+
+        svc.InvalidatePath(@"D:\Downloads\Capybara.png");
+
+        Assert.False(svc.BitmapCache.ContainsKey("d:/downloads/capybara.png"),
+            "OrdinalIgnoreCase + slash normalization must handle mixed-case backslash paths.");
+    }
+
+    /// <summary>
+    /// Regression test for the hot-reload stale-preview bug (Issue #310).
+    ///
+    /// Before the fix: <see cref="ThumbnailService.GetBitmap"/> stored cache keys verbatim,
+    /// so a Windows drag-drop path like <c>D:\Downloads\capybara.png</c> was stored with
+    /// backslashes.  <see cref="ThumbnailService.InvalidatePath"/> converts backslashes to
+    /// forward slashes before calling Remove, so the remove missed the backslash-keyed entry.
+    /// The old bitmap stayed in the cache and the tree view / preview / timeline showed the
+    /// stale image even after the PNG changed on disk.
+    ///
+    /// After the fix: GetBitmap normalizes the key to forward slashes at storage time, so
+    /// InvalidatePath's normalized Remove always hits.
+    /// </summary>
+    [Fact]
+    public void GetBitmap_BackslashPath_ThenInvalidate_EmptiesCache()
+    {
+        var svc = MakeSvc();
+        // Simulate GetBitmap being called with a raw Windows drag-drop path (non-existent
+        // file — GetBitmap caches null for decode failures; the key format is what matters).
+        svc.GetBitmap(@"D:\Downloads\capybara.png");
+
+        // GetBitmap must have stored the entry under a forward-slash key.
+        Assert.True(svc.BitmapCache.ContainsKey("D:/Downloads/capybara.png"),
+            "GetBitmap should store the cache key with forward slashes.");
+        Assert.False(svc.BitmapCache.ContainsKey(@"D:\Downloads\capybara.png"),
+            "GetBitmap must NOT store a backslash key — InvalidatePath would then miss it.");
+
+        // Now invalidate (as OnPngChangedOnDisk does, with the raw FSW backslash path).
+        svc.InvalidatePath(@"D:\Downloads\capybara.png");
+
+        Assert.Empty(svc.BitmapCache);
+    }
+
+    [Fact]
+    public void GetBitmap_BackslashPath_IsRetrievableByForwardSlashKey()
+    {
+        // Calling GetBitmap twice — once with backslash, once with forward slash — must
+        // hit the same cache entry (not decode twice and store under two different keys).
+        var svc = MakeSvc();
+        svc.GetBitmap(@"D:\Downloads\capybara.png");
+
+        // Forward-slash lookup must hit the entry stored by the backslash call.
+        var _ = svc.GetBitmap("D:/Downloads/capybara.png");
+
+        Assert.Single(svc.BitmapCache);
     }
 
     [Fact]
