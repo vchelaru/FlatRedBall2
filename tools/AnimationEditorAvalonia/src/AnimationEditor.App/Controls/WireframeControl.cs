@@ -934,67 +934,7 @@ public class WireframeControl : Control
     {
         _showGrid = show;
         _gridSize = cellSize;
-        // Snap and write UV back when grid is enabled so existing frames immediately
-        // align to grid lines.  This is the only place that mutates frame UV data;
-        // passive RefreshFramesInternal calls (e.g. from SelectionChanged) do not.
-        ApplyGridSnap();
         RefreshFramesInternal();
-    }
-
-    /// <summary>
-    /// Snaps the UV coordinates of every currently-visible frame to the active
-    /// grid and writes them back to the <see cref="AnimationFrameSave"/> objects.
-    /// Called only from <see cref="SetGrid"/> so that passive refreshes triggered
-    /// by selection changes cannot silently corrupt animation data.
-    /// </summary>
-    private void ApplyGridSnap()
-    {
-        if (!_showGrid || _gridSize <= 0 || _bitmap is null) return;
-
-        var selectedFrame  = _selectedState?.SelectedFrame;
-        var selectedChain  = _selectedState?.SelectedChain;
-        var selectedChains = _selectedState?.SelectedChains;
-
-        string? achxFolder = string.IsNullOrEmpty(_projectManager?.FileName)
-            ? null
-            : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
-
-        IEnumerable<AnimationFrameSave> framesToSnap;
-        if (selectedFrame != null)
-            framesToSnap = new[] { selectedFrame };
-        else if (selectedChains?.Count > 0)
-            framesToSnap = selectedChains.SelectMany(c => c.Frames);
-        else if (selectedChain?.Frames != null)
-            framesToSnap = selectedChain.Frames;
-        else
-            return;
-
-        float w = _bitmap.Width;
-        float h = _bitmap.Height;
-        static float Snap(float v, int g) => MathF.Round(v / g) * g;
-
-        foreach (var frame in framesToSnap)
-        {
-            if (string.IsNullOrEmpty(frame.TextureName)) continue;
-
-            if (achxFolder != null && _loadedTexturePath != null)
-            {
-                var fp = new FilePath(Path.Combine(achxFolder, frame.TextureName));
-                if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
-            }
-
-            float pixL = Snap(frame.LeftCoordinate   * w, _gridSize);
-            float pixT = Snap(frame.TopCoordinate    * h, _gridSize);
-            float pixR = Snap(frame.RightCoordinate  * w, _gridSize);
-            float pixB = Snap(frame.BottomCoordinate * h, _gridSize);
-            if (pixR <= pixL) pixR = pixL + _gridSize;
-            if (pixB <= pixT) pixB = pixT + _gridSize;
-
-            frame.LeftCoordinate   = pixL / w;
-            frame.RightCoordinate  = pixR / w;
-            frame.TopCoordinate    = pixT / h;
-            frame.BottomCoordinate = pixB / h;
-        }
     }
 
     /// <summary>
@@ -2114,9 +2054,9 @@ public class WireframeControl : Control
 
             if (_showGrid && _gridSize > 0)
             {
-                // Snap the display coordinates to grid line intersections.
-                // UV write-back is intentionally omitted here; it is the sole
-                // responsibility of ApplyGridSnap (called from SetGrid).
+                // Snap the display coordinates to grid line intersections for
+                // visual feedback.  UV write-back is intentionally omitted —
+                // grid is a future-edit setting and must never modify existing frames.
                 static float Snap(float v, int g) => MathF.Round(v / g) * g;
                 pixL = Snap(pixL, _gridSize);
                 pixT = Snap(pixT, _gridSize);
