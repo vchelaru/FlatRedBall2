@@ -167,7 +167,7 @@ public class HistoryPanelButtonStateTests
             ctx.UndoManager.Undo(); // B → redo stack
             Dispatcher.UIThread.RunJobs();
 
-            var list = window.FindControl<ListBox>("HistoryList")!;
+            var list = window.FindControl<ItemsControl>("HistoryList")!;
             var items = ((IEnumerable<HistoryEntryVm>)list.ItemsSource!).ToList();
 
             // B was undone; it must appear at row 0 (top), not at the bottom
@@ -179,8 +179,9 @@ public class HistoryPanelButtonStateTests
             Assert.Equal("#6a6e76", items[0].Foreground);
             Assert.Equal("#e6e8ec", items[1].Foreground);
 
-            // Selection sits on A (the most recently applied command)
-            Assert.Equal(1, list.SelectedIndex);
+            // A is the current "you are here" entry
+            Assert.False(items[0].IsCurrent);
+            Assert.True(items[1].IsCurrent);
         }
         finally { window.Close(); }
     }
