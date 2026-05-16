@@ -7,73 +7,46 @@ namespace AnimationEditor.Core.Tests;
 
 public class FramePasteLogicTests
 {
-    static AnimationFrameSave Frame(string name) => new AnimationFrameSave { Name = name };
-
     [Fact]
-    public void AssignUniqueNames_CollidingName_RenamesWithNextFreeFrameN()
+    public void AssignUniqueNames_NonCustomFrame_ClearsName()
     {
-        var existing = new List<AnimationFrameSave> { Frame("Frame 1") };
-        var pasted   = new List<AnimationFrameSave> { Frame("Frame 1") };
+        var existing = new List<AnimationFrameSave> { new AnimationFrameSave { Name = "Frame 1" } };
+        var pasted   = new List<AnimationFrameSave> { new AnimationFrameSave { Name = "Frame 1" } };
+        // HasCustomName=false (default) → name should be cleared
 
         FramePasteLogic.AssignUniqueNames(existing, pasted);
 
-        Assert.Equal("Frame 2", pasted[0].Name);
+        Assert.Equal(string.Empty, pasted[0].Name);
     }
 
     [Fact]
-    public void AssignUniqueNames_CustomName_FallsBackToNextFreeFrameN()
-    {
-        var existing = new List<AnimationFrameSave> { Frame("Frame 1") };
-        var pasted   = new List<AnimationFrameSave> { Frame("Jump") };
-
-        FramePasteLogic.AssignUniqueNames(existing, pasted);
-
-        Assert.Equal("Frame 2", pasted[0].Name);
-    }
-
-    [Fact]
-    public void AssignUniqueNames_FrameAlreadyFreeWithSameName_KeepsName()
-    {
-        // "Frame 3" is free (Frame 1 and Frame 2 are taken), so NextFreeFrameName returns "Frame 3".
-        var existing = new List<AnimationFrameSave> { Frame("Frame 1"), Frame("Frame 2") };
-        var pasted   = new List<AnimationFrameSave> { Frame("Frame 3") };
-
-        FramePasteLogic.AssignUniqueNames(existing, pasted);
-
-        Assert.Equal("Frame 3", pasted[0].Name);
-    }
-
-    [Fact]
-    public void AssignUniqueNames_GapInSequence_FillsGap()
-    {
-        var existing = new List<AnimationFrameSave> { Frame("Frame 1"), Frame("Frame 3") };
-        var pasted   = new List<AnimationFrameSave> { Frame("Frame 1") };
-
-        FramePasteLogic.AssignUniqueNames(existing, pasted);
-
-        Assert.Equal("Frame 2", pasted[0].Name);
-    }
-
-    [Fact]
-    public void AssignUniqueNames_MultipleFramesPasted_AllGetUniqueNames()
-    {
-        var existing = new List<AnimationFrameSave> { Frame("Frame 1") };
-        var pasted   = new List<AnimationFrameSave> { Frame("Frame 1"), Frame("Frame 1") };
-
-        FramePasteLogic.AssignUniqueNames(existing, pasted);
-
-        Assert.Equal("Frame 2", pasted[0].Name);
-        Assert.Equal("Frame 3", pasted[1].Name);
-    }
-
-    [Fact]
-    public void AssignUniqueNames_NoExistingFrames_StartsAtFrame1()
+    public void AssignUniqueNames_CustomNamedFrame_KeepsName()
     {
         var existing = new List<AnimationFrameSave>();
-        var pasted   = new List<AnimationFrameSave> { Frame("Frame 1") };
+        var pasted   = new List<AnimationFrameSave>
+        {
+            new AnimationFrameSave { HasCustomName = true, Name = "Jump" }
+        };
 
         FramePasteLogic.AssignUniqueNames(existing, pasted);
 
-        Assert.Equal("Frame 1", pasted[0].Name);
+        Assert.Equal("Jump", pasted[0].Name);
+        Assert.True(pasted[0].HasCustomName);
+    }
+
+    [Fact]
+    public void AssignUniqueNames_MultipleNonCustomFrames_AllCleared()
+    {
+        var existing = new List<AnimationFrameSave>();
+        var pasted   = new List<AnimationFrameSave>
+        {
+            new AnimationFrameSave { Name = "Frame 1" },
+            new AnimationFrameSave { Name = "Frame 2" },
+        };
+
+        FramePasteLogic.AssignUniqueNames(existing, pasted);
+
+        Assert.Equal(string.Empty, pasted[0].Name);
+        Assert.Equal(string.Empty, pasted[1].Name);
     }
 }

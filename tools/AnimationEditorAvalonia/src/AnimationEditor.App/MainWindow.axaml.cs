@@ -2424,7 +2424,7 @@ public partial class MainWindow : Window
                     if (vm.Data is AnimationChainSave chain)
                         BeginInlineRename(vm, chain.Name);
                     else if (vm.Data is AnimationFrameSave frame)
-                        BeginInlineRename(vm, frame.TextureName ?? string.Empty);
+                        BeginInlineRename(vm, frame.HasCustomName ? frame.Name : string.Empty);
                 }
                 else
                     WireframeCtrl.ToggleDebugMode();
@@ -3123,6 +3123,11 @@ public partial class MainWindow : Window
             {
                 _appCommands.RenameChain(chain, newName);
             }
+        }
+        else if (vm.Data is AnimationFrameSave frame)
+        {
+            if (!string.IsNullOrEmpty(newName))
+                _appCommands.RenameFrame(frame, newName);
         }
 
         AnimTree.Focus();

@@ -155,12 +155,13 @@ public class TreeBuilderPureTests
     [Fact]
     public void BuildFrameHeader_NameOverridesTextureFilename()
     {
-        // A user-assigned Name takes precedence over the texture filename so that
-        // double-click rename on a textured frame changes the display label without
-        // touching the texture reference.
+        // A user-assigned Name (HasCustomName=true) takes precedence over the
+        // texture filename so that inline rename on a textured frame changes the
+        // display label without touching the texture reference.
         var frame = new AnimationFrameSave
         {
             TextureName = "sprites/walk1.png",
+            HasCustomName = true,
             Name = "Walk Start",
         };
         Assert.Equal("Walk Start", TreeBuilder.BuildFrameHeader(frame));
@@ -460,11 +461,10 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
-    public void SyncFramesInto_Reorder_KeepsUnnamedFrameHeaderStable()
+    public void SyncFramesInto_Reorder_DynamicLabelsUpdateToReflectNewPosition()
     {
-        // Unnamed frames are labeled by creation order ("Frame 1", "Frame 2").
-        // After a reorder their labels must NOT change — the label staying put
-        // is how the user sees that the order actually changed.
+        // Auto-named frames display "Frame N" based on their current index.
+        // After a reorder the label CHANGES to reflect the new position.
         var frameA = new AnimationFrameSave { TextureName = "" };
         var frameB = new AnimationFrameSave { TextureName = "" };
         var chainNode = new TreeNodeVm();
@@ -474,16 +474,15 @@ public class TreeBuilderPureTests
         // Move frameA to index 1 (swap order)
         TreeBuilder.SyncFramesInto(chainNode, new[] { frameB, frameA });
 
-        // Labels stay with their VMs — not renumbered by new position.
-        Assert.Equal("Frame 2", chainNode.Children[0].Header);  // frameB stays "Frame 2"
-        Assert.Equal("Frame 1", chainNode.Children[1].Header);  // frameA stays "Frame 1"
+        // Both frames now have positional labels matching their new positions.
+        Assert.Equal("Frame 1", chainNode.Children[0].Header);  // frameB is now at index 0
+        Assert.Equal("Frame 2", chainNode.Children[1].Header);  // frameA is now at index 1
     }
 
     [Fact]
-    public void SyncFramesInto_MoveThirdToTop_ShowsFrame3AtTop()
+    public void SyncFramesInto_MoveThirdToTop_DynamicLabelsRenumber()
     {
-        // Regression: "Move to top" on the 3rd unnamed frame must produce
-        // "Frame 3 / Frame 1 / Frame 2" in the tree, not "Frame 1 / Frame 2 / Frame 3".
+        // Dynamic labels renumber after reorder — the frame moved to index 0 now shows "Frame 1".
         var frameA = new AnimationFrameSave { TextureName = "" };
         var frameB = new AnimationFrameSave { TextureName = "" };
         var frameC = new AnimationFrameSave { TextureName = "" };
@@ -494,59 +493,59 @@ public class TreeBuilderPureTests
 
         TreeBuilder.SyncFramesInto(chainNode, new[] { frameC, frameA, frameB });
 
-        Assert.Equal("Frame 3", chainNode.Children[0].Header);
-        Assert.Equal("Frame 1", chainNode.Children[1].Header);
-        Assert.Equal("Frame 2", chainNode.Children[2].Header);
+        Assert.Equal("Frame 1", chainNode.Children[0].Header);  // frameC at index 0
+        Assert.Equal("Frame 2", chainNode.Children[1].Header);  // frameA at index 1
+        Assert.Equal("Frame 3", chainNode.Children[2].Header);  // frameB at index 2
     }
 
     [Fact]
-    public void BuildFrameNode_SetsNameForUnnamedFrame()
+    public void BuildFrameNode_AutoNamed_DoesNotPersistNameToModel()
     {
-        // BuildFrameNode must persist the display label into AnimationFrameSave.Name
-        // so copy/paste (which serializes the frame) and RefreshTreeView (full rebuild)
-        // reproduce the same label regardless of the frame's new position.
+        // Dynamic-label design: auto-named frames display "Frame N" at render time;
+        // the Name field is intentionally left empty so reorder updates the label.
         var frame = new AnimationFrameSave { TextureName = "" };
 
-        TreeBuilder.BuildFrameNode(frame, 2);  // position 2 → "Frame 3"
+        TreeBuilder.BuildFrameNode(frame, 2);  // position 2 → display "Frame 3", but Name stays empty
 
-        Assert.Equal("Frame 3", frame.Name);
+        Assert.False(frame.HasCustomName);
+        Assert.Equal(string.Empty, frame.Name);
     }
 
     [Fact]
-    public void BuildFrameNode_SetsNameForTexturedUnnamedFrame()
+    public void BuildFrameNode_AutoNamed_TexturedFrameDoesNotPersistName()
     {
-        // Textured frames must also get a persisted "Frame N" label so that
-        // drag-and-drop frames use the same auto-naming scheme as + button frames.
+        // Textured frames are also auto-named dynamically — Name must not be set.
         var frame = new AnimationFrameSave { TextureName = "sprites/walk1.png" };
 
         TreeBuilder.BuildFrameNode(frame, 0);
 
-        Assert.Equal("Frame 1", frame.Name);
+        Assert.False(frame.HasCustomName);
+        Assert.Equal(string.Empty, frame.Name);
     }
 
     [Fact]
-    public void BuildFrameNode_DoesNotOverwriteExistingName()
+    public void BuildFrameNode_CustomNamed_PreservesNameAndFlag()
     {
-        // When copying a chain the copied frames already have Name set.
-        // BuildFrameNode must not overwrite it with a position-based label.
-        var frame = new AnimationFrameSave { TextureName = "", Name = "Frame 3" };
+        // A frame with HasCustomName=true keeps its Name through BuildFrameNode.
+        var frame = new AnimationFrameSave { HasCustomName = true, Name = "Jump Frame" };
 
-        TreeBuilder.BuildFrameNode(frame, 0);  // index 0, but Name already set
+        TreeBuilder.BuildFrameNode(frame, 0);
 
-        Assert.Equal("Frame 3", frame.Name);
+        Assert.True(frame.HasCustomName);
+        Assert.Equal("Jump Frame", frame.Name);
     }
 
     [Fact]
-    public void BuildTree_ReorderedChainWithNamesSet_PreservesLabels()
+    public void BuildTree_CustomNamedFramesReordered_PreservesCustomLabels()
     {
-        // Simulates paste: deserialised frames carry their Name values from the original.
-        // BuildTree must use Name, not recompute from position.
-        var frameA = new AnimationFrameSave { TextureName = "", Name = "Frame 1" };
-        var frameB = new AnimationFrameSave { TextureName = "", Name = "Frame 2" };
-        var frameC = new AnimationFrameSave { TextureName = "", Name = "Frame 3" };
+        // Custom-named frames (HasCustomName=true) keep their display name regardless
+        // of position — the label is sticky, not positional.
+        var frameA = new AnimationFrameSave { HasCustomName = true, Name = "Idle" };
+        var frameB = new AnimationFrameSave { HasCustomName = true, Name = "Walk" };
+        var frameC = new AnimationFrameSave { HasCustomName = true, Name = "Run" };
 
         var acls = new AnimationChainListSave();
-        var chain = new AnimationChainSave { Name = "Walk" };
+        var chain = new AnimationChainSave { Name = "Anim" };
         chain.Frames.Add(frameC);  // reordered: C first
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
@@ -554,9 +553,9 @@ public class TreeBuilderPureTests
 
         var nodes = TreeBuilder.BuildTree(acls);
 
-        Assert.Equal("Frame 3", nodes[0].Children[0].Header);
-        Assert.Equal("Frame 1", nodes[0].Children[1].Header);
-        Assert.Equal("Frame 2", nodes[0].Children[2].Header);
+        Assert.Equal("Run",  nodes[0].Children[0].Header);
+        Assert.Equal("Idle", nodes[0].Children[1].Header);
+        Assert.Equal("Walk", nodes[0].Children[2].Header);
     }
 }
 
@@ -813,11 +812,10 @@ public class TreeBuilderSyncFramesTests
 
         TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
 
-        // After swap, each frame's header must reflect its original name —
-        // labels are stable (stored in AnimationFrameSave.Name) so the user
-        // can visually identify which frame moved, not just its new position.
-        Assert.Equal("Frame 2", chainNode.Children[0].Header);
-        Assert.Equal("Frame 1", chainNode.Children[1].Header);
+        // After swap, labels update dynamically to reflect the new position —
+        // auto-named frames always show "Frame N" for their current index.
+        Assert.Equal("Frame 1", chainNode.Children[0].Header);
+        Assert.Equal("Frame 2", chainNode.Children[1].Header);
     }
 }
 

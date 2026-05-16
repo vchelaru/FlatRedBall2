@@ -178,6 +178,12 @@ public class AnimationChainListSave
         if (frame.RelativeX != 0f) el.Add(new XElement("RelativeX", FloatStr(frame.RelativeX)));
         if (frame.RelativeY != 0f) el.Add(new XElement("RelativeY", FloatStr(frame.RelativeY)));
 
+        if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
+        {
+            el.Add(new XElement("Name", frame.Name));
+            el.Add(new XElement("HasCustomName", "true"));
+        }
+
         el.Add(WriteShapes(frame.ShapesSave));
         return el;
     }
@@ -246,6 +252,8 @@ public class AnimationChainListSave
         frame.FlipVertical = BoolEl(el, "FlipVertical");
         frame.RelativeX = FloatEl(el, "RelativeX");
         frame.RelativeY = FloatEl(el, "RelativeY");
+        frame.Name = (string?)el.Element("Name") ?? string.Empty;
+        frame.HasCustomName = BoolEl(el, "HasCustomName");
 
         // FRB1 dialect: shape wrapper is <ShapeCollectionSave>. FRB2's <ShapesSave> is not
         // accepted — no .achx files exist in the wild using it (the FRB2 writer didn't exist
