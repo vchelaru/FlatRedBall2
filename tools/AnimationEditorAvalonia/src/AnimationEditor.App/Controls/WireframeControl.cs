@@ -1760,8 +1760,27 @@ public class WireframeControl : Control
             float newScrollY = Math.Min(rawScrollY, maxScrollY);
 
             // _panX absorbs the clamped overflow so the cursor pivot is preserved.
-            _panX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
-            _panY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
+            // When zooming toward blank space far from the image the raw value can go
+            // negative, placing the sprite to the left of scroll-origin-0.  Since scroll
+            // cannot go below 0, a negative _panX makes the image permanently unreachable
+            // (#319).  Clamp to 0 and pull newScrollX back so the image right/bottom edge
+            // stays visible at the post-zoom viewport position.
+            float rawPanX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
+            float rawPanY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
+
+            if (overflowX && _bitmap != null && rawPanX < 0f)
+            {
+                _panX      = 0f;
+                newScrollX = Math.Max(0f, Math.Min(newScrollX, _bitmap.Width  * _zoom - 1f));
+            }
+            else { _panX = rawPanX; }
+
+            if (overflowY && _bitmap != null && rawPanY < 0f)
+            {
+                _panY      = 0f;
+                newScrollY = Math.Max(0f, Math.Min(newScrollY, _bitmap.Height * _zoom - 1f));
+            }
+            else { _panY = rawPanY; }
 
             DebugLog("ZOOM_TOWARD",
                 $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +

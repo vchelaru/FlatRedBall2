@@ -1220,6 +1220,86 @@ public class WireframePanZoomTests
         finally { Directory.Delete(dir, true); }
     }
 
+    // ── Zoom toward blank space: sprite must not go off-screen ────────────────
+
+    /// <summary>
+    /// Regression guard for #319: zooming repeatedly toward blank space far from
+    /// a small image must not push the sprite outside the scrollable area, where
+    /// it becomes permanently unreachable.
+    ///
+    /// Root cause: each zoom step computes <c>_panX = epX − (rawScrollX − maxScrollX)</c>.
+    /// When the pivot is far from the image, the overshoot <c>(rawScrollX − maxScrollX)</c>
+    /// grows faster than <c>epX</c>, so <c>_panX</c> goes negative.  Since scroll
+    /// cannot go below 0, a negative <c>_panX</c> places the image to the left of
+    /// scroll-origin-0, making it invisible and unreachable by any scroll or pan gesture.
+    ///
+    /// Fix: <c>_panX</c> is clamped to ≥ 0 and the scroll target is adjusted so the
+    /// image right edge remains visible at the post-zoom viewport position.
+    /// </summary>
+    [AvaloniaFact]
+    public void ZoomTowardBlankSpace_Repeatedly_DoesNotPushSpriteOffScreen()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir, "small.png", size: 32);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
+
+            ctrl.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            // 100% zoom for a deterministic starting state.
+            ctrl.SetZoomPercent(100);
+            Dispatcher.UIThread.RunJobs();
+
+            double vpW = sv.Viewport.Width;
+            double vpH = sv.Viewport.Height;
+
+            // Zoom 8 notches toward the far corner — well past the 32×32 image.
+            float pivotX = (float)(vpW * 0.90);
+            float pivotY = (float)(vpH * 0.90);
+            for (int i = 0; i < 8; i++)
+                ctrl.SimulateWheelZoom(pivotX, pivotY, 1.25f);
+            Dispatcher.UIThread.RunJobs();
+
+            float panX   = ctrl.CameraState.PanX;
+            float panY   = ctrl.CameraState.PanY;
+            float zoom   = ctrl.CameraState.Zoom;
+            float scrollX = ctrl.ScrollTarget.X;
+            float scrollY = ctrl.ScrollTarget.Y;
+
+            // PanX/PanY must be >= 0: negative means the sprite is left of scroll-origin
+            // and permanently unreachable by scrolling (#319).
+            Assert.True(panX >= 0f,
+                $"PanX={panX:F1} went negative — sprite was pushed off the left edge " +
+                $"of the scrollable area (zoom={zoom:F3}, scrollX={scrollX:F1})");
+            Assert.True(panY >= 0f,
+                $"PanY={panY:F1} went negative — sprite was pushed above the scrollable " +
+                $"area (zoom={zoom:F3}, scrollY={scrollY:F1})");
+
+            // Image must also be visible at the current scroll: right/bottom edges must
+            // lie to the right/below of the viewport's current left/top edge.
+            const int imgSize = 32;
+            Assert.True(panX + imgSize * zoom > scrollX,
+                $"Image right edge ({panX + imgSize * zoom:F1}) ≤ scrollX ({scrollX:F1}): " +
+                $"image is off the left of the viewport");
+            Assert.True(panY + imgSize * zoom > scrollY,
+                $"Image bottom edge ({panY + imgSize * zoom:F1}) ≤ scrollY ({scrollY:F1}): " +
+                $"image is above the viewport");
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
     /// <summary>
     /// Regression guard for the zoom-to-cursor scroll-bounds drift bug (#138) with
     /// three rapid successive wheel-zoom notches.
