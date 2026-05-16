@@ -30,13 +30,12 @@ public class PreviewPanLimitTests
         return ctx;
     }
 
-    private const float ViewW      = 400f - 20f; // 380
-    private const float ViewH      = 300f - 20f; // 280
-    private const float PanPadding = 300f;
-    private static float MaxPanX => ViewW / 2f + PanPadding;  //  490
-    private static float MinPanX => -(ViewW / 2f + PanPadding); // -490
-    private static float MaxPanY => ViewH / 2f + PanPadding;  //  440
-    private static float MinPanY => -(ViewH / 2f + PanPadding); // -440
+    private const float ViewW = 400f - 20f; // 380
+    private const float ViewH = 300f - 20f; // 280
+    private static float MaxPanX => ViewW / 2f;   //  190
+    private static float MinPanX => -(ViewW / 2f); // -190
+    private static float MaxPanY => ViewH / 2f;   //  140
+    private static float MinPanY => -(ViewH / 2f); // -140
 
     /// <summary>
     /// Regression guard for #321: zooming repeatedly toward the far-right edge
