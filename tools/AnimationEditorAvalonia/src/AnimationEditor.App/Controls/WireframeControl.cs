@@ -15,6 +15,7 @@ using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -1746,6 +1747,24 @@ public class WireframeControl : Control
         }
     }
 
+    /// <summary>
+    /// Adjusts <c>_panX</c>, <c>_panY</c>, and the pending scroll target so that the
+    /// content-space point beneath viewport position (<paramref name="sx"/>, <paramref name="sy"/>)
+    /// stays fixed after a zoom by <paramref name="factor"/>.
+    /// </summary>
+    /// <remarks>
+    /// Post-conditions when a ScrollViewer is attached:
+    /// <list type="bullet">
+    ///   <item><c>_panX ≥ 0</c> — sprite never pushed off the left edge (#319).</item>
+    ///   <item><c>_panX + bitmap.Width × _zoom / 2 ≥ viewport.Width / 2</c> — sprite always
+    ///         pannable to the viewport centre (#341).</item>
+    /// </list>
+    /// The invariant floor is <c>epX = EffectivePaddingX()</c>, which is defined so that
+    /// <c>centreScroll = epX + imgW × zoom / 2 − vpW / 2 ≥ ExtraScrollable &gt; 0</c>.
+    /// Never substitute <c>0</c> as the clamp target — doing so erases the left-side
+    /// padding buffer and makes the sprite centre map to a negative (unreachable) scroll
+    /// offset (see #319 for the off-screen variant and #341 for the locked-centering variant).
+    /// </remarks>
     private void ZoomToward(float sx, float sy, float factor)
     {
         float oldZoom = _zoom;
@@ -1791,27 +1810,45 @@ public class WireframeControl : Control
             float newScrollY = Math.Min(rawScrollY, maxScrollY);
 
             // _panX absorbs the clamped overflow so the cursor pivot is preserved.
-            // When zooming toward blank space far from the image the raw value can go
-            // negative, placing the sprite to the left of scroll-origin-0.  Since scroll
-            // cannot go below 0, a negative _panX makes the image permanently unreachable
-            // (#319).  Clamp to 0 and pull newScrollX back so the image right/bottom edge
-            // stays visible at the post-zoom viewport position.
+            // When zooming toward blank space far from the image, the overflow
+            // (rawScrollX − maxScrollX) can reduce rawPanX below the threshold needed
+            // to pan/centre the sprite.
+            //
+            // The minimum panX that still allows centering is:
+            //   minPanX = max(0, vpW/2 − imgW*zoom/2)
+            // (centreScroll = panX + imgW*zoom/2 − vpW/2 ≥ 0 requires panX ≥ minPanX)
+            //
+            // When rawPanX falls below this threshold (including going negative as in #319),
+            // clamp to epX instead of 0.  Using 0 (#319 original fix) erased the
+            // effective-padding buffer, making the sprite's centre map to a negative scroll
+            // offset that is unreachable, so the user could no longer pan to centre (#341).
+            // Using epX restores the padding and ensures centreScroll > 0.
             float rawPanX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
             float rawPanY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
 
-            if (overflowX && _bitmap != null && rawPanX < 0f)
-            {
-                _panX      = 0f;
-                newScrollX = Math.Max(0f, Math.Min(newScrollX, _bitmap.Width  * _zoom - 1f));
-            }
-            else { _panX = rawPanX; }
+            float minPanX = overflowX && _bitmap != null
+                ? Math.Max(0f, (float)vp.Width  / 2f - _bitmap.Width  * _zoom / 2f)
+                : 0f;
+            float minPanY = overflowY && _bitmap != null
+                ? Math.Max(0f, (float)vp.Height / 2f - _bitmap.Height * _zoom / 2f)
+                : 0f;
 
-            if (overflowY && _bitmap != null && rawPanY < 0f)
+            _panX = rawPanX < minPanX ? epX : rawPanX;
+            _panY = rawPanY < minPanY ? epY : rawPanY;
+
+#if DEBUG
+            if (_bitmap != null)
             {
-                _panY      = 0f;
-                newScrollY = Math.Max(0f, Math.Min(newScrollY, _bitmap.Height * _zoom - 1f));
+                float dbgCentreX = _panX + _bitmap.Width  * _zoom / 2f - (float)vp.Width  / 2f;
+                float dbgCentreY = _panY + _bitmap.Height * _zoom / 2f - (float)vp.Height / 2f;
+                Debug.Assert(dbgCentreX >= 0f,
+                    $"ZoomToward post-cond: centreScrollX={dbgCentreX:F2} < 0 " +
+                    $"(panX={_panX:F1}, imgW={_bitmap.Width}, zoom={_zoom:F3}, vpW={vp.Width:F1})");
+                Debug.Assert(dbgCentreY >= 0f,
+                    $"ZoomToward post-cond: centreScrollY={dbgCentreY:F2} < 0 " +
+                    $"(panY={_panY:F1}, imgH={_bitmap.Height}, zoom={_zoom:F3}, vpH={vp.Height:F1})");
             }
-            else { _panY = rawPanY; }
+#endif
 
             DebugLog("ZOOM_TOWARD",
                 $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +

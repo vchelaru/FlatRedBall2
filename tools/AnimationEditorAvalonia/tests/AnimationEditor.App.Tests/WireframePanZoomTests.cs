@@ -58,6 +58,40 @@ public class WireframePanZoomTests
         => w.FindControl<T>(name)
            ?? throw new InvalidOperationException($"Control '{name}' not found");
 
+    /// <summary>
+    /// Asserts the core ZoomToward post-conditions that must hold after ANY zoom operation:
+    /// <list type="bullet">
+    ///   <item><c>panX/Y ≥ 0</c> — sprite not pushed off the left/top edge (#319).</item>
+    ///   <item>Sprite centre reachable by scrolling:
+    ///         <c>panX + imgW×zoom/2 ≥ vpW/2</c> — centering never locked (#341).</item>
+    /// </list>
+    /// These two invariants subsume every zoom bug we have fixed; a negative panX
+    /// violates the first, a too-small panX violates the second.
+    /// </summary>
+    private static void AssertZoomInvariants(WireframeControl ctrl, ScrollViewer sv, string context = "")
+    {
+        var (panX, panY, zoom) = ctrl.CameraState;
+        var (imgW, imgH)       = ctrl.BitmapSize;
+        float vpW = (float)sv.Viewport.Width;
+        float vpH = (float)sv.Viewport.Height;
+
+        Assert.True(panX >= 0f,
+            $"{context}: panX={panX:F1} < 0 — sprite pushed off the left edge " +
+            $"(zoom={zoom:F3}, vpW={vpW:F1}, imgW={imgW})");
+        Assert.True(panY >= 0f,
+            $"{context}: panY={panY:F1} < 0 — sprite pushed above the top edge " +
+            $"(zoom={zoom:F3}, vpH={vpH:F1}, imgH={imgH})");
+
+        float centreScrollX = panX + imgW * zoom / 2f - vpW / 2f;
+        float centreScrollY = panY + imgH * zoom / 2f - vpH / 2f;
+        Assert.True(centreScrollX >= 0f,
+            $"{context}: centreScrollX={centreScrollX:F1} < 0 — " +
+            $"sprite centre unreachable by scrolling (panX={panX:F1}, imgW={imgW}, zoom={zoom:F3}, vpW={vpW:F1})");
+        Assert.True(centreScrollY >= 0f,
+            $"{context}: centreScrollY={centreScrollY:F1} < 0 — " +
+            $"sprite centre unreachable by scrolling (panY={panY:F1}, imgH={imgH}, zoom={zoom:F3}, vpH={vpH:F1})");
+    }
+
     // ── LoadTexture centres small images ──────────────────────────────────────
 
     /// <summary>
@@ -1199,6 +1233,9 @@ public class WireframePanZoomTests
             ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 2.0f);
             Dispatcher.UIThread.RunJobs();
 
+            // Invariant: zoom-toward-boundary must not break pan-centering (#341).
+            AssertZoomInvariants(ctrl, sv, "after 2× zoom at right scroll boundary");
+
             // ── Assert: content coord under cursor must be preserved ───────────
             // sv.Offset.X is the scroll actually applied (clamped to maxScrollX).
             // With the fix, _panX absorbs the overflow so the mapping is exact.
@@ -1270,30 +1307,8 @@ public class WireframePanZoomTests
                 ctrl.SimulateWheelZoom(pivotX, pivotY, 1.25f);
             Dispatcher.UIThread.RunJobs();
 
-            float panX   = ctrl.CameraState.PanX;
-            float panY   = ctrl.CameraState.PanY;
-            float zoom   = ctrl.CameraState.Zoom;
-            float scrollX = ctrl.ScrollTarget.X;
-            float scrollY = ctrl.ScrollTarget.Y;
-
-            // PanX/PanY must be >= 0: negative means the sprite is left of scroll-origin
-            // and permanently unreachable by scrolling (#319).
-            Assert.True(panX >= 0f,
-                $"PanX={panX:F1} went negative — sprite was pushed off the left edge " +
-                $"of the scrollable area (zoom={zoom:F3}, scrollX={scrollX:F1})");
-            Assert.True(panY >= 0f,
-                $"PanY={panY:F1} went negative — sprite was pushed above the scrollable " +
-                $"area (zoom={zoom:F3}, scrollY={scrollY:F1})");
-
-            // Image must also be visible at the current scroll: right/bottom edges must
-            // lie to the right/below of the viewport's current left/top edge.
-            const int imgSize = 32;
-            Assert.True(panX + imgSize * zoom > scrollX,
-                $"Image right edge ({panX + imgSize * zoom:F1}) ≤ scrollX ({scrollX:F1}): " +
-                $"image is off the left of the viewport");
-            Assert.True(panY + imgSize * zoom > scrollY,
-                $"Image bottom edge ({panY + imgSize * zoom:F1}) ≤ scrollY ({scrollY:F1}): " +
-                $"image is above the viewport");
+            // panX/Y ≥ 0 AND sprite centre reachable by scrolling (#319, #341).
+            AssertZoomInvariants(ctrl, sv, "after 8 blank-space zoom steps");
 
             window.Close();
         }
@@ -1360,6 +1375,9 @@ public class WireframePanZoomTests
             ctrl.SimulateWheelZoom(vpX, (float)(vpH / 2), 1.25f);
             Dispatcher.UIThread.RunJobs();
 
+            // Invariant: rapid zoom at boundary must preserve pan-centering (#341).
+            AssertZoomInvariants(ctrl, sv, "after 3 rapid 1.25× zooms at right scroll boundary");
+
             float scrollX1 = (float)sv.Offset.X;
             float panX1    = ctrl.PanOffset.X;
             float zoom1    = ctrl.CameraState.Zoom;
@@ -1371,6 +1389,140 @@ public class WireframePanZoomTests
                 $"expected≈{tx0:F3}  got={txAfter:F3}  drift={txAfter - tx0:F3}. " +
                 $"scroll: {scrollX0:F1}→{scrollX1:F1}  panX: {panX0:F1}→{panX1:F1}  " +
                 $"zoom: {zoom0:F3}→{zoom1:F3}  vpX={vpX:F1}  vpW={vpW:F1}");
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    // ── Bottom-right zoom pan-centering bug (#341) ────────────────────────────
+
+    /// <summary>
+    /// Regression guard for the "sprite stuck near top-left after zooming from
+    /// bottom-right corner" pan-centering bug (#341).
+    ///
+    /// Root cause: after multiple zoom-in steps with the pivot at the bottom-right
+    /// corner, <c>ZoomToward</c> computes a very negative <c>rawPanX</c>.  The #319
+    /// guard clamped <c>_panX = 0</c>, erasing the effective-padding buffer.  With
+    /// <c>_panX = 0</c> and a small image the sprite's centre maps to a negative
+    /// scroll offset — unreachable because scroll ≥ 0 — so the user cannot pan the
+    /// sprite to the viewport centre.
+    ///
+    /// Fix: clamp to <c>epX</c> (effective-padding X) instead of 0, preserving the
+    /// left-side buffer so the sprite is always pannable to the viewport centre.
+    /// </summary>
+    [AvaloniaFact]
+    public void ZoomFromBottomRight_MultipleTimes_SpritePannableToCenter()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // 32×32 sprite — small enough that rawPanX becomes negative after ~5
+            // bottom-right zoom steps, reliably triggering the clamped branch.
+            var texPath = WriteSolidPng(dir, "small32.png", size: 32);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
+
+            ctrl.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            // Start from 100 % zoom for a deterministic initial state.
+            ctrl.SetZoomPercent(100);
+            Dispatcher.UIThread.RunJobs();
+
+            float vpW = (float)sv.Viewport.Width;
+            float vpH = (float)sv.Viewport.Height;
+
+            // Simulate 8 wheel-zoom-in notches from the bottom-right corner.
+            // rawPanX goes negative after ~5 steps, triggering the _panX clamp.
+            float pivotX = vpW - 10f;
+            float pivotY = vpH - 10f;
+            for (int i = 0; i < 8; i++)
+                ctrl.SimulateWheelZoom(pivotX, pivotY, 1.25f);
+
+            Dispatcher.UIThread.RunJobs();
+
+            // panX/Y ≥ 0 AND sprite centre reachable: covers #319 (sprite off-screen)
+            // and #341 (centreScroll < 0, centering blocked).
+            AssertZoomInvariants(ctrl, sv, "after 8 bottom-right zoom steps");
+
+            // ── Assert: executing the rightward pan actually decreases scroll ──
+            double scrollBefore = sv.Offset.X;
+            const float panAmt = 50f;
+            if (scrollBefore >= panAmt)
+            {
+                ctrl.SimulatePanStart(vpW / 2f, vpH / 2f);
+                ctrl.SimulatePanMove(vpW / 2f + panAmt, vpH / 2f);
+                ctrl.SimulatePanEnd();
+                Dispatcher.UIThread.RunJobs();
+
+                double scrollAfter = sv.Offset.X;
+                Assert.True(Math.Abs(scrollBefore - scrollAfter - panAmt) < 5.0,
+                    $"Rightward pan of {panAmt}px must decrease scroll by ~{panAmt}px; " +
+                    $"before={scrollBefore:F1} after={scrollAfter:F1} " +
+                    $"delta={scrollBefore - scrollAfter:F1}. Sprite is stuck (#341).");
+            }
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    // ── Parameterized blank-space zoom invariants ─────────────────────────────
+
+    /// <summary>
+    /// Parameterized regression guard: zooming 8 notches toward any blank-space
+    /// viewport position must always satisfy the core ZoomToward post-conditions.
+    ///
+    /// Covers #319 (0.9 pivot), #341 (0.99 pivot), and additional fractions in
+    /// a single harness — a future incomplete clamping fix would fail at least
+    /// one of these cases even if it accidentally passes the others.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(0.5f,  0.5f,  "viewport centre")]
+    [InlineData(0.9f,  0.9f,  "#319 pivot (90% corner)")]
+    [InlineData(0.99f, 0.99f, "#341 pivot (99% far corner)")]
+    [InlineData(0.5f,  0.99f, "bottom-edge centre")]
+    [InlineData(0.99f, 0.5f,  "right-edge centre")]
+    public void ZoomTowardBlankSpace_AnyPivot_InvariantsHold(float fracX, float fracY, string label)
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir, "small.png", size: 32);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
+            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
+
+            ctrl.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            ctrl.SetZoomPercent(100);
+            Dispatcher.UIThread.RunJobs();
+
+            float vpW = (float)sv.Viewport.Width;
+            float vpH = (float)sv.Viewport.Height;
+
+            float pivotX = vpW * fracX;
+            float pivotY = vpH * fracY;
+            for (int i = 0; i < 8; i++)
+                ctrl.SimulateWheelZoom(pivotX, pivotY, 1.25f);
+            Dispatcher.UIThread.RunJobs();
+
+            AssertZoomInvariants(ctrl, sv, $"[{label}] after 8 blank-space zoom steps");
 
             window.Close();
         }
