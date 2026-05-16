@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!--
+      Multi-target both backends so the Desktop head (net10) and BlazorGL head (net8)
+      each get the matching engine flavor. A single-TFM Common forces the wrong backend
+      onto one of the heads and crashes on the first engine call. See the
+      multiplatform-conversion skill for the full rationale.
+    -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MyGame</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Mirror the engine's backend defines so game code can #if KNI / #if MONOGAME. -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
+  </PropertyGroup>
+
+  <!-- net8.0 -> KNI backend (browser/WASM, future KNI mobile). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="FlatRedBall2.Kni" Version="*-*" />
+  </ItemGroup>
+
+  <!-- net10.0 -> MonoGame backend (desktop). -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="FlatRedBall2.MonoGame" Version="*-*" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+  </ItemGroup>
+</Project>

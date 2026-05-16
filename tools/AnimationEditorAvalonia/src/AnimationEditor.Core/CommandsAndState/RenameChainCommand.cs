@@ -10,6 +10,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
 
+        public string Description { get; }
+
         public RenameChainCommand(AnimationChainSave chain, string oldName, string newName,
             IAppCommands commands, IApplicationEvents events)
         {
@@ -18,6 +20,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _newName = newName;
             _commands = commands;
             _events = events;
+            Description = $"Rename '{oldName}' → '{newName}'";
         }
 
         public bool Do()

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace FlatRedBall2.Animation.Content;
 
@@ -10,14 +11,17 @@ namespace FlatRedBall2.Animation.Content;
 /// <remarks>Serialized as <c>&lt;ShapeCollectionSave&gt;</c> in .achx XML.</remarks>
 public class ShapesSave
 {
-    /// <summary>Rectangles defined for this frame.</summary>
-    public List<AARectSave> AARectSaves = new();
+    /// <summary>All shapes in user-defined order. Entries are <see cref="AARectSave"/>, <see cref="CircleSave"/>, or <see cref="PolygonSave"/>.</summary>
+    public List<object> Shapes = new();
 
-    /// <summary>Circles defined for this frame.</summary>
-    public List<CircleSave> CircleSaves = new();
+    /// <summary>All rectangles, projected from <see cref="Shapes"/> in their stored order.</summary>
+    public IEnumerable<AARectSave> AARectSaves => Shapes.OfType<AARectSave>();
 
-    /// <summary>Polygons defined for this frame.</summary>
-    public List<PolygonSave> PolygonSaves = new();
+    /// <summary>All circles, projected from <see cref="Shapes"/> in their stored order.</summary>
+    public IEnumerable<CircleSave> CircleSaves => Shapes.OfType<CircleSave>();
+
+    /// <summary>All polygons, projected from <see cref="Shapes"/> in their stored order.</summary>
+    public IEnumerable<PolygonSave> PolygonSaves => Shapes.OfType<PolygonSave>();
 }
 
 /// <summary>Serialized rectangle entry within a <see cref="ShapesSave"/>.</summary>

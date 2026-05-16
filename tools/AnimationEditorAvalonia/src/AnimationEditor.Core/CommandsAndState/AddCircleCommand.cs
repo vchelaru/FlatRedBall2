@@ -8,33 +8,41 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly AnimationFrameSave _frame;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
+        private readonly ISelectedState _selectedState;
+        private readonly CircleSave? _preAddCircle;
+
+        public string Description => "Add Circle";
 
         public AddCircleCommand(CircleSave circle, AnimationFrameSave frame,
-            IAppCommands commands, IApplicationEvents events)
+            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
         {
             _circle = circle;
             _frame = frame;
             _commands = commands;
             _events = events;
+            _selectedState = selectedState;
+            _preAddCircle = selectedState.SelectedCircle;
         }
 
         public bool Do()
         {
-            _frame.ShapesSave!.CircleSaves.Add(_circle);
+            _frame.ShapesSave!.Shapes.Add(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedCircle = _circle;
             return true;
         }
 
         public void Undo()
         {
-            _frame.ShapesSave!.CircleSaves.Remove(_circle);
+            _frame.ShapesSave!.Shapes.Remove(_circle);
             _commands.RefreshTreeNode(_frame);
             _commands.RefreshAnimationFrameDisplay();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedCircle = _preAddCircle;
         }
     }
 }

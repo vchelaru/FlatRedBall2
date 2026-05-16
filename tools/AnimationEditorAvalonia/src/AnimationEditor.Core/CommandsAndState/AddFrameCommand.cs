@@ -8,14 +8,21 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly AnimationChainSave _chain;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
+        private readonly ISelectedState _selectedState;
+        private readonly AnimationFrameSave? _preAddFrame;
+
+        public string Description { get; }
 
         public AddFrameCommand(AnimationFrameSave frame, AnimationChainSave chain,
-            IAppCommands commands, IApplicationEvents events)
+            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
         {
             _frame = frame;
             _chain = chain;
             _commands = commands;
             _events = events;
+            _selectedState = selectedState;
+            _preAddFrame = selectedState.SelectedFrame;
+            Description = $"Add Frame to '{chain.Name}'";
         }
 
         public bool Do()
@@ -24,6 +31,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedFrame = _frame;
             return true;
         }
 
@@ -33,6 +41,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedFrame = _preAddFrame;
         }
     }
 }

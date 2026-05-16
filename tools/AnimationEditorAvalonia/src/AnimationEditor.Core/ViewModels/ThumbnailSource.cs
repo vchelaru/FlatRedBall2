@@ -6,15 +6,17 @@ namespace AnimationEditor.Core.ViewModels;
 /// Value signature of the visual a chain's first-frame thumbnail is rendered from.
 /// Two equal <see cref="ThumbnailSource"/> values produce an identical thumbnail, so the
 /// animation tree only regenerates a chain icon when this changes — which happens on a
-/// frame reorder, a first-frame texture swap, a first-frame region edit, or a first-frame
-/// delete.
+/// frame reorder, a first-frame texture swap, a first-frame region edit, a first-frame
+/// flip toggle, or a first-frame delete.
 /// </summary>
 public readonly record struct ThumbnailSource(
     string? TextureName,
     float Left,
     float Right,
     float Top,
-    float Bottom)
+    float Bottom,
+    bool FlipHorizontal,
+    bool FlipVertical)
 {
     /// <summary>
     /// Returns the signature of <paramref name="chain"/>'s first frame, or <c>null</c>
@@ -31,6 +33,8 @@ public readonly record struct ThumbnailSource(
             frame.LeftCoordinate,
             frame.RightCoordinate,
             frame.TopCoordinate,
-            frame.BottomCoordinate);
+            frame.BottomCoordinate,
+            frame.FlipHorizontal,
+            frame.FlipVertical);
     }
 }

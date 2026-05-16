@@ -18,6 +18,15 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Fired when texture references in the loaded project may have changed.</summary>
         event Action AvailableTexturesChanged;
 
+        /// <summary>Fired when a referenced PNG changes on disk. Arg: absolute path.</summary>
+        event Action<string> PngChangedOnDisk;
+
+        /// <summary>Fired when the .achx file is deleted from disk.</summary>
+        event Action<string> AchxDeletedOnDisk;
+
+        /// <summary>Fired after a successful hot-reload of the .achx file. Arg: path.</summary>
+        event Action<string> AchxReloadedFromDisk;
+
         void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);
         void RaiseAnimationChainsChanged();
@@ -27,5 +36,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void CallWireframeTextureChange();
         void RaiseCurrentFileChanged(string path);
         void RaiseAvailableTexturesChanged();
+        void RaisePngChangedOnDisk(string path);
+        void RaiseAchxDeletedOnDisk(string path);
+        void RaiseAchxReloadedFromDisk(string path);
     }
 }

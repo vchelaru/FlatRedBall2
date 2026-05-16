@@ -27,24 +27,40 @@ public sealed class ThumbnailService
     public ThumbnailService(IProjectManager projectManager) =>
         _projectManager = projectManager;
 
+    /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.
+    /// Normalises backslashes to forward slashes before lookup so FSW-reported paths (backslash
+    /// on Windows) evict entries that were stored via <c>FilePath.FullPath</c> (forward slash).
+    /// </summary>
+    public void InvalidatePath(string absolutePath)
+    {
+        BitmapCache.Remove(absolutePath.Replace('\\', '/'));
+    }
+
     /// <summary>
     /// Returns the cached decode of <paramref name="path"/>, decoding on first access.
     /// Returns <c>null</c> for a null/empty path or a file that fails to decode (the
     /// failure is cached too, so a missing texture is not retried every frame).
+    /// <para>
+    /// The cache key is always stored with forward slashes so it matches the normalized
+    /// paths returned by <see cref="ResolveTexturePath"/> and removed by
+    /// <see cref="InvalidatePath"/>. This prevents stale bitmaps when the caller supplies
+    /// a Windows-style backslash path (e.g. from a drag-drop on an unsaved project).
+    /// </para>
     /// </summary>
     public SKBitmap? GetBitmap(string? path)
     {
         if (string.IsNullOrEmpty(path)) return null;
-        if (BitmapCache.TryGetValue(path, out var cached)) return cached;
+        var key = path.Replace('\\', '/');
+        if (BitmapCache.TryGetValue(key, out var cached)) return cached;
         try
         {
             var bm = SKBitmap.Decode(path);
-            BitmapCache[path] = bm;
+            BitmapCache[key] = bm;
             return bm;
         }
         catch
         {
-            BitmapCache[path] = null;
+            BitmapCache[key] = null;
             return null;
         }
     }
@@ -59,8 +75,13 @@ public sealed class ThumbnailService
         if (frame is null || string.IsNullOrEmpty(frame.TextureName)) return null;
 
         // Absolute path (e.g. drag-dropped textures before an ACHX file is saved).
+        // Normalize to forward slashes so the returned path is a consistent cache key
+        // regardless of whether the caller used backslashes (native Windows drag-drop path).
         if (Path.IsPathRooted(frame.TextureName))
-            return File.Exists(frame.TextureName) ? frame.TextureName : null;
+        {
+            var normalized = frame.TextureName.Replace('\\', '/');
+            return File.Exists(frame.TextureName) ? normalized : null;
+        }
 
         // Relative path: requires a saved ACHX to derive the base folder.
         if (string.IsNullOrEmpty(_projectManager.FileName))
@@ -126,12 +147,24 @@ public sealed class ThumbnailService
         using var canvas = new SKCanvas(thumb);
         canvas.Clear(SKColors.Transparent);
         using var paint  = new SKPaint { Color = SKColors.White };
+
+        bool anyFlip = frame.FlipHorizontal || frame.FlipVertical;
+        if (anyFlip)
+        {
+            canvas.Save();
+            float flipScaleX = frame.FlipHorizontal ? -1f : 1f;
+            float flipScaleY = frame.FlipVertical   ? -1f : 1f;
+            canvas.Scale(flipScaleX, flipScaleY, finalW / 2f, finalH / 2f);
+        }
+
         // Nearest-neighbour ("point") sampling: keeps sprite-sheet art crisp/pixellated
         // instead of the blurry smear linear filtering produces on game art.
         canvas.DrawImage(region,
             SKRect.Create(0, 0, finalW, finalH),
             new SKSamplingOptions(SKFilterMode.Nearest),
             paint);
+
+        if (anyFlip) canvas.Restore();
         return thumb;
     }
 }

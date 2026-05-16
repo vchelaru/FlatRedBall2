@@ -8,14 +8,21 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly AnimationChainListSave _acls;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
+        private readonly ISelectedState _selectedState;
+        private readonly AnimationChainSave? _preAddChain;
+
+        public string Description { get; }
 
         public AddChainCommand(AnimationChainSave chain, AnimationChainListSave acls,
-            IAppCommands commands, IApplicationEvents events)
+            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
         {
             _chain = chain;
             _acls = acls;
             _commands = commands;
             _events = events;
+            _selectedState = selectedState;
+            _preAddChain = selectedState.SelectedChain;
+            Description = $"Add Animation '{chain.Name}'";
         }
 
         public bool Do()
@@ -26,6 +33,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedChain = _chain;
             return true;
         }
 
@@ -35,6 +43,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeView();
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedChain = _preAddChain;
         }
     }
 }

@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -160,14 +161,14 @@ public class AchxSerializationTests
         var chain = new AnimationChainSave { Name = "WithRect" };
         var frame = TestHelpers.MakeFrame();
         var rect = new AARectSave { Name = "HitBox", ScaleX = 8, ScaleY = 8, X = 2, Y = -1 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
         acls.Save(path);
         var loaded = AnimationChainListSave.FromFile(path);
         var loadedRect = loaded.AnimationChains[0].Frames[0]
-            .ShapesSave?.AARectSaves[0];
+            .ShapesSave?.AARectSaves.First();
 
         Assert.NotNull(loadedRect);
         Assert.Equal("HitBox", loadedRect!.Name);
@@ -185,14 +186,14 @@ public class AchxSerializationTests
         var chain = new AnimationChainSave { Name = "WithCircle" };
         var frame = TestHelpers.MakeFrame();
         var circle = new CircleSave { Name = "AttackRange", Radius = 20, X = 1, Y = 2 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
         acls.Save(path);
         var loaded = AnimationChainListSave.FromFile(path);
         var loadedCircle = loaded.AnimationChains[0].Frames[0]
-            .ShapesSave?.CircleSaves[0];
+            .ShapesSave?.CircleSaves.First();
 
         Assert.NotNull(loadedCircle);
         Assert.Equal("AttackRange", loadedCircle!.Name);

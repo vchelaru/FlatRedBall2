@@ -89,6 +89,13 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>True when this node represents a CircleSave shape. Set once at construction time.</summary>
     public bool IsCircleNode { get; set; }
 
+    /// <summary>
+    /// True when this is a frame node that currently has no shape children.
+    /// Used by the tree template to show a spacer that matches the chevron width,
+    /// keeping frame icons horizontally aligned regardless of whether they have shapes.
+    /// </summary>
+    public bool IsLeafFrameNode => IsFrameNode && Children.Count == 0;
+
     private object? _thumbnail;
     /// <summary>
     /// First-frame thumbnail for a chain node, set by the App layer once the texture is
@@ -127,7 +134,13 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// </summary>
     public ThumbnailSource? ThumbnailSource { get; set; }
 
-    public ObservableCollection<TreeNodeVm> Children { get; } = new();
+    public ObservableCollection<TreeNodeVm> Children { get; }
+
+    public TreeNodeVm()
+    {
+        Children = new ObservableCollection<TreeNodeVm>();
+        Children.CollectionChanged += (_, _) => Notify(nameof(IsLeafFrameNode));
+    }
 
     /// <summary>
     /// Sets <see cref="IsExpanded"/> on <paramref name="node"/> and every descendant.

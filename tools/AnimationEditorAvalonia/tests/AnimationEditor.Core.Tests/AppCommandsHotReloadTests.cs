@@ -1,15 +1,18 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.HotReload;
 using FlatRedBall2.Animation.Content;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
 
 /// <summary>
-/// Verifies the hot-reload path in <see cref="AppCommands.ReloadAchxFromDisk"/>:
-/// mangled files surface <see cref="IAppCommands.HotReloadFailed"/> and leave the
-/// in-memory state untouched; valid files load normally.
+/// Verifies hot-reload behavior in <see cref="AppCommands"/>:
+/// reload failures surface through <see cref="IAppCommands.HotReloadFailed"/>
+/// and watcher synchronization starts/restarts correctly.
 /// </summary>
 [Collection("SequentialSingletons")]
 public class AppCommandsHotReloadTests : IDisposable
@@ -45,7 +48,7 @@ public class AppCommandsHotReloadTests : IDisposable
         return path;
     }
 
-    // ── Mangled file: fires HotReloadFailed ───────────────────────────────────
+    // ── ReloadAchxFromDisk: failure handling ─────────────────────────────────
 
     [Fact]
     public void ReloadAchxFromDisk_ConflictMarkerFile_FiresHotReloadFailed()
@@ -95,7 +98,6 @@ public class AppCommandsHotReloadTests : IDisposable
     [Fact]
     public void ReloadAchxFromDisk_MangledFile_DoesNotClearUndoStack()
     {
-        // Put something on the undo stack first.
         var path = WriteMinimalAchx("Before");
         _ctx.AppCommands.LoadAnimationChain(path);
         _ctx.AppCommands.AddAnimationChainWithName("Extra");
@@ -104,10 +106,6 @@ public class AppCommandsHotReloadTests : IDisposable
         _ctx.UndoManager.StackChanged += () => wasCleared = true;
 
         _ctx.AppCommands.ReloadAchxFromDisk(WriteConflictMarkerFile());
-
-        // StackChanged fires on every push/pop/clear — but since reload aborted,
-        // the undo stack was not touched by ReloadAchxFromDisk.
-        // Reset the flag after a potential false-fire from the AddAnimationChainWithName above.
         wasCleared = false;
         _ctx.AppCommands.ReloadAchxFromDisk(WriteConflictMarkerFile());
 
@@ -124,8 +122,6 @@ public class AppCommandsHotReloadTests : IDisposable
 
         Assert.False(loadFailedFired);
     }
-
-    // ── Valid file: loads normally ────────────────────────────────────────────
 
     [Fact]
     public void ReloadAchxFromDisk_ValidFile_LoadsNewContent()
@@ -149,5 +145,112 @@ public class AppCommandsHotReloadTests : IDisposable
         _ctx.AppCommands.ReloadAchxFromDisk(WriteMinimalAchx("Run"));
 
         Assert.False(fired);
+    }
+
+    // ── SyncHotReloadWatcher: watcher start/update behavior ──────────────────
+
+    [Fact]
+    public void SyncHotReloadWatcher_UnsavedProject_PassesEmptyAchxPath()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        ctx.ProjectManager.FileName = null;
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.Equal(string.Empty, spy.LastStartAchxPath);
+    }
+
+    [Fact]
+    public void SyncHotReloadWatcher_UnsavedProjectWithAbsolutePng_StartsWatchingThatPng()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        ctx.ProjectManager.FileName = null;
+
+        var pngPath = Path.Combine(Path.GetTempPath(), "Sprites", "hero.png");
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(TestHelpers.MakeFrame(pngPath));
+        ctx.Acls.AnimationChains.Add(chain);
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.NotNull(spy.LastStartPngPaths);
+        Assert.Contains(pngPath, spy.LastStartPngPaths!, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SyncHotReloadWatcher_UnsavedProjectNoPngs_StartsWithEmptyPngList()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        ctx.ProjectManager.FileName = null;
+
+        ctx.Acls.AnimationChains.Add(new AnimationChainSave { Name = "Idle" });
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.NotNull(spy.LastStartPngPaths);
+        Assert.Empty(spy.LastStartPngPaths!);
+    }
+
+    [Fact]
+    public void SyncHotReloadWatcher_SavedProject_PassesAchxPath()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(Path.GetTempPath(), "proj", "anim.achx");
+        ctx.ProjectManager.FileName = achxPath;
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.Equal(achxPath, spy.LastStartAchxPath);
+    }
+
+    [Fact]
+    public void SyncHotReloadWatcher_SavedProjectWithRelativePng_ResolvesAbsolutePath()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var spy = new SpyHotReloadWatcher();
+        ctx.AppCommands.HotReloadWatcher = spy;
+        var achxPath = Path.Combine(Path.GetTempPath(), "proj", "anim.achx");
+        ctx.ProjectManager.FileName = achxPath;
+
+        var chain = new AnimationChainSave { Name = "Run" };
+        chain.Frames.Add(TestHelpers.MakeFrame("sprites/run.png"));
+        ctx.Acls.AnimationChains.Add(chain);
+
+        ctx.AppCommands.SyncHotReloadWatcher();
+
+        Assert.NotNull(spy.LastStartPngPaths);
+        var expectedAbs = Path.Combine(Path.GetDirectoryName(achxPath)!, "sprites/run.png");
+        Assert.Contains(expectedAbs, spy.LastStartPngPaths!, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class SpyHotReloadWatcher : IHotReloadWatcher
+    {
+        public string? LastStartAchxPath;
+        public List<string>? LastStartPngPaths;
+
+        public event Action<string>? AchxChangedOnDisk { add { } remove { } }
+        public event Action<string>? PngChangedOnDisk { add { } remove { } }
+        public event Action<string>? AchxDeletedOnDisk { add { } remove { } }
+
+        public bool IsEnabled { get; set; } = true;
+
+        public void StartWatching(string achxPath, IEnumerable<string> pngPaths)
+        {
+            LastStartAchxPath = achxPath;
+            LastStartPngPaths = new List<string>(pngPaths);
+        }
+
+        public void UpdatePngList(IEnumerable<string> newPngPaths) { }
+        public void StopWatching() { }
+        public void RecordOwnSave(string filePath) { }
+        public void Dispose() { }
     }
 }

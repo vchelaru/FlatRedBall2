@@ -136,6 +136,7 @@ public class UndoManagerSaveStateTests
 
     private sealed class StubCommand : IUndoableCommand
     {
+        public string Description => "Stub";
         public bool Do() => true;
         public void Undo() { }
         public void Redo() { }

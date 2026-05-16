@@ -16,6 +16,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IApplicationEvents _events;
         private readonly System.Action _refresh;
 
+        public string Description { get; }
+
         public FlipCommand(
             IReadOnlyList<AnimationFrameSave> frames, bool horizontal,
             IAppCommands commands, IApplicationEvents events, System.Action refresh)
@@ -25,6 +27,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands = commands;
             _events = events;
             _refresh = refresh;
+            Description = horizontal ? "Flip Horizontal" : "Flip Vertical";
         }
 
         public bool Do() { Toggle(); return true; }

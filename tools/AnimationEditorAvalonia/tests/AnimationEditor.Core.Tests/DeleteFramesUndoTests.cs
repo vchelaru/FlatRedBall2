@@ -67,4 +67,27 @@ public class DeleteFramesUndoTests
         Assert.Same(f0, chain.Frames[0]);
         Assert.Same(f2, chain.Frames[2]);
     }
+
+    /// <summary>
+    /// Regression test for #272: multi-select batch delete only removed one frame.
+    /// Verifies the HandleDelete path: SelectedNodes → SelectedFrames → DeleteFrames.
+    /// </summary>
+    [Fact]
+    public void DeleteFrames_ViaSelectedNodes_DeletesAllSelectedFrames()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 4);
+        var f0 = chain.Frames[0];
+        var f2 = chain.Frames[2];
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedNodes = new List<object> { f0, f2 };
+
+        // Exact logic from MainWindow.HandleDelete for AnimationFrameSave
+        var frames = ctx.SelectedState.SelectedFrames;
+        ctx.AppCommands.DeleteFrames(frames);
+
+        Assert.Equal(2, chain.Frames.Count);
+        Assert.DoesNotContain(f0, chain.Frames);
+        Assert.DoesNotContain(f2, chain.Frames);
+    }
 }

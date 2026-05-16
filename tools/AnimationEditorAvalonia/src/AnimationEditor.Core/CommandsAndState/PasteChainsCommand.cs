@@ -19,19 +19,27 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IReadOnlyList<AnimationChainSave> _chains;
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
+        private readonly ISelectedState _selectedState;
+        private readonly AnimationChainSave? _preAddChain;
 
         private int[] _insertedIndices = [];
+
+        public string Description { get; }
 
         public PasteChainsCommand(
             AnimationChainListSave acls,
             IReadOnlyList<AnimationChainSave> chains,
             IAppCommands commands,
-            IApplicationEvents events)
+            IApplicationEvents events,
+            ISelectedState selectedState)
         {
             _acls = acls;
             _chains = chains;
             _commands = commands;
             _events = events;
+            _selectedState = selectedState;
+            _preAddChain = selectedState.SelectedChain;
+            Description = chains.Count == 1 ? "Paste Animation" : $"Paste {chains.Count} Animations";
         }
 
         public bool Do()
@@ -44,6 +52,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 .ToArray();
 
             RaiseSideEffects();
+            _selectedState.SelectedChain = _chains[0];
             return true;
         }
 
@@ -52,6 +61,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             foreach (var chain in _chains)
                 _acls.AnimationChains.Remove(chain);
             RaiseSideEffects();
+            _selectedState.SelectedChain = _preAddChain;
         }
 
         public void Redo()
@@ -62,6 +72,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 _acls.AnimationChains.Insert(idx, _chains[i]);
             }
             RaiseSideEffects();
+            _selectedState.SelectedChain = _chains[0];
         }
 
         private void RaiseSideEffects()

@@ -34,7 +34,7 @@ public class AnimationChainListSaveWriterTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.AARectSaves.Add(new AARectSave { Name = "Hit", X = 1, Y = 2, ScaleX = 3, ScaleY = 4 });
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Hit", X = 1, Y = 2, ScaleX = 3, ScaleY = 4 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -52,7 +52,7 @@ public class AnimationChainListSaveWriterTests
         var chain = new AnimationChainSave { Name = "C" };
         var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
         frame.ShapesSave = new ShapesSave();
-        frame.ShapesSave.CircleSaves.Add(new CircleSave { Name = "Origin", X = 5, Y = 6, Radius = 7 });
+        frame.ShapesSave.Shapes.Add(new CircleSave { Name = "Origin", X = 5, Y = 6, Radius = 7 });
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
@@ -98,7 +98,7 @@ public class AnimationChainListSaveWriterTests
         var poly = new PolygonSave { Name = "Shape", X = 0, Y = 0 };
         poly.Points.Add(new Vector2Save { X = 1, Y = 2 });
         poly.Points.Add(new Vector2Save { X = 3, Y = 4 });
-        frame.ShapesSave.PolygonSaves.Add(poly);
+        frame.ShapesSave.Shapes.Add(poly);
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 

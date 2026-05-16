@@ -16,6 +16,21 @@ Each sample is a complete runnable game built on the engine — open the source 
 | [PlatformKing](samples/PlatformKing/) | Platformer | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/PlatformKing/) |
 | [Solitaire](samples/Solitaire/) | Klondike solitaire | [▶ Play in browser](https://vchelaru.github.io/FlatRedBall2/Solitaire/) |
 
+## Tools
+
+**Animation Editor** — author and preview sprite animation chains (`.achx`). Self-contained downloads (no .NET install required):
+
+| Platform | Download |
+|---|---|
+| Windows (x64) | [AnimationEditor-win-x64.zip](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-win-x64.zip) |
+| macOS (Apple Silicon) | [AnimationEditor-osx-arm64.zip](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-osx-arm64.zip) |
+| macOS (Intel) | [AnimationEditor-osx-x64.zip](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-osx-x64.zip) |
+| Linux (x64) | [AnimationEditor-linux-x64.tar.gz](https://github.com/vchelaru/FlatRedBall2/releases/latest/download/AnimationEditor-linux-x64.tar.gz) |
+
+The links above always resolve to the latest published release. Older versions are on the [Releases page](https://github.com/vchelaru/FlatRedBall2/releases).
+
+Binaries are unsigned. Windows SmartScreen will warn on first run ("More info" → "Run anyway"); macOS Gatekeeper will refuse to open directly — right-click the executable, choose Open, then confirm.
+
 ## Features
 
 - **Screens & Entities** — structured game object model with lifecycle hooks (`CustomInitialize`, `CustomActivity`, `CustomDestroy`)
@@ -85,6 +100,8 @@ Scaffold a new game. Pick a name (we'll use `YourGameName` below) and run from a
 dotnet new frb2-desktop -n YourGameName
 ```
 
+> **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. It adds a `YourGameName.BlazorGL/` head (Blazor WebAssembly via KNI) alongside the desktop one, sharing the same `Common` project. Slightly more complex layout — only worth it if you actually plan to ship to the web. See [Multi-platform setup](#multi-platform-desktop--web) below for what changes.
+
 By default the new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs) so an AI assistant can reference them immediately. To start with an empty `Content/` folder instead:
 
 ```
@@ -113,6 +130,31 @@ A window should open showing the text "Hello from FlatRedBall 2" centered on a b
 - Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code goes. `CustomInitialize` runs once when the screen starts (it's where the placeholder label is created — delete that block once you start building your own game); `CustomActivity` runs every frame.
 - For complete examples of real games, browse the [`samples/`](samples/) directory of **this repository** (not your project). Each sample is a runnable project demonstrating different engine features.
 - For task-specific guidance (entities, collision, animation, etc.), see [`frb-skills/`](frb-skills/) — Markdown guides written for AI assistants but readable by humans too.
+
+### Multi-platform (Desktop + Web)
+
+If you also want to ship to browsers, use `frb2-multiplatform` instead of `frb2-desktop`:
+
+```
+dotnet new frb2-multiplatform -n YourGameName
+```
+
+This produces three projects sharing one `Common`:
+
+- `YourGameName.Common/` — game code, multi-targets `net8.0` (KNI/web) and `net10.0` (MonoGame/desktop).
+- `YourGameName.Desktop/` — desktop entry point (MonoGame, `net10.0`).
+- `YourGameName.BlazorGL/` — Blazor WebAssembly entry point (KNI, `net8.0`). Contains its own `App.razor`, `Pages/Index.razor`, `wwwroot/frb-host.js`, etc. — edit them freely; they're yours.
+
+Run the desktop head as before. To run the web head:
+
+```
+cd YourGameName/YourGameName.BlazorGL
+dotnet run
+```
+
+This launches a local dev server (default `https://localhost:5001`) — open the URL and the game runs in the browser canvas. Apos.Shapes' precompiled shader XNB ships in `wwwroot/Content/` so neither Wine nor a shader compiler is needed on macOS/Linux.
+
+`Game1.cs` uses `#if KNI` to pick `GraphicsProfile.FL10_0` on the web target (`GraphicsProfile.HiDef` on desktop). Keep that pattern if you add any code that diverges between backends. Save data and other `System.IO.File`-based code should be gated behind `#if !KNI` since browsers have no filesystem.
 
 ### Manual setup (reference)
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -16,6 +17,12 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public bool CanUndo => _undoStack.Count > 0;
         public bool CanRedo => _redoStack.Count > 0;
         public SaveState SaveState => _saveState;
+
+        /// <inheritdoc cref="IUndoManager.UndoHistory"/>
+        public IReadOnlyList<IUndoableCommand> UndoHistory => _undoStack.Reverse().ToList();
+
+        /// <inheritdoc cref="IUndoManager.RedoHistory"/>
+        public IReadOnlyList<IUndoableCommand> RedoHistory => _redoStack.ToList();
 
         /// <summary>Raised after <see cref="Execute"/>, <see cref="Record"/>, <see cref="Undo"/>, <see cref="Redo"/>, <see cref="Clear"/>, <see cref="MarkSaved"/>, or <see cref="MarkSaveFailed"/>.</summary>
         public event Action? StackChanged;

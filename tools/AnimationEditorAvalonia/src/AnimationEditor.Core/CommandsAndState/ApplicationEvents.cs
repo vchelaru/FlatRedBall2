@@ -14,6 +14,9 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action? AnimationChainsChanged;
         public event Action<string>? CurrentFileChanged;
         public event Action? AvailableTexturesChanged;
+        public event Action<string>? PngChangedOnDisk;
+        public event Action<string>? AchxDeletedOnDisk;
+        public event Action<string>? AchxReloadedFromDisk;
 
         public void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle) =>
             AfterAxisAlignedRectangleChanged?.Invoke(rectangle);
@@ -41,5 +44,14 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void RaiseAvailableTexturesChanged() =>
             AvailableTexturesChanged?.Invoke();
+
+        public void RaisePngChangedOnDisk(string path) =>
+            PngChangedOnDisk?.Invoke(path);
+
+        public void RaiseAchxDeletedOnDisk(string path) =>
+            AchxDeletedOnDisk?.Invoke(path);
+
+        public void RaiseAchxReloadedFromDisk(string path) =>
+            AchxReloadedFromDisk?.Invoke(path);
     }
 }

@@ -31,7 +31,7 @@ public class ThumbnailSourceTests
 
         var source = ThumbnailSource.FromChain(chain);
 
-        Assert.Equal(new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f), source);
+        Assert.Equal(new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false), source);
     }
 
     [Fact]
@@ -62,5 +62,41 @@ public class ThumbnailSourceTests
         });
 
         Assert.NotEqual(ThumbnailSource.FromChain(leftHalf), ThumbnailSource.FromChain(rightHalf));
+    }
+
+    [Fact]
+    public void FromChain_FlipHorizontalChange_ProducesUnequalSignature()
+    {
+        // A flip toggle on the first frame must invalidate the cached chain icon.
+        var normal = new AnimationChainSave { Name = "Normal" };
+        normal.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipHorizontal = false,
+        });
+        var flipped = new AnimationChainSave { Name = "Flipped" };
+        flipped.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipHorizontal = true,
+        });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(normal), ThumbnailSource.FromChain(flipped));
+    }
+
+    [Fact]
+    public void FromChain_FlipVerticalChange_ProducesUnequalSignature()
+    {
+        // A vertical flip toggle on the first frame must also invalidate the cached chain icon.
+        var normal = new AnimationChainSave { Name = "Normal" };
+        normal.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipVertical = false,
+        });
+        var flipped = new AnimationChainSave { Name = "Flipped" };
+        flipped.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f, FlipVertical = true,
+        });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(normal), ThumbnailSource.FromChain(flipped));
     }
 }

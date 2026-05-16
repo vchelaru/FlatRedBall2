@@ -69,6 +69,39 @@ public class TreeThumbnailTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [AvaloniaFact]
+    public void AnimationChainsChanged_AfterFirstFrameFlipHorizontal_RegeneratesTreeThumbnail()
+    {
+        // Flipping the first frame fires AnimationChainsChanged. The tree thumbnail for the
+        // chain must regenerate to show the flipped version, not the stale cached one.
+        var (window, ctx) = CreateWindow();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            WriteSolidPng(dir, "red.png", SKColors.Red);
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(FullFrame("red.png"));
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            var chainNode = GetRoots(window)[0];
+            var initialThumbnail = chainNode.Thumbnail;
+            Assert.NotNull(initialThumbnail);
+
+            // Flip the first frame and notify the system via the event bus (the same path
+            // taken by FlipFrameHorizontally and undo/redo).
+            chain.Frames[0].FlipHorizontal = true;
+            ctx.ApplicationEvents.RaiseAnimationChainsChanged();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.NotSame(initialThumbnail, chainNode.Thumbnail);
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
     public void RefreshTreeView_ChainWithFirstFrame_SetsChainNodeThumbnail()
     {
         var (window, ctx) = CreateWindow();

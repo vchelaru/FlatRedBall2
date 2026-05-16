@@ -14,20 +14,15 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: windows-latest
-
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version:    ${{ steps.meta.outputs.version }}
+      tag:        ${{ steps.meta.outputs.tag }}
+      title:      ${{ steps.meta.outputs.title }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      draft:      ${{ steps.meta.outputs.draft }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Compute version + tag + title
         id: meta
         shell: pwsh
@@ -48,26 +43,109 @@ jobs:
           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
           "draft=$draft"           >> $env:GITHUB_OUTPUT
 
-      - name: Restore
-        run: dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Publish Animation Editor (Windows, self-contained)
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test AnimationEditor solution
+        run: dotnet test tools/AnimationEditorAvalonia/AnimationEditorAvalonia.slnx -c Release
+
+  build:
+    needs: [meta, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            archive: zip
+            asset: AnimationEditor-win-x64.zip
+          - rid: linux-x64
+            os: ubuntu-latest
+            archive: tar.gz
+            asset: AnimationEditor-linux-x64.tar.gz
+          - rid: osx-x64
+            os: macos-latest
+            archive: zip
+            asset: AnimationEditor-osx-x64.zip
+          - rid: osx-arm64
+            os: macos-latest
+            archive: zip
+            asset: AnimationEditor-osx-arm64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj -r ${{ matrix.rid }}
+
+      - name: Publish (${{ matrix.rid }}, self-contained single-file)
         run: >
           dotnet publish
           tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
           -c Release
-          -r win-x64
+          -r ${{ matrix.rid }}
           --self-contained
-          -p:Version=${{ steps.meta.outputs.version }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ needs.meta.outputs.version }}
           -o dist/publish
 
-      - name: Package release zip
+      - name: Mark binary executable (non-Windows)
+        if: matrix.os != 'windows-latest'
+        run: chmod +x dist/publish/AnimationEditor.App
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $zip = "dist/AnimationEditor.zip"
-          if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path "dist/publish/*" -DestinationPath $zip
+          New-Item -ItemType Directory -Force -Path dist/out | Out-Null
+          Compress-Archive -Path "dist/publish/*" -DestinationPath "dist/out/${{ matrix.asset }}"
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          mkdir -p dist/out
+          tar -czf "dist/out/${{ matrix.asset }}" -C dist/publish .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/out/${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [meta, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la dist
 
       - name: Create tag (release only)
         if: github.event.inputs.release_kind == 'release'
@@ -75,15 +153,19 @@ jobs:
         run: |
           git config user.name  "github-actions"
           git config user.email "actions@github.com"
-          git tag -a "${{ steps.meta.outputs.tag }}" -m "${{ steps.meta.outputs.title }}"
-          git push origin "${{ steps.meta.outputs.tag }}"
+          git tag -a "${{ needs.meta.outputs.tag }}" -m "${{ needs.meta.outputs.title }}"
+          git push origin "${{ needs.meta.outputs.tag }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name:     ${{ steps.meta.outputs.title }}
+          tag_name:   ${{ needs.meta.outputs.tag }}
+          name:       ${{ needs.meta.outputs.title }}
           generate_release_notes: true
-          prerelease: ${{ steps.meta.outputs.prerelease }}
-          draft:      ${{ steps.meta.outputs.draft }}
-          files: dist/AnimationEditor.zip
+          prerelease: ${{ needs.meta.outputs.prerelease }}
+          draft:      ${{ needs.meta.outputs.draft }}
+          files: |
+            dist/AnimationEditor-win-x64.zip
+            dist/AnimationEditor-linux-x64.tar.gz
+            dist/AnimationEditor-osx-x64.zip
+            dist/AnimationEditor-osx-arm64.zip

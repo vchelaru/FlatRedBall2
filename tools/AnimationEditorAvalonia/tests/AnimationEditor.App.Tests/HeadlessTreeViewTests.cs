@@ -675,7 +675,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.CircleSaves.Add(circle);
+            frame.ShapesSave.Shapes.Add(circle);
             var chain  = new AnimationChainSave { Name = "Run" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
@@ -717,7 +717,7 @@ public class HeadlessTreeViewTests
                 TextureName         = "Tex.png",
                 ShapesSave = new ShapesSave()
             };
-            frame.ShapesSave.AARectSaves.Add(rect);
+            frame.ShapesSave.Shapes.Add(rect);
             var chain = new AnimationChainSave { Name = "Idle" };
             chain.Frames.Add(frame);
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);

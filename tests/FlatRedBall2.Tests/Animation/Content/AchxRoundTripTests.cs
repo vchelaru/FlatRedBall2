@@ -83,32 +83,38 @@ public class AchxRoundTripTests
         }
 
         actual.ShapesSave.ShouldNotBeNull();
-        actual.ShapesSave!.AARectSaves.Count.ShouldBe(expected.ShapesSave.AARectSaves.Count);
-        for (int i = 0; i < expected.ShapesSave.AARectSaves.Count; i++)
+        var expRects = expected.ShapesSave.AARectSaves.ToList();
+        var actRects = actual.ShapesSave!.AARectSaves.ToList();
+        actRects.Count.ShouldBe(expRects.Count);
+        for (int i = 0; i < expRects.Count; i++)
         {
-            var er = expected.ShapesSave.AARectSaves[i];
-            var ar = actual.ShapesSave.AARectSaves[i];
+            var er = expRects[i];
+            var ar = actRects[i];
             ar.Name.ShouldBe(er.Name);
             ar.X.ShouldBe(er.X);
             ar.Y.ShouldBe(er.Y);
             ar.ScaleX.ShouldBe(er.ScaleX);
             ar.ScaleY.ShouldBe(er.ScaleY);
         }
-        actual.ShapesSave.CircleSaves.Count.ShouldBe(expected.ShapesSave.CircleSaves.Count);
-        for (int i = 0; i < expected.ShapesSave.CircleSaves.Count; i++)
+        var expCircles = expected.ShapesSave.CircleSaves.ToList();
+        var actCircles = actual.ShapesSave.CircleSaves.ToList();
+        actCircles.Count.ShouldBe(expCircles.Count);
+        for (int i = 0; i < expCircles.Count; i++)
         {
-            var ec = expected.ShapesSave.CircleSaves[i];
-            var ac = actual.ShapesSave.CircleSaves[i];
+            var ec = expCircles[i];
+            var ac = actCircles[i];
             ac.Name.ShouldBe(ec.Name);
             ac.X.ShouldBe(ec.X);
             ac.Y.ShouldBe(ec.Y);
             ac.Radius.ShouldBe(ec.Radius);
         }
-        actual.ShapesSave.PolygonSaves.Count.ShouldBe(expected.ShapesSave.PolygonSaves.Count);
-        for (int i = 0; i < expected.ShapesSave.PolygonSaves.Count; i++)
+        var expPolys = expected.ShapesSave.PolygonSaves.ToList();
+        var actPolys = actual.ShapesSave.PolygonSaves.ToList();
+        actPolys.Count.ShouldBe(expPolys.Count);
+        for (int i = 0; i < expPolys.Count; i++)
         {
-            var ep = expected.ShapesSave.PolygonSaves[i];
-            var ap = actual.ShapesSave.PolygonSaves[i];
+            var ep = expPolys[i];
+            var ap = actPolys[i];
             ap.Name.ShouldBe(ep.Name);
             ap.X.ShouldBe(ep.X);
             ap.Y.ShouldBe(ep.Y);
@@ -157,13 +163,13 @@ public class AchxRoundTripTests
         frame.ShapesSave = new ShapesSave();
         var poly = new PolygonSave { Name = "Dot", X = 0, Y = 0 };
         poly.Points.Add(new Vector2Save { X = 5, Y = 7 });
-        frame.ShapesSave.PolygonSaves.Add(poly);
+        frame.ShapesSave.Shapes.Add(poly);
         chain.Frames.Add(frame);
         save.AnimationChains.Add(chain);
 
         var roundTripped = RoundTrip(save);
 
-        var p = roundTripped.AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves[0];
+        var p = roundTripped.AnimationChains[0].Frames[0].ShapesSave!.PolygonSaves.First();
         p.Points.Count.ShouldBe(1);
         p.Points[0].X.ShouldBe(5f);
         p.Points[0].Y.ShouldBe(7f);

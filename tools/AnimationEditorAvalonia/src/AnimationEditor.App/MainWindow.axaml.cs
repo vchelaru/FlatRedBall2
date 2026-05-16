@@ -1,7 +1,8 @@
-using AnimationEditor.Core;
+﻿using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.DragDrop;
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
@@ -48,11 +49,11 @@ public partial class MainWindow : Window
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressTreeSelectionHandling;
     private System.Threading.CancellationTokenSource? _toastCts;
-    private List<AnimationChainSave>? _pendingDeleteChains;
 
+    // AppContext.BaseDirectory works under single-file publish; Assembly.Location is empty there (IL3000).
+    // Path.Combine handles the platform-correct separator (was a hardcoded "\\" — would break on macOS/Linux).
     private FilePath SettingsFilePath =>
-        new FilePath((Path.GetDirectoryName(
-            System.Reflection.Assembly.GetExecutingAssembly().Location) ?? string.Empty) + "\\AESettings.json");
+        new FilePath(Path.Combine(AppContext.BaseDirectory, "AESettings.json"));
 
     public MainWindow(
         IProjectManager projectManager,
@@ -97,6 +98,7 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Closed += (_, _) =>
         {
+            _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
             foreach (var vm in _timelineFrames)
                 (vm.Thumbnail as IDisposable)?.Dispose();
@@ -142,7 +144,7 @@ public partial class MainWindow : Window
         _appCommands.RebuildTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RebuildTreeView);
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
-        _appCommands.RefreshAnimationFrameDisplayRequested += () => { };
+        _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
         // RefreshWireframeRequested is handled by WireframeControl directly
 
         _events.CurrentFileChanged     += path => Dispatcher.UIThread.InvokeAsync(() =>
@@ -169,17 +171,18 @@ public partial class MainWindow : Window
             _undoManager.Undo();
         };
 
-        DeleteChainConfirmBtn.Click += (_, _) => CommitDeleteChain();
-        DeleteChainCancelBtn.Click  += (_, _) => CancelDeleteChain();
+        // Wire hot reload watcher
+        _appCommands.HotReloadWatcher = new HotReloadWatcher();
+        _appCommands.WireHotReloadWatcher();
 
-        PointerPressed += (_, e) =>
-        {
-            if (_pendingDeleteChains is not null &&
-                !DeleteChainConfirmPanel.IsPointerOver)
-            {
-                CancelDeleteChain();
-            }
-        };
+        _events.PngChangedOnDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() => OnPngChangedOnDisk(path));
+        _events.AchxDeletedOnDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowToast($"'{System.IO.Path.GetFileName(path)}' was deleted from disk."));
+        _events.AchxReloadedFromDisk += path =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+                ShowToast($"Reloaded {System.IO.Path.GetFileName(path)}"));
     }
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
@@ -426,6 +429,7 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.InvokeAsync(RefreshTimelineStrip);
+        Dispatcher.UIThread.InvokeAsync(RefreshTreeThumbnails);
         // Re-sync the property inspector so its values (flip toggles, frame length,
         // offsets, …) reflect the model after any mutation — including undo/redo.
         Dispatcher.UIThread.InvokeAsync(RefreshPropertyPanel);
@@ -477,6 +481,47 @@ public partial class MainWindow : Window
     }
 
 
+
+    private void RefreshHistoryPanel()
+    {
+        var undoHistory = _undoManager.UndoHistory;
+        var redoHistory = _undoManager.RedoHistory;
+        var items = new List<Models.HistoryEntryVm>();
+        // Newest undo item at the top, oldest at the bottom
+        foreach (var cmd in undoHistory.Reverse())
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec"));
+        foreach (var cmd in redoHistory)
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#6a6e76"));
+        HistoryList.ItemsSource = items;
+
+        // Current step is always row 0 (most recent action)
+        HistoryList.SelectedIndex = undoHistory.Count > 0 ? 0 : -1;
+        if (items.Count > 0)
+            HistoryList.ScrollIntoView(items[0]);
+
+        HistoryUndoButton.IsEnabled = _undoManager.CanUndo;
+        HistoryRedoButton.IsEnabled = _undoManager.CanRedo;
+    }
+
+    private void SetHistoryVisible(bool visible)
+    {
+        HistorySplitter.IsVisible = visible;
+        HistorySectionGrid.IsVisible = visible;
+        if (visible)
+        {
+            // Share space: inspector content gets 2/3, history list gets 1/3
+            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(2, GridUnitType.Star);
+            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(4);
+            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
+        }
+        else
+        {
+            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
+            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(0);
+            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(0);
+        }
+        MenuShowHistory.IsEnabled = !visible;
+    }
 
     // ── Texture combo helpers ─────────────────────────────────────────────────
 
@@ -617,6 +662,16 @@ public partial class MainWindow : Window
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
+        MenuReloadFromDisk.Click += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(_projectManager.FileName))
+                _appCommands.ReloadAchxFromDisk(_projectManager.FileName);
+        };
+        MenuEnableHotReload.Click += (_, _) =>
+        {
+            _appCommands.HotReloadWatcher.IsEnabled = MenuEnableHotReload.IsChecked == true;
+        };
+
         MenuUndo.IsEnabled = _undoManager.CanUndo;
         MenuRedo.IsEnabled = _undoManager.CanRedo;
         MenuUndo.Click += (_, _) => _undoManager.Undo();
@@ -625,7 +680,15 @@ public partial class MainWindow : Window
         {
             MenuUndo.IsEnabled = _undoManager.CanUndo;
             MenuRedo.IsEnabled = _undoManager.CanRedo;
+            RefreshHistoryPanel();
         };
+        RefreshHistoryPanel();
+
+        HistoryUndoButton.Click  += (_, _) => _undoManager.Undo();
+        HistoryRedoButton.Click  += (_, _) => _undoManager.Redo();
+        HistoryCloseButton.Click += (_, _) => SetHistoryVisible(false);
+        MenuShowHistory.Click    += (_, _) => SetHistoryVisible(true);
+        MenuShowHistory.IsEnabled = false;
 
         RefreshRecentFiles();
     }
@@ -1057,6 +1120,7 @@ public partial class MainWindow : Window
         RefreshTextureCombo();
         _appCommands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
+        _appCommands.SyncHotReloadWatcher();  // watch the newly-referenced PNG directory
         e.Handled = true;
     }
 
@@ -1209,6 +1273,39 @@ public partial class MainWindow : Window
     private TreeNodeVm? FindChainNode(AnimationChainSave chain) =>
         _treeRoots.FirstOrDefault(n => n.Data is AnimationChainSave c && c == chain);
 
+    // ── Hot reload ────────────────────────────────────────────────────────────
+
+    private void OnPngChangedOnDisk(string absolutePath)
+    {
+        _thumbnailService.InvalidatePath(absolutePath);
+
+        // Force-reload the wireframe texture if it matches the changed PNG
+        if (string.Equals(WireframeCtrl.LoadedTexturePath,
+            new FilePath(absolutePath).Standardized,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            WireframeCtrl.ForceReloadTexture();
+        }
+
+        // Invalidate all cached thumbnails for this path and rebuild tree icons
+        foreach (var node in _treeRoots)
+        {
+            if (node.Data is AnimationChainSave chain &&
+                chain.Frames.Count > 0 &&
+                !string.IsNullOrEmpty(chain.Frames[0].TextureName))
+            {
+                // Force thumbnail regeneration regardless of source equality
+                (node.Thumbnail as IDisposable)?.Dispose();
+                node.Thumbnail = null;
+                node.ThumbnailSource = null;
+            }
+        }
+        RefreshTreeThumbnails();
+        RefreshTimelineStrip();
+        _appCommands.RefreshAnimationFrameDisplay();
+        ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
+    }
+
     /// <summary>
     /// Pixel size the chain first-frame thumbnail bitmap is baked at. Kept at twice the
     /// displayed icon size (the <c>TreeNodeIconSize</c> resource in MainWindow.axaml, 28px)
@@ -1267,7 +1364,20 @@ public partial class MainWindow : Window
 
         var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
-        if (target is not null && !ReferenceEquals(AnimTree.SelectedItem, target))
+        // When a shape is selected, ensure its parent frame node is expanded so
+        // the shape node is visible in the tree (Avalonia does not auto-expand parents).
+        if (sel is AARectSave or CircleSave)
+        {
+            var frame = _selectedState.SelectedFrame;
+            if (frame is not null)
+            {
+                var frameNode = TreeBuilder.FindNodeForData(_treeRoots, frame);
+                if (frameNode is not null)
+                    frameNode.IsExpanded = true;
+            }
+        }
+
+        if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
             AnimTree.SelectedItem = target;
     }
 
@@ -2045,6 +2155,76 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Builds a danger-styled delete confirmation dialog. ENTER confirms (Delete), ESC cancels,
+    /// and closing by any other means resolves <paramref name="tcs"/> to false.
+    /// </summary>
+    internal static Window BuildDeleteConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 380,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+
+        var panel = new StackPanel { Margin = new Avalonia.Thickness(20, 16, 20, 16), Spacing = 8 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            FontSize = 13,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "This action cannot be undone.",
+            FontSize = 11,
+            Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#9098a4"))
+        });
+
+        var deleteBtn = new Button
+        {
+            Content = "Delete",
+            Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d83a3a")),
+            Foreground = Avalonia.Media.Brushes.White,
+            Padding = new Avalonia.Thickness(16, 6)
+        };
+        var cancelBtn = new Button
+        {
+            Content = "Cancel",
+            Padding = new Avalonia.Thickness(16, 6)
+        };
+
+        deleteBtn.Click += (_, _) => { tcs.TrySetResult(true);  dialog.Close(); };
+        cancelBtn.Click += (_, _) => { tcs.TrySetResult(false); dialog.Close(); };
+
+        var buttons = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Margin = new Avalonia.Thickness(0, 4, 0, 0)
+        };
+        buttons.Children.Add(cancelBtn);
+        buttons.Children.Add(deleteBtn);
+        panel.Children.Add(buttons);
+
+        dialog.Content = panel;
+        dialog.Closed += (_, _) => tcs.TrySetResult(false);
+
+        WireDialogKeyboard(dialog,
+            onConfirm: () => { tcs.TrySetResult(true);  dialog.Close(); },
+            onCancel:  () => { tcs.TrySetResult(false); dialog.Close(); });
+
+        // Ensure ENTER confirms (Delete) by focusing the delete button last — it overrides
+        // WireDialogKeyboard's Opened handler which would otherwise land on Cancel (first child).
+        dialog.Opened += (_, _) => deleteBtn.Focus();
+
+        return dialog;
+    }
+
+    /// <summary>
     /// Wires ENTER → <paramref name="onConfirm"/> and ESC → <paramref name="onCancel"/>
     /// on a modal dialog. The handler is attached at the window with
     /// <c>handledEventsToo: true</c> so it still fires when a focused input control
@@ -2193,16 +2373,19 @@ public partial class MainWindow : Window
 
             if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 _ = HandleCopyAsync();
             }
             else if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 _ = HandlePasteAsync();
             }
             else if (e.Key == Key.Delete)
             {
+                if (IsTextInputFocused()) return;
                 e.Handled = true;
                 HandleDelete();
             }
@@ -2242,10 +2425,17 @@ public partial class MainWindow : Window
         }), RoutingStrategies.Tunnel);
     }
 
+    // Returns true when a text-editing control (TextBox) owns keyboard focus.
+    // Used to gate frame/shape copy-paste and Delete so those keys still reach
+    // the text control instead of being swallowed by the window-level handler.
+    private bool IsTextInputFocused()
+        => FocusManager?.GetFocusedElement() is TextBox;
+
     // ── Copy / Paste ──────────────────────────────────────────────────────────
 
     private async Task HandleCopyAsync()
     {
+        if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
@@ -2267,6 +2457,7 @@ public partial class MainWindow : Window
 
     private async Task HandlePasteAsync()
     {
+        if (IsTextInputFocused()) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
@@ -2305,6 +2496,7 @@ public partial class MainWindow : Window
             foreach (var pasted in frames)
                 pasted.ShapesSave ??= new ShapesSave();
 
+            FramePasteLogic.AssignUniqueNames(targetChain.Frames, frames);
             _appCommands.PasteFrames(targetChain, frames);
             _selectedState.SelectedFrame = frames[^1];
             _appCommands.RefreshWireframe();
@@ -2362,14 +2554,22 @@ public partial class MainWindow : Window
         }
         else if (selectedVm.Data is AARectSave rectToDel)
         {
-            var rects = _selectedState.SelectedRectangles;
-            _ = _appCommands.AskToDeleteRectangles(
-                rects.Count > 0 ? rects : new() { rectToDel });
+            var frame   = _selectedState.SelectedFrame!;
+            var rects   = _selectedState.SelectedRectangles;
+            var circles = _selectedState.SelectedCircles;
+            ShowDeleteShapeConfirm(
+                frame,
+                rects.Count > 0 ? rects : new() { rectToDel },
+                circles);
         }
         else if (selectedVm.Data is CircleSave circleToDel)
         {
+            var frame   = _selectedState.SelectedFrame!;
             var circles = _selectedState.SelectedCircles;
-            _ = _appCommands.AskToDeleteCircles(
+            var rects   = _selectedState.SelectedRectangles;
+            ShowDeleteShapeConfirm(
+                frame,
+                rects,
                 circles.Count > 0 ? circles : new() { circleToDel });
         }
     }
@@ -2394,33 +2594,34 @@ public partial class MainWindow : Window
     private void ShowDeleteChainConfirm(AnimationChainSave chain) =>
         ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
 
-    private void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
+    private async void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
     {
-        _pendingDeleteChains = chains;
-        string label = chains.Count == 1
-            ? $"Delete \"{chains[0].Name}\"?"
+        string msg = chains.Count == 1
+            ? $"Delete animation \"{chains[0].Name}\"? It has {chains[0].Frames.Count} frame(s)."
             : $"Delete {chains.Count} animations?";
-        DeleteChainConfirmLabel.Text = label;
-        DeleteChainConfirmPanel.IsVisible = true;
+        var tcs = new TaskCompletionSource<bool>();
+        var dialog = BuildDeleteConfirmDialog(msg, "Delete Animation", tcs);
+        await dialog.ShowDialog(this);
+        if (await tcs.Task)
+            _appCommands.DeleteAnimationChains(chains);
     }
 
-    private void CommitDeleteChain()
+    private async void ShowDeleteShapeConfirm(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles)
     {
-        if (_pendingDeleteChains is null) return;
-        List<AnimationChainSave> chains = _pendingDeleteChains;
-        _pendingDeleteChains = null;
-        DeleteChainConfirmPanel.IsVisible = false;
-        _appCommands.DeleteAnimationChains(chains);
+        int total = rects.Count + circles.Count;
+        string name = rects.Count > 0 ? rects[0].Name : circles[0].Name;
+        string msg = total == 1
+            ? $"Delete shape \"{name}\"?"
+            : $"Delete {total} shape(s)?";
+        var tcs = new TaskCompletionSource<bool>();
+        var dialog = BuildDeleteConfirmDialog(msg, "Delete Shape", tcs);
+        await dialog.ShowDialog(this);
+        if (await tcs.Task)
+            _appCommands.DeleteShapes(frame, rects, circles);
     }
 
-    private void CancelDeleteChain()
-    {
-        _pendingDeleteChains = null;
-        DeleteChainConfirmPanel.IsVisible = false;
-    }
-
-    internal void ShowDeleteChainConfirmForTest(AnimationChainSave chain) =>
-        ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
+    /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>
+    internal void HandleDeleteForTest() => HandleDelete();
 
     // ── Add Multiple Frames ───────────────────────────────────────────────────
 

@@ -109,10 +109,10 @@ public class VisualRenderTests
         using var bm = ctrl.RenderToBitmap(64, 64);
         var center = bm.GetPixel(32, 32);
 
-        // Background is SKColor(30, 30, 30)
-        Assert.Equal(30, (int)center.Red);
-        Assert.Equal(30, (int)center.Green);
-        Assert.Equal(30, (int)center.Blue);
+        // Background matches BgCanvas design token (#0e0f12)
+        Assert.Equal(0x0e, (int)center.Red);
+        Assert.Equal(0x0f, (int)center.Green);
+        Assert.Equal(0x12, (int)center.Blue);
     }
 
     // ── WireframeControl — texture rendering ──────────────────────────────────
@@ -1389,7 +1389,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.AARectSaves.Add(
+        frame.ShapesSave.Shapes.Add(
             new AARectSave { Name = "Box", X = 0, Y = 0, ScaleX = 15, ScaleY = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -1430,7 +1430,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.CircleSaves.Add(
+        frame.ShapesSave.Shapes.Add(
             new CircleSave { Name = "Ring", X = 0, Y = 0, Radius = 15 });
 
         ctx.SelectedState.SelectedFrame = frame;
@@ -1467,7 +1467,7 @@ public class VisualRenderTests
             FrameLength = 0.1f,
             ShapesSave = new ShapesSave()
         };
-        frame.ShapesSave.AARectSaves.Add(rect);
+        frame.ShapesSave.Shapes.Add(rect);
 
         ctx.SelectedState.SelectedFrame = frame;
         ctx.SelectedState.SelectedRectangle = rect; // mark as selected

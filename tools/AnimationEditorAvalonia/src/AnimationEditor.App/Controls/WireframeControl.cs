@@ -90,7 +90,7 @@ public class WireframeControl : Control
 
         internal static void RenderSk(SKCanvas canvas, RenderSnapshot s)
         {
-            canvas.Clear(new SKColor(30, 30, 30));
+            canvas.Clear(CanvasClearColor);
 
             if (s.Image != null)
             {
@@ -284,6 +284,9 @@ public class WireframeControl : Control
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
     private static readonly ISolidColorBrush _dbgBg = new SolidColorBrush(Color.FromArgb(210, 0, 0, 0));
     private static readonly ISolidColorBrush _dbgFg = new SolidColorBrush(Color.FromRgb(0, 255, 80));
+
+    // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
+    internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
 
     /// <summary>
     /// Toggle the real-time debug overlay + event log.  Bind to F2 in MainWindow.
@@ -892,6 +895,19 @@ public class WireframeControl : Control
     {
         var path = DetermineTexturePath();
         LoadTexture(path);
+    }
+
+    /// <summary>
+    /// Force-reload the currently displayed texture from disk, bypassing the identity check.
+    /// Use for PNG hot-reload when the file content changed but the path did not.
+    /// Must be called on the UI thread.
+    /// </summary>
+    public void ForceReloadTexture()
+    {
+        var path = _loadedTexturePath;
+        if (path == null) return;
+        _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
+        LoadTexture(new FilePath(path).StandardizedCaseSensitive);
     }
 
     /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit).</summary>

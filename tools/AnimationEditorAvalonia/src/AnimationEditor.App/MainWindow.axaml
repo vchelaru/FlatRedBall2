@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
+        xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="AnimationEditor.App.MainWindow"
@@ -94,6 +95,9 @@
                         <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
                         <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
                         <Separator />
+                        <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
+                        <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />
+                        <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
                     </MenuItem>
                     <MenuItem Header="_View">
@@ -102,6 +106,8 @@
                         <Separator />
                         <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+OemPlus" />
                         <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+OemMinus" />
+                        <Separator />
+                        <MenuItem Header="Show _History" x:Name="MenuShowHistory" />
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem Header="_About"         x:Name="MenuAbout" />
@@ -117,7 +123,7 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         IsHitTestVisible="False">
-                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-16.png"
+                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-32.png"
                        Width="16" Height="16" />
                 <TextBlock Text="AnimationEditor"
                            FontSize="12"
@@ -186,8 +192,8 @@
         <Grid x:Name="MainContentGrid" ColumnDefinitions="280,4,240,4,*">
 
             <!-- ── Left: Animation tree ── -->
-            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*,Auto"
-                  Background="{StaticResource BgApp}">
+            <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
+                  Background="{StaticResource BgCanvas}">
 
                 <!-- ── Tree pane header ── -->
                 <Border Grid.Row="0"
@@ -238,35 +244,8 @@
                     </DockPanel>
                 </Border>
 
-                <!-- Delete chain confirm -->
-                <Border x:Name="DeleteChainConfirmPanel"
-                        Grid.Row="1"
-                        IsVisible="False"
-                        Background="{StaticResource BgRail}"
-                        BorderBrush="{StaticResource LineBrush}"
-                        BorderThickness="0,0,0,1"
-                        Padding="10,5">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                            <Button x:Name="DeleteChainConfirmBtn"
-                                    Content="Confirm"
-                                    Padding="8,3"
-                                    FontSize="11" />
-                            <Button x:Name="DeleteChainCancelBtn"
-                                    Content="Cancel"
-                                    Padding="8,3"
-                                    FontSize="11" />
-                        </StackPanel>
-                        <TextBlock x:Name="DeleteChainConfirmLabel"
-                                   Foreground="{StaticResource InkMid}"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   FontSize="11" />
-                    </DockPanel>
-                </Border>
-
-                <TreeView x:Name="AnimTree" Grid.Row="2"
-                          Background="{StaticResource BgApp}"
+                <TreeView x:Name="AnimTree" Grid.Row="1"
+                          Background="{StaticResource BgCanvas}"
                           SelectionMode="Multiple"
                           ScrollViewer.VerticalScrollBarVisibility="Visible"
                           ScrollViewer.AllowAutoHide="False">
@@ -278,6 +257,14 @@
                         <!-- Expand chevron hit area to a full-height square; icon stays 12×12 centered. -->
                         <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
                             <Setter Property="Margin" Value="0" />
+                            <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
+                        </Style>
+                        <!-- The Fluent theme's :empty style overrides the panel width to 12px for
+                             leaf items, causing their content to start ~20px left of non-leaf items.
+                             Override it here with the same full width so leaf and non-leaf items
+                             always indent identically.  The ToggleButton inside is already hidden for
+                             :empty items by the Fluent theme; the panel becomes an invisible spacer. -->
+                        <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
                             <Setter Property="Width" Value="{DynamicResource TreeViewItemMinHeight}" />
                         </Style>
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
@@ -318,7 +305,7 @@
                         <TreeDataTemplate x:DataType="models:TreeNodeVm"
                                           ItemsSource="{Binding Children}">
                             <Grid ColumnDefinitions="*,Auto,Auto" HorizontalAlignment="Stretch">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Node kind icons: SVG files are the single source of truth for path data. -->
                                     <!-- Chain node: first-frame thumbnail when the chain has frames, generic glyph
                                          otherwise. Only the chain ("animation") icon is enlarged so the first-frame
@@ -403,10 +390,10 @@
                 </TreeView>
 
                 <!-- ── Add Animation button ── -->
-                <Border Grid.Row="3"
+                <Border Grid.Row="2"
                         BorderBrush="{StaticResource LineBrush}"
                         BorderThickness="0,1,0,0"
-                        Background="{StaticResource BgApp}"
+                        Background="{StaticResource BgCanvas}"
                         Padding="8,6">
                     <Button x:Name="AddChainBtn"
                             Content="+ Add Animation"
@@ -664,9 +651,9 @@
 
                     <!-- ── Timeline strip ── -->
                     <Grid Grid.Row="2" RowDefinitions="14,*">
-                        <!-- ruler header -->
+                        <!-- ruler header — BgRail matches the wireframe/preview toolbars -->
                         <Border Grid.Row="0"
-                                Background="{StaticResource BgCanvas}"
+                                Background="{StaticResource BgRail}"
                                 BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="0,1,0,1">
                             <TextBlock Text="TIMELINE"
@@ -675,9 +662,9 @@
                                        VerticalAlignment="Center"
                                        Margin="6,0" />
                         </Border>
-                        <!-- frame cells -->
+                        <!-- frame cells — BgCanvas background so cells (BgPanel) contrast against it -->
                         <Border Grid.Row="1"
-                                Background="{StaticResource BgRail}"
+                                Background="{StaticResource BgCanvas}"
                                 BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="0,0,0,0">
                             <ScrollViewer HorizontalScrollBarVisibility="Auto"
@@ -693,7 +680,7 @@
                                             <Grid Width="{Binding Width}" Height="38">
                                                 <Border BorderBrush="{StaticResource LineBrush}"
                                                         BorderThickness="0,0,1,0"
-                                                        Background="Transparent">
+                                                        Background="{StaticResource BgPanel}">
                                                     <StackPanel VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center"
                                                                 Spacing="2">
@@ -737,7 +724,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Middle: Property Inspector ── -->
-            <Grid Grid.Column="2" RowDefinitions="Auto,*">
+            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,2*,4,*">
 
                 <!-- ── Inspector pane header ── -->
                 <Border Grid.Row="0"
@@ -999,6 +986,95 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
+
+                <!-- ── History pane splitter ── -->
+                <GridSplitter x:Name="HistorySplitter"
+                              Grid.Row="2"
+                              ResizeDirection="Rows"
+                              Background="{StaticResource LineBrush}"
+                              HorizontalAlignment="Stretch"
+                              Height="4" />
+
+                <!-- ── History section (header + list) ── -->
+                <Grid x:Name="HistorySectionGrid"
+                      Grid.Row="3"
+                      RowDefinitions="Auto,*">
+
+                    <!-- ── History pane header ── -->
+                    <Border x:Name="HistoryHeaderBorder"
+                            Grid.Row="0"
+                            Background="{StaticResource BgRail}"
+                            BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1,1,0,1"
+                            Height="36">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="HISTORY"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkMid}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0" />
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        Spacing="2"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,4,0">
+                                <Button x:Name="HistoryUndoButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Undo">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconUndo.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                                <Button x:Name="HistoryRedoButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Redo">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconRedo.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                                <Button x:Name="HistoryCloseButton"
+                                        Width="26" Height="26"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Close History">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconClose.svg"
+                                             CurrentColor="#e6e8ec" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ── History list ── -->
+                    <ListBox x:Name="HistoryList"
+                             Grid.Row="1"
+                             Background="{StaticResource BgPanel}"
+                             BorderBrush="{StaticResource LineBrush}"
+                             BorderThickness="1,0,0,0"
+                             Padding="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="appModels:HistoryEntryVm">
+                                <TextBlock Text="{Binding Description}"
+                                           FontSize="11"
+                                           Foreground="{Binding Foreground}"
+                                           Padding="8,3"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                </Grid>
+
             </Grid>
         </Grid>
     </DockPanel>

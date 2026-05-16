@@ -1,4 +1,5 @@
-using AnimationEditor.Core.CommandsAndState.Commands;
+﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
@@ -103,6 +104,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public IFileDialogService FileDialogService { get; set; } = NullFileDialogService.Instance;
 
+        /// <inheritdoc cref="IAppCommands.HotReloadWatcher"/>
+        public IHotReloadWatcher HotReloadWatcher { get; set; } = NullHotReloadWatcher.Instance;
+
         public event Action<string>? FramesDeleted;
 
         /// <summary>
@@ -199,29 +203,11 @@ namespace AnimationEditor.Core.CommandsAndState
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
-        }
 
-        /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
-        public void ReloadAchxFromDisk(string path)
-        {
-            try
-            {
-                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(path));
-            }
-            catch (Exception ex)
-            {
-                HotReloadFailed?.Invoke(path, ex.Message);
-                return;
-            }
-
-            _undoManager.Clear();
-            _undoManager.MarkSaved();
-            _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
-            RebuildTreeViewRequested?.Invoke();
-            RefreshWireframeRequested?.Invoke();
-            RefreshAnimationFrameDisplayRequested?.Invoke();
-            _events.CallAchxLoaded(path);
-            _events.RaiseAvailableTexturesChanged();
+            // Start watching the loaded file and its referenced PNGs
+            var achxDir = System.IO.Path.GetDirectoryName(fileName) ?? string.Empty;
+            var pngPaths = GetReferencedAbsolutePngPaths(fileName, achxDir);
+            HotReloadWatcher.StartWatching(fileName, pngPaths);
         }
 
         public void RefreshTreeNode(AnimationChainSave animationChain) =>
@@ -244,6 +230,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var target = fileName ?? _pm.FileName;
             if (!string.IsNullOrEmpty(target))
             {
+                HotReloadWatcher.RecordOwnSave(target);
                 try
                 {
                     _pm.SaveAnimationChainList(target);
@@ -276,6 +263,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             SaveCurrentAnimationChainList(path);
             _pm.FileName = path;
+            SyncHotReloadWatcher();  // pick up the saved achx path + any PNG dirs
             _ioManager.DeleteRecoveryFile();
             SaveAsCompleted?.Invoke(path);
             _events.RaiseCurrentFileChanged(path);
@@ -286,7 +274,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
-            _undoManager.Execute(new DeleteChainsCommand(animationChains, acls, this, _events));
+            _undoManager.Execute(new DeleteChainsCommand(animationChains, acls, this, _events, _selectedState));
         }
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
@@ -300,8 +288,7 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             ApplyRectangleMatch(rectangleSave, frame);
-            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangleSave, frame, this, _events));
-            _selectedState.SelectedRectangle = rectangleSave;
+            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangleSave, frame, this, _events, _selectedState));
         }
 
         public void AddCircle(AnimationFrameSave frame)
@@ -314,8 +301,7 @@ namespace AnimationEditor.Core.CommandsAndState
             };
 
             ApplyCircleMatch(circleSave, frame);
-            _undoManager.Execute(new AddCircleCommand(circleSave, frame, this, _events));
-            _selectedState.SelectedCircle = circleSave;
+            _undoManager.Execute(new AddCircleCommand(circleSave, frame, this, _events, _selectedState));
         }
 
         /// <summary>
@@ -356,12 +342,12 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
         {
-            _undoManager.Execute(new DeleteCircleCommand(circle, owner, this, _events));
+            _undoManager.Execute(new DeleteCircleCommand(circle, owner, this, _events, _selectedState));
         }
 
         public void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner)
         {
-            _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events));
+            _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events, _selectedState));
         }
 
         public async Task AskToDeleteRectangles(List<AARectSave> rectangles)
@@ -377,10 +363,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     var frame = _objectFinder.GetAnimationFrameContaining(rectangle);
                     if (frame != null)
-                        commands.Add(new DeleteAxisAlignedRectangleCommand(rectangle, frame, this, _events));
+                        commands.Add(new DeleteAxisAlignedRectangleCommand(rectangle, frame, this, _events, _selectedState));
                 }
                 if (commands.Count > 0)
-                    _undoManager.Execute(new CompositeCommand(commands));
+                {
+                    var desc = rectangles.Count == 1
+                        ? $"Delete Rectangle '{rectangles[0].Name}'"
+                        : $"Delete {rectangles.Count} Rectangles";
+                    _undoManager.Execute(new CompositeCommand(commands, desc));
+                }
             }
         }
 
@@ -397,11 +388,45 @@ namespace AnimationEditor.Core.CommandsAndState
                 {
                     var frame = _objectFinder.GetAnimationFrameContaining(circle);
                     if (frame != null)
-                        commands.Add(new DeleteCircleCommand(circle, frame, this, _events));
+                        commands.Add(new DeleteCircleCommand(circle, frame, this, _events, _selectedState));
                 }
                 if (commands.Count > 0)
-                    _undoManager.Execute(new CompositeCommand(commands));
+                {
+                    var desc = circles.Count == 1
+                        ? $"Delete Circle '{circles[0].Name}'"
+                        : $"Delete {circles.Count} Circles";
+                    _undoManager.Execute(new CompositeCommand(commands, desc));
+                }
             }
+        }
+
+        public async Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
+        {
+            var allNames = rectangles.Select(r => r.Name).Concat(circles.Select(c => c.Name));
+            var message = "Delete the following shape(s)?\n\n" +
+                string.Join("\n", allNames);
+
+            if (!await ConfirmAsync(message, "Delete?")) return;
+
+            AnimationFrameSave? frame = null;
+            if (rectangles.Count > 0)
+                frame = _objectFinder.GetAnimationFrameContaining(rectangles[0]);
+            if (frame == null && circles.Count > 0)
+                frame = _objectFinder.GetAnimationFrameContaining(circles[0]);
+            if (frame == null) return;
+
+            DeleteShapes(frame, rectangles, circles);
+        }
+
+        public void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles)
+        {
+            var commands = new List<IUndoableCommand>();
+            foreach (var rect in rectangles.ToArray())
+                commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events, _selectedState));
+            foreach (var circle in circles.ToArray())
+                commands.Add(new DeleteCircleCommand(circle, frame, this, _events, _selectedState));
+            if (commands.Count > 0)
+                _undoManager.Execute(new CompositeCommand(commands));
         }
 
         public async Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains)
@@ -424,7 +449,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 string label = validFrames.Count == 1
                     ? $"Frame {chain.Frames.IndexOf(validFrames[0]) + 1}"
                     : $"{validFrames.Count} frames";
-                _undoManager.Execute(new DeleteFramesCommand(frames, chain, this, _events));
+                _undoManager.Execute(new DeleteFramesCommand(frames, chain, this, _events, _selectedState));
                 if (validFrames.Count > 0)
                     FramesDeleted?.Invoke(label);
             }
@@ -438,9 +463,9 @@ namespace AnimationEditor.Core.CommandsAndState
             var frame = _selectedState.SelectedFrame;
             if (frame?.ShapesSave == null) return new List<string>();
 
-            return frame.ShapesSave!.AARectSaves
-                .Select(r => r.Name)
-                .Concat(frame.ShapesSave!.CircleSaves.Select(c => c.Name))
+            return frame.ShapesSave!.Shapes
+                .Select(s => s switch { AARectSave r => r.Name, CircleSave c => c.Name, _ => null })
+                .OfType<string>()
                 .ToList();
         }
 
@@ -469,8 +494,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             name = StringFunctions.MakeStringUnique(name, acls.AnimationChains.Select(c => c.Name).ToList());
             var chain = new AnimationChainSave { Name = name };
-            _undoManager.Execute(new AddChainCommand(chain, acls, this, _events));
-            _selectedState.SelectedChain = chain;
+            _undoManager.Execute(new AddChainCommand(chain, acls, this, _events, _selectedState));
             return chain;
         }
 
@@ -503,8 +527,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 FrameLength      = 0.1f,
                 ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
-            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events));
-            _selectedState.SelectedFrame = frame;
+            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
         }
 
         public void MoveChain(AnimationChainSave chain, int delta)
@@ -517,7 +540,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.RemoveAt(idx); chains.Insert(newIdx, chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                delta > 0 ? "Move Animation Down" : "Move Animation Up"));
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
@@ -527,7 +551,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.Remove(chain); chains.Insert(0, chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Move Animation to Top"));
         }
 
         public void MoveChainToBottom(AnimationChainSave chain)
@@ -537,7 +562,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
                 chains,
                 () => { chains.Remove(chain); chains.Add(chain); },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Move Animation to Bottom"));
         }
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
@@ -548,7 +574,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.RemoveAt(idx); chain.Frames.Insert(newIdx, frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                delta > 0 ? "Move Frame Down" : "Move Frame Up"));
         }
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
@@ -556,7 +583,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Insert(0, frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Move Frame to Top"));
         }
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
@@ -564,21 +592,50 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Add(frame); },
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Move Frame to Bottom"));
+        }
+
+        public void MoveShape(object shape, AnimationFrameSave frame, int delta)
+        {
+            var shapes = frame.ShapesSave?.Shapes;
+            if (shapes is null) return;
+            int idx    = shapes.IndexOf(shape);
+            if (idx < 0) return;
+            int newIdx = Math.Clamp(idx + delta, 0, shapes.Count - 1);
+            if (newIdx == idx) return;
+            _undoManager.Execute(new ReorderCommand<object>(
+                shapes,
+                () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
+                this, _events, () => RefreshTreeNode(frame),
+                delta > 0 ? "Move Shape Down" : "Move Shape Up"));
         }
 
         /// <summary>
-        /// Moves the currently-selected frame or chain up (<paramref name="delta"/> = -1)
+        /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
         /// or down (<paramref name="delta"/> = +1) in the tree.
-        /// Frame selection takes priority: if a frame is selected its parent chain is used.
+        /// Shape selection takes highest priority: if a shape is selected it is reordered within
+        /// its frame's shape list. Frame selection takes next priority; chain is last.
         /// No-op when nothing is selected or when the item is already at the boundary.
         /// </summary>
         public void HandleReorder(int delta)
         {
-            var frame = _selectedState.SelectedFrame;
-            var chain = _selectedState.SelectedChain;
+            var rect   = _selectedState.SelectedRectangle;
+            var circle = _selectedState.SelectedCircle;
+            var frame  = _selectedState.SelectedFrame;
+            var chain  = _selectedState.SelectedChain;
 
-            if (frame is not null && chain is not null)
+            if (rect is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (ownerFrame is not null) MoveShape(rect, ownerFrame, delta);
+            }
+            else if (circle is not null)
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (ownerFrame is not null) MoveShape(circle, ownerFrame, delta);
+            }
+            else if (frame is not null && chain is not null)
                 MoveFrame(frame, chain, delta);
             else if (chain is not null)
                 MoveChain(chain, delta);
@@ -615,7 +672,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => chain.Frames.Reverse(),
-                this, _events, () => RefreshTreeNode(chain)));
+                this, _events, () => RefreshTreeNode(chain),
+                "Invert Frame Order"));
         }
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
@@ -623,7 +681,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => { foreach (var frame in chain.Frames) frame.FrameLength = frameLength; },
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Set All Frame Lengths"));
         }
 
         public AnimationChainSave? DuplicateChain(
@@ -658,20 +717,25 @@ namespace AnimationEditor.Core.CommandsAndState
                 };
                 if (frame.ShapesSave != null)
                 {
-                    foreach (var r in frame.ShapesSave!.AARectSaves)
-                        fCopy.ShapesSave!.AARectSaves.Add(
-                            new AARectSave
-                            { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                    foreach (var c in frame.ShapesSave!.CircleSaves)
-                        fCopy.ShapesSave!.CircleSaves.Add(
-                            new CircleSave
-                            { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                    foreach (var shape in frame.ShapesSave!.Shapes)
+                    {
+                        switch (shape)
+                        {
+                            case AARectSave r:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
+                                break;
+                            case CircleSave c:
+                                fCopy.ShapesSave!.Shapes.Add(
+                                    new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                                break;
+                        }
+                    }
                 }
                 copy.Frames.Add(fCopy);
             }
 
-            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events));
-            _selectedState.SelectedChain = copy;
+            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events, _selectedState));
             return copy;
         }
 
@@ -688,7 +752,8 @@ namespace AnimationEditor.Core.CommandsAndState
                     foreach (var c in sorted)
                         acls.AnimationChains.Add(c);
                 },
-                this, _events, RefreshTreeView));
+                this, _events, RefreshTreeView,
+                "Sort Animations"));
         }
 
         // ── A16: Adjust Offsets ───────────────────────────────────────────────
@@ -721,7 +786,8 @@ namespace AnimationEditor.Core.CommandsAndState
                             AdjustOffsetCalculator.ApplyJustifyBottom([frame], height.Value, offsetMultiplier);
                     }
                 },
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Justify Bottom"));
         }
 
         /// <summary>
@@ -737,7 +803,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative),
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Adjust Offsets"));
         }
 
         // ── A17: Scale Frame Times ────────────────────────────────────────────
@@ -753,7 +820,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration),
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Scale Frame Times"));
         }
 
         /// <summary>
@@ -767,7 +835,8 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration),
-                this, _events, refreshWireframe: false));
+                this, _events, refreshWireframe: false,
+                "Scale Frame Times"));
         }
 
         // ── F12: Add Multiple Frames ──────────────────────────────────────────
@@ -789,8 +858,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var added = result.Frames.ToArray();
             if (added.Length > 0)
             {
-                _undoManager.Execute(new AddFramesCommand(added, chain, this, _events));
-                _selectedState.SelectedFrame = added[^1];
+                _undoManager.Execute(new AddFramesCommand(added, chain, this, _events, _selectedState));
             }
 
             return result.ExceededTextureBounds;
@@ -827,7 +895,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 () => modified = TextureResizeAdjuster.AdjustAll(
                     acls, aclsDir, absoluteTextureFilePath,
                     oldWidth, oldHeight, newWidth, newHeight),
-                this, _events, refreshWireframe: true));
+                this, _events, refreshWireframe: true,
+                "Adjust UV After Resize"));
 
             return modified;
         }
@@ -883,8 +952,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
             };
 
-            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events));
-            _selectedState.SelectedFrame = frame;
+            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────
@@ -909,19 +977,125 @@ namespace AnimationEditor.Core.CommandsAndState
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null) return;
-            _undoManager.Execute(new PasteChainsCommand(acls, chains, this, _events));
+            _undoManager.Execute(new PasteChainsCommand(acls, chains, this, _events, _selectedState));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteFrames"/>
         public void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames) =>
-            _undoManager.Execute(new AddFramesCommand(frames.ToArray(), chain, this, _events));
+            _undoManager.Execute(new AddFramesCommand(frames.ToArray(), chain, this, _events, _selectedState));
 
         /// <inheritdoc cref="IAppCommands.PasteRectangle"/>
         public void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle) =>
-            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangle, frame, this, _events));
+            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangle, frame, this, _events, _selectedState));
 
         /// <inheritdoc cref="IAppCommands.PasteCircle"/>
         public void PasteCircle(AnimationFrameSave frame, CircleSave circle) =>
-            _undoManager.Execute(new AddCircleCommand(circle, frame, this, _events));
+            _undoManager.Execute(new AddCircleCommand(circle, frame, this, _events, _selectedState));
+
+        // ── Hot Reload ────────────────────────────────────────────────────────────
+
+        /// <inheritdoc cref="IAppCommands.WireHotReloadWatcher"/>
+        public void WireHotReloadWatcher()
+        {
+            HotReloadWatcher.AchxChangedOnDisk += path =>
+                DoOnUiThread(() => ReloadAchxFromDisk(path));
+
+            HotReloadWatcher.PngChangedOnDisk += path =>
+                DoOnUiThread(() => ReloadPngFromDisk(path));
+
+            HotReloadWatcher.AchxDeletedOnDisk += path =>
+                DoOnUiThread(() => _events.RaiseAchxDeletedOnDisk(path));
+        }
+
+        /// <inheritdoc cref="IAppCommands.ReloadAchxFromDisk"/>
+        public void ReloadAchxFromDisk(string path)
+        {
+            // Capture selection state before reload
+            string? selectedChainName = _selectedState.SelectedChain?.Name;
+            int? selectedFrameIndex = _selectedState.SelectedFrame != null
+                ? _selectedState.SelectedChain?.Frames.IndexOf(_selectedState.SelectedFrame)
+                : null;
+
+            try
+            {
+                _pm.LoadAnimationChain(new AnimationEditor.Core.Paths.FilePath(path));
+            }
+            catch (Exception ex)
+            {
+                HotReloadFailed?.Invoke(path, ex.Message);
+                return;
+            }
+
+            _undoManager.Clear();
+            _undoManager.MarkSaved();
+
+            // Restore selection
+            _selectedState.Reset();
+            var acls = _pm.AnimationChainListSave;
+            if (acls != null && selectedChainName != null)
+            {
+                var restoredChain = acls.AnimationChains
+                    .FirstOrDefault(c => c.Name == selectedChainName);
+                if (restoredChain != null)
+                {
+                    _selectedState.SelectedChain = restoredChain;
+                    if (selectedFrameIndex.HasValue &&
+                        selectedFrameIndex.Value >= 0 &&
+                        selectedFrameIndex.Value < restoredChain.Frames.Count)
+                    {
+                        _selectedState.SelectedFrame = restoredChain.Frames[selectedFrameIndex.Value];
+                    }
+                }
+                else
+                {
+                    _selectedState.SelectedChain = acls.AnimationChains.FirstOrDefault();
+                }
+            }
+
+            // Refresh tree without collapsing (preserves expanded nodes)
+            RefreshTreeViewRequested?.Invoke();
+
+            // Update PNG watch list for new references
+            var achxDir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
+            var newPngs = GetReferencedAbsolutePngPaths(path, achxDir);
+            HotReloadWatcher.UpdatePngList(newPngs);
+
+            _ioManager.LoadAndApplyCompanionFileFor(path);
+            RefreshWireframeRequested?.Invoke();
+            RefreshAnimationFrameDisplayRequested?.Invoke();
+
+            _events.RaiseAchxReloadedFromDisk(path);
+        }
+
+        /// <inheritdoc cref="IAppCommands.ReloadPngFromDisk"/>
+        public void ReloadPngFromDisk(string absolutePngPath) =>
+            _events.RaisePngChangedOnDisk(absolutePngPath);
+
+        /// <inheritdoc cref="IAppCommands.SyncHotReloadWatcher"/>
+        public void SyncHotReloadWatcher()
+        {
+            var achxPath = _pm.FileName ?? string.Empty;
+            var achxDir  = !string.IsNullOrEmpty(achxPath)
+                ? System.IO.Path.GetDirectoryName(achxPath) ?? string.Empty
+                : string.Empty;
+            HotReloadWatcher.StartWatching(achxPath, GetReferencedAbsolutePngPaths(achxPath, achxDir));
+        }
+
+        private IEnumerable<string> GetReferencedAbsolutePngPaths(string _, string achxDir)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null) yield break;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var chain in acls.AnimationChains)
+            foreach (var frame in chain.Frames)
+            {
+                if (string.IsNullOrEmpty(frame.TextureName)) continue;
+                var abs = System.IO.Path.IsPathRooted(frame.TextureName)
+                    ? frame.TextureName
+                    : System.IO.Path.Combine(achxDir, frame.TextureName);
+                if (seen.Add(abs)) yield return abs;
+            }
+        }
     }
 }

@@ -15,7 +15,7 @@
       <BottomCoordinate>0.5</BottomCoordinate>
       <RelativeX>5</RelativeX>
       <ShapeCollectionSave>
-        <AxisAlignedRectangleSaves>
+        <Shapes>
           <AxisAlignedRectangleSave>
             <X>1</X>
             <Y>2</Y>
@@ -23,9 +23,12 @@
             <ScaleY>4</ScaleY>
             <Name>Hit</Name>
           </AxisAlignedRectangleSave>
-        </AxisAlignedRectangleSaves>
-        <AxisAlignedCubeSaves />
-        <PolygonSaves>
+          <CircleSave>
+            <X>5</X>
+            <Y>6</Y>
+            <Radius>7</Radius>
+            <Name>Origin</Name>
+          </CircleSave>
           <PolygonSave>
             <Name>Edge</Name>
             <X>0</X>
@@ -41,15 +44,8 @@
               </Vector2Save>
             </Points>
           </PolygonSave>
-        </PolygonSaves>
-        <CircleSaves>
-          <CircleSave>
-            <X>5</X>
-            <Y>6</Y>
-            <Radius>7</Radius>
-            <Name>Origin</Name>
-          </CircleSave>
-        </CircleSaves>
+        </Shapes>
+        <AxisAlignedCubeSaves />
         <SphereSaves />
       </ShapeCollectionSave>
     </Frame>

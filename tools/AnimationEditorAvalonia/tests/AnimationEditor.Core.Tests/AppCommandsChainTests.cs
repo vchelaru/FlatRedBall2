@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -394,13 +395,13 @@ public class AppCommandsChainTests
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var source = TestHelpers.MakeChain(acls, "Attack", 1);
-        source.Frames[0].ShapesSave!.AARectSaves.Add(
+        source.Frames[0].ShapesSave!.Shapes.Add(
             new AARectSave { Name = "HitBox", ScaleX = 5, ScaleY = 5 });
 
         var copy = ctx.AppCommands.DuplicateChain(source);
 
         Assert.Single(copy!.Frames[0].ShapesSave!.AARectSaves);
-        Assert.Equal("HitBox", copy.Frames[0].ShapesSave!.AARectSaves[0].Name);
+        Assert.Equal("HitBox", copy.Frames[0].ShapesSave!.AARectSaves.First().Name);
     }
 
     [Fact]

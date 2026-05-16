@@ -1,3 +1,4 @@
+using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
@@ -64,14 +65,6 @@ namespace AnimationEditor.Core.CommandsAndState
         Task OpenAchxWorkflowAsync(string path);
         void LoadAnimationChain(string fileName);
 
-        /// <summary>
-        /// Reloads the open .achx from disk without resetting the UI state. Intended
-        /// for use by the hot-reload pipeline: on success it replaces the in-memory
-        /// model and fires <c>AchxLoaded</c>; on failure (bad XML, conflict markers) it
-        /// fires <see cref="HotReloadFailed"/> and leaves the current state untouched.
-        /// Unlike <see cref="LoadAnimationChain"/>, this never fires <see cref="LoadFailed"/>.
-        /// </summary>
-        void ReloadAchxFromDisk(string path);
         void RefreshTreeNode(AnimationChainSave animationChain);
         void RefreshTreeNode(AnimationFrameSave animationFrame);
         void RefreshAnimationFrameDisplay();
@@ -88,6 +81,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
         Task AskToDeleteRectangles(List<AARectSave> rectangles);
         Task AskToDeleteCircles(List<CircleSave> circles);
+        Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles);
+        void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles);
         Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains);
         void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
@@ -100,6 +95,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);
         void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain);
         void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain);
+        void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void HandleReorder(int delta);
         void FlipFrameHorizontally(AnimationFrameSave frame);
         void FlipFrameVertically(AnimationFrameSave frame);
@@ -119,8 +115,39 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 
+        // ── Hot Reload ────────────────────────────────────────────────────────────
+
         /// <summary>
-        /// Pastes clipboard chains into the project: renames each to be unique and inserts
+        /// Hot-reload watcher. Wired to a real <see cref="HotReloadWatcher"/> by the app layer;
+        /// defaults to <see cref="NullHotReloadWatcher"/> so tests don't need to stub it.
+        /// </summary>
+        IHotReloadWatcher HotReloadWatcher { get; set; }
+
+        /// <summary>
+        /// Subscribe to the hot-reload watcher after it's injected by the app layer.
+        /// </summary>
+        void WireHotReloadWatcher();
+
+        /// <summary>
+        /// Hot-reload: reloads the .achx from disk, preserving selection state.
+        /// Clears the undo stack. Fires <see cref="IApplicationEvents.AchxReloadedFromDisk"/>.
+        /// </summary>
+        void ReloadAchxFromDisk(string path);
+
+        /// <summary>
+        /// Hot-reload: notifies consumers that a PNG has changed on disk.
+        /// </summary>
+        void ReloadPngFromDisk(string absolutePngPath);
+
+        /// <summary>
+        /// Synchronizes the hot-reload watcher with the current project state.
+        /// Starts (or restarts) watching PNG directories and (if saved) the .achx file.
+        /// Safe to call for unsaved projects — uses <see cref="string.Empty"/> as achxPath.
+        /// Call after any operation that adds or changes PNG references (drag-drop, Save As).
+        /// </summary>
+        void SyncHotReloadWatcher();
+
+        /// <summary>Pastes clipboard chains into the project: renames each to be unique and inserts
         /// the block below its source rows (see <see cref="IO.ChainPasteLogic"/>). Undoable.
         /// </summary>
         void PasteChains(IReadOnlyList<AnimationChainSave> chains);

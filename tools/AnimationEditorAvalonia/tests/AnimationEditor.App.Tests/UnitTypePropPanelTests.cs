@@ -152,7 +152,7 @@ public class UnitTypePropPanelTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
         var circle = new CircleSave { Name = "HurtCircle", X = 6, Y = 2, Radius = 7 };
-        frame.ShapesSave!.CircleSaves.Add(circle);
+        frame.ShapesSave!.Shapes.Add(circle);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
@@ -182,7 +182,7 @@ public class UnitTypePropPanelTests
         var chain = new AnimationChainSave { Name = "Walk" };
         var frame = new AnimationFrameSave { TextureName = "dummy.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
         var rect = new AARectSave { Name = "HitBox", X = 3, Y = 4, ScaleX = 8, ScaleY = 9 };
-        frame.ShapesSave!.AARectSaves.Add(rect);
+        frame.ShapesSave!.Shapes.Add(rect);
         chain.Frames.Add(frame);
         acls.AnimationChains.Add(chain);
 
