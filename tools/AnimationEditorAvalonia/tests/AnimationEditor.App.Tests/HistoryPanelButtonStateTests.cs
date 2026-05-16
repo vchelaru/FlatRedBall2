@@ -156,8 +156,13 @@ public class HistoryPanelButtonStateTests
 
     // ── History list ordering ─────────────────────────────────────────────────
 
+    /// <summary>
+    /// Photoshop order: applied (undo) items sit above redo items.
+    /// Oldest applied entry is at the top; newest applied is the "you are here" row;
+    /// redo items appear below, with the next-to-redo item immediately under the cursor.
+    /// </summary>
     [AvaloniaFact]
-    public void HistoryList_UndoneItemStaysAtTop_NotMovedToBottom()
+    public void HistoryList_AppliedItemsAboveRedoItems_PhotoshopOrder()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -170,18 +175,45 @@ public class HistoryPanelButtonStateTests
             var list = window.FindControl<ItemsControl>("HistoryList")!;
             var items = ((IEnumerable<HistoryEntryVm>)list.ItemsSource!).ToList();
 
-            // B was undone; it must appear at row 0 (top), not at the bottom
+            // Applied history at top, redo items below
             Assert.Equal(2, items.Count);
-            Assert.Equal("B", items[0].Description);
-            Assert.Equal("A", items[1].Description);
+            Assert.Equal("A", items[0].Description); // oldest applied at top
+            Assert.Equal("B", items[1].Description); // redo item at bottom
 
-            // B is dimmed (redo item), A is bright (applied item)
-            Assert.Equal("#6a6e76", items[0].Foreground);
-            Assert.Equal("#e6e8ec", items[1].Foreground);
+            // A is bright (applied), B is dimmed (redo)
+            Assert.Equal("#e6e8ec", items[0].Foreground);
+            Assert.Equal("#6a6e76", items[1].Foreground);
 
             // A is the current "you are here" entry
+            Assert.True(items[0].IsCurrent);
+            Assert.False(items[1].IsCurrent);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void HistoryList_MultipleAppliedCommands_OldestAtTopNewestAtBottom()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.UndoManager.Record(new StubCmd("A"));
+            ctx.UndoManager.Record(new StubCmd("B"));
+            ctx.UndoManager.Record(new StubCmd("C"));
+            Dispatcher.UIThread.RunJobs();
+
+            var list = window.FindControl<ItemsControl>("HistoryList")!;
+            var items = ((IEnumerable<HistoryEntryVm>)list.ItemsSource!).ToList();
+
+            Assert.Equal(3, items.Count);
+            Assert.Equal("A", items[0].Description);
+            Assert.Equal("B", items[1].Description);
+            Assert.Equal("C", items[2].Description);
+
+            // C is the most recently applied — "you are here"
             Assert.False(items[0].IsCurrent);
-            Assert.True(items[1].IsCurrent);
+            Assert.False(items[1].IsCurrent);
+            Assert.True(items[2].IsCurrent);
         }
         finally { window.Close(); }
     }

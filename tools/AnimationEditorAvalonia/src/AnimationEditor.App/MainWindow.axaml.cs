@@ -470,18 +470,17 @@ public partial class MainWindow : Window
         var undoHistory = _undoManager.UndoHistory;
         var redoHistory = _undoManager.RedoHistory;
         var items = new List<Models.HistoryEntryVm>();
-        // Redo items reversed so newest-recorded sits at top — positions never move on undo/redo
-        foreach (var cmd in redoHistory.Reverse())
+        // Photoshop order: oldest applied at top, newest applied at bottom, redo items below.
+        foreach (var cmd in undoHistory)
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec"));
+        // Mark the most recently applied command as "you are here".
+        if (items.Count > 0)
+            items[^1] = items[^1] with { IsCurrent = true };
+        // Redo items follow: next-to-redo first, furthest future last.
+        foreach (var cmd in redoHistory)
             items.Add(new Models.HistoryEntryVm(cmd.Description, "#6a6e76"));
-        // Undo items newest-first; first entry is the current "you are here" position
-        bool firstUndo = true;
-        foreach (var cmd in undoHistory.Reverse())
-        {
-            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec", firstUndo));
-            firstUndo = false;
-        }
         HistoryList.ItemsSource = items;
-        int currentIndex = redoHistory.Count;
+        int currentIndex = undoHistory.Count - 1;
         ScrollHistoryToCurrent(currentIndex, items.Count);
 
         HistoryUndoButton.IsEnabled = _undoManager.CanUndo;
@@ -490,7 +489,7 @@ public partial class MainWindow : Window
 
     private void ScrollHistoryToCurrent(int currentIndex, int totalCount)
     {
-        if (totalCount == 0) return;
+        if (totalCount == 0 || currentIndex < 0) return;
         Dispatcher.UIThread.Post(() =>
         {
             double extent   = HistoryScrollViewer.Extent.Height;
