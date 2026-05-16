@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
@@ -282,8 +283,9 @@ public class WireframeControl : Control
     private static readonly string _debugLogPath =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wireframe_debug.log");
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
-    private static readonly ISolidColorBrush _dbgBg = new SolidColorBrush(Color.FromArgb(210, 0, 0, 0));
-    private static readonly ISolidColorBrush _dbgFg = new SolidColorBrush(Color.FromRgb(0, 255, 80));
+    // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
+    private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
+    private static readonly IImmutableBrush _dbgFg = new ImmutableSolidColorBrush(Color.FromRgb(0, 255, 80));
 
     // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
     internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
