@@ -400,12 +400,66 @@ public class GridRenderTests
     // ── Grid-snap: boundary box alignment ─────────────────────────────────────
 
     /// <summary>
-    /// A frame whose pixel bounds are not aligned to the grid should have its
-    /// displayed bounds (and UV coordinates) snapped to the nearest grid line
-    /// when grid mode is active.
+    /// Enabling the grid must NOT modify existing frame UV coordinates.
+    /// Grid is a future-edit setting: it snaps new drags and new frame creation
+    /// but must never rewrite the positions of frames that already exist.
     /// </summary>
     [AvaloniaFact]
-    public void GridEnabled_NonAlignedFrameBounds_SnapsToNearestGridLine()
+    public void SetGrid_Enable_DoesNotModifyExistingFrameUvCoordinates()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
+
+        var chain = new AnimationChainSave { Name = "C" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            // Deliberately off-grid (not divisible by 10): 13, 23, 47, 58 pixels.
+            LeftCoordinate   = 13f / 100f,
+            TopCoordinate    = 23f / 100f,
+            RightCoordinate  = 47f / 100f,
+            BottomCoordinate = 58f / 100f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);
+
+        float origLeft   = frame.LeftCoordinate;
+        float origTop    = frame.TopCoordinate;
+        float origRight  = frame.RightCoordinate;
+        float origBottom = frame.BottomCoordinate;
+
+        try
+        {
+            ctrl.SetGrid(true, 10);
+
+            Assert.Equal(origLeft,   frame.LeftCoordinate);
+            Assert.Equal(origTop,    frame.TopCoordinate);
+            Assert.Equal(origRight,  frame.RightCoordinate);
+            Assert.Equal(origBottom, frame.BottomCoordinate);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// A frame whose pixel bounds are not aligned to the grid should have its
+    /// <em>displayed</em> bounds snapped to the nearest grid line when grid mode
+    /// is active.  The underlying UV coordinates must remain unchanged — the snap
+    /// is display-only so the wireframe gives visual grid alignment feedback
+    /// without destructively modifying animation data.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridEnabled_NonAlignedFrameBounds_DisplayBoundsSnapToNearestGridLine()
     {
         var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -432,7 +486,6 @@ public class GridRenderTests
         ctx.SelectedState.SelectedFrame = frame;
 
         var ctrl = ctx.CreateWireframeControl();
-        ctrl.InitializeServices(ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents, ctx.ProjectManager, ctx.UndoManager);
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0, 0, 1);
 
@@ -444,17 +497,17 @@ public class GridRenderTests
             Assert.Single(rects);
             var bounds = rects[0].Bounds;
 
-            // Each edge should be on a 10-pixel boundary.
+            // Display bounds snapped to 10-pixel grid for visual feedback.
             Assert.Equal(0, (int)bounds.Left   % 10);
             Assert.Equal(0, (int)bounds.Top    % 10);
             Assert.Equal(0, (int)bounds.Right  % 10);
             Assert.Equal(0, (int)bounds.Bottom % 10);
 
-            // UV data on the frame itself must also be snapped.
-            Assert.Equal(0, (int)MathF.Round(frame.LeftCoordinate   * 100) % 10);
-            Assert.Equal(0, (int)MathF.Round(frame.TopCoordinate    * 100) % 10);
-            Assert.Equal(0, (int)MathF.Round(frame.RightCoordinate  * 100) % 10);
-            Assert.Equal(0, (int)MathF.Round(frame.BottomCoordinate * 100) % 10);
+            // UV data on the frame itself must NOT be snapped.
+            Assert.Equal(13f / 100f, frame.LeftCoordinate);
+            Assert.Equal(23f / 100f, frame.TopCoordinate);
+            Assert.Equal(47f / 100f, frame.RightCoordinate);
+            Assert.Equal(58f / 100f, frame.BottomCoordinate);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -510,8 +563,8 @@ public class GridRenderTests
     }
 
     /// <summary>
-    /// Toggling grid off must leave the displayed bounds unchanged (the UV data
-    /// was already snapped when grid was on, and grid-off does not re-snap).
+    /// When the grid is disabled, displayed bounds must equal the raw UV pixel
+    /// coordinates — no snapping is applied in either direction.
     /// </summary>
     [AvaloniaFact]
     public void GridDisabled_BoundsMatchRawUV()
