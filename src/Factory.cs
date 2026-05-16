@@ -308,6 +308,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
             entity.Layer = _screen.Layer;
         configure?.Invoke(entity);
         entity.CustomInitialize();
+        entity.InvokeInitialized();
         if (IsSolidGrid)
         {
             _gridMembers.Add(entity);

@@ -36,7 +36,7 @@ namespace FlatRedBall2;
 /// after resetting engine-owned state and invoking <see cref="Reset"/>.
 /// </para>
 /// </summary>
-public class Entity : ICollidable, IAttachable
+public class Entity : ICollidable, IAttachable, ILifecycleEvents
 {
     private readonly List<IAttachable> _children = new();
     private readonly List<ICollidable> _shapes = new();
@@ -291,6 +291,12 @@ public class Entity : ICollidable, IAttachable
     // children, shapes, or Gum visuals — those are reused on recycle.
     internal bool _isPooled;
 
+    /// <summary>Raised after <see cref="CustomInitialize"/> completes. Fired by <see cref="Factory{T}.Create()"/>.</summary>
+    public event Action? Initialized;
+
+    /// <summary>Raised after each <see cref="CustomActivity"/> call.</summary>
+    public event Action? Updated;
+
     /// <summary>
     /// Raised at the end of <see cref="Destroy"/>, after <see cref="CustomDestroy"/>, child
     /// teardown, and factory/screen unregistration have completed. The entity is fully torn
@@ -298,6 +304,12 @@ public class Entity : ICollidable, IAttachable
     /// needs to re-arm when a tracked entity dies).
     /// </summary>
     public event Action? Destroyed;
+
+    // Internal accessor — Factory<T> calls this after CustomInitialize to fire the Initialized event.
+    internal void InvokeInitialized() => Initialized?.Invoke();
+
+    // Internal accessor — Screen calls this after CustomActivity to fire the Updated event.
+    internal void InvokeUpdated() => Updated?.Invoke();
 
     // Internal access to shapes for collision
     internal IReadOnlyList<ICollidable> Shapes => _shapes;

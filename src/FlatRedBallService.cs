@@ -346,6 +346,7 @@ public class FlatRedBallService
     {
         CurrentScreen.DisposeContentWatchers();
         CurrentScreen.CustomDestroy();
+        CurrentScreen.InvokeDestroyed();
         CurrentScreen._tweens.Clear();
         CurrentScreen.ContentLoader.UnloadAll();
 
@@ -394,6 +395,7 @@ public class FlatRedBallService
 
         CurrentScreen = screen;
         screen.CustomInitialize();
+        screen.InvokeInitialized();
 
         // Snap every CameraControllingEntity to its target now that CustomInitialize has
         // wired up Targets. Without this, frame 1's lazy-spawn tick runs against the camera's

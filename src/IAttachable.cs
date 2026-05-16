@@ -1,9 +1,7 @@
 namespace FlatRedBall2;
 
 /// <summary>
-/// Contract for anything that can be added to an <see cref="Entity"/> as a child via
-/// <see cref="Entity.Add(IAttachable, FlatRedBall2.Rendering.Layer?)"/>: shapes, sprites,
-/// Gum visuals, and sub-entities all implement this.
+/// Provides spatial parent-child attachment with position inheritance.
 /// <para>
 /// Implementations interpret <see cref="X"/>/<see cref="Y"/>/<see cref="Z"/> as offsets
 /// from <see cref="Parent"/> when attached, or as world-space coordinates when <see cref="Parent"/>
@@ -11,7 +9,7 @@ namespace FlatRedBall2;
 /// world-space value.
 /// </para>
 /// </summary>
-public interface IAttachable
+public interface ISpatialAttachable
 {
     /// <summary>The entity this object is attached to, or <c>null</c> if it is a root.</summary>
     Entity? Parent { get; set; }
@@ -33,7 +31,19 @@ public interface IAttachable
 
     /// <summary>Final Z after walking the <see cref="Parent"/> chain.</summary>
     float AbsoluteZ { get; }
+}
 
+/// <summary>
+/// Signals that this object can be removed from the engine and any parent hierarchy.
+/// </summary>
+public interface IDestroyable
+{
     /// <summary>Releases this object's resources. Called recursively by <see cref="Entity.Destroy"/> on every child.</summary>
     void Destroy();
 }
+
+/// <summary>
+/// Combined spatial attachment and destruction contract. Prefer <see cref="ISpatialAttachable"/>
+/// or <see cref="IDestroyable"/> individually when only one concern is needed.
+/// </summary>
+public interface IAttachable : ISpatialAttachable, IDestroyable { }

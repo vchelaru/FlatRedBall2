@@ -28,7 +28,7 @@ namespace FlatRedBall2;
 /// and its entities are destroyed before the new screen's <see cref="CustomInitialize"/> runs.
 /// </para>
 /// </summary>
-public class Screen
+public class Screen : ILifecycleEvents
 {
     private readonly List<Entity> _entities = new();
     private readonly List<ICollisionRelationship> _collisionRelationships = new();
@@ -440,6 +440,21 @@ public class Screen
     public virtual DisplaySettings? PreferredDisplaySettings => null;
 
     // Lifecycle
+
+    /// <summary>Raised after <see cref="CustomInitialize"/> completes. Fired by the engine when the screen activates.</summary>
+    public event Action? Initialized;
+
+    /// <summary>Raised after each <see cref="CustomActivity"/> call.</summary>
+    public event Action? Updated;
+
+    /// <summary>Raised after <see cref="CustomDestroy"/> completes, before entities and content are torn down.</summary>
+    public event Action? Destroyed;
+
+    // Called by FlatRedBallService after screen.CustomInitialize().
+    internal void InvokeInitialized() => Initialized?.Invoke();
+
+    // Called by FlatRedBallService after CurrentScreen.CustomDestroy().
+    internal void InvokeDestroyed() => Destroyed?.Invoke();
 
     /// <summary>
     /// Override to initialize the screen — create entities, set up factories, configure the camera,
@@ -905,7 +920,8 @@ public class Screen
                 if (entity.PauseMode != PauseMode.Always) continue;
                 entity.PhysicsUpdate(frameTime);
                 if (i >= _entities.Count) continue;
-                _entities[i].CustomActivity(frameTime);
+                entity.CustomActivity(frameTime);
+                entity.InvokeUpdated();
             }
             if (engine != null)
                 engine._frameProfile.ActivityMs = ProfileClock.Ms(tPaused, System.Diagnostics.Stopwatch.GetTimestamp());
@@ -981,7 +997,9 @@ public class Screen
             for (int i = _entities.Count - 1; i >= 0; i--)
             {
                 if (i >= _entities.Count) continue;
-                _entities[i].CustomActivity(frameTime);
+                var ent = _entities[i];
+                ent.CustomActivity(frameTime);
+                ent.InvokeUpdated();
             }
 
             // 4. Animate sprites
@@ -1016,6 +1034,7 @@ public class Screen
         // 5. Screen CustomActivity — always runs so pause menu logic can respond to input
         long t6 = System.Diagnostics.Stopwatch.GetTimestamp();
         CustomActivity(frameTime);
+        Updated?.Invoke();
         if (engine != null)
             engine._frameProfile.ActivityMs += ProfileClock.Ms(t6, System.Diagnostics.Stopwatch.GetTimestamp());
     }
