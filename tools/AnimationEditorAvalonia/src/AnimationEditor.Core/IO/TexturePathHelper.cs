@@ -61,6 +61,28 @@ public static class TexturePathHelper
         return IsAbsolute(rel) ? framePath : rel;
     }
 
+    /// <summary>
+    /// Resolves a display path (which may be relative or absolute) to an absolute path
+    /// using the .achx folder as the base for relative paths. This is the inverse of
+    /// <see cref="ComputeDisplayPath"/>: a relative display path is combined with
+    /// <paramref name="achxFolder"/> and normalized via <see cref="Path.GetFullPath"/>.
+    /// </summary>
+    /// <param name="displayPath">
+    /// The path as shown in the texture name TextBox — may be relative (relative to the
+    /// .achx folder) or absolute.
+    /// </param>
+    /// <param name="achxFolder">
+    /// The directory of the .achx file. If empty, <paramref name="displayPath"/> is
+    /// returned unchanged.
+    /// </param>
+    public static string ResolveDisplayPath(string displayPath, string achxFolder)
+    {
+        if (string.IsNullOrEmpty(displayPath)) return string.Empty;
+        if (IsAbsolute(displayPath)) return displayPath;
+        if (string.IsNullOrEmpty(achxFolder)) return displayPath;
+        return Path.GetFullPath(Path.Combine(achxFolder, displayPath));
+    }
+
     private static bool IsAbsolute(string path)
         => Path.IsPathRooted(path)
            || (path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':');

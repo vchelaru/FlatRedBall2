@@ -882,7 +882,7 @@
                                                    Foreground="{StaticResource InkMid}" />
                                         <Grid ColumnDefinitions="*,24">
                                             <TextBox x:Name="PropTextureName" Grid.Column="0"
-                                                     FontSize="10" IsReadOnly="True" Opacity="0.7" />
+                                                     FontSize="10" />
                                             <Button x:Name="PropTextureBrowseBtn" Grid.Column="1"
                                                     Content="…" FontSize="10"
                                                     Width="24" Height="22"

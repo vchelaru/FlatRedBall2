@@ -1,3 +1,4 @@
+using System.IO;
 using AnimationEditor.Core.IO;
 using Xunit;
 
@@ -118,5 +119,52 @@ public class TexturePathHelperTests
         string display = TexturePathHelper.ComputeDisplayPath(absolute, null);
 
         Assert.Equal(absolute, display);
+    }
+
+    // ── ResolveDisplayPath ────────────────────────────────────────────────────
+
+    [Fact]
+    public void ResolveDisplayPath_EmptyDisplayPath_ReturnsEmpty()
+    {
+        string resolved = TexturePathHelper.ResolveDisplayPath(string.Empty, @"C:\Project\Animations\");
+
+        Assert.Equal(string.Empty, resolved);
+    }
+
+    [Fact]
+    public void ResolveDisplayPath_AbsolutePath_ReturnedUnchanged()
+    {
+        const string absolute = @"C:\Project\Content\Hero.png";
+        string resolved = TexturePathHelper.ResolveDisplayPath(absolute, @"C:\Project\Animations\");
+
+        Assert.Equal(absolute, resolved);
+    }
+
+    [Fact]
+    public void ResolveDisplayPath_RelativePathEmptyAchxFolder_ReturnedUnchanged()
+    {
+        string resolved = TexturePathHelper.ResolveDisplayPath("Hero.png", string.Empty);
+
+        Assert.Equal("Hero.png", resolved);
+    }
+
+    [Fact]
+    public void ResolveDisplayPath_SimpleRelativePath_ResolvesToAbsolute()
+    {
+        string resolved = TexturePathHelper.ResolveDisplayPath("Hero.png", @"C:\Project\Animations\");
+
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(@"C:\Project\Animations\", "Hero.png")),
+            resolved);
+    }
+
+    [Fact]
+    public void ResolveDisplayPath_DotDotRelativePath_ResolvesToAbsolute()
+    {
+        string resolved = TexturePathHelper.ResolveDisplayPath("../Content/Hero.png", @"C:\Project\Animations\");
+
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(@"C:\Project\Animations\", "../Content/Hero.png")),
+            resolved);
     }
 }

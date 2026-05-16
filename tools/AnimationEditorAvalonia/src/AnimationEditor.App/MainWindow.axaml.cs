@@ -1729,7 +1729,32 @@ public partial class MainWindow : Window
         PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
 
+        PropTextureName.LostFocus  += (_, _) => ApplyTextureName();
         PropTextureBrowseBtn.Click += async (_, _) => await BrowseForFrameTexture();
+    }
+
+    private void ApplyTextureName()
+    {
+        if (_suppressPropRefresh) return;
+        var frame = _selectedState.SelectedFrame;
+        if (frame is null) return;
+
+        var inputText = PropTextureName.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(inputText)) return;
+
+        var currentDisplay = TexturePathHelper.ComputeDisplayPath(frame.TextureName, _projectManager.FileName);
+        if (inputText == currentDisplay) return;
+
+        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+
+        string absolutePath = TexturePathHelper.ResolveDisplayPath(inputText, achxFolder);
+        string storePath    = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
+
+        _appCommands.SetFrameTextureName(frame, storePath);
+        WireframeCtrl.LoadTexture(absolutePath);
+        RefreshPropertyPanel();
     }
 
     private async Task BrowseForFrameTexture()
