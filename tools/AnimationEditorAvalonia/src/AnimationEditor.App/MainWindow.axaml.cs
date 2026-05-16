@@ -354,6 +354,7 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         WireframeCtrl.ZoomChanged            += zoomPct => { SyncZoomCombo(zoomPct); SaveCompanionFile(); };
+        WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
@@ -448,6 +449,10 @@ public partial class MainWindow : Window
         GridSize             = GetGridSizeFromInput(),
         WireframeZoomPercent = (int)MathF.Round(WireframeCtrl.Zoom * 100f),
         PreviewZoomPercent   = (int)MathF.Round(PreviewCtrl.Zoom * 100f),
+        WireframePanX        = WireframeCtrl.CameraState.PanX,
+        WireframePanY        = WireframeCtrl.CameraState.PanY,
+        PreviewPanX          = PreviewCtrl.PanOffset.X,
+        PreviewPanY          = PreviewCtrl.PanOffset.Y,
         OffsetMultiplier     = _appState.OffsetMultiplier,
         ExpandedNodes        = TreeBuilder.GetExpandedChainNames(_treeRoots).ToList(),
         HorizontalGuides     = PreviewCtrl.HGuides.ToList(),
@@ -472,6 +477,9 @@ public partial class MainWindow : Window
 
             WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
             PreviewCtrl.SetZoomPercent(settings.PreviewZoomPercent);
+
+            WireframeCtrl.SetCamera(settings.WireframePanX, settings.WireframePanY, WireframeCtrl.CameraState.Zoom);
+            PreviewCtrl.SetPan(settings.PreviewPanX, settings.PreviewPanY);
 
             var expandedSet = settings.ExpandedNodes.ToHashSet();
             foreach (var node in _treeRoots)
@@ -900,6 +908,7 @@ public partial class MainWindow : Window
         PreviewCtrl.WheelZoomPresets = _previewZoomPresets;
 
         PreviewCtrl.ZoomChanged += zoomPct => { SyncPreviewZoomCombo(zoomPct); SaveCompanionFile(); };
+        PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
         PreviewCtrl.Playback.FrameIndexChanged += OnPreviewPlaybackFrameIndexChanged;
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
     }

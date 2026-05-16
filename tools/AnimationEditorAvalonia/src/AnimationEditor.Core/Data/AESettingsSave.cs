@@ -27,5 +27,9 @@ namespace AnimationEditor.Core.Data
         public int GridSize { get; set; } = 16;
         public int WireframeZoomPercent { get; set; } = 100;
         public int PreviewZoomPercent { get; set; } = 100;
+        public float WireframePanX { get; set; }
+        public float WireframePanY { get; set; }
+        public float PreviewPanX { get; set; }
+        public float PreviewPanY { get; set; }
     }
 }

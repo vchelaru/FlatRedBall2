@@ -241,6 +241,9 @@ public class PreviewControl : Control
     /// </summary>
     public event Action<float>? ZoomChanged;
 
+    /// <summary>Fired when the user finishes a pan gesture (pointer released after drag).</summary>
+    public event Action<float, float>? PanChanged;
+
     /// <summary>
     /// When non-null, mouse-wheel zoom steps through these preset percentages instead
     /// of applying a raw ×1.25/×0.8 multiplier.  Set by <c>MainWindow</c> on startup.
@@ -1192,6 +1195,7 @@ public class PreviewControl : Control
         }
 
         _isPanning = false;
+        PanChanged?.Invoke(_panX, _panY);
         e.Pointer.Capture(null);
     }
 

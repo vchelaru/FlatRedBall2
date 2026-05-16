@@ -167,6 +167,51 @@ public class AESettingsSaveRoundTripTests
         Assert.Equal(150, Deserialize(Serialize(s)).PreviewZoomPercent);
     }
 
+    // ── Pan fields ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void WireframePanX_DefaultIsZero()
+    {
+        Assert.Equal(0f, new AESettingsSave().WireframePanX);
+    }
+
+    [Fact]
+    public void WireframePanY_DefaultIsZero()
+    {
+        Assert.Equal(0f, new AESettingsSave().WireframePanY);
+    }
+
+    [Fact]
+    public void PreviewPanX_DefaultIsZero()
+    {
+        Assert.Equal(0f, new AESettingsSave().PreviewPanX);
+    }
+
+    [Fact]
+    public void PreviewPanY_DefaultIsZero()
+    {
+        Assert.Equal(0f, new AESettingsSave().PreviewPanY);
+    }
+
+    [Fact]
+    public void PanFields_NonDefault_RoundTrip()
+    {
+        var s = new AESettingsSave
+        {
+            WireframePanX = 123.5f,
+            WireframePanY = -45.0f,
+            PreviewPanX   = 0.5f,
+            PreviewPanY   = 99.9f,
+        };
+
+        var loaded = Deserialize(Serialize(s));
+
+        Assert.Equal(123.5f, loaded.WireframePanX);
+        Assert.Equal(-45.0f, loaded.WireframePanY);
+        Assert.Equal(0.5f,   loaded.PreviewPanX);
+        Assert.Equal(99.9f,  loaded.PreviewPanY);
+    }
+
     // ── Combined ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -179,6 +224,10 @@ public class AESettingsSaveRoundTripTests
             OffsetMultiplier     = 2f,
             WireframeZoomPercent = 300,
             PreviewZoomPercent   = 50,
+            WireframePanX        = 10f,
+            WireframePanY        = -20f,
+            PreviewPanX          = 5f,
+            PreviewPanY          = 15f,
         };
         s.HorizontalGuides.Add(50f);
         s.VerticalGuides.Add(75f);
@@ -187,9 +236,13 @@ public class AESettingsSaveRoundTripTests
         var loaded = Deserialize(Serialize(s));
 
         Assert.True(loaded.SnapToGrid);
-        Assert.Equal(8,   loaded.GridSize);
-        Assert.Equal(300, loaded.WireframeZoomPercent);
-        Assert.Equal(50,  loaded.PreviewZoomPercent);
+        Assert.Equal(8,    loaded.GridSize);
+        Assert.Equal(300,  loaded.WireframeZoomPercent);
+        Assert.Equal(50,   loaded.PreviewZoomPercent);
+        Assert.Equal(10f,  loaded.WireframePanX);
+        Assert.Equal(-20f, loaded.WireframePanY);
+        Assert.Equal(5f,   loaded.PreviewPanX);
+        Assert.Equal(15f,  loaded.PreviewPanY);
         Assert.Single(loaded.HorizontalGuides);
         Assert.Single(loaded.VerticalGuides);
         Assert.Single(loaded.ExpandedNodes);

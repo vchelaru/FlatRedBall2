@@ -450,6 +450,9 @@ public class WireframeControl : Control
     /// </summary>
     public event Action<float>? ZoomChanged;
 
+    /// <summary>Fired when the user finishes a pan gesture (pointer released after drag).</summary>
+    public event Action<float, float>? PanChanged;
+
     /// <summary>
     /// When non-null, mouse-wheel zoom steps through these preset percentages instead of
     /// applying a raw ×1.25 / ÷1.25 multiplier.  Set by <c>MainWindow</c> on startup.
@@ -1634,6 +1637,7 @@ public class WireframeControl : Control
         if (_isPanning)
         {
             _isPanning = false;
+            PanChanged?.Invoke(_panX, _panY);
             e.Pointer.Capture(null);
         }
 
