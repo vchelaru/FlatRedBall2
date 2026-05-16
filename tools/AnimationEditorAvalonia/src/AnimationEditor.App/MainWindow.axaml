@@ -190,7 +190,7 @@
 
             <!-- ── Left: Animation tree ── -->
             <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
-                  Background="{StaticResource BgApp}">
+                  Background="{StaticResource BgCanvas}">
 
                 <!-- ── Tree pane header ── -->
                 <Border Grid.Row="0"
@@ -242,7 +242,7 @@
                 </Border>
 
                 <TreeView x:Name="AnimTree" Grid.Row="1"
-                          Background="{StaticResource BgApp}"
+                          Background="{StaticResource BgCanvas}"
                           SelectionMode="Multiple"
                           ScrollViewer.VerticalScrollBarVisibility="Visible"
                           ScrollViewer.AllowAutoHide="False">
@@ -390,7 +390,7 @@
                 <Border Grid.Row="2"
                         BorderBrush="{StaticResource LineBrush}"
                         BorderThickness="0,1,0,0"
-                        Background="{StaticResource BgApp}"
+                        Background="{StaticResource BgCanvas}"
                         Padding="8,6">
                     <Button x:Name="AddChainBtn"
                             Content="+ Add Animation"
@@ -648,9 +648,9 @@
 
                     <!-- ── Timeline strip ── -->
                     <Grid Grid.Row="2" RowDefinitions="14,*">
-                        <!-- ruler header -->
+                        <!-- ruler header — BgRail matches the wireframe/preview toolbars -->
                         <Border Grid.Row="0"
-                                Background="{StaticResource BgCanvas}"
+                                Background="{StaticResource BgRail}"
                                 BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="0,1,0,1">
                             <TextBlock Text="TIMELINE"
@@ -659,9 +659,9 @@
                                        VerticalAlignment="Center"
                                        Margin="6,0" />
                         </Border>
-                        <!-- frame cells -->
+                        <!-- frame cells — BgCanvas background so cells (BgPanel) contrast against it -->
                         <Border Grid.Row="1"
-                                Background="{StaticResource BgRail}"
+                                Background="{StaticResource BgCanvas}"
                                 BorderBrush="{StaticResource LineBrush}"
                                 BorderThickness="0,0,0,0">
                             <ScrollViewer HorizontalScrollBarVisibility="Auto"
@@ -677,7 +677,7 @@
                                             <Grid Width="{Binding Width}" Height="38">
                                                 <Border BorderBrush="{StaticResource LineBrush}"
                                                         BorderThickness="0,0,1,0"
-                                                        Background="Transparent">
+                                                        Background="{StaticResource BgPanel}">
                                                     <StackPanel VerticalAlignment="Center"
                                                                 HorizontalAlignment="Center"
                                                                 Spacing="2">

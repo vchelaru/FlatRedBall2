@@ -45,6 +45,9 @@ public class PreviewControl : Control
 
     // -- Rulers / guides -------------------------------------------------------
     private const float RulerSize = 20f;
+
+    // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
+    internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
@@ -1204,7 +1207,7 @@ public class PreviewControl : Control
     private static void RenderSkCore(
         SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKBitmap?> cache)
     {
-        canvas.Clear(new SKColor(30, 30, 30));
+        canvas.Clear(CanvasClearColor);
 
         // Content origin is shifted so the ruler strips sit at the left/top edges
         float cx = (s.Width  - RulerSize) / 2f + RulerSize + s.PanX;

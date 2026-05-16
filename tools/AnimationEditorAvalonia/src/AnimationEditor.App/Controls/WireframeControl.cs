@@ -90,7 +90,7 @@ public class WireframeControl : Control
 
         internal static void RenderSk(SKCanvas canvas, RenderSnapshot s)
         {
-            canvas.Clear(new SKColor(30, 30, 30));
+            canvas.Clear(CanvasClearColor);
 
             if (s.Image != null)
             {
@@ -284,6 +284,9 @@ public class WireframeControl : Control
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
     private static readonly ISolidColorBrush _dbgBg = new SolidColorBrush(Color.FromArgb(210, 0, 0, 0));
     private static readonly ISolidColorBrush _dbgFg = new SolidColorBrush(Color.FromRgb(0, 255, 80));
+
+    // Matches the BgCanvas design token (#0e0f12) — darkest tier, shared by all content panels.
+    internal static readonly SKColor CanvasClearColor = new(0x0e, 0x0f, 0x12);
 
     /// <summary>
     /// Toggle the real-time debug overlay + event log.  Bind to F2 in MainWindow.

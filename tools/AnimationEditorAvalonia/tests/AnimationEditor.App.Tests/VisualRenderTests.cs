@@ -109,10 +109,10 @@ public class VisualRenderTests
         using var bm = ctrl.RenderToBitmap(64, 64);
         var center = bm.GetPixel(32, 32);
 
-        // Background is SKColor(30, 30, 30)
-        Assert.Equal(30, (int)center.Red);
-        Assert.Equal(30, (int)center.Green);
-        Assert.Equal(30, (int)center.Blue);
+        // Background matches BgCanvas design token (#0e0f12)
+        Assert.Equal(0x0e, (int)center.Red);
+        Assert.Equal(0x0f, (int)center.Green);
+        Assert.Equal(0x12, (int)center.Blue);
     }
 
     // ── WireframeControl — texture rendering ──────────────────────────────────
