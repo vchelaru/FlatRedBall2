@@ -1297,6 +1297,7 @@ public partial class MainWindow : Window
             }
         }
         RefreshTreeThumbnails();
+        RefreshTimelineStrip();
         _appCommands.RefreshAnimationFrameDisplay();
         ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
     }
