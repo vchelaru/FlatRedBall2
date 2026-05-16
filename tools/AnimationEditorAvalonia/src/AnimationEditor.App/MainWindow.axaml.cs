@@ -487,17 +487,18 @@ public partial class MainWindow : Window
         var undoHistory = _undoManager.UndoHistory;
         var redoHistory = _undoManager.RedoHistory;
         var items = new List<Models.HistoryEntryVm>();
-        // Newest undo item at the top, oldest at the bottom
-        foreach (var cmd in undoHistory.Reverse())
-            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec"));
-        foreach (var cmd in redoHistory)
+        // Redo items reversed so newest-recorded sits at top — positions never move on undo/redo
+        foreach (var cmd in redoHistory.Reverse())
             items.Add(new Models.HistoryEntryVm(cmd.Description, "#6a6e76"));
+        // Undo items newest-first; first entry is the current "you are here" position
+        bool firstUndo = true;
+        foreach (var cmd in undoHistory.Reverse())
+        {
+            items.Add(new Models.HistoryEntryVm(cmd.Description, "#e6e8ec", firstUndo));
+            firstUndo = false;
+        }
         HistoryList.ItemsSource = items;
-
-        // Current step is always row 0 (most recent action)
-        HistoryList.SelectedIndex = undoHistory.Count > 0 ? 0 : -1;
-        if (items.Count > 0)
-            HistoryList.ScrollIntoView(items[0]);
+        HistoryScrollViewer.Offset = new Avalonia.Vector(0, 0);
 
         HistoryUndoButton.IsEnabled = _undoManager.CanUndo;
         HistoryRedoButton.IsEnabled = _undoManager.CanRedo;

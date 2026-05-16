@@ -1054,30 +1054,27 @@
                         </Grid>
                     </Border>
 
-                    <!-- ── History list ── -->
-                    <ListBox x:Name="HistoryList"
-                             Grid.Row="1"
-                             Background="{StaticResource BgPanel}"
-                             BorderBrush="{StaticResource LineBrush}"
-                             BorderThickness="1,0,0,0"
-                             Padding="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="MinHeight" Value="0" />
-                                <Setter Property="Padding" Value="0" />
-                            </Style>
-                        </ListBox.Styles>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="appModels:HistoryEntryVm">
-                                <TextBlock Text="{Binding Description}"
-                                           FontSize="11"
-                                           Foreground="{Binding Foreground}"
-                                           Padding="8,3"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <!-- ── History list (read-only — no user selection) ── -->
+                    <ScrollViewer x:Name="HistoryScrollViewer"
+                                  Grid.Row="1"
+                                  Background="{StaticResource BgPanel}"
+                                  BorderBrush="{StaticResource LineBrush}"
+                                  BorderThickness="1,0,0,0"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="HistoryList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="appModels:HistoryEntryVm">
+                                    <Border Background="{Binding Background}">
+                                        <TextBlock Text="{Binding Description}"
+                                                   FontSize="11"
+                                                   Foreground="{Binding Foreground}"
+                                                   Padding="8,3"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
 
                 </Grid>
 

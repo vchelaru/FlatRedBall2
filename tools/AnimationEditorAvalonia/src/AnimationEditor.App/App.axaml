@@ -138,6 +138,10 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="0"/>
         </Style>
+        <!-- Disabled buttons: dim so the user can tell they are unavailable -->
+        <Style Selector="Button:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
         <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
         <Style Selector="Button.plus">
             <Setter Property="ContentTemplate">
