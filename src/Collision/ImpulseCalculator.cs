@@ -29,7 +29,8 @@ public static class ImpulseCalculator
         if (relVelAlongNormal >= 0f) return Vector2.Zero; // already separating
 
         float impulse = -(1f + elasticity) * relVelAlongNormal;
-        return impulse * thisRatio * normal;
+        Vector2 impulseVector = impulse * normal;
+        return thisRatio * impulseVector;
     }
 
     /// <summary>
@@ -62,7 +63,8 @@ public static class ImpulseCalculator
         if (relVelAlongNormal >= 0f) return; // already separating
 
         float impulse = -(1f + elasticity) * relVelAlongNormal;
-        thisDelta = impulse * thisRatio * normal;
-        otherDelta = -(impulse * otherRatio * normal);
+        Vector2 impulseVector = impulse * normal;
+        thisDelta = thisRatio * impulseVector;
+        otherDelta = -otherRatio * impulseVector;
     }
 }

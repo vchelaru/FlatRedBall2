@@ -67,4 +67,3 @@ public class ILifecycleEventsTests
         entity.DestroyedFired.ShouldBeTrue();
     }
 }
-

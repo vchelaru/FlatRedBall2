@@ -821,8 +821,8 @@ public class Screen : ILifecycleEvents
     /// <para>- Two groups: <c>AddCollisionRelationship&lt;A, B&gt;(listA, listB)</c></para>
     /// <para>- Self-collision: <c>AddSelfCollisionRelationship&lt;A&gt;(list)</c></para>
     /// <para>- Tiles: <c>AddCollisionRelationship(entities, tiles)</c> (no explicit type args)</para>
-    /// Common mistake: <c>AddCollisionRelationship&lt;Enemy&gt;(_enemies, _players)</c>.
-    /// With one type argument, the compiler chooses the two-arg overload only if both lists are supplied.
+    /// Common mistake: calling <c>AddCollisionRelationship&lt;Enemy&gt;(...)</c> for self-collision.
+    /// Self-collision now has an explicit API: <c>AddSelfCollisionRelationship&lt;Enemy&gt;(list)</c>.
     /// </remarks>
     /// <summary>
     /// Registers a collision relationship between a single entity and a group of entities.
