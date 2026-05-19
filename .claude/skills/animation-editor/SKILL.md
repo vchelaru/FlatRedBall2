@@ -67,3 +67,18 @@ Services (`ProjectManager`, `SelectedState`, `AppCommands`, `AppState`, `Applica
 Tests build their own fresh graph per test via `TestHelpers.BuildServices()` (App) / `TestHelpers.SetupFreshAcls()` (Core), which returns a `TestServices` context exposing every service. Tests then address services through that context (`ctx.AppCommands.Foo()`) rather than statics. Each test gets a brand-new graph, so cross-test selection leakage is impossible.
 
 When constructing an Avalonia control directly (`WireframeControl` / `PreviewControl`) — because Avalonia requires a parameterless constructor for XAML — call `ctx.CreateWireframeControl()` / `ctx.CreatePreviewControl()`, which wraps `new WireframeControl()` and `InitializeServices(...)` so the control's injected fields are populated before any method runs.
+
+## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
+
+**Never use `System.IO.Path.GetFileName`, `Path.GetDirectoryName`, or `Path.Combine` on paths stored in `ProjectManager.FileName` or any user-supplied path.** These methods are OS-native: on Linux they only recognise `/` as a separator, so a Windows-authored `C:\foo\bar.achx` path would be returned whole by `Path.GetFileName`.
+
+`FilePath` (`AnimationEditor.Core.Paths.FilePath`) normalises both `\` and `/` regardless of host OS. Use its properties instead:
+
+| Need | Use |
+|---|---|
+| Filename only (no directory) | `new FilePath(path).NoPath` |
+| Directory of a file | `new FilePath(path).GetDirectoryContainingThis()` |
+| Extension (lower-case, no dot) | `new FilePath(path).Extension` |
+| Equality / comparison | `new FilePath(a) == new FilePath(b)` |
+
+Tests that exercise path logic **must** use Windows-style backslash literals (e.g. `@"C:\projects\MyAnim.achx"`) to prove the cross-platform handling works — not `Path.Combine`, which would only exercise the current OS's separator.

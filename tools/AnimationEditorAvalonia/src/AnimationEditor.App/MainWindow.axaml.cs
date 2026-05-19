@@ -2186,7 +2186,7 @@ public partial class MainWindow : Window
         TitleFileName.IsVisible  = hasFile;
         if (hasFile)
         {
-            TitleFileName.Text = new FilePath(filePath).NoPath;
+            TitleFileName.Text = new FilePath(filePath!).NoPath;
             ToolTip.SetTip(TitleFileName, filePath);
         }
     }

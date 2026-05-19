@@ -32,6 +32,12 @@ public class FilePath : IComparable, IEquatable<FilePath>
 
     public string StandardizedNoPathNoExtension => RemovePath(RemoveExtension(Standardized));
     public string NoPathNoExtension => RemovePath(RemoveExtension(FullPath));
+    /// <summary>
+    /// File name with extension, directory stripped. Handles both <c>/</c> and <c>\</c> separators
+    /// regardless of host OS — use this instead of <c>System.IO.Path.GetFileName</c>, which only
+    /// strips the OS-native separator and silently returns the full path on Linux for Windows-authored
+    /// backslash paths.
+    /// </summary>
     public string NoPath => RemovePath(FullPath);
 
     private string? _fullPathCache;
