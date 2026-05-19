@@ -706,6 +706,19 @@ public partial class MainWindow : Window
     private void OnTitleBarDoubleTapped(object? sender, TappedEventArgs e) =>
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
+    private void OnTitleFileOpenFolderClick(object? sender, RoutedEventArgs e)
+    {
+        var folder = Path.GetDirectoryName(_projectManager.FileName);
+        if (!string.IsNullOrEmpty(folder))
+            Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+    }
+
+    private void OnTitleFileCopyPathClick(object? sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_projectManager.FileName))
+            _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(_projectManager.FileName);
+    }
+
     private void OnMinimizeBtnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void OnMaximizeBtnClick(object? sender, RoutedEventArgs e) =>
@@ -2165,9 +2178,17 @@ public partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        Title = string.IsNullOrEmpty(_projectManager.FileName)
-            ? "AnimationEditor"
-            : $"AnimationEditor - {_projectManager.FileName}";
+        var filePath = _projectManager.FileName;
+        Title = TitleBarHelper.BuildWindowTitle(filePath);
+
+        var hasFile = !string.IsNullOrEmpty(filePath);
+        TitleSeparator.IsVisible = hasFile;
+        TitleFileName.IsVisible  = hasFile;
+        if (hasFile)
+        {
+            TitleFileName.Text = Path.GetFileName(filePath);
+            ToolTip.SetTip(TitleFileName, filePath);
+        }
     }
 
     private void LoadSettingsFile()
