@@ -1,4 +1,5 @@
 using AnimationEditor.Core;
+using System.IO;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -15,15 +16,17 @@ public sealed class TitleBarHelperTests
     [Fact]
     public void BuildWindowTitle_WhenFileOpen_ReturnsFileNameNotFullPath()
     {
-        var title = TitleBarHelper.BuildWindowTitle(@"C:\projects\sprites\MyAnimation.achx");
-        Assert.DoesNotContain(@"C:\", title);
+        var filePath = Path.Combine("projects", "sprites", "MyAnimation.achx");
+        var title = TitleBarHelper.BuildWindowTitle(filePath);
+        Assert.DoesNotContain("sprites" + Path.DirectorySeparatorChar, title);
         Assert.Contains("MyAnimation.achx", title);
     }
 
     [Fact]
     public void BuildWindowTitle_WhenFileOpen_FormatsAsAppNameDashFileName()
     {
-        var title = TitleBarHelper.BuildWindowTitle(@"C:\projects\sprites\MyAnimation.achx");
+        var filePath = Path.Combine("projects", "sprites", "MyAnimation.achx");
+        var title = TitleBarHelper.BuildWindowTitle(filePath);
         Assert.Equal("AnimationEditor - MyAnimation.achx", title);
     }
 }
