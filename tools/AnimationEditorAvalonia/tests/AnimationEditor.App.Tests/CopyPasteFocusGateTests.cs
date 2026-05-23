@@ -1,5 +1,6 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -8,6 +9,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -123,6 +125,73 @@ public class CopyPasteFocusGateTests
 
             var clipboardText = await window.Clipboard!.TryGetTextAsync();
             Assert.Equal("plain text", clipboardText);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// macOS regression: Meta+V (Cmd+V) must trigger the paste handler just like
+    /// Ctrl+V does on Windows/Linux.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task MetaV_NonTextBoxFocused_PastesFrame()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            var xml = ClipboardPayload.Serialize(
+                new List<AnimationFrameSave> { new() { TextureName = "run.png", FrameLength = 0.1f } });
+            await window.Clipboard!.SetTextAsync(xml);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            tree.Focus();
+            Dispatcher.UIThread.RunJobs();
+
+            window.KeyPress(Key.V, RawInputModifiers.Meta, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Single(chain.Frames);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// macOS regression: Meta+C (Cmd+C) must copy the selected chain to the
+    /// clipboard, just like Ctrl+C does on Windows/Linux.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task MetaC_NonTextBoxFocused_CopiesChain()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Run" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            // Directly seed the tree and select the chain node, matching the pattern
+            // used by HeadlessTreeViewTests to avoid needing a full UI rebuild cycle.
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var roots = (ObservableCollection<TreeNodeVm>)tree.ItemsSource!;
+            var chainVm = new TreeNodeVm { Header = "Run", Data = chain };
+            roots.Add(chainVm);
+            tree.SelectedItems!.Add(chainVm);
+            Dispatcher.UIThread.RunJobs();
+
+            // Seed the clipboard with plain text so we can detect when it changes.
+            await window.Clipboard!.SetTextAsync("unrelated");
+
+            tree.Focus();
+            Dispatcher.UIThread.RunJobs();
+
+            window.KeyPress(Key.C, RawInputModifiers.Meta, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            var clipboardText = await window.Clipboard!.TryGetTextAsync();
+            Assert.NotEqual("unrelated", clipboardText);
+            Assert.False(string.IsNullOrWhiteSpace(clipboardText));
         }
         finally { window.Close(); }
     }

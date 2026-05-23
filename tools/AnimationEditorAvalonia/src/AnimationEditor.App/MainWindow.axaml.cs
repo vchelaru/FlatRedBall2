@@ -2493,6 +2493,13 @@ public partial class MainWindow : Window
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
+    // Returns true when the platform command modifier is active.
+    // On macOS the Command key (⌘) maps to KeyModifiers.Meta; on Windows/Linux it is Control.
+    // Accepting both lets Ctrl+C/V/Z keep working in tests and on Windows/Linux while also
+    // handling Cmd+C/V/Z on macOS.
+    private static bool HasCommandModifier(KeyModifiers m)
+        => m.HasFlag(KeyModifiers.Control) || m.HasFlag(KeyModifiers.Meta);
+
     private void WireKeyboard()
     {
         // Use Tunnel routing so we intercept keys before child controls (e.g. the TreeView,
@@ -2502,13 +2509,13 @@ public partial class MainWindow : Window
         {
             if (e.Handled) return;
 
-            if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            if (e.Key == Key.C && HasCommandModifier(e.KeyModifiers))
             {
                 if (IsTextInputFocused()) return;
                 e.Handled = true;
                 _ = HandleCopyAsync();
             }
-            else if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            else if (e.Key == Key.V && HasCommandModifier(e.KeyModifiers))
             {
                 if (IsTextInputFocused()) return;
                 e.Handled = true;
@@ -2542,14 +2549,15 @@ public partial class MainWindow : Window
                 else
                     WireframeCtrl.ToggleDebugMode();
             }
-            else if (e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Control) &&
+            else if (e.Key == Key.Z && HasCommandModifier(e.KeyModifiers) &&
                      !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
                 e.Handled = true;
                 _undoManager.Undo();
             }
-            else if ((e.Key == Key.Y && e.KeyModifiers.HasFlag(KeyModifiers.Control)) ||
-                     (e.Key == Key.Z && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift)))
+            else if ((e.Key == Key.Y && HasCommandModifier(e.KeyModifiers)) ||
+                     (e.Key == Key.Z && (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) ||
+                                         e.KeyModifiers == (KeyModifiers.Meta    | KeyModifiers.Shift))))
             {
                 e.Handled = true;
                 _undoManager.Redo();
