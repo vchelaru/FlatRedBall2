@@ -9,16 +9,19 @@ class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        // Set the Dock label BEFORE Avalonia calls [NSApplication sharedApplication]
+        // (inside UsePlatformDetect). The Dock caches the process name at that point;
+        // calling setProcessName: afterwards has no visible effect on the Dock label.
+        MacOSDockIcon.SetProcessName("Animation Editor");
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            // AfterSetup fires after UsePlatformDetect() loads Foundation/AppKit,
-            // so NSProcessInfo is accessible and setProcessName: takes effect.
-            .AfterSetup(_ => MacOSDockIcon.SetProcessName("Animation Editor"))
 #if DEBUG
             .WithDeveloperTools()
 #endif

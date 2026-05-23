@@ -4,23 +4,20 @@ using System.Runtime.InteropServices;
 namespace AnimationEditor.App;
 
 /// <summary>
-/// Applies macOS-specific app metadata directly via Objective-C runtime P/Invoke.
+/// Applies macOS-specific Dock customisations directly via Objective-C runtime P/Invoke,
+/// working around Avalonia 12 limitations with <c>WindowDecorations="None"</c>.
 ///
-/// Avalonia 12 with <c>WindowDecorations="None"</c> does not propagate
-/// <c>Window.Icon</c> to <c>NSApplication.sharedApplication.applicationIconImage</c>
-/// because it only does so through the native NSWindow title-bar code path, which is
-/// skipped when the native chrome is hidden. We bypass Avalonia entirely and call
-/// AppKit directly.
+/// <para><b>Dock label</b> — <see cref="SetProcessName"/> must be called at the very
+/// start of <c>Main()</c>, BEFORE any Avalonia code runs. The macOS Dock reads and
+/// caches the app label when <c>[NSApplication sharedApplication]</c> is first called
+/// (inside <c>UsePlatformDetect()</c>). Setting the process name after that point has
+/// no visible effect. Foundation classes are available from the dyld shared cache on
+/// macOS 12+ without an explicit <c>dlopen</c>.</para>
 ///
-/// Call order matters:
-/// <list type="bullet">
-///   <item><see cref="SetProcessName"/> — call at the start of <c>Main()</c>, before
-///   Avalonia starts, so the Dock label is correct from the first frame.</item>
-///   <item><see cref="Set"/> — call via <c>Dispatcher.UIThread.Post</c> inside
-///   <c>OnFrameworkInitializationCompleted</c>, AFTER <c>desktop.MainWindow</c> is
-///   assigned. Posting to the next UI tick ensures Avalonia's own NSApplication
-///   initialisation (which may clear the icon) has already completed.</item>
-/// </list>
+/// <para><b>Dock icon</b> — <see cref="Set"/> must be called via
+/// <c>Dispatcher.UIThread.Post</c> inside <c>OnFrameworkInitializationCompleted</c>,
+/// AFTER <c>desktop.MainWindow</c> is assigned, so it runs after Avalonia's own
+/// NSApplication initialisation (which may clear the icon).</para>
 /// </summary>
 internal static class MacOSDockIcon
 {
@@ -44,6 +41,32 @@ internal static class MacOSDockIcon
 
     [DllImport("/usr/lib/libobjc.dylib")]
     private static extern IntPtr sel_registerName(string name);
+
+    /// <summary>
+    /// Sets the macOS Dock label by changing the process name BEFORE
+    /// <c>[NSApplication sharedApplication]</c> is called. Call at the very start of
+    /// <c>Main()</c>. Foundation classes (NSProcessInfo, NSString) are accessible from
+    /// the dyld shared cache on macOS 12+ without an explicit framework load.
+    /// Safe to call on non-macOS platforms (returns immediately).
+    /// </summary>
+    public static void SetProcessName(string name)
+    {
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        var nameStr = ToNSString(name);
+        if (nameStr == IntPtr.Zero)
+            return;
+
+        var processInfo = MsgSend(
+            objc_getClass("NSProcessInfo"),
+            sel_registerName("processInfo"));
+
+        if (processInfo == IntPtr.Zero)
+            return;
+
+        MsgSendVoid1(processInfo, sel_registerName("setProcessName:"), nameStr);
+    }
 
     /// <summary>
     /// Creates an NSImage from raw image bytes (PNG, TIFF, etc.) and assigns it to
@@ -91,31 +114,6 @@ internal static class MacOSDockIcon
         {
             Marshal.FreeHGlobal(buf);
         }
-    }
-
-    /// <summary>
-    /// Sets the macOS process name that the Dock displays under the app icon. Call
-    /// this at the start of <c>Main()</c>, before any Avalonia initialisation, so the
-    /// label is correct from first launch.
-    /// </summary>
-    public static void SetProcessName(string name)
-    {
-        if (!OperatingSystem.IsMacOS())
-            return;
-
-        // Foundation is available even before AppKit, and NSProcessInfo lives there.
-        NativeLibrary.TryLoad(
-            "/System/Library/Frameworks/Foundation.framework/Foundation", out _);
-
-        var nameStr = ToNSString(name);
-        if (nameStr == IntPtr.Zero)
-            return;
-
-        var processInfo = MsgSend(
-            objc_getClass("NSProcessInfo"),
-            sel_registerName("processInfo"));
-
-        MsgSendVoid1(processInfo, sel_registerName("setProcessName:"), nameStr);
     }
 
     private static IntPtr ToNSString(string value)
