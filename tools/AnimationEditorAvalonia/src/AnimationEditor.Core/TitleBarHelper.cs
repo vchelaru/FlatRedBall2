@@ -5,8 +5,8 @@ namespace AnimationEditor.Core;
 /// <summary>Builds window title strings from an optional open-file path.</summary>
 public static class TitleBarHelper
 {
-    /// <summary>The branded application name shown in the macOS system menu bar and other OS surfaces.</summary>
-    public const string AppName = "FlatRedBall Animation Editor";
+    /// <summary>The application name shown in the macOS system menu bar and other OS surfaces.</summary>
+    public const string AppName = "Animation Editor";
 
     /// <summary>
     /// Returns the window title for the animation editor.
