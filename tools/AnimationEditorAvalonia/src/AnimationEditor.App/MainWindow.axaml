@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="AnimationEditor.App.MainWindow"
         Title="AnimationEditor"
-        Icon="avares://AnimationEditor.App/Assets/icons/achx-icon-256.png"
+        Icon="avares://AnimationEditor/Assets/icons/achx-icon-256.png"
         MinWidth="900" MinHeight="600"
         WindowDecorations="None">
 
@@ -124,7 +124,7 @@
             <StackPanel Orientation="Horizontal" Spacing="6"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center">
-                <Image Source="avares://AnimationEditor.App/Assets/icons/achx-icon-32.png"
+                <Image Source="avares://AnimationEditor/Assets/icons/achx-icon-32.png"
                        Width="16" Height="16"
                        IsHitTestVisible="False" />
                 <TextBlock Text="AnimationEditor"
@@ -345,25 +345,25 @@
                                              Width="{StaticResource TreeNodeIconSize}" Height="{StaticResource TreeNodeIconSize}"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconChain.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconChain.svg"
                                              CurrentColor="#9098a4" />
                                     <svg:Svg IsVisible="{Binding IsFrameNode}"
                                              Width="14" Height="14"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconFrame.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconFrame.svg"
                                              CurrentColor="#5d6573" />
                                     <svg:Svg IsVisible="{Binding IsRectNode}"
                                              Width="14" Height="14"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconShape.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconShape.svg"
                                              CurrentColor="#5d6573" />
                                     <svg:Svg IsVisible="{Binding IsCircleNode}"
                                              Width="14" Height="14"
                                              Margin="0,0,4,0"
                                              VerticalAlignment="Center"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconCircle.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconCircle.svg"
                                              CurrentColor="#5d6573" />
                                     <Panel>
                                         <!-- Display mode -->
@@ -461,7 +461,7 @@
                                       ToolTip.Tip="Click = set frame; Ctrl+Click = add new frame">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <svg:Svg Width="16" Height="16"
-                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconMagicWand.svg"
+                                         Path="avares://AnimationEditor/Assets/icons/svg/IconMagicWand.svg"
                                          CurrentColor="#e6e8ec"
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="Magic Wand" VerticalAlignment="Center" />
@@ -480,7 +480,7 @@
                                       ToolTip.Tip="Snap to Grid">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <svg:Svg Width="16" Height="16"
-                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconGrid.svg"
+                                         Path="avares://AnimationEditor/Assets/icons/svg/IconGrid.svg"
                                          CurrentColor="#e6e8ec"
                                          VerticalAlignment="Center" />
                                 <TextBlock Text="Grid" VerticalAlignment="Center" />
@@ -587,7 +587,7 @@
                                           ToolTip.Tip="Show previous frame at 50% alpha">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconOnionSkin.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconOnionSkin.svg"
                                              CurrentColor="#e6e8ec"
                                              VerticalAlignment="Center" />
                                     <TextBlock Text="Onion Skin" VerticalAlignment="Center" />
@@ -601,7 +601,7 @@
                                           ToolTip.Tip="Show guides">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconGuides.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconGuides.svg"
                                              CurrentColor="#e6e8ec"
                                              VerticalAlignment="Center" />
                                     <TextBlock Text="Guides" VerticalAlignment="Center" />
@@ -878,7 +878,7 @@
                                                           HorizontalContentAlignment="Center"
                                                           VerticalContentAlignment="Center">
                                                 <svg:Svg Width="16" Height="16"
-                                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconFlipH.svg"
+                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipH.svg"
                                                          CurrentColor="#e6e8ec"
                                                          VerticalAlignment="Center" />
                                             </ToggleButton>
@@ -888,7 +888,7 @@
                                                           HorizontalContentAlignment="Center"
                                                           VerticalContentAlignment="Center">
                                                 <svg:Svg Width="16" Height="16"
-                                                         Path="avares://AnimationEditor.App/Assets/icons/svg/IconFlipV.svg"
+                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipV.svg"
                                                          CurrentColor="#e6e8ec"
                                                          VerticalAlignment="Center" />
                                             </ToggleButton>
@@ -1052,7 +1052,7 @@
                                         VerticalContentAlignment="Center"
                                         ToolTip.Tip="Undo">
                                     <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconUndo.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconUndo.svg"
                                              CurrentColor="#e6e8ec" />
                                 </Button>
                                 <Button x:Name="HistoryRedoButton"
@@ -1062,7 +1062,7 @@
                                         VerticalContentAlignment="Center"
                                         ToolTip.Tip="Redo">
                                     <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconRedo.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconRedo.svg"
                                              CurrentColor="#e6e8ec" />
                                 </Button>
                                 <Button x:Name="HistoryCloseButton"
@@ -1072,7 +1072,7 @@
                                         VerticalContentAlignment="Center"
                                         ToolTip.Tip="Close History">
                                     <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconClose.svg"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconClose.svg"
                                              CurrentColor="#e6e8ec" />
                                 </Button>
                             </StackPanel>

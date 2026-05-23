@@ -3,6 +3,14 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <!-- Rename the executable to "AnimationEditor" so the macOS Dock label reads
+         "AnimationEditor" instead of "AnimationEditor.App". The Dock reads
+         NSRunningApplication.localizedName, which is derived from the executable
+         filename. Spaces are not valid in avares:// URI authority, so the best
+         we can achieve for an unpackaged dotnet run is the dash-free camel-case name.
+         The human-readable "Animation Editor" label is used for bundled .app
+         distribution via CFBundleName / CFBundleDisplayName in Info.plist. -->
+    <AssemblyName>AnimationEditor</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- MainWindow is DI-only; runtime XAML instantiation is intentionally not supported -->
@@ -12,6 +20,18 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\icons\**" />
   </ItemGroup>
+
+  <!-- macOS app bundle icon: .icns is copied next to the binary and referenced by CFBundleIconFile. -->
+  <ItemGroup>
+    <Content Include="Assets\icons\AppIcon.icns" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- CFBundleIconFile tells the macOS runtime which .icns to use for the Dock and Finder.
+       CFBundleName sets the human-readable app name for bundled distribution. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('osx'))">
+    <CFBundleIconFile>AppIcon</CFBundleIconFile>
+    <CFBundleName>Animation Editor</CFBundleName>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.1" />
@@ -34,4 +54,42 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AnimationEditor.App.Tests" />
   </ItemGroup>
+
+  <!--
+    macOS app bundle for development. Creates AnimationEditor.app/ in the build
+    output so that `open bin/…/AnimationEditor.app` launches with the Dock label
+    "Animation Editor" (from CFBundleDisplayName in Info.plist) instead of the
+    raw executable filename "AnimationEditor".
+
+    The executable inside the bundle is a relative symlink pointing back to the
+    real binary in the build output directory. .NET resolves symlinks when
+    locating sibling DLLs, so the runtime finds all assemblies correctly.
+
+    Usage on macOS:
+        dotnet build   (or dotnet run for quick iteration — Dock shows "AnimationEditor")
+        open tools/AnimationEditorAvalonia/src/AnimationEditor.App/bin/Debug/net10.0/AnimationEditor.app
+  -->
+  <Target Name="CreateMacOSDevBundle" AfterTargets="Build"
+          Condition="$([MSBuild]::IsOSPlatform('osx'))">
+    <PropertyGroup>
+      <!-- $(OutDir) is the fully-qualified output directory; safer than relative $(OutputPath). -->
+      <_BundleDir>$(OutDir)AnimationEditor.app</_BundleDir>
+      <_BundleMacOS>$(_BundleDir)/Contents/MacOS</_BundleMacOS>
+      <_BundleResources>$(_BundleDir)/Contents/Resources</_BundleResources>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_BundleMacOS);$(_BundleResources)" />
+
+    <!-- Relative symlink: Contents/MacOS/AnimationEditor → ../../../AnimationEditor -->
+    <Exec Command="ln -sf ../../../$(AssemblyName) $(_BundleMacOS)/$(AssemblyName)" />
+
+    <!-- Copy the .icns from source (not output) so the icon is always present even on clean builds. -->
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)Assets/icons/AppIcon.icns"
+          DestinationFolder="$(_BundleResources)"
+          SkipUnchangedFiles="true" />
+
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)macos/Info.plist"
+          DestinationFiles="$(_BundleDir)/Contents/Info.plist"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

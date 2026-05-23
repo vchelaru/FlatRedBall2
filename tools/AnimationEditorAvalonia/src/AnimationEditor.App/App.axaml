@@ -68,7 +68,7 @@
                                                   BorderThickness="0"
                                                   MinWidth="0" MinHeight="0" Padding="2">
                                         <svg:Svg Width="7" Height="7"
-                                                 Path="avares://AnimationEditor.App/Assets/icons/svg/IconChevronUp.svg"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconChevronUp.svg"
                                                  CurrentColor="#9098a4" />
                                     </RepeatButton>
                                     <RepeatButton Name="PART_DecreaseButton"
@@ -79,7 +79,7 @@
                                                   BorderThickness="0"
                                                   MinWidth="0" MinHeight="0" Padding="2">
                                         <svg:Svg Width="7" Height="7"
-                                                 Path="avares://AnimationEditor.App/Assets/icons/svg/IconChevronDown.svg"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconChevronDown.svg"
                                                  CurrentColor="#9098a4" />
                                     </RepeatButton>
                                 </StackPanel>
@@ -147,7 +147,7 @@
             <Setter Property="ContentTemplate">
                 <DataTemplate>
                     <svg:Svg Width="10" Height="10"
-                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconPlus.svg"
+                             Path="avares://AnimationEditor/Assets/icons/svg/IconPlus.svg"
                              CurrentColor="#e6e8ec" />
                 </DataTemplate>
             </Setter>
@@ -156,7 +156,7 @@
             <Setter Property="ContentTemplate">
                 <DataTemplate>
                     <svg:Svg Width="10" Height="10"
-                             Path="avares://AnimationEditor.App/Assets/icons/svg/IconMinus.svg"
+                             Path="avares://AnimationEditor/Assets/icons/svg/IconMinus.svg"
                              CurrentColor="#e6e8ec" />
                 </DataTemplate>
             </Setter>

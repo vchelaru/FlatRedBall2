@@ -10,6 +10,26 @@ dotnet test
 
 ---
 
+## Running on macOS — Dock name and icon
+
+On macOS, `dotnet run` launches the bare executable and the Dock shows
+`AnimationEditor` (the assembly name). To get the full `Animation Editor`
+label with the correct icon, launch via the `.app` bundle that the build
+produces automatically:
+
+```bash
+# From the AnimationEditor.App project directory:
+./run-mac.sh
+
+# Or manually after any dotnet build:
+open bin/Debug/net10.0/AnimationEditor.app
+```
+
+`run-mac.sh` builds the project and calls `open -W` (waits for the window to
+close), giving the same terminal experience as `dotnet run`.
+
+---
+
 ## Troubleshooting: Build Fails with "file is locked by another process"
 
 **Symptom**

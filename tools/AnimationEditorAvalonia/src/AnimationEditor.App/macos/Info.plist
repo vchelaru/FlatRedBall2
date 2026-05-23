@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Display name shown in the macOS Dock, Finder, and Mission Control. -->
+    <key>CFBundleDisplayName</key>
+    <string>Animation Editor</string>
+    <key>CFBundleName</key>
+    <string>Animation Editor</string>
+    <key>CFBundleExecutable</key>
+    <string>AnimationEditor</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.flatredball.animationeditor</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+</dict>
+</plist>
