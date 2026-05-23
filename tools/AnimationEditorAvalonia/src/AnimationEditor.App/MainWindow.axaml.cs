@@ -788,6 +788,29 @@ public partial class MainWindow : Window
         RefreshRecentFiles();
     }
 
+    /// <summary>
+    /// Returns delegates for every actionable menu item so that the macOS NativeMenu
+    /// can be wired from <see cref="App"/> without reaching into private window state.
+    /// </summary>
+    internal NativeMenuActions CreateNativeMenuActions() => new(
+        New:             () => OnNewClick(null, null!),
+        Load:            () => _ = LoadAsync(),
+        RecentFiles:     () => _appSettings.RecentFiles
+                                    .Take(5)
+                                    .Select(f => (System.IO.Path.GetFileName(f), (Action)(() => _ = LoadAnimationFileAsync(f))))
+                                    .ToList(),
+        Save:            () => OnSaveClick(null, null!),
+        SaveAs:          () => _ = _appCommands.SaveCurrentAnimationChainListAsync(),
+        Undo:            () => _undoManager.Undo(),
+        Redo:            () => _undoManager.Redo(),
+        Copy:            () => _ = HandleCopyAsync(),
+        Paste:           () => _ = HandlePasteAsync(),
+        ReloadFromDisk:  () => { if (!string.IsNullOrEmpty(_projectManager.FileName)) _appCommands.ReloadAchxFromDisk(_projectManager.FileName); },
+        ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
+        ResizeTexture:   () => _ = DoResizeTextureAsync(),
+        ShowHistory:     () => SetHistoryVisible(true),
+        About:           () => _ = BuildAboutWindow().ShowDialog(this));
+
     private void RefreshRecentFiles()
     {
         MenuLoadRecent.Items.Clear();

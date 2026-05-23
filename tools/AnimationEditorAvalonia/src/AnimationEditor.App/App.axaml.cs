@@ -6,6 +6,7 @@ using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -13,6 +14,7 @@ using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
+using System.Windows.Input;
 
 namespace AnimationEditor.App;
 
@@ -30,9 +32,10 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var mainWindow = services.GetRequiredService<MainWindow>();
-            mainWindow.Icon = LoadAppIcon();
-            desktop.MainWindow = mainWindow;
+            var window = services.GetRequiredService<MainWindow>();
+            window.Icon = LoadAppIcon();
+            desktop.MainWindow = window;
+            RegisterNativeMenu(window);
 
             // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
             // may clear NSApplication.applicationIconImage during window assignment
@@ -59,6 +62,52 @@ public partial class App : Application
             new Uri("avares://AnimationEditor/Assets/icons/achx-icon-256.png"));
         return new WindowIcon(new Bitmap(stream));
     }
+
+    private void RegisterNativeMenu(MainWindow window)
+    {
+        var a = window.CreateNativeMenuActions();
+
+        var fileMenu = new NativeMenu();
+        fileMenu.Add(new NativeMenuItem("New")      { Command = Cmd(a.New),    Gesture = new KeyGesture(Key.N, KeyModifiers.Meta) });
+        fileMenu.Add(new NativeMenuItem("Open…")    { Command = Cmd(a.Load),   Gesture = new KeyGesture(Key.L, KeyModifiers.Meta) });
+
+        var recentMenu = new NativeMenu();
+        foreach (var (header, execute) in a.RecentFiles())
+            recentMenu.Add(new NativeMenuItem(header) { Command = Cmd(execute) });
+        fileMenu.Add(new NativeMenuItem("Open Recent") { Menu = recentMenu });
+
+        fileMenu.Add(new NativeMenuItemSeparator());
+        fileMenu.Add(new NativeMenuItem("Save")     { Command = Cmd(a.Save),   Gesture = new KeyGesture(Key.S, KeyModifiers.Meta) });
+        fileMenu.Add(new NativeMenuItem("Save As…") { Command = Cmd(a.SaveAs), Gesture = new KeyGesture(Key.S, KeyModifiers.Meta | KeyModifiers.Shift) });
+
+        var editMenu = new NativeMenu();
+        editMenu.Add(new NativeMenuItem("Undo")  { Command = Cmd(a.Undo),  Gesture = new KeyGesture(Key.Z, KeyModifiers.Meta) });
+        editMenu.Add(new NativeMenuItem("Redo")  { Command = Cmd(a.Redo),  Gesture = new KeyGesture(Key.Z, KeyModifiers.Meta | KeyModifiers.Shift) });
+        editMenu.Add(new NativeMenuItemSeparator());
+        editMenu.Add(new NativeMenuItem("Copy")  { Command = Cmd(a.Copy),  Gesture = new KeyGesture(Key.C, KeyModifiers.Meta) });
+        editMenu.Add(new NativeMenuItem("Paste") { Command = Cmd(a.Paste), Gesture = new KeyGesture(Key.V, KeyModifiers.Meta) });
+        editMenu.Add(new NativeMenuItemSeparator());
+        editMenu.Add(new NativeMenuItem("Reload from Disk")  { Command = Cmd(a.ReloadFromDisk) });
+        editMenu.Add(new NativeMenuItem("Enable Hot Reload") { Command = Cmd(a.ToggleHotReload) });
+        editMenu.Add(new NativeMenuItemSeparator());
+        editMenu.Add(new NativeMenuItem("Resize Texture…")  { Command = Cmd(a.ResizeTexture) });
+
+        var viewMenu = new NativeMenu();
+        viewMenu.Add(new NativeMenuItem("Show History") { Command = Cmd(a.ShowHistory) });
+
+        var helpMenu = new NativeMenu();
+        helpMenu.Add(new NativeMenuItem("About Animation Editor") { Command = Cmd(a.About) });
+
+        var appMenu = new NativeMenu();
+        appMenu.Add(new NativeMenuItem("File") { Menu = fileMenu });
+        appMenu.Add(new NativeMenuItem("Edit") { Menu = editMenu });
+        appMenu.Add(new NativeMenuItem("View") { Menu = viewMenu });
+        appMenu.Add(new NativeMenuItem("Help") { Menu = helpMenu });
+
+        NativeMenu.SetMenu(window, appMenu);
+    }
+
+    private static ICommand Cmd(Action action) => new RelayCommand(action);
 
     private static ServiceProvider BuildServices()
     {
