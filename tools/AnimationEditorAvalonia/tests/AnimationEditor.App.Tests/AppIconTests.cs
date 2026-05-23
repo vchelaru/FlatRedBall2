@@ -2,6 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using System;
+using System.IO;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -49,14 +51,38 @@ public class AppIconTests
     }
 
     /// <summary>
-    /// MacOSDockIcon.Set must not throw when given a non-existent path (defensive guard
-    /// against missing icon at runtime on non-macOS platforms or missing .icns builds).
+    /// MacOSDockIcon.Set must not throw when given an empty byte array (defensive guard
+    /// against asset-loading failure at runtime).
     /// </summary>
     [Fact]
-    public void MacOSDockIcon_DoesNotThrowForMissingFile()
+    public void MacOSDockIcon_DoesNotThrowForEmptyBytes()
     {
-        var exception = Record.Exception(() =>
-            MacOSDockIcon.Set("/nonexistent/AppIcon.icns"));
+        var exception = Record.Exception(() => MacOSDockIcon.Set(Array.Empty<byte>()));
+        Assert.Null(exception);
+    }
+
+    /// <summary>
+    /// MacOSDockIcon.Set must not throw when called with valid PNG bytes on any platform.
+    /// On non-macOS this is a no-op; on macOS it exercises the NSImage creation path.
+    /// </summary>
+    [AvaloniaFact]
+    public void MacOSDockIcon_DoesNotThrowWithValidPngBytes()
+    {
+        using var stream = AssetLoader.Open(new Uri(IconUri));
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+
+        var exception = Record.Exception(() => MacOSDockIcon.Set(ms.ToArray()));
+        Assert.Null(exception);
+    }
+
+    /// <summary>
+    /// MacOSDockIcon.SetProcessName must not throw on any platform.
+    /// </summary>
+    [Fact]
+    public void MacOSDockIcon_SetProcessName_DoesNotThrow()
+    {
+        var exception = Record.Exception(() => MacOSDockIcon.SetProcessName("Test App"));
         Assert.Null(exception);
     }
 }

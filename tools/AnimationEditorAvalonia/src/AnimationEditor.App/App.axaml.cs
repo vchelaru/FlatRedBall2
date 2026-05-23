@@ -9,8 +9,10 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.IO;
 
 namespace AnimationEditor.App;
 
@@ -28,15 +30,26 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = services.GetRequiredService<MainWindow>();
-            // Set the icon in code so Avalonia's macOS backend propagates it to
-            // NSApplication.SharedApplication.ApplicationIconImage for the Dock.
-            // The XAML attribute alone is not always sufficient on macOS when
-            // WindowDecorations="None" bypasses the native NSWindow title-bar path.
             mainWindow.Icon = LoadAppIcon();
             desktop.MainWindow = mainWindow;
+
+            // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
+            // may clear NSApplication.applicationIconImage during window assignment
+            // (when WindowDecorations="None" bypasses the native title-bar path), so
+            // we set it AFTER Avalonia's own initialisation has finished.
+            Dispatcher.UIThread.Post(SetMacOSDockIcon);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void SetMacOSDockIcon()
+    {
+        using var stream = AssetLoader.Open(
+            new Uri("avares://AnimationEditor.App/Assets/icons/achx-icon-256.png"));
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        MacOSDockIcon.Set(ms.ToArray());
     }
 
     private static WindowIcon LoadAppIcon()
