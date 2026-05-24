@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     private readonly Services.ThumbnailService _thumbnailService;
 
     private AppSettingsModel _appSettings = new();
+    private readonly TabManager _tabManager = new();
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
     private bool _suppressZoomComboChanged;
@@ -97,6 +98,7 @@ public partial class MainWindow : Window
         WirePropertyPanel();
         WirePlaybackControls();
         WireKeyboard();
+        WireTabBar();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService);
@@ -104,12 +106,171 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Closed += (_, _) =>
         {
+            SaveTabsToSettings();
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
             foreach (var vm in _timelineFrames)
                 (vm.Thumbnail as IDisposable)?.Dispose();
             DisposeTreeThumbnails();
         };
+    }
+
+    // ── Tab bar ───────────────────────────────────────────────────────────────
+
+    private void WireTabBar()
+    {
+        _tabManager.ActiveChanged += _ => Dispatcher.UIThread.InvokeAsync(RebuildTabStrip);
+    }
+
+    private void RebuildTabStrip()
+    {
+        TabStrip.Children.Clear();
+
+        var tabs = _tabManager.Tabs;
+        TabBarBorder.IsVisible = tabs.Count > 0;
+
+        foreach (var tab in tabs)
+        {
+            bool isActive = tab == _tabManager.ActiveTab;
+            var captured = tab;
+
+            // Tab container
+            var tabBorder = new Border
+            {
+                Background = isActive
+                    ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2f3641"))
+                    : Avalonia.Media.Brushes.Transparent,
+                BorderBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#2a2e36")),
+                BorderThickness = new Avalonia.Thickness(0, 0, 1, 0),
+                Padding = new Avalonia.Thickness(0),
+                Cursor = new Cursor(StandardCursorType.Hand),
+            };
+
+            ToolTip.SetTip(tabBorder, tab.Path.FullPath);
+
+            var row = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                Margin = new Avalonia.Thickness(8, 0, 0, 0),
+            };
+
+            var label = new TextBlock
+            {
+                Text = tab.DisplayName,
+                FontSize = 11,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Foreground = isActive
+                    ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#d4d8de"))
+                    : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#9098a4")),
+            };
+            Grid.SetColumn(label, 0);
+
+            var closeBtn = new Button
+            {
+                Content = "✕",
+                FontSize = 9,
+                Width = 20,
+                Height = 20,
+                Padding = new Avalonia.Thickness(0),
+                Background = Avalonia.Media.Brushes.Transparent,
+                BorderThickness = new Avalonia.Thickness(0),
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#9098a4")),
+                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                Margin = new Avalonia.Thickness(2, 0, 2, 0),
+            };
+            Grid.SetColumn(closeBtn, 1);
+            closeBtn.Click += (_, _) => CloseTab(captured);
+
+            row.Children.Add(label);
+            row.Children.Add(closeBtn);
+            tabBorder.Child = row;
+
+            // Click on the tab label/body activates it
+            tabBorder.PointerPressed += (_, args) =>
+            {
+                if (args.GetCurrentPoint(tabBorder).Properties.IsLeftButtonPressed)
+                {
+                    _ = ActivateTabAsync(captured);
+                    args.Handled = true;
+                }
+            };
+
+            // Middle-click closes the tab
+            tabBorder.PointerReleased += (_, args) =>
+            {
+                if (args.GetCurrentPoint(tabBorder).Properties.PointerUpdateKind ==
+                    PointerUpdateKind.MiddleButtonReleased)
+                {
+                    CloseTab(captured);
+                    args.Handled = true;
+                }
+            };
+
+            TabStrip.Children.Add(tabBorder);
+        }
+    }
+
+    private async Task ActivateTabAsync(TabEntry tab)
+    {
+        if (tab == _tabManager.ActiveTab) return;
+        SaveCompanionFile();
+        _tabManager.Activate(tab.Path);
+        // Bypass LoadAnimationFileAsync so we don't hit the short-circuit that skips
+        // the file load when the path is already the active tab.
+        await _appCommands.OpenAchxWorkflowAsync(tab.Path.FullPath);
+        RebuildTabStrip();
+    }
+
+    /// <summary>
+    /// Opens <paramref name="filePath"/> as a new tab (or focuses it if already open).
+    /// Called from <see cref="App"/> when the single-instance server receives a path from
+    /// a second process.
+    /// </summary>
+    public async Task OpenFileAsTab(string filePath) => await LoadAnimationFileAsync(filePath);
+
+    private void CloseTab(TabEntry tab)
+    {
+        _tabManager.Close(tab.Path);
+        var next = _tabManager.ActiveTab;
+        if (next != null)
+            _ = LoadAnimationFileAsync(next.Path.FullPath);
+        else
+        {
+            // All tabs closed — start fresh
+            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+            _projectManager.FileName = null;
+            _selectedState.Reset();
+            _undoManager.Clear();
+            RefreshTreeView();
+            UpdateTitle();
+            UpdateStatusBar();
+        }
+    }
+
+    private void SaveTabsToSettings()
+    {
+        _appSettings.OpenTabPaths = _tabManager.OpenTabPaths.ToList();
+        _appSettings.ActiveTabPath = _tabManager.ActiveTab?.Path.FullPath;
+        SaveSettingsFile();
+    }
+
+    private async Task RestoreTabsAsync()
+    {
+        if (_appSettings.OpenTabPaths.Count == 0) return;
+
+        // Filter to paths that still exist on disk
+        var valid = _appSettings.OpenTabPaths
+            .Where(p => File.Exists(p))
+            .ToList();
+        if (valid.Count == 0) return;
+
+        _tabManager.RestoreFrom(valid, _appSettings.ActiveTabPath);
+
+        // Load the active tab's file into the editor
+        var active = _tabManager.ActiveTab;
+        if (active != null)
+            await LoadAnimationFileAsync(active.Path.FullPath);
     }
 
     // ── Startup ───────────────────────────────────────────────────────────────
@@ -120,6 +281,10 @@ public partial class MainWindow : Window
         if (args.Length >= 2 && File.Exists(args[1]))
         {
             _ = LoadAnimationFileAsync(args[1]);
+        }
+        else if (_appSettings.OpenTabPaths.Count > 0)
+        {
+            _ = RestoreTabsAsync();
         }
         else
         {
@@ -2223,8 +2388,19 @@ public partial class MainWindow : Window
 
     private async Task LoadAnimationFileAsync(string fileName)
     {
-        if (!string.IsNullOrEmpty(fileName))
-            await _appCommands.OpenAchxWorkflowAsync(fileName);
+        if (string.IsNullOrEmpty(fileName)) return;
+
+        var filePath = new FilePath(fileName);
+        var result = _tabManager.OpenOrFocus(filePath);
+
+        if (result == TabOpenResult.Focused)
+        {
+            // File is already loaded in the editor — just rebuild the tab strip to highlight it.
+            RebuildTabStrip();
+            return;
+        }
+
+        await _appCommands.OpenAchxWorkflowAsync(fileName);
     }
 
     private void UpdateTitle()

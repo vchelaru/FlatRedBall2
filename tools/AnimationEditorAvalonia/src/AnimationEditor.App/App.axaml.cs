@@ -20,6 +20,12 @@ namespace AnimationEditor.App;
 
 public partial class App : Application
 {
+    /// <summary>
+    /// Set by <see cref="Program.Main"/> before Avalonia starts. Used to wire the
+    /// single-instance file-open pipe to the running <see cref="MainWindow"/>.
+    /// </summary>
+    internal static SingleInstanceServer? SingleInstance { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -36,6 +42,13 @@ public partial class App : Application
             window.Icon = LoadAppIcon();
             desktop.MainWindow = window;
             RegisterNativeMenu(window);
+
+            // Wire single-instance IPC: file paths received from a second process open as tabs.
+            if (SingleInstance != null)
+            {
+                SingleInstance.FileOpenRequested += path =>
+                    Dispatcher.UIThread.InvokeAsync(() => window.OpenFileAsTab(path));
+            }
 
             // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
             // may clear NSApplication.applicationIconImage during window assignment

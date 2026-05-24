@@ -157,6 +157,21 @@
             </StackPanel>
             </Grid>
         </Border>
+        <!-- ── Tab bar: one tab per open .achx file ── -->
+        <Border x:Name="TabBarBorder"
+                DockPanel.Dock="Top"
+                Background="{StaticResource BgCanvas}"
+                BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="0,0,0,1"
+                Height="30"
+                IsVisible="False">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="TabStrip"
+                            Orientation="Horizontal" />
+            </ScrollViewer>
+        </Border>
+
         <Border DockPanel.Dock="Bottom"
                 Background="{StaticResource BgRail}"
                 BorderBrush="{StaticResource LineBrush}"
