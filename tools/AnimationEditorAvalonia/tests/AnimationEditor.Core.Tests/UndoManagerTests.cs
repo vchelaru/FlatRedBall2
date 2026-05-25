@@ -121,6 +121,92 @@ public class UndoManagerTests
         Assert.Null(ex);
     }
 
+    // ── TakeSnapshot / RestoreSnapshot ───────────────────────────────────────
+
+    [Fact]
+    public void TakeSnapshot_CapturesUndoStack()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+
+        var snapshot = _undo.TakeSnapshot();
+
+        Assert.Single(snapshot.UndoStack);
+        Assert.Same(cmd, snapshot.UndoStack[0]);
+    }
+
+    [Fact]
+    public void TakeSnapshot_CapturesRedoStack()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+        _undo.Undo();
+
+        var snapshot = _undo.TakeSnapshot();
+
+        Assert.Empty(snapshot.UndoStack);
+        Assert.Single(snapshot.RedoStack);
+        Assert.Same(cmd, snapshot.RedoStack[0]);
+    }
+
+    [Fact]
+    public void RestoreSnapshot_RestoresUndoStack()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+        var snapshot = _undo.TakeSnapshot();
+
+        var fresh = new UndoManager();
+        fresh.RestoreSnapshot(snapshot);
+
+        Assert.True(fresh.CanUndo);
+        Assert.False(fresh.CanRedo);
+    }
+
+    [Fact]
+    public void RestoreSnapshot_RestoresRedoStack()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+        _undo.Undo();
+        var snapshot = _undo.TakeSnapshot();
+
+        var fresh = new UndoManager();
+        fresh.RestoreSnapshot(snapshot);
+
+        Assert.False(fresh.CanUndo);
+        Assert.True(fresh.CanRedo);
+    }
+
+    [Fact]
+    public void RestoreSnapshot_UndoStillWorksAfterRestore()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+        var snapshot = _undo.TakeSnapshot();
+
+        var fresh = new UndoManager();
+        fresh.RestoreSnapshot(snapshot);
+        fresh.Undo();
+
+        Assert.Equal(1, cmd.UndoCalls);
+    }
+
+    [Fact]
+    public void RestoreSnapshot_RaisesStackChanged()
+    {
+        var cmd = new StubCommand();
+        _undo.Record(cmd);
+        var snapshot = _undo.TakeSnapshot();
+
+        int raised = 0;
+        var fresh = new UndoManager();
+        fresh.StackChanged += () => raised++;
+        fresh.RestoreSnapshot(snapshot);
+
+        Assert.Equal(1, raised);
+    }
+
     // ── Stub ──────────────────────────────────────────────────────────────────
 
     private sealed class StubCommand : IUndoableCommand
