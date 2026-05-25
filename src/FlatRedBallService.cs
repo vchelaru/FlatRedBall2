@@ -15,6 +15,7 @@ using FlatRedBall2.Rendering.Batches;
 using FlatRedBall2.Utilities;
 using Gum.Forms;
 using Gum.Wireframe;
+using KernSmith.Gum;
 using MonoGameGum;
 using MonoGameAndGum.Renderables;
 using Microsoft.Xna.Framework.Content;
@@ -270,6 +271,13 @@ public class FlatRedBallService
         {
             _gum.Initialize(game, DefaultVisualsVersion.V3);
         }
+
+        // KernSmith generates BitmapFonts in memory for any (family, size, style)
+        // combination — TextRuntime / DrawString resolve fonts without requiring
+        // pre-baked .fnt files in Content/FontCache/. Slots into Gum's font lookup
+        // cascade as IInMemoryFontCreator. Same wiring for both MonoGame and KNI.
+        CustomSetPropertyOnRenderable.InMemoryFontCreator =
+            new KernSmithFontCreator(game.GraphicsDevice);
         GumRenderBatch.Instance.Initialize();
         ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
         System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
