@@ -107,6 +107,13 @@ namespace AnimationEditor.Core.CommandsAndState
         void InvertFrameOrder(AnimationChainSave chain);
         void SetAllFrameLengths(AnimationChainSave chain, float frameLength);
         AnimationChainSave? DuplicateChain(AnimationChainSave source, bool flipH = false, bool flipV = false, string? newName = null);
+
+        /// <summary>
+        /// Deep-copies <paramref name="source"/> and inserts the copy immediately after it
+        /// in <paramref name="chain"/>. All UV coordinates, timing, flip flags, relative offsets,
+        /// and attached shapes are copied. Undoable.
+        /// </summary>
+        AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain);
         void SortAnimationsAlphabetically();
         void AdjustOffsetsJustifyBottom(AnimationChainSave chain, Func<AnimationFrameSave, float?> getTextureHeight, float offsetMultiplier = 1f);
         void AdjustOffsetsAdjustAll(AnimationChainSave chain, float? deltaX, float? deltaY, bool relative);
