@@ -1017,13 +1017,17 @@ public class WireframeControl : Control
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
-        FrameRegionChanged?.Invoke(sel.Frame);
-        _undoManager!.Record(new FrameRegionChangedCommand(
-            sel.Frame,
-            _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-            sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
-            sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate,
-            _appCommands!, _events!));
+        float aL = sel.Frame.LeftCoordinate, aT = sel.Frame.TopCoordinate;
+        float aR = sel.Frame.RightCoordinate, aB = sel.Frame.BottomCoordinate;
+        if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+        {
+            FrameRegionChanged?.Invoke(sel.Frame);
+            _undoManager!.Record(new FrameRegionChangedCommand(
+                sel.Frame,
+                _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                aL, aT, aR, aB,
+                _appCommands!, _events!));
+        }
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1067,9 +1071,12 @@ public class WireframeControl : Control
                 s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                 s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
             .ToList();
-        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-        foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-            FrameRegionChanged?.Invoke(fr.Frame);
+        if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+        {
+            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+                FrameRegionChanged?.Invoke(fr.Frame);
+        }
 
         _bulkHandleDragStarts.Clear();
         _draggingRect   = null;
@@ -1113,7 +1120,8 @@ public class WireframeControl : Control
                     s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                     s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                 .ToList();
-            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
         }
 
         ChainRegionChanged?.Invoke(chain);
@@ -1655,20 +1663,29 @@ public class WireframeControl : Control
                         s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                         s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                     .ToList();
-                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-                foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-                    FrameRegionChanged?.Invoke(fr.Frame);
+                if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                {
+                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                    foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+                        FrameRegionChanged?.Invoke(fr.Frame);
+                }
                 _bulkHandleDragStarts.Clear();
             }
             else
             {
-                FrameRegionChanged?.Invoke(_draggingRect.Frame);
-                _undoManager!.Record(new FrameRegionChangedCommand(
-                    _draggingRect.Frame,
-                    _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-                    _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
-                    _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate,
-                    _appCommands!, _events!));
+                float aL = _draggingRect.Frame.LeftCoordinate;
+                float aT = _draggingRect.Frame.TopCoordinate;
+                float aR = _draggingRect.Frame.RightCoordinate;
+                float aB = _draggingRect.Frame.BottomCoordinate;
+                if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+                {
+                    FrameRegionChanged?.Invoke(_draggingRect.Frame);
+                    _undoManager!.Record(new FrameRegionChangedCommand(
+                        _draggingRect.Frame,
+                        _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                        aL, aT, aR, aB,
+                        _appCommands!, _events!));
+                }
             }
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
@@ -1689,7 +1706,8 @@ public class WireframeControl : Control
                             s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                             s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                         .ToList();
-                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                    if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
                 }
                 ChainRegionChanged?.Invoke(chain);
             }
@@ -1707,6 +1725,12 @@ public class WireframeControl : Control
     }
 
     // ── Mouse helpers ─────────────────────────────────────────────────────────
+
+    private static bool RegionChanged(
+        float bL, float bT, float bR, float bB,
+        float aL, float aT, float aR, float aB)
+        => Math.Abs(aL - bL) > 0.0001f || Math.Abs(aT - bT) > 0.0001f ||
+           Math.Abs(aR - bR) > 0.0001f || Math.Abs(aB - bB) > 0.0001f;
 
     private void StartPan(Point pos)
     {

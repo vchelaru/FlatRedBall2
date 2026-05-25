@@ -230,4 +230,27 @@ public class WireframeChainDragTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    // ── No undo entry when click has no movement ──────────────────────────────
+
+    /// <summary>
+    /// Releasing the chain-drag handle without moving (start == end) must not push
+    /// an undo entry, because no frame coordinates changed.
+    /// Regression guard for: https://github.com/vchelaru/FlatRedBall2/issues/362
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateChainDrag_NoMovement_DoesNotRecordUndo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, _, _, dir) = BuildCtrlWithChainSelected(ctx);
+        try
+        {
+            ctrl.SimulateChainDrag(startScreenX: 16f, startScreenY: 8f,
+                                   endScreenX:   16f, endScreenY:   8f);
+
+            Assert.False(ctx.UndoManager.CanUndo,
+                "Chain click without dragging must not create an undo entry");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }
