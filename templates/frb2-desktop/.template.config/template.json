@@ -24,7 +24,7 @@
       "modifiers": [
         {
           "condition": "(!IncludeStarterContent)",
-          "exclude": [ "MyGame.Desktop/Content/*/**" ]
+          "exclude": [ "MyGame.Common/Content/*/**" ]
         }
       ]
     }
