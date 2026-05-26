@@ -58,6 +58,20 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
 
         void Clear();
 
+        /// <summary>
+        /// Captures the current undo and redo stacks as an immutable snapshot.
+        /// Store the snapshot on the active <see cref="AnimationEditor.Core.Models.TabEntry"/>
+        /// before switching tabs so history can be restored with <see cref="RestoreSnapshot"/>.
+        /// </summary>
+        UndoSnapshot TakeSnapshot();
+
+        /// <summary>
+        /// Replaces the current undo and redo stacks with those from <paramref name="snapshot"/>
+        /// and raises <see cref="StackChanged"/>. Call this after loading a tab's file content
+        /// (which calls <see cref="Clear"/>) to reinstate that tab's saved history.
+        /// </summary>
+        void RestoreSnapshot(UndoSnapshot snapshot);
+
         /// <summary>Marks the last auto-save as successful, setting <see cref="SaveState"/> to <see cref="SaveState.AutoSaveOn"/>.</summary>
         void MarkSaved();
 

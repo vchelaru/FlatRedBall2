@@ -978,6 +978,22 @@ public class WireframeControl : Control
     }
 
     /// <summary>
+    /// Applies the grid-snapped cell at the given screen position to the currently-selected frame
+    /// (via <see cref="ApplyRegionToSelectedFrame"/>). This is the double-click path in grid mode:
+    /// it bypasses handle hit-testing so frames that cover the entire texture can still be
+    /// assigned a specific cell.
+    /// No-ops when bitmap is null, grid is off, cell size is ≤ 0, or no frame is selected.
+    /// </summary>
+    public void SimulateGridSnapDoubleClick(float screenX, float screenY)
+    {
+        if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
+        var world = ScreenToTexture(screenX, screenY);
+        int gx = GridSnapper.Snap(world.X, _gridSize);
+        int gy = GridSnapper.Snap(world.Y, _gridSize);
+        ApplyRegionToSelectedFrame(gx, gy, gx + _gridSize, gy + _gridSize);
+    }
+
+    /// <summary>
     /// Runs the hover-preview snap logic for the given screen point and returns
     /// the resulting preview state. Requires a loaded texture (returns ShowPreview=false otherwise).
     /// </summary>
@@ -1017,13 +1033,17 @@ public class WireframeControl : Control
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
-        FrameRegionChanged?.Invoke(sel.Frame);
-        _undoManager!.Record(new FrameRegionChangedCommand(
-            sel.Frame,
-            _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-            sel.Frame.LeftCoordinate, sel.Frame.TopCoordinate,
-            sel.Frame.RightCoordinate, sel.Frame.BottomCoordinate,
-            _appCommands!, _events!));
+        float aL = sel.Frame.LeftCoordinate, aT = sel.Frame.TopCoordinate;
+        float aR = sel.Frame.RightCoordinate, aB = sel.Frame.BottomCoordinate;
+        if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+        {
+            FrameRegionChanged?.Invoke(sel.Frame);
+            _undoManager!.Record(new FrameRegionChangedCommand(
+                sel.Frame,
+                _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                aL, aT, aR, aB,
+                _appCommands!, _events!));
+        }
         _draggingRect   = null;
         _draggingHandle = HandleKind.None;
     }
@@ -1067,9 +1087,12 @@ public class WireframeControl : Control
                 s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                 s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
             .ToList();
-        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-        foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-            FrameRegionChanged?.Invoke(fr.Frame);
+        if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+        {
+            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+                FrameRegionChanged?.Invoke(fr.Frame);
+        }
 
         _bulkHandleDragStarts.Clear();
         _draggingRect   = null;
@@ -1113,7 +1136,8 @@ public class WireframeControl : Control
                     s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                     s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                 .ToList();
-            _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+            if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
         }
 
         ChainRegionChanged?.Invoke(chain);
@@ -1353,7 +1377,7 @@ public class WireframeControl : Control
             snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
         var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
-        if (sel != null)
+        if (sel != null && !_isMagicWandMode)
         {
             snap.SelectedHandleBounds = sel.Bounds;
 
@@ -1425,8 +1449,20 @@ public class WireframeControl : Control
 
         if (!props.IsLeftButtonPressed) return;
 
-        // 1. Hit-test resize handles on the selected frame
-        if (!isCtrl)
+        // Grid mode double-click: bypass handle hit-testing so that a frame covering
+        // the entire texture (which would otherwise always hit HandleKind.Move) can still
+        // have a specific grid cell applied to it.
+        if (!isCtrl && !_isMagicWandMode && e.ClickCount == 2 && _showGrid && _gridSize > 0 && _bitmap != null)
+        {
+            var dblWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+            int gx = GridSnapper.Snap(dblWorld.X, _gridSize);
+            int gy = GridSnapper.Snap(dblWorld.Y, _gridSize);
+            ApplyRegionToSelectedFrame(gx, gy, gx + _gridSize, gy + _gridSize);
+            return;
+        }
+
+        // 1. Hit-test resize handles on the selected frame (skipped in Magic Wand mode)
+        if (!isCtrl && !_isMagicWandMode)
         {
             var (hitFrame, hitHandle) = HitTestHandle(pos);
             if (hitHandle != HandleKind.None)
@@ -1477,16 +1513,24 @@ public class WireframeControl : Control
         // 2. Magic-wand mode
         if (_isMagicWandMode && _inspectableImage != null)
         {
-            _inspectableImage.GetOpaqueWandBounds(
-                (int)world.X, (int)world.Y,
-                out int minX, out int minY, out int maxX, out int maxY);
-
-            if (maxX >= minX && maxY >= minY)
+            if (isCtrl)
             {
-                if (isCtrl)
+                // Ctrl+click: create a new frame from the wand's flood-fill bounds.
+                _inspectableImage.GetOpaqueWandBounds(
+                    (int)world.X, (int)world.Y,
+                    out int minX, out int minY, out int maxX, out int maxY);
+                if (maxX >= minX && maxY >= minY)
                     FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
-                else
-                    ApplyRegionToSelectedFrame(minX, minY, maxX, maxY);
+            }
+            else if (e.ClickCount >= 2 && _showPreview)
+            {
+                // Double-click: apply the currently-hovered preview rect to the selected frame.
+                ApplyPreviewToSelectedFrame();
+            }
+            else
+            {
+                // Single-click: plain frame selection only.
+                TrySelectFrameAtPoint(world);
             }
             return;
         }
@@ -1655,20 +1699,29 @@ public class WireframeControl : Control
                         s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                         s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                     .ToList();
-                _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
-                foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
-                    FrameRegionChanged?.Invoke(fr.Frame);
+                if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                {
+                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                    foreach (var (fr, _, _, _, _, _) in _bulkHandleDragStarts)
+                        FrameRegionChanged?.Invoke(fr.Frame);
+                }
                 _bulkHandleDragStarts.Clear();
             }
             else
             {
-                FrameRegionChanged?.Invoke(_draggingRect.Frame);
-                _undoManager!.Record(new FrameRegionChangedCommand(
-                    _draggingRect.Frame,
-                    _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
-                    _draggingRect.Frame.LeftCoordinate, _draggingRect.Frame.TopCoordinate,
-                    _draggingRect.Frame.RightCoordinate, _draggingRect.Frame.BottomCoordinate,
-                    _appCommands!, _events!));
+                float aL = _draggingRect.Frame.LeftCoordinate;
+                float aT = _draggingRect.Frame.TopCoordinate;
+                float aR = _draggingRect.Frame.RightCoordinate;
+                float aB = _draggingRect.Frame.BottomCoordinate;
+                if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+                {
+                    FrameRegionChanged?.Invoke(_draggingRect.Frame);
+                    _undoManager!.Record(new FrameRegionChangedCommand(
+                        _draggingRect.Frame,
+                        _dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB,
+                        aL, aT, aR, aB,
+                        _appCommands!, _events!));
+                }
             }
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
@@ -1689,7 +1742,8 @@ public class WireframeControl : Control
                             s.Rect.Frame.LeftCoordinate, s.Rect.Frame.TopCoordinate,
                             s.Rect.Frame.RightCoordinate, s.Rect.Frame.BottomCoordinate))
                         .ToList();
-                    _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
+                    if (snapshots.Any(s => RegionChanged(s.BL, s.BT, s.BR, s.BB, s.AL, s.AT, s.AR, s.AB)))
+                        _undoManager!.Record(new BulkFrameRegionChangedCommand(snapshots, _appCommands!, _events!));
                 }
                 ChainRegionChanged?.Invoke(chain);
             }
@@ -1707,6 +1761,12 @@ public class WireframeControl : Control
     }
 
     // ── Mouse helpers ─────────────────────────────────────────────────────────
+
+    private static bool RegionChanged(
+        float bL, float bT, float bR, float bB,
+        float aL, float aT, float aR, float aB)
+        => Math.Abs(aL - bL) > 0.0001f || Math.Abs(aT - bT) > 0.0001f ||
+           Math.Abs(aR - bR) > 0.0001f || Math.Abs(aB - bB) > 0.0001f;
 
     private void StartPan(Point pos)
     {
@@ -2083,6 +2143,19 @@ public class WireframeControl : Control
         FrameRegionChanged?.Invoke(frame);
     }
 
+    /// <summary>
+    /// Applies the current hover-preview rect (<see cref="_previewRect"/>) to the selected frame.
+    /// Used by Magic Wand double-click to commit the dashed-outline selection.
+    /// No-op when no frame is selected, no bitmap is loaded, or no preview is active.
+    /// </summary>
+    private void ApplyPreviewToSelectedFrame()
+    {
+        if (!_showPreview || _selectedState!.SelectedFrame is null || _bitmap is null) return;
+        ApplyRegionToSelectedFrame(
+            (int)_previewRect.Left, (int)_previewRect.Top,
+            (int)_previewRect.Right, (int)_previewRect.Bottom);
+    }
+
     // ── Coordinate transforms ─────────────────────────────────────────────────
 
     private SKPoint ScreenToTexture(float sx, float sy)
@@ -2260,6 +2333,21 @@ public class WireframeControl : Control
         var (minX, minY, maxX, maxY) = PlainClickFrameRegionCalculator.Compute(
             world.X, world.Y, _bitmap.Width, _bitmap.Height, lastW, lastH);
         FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+    }
+
+    /// <summary>
+    /// Test-only: simulates a Magic Wand double-click at the given screen position.
+    /// Updates the hover preview from the pixel at <paramref name="screenX"/>,
+    /// <paramref name="screenY"/> and then applies <see cref="ApplyPreviewToSelectedFrame"/>,
+    /// mirroring the double-click branch in <see cref="OnPointerPressed"/>.
+    /// No-op when magic-wand mode is off, the bitmap is null, or there is no preview.
+    /// </summary>
+    public void SimulateWandDoubleClick(float screenX, float screenY)
+    {
+        if (!_isMagicWandMode || _bitmap is null) return;
+        UpdatePreview(new Point(screenX, screenY));
+        if (_showPreview)
+            ApplyPreviewToSelectedFrame();
     }
 
     /// <summary>

@@ -612,4 +612,130 @@ public class GridRenderTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    // ── Double-click: ApplyRegionToSelectedFrame ──────────────────────────────
+
+    /// <summary>
+    /// Helper: loads a 64×64 texture, creates a single full-sheet frame (UV 0→1),
+    /// selects it, and returns both the control and the frame.
+    /// </summary>
+    private static (WireframeControl ctrl, AnimationFrameSave frame, string dir)
+        BuildCtrlWithFullSheetFrame(TestServices ctx)
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black);
+
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            LeftCoordinate   = 0f,
+            TopCoordinate    = 0f,
+            RightCoordinate  = 1f,
+            BottomCoordinate = 1f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);   // pan=(0,0), zoom=1 → screen ≡ texture coordinates
+        return (ctrl, frame, dir);
+    }
+
+    /// <summary>
+    /// Double-clicking at screen (20, 20) with cellSize=16, pan=(0,0), zoom=1 on a full-sheet
+    /// frame should update that frame's UV coordinates to the cell (16,16)→(32,32) (i.e. 0.25–0.5
+    /// on a 64×64 texture).
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_WithFullSheetFrame_UpdatesFrameUVToClickedCell()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+
+            // Screen (20,20) → texture (20,20) → snap to 16 → cell (16,16,32,32) on 64×64
+            Assert.Equal(16f / 64f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(16f / 64f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(32f / 64f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(32f / 64f, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Verifies the grid-snap math: clicking at (0, 0) should map to the top-left cell (0,0,16,16).
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_SnapsToCorrectGridCell()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(5f, 5f);
+
+            // (5,5) snaps to (0,0,16,16) on 64×64 texture
+            Assert.Equal(0f,        frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(0f,        frame.TopCoordinate,    precision: 5);
+            Assert.Equal(16f / 64f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(16f / 64f, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// When the grid is disabled, SimulateGridSnapDoubleClick must not modify the selected frame.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_GridDisabled_IsNoOp()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        try
+        {
+            ctrl.SetGrid(false, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+
+            // UV should remain at full-sheet values
+            Assert.Equal(0f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(0f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(1f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(1f, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// When no frame is selected, SimulateGridSnapDoubleClick must not throw and must be a no-op.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_NoSelectedFrame_IsNoOp()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        try
+        {
+            ctx.SelectedState.SelectedFrame = null;
+            ctrl.SetGrid(true, 16);
+
+            // Must not throw
+            var ex = Record.Exception(() => ctrl.SimulateGridSnapDoubleClick(20f, 20f));
+            Assert.Null(ex);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }

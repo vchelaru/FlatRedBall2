@@ -1,3 +1,4 @@
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Paths;
 
 namespace AnimationEditor.Core.Models
@@ -24,6 +25,13 @@ namespace AnimationEditor.Core.Models
 
         /// <summary>The absolute path of the <c>.achx</c> file this tab represents.</summary>
         public FilePath Path { get; }
+
+        /// <summary>
+        /// Undo/redo stack snapshot saved when this tab was last deactivated.
+        /// Restored after the tab's file is reloaded on re-activation so the user's
+        /// edit history persists across tab switches.
+        /// </summary>
+        public UndoSnapshot? UndoSnapshot { get; set; }
 
         /// <summary>
         /// The tab label. Returns <see cref="_displayNameOverride"/> when set;

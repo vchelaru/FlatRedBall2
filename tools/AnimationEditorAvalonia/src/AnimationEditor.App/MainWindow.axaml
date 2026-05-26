@@ -470,18 +470,40 @@
                                   PlaceholderText="(none)"
                                   IsVisible="False" />
 
-                        <ToggleButton x:Name="MagicWandToggle"
-                                      Height="26"
-                                      Foreground="{StaticResource Ink}"
-                                      ToolTip.Tip="Click = set frame; Ctrl+Click = add new frame">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <svg:Svg Width="16" Height="16"
-                                         Path="avares://AnimationEditor/Assets/icons/svg/IconMagicWand.svg"
-                                         CurrentColor="#e6e8ec"
-                                         VerticalAlignment="Center" />
-                                <TextBlock Text="Magic Wand" VerticalAlignment="Center" />
+                        <!-- Edit-mode toggle: Move vs Magic Wand -->
+                        <Border BorderBrush="{StaticResource LineBrush}"
+                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                Height="26" Margin="0,0,2,0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <ToggleButton x:Name="MoveModeToggle"
+                                              Height="26"
+                                              Foreground="{StaticResource Ink}"
+                                              CornerRadius="3,0,0,3"
+                                              ToolTip.Tip="Move mode — drag handles to resize/move frames">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <svg:Svg Width="16" Height="16"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconMove.svg"
+                                                 CurrentColor="#e6e8ec"
+                                                 VerticalAlignment="Center" />
+                                        <TextBlock Text="Move" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </ToggleButton>
+                                <Border Width="1" Background="{StaticResource LineBrush}" />
+                                <ToggleButton x:Name="MagicWandToggle"
+                                              Height="26"
+                                              Foreground="{StaticResource Ink}"
+                                              CornerRadius="0,3,3,0"
+                                              ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <svg:Svg Width="16" Height="16"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconMagicWand.svg"
+                                                 CurrentColor="#e6e8ec"
+                                                 VerticalAlignment="Center" />
+                                        <TextBlock Text="Magic Wand" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </ToggleButton>
                             </StackPanel>
-                        </ToggleButton>
+                        </Border>
 
                         <!-- Divider -->
                         <Border Width="1" Height="18" Background="{StaticResource LineBrush}"

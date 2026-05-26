@@ -304,4 +304,67 @@ public class WireframeHandleDragTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    // ── No undo entry when click has no movement ──────────────────────────────
+
+    /// <summary>
+    /// Releasing a handle without dragging (start == end) must not push an undo
+    /// entry, because no frame coordinates changed.
+    /// Regression guard for: https://github.com/vchelaru/FlatRedBall2/issues/362
+    /// </summary>
+    [AvaloniaFact]
+    public void HandleDrag_NoMovement_DoesNotRecordUndo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, dir) = BuildCtrlWithSelectedFrame(ctx);
+        try
+        {
+            ctrl.SimulateHandleDrag(HandleKind.TopLeft,
+                startScreenX: 0f, startScreenY: 0f,
+                endScreenX:   0f, endScreenY:   0f);
+
+            Assert.False(ctx.UndoManager.CanUndo,
+                "Clicking a handle without dragging must not create an undo entry");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Same as <see cref="HandleDrag_NoMovement_DoesNotRecordUndo"/> for the bulk
+    /// (multi-chain) handle-drag path.
+    /// </summary>
+    [AvaloniaFact]
+    public void BulkHandleDrag_NoMovement_DoesNotRecordUndo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithSelectedFrame(ctx);
+        try
+        {
+            // Add a second chain so bulk mode is active
+            var chain2 = new AnimationChainSave { Name = "Walk2" };
+            var frame2 = new AnimationFrameSave
+            {
+                TextureName      = "sprite.png",
+                FrameLength      = 0.1f,
+                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
+                RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+                ShapesSave       = new ShapesSave(),
+            };
+            chain2.Frames.Add(frame2);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain2);
+            ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>
+            {
+                ctx.SelectedState.SelectedChain!, chain2,
+            };
+            ctrl.RefreshFrames();
+
+            ctrl.SimulateBulkHandleDrag(frame, HandleKind.TopLeft,
+                startScreenX: 0f, startScreenY: 0f,
+                endScreenX:   0f, endScreenY:   0f);
+
+            Assert.False(ctx.UndoManager.CanUndo,
+                "Bulk handle click without dragging must not create an undo entry");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }

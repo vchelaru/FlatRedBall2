@@ -326,6 +326,12 @@ public partial class MainWindow : Window
     private async Task ActivateTabAsync(TabEntry tab)
     {
         if (tab == _tabManager.ActiveTab) return;
+
+        // Save the leaving tab's undo history before the editor reloads a different file.
+        var leavingTab = _tabManager.ActiveTab;
+        if (leavingTab != null)
+            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
+
         SaveCompanionFile();
         _tabManager.Activate(tab.Path);
         // Bypass LoadAnimationFileAsync so we don't hit the short-circuit that skips
@@ -337,6 +343,8 @@ public partial class MainWindow : Window
             _projectManager.FileName = null;
             _selectedState.Reset();
             _undoManager.Clear();
+            if (tab.UndoSnapshot != null)
+                _undoManager.RestoreSnapshot(tab.UndoSnapshot);
             RefreshTreeView();
             UpdateTitle();
             UpdateStatusBar();
@@ -344,6 +352,9 @@ public partial class MainWindow : Window
         else
         {
             await _appCommands.OpenAchxWorkflowAsync(tab.Path.FullPath);
+            // LoadAnimationChain cleared the stack — restore this tab's saved history.
+            if (tab.UndoSnapshot != null)
+                _undoManager.RestoreSnapshot(tab.UndoSnapshot);
         }
         RebuildTabStrip();
     }
@@ -365,7 +376,12 @@ public partial class MainWindow : Window
             // so the just-closed file is not accidentally re-registered as a background tab.
             if (!IsUntitledTab(next))
                 _ = _appCommands.OpenAchxWorkflowAsync(next.Path.FullPath)
-                    .ContinueWith(_ => Dispatcher.UIThread.InvokeAsync(RebuildTabStrip));
+                    .ContinueWith(_ => Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        if (next.UndoSnapshot != null)
+                            _undoManager.RestoreSnapshot(next.UndoSnapshot);
+                        RebuildTabStrip();
+                    }));
             else
             {
                 // Switching to an Untitled tab — reset to a blank editor.
@@ -373,6 +389,8 @@ public partial class MainWindow : Window
                 _projectManager.FileName = null;
                 _selectedState.Reset();
                 _undoManager.Clear();
+                if (next.UndoSnapshot != null)
+                    _undoManager.RestoreSnapshot(next.UndoSnapshot);
                 RefreshTreeView();
                 UpdateTitle();
                 UpdateStatusBar();
@@ -523,9 +541,12 @@ public partial class MainWindow : Window
 
     // ── Wireframe toolbar wiring ──────────────────────────────────────────────
 
+    private bool _suppressModeToggle;
+
     private void WireWireframeToolbar()
     {
         TextureCombo.SelectionChanged += OnTextureComboChanged;
+        MoveModeToggle.IsCheckedChanged += OnMoveModeToggled;
         MagicWandToggle.IsCheckedChanged += OnMagicWandToggled;
         SnapToGridCheck.IsCheckedChanged += OnSnapToGridChanged;
         GridSizeInput.LostFocus += OnGridSizeInputLostFocus;
@@ -538,6 +559,10 @@ public partial class MainWindow : Window
         ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
         ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
         WireframeCtrl.WheelZoomPresets = _zoomPresets;
+
+        // Default to Move mode
+        MoveModeToggle.IsChecked = true;
+        WireframeCtrl.IsMagicWandMode = false;
 
         // Apply initial grid state
         WireframeCtrl.SetGrid(false, 16);
@@ -561,9 +586,24 @@ public partial class MainWindow : Window
         RefreshPropertyPanel();
     }
 
+    private void OnMoveModeToggled(object? sender, RoutedEventArgs e)
+    {
+        if (_suppressModeToggle) return;
+        if (MoveModeToggle.IsChecked != true) return;
+        _suppressModeToggle = true;
+        MagicWandToggle.IsChecked = false;
+        _suppressModeToggle = false;
+        WireframeCtrl.IsMagicWandMode = false;
+    }
+
     private void OnMagicWandToggled(object? sender, RoutedEventArgs e)
     {
-        WireframeCtrl.IsMagicWandMode = MagicWandToggle.IsChecked == true;
+        if (_suppressModeToggle) return;
+        if (MagicWandToggle.IsChecked != true) return;
+        _suppressModeToggle = true;
+        MoveModeToggle.IsChecked = false;
+        _suppressModeToggle = false;
+        WireframeCtrl.IsMagicWandMode = true;
     }
 
     private void OnSnapToGridChanged(object? sender, RoutedEventArgs e)
@@ -2564,6 +2604,11 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(fileName)) return;
 
+        // Save the leaving tab's undo history before a different file takes over the editor.
+        var leavingTab = _tabManager.ActiveTab;
+        if (leavingTab != null)
+            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
+
         // If there is already a file open that hasn't been registered as a tab yet,
         // add it as a background tab so it appears as the first tab when the second
         // file is opened.  This covers the common case of File > Open > Open.
@@ -2571,6 +2616,7 @@ public partial class MainWindow : Window
 
         var filePath = new FilePath(fileName);
         var result = _tabManager.OpenOrFocus(filePath);
+        var arrivedTab = _tabManager.ActiveTab;
 
         if (result == TabOpenResult.Focused)
         {
@@ -2581,12 +2627,20 @@ public partial class MainWindow : Window
             bool alreadyShown = string.Equals(_projectManager.FileName, fileName,
                 StringComparison.OrdinalIgnoreCase);
             if (!alreadyShown && !string.IsNullOrEmpty(fileName))
+            {
                 await _appCommands.OpenAchxWorkflowAsync(fileName);
+                if (arrivedTab?.UndoSnapshot != null)
+                    _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
+            }
             RebuildTabStrip();
             return;
         }
 
         await _appCommands.OpenAchxWorkflowAsync(fileName);
+        // Restore this tab's prior history if it was previously open (snapshot normally
+        // null on first open; non-null if the tab was closed and re-opened mid-session).
+        if (arrivedTab?.UndoSnapshot != null)
+            _undoManager.RestoreSnapshot(arrivedTab.UndoSnapshot);
     }
 
     /// <summary>

@@ -70,6 +70,24 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             StackChanged?.Invoke();
         }
 
+        /// <inheritdoc cref="IUndoManager.TakeSnapshot"/>
+        public UndoSnapshot TakeSnapshot() =>
+            new(_undoStack.Reverse().ToList(), _redoStack.ToList());
+
+        /// <inheritdoc cref="IUndoManager.RestoreSnapshot"/>
+        public void RestoreSnapshot(UndoSnapshot snapshot)
+        {
+            _undoStack.Clear();
+            // UndoStack is oldest-first; pushing in that order leaves newest on top.
+            foreach (var cmd in snapshot.UndoStack)
+                _undoStack.Push(cmd);
+            _redoStack.Clear();
+            // RedoStack is stored LIFO (next-to-redo first); push in reverse to restore that order.
+            for (int i = snapshot.RedoStack.Count - 1; i >= 0; i--)
+                _redoStack.Push(snapshot.RedoStack[i]);
+            StackChanged?.Invoke();
+        }
+
         /// <summary>Marks the last auto-save as successful, setting <see cref="SaveState"/> to <see cref="SaveState.AutoSaveOn"/>.</summary>
         public void MarkSaved()
         {
