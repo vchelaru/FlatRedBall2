@@ -1,6 +1,6 @@
 ---
 name: gum-integration
-description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, menus, buttons, labels, text display, StackPanel, Panel, layout, Gum Forms controls, Add, screen-space vs world-space UI, or any Gum-related question. Also trigger when user asks about displaying text on screen."
+description: "Gum Integration in FlatRedBall2. Use when working with UI, HUD, menus, buttons, labels, text display, StackPanel, Panel, layout, Gum Forms controls, Add, AddOverlay, screen-space vs world-space UI, blurry or low-res text, rendering quality, or any Gum-related question. Also trigger when user asks about displaying text on screen."
 ---
 
 # Gum Integration in FlatRedBall2
@@ -164,6 +164,20 @@ Add(scoreLabel, layer: hudLayer);
 
 **World-space**: `entity.Add(element)` places a Gum element at the entity's world position. It follows the entity and shifts when the camera pans. The visual is automatically removed when the entity is destroyed. `entity.IsVisible = false` hides it — don't reach into `element.Visible`.
 
+## Overlay vs Camera UI: Rendering Quality
+
+`Add()` parents UI under the camera's `UiRoot`, whose canvas matches the design resolution. Gum generates font bitmaps at `FontSize` design pixels; the render batch upscales them by `Camera.PixelsPerUnit`. At 2× (e.g. 480→960 window), a 22px font bitmap renders at 44px — each source pixel becomes a 2×2 block on screen, visibly lowering quality.
+
+`AddOverlay()` parents UI under `Screen.OverlayRoot`, sized to the back-buffer and rendered 1:1. `FontSize=22` generates a 22px bitmap rendered at 22px — sharp at any `PixelsPerUnit`. Use `AddOverlay()` for any text-bearing screen-space HUD when the window is larger than the design resolution.
+
+Coordinate values for overlay elements are in back-buffer pixels (design coords × `PixelsPerUnit`). For hit-testing overlay UI from world-space cursor input:
+
+```csharp
+float s  = Camera.PixelsPerUnit;
+float cx = (worldPos.X - Camera.Left) * s;
+float cy = (Camera.Top - worldPos.Y)  * s;
+```
+
 ## Loading Gum Screens from a .gumx Project File
 
 When a `.gumx` project is loaded (via `EngineInitSettings.GumProjectFile`), you can instantiate a Gum screen defined in the project and add it to the FRB2 screen (e.g., as a background visual):
@@ -247,6 +261,7 @@ The API differs by type:
 - **"Keyboard navigation" on Forms controls means Tab/accessibility focus only — not arrow keys.** Game action menus (battle commands, pause menus) require custom logic: maintain a `_selectedIndex` int and drive selection with `WasKeyPressed(Keys.Up/Down/Left/Right)` in `Screen.CustomActivity`. Apply visual highlight by toggling a property on the selected element. Do not try to use `Button.IsFocused` or `OnKeyDown` for this — Forms focus is designed for form tab-order, not game input.
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Shapes (`ColoredCircleRuntime`, `RoundedRectangleRuntime`, `ArcRuntime`) are in `MonoGameGum.GueDeriving` — same namespace as other visual types. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
 - **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
+- **`Add()` upscales fonts** when the window is larger than the design canvas (`PixelsPerUnit > 1`). At 2× scale a 22px font bitmap renders as a 44px upscale — blocky. Use `AddOverlay()` for text-bearing HUD to render at native back-buffer resolution (1:1). See *Overlay vs Camera UI: Rendering Quality* above.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Projected world coordinates under zoom** — `Camera.WorldToScreen` gives viewport pixels, but Gum applies zoom scaling during render. For projected Gum overlays (selection rectangles, tile highlights), convert viewport-pixel coordinates into Gum canvas units using zoom compensation (`1 / Camera.Zoom`) to avoid double-scaling drift.
 - **Initialize order**: Do not create Gum elements before `FlatRedBallService.Initialize`.
