@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../../src/AnimationChain.MonoGame/AnimationChain.MonoGame.csproj" />
+  <Project Path="AnimationChainSample.csproj" />
+</Solution>
