@@ -6,37 +6,6 @@
 
 FlatRedBall2 is the next generation of [FlatRedBall](https://github.com/vchelaru/FlatRedBall)  — a 2D game engine with 20+ years of iteration behind it, rebuilt from the ground up on modern .NET. It runs on two backends: [MonoGame](https://monogame.net) for desktop and [KNI](https://github.com/kniEngine/kni) for browser (via Blazor WASM), sharing a single codebase.
 
-## Quick Start for Humans
-
-New to FlatRedBall2? Get a working game in under 5 minutes.
-
-**1. Verify .NET 10 is installed**
-```
-dotnet --version
-```
-You should see `10.x`. If not, see [Installing .NET 10](#installing-net-10) below.
-
-**2. Create a new game project**
-```
-dotnet new install FlatRedBall2.Templates
-dotnet new frb2-desktop -n MyGame
-```
-
-**3. Run it**
-```
-cd MyGame/MyGame.Desktop
-dotnet tool restore
-dotnet run
-```
-
-A window opens showing "Hello from FlatRedBall 2" on a black background — you're done.
-
-**4. Next steps**
-- Open `MyGame.Common/Screens/GameScreen.cs` — this is where your code goes
-- Browse the [Samples](samples/) to see real games built on the engine
-- Check [`frb-skills/`](frb-skills/) for task-specific guides (entities, collision, animation, etc.)
-- See [Detailed Setup](#detailed-setup-guide) below for multi-platform (desktop + web) and custom project setup
-
 ## Samples
 
 Each sample is a complete runnable game built on the engine — open the source to see real usage patterns.
@@ -76,75 +45,48 @@ Binaries are unsigned. Windows SmartScreen will warn on first run ("More info" �
 - **Extensive XML documentation** — every public API documented; IntelliSense covers everything
 - **AI assistant support** — ships with skill files in `/frb-skills/` for any AI coding tool
 
-## Prerequisites
+## Quick Start
 
-FlatRedBall2 requires the **.NET 10 SDK**. Before running any `dotnet` command below, verify it is installed and on your PATH:
+### Step 1 — Verify .NET 10 is installed
+
+FlatRedBall2 requires the **.NET 10 SDK**. Check your version:
 
 ```
 dotnet --version
 ```
 
-You should see a version starting with `10.` (e.g. `10.0.100`). If you instead see:
+You should see `10.x` (e.g. `10.0.100`). If the command isn't found or shows an older version, see [Installing .NET 10](#installing-net-10) below.
 
-- `'dotnet' is not recognized as the name of a cmdlet...` (PowerShell) or `dotnet: command not found` (bash) — the SDK is not installed, or its install directory is not on your PATH.
-- A version older than `10.` — you have an older SDK; install .NET 10 alongside it (side-by-side installs are supported).
+### Step 2 — Install the project template
 
-### Installing .NET 10
-
-Pick whichever method fits your platform:
-
-**Windows** — either run the installer from https://dotnet.microsoft.com/download/dotnet/10.0, or use winget:
-
-```
-winget install Microsoft.DotNet.SDK.10
-```
-
-**macOS** — installer from the same download page, or via Homebrew:
-
-```
-brew install --cask dotnet-sdk
-```
-
-**Linux** — use Microsoft's install script (works on any distro):
-
-```
-curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0
-```
-
-Or follow the distro-specific package instructions at https://learn.microsoft.com/dotnet/core/install/linux.
-
-> **Important — restart your terminal after installing.** Every install method above (winget, Homebrew, the GUI installers, the Linux script) adds `dotnet` to PATH, but existing terminal sessions cache the old PATH and will not see it. Close the terminal and open a fresh one before continuing. This includes the integrated terminal in VS Code / Visual Studio / Rider — restart the editor too.
-
-After restarting, run `dotnet --version` to confirm you see `10.x`.
-
-## Detailed Setup Guide
-
-Install the project template once (re-run before each new project to pick up template updates):
+Run this once (and again before any new project to pick up template updates):
 
 ```
 dotnet new install FlatRedBall2.Templates
 ```
 
-Scaffold a new game. Pick a name (we'll use `YourGameName` below) and run from any directory you want the project folder created in:
+### Step 3 — Create your game
+
+Pick a name and run from the directory where you want the project folder created:
 
 ```
 dotnet new frb2-desktop -n YourGameName
 ```
 
-> **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. It adds a `YourGameName.BlazorGL/` head (Blazor WebAssembly via KNI) alongside the desktop one, sharing the same `Common` project. Slightly more complex layout — only worth it if you actually plan to ship to the web. See [Multi-platform setup](#multi-platform-desktop--web) below for what changes.
+This creates a `YourGameName/` folder with two projects inside:
 
-By default the new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs) so an AI assistant can reference them immediately. To start with an empty `Content/` folder instead:
+- `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
+- `YourGameName.Desktop/` — the desktop entry point that references `Common` and configures MonoGame.
+
+> **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. See [Multi-platform (Desktop + Web)](#multi-platform-desktop--web) below.
+
+The new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs). To start with an empty `Content/` folder instead:
 
 ```
 dotnet new frb2-desktop -n YourGameName --IncludeStarterContent false
 ```
 
-This creates a `YourGameName/` folder containing two C# projects:
-
-- `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
-- `YourGameName.Desktop/` — the desktop entry point that references `Common` and configures MonoGame.
-
-Build and run:
+### Step 4 — Build and run
 
 ```
 cd YourGameName/YourGameName.Desktop
@@ -154,7 +96,13 @@ dotnet run
 
 > **Why `cd YourGameName.Desktop`?** `dotnet tool restore` installs the MGCB content pipeline tool, and the tool manifest (`.config/dotnet-tools.json`) only lives in that subdirectory. Running `dotnet tool restore` from the solution root silently does nothing.
 
-A window should open showing the text "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
+A window opens showing "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
+
+### Step 5 — Start building
+
+- Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code lives. `CustomInitialize` runs once when the screen starts (the placeholder label is created here — delete that block and replace it with your own code); `CustomActivity` runs every frame.
+- Browse the [`samples/`](samples/) directory of **this repository** (not your project) for complete working game examples.
+- See [`frb-skills/`](frb-skills/) for task-specific guides (entities, collision, animation, and more) — written for AI assistants but readable by humans too.
 
 ### Multi-platform (Desktop + Web)
 
@@ -260,6 +208,32 @@ public class GameScreen : Screen
 ```
 
 See the `samples/` directory for complete working examples.
+
+## Installing .NET 10
+
+FlatRedBall2 requires the **.NET 10 SDK**. If `dotnet --version` isn't found or shows an older version, install it:
+
+**Windows** — installer from https://dotnet.microsoft.com/download/dotnet/10.0, or via winget:
+
+```
+winget install Microsoft.DotNet.SDK.10
+```
+
+**macOS** — same download page, or via Homebrew:
+
+```
+brew install --cask dotnet-sdk
+```
+
+**Linux** — Microsoft's install script (works on any distro):
+
+```
+curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0
+```
+
+Or follow distro-specific instructions at https://learn.microsoft.com/dotnet/core/install/linux.
+
+> **Restart your terminal after installing** — installers add `dotnet` to PATH, but existing terminal sessions won't see it. Close and reopen your terminal (or restart the editor if using VS Code / Rider). Then run `dotnet --version` to confirm `10.x`.
 
 ## Working with AI Assistants
 
