@@ -118,7 +118,9 @@ public class AchxLoaderTests
     public void FromFile_SetsFileName()
     {
         var save = AnimationChainListSave.FromFile("my/path/anim.achx", XmlStream(SimpleAchx));
-        Assert.Equal("my/path/anim.achx", save.FileName);
+        // FileName is always stored as an absolute path to avoid double-resolution
+        // when callers combine it with their own achxDir.
+        Assert.Equal(Path.GetFullPath("my/path/anim.achx"), save.FileName);
     }
 
     // ─── ToAnimationChainList ────────────────────────────────────────────────────

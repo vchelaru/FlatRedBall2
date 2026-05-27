@@ -105,7 +105,9 @@ public class AnimationChainListSave
         var projectFileEl = root.Element("ProjectFile");
         if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
 
-        result.FileName = filePath;
+        // Store the absolute path so ToAnimationChainList always produces absolute texture paths,
+        // preventing double-resolution when callers (e.g. AchxLoader) also combine with achxDir.
+        result.FileName = Path.GetFullPath(filePath);
         return result;
     }
 
