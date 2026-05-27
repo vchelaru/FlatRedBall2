@@ -44,7 +44,7 @@
       compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
       reference the AspNetCore.Components / JSInterop assemblies.
     -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->
