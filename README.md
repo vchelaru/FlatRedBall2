@@ -131,9 +131,18 @@ A window opens showing "Hello from FlatRedBall 2" centered on a black background
 
 ### Step 4 — Start building
 
-- Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code lives. `CustomInitialize` runs once when the screen starts (the placeholder label is created here — delete that block and replace it with your own code); `CustomActivity` runs every frame.
-- Browse the [`samples/`](samples/) directory of **this repository** (not your project) for complete working game examples.
-- See [`frb-skills/`](frb-skills/) for task-specific guides (entities, collision, animation, and more) — written for AI assistants but readable by humans too.
+Open `YourGameName.Common/Screens/GameScreen.cs`. The template creates a centered label to confirm rendering works — delete that block and replace it with your own code.
+
+**Core concepts:**
+
+- **Screen** — a game state (level, menu, game-over). `GameScreen` is your first one. Add entities and logic here.
+- **Entity** — a game object with position, physics, and shapes (player, enemy, bullet). Always create them through a `Factory<T>(this)` rather than directly with `new T()`.
+- **`CustomInitialize`** — runs once when the screen or entity starts. Create factories, load content, and wire up collision relationships here.
+- **`CustomActivity(FrameTime time)`** — runs every frame. Move things, fire timers, check win/lose conditions. Use `time.DeltaSeconds` for frame-rate-independent motion.
+
+The engine handles rendering, physics integration, and collision detection automatically — you wire up the logic and it does the rest.
+
+Browse the [`samples/`](samples/) directory of **this repository** for complete games that show these patterns in practice. See [`frb-skills/`](frb-skills/) for task-specific guides (entities, collision, animation, physics, and more).
 
 ### Multi-platform (Desktop + Web)
 
