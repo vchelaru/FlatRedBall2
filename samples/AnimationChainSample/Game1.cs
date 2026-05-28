@@ -1,4 +1,5 @@
 using FlatRedBall.AnimationChain;
+using FlatRedBall.AnimationChain.Content;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -6,34 +7,27 @@ using Microsoft.Xna.Framework.Input;
 namespace AnimationChainSample;
 
 /// <summary>
-/// Minimal demo: loads FrbCon2026Icons.achx (22 named chains) and cycles through them.
+/// Minimal demo: loads hero.achx (Walk / Run / Idle) and plays each chain
+/// on a procedural spritesheet -- no external art required.
 ///
 /// Controls:
-///   Space  — cycle to the next chain
-///   R      — hot-reload FrbCon2026Icons.achx from disk (try editing frame timings while running)
-///   Escape — exit
-///
-/// Drop frbcon-2026.png next to FrbCon2026Icons.achx in Content/ to see real art.
-/// Until then the sprites draw as invisible (null texture) but chain cycling still works.
+///   Space  -- cycle Walk -> Run -> Idle -> Walk
+///   R      -- hot-reload hero.achx from disk (try editing frame timings while running)
+///   Escape -- exit
 /// </summary>
 public class Game1 : Game
 {
-    private static readonly string[] ChainOrder =
-    [
-        "FrbCon2026_Row01", "FrbCon2026_Row02", "FrbCon2026_Row03", "FrbCon2026_Row04",
-        "FrbCon2026_Row05", "FrbCon2026_Row06", "FrbCon2026_Row07", "FrbCon2026_Row08",
-        "FrbCon2026_Row09", "FrbCon2026_Row10", "FrbCon2026_Row11", "FrbCon2026_Row12",
-        "FrbCon2026_Row13", "FrbCon2026_Row14", "FrbCon2026_Row15", "FrbCon2026_Row16",
-        "FrbCon2026_Row17", "FrbCon2026_Row18", "FrbCon2026_Row19", "FrbCon2026_Row20",
-        "FrbCon2026_Row21", "FrbCon2026_Row20Copy",
-    ];
+    private static readonly string[] ChainOrder = ["Walk", "Run", "Idle"];
 
-    private const string AchxPath = "Content/FrbCon2026Icons.achx";
+    private const string AchxPath = "Content/hero.achx";
 
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
 
-    private AchxLoader _loader = null!;
+    // Procedural 320x32 spritesheet: 10 frames at 32x32 each.
+    // col 0-3 = Walk (reds), col 4-7 = Run (blues), col 8-9 = Idle (grays).
+    private Texture2D _spriteSheet = null!;
+
     private AnimationChainList _animations = null!;
     private AnimationPlayer _player = null!;
     private int _chainIndex;
@@ -56,10 +50,10 @@ public class Game1 : Game
         base.Initialize();
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-        // AchxLoader resolves frbcon-2026.png relative to the .achx file.
-        // Missing PNG -> null textures -> DrawAnimation no-ops gracefully.
-        _loader     = new AchxLoader(GraphicsDevice);
-        _animations = _loader.Load(AchxPath);
+        _spriteSheet = CreateSpriteSheet(GraphicsDevice);
+
+        var save = AnimationChainListSave.FromFile(AchxPath);
+        _animations = save.ToAnimationChainList(_ => _spriteSheet);
 
         _player = new AnimationPlayer(_animations);
         _player.Play(ChainOrder[_chainIndex]);
@@ -82,7 +76,7 @@ public class Game1 : Game
 
         if (IsPressed(keys, Keys.R))
         {
-            bool ok = _loader.TryReload(_animations, AchxPath);
+            bool ok = _animations.TryReloadFrom(AchxPath, _ => _spriteSheet);
             Window.Title = ok
                 ? $"Reloaded! -- {CurrentStatus()}"
                 : "Reload failed (file busy?) -- try again";
@@ -106,12 +100,6 @@ public class Game1 : Game
         base.Draw(gameTime);
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing) _loader?.Dispose();
-        base.Dispose(disposing);
-    }
-
     private bool IsPressed(KeyboardState cur, Keys key) =>
         cur.IsKeyDown(key) && !_prevKeys.IsKeyDown(key);
 
@@ -120,4 +108,41 @@ public class Game1 : Game
 
     private void UpdateTitle() =>
         Window.Title = $"AnimationChain.MonoGame -- {CurrentStatus()}   [Space] cycle  [R] reload  [Esc] quit";
+
+    private static Texture2D CreateSpriteSheet(GraphicsDevice gd)
+    {
+        Color[] palette =
+        [
+            new Color(200,  50,  50),   // Walk 0
+            new Color(230, 100,  50),   // Walk 1
+            new Color(230, 100,  50),   // Walk 2
+            new Color(200,  50,  50),   // Walk 3
+            new Color( 50,  80, 220),   // Run 0
+            new Color( 50, 160, 240),   // Run 1
+            new Color( 80, 210, 255),   // Run 2
+            new Color( 50, 160, 240),   // Run 3
+            new Color(160, 160, 160),   // Idle 0
+            new Color(210, 210, 210),   // Idle 1
+        ];
+
+        const int frameSize  = 32;
+        const int frameCount = 10;
+        int w = frameSize * frameCount;
+        int h = frameSize;
+
+        var texture = new Texture2D(gd, w, h);
+        var data    = new Color[w * h];
+
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            int  frame    = x / frameSize;
+            int  lx       = x % frameSize;
+            bool isBorder = lx == 0 || lx == frameSize - 1 || y == 0 || y == frameSize - 1;
+            data[y * w + x] = isBorder ? Color.Black : palette[frame];
+        }
+
+        texture.SetData(data);
+        return texture;
+    }
 }
