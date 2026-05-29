@@ -1,4 +1,7 @@
 using System;
+using Gum.Forms.Controls;
+using Gum.Wireframe;
+using FlatRedBall2.Rendering;
 
 namespace FlatRedBall2;
 
@@ -8,6 +11,34 @@ namespace FlatRedBall2;
 /// </summary>
 public static class ScreenExtensions
 {
+    /// <summary>
+    /// Adds a Forms control to the primary camera HUD (`screen.Add(...)`), which is
+    /// camera-scoped and scales with <see cref="Rendering.Camera.PixelsPerUnit"/>.
+    /// </summary>
+    public static void AddCameraUi(this Screen screen, FrameworkElement element, Layer? layer = null)
+        => screen.Add(element, layer);
+
+    /// <summary>
+    /// Adds a Gum visual to the primary camera HUD (`screen.Add(...)`), which is
+    /// camera-scoped and scales with <see cref="Rendering.Camera.PixelsPerUnit"/>.
+    /// </summary>
+    public static void AddCameraUi(this Screen screen, GraphicalUiElement visual, Layer? layer = null)
+        => screen.Add(visual, layer);
+
+    /// <summary>
+    /// Adds a Forms control to the screen overlay (`screen.AddOverlay(...)`), drawn once
+    /// after all camera passes at full-window scale.
+    /// </summary>
+    public static void AddScreenOverlay(this Screen screen, FrameworkElement element, Layer? layer = null)
+        => screen.AddOverlay(element, layer);
+
+    /// <summary>
+    /// Adds a Gum visual to the screen overlay (`screen.AddOverlay(...)`), drawn once
+    /// after all camera passes at full-window scale.
+    /// </summary>
+    public static void AddScreenOverlay(this Screen screen, GraphicalUiElement visual, Layer? layer = null)
+        => screen.AddOverlay(visual, layer);
+
     /// <summary>
     /// Restarts the current screen using <paramref name="newConfigure"/> instead of the previously
     /// retained callback. The new callback fully replaces the retained one — both for this restart

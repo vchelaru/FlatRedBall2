@@ -511,6 +511,8 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     /// Override to run per-frame game logic. Called by <see cref="Screen"/> every frame after
     /// physics and collision have resolved, so positions and velocities reflect the current
     /// frame's state. Skipped while the screen is paused (<see cref="Screen.IsPaused"/>).
+    /// Do <b>not</b> create entities, factories, or collision relationships here —
+    /// use <see cref="CustomInitialize"/> instead.
     /// </summary>
     public virtual void CustomActivity(FrameTime time) { }
 

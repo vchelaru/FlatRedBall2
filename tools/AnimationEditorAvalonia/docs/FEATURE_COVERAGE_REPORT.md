@@ -54,6 +54,7 @@
 | F11 | Set relative X/Y offset | Sets `RelativeX` / `RelativeY` for animation position offsets |
 | F12 | Add multiple frames (batch) | "Add Multiple Frames" dialog; user enters count N; optional **Increment frame position** auto-advances `Left/Right/Top/BottomCoordinate` row-by-row based on the last frame's cell size; warns when increment would exceed texture bounds; N frames are added sequentially with each selecting the newly created frame |
 | F13 | Pixel-mode frame UV editing | When `UnitType` is `Pixel`, setting X/Y moves both the near and far edges by the pixel delta (preserving size); setting Width/Height adjusts only the far edge; all coordinates are rounded to the nearest pixel boundary after each change (mirroring `AnimationFrameDisplayer.CoordinateChange` in the WinForms app) |
+| F14 | Duplicate frame | Deep-copies a single frame (UV coordinates, timing, flip flags, relative offsets, texture, shapes) and inserts the copy immediately after the source frame in the chain; undoable |
 
 ### 1.3 Shape / Collision Management (per frame)
 

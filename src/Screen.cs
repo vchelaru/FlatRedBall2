@@ -466,6 +466,8 @@ public class Screen : ILifecycleEvents
     /// <summary>
     /// Override to run per-frame screen logic. Called after entity activity, collision, and tween
     /// advancement have completed for this frame. Skipped while <see cref="IsPaused"/> is <c>true</c>.
+    /// Do <b>not</b> create entities, factories, or collision relationships here —
+    /// use <see cref="CustomInitialize"/> instead.
     /// </summary>
     public virtual void CustomActivity(FrameTime time) { }
 

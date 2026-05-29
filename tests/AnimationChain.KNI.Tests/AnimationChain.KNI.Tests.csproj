@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!--
+    The AnimationChain.KNI.csproj uses PrivateAssets=All on its nkast references, so we must
+    pull them in directly here for type resolution (e.g. Texture2D in AnimationFrame).
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
+    <PackageReference Include="xunit" Version="2.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.*">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AnimationChain.MonoGame\AnimationChain.KNI.csproj" />
+  </ItemGroup>
+
+  <!-- Link to the shared test sources rather than duplicate them. -->
+  <ItemGroup>
+    <Compile Include="..\AnimationChain.MonoGame.Tests\AchxLoaderTests.cs" Link="AchxLoaderTests.cs" />
+    <Compile Include="..\AnimationChain.MonoGame.Tests\AnimationPlayerTests.cs" Link="AnimationPlayerTests.cs" />
+  </ItemGroup>
+</Project>

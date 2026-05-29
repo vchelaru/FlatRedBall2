@@ -58,62 +58,83 @@ You should see a version starting with `10.` (e.g. `10.0.100`). If you instead s
 - `'dotnet' is not recognized as the name of a cmdlet...` (PowerShell) or `dotnet: command not found` (bash) — the SDK is not installed, or its install directory is not on your PATH.
 - A version older than `10.` — you have an older SDK; install .NET 10 alongside it (side-by-side installs are supported).
 
+See [Installing .NET 10](#installing-net-10) below for platform-specific instructions.
+
 ### Installing .NET 10
 
-Pick whichever method fits your platform:
+FlatRedBall2 requires the **.NET 10 SDK**. If `dotnet --version` isn't found or shows an older version, install it:
 
-**Windows** — either run the installer from https://dotnet.microsoft.com/download/dotnet/10.0, or use winget:
+**Windows** — installer from https://dotnet.microsoft.com/download/dotnet/10.0, or via winget:
 
 ```
 winget install Microsoft.DotNet.SDK.10
 ```
 
-**macOS** — installer from the same download page, or via Homebrew:
+**macOS** — same download page, or via Homebrew:
 
 ```
 brew install --cask dotnet-sdk
 ```
 
-**Linux** — use Microsoft's install script (works on any distro):
+**Linux** — Microsoft's install script (works on any distro):
 
 ```
 curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0
 ```
 
-Or follow the distro-specific package instructions at https://learn.microsoft.com/dotnet/core/install/linux.
+Or follow distro-specific instructions at https://learn.microsoft.com/dotnet/core/install/linux.
 
-> **Important — restart your terminal after installing.** Every install method above (winget, Homebrew, the GUI installers, the Linux script) adds `dotnet` to PATH, but existing terminal sessions cache the old PATH and will not see it. Close the terminal and open a fresh one before continuing. This includes the integrated terminal in VS Code / Visual Studio / Rider — restart the editor too.
-
-After restarting, run `dotnet --version` to confirm you see `10.x`.
+> **Restart your terminal after installing** — installers add `dotnet` to PATH, but existing terminal sessions won't see it. Close and reopen your terminal (or restart the editor if using VS Code / Rider). Then run `dotnet --version` to confirm `10.x`.
 
 ## Quick Start
 
-Install the project template once (re-run before each new project to pick up template updates):
+### Step 1 — Install the project template
+
+Run this once (and again before any new project to pick up template updates):
 
 ```
 dotnet new install FlatRedBall2.Templates
 ```
 
-Scaffold a new game. Pick a name (we'll use `YourGameName` below) and run from any directory you want the project folder created in:
+### Step 2 — Create your game
+
+Pick a name and run from the directory where you want the project folder created:
 
 ```
 dotnet new frb2-desktop -n YourGameName
 ```
 
-> **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. It adds a `YourGameName.BlazorGL/` head (Blazor WebAssembly via KNI) alongside the desktop one, sharing the same `Common` project. Slightly more complex layout — only worth it if you actually plan to ship to the web. See [Multi-platform setup](#multi-platform-desktop--web) below for what changes.
+This creates a `YourGameName/` folder with two projects inside:
 
-By default the new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs) so an AI assistant can reference them immediately. To start with an empty `Content/` folder instead:
+- `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
+- `YourGameName.Desktop/` — the desktop entry point that references `Common` and configures MonoGame.
+
+> **Targeting the browser too?** Use `frb2-multiplatform` instead of `frb2-desktop`. See [Multi-platform (Desktop + Web)](#multi-platform-desktop--web) below.
+
+The new project's `Content/` folder is pre-populated with starter assets (animation chains, a base `.tmx` map and `StandardTileset`, and platformer/topdown JSON configs). To start with an empty `Content/` folder instead:
 
 ```
 dotnet new frb2-desktop -n YourGameName --IncludeStarterContent false
 ```
 
-This creates a `YourGameName/` folder containing two C# projects:
+### Repo setup (`.gitignore`)
 
-- `YourGameName.Common/` — your game code (screens, entities), shared across all targets.
-- `YourGameName.Desktop/` — the desktop entry point that references `Common` and configures MonoGame.
+Use `frb2-desktop` or `frb2-multiplatform` templates — they already include the recommended `.gitignore`.
 
-Build and run:
+Manual baseline:
+
+```
+bin/
+obj/
+Content/obj/
+.vs/
+*.user
+*.suo
+```
+
+For web projects, keep the template's `wwwroot/Content/.gitignore` (that folder is build output).
+
+### Step 3 — Build and run
 
 ```
 cd YourGameName/YourGameName.Desktop
@@ -123,17 +144,22 @@ dotnet run
 
 > **Why `cd YourGameName.Desktop`?** `dotnet tool restore` installs the MGCB content pipeline tool, and the tool manifest (`.config/dotnet-tools.json`) only lives in that subdirectory. Running `dotnet tool restore` from the solution root silently does nothing.
 
-A window should open showing the text "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
+A window opens showing "Hello from FlatRedBall 2" centered on a black background. If you see that, everything works.
 
-### Next steps
+### Step 4 — Start building
 
-- Open `YourGameName.Common/Screens/GameScreen.cs` — this is where your game code goes. `CustomInitialize` runs once when the screen starts (it's where the placeholder label is created — delete that block once you start building your own game); `CustomActivity` runs every frame.
-- For complete examples of real games, browse the [`samples/`](samples/) directory of **this repository** (not your project). Each sample is a runnable project demonstrating different engine features.
-- For task-specific guidance (entities, collision, animation, etc.), see [`frb-skills/`](frb-skills/) — Markdown guides written for AI assistants but readable by humans too.
+Open `YourGameName.Common/Screens/GameScreen.cs`. The template creates a centered label to confirm rendering works — delete that block and replace it with your own code.
+
+**Core concepts:**
+
+- **Screen** — a game state (level, menu, game-over). `GameScreen` is your first one.
+- **Entity** — a game object (player, enemy, bullet). Create them through `Factory<T>(this)` — never `new T()` directly.
+
+The engine handles rendering, physics, and collision automatically. Override `CustomInitialize` for one-time setup (factories, content, collision wiring) and `CustomActivity(FrameTime time)` for per-frame logic. For complete lifecycle rules see [`frb-skills/engine-overview/SKILL.md`](frb-skills/engine-overview/SKILL.md).
+
+Browse the [`samples/`](samples/) directory for complete games. See [`frb-skills/`](frb-skills/) for task-specific guides (entities, collision, animation, physics, and more).
 
 ### Multi-platform (Desktop + Web)
-
-If you also want to ship to browsers, use `frb2-multiplatform` instead of `frb2-desktop`:
 
 ```
 dotnet new frb2-multiplatform -n YourGameName

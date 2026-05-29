@@ -2082,6 +2082,9 @@ public partial class MainWindow : Window
             AddMenuItem("Rename…", () =>
                 BeginInlineRename(vm!, frame2.HasCustomName ? frame2.Name : string.Empty));
             AddSeparator();
+            if (chain2 is not null)
+                AddMenuItem("Duplicate Frame", () => _appCommands.DuplicateFrame(frame2, chain2));
+            AddSeparator();
             AddMenuItem("Delete Frame", () =>
                 _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
         }

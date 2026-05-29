@@ -745,6 +745,47 @@ namespace AnimationEditor.Core.CommandsAndState
             return copy;
         }
 
+        public AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain)
+        {
+            if (!chain.Frames.Contains(source)) return null;
+
+            var copy = new AnimationFrameSave
+            {
+                TextureName      = source.TextureName,
+                LeftCoordinate   = source.LeftCoordinate,
+                RightCoordinate  = source.RightCoordinate,
+                TopCoordinate    = source.TopCoordinate,
+                BottomCoordinate = source.BottomCoordinate,
+                FrameLength      = source.FrameLength,
+                FlipHorizontal   = source.FlipHorizontal,
+                FlipVertical     = source.FlipVertical,
+                RelativeX        = source.RelativeX,
+                RelativeY        = source.RelativeY,
+                ShapesSave       = new FlatRedBall2.Animation.Content.ShapesSave()
+            };
+
+            if (source.ShapesSave != null)
+            {
+                foreach (var shape in source.ShapesSave.Shapes)
+                {
+                    switch (shape)
+                    {
+                        case AARectSave r:
+                            copy.ShapesSave!.Shapes.Add(
+                                new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
+                            break;
+                        case CircleSave c:
+                            copy.ShapesSave!.Shapes.Add(
+                                new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
+                            break;
+                    }
+                }
+            }
+
+            _undoManager.Execute(new DuplicateFrameCommand(source, copy, chain, this, _events, _selectedState));
+            return copy;
+        }
+
         public void SortAnimationsAlphabetically()
         {
             var acls = _pm.AnimationChainListSave;

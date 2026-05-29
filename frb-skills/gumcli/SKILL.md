@@ -1,6 +1,6 @@
 ---
 name: gumcli
-description: "Gum CLI tool for FlatRedBall2. Trigger at game/sample START — before any code is written — to ask the user whether the project will use Gum and which mode (code-only, project+dynamic, or project+codegen). Covers locating gumcli.exe, running gumcli new, .csproj content includes, and codegen."
+description: "Gum CLI tool for FlatRedBall2. Trigger at game/sample START — before any code is written — to ask the user whether the project will use Gum and which mode (code-only, project+dynamic, or project+codegen). Covers locating gumcli.exe, running gumcli new, .csproj content includes, codegen, and custom/Google font setup."
 ---
 
 # Gum CLI Setup
@@ -116,7 +116,7 @@ Exit codes: `0` = success, `1` = elements blocked by errors, `2` = load/config f
 
 ## Font Generation
 
-If the project uses custom bitmap fonts (Text elements with a Font variable set), generate the missing `.fnt` and `.png` files with:
+FRB2 can generate fonts in memory from installed system font families, so plain `Font="Arial"` style usage often works without pre-baked files. Use this command when the Gum project relies on generated bitmap caches (especially `UseCustomFont=true` + `CustomFontFile`) and needs deterministic `.fnt`/`.png` output:
 
 ```bash
 gumcli fonts Content/GumProject/GumProject.gumx
@@ -126,6 +126,23 @@ gumcli fonts Content/GumProject/GumProject.gumx
 - Only generates fonts that don't already exist on disk; safe to re-run.
 - Font files land in `FontCache/` next to the `.gumx` file. Add that folder to `.gitignore` or check it in depending on your CI setup.
 - Run this after `gumcli new` if the project template includes screens with font-bearing Text instances, or any time a new font/size combination is added in the Gum editor.
+
+### Google Font workflow (issue #371 class of requests)
+
+Google Fonts links are usually specimen pages, not runtime font files. The reliable flow is: download the `.ttf`/`.otf` into the Gum project, point Gum text styles at that file, then regenerate font caches.
+
+1. Save the font file under `Content/GumProject/Fonts/` (for example `Content/GumProject/Fonts/Inter-Regular.ttf`).
+2. In Gum (usually on a shared text style like `Styles/Normal`), set:
+   - `UseCustomFont = true`
+   - `CustomFontFile = Fonts/Inter-Regular.ttf` (project-relative path)
+3. Run `gumcli check`, then `gumcli fonts`:
+
+```bash
+gumcli check Content/GumProject/GumProject.gumx
+gumcli fonts Content/GumProject/GumProject.gumx
+```
+
+4. If using mode 3 (codegen), run `gumcli codegen` after the Gum XML change.
 
 ---
 

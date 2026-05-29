@@ -272,6 +272,9 @@ public class FlatRedBallService
             _gum.Initialize(game, DefaultVisualsVersion.V3);
         }
 
+        if (settings is not null)
+            ValidateConfiguredGumFontFiles(settings);
+
         // KernSmith generates BitmapFonts in memory for any (family, size, style)
         // combination — TextRuntime / DrawString resolve fonts without requiring
         // pre-baked .fnt files in Content/FontCache/. Slots into Gum's font lookup
@@ -281,6 +284,117 @@ public class FlatRedBallService
         GumRenderBatch.Instance.Initialize();
         ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
         System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
+    }
+
+    internal static IReadOnlyList<string> ResolveGumFontValidationPaths(EngineInitSettings settings)
+    {
+        if (settings.GumFontFilesToValidate.Count == 0)
+            return Array.Empty<string>();
+
+        var gumProjectDirectory = GetGumProjectDirectory(settings.GumProjectFile);
+        var resolved = new List<string>(settings.GumFontFilesToValidate.Count);
+
+        foreach (var configuredPath in settings.GumFontFilesToValidate)
+        {
+            if (string.IsNullOrWhiteSpace(configuredPath))
+                continue;
+
+            var path = NormalizePathSeparators(configuredPath);
+            if (!IsAbsoluteContentPath(path) && !string.IsNullOrWhiteSpace(gumProjectDirectory))
+                path = CombineForwardSlashPaths(gumProjectDirectory!, path);
+
+            resolved.Add(path);
+        }
+
+        return resolved;
+    }
+
+    internal static void ValidateConfiguredGumFontFiles(
+        EngineInitSettings settings,
+        Func<string, bool>? fileExists = null,
+        Action<string>? warn = null)
+    {
+        var resolvedPaths = ResolveGumFontValidationPaths(settings);
+        if (resolvedPaths.Count == 0)
+            return;
+
+        fileExists ??= ContentFileExists;
+        warn ??= static message => System.Diagnostics.Debug.WriteLine(message);
+
+        var missingPaths = resolvedPaths.Where(path => !fileExists(path)).ToArray();
+        if (missingPaths.Length == 0)
+            return;
+
+        var message = $"Configured Gum font file(s) were not found: {string.Join(", ", missingPaths)}.";
+        if (settings.MissingGumFontFileBehavior == MissingGumFontFileBehavior.Throw)
+            throw new InvalidOperationException(message);
+
+        warn(message);
+    }
+
+    private static string CombineForwardSlashPaths(string left, string right)
+    {
+        if (string.IsNullOrEmpty(left))
+            return NormalizePathSeparators(right);
+
+        var normalizedLeft = NormalizePathSeparators(left).TrimEnd('/');
+        var normalizedRight = NormalizePathSeparators(right).TrimStart('/');
+        return $"{normalizedLeft}/{normalizedRight}";
+    }
+
+    private static bool ContentFileExists(string relativePath)
+    {
+        var path = relativePath.TrimStart('/', '\\');
+        try
+        {
+            using var _ = Microsoft.Xna.Framework.TitleContainer.OpenStream(path);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string? GetGumProjectDirectory(string? gumProjectFile)
+    {
+        if (string.IsNullOrWhiteSpace(gumProjectFile))
+            return null;
+
+        var normalized = NormalizePathSeparators(gumProjectFile).Trim();
+        var slashIndex = normalized.LastIndexOf('/');
+        if (slashIndex < 0)
+            return null;
+
+        return normalized.Substring(0, slashIndex);
+    }
+
+    private static string NormalizePathSeparators(string path)
+        => path.Replace('\\', '/');
+
+    internal static bool IsAbsoluteContentPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        var normalized = NormalizePathSeparators(path.Trim());
+        if (Path.IsPathRooted(normalized))
+            return true;
+
+        // Path.IsPathRooted("C:/...") is false on Unix, but these are still explicit absolute
+        // Windows paths that should not be rewritten as Gum-project-relative content.
+        return normalized.Length >= 3
+            && char.IsLetter(normalized[0])
+            && normalized[1] == ':'
+            && normalized[2] == '/';
     }
 
     // Screen management

@@ -269,4 +269,153 @@ public class AppCommandsFrameTests
             ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
         }
     }
+
+    // ── DuplicateFrame ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void DuplicateFrame_CreatesDeepCopy()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var source = chain.Frames[0];
+
+        var copy = ctx.AppCommands.DuplicateFrame(source, chain);
+
+        Assert.NotNull(copy);
+        Assert.NotSame(source, copy);
+    }
+
+    [Fact]
+    public void DuplicateFrame_CopiesTextureName()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        chain.Frames[0].TextureName = "hero.png";
+
+        var copy = ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);
+
+        Assert.Equal("hero.png", copy!.TextureName);
+    }
+
+    [Fact]
+    public void DuplicateFrame_CopiesUvCoordinates()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        var source = chain.Frames[0];
+        source.LeftCoordinate   = 0.1f;
+        source.RightCoordinate  = 0.5f;
+        source.TopCoordinate    = 0.2f;
+        source.BottomCoordinate = 0.8f;
+        source.FrameLength      = 0.25f;
+        source.RelativeX        = 3f;
+        source.RelativeY        = -2f;
+
+        var copy = ctx.AppCommands.DuplicateFrame(source, chain);
+
+        Assert.Equal(0.1f,  copy!.LeftCoordinate);
+        Assert.Equal(0.5f,  copy.RightCoordinate);
+        Assert.Equal(0.2f,  copy.TopCoordinate);
+        Assert.Equal(0.8f,  copy.BottomCoordinate);
+        Assert.Equal(0.25f, copy.FrameLength);
+        Assert.Equal(3f,    copy.RelativeX);
+        Assert.Equal(-2f,   copy.RelativeY);
+    }
+
+    [Fact]
+    public void DuplicateFrame_CopiesFlipFlags()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Idle", 1);
+        chain.Frames[0].FlipHorizontal = true;
+        chain.Frames[0].FlipVertical   = true;
+
+        var copy = ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);
+
+        Assert.True(copy!.FlipHorizontal);
+        Assert.True(copy.FlipVertical);
+    }
+
+    [Fact]
+    public void DuplicateFrame_CopiesShapes()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Attack", 1);
+        chain.Frames[0].ShapesSave!.Shapes.Add(
+            new AARectSave { Name = "HitBox", ScaleX = 4, ScaleY = 4 });
+
+        var copy = ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);
+
+        Assert.Single(copy!.ShapesSave!.AARectSaves);
+        Assert.Equal("HitBox", copy.ShapesSave!.AARectSaves.First().Name);
+        Assert.NotSame(chain.Frames[0].ShapesSave!.Shapes[0], copy.ShapesSave.Shapes[0]);
+    }
+
+    [Fact]
+    public void DuplicateFrame_InsertsImmediatelyAfterSource()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 3);
+        var source = chain.Frames[1]; // middle frame
+
+        var copy = ctx.AppCommands.DuplicateFrame(source, chain);
+
+        Assert.Equal(4, chain.Frames.Count);
+        Assert.Equal(2, chain.Frames.IndexOf(copy!));
+    }
+
+    [Fact]
+    public void DuplicateFrame_InsertsAfterLastFrame()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
+        var source = chain.Frames[1]; // last frame
+
+        var copy = ctx.AppCommands.DuplicateFrame(source, chain);
+
+        Assert.Equal(3, chain.Frames.Count);
+        Assert.Same(copy, chain.Frames[2]);
+    }
+
+    [Fact]
+    public void DuplicateFrame_SetsSelectedFrameToTheCopy()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+
+        var copy = ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);
+
+        Assert.Same(copy, ctx.SelectedState.SelectedFrame);
+    }
+
+    [Fact]
+    public void DuplicateFrame_FiresAnimationChainsChanged()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 1);
+        bool fired = false;
+        void Handler() => fired = true;
+        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
+        try
+        {
+            ctx.AppCommands.DuplicateFrame(chain.Frames[0], chain);
+            Assert.True(fired);
+        }
+        finally
+        {
+            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
+        }
+    }
+
+    [Fact]
+    public void DuplicateFrame_WhenSourceNotInChain_ReturnsNull()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var orphan = new AnimationFrameSave();
+
+        var result = ctx.AppCommands.DuplicateFrame(orphan, chain);
+
+        Assert.Null(result);
+    }
 }

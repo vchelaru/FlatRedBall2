@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- NuGet Metadata -->
+    <PackageId>FlatRedBall.AnimationChain.KNI</PackageId>
+    <Authors>Victor Chelaru</Authors>
+    <Description>
+      A standalone KNI (nkast) library for loading and playing .achx animation files created
+      by the FlatRedBall Animation Editor. Targets Blazor WASM and other KNI platforms.
+      No FlatRedBall2 engine dependency required.
+      For MonoGame DesktopGL targets, use FlatRedBall.AnimationChain.MonoGame instead.
+    </Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AnimationChain.KNI.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
