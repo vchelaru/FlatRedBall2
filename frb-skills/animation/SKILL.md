@@ -7,6 +7,15 @@ description: "Sprite animation in FlatRedBall2. Use for AnimationChain, Animatio
 
 Sprites animate via `AnimationChain` / `AnimationChainList`, driven automatically by `Screen.Update` — no per-frame call needed in game code.
 
+## Quick setup: adding animation content
+
+1. Create a folder in your `*.Common` project's `Content` directory (for example `Content/Animations`).
+2. Copy your source spritesheet PNG into that folder.
+3. Open Animation Editor and save a new `.achx` in the same folder as the PNG.
+4. Ensure your project copies these files to output (for example `Content/Animations/**` in `.csproj`; see `references/platformer-template.md`).
+
+`FileRelativeTextures` in `.achx` expects relative texture paths, so keeping `.achx` and texture content together avoids broken lookups.
+
 ## Runtime Types
 
 - `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection
@@ -31,6 +40,12 @@ Sprites animate via `AnimationChain` / `AnimationChainList`, driven automaticall
 ## Building Chains in Code
 
 There is no builder API; it's plain object init. Construct `AnimationFrame` instances with `Texture`, `SourceRectangle`, and `FrameLength`, add them to an `AnimationChain` (with a `Name`), add chains to an `AnimationChainList`, assign the list to `Sprite.AnimationChains`, then `PlayAnimation`. For hitboxes/hurtboxes per frame, see Topics.
+
+## Prompt handoff template
+
+When you want an AI assistant to wire animation selection to gameplay state, describe the mapping explicitly:
+
+"Use `Player.achx` for `PlayerSprite`. Play `Idle` when speed is 0, `Run` when grounded and moving, `Jump` when vertical velocity is positive, and `Fall` when vertical velocity is negative. Do not restart the same chain every frame; only switch when the target chain name changes."
 
 ## Hot-Reload
 
