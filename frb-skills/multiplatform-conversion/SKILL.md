@@ -29,6 +29,10 @@ GameName/
 
 The `Game` subclass (Game1) lives in `Common` so both heads instantiate the same type. Heads own only their entry points and platform-specific csproj wiring.
 
+## Asset placement
+
+Assets belong in `Common/Content/` by default. Only move to platform-specific folders if they won't work elsewhere (e.g., platform-specific UI sizes, backend-incompatible shader variants). Most art, audio, and data stay in `Common/` so both Desktop and BlazorGL draw from a single source — no duplication.
+
 ## Common csproj — must multi-target
 
 When the heads sit on different TFMs (Desktop net10.0, BlazorGL net8.0), `Common` must multi-target both. A single-TFM Common forces the transitive engine reference to one backend, and the wrong-TFM head loads an assembly built against the other backend's XNA. Symptom: `MissingMethodException` on the first engine call.
