@@ -217,4 +217,105 @@ public class AnimationChainListSaveLoadingTests
 
         Should.Throw<InvalidOperationException>(() => save.ToAnimationChainList(null!));
     }
+
+    // ─── FromStream ──────────────────────────────────────────────────────────────
+
+    private static readonly string SimpleXml =
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<AnimationChainArraySave>" +
+        "  <TimeMeasurementUnit>Second</TimeMeasurementUnit>" +
+        "  <CoordinateType>UV</CoordinateType>" +
+        "  <AnimationChain><Name>Walk</Name>" +
+        "    <Frame><TextureName>walk.png</TextureName><FrameLength>0.1</FrameLength>" +
+        "      <LeftCoordinate>0</LeftCoordinate><RightCoordinate>0.25</RightCoordinate>" +
+        "      <TopCoordinate>0</TopCoordinate><BottomCoordinate>1</BottomCoordinate>" +
+        "    </Frame>" +
+        "  </AnimationChain>" +
+        "  <AnimationChain><Name>Idle</Name>" +
+        "    <Frame><TextureName>idle.png</TextureName><FrameLength>0.5</FrameLength></Frame>" +
+        "  </AnimationChain>" +
+        "</AnimationChainArraySave>";
+
+    [Fact]
+    public void FromStream_ParsesChainNames()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml));
+        var save = AnimationChainListSave.FromStream(stream);
+        save.AnimationChains.Count.ShouldBe(2);
+        save.AnimationChains[0].Name.ShouldBe("Walk");
+        save.AnimationChains[1].Name.ShouldBe("Idle");
+    }
+
+    [Fact]
+    public void FromStream_FileNameIsEmpty()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml));
+        var save = AnimationChainListSave.FromStream(stream);
+        save.FileName.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void FromStream_ParsesFrameCoordinates()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml));
+        var save = AnimationChainListSave.FromStream(stream);
+        var f = save.AnimationChains[0].Frames[0];
+        f.LeftCoordinate.ShouldBe(0f);
+        f.RightCoordinate.ShouldBe(0.25f);
+        f.TopCoordinate.ShouldBe(0f);
+        f.BottomCoordinate.ShouldBe(1f);
+    }
+
+    [Fact]
+    public void FromStream_ProducesEquivalentResultToFromFile()
+    {
+        var fromFile = AnimationChainListSave.FromFile("any.achx",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml)));
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml));
+        var fromStream = AnimationChainListSave.FromStream(stream);
+
+        fromStream.AnimationChains.Count.ShouldBe(fromFile.AnimationChains.Count);
+        fromStream.AnimationChains[0].Name.ShouldBe(fromFile.AnimationChains[0].Name);
+        fromStream.TimeMeasurementUnit.ShouldBe(fromFile.TimeMeasurementUnit);
+        fromStream.CoordinateType.ShouldBe(fromFile.CoordinateType);
+    }
+
+    // ─── FromString ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FromString_ParsesChainNames()
+    {
+        var save = AnimationChainListSave.FromString(SimpleXml);
+        save.AnimationChains.Count.ShouldBe(2);
+        save.AnimationChains[0].Name.ShouldBe("Walk");
+        save.AnimationChains[1].Name.ShouldBe("Idle");
+    }
+
+    [Fact]
+    public void FromString_FileNameIsEmpty()
+    {
+        var save = AnimationChainListSave.FromString(SimpleXml);
+        save.FileName.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void FromString_ParsesFrameCount()
+    {
+        var save = AnimationChainListSave.FromString(SimpleXml);
+        save.AnimationChains[0].Frames.Count.ShouldBe(1);
+        save.AnimationChains[1].Frames.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void FromString_ProducesEquivalentResultToFromFile()
+    {
+        var fromFile = AnimationChainListSave.FromFile("any.achx",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(SimpleXml)));
+        var fromString = AnimationChainListSave.FromString(SimpleXml);
+
+        fromString.AnimationChains.Count.ShouldBe(fromFile.AnimationChains.Count);
+        fromString.AnimationChains[0].Name.ShouldBe(fromFile.AnimationChains[0].Name);
+        fromString.TimeMeasurementUnit.ShouldBe(fromFile.TimeMeasurementUnit);
+        fromString.CoordinateType.ShouldBe(fromFile.CoordinateType);
+    }
 }

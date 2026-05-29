@@ -77,9 +77,36 @@ public class AnimationChainListSave
     public static AnimationChainListSave FromFile(string filePath, Func<string, Stream> streamProvider)
     {
         using var stream = streamProvider(filePath);
-        var doc = XDocument.Load(stream);
-        var root = doc.Root!;
+        var result = ParseXml(XDocument.Load(stream));
+        // Store the absolute path so ToAnimationChainList always produces absolute texture paths,
+        // preventing double-resolution when callers (e.g. AchxLoader) also combine with achxDir.
+        result.FileName = Path.GetFullPath(filePath);
+        return result;
+    }
 
+    /// <summary>
+    /// Parses .achx XML from an already-open <paramref name="stream"/>. <see cref="FileName"/>
+    /// is set to <see cref="string.Empty"/>; if <see cref="FileRelativeTextures"/> is <c>true</c>,
+    /// texture paths in the file are passed through as-is with no directory prefix prepended.
+    /// The caller retains ownership of <paramref name="stream"/> and is responsible for disposing it.
+    /// </summary>
+    public static AnimationChainListSave FromStream(Stream stream)
+        => ParseXml(XDocument.Load(stream));
+
+    /// <summary>
+    /// Parses .achx XML from an in-memory string. <see cref="FileName"/> is set to
+    /// <see cref="string.Empty"/>; if <see cref="FileRelativeTextures"/> is <c>true</c>,
+    /// texture paths in the file are passed through as-is with no directory prefix prepended.
+    /// </summary>
+    public static AnimationChainListSave FromString(string xml)
+    {
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(xml));
+        return FromStream(stream);
+    }
+
+    private static AnimationChainListSave ParseXml(XDocument doc)
+    {
+        var root = doc.Root!;
         var result = new AnimationChainListSave();
 
         var frt = root.Element("FileRelativeTextures");
@@ -105,9 +132,6 @@ public class AnimationChainListSave
         var projectFileEl = root.Element("ProjectFile");
         if (projectFileEl != null) result.ProjectFile = projectFileEl.Value;
 
-        // Store the absolute path so ToAnimationChainList always produces absolute texture paths,
-        // preventing double-resolution when callers (e.g. AchxLoader) also combine with achxDir.
-        result.FileName = Path.GetFullPath(filePath);
         return result;
     }
 
