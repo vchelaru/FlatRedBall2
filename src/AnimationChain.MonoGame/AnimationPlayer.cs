@@ -35,6 +35,49 @@ public class AnimationPlayer
     public AnimationChain? CurrentChain =>
         _currentChainIndex >= 0 && _chains != null ? _chains[_currentChainIndex] : null;
 
+    /// <summary>
+    /// Name of the currently playing chain, or <c>null</c> if none is active.
+    /// </summary>
+    public string? CurrentChainName => CurrentChain?.Name;
+
+    /// <summary>
+    /// Current frame index within <see cref="CurrentChain"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No non-empty chain is active.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Value is outside the current chain's frame range.</exception>
+    public int CurrentFrameIndex
+    {
+        get => _currentFrameIndex;
+        set
+        {
+            var chain = RequireCurrentPlayableChain();
+            if ((uint)value >= (uint)chain.Count)
+                throw new ArgumentOutOfRangeException(nameof(value));
+
+            _currentFrameIndex = value;
+            _timeIntoAnimation = GetTimeAtFrameStart(chain, value);
+        }
+    }
+
+    /// <summary>
+    /// Elapsed time into the current animation.
+    /// Setting this seeks playback time and updates <see cref="CurrentFrameIndex"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No non-empty chain is active.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Value is negative.</exception>
+    public TimeSpan TimeIntoAnimation
+    {
+        get => TimeSpan.FromSeconds(_timeIntoAnimation);
+        set
+        {
+            if (value < TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(value));
+
+            var chain = RequireCurrentPlayableChain();
+            SeekToTime(chain, value.TotalSeconds);
+        }
+    }
+
     /// <summary>When <c>true</c> (the default), <see cref="Update"/> advances frames.</summary>
     public bool Animate { get; set; } = true;
 
@@ -68,8 +111,7 @@ public class AnimationPlayer
             {
                 if (_currentChainIndex == i) return; // already playing — no restart
                 _currentChainIndex = i;
-                _currentFrameIndex = 0;
-                _timeIntoAnimation = 0;
+                ResetPlaybackPosition();
                 Animate = true;
                 return;
             }
@@ -91,12 +133,44 @@ public class AnimationPlayer
             {
                 if (_currentChainIndex == i) return;
                 _currentChainIndex = i;
-                _currentFrameIndex = 0;
-                _timeIntoAnimation = 0;
+                ResetPlaybackPosition();
                 Animate = true;
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Pauses playback at the current frame and time.
+    /// </summary>
+    public void Pause() => Animate = false;
+
+    /// <summary>
+    /// Resumes playback from the current frame and time.
+    /// </summary>
+    public void Resume()
+    {
+        if (_currentChainIndex < 0 || _chains == null)
+            return;
+
+        Animate = true;
+    }
+
+    /// <summary>
+    /// Rewinds to the first frame and pauses playback.
+    /// </summary>
+    public void Stop()
+    {
+        Reset();
+        Animate = false;
+    }
+
+    /// <summary>
+    /// Rewinds to the first frame without changing <see cref="Animate"/>.
+    /// </summary>
+    public void Reset()
+    {
+        ResetPlaybackPosition();
     }
 
     /// <summary>
@@ -130,6 +204,51 @@ public class AnimationPlayer
             }
         }
 
+        UpdateFrameIndexFromTime(chain);
+    }
+
+    private void ResetPlaybackPosition()
+    {
+        _currentFrameIndex = 0;
+        _timeIntoAnimation = 0;
+    }
+
+    private AnimationChain RequireCurrentPlayableChain()
+    {
+        if (_currentChainIndex < 0 || _chains == null)
+            throw new InvalidOperationException("No animation chain is currently active.");
+
+        var chain = _chains[_currentChainIndex];
+        if (chain.Count == 0)
+            throw new InvalidOperationException("The current animation chain has no frames.");
+
+        return chain;
+    }
+
+    private void SeekToTime(AnimationChain chain, double seconds)
+    {
+        double totalLength = chain.TotalLength.TotalSeconds;
+        if (totalLength <= 0)
+        {
+            _timeIntoAnimation = 0;
+            _currentFrameIndex = 0;
+            return;
+        }
+
+        if (IsLooping)
+        {
+            _timeIntoAnimation = seconds % totalLength;
+        }
+        else
+        {
+            _timeIntoAnimation = seconds >= totalLength ? totalLength : seconds;
+        }
+
+        UpdateFrameIndexFromTime(chain);
+    }
+
+    private void UpdateFrameIndexFromTime(AnimationChain chain)
+    {
         // Find the frame at the current accumulated time.
         double t = _timeIntoAnimation;
         _currentFrameIndex = chain.Count - 1; // default to last if time overshoots
@@ -142,5 +261,13 @@ public class AnimationPlayer
                 break;
             }
         }
+    }
+
+    private static double GetTimeAtFrameStart(AnimationChain chain, int frameIndex)
+    {
+        double time = 0;
+        for (int i = 0; i < frameIndex; i++)
+            time += chain[i].FrameLength.TotalSeconds;
+        return time;
     }
 }
