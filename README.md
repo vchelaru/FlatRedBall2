@@ -117,6 +117,23 @@ The new project's `Content/` folder is pre-populated with starter assets (animat
 dotnet new frb2-desktop -n YourGameName --IncludeStarterContent false
 ```
 
+### Repo setup (`.gitignore`)
+
+Use `frb2-desktop` or `frb2-multiplatform` templates — they already include the recommended `.gitignore`.
+
+Manual baseline:
+
+```
+bin/
+obj/
+Content/obj/
+.vs/
+*.user
+*.suo
+```
+
+For web projects, keep the template's `wwwroot/Content/.gitignore` (that folder is build output).
+
 ### Step 3 — Build and run
 
 ```
