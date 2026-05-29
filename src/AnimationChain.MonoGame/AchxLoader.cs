@@ -82,6 +82,25 @@ public sealed class AchxLoader : IDisposable
     }
 
     /// <summary>
+    /// Loads animation data from an already-open .achx XML <paramref name="achxStream"/>.
+    /// Because no file path is available, <see cref="AnimationChainListSave.FileRelativeTextures"/>
+    /// resolution is skipped — texture paths stored in the file are passed directly to
+    /// <paramref name="textureStreamProvider"/>. Supply a <paramref name="textureStreamProvider"/>
+    /// that handles those paths as written in the .achx XML.
+    /// </summary>
+    /// <param name="achxStream">A readable stream containing the .achx XML. The caller retains ownership.</param>
+    /// <param name="textureStreamProvider">
+    /// Optional override for texture loading. When <c>null</c>, falls back to
+    /// <see cref="File.OpenRead"/>. Return <c>null</c> to produce a frame with no texture.
+    /// </param>
+    public AnimationChainList Load(Stream achxStream, Func<string, Stream?>? textureStreamProvider = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var save = AnimationChainListSave.FromStream(achxStream);
+        return save.ToAnimationChainList(texPath => GetOrLoadTexture(texPath, textureStreamProvider));
+    }
+
+    /// <summary>
     /// Reloads an existing <see cref="AnimationChainList"/> in place from the .achx at
     /// <paramref name="achxPath"/>. Chains with matching names have their frames replaced
     /// (live <see cref="AnimationPlayer"/> references keep working); new chains are appended.

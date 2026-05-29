@@ -234,6 +234,83 @@ public class AchxLoaderTests
         Assert.Null(list["NotHere"]);
     }
 
+    // ─── FromStream ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FromStream_ParsesChainNames()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleAchx));
+        var save = AnimationChainListSave.FromStream(stream);
+        Assert.Equal(2, save.AnimationChains.Count);
+        Assert.Equal("Run", save.AnimationChains[0].Name);
+        Assert.Equal("Idle", save.AnimationChains[1].Name);
+    }
+
+    [Fact]
+    public void FromStream_FileNameIsEmpty()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleAchx));
+        var save = AnimationChainListSave.FromStream(stream);
+        Assert.Equal(string.Empty, save.FileName);
+    }
+
+    [Fact]
+    public void FromStream_ParsesFrameCoordinates()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SimpleAchx));
+        var save = AnimationChainListSave.FromStream(stream);
+        var f = save.AnimationChains[0].Frames[0];
+        Assert.Equal(0f,   f.LeftCoordinate,   precision: 5);
+        Assert.Equal(0.5f, f.RightCoordinate,  precision: 5);
+        Assert.Equal(0f,   f.TopCoordinate,    precision: 5);
+        Assert.Equal(1f,   f.BottomCoordinate, precision: 5);
+    }
+
+    [Fact]
+    public void FromStream_ParsesFrameLength_Milliseconds()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(MillisecondAchx));
+        var save = AnimationChainListSave.FromStream(stream);
+        Assert.Equal(100f, save.AnimationChains[0].Frames[0].FrameLength, precision: 5);
+    }
+
+    // ─── FromString ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FromString_ParsesChainNames()
+    {
+        var save = AnimationChainListSave.FromString(SimpleAchx);
+        Assert.Equal(2, save.AnimationChains.Count);
+        Assert.Equal("Run", save.AnimationChains[0].Name);
+        Assert.Equal("Idle", save.AnimationChains[1].Name);
+    }
+
+    [Fact]
+    public void FromString_FileNameIsEmpty()
+    {
+        var save = AnimationChainListSave.FromString(SimpleAchx);
+        Assert.Equal(string.Empty, save.FileName);
+    }
+
+    [Fact]
+    public void FromString_ParsesFrameCoordinates()
+    {
+        var save = AnimationChainListSave.FromString(SimpleAchx);
+        var f = save.AnimationChains[0].Frames[0];
+        Assert.Equal(0f,   f.LeftCoordinate,   precision: 5);
+        Assert.Equal(0.5f, f.RightCoordinate,  precision: 5);
+        Assert.Equal(0f,   f.TopCoordinate,    precision: 5);
+        Assert.Equal(1f,   f.BottomCoordinate, precision: 5);
+    }
+
+    [Fact]
+    public void FromString_ParsesFrameCount()
+    {
+        var save = AnimationChainListSave.FromString(SimpleAchx);
+        Assert.Equal(2, save.AnimationChains[0].Frames.Count);
+        Assert.Single(save.AnimationChains[1].Frames);
+    }
+
     // ─── Save / round-trip ────────────────────────────────────────────────────────
 
     [Fact]
