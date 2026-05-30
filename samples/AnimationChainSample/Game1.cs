@@ -12,7 +12,7 @@ namespace AnimationChainSample;
 ///
 /// Controls:
 ///   Space  -- cycle Walk -> Run -> Idle -> Walk
-///   R      -- hot-reload hero.achx from disk (try editing frame timings while running)
+///   R      -- reload hero.achx from the content stream
 ///   Escape -- exit
 /// </summary>
 public class Game1 : Game
@@ -51,8 +51,7 @@ public class Game1 : Game
         // Load the real spritesheet PNG
         _spriteSheet = Content.Load<Texture2D>("AnimatedSpritesheet");
 
-        var save = AnimationChainListSave.FromFile(AchxPath);
-        _animations = save.ToAnimationChainList(_ => _spriteSheet);
+        _animations = LoadAnimations();
 
         // Build the chain order from all available animations
         _chainOrder = _animations.Select(ac => ac.Name).ToArray();
@@ -81,10 +80,10 @@ public class Game1 : Game
 
         if (IsPressed(keys, Keys.R))
         {
-            bool ok = _animations.TryReloadFrom(AchxPath, _ => _spriteSheet);
+            bool ok = TryReloadAnimations();
             Window.Title = ok
                 ? $"Reloaded! -- {CurrentStatus()}"
-                : "Reload failed (file busy?) -- try again";
+                : "Reload failed -- check Content/hero.achx and try again";
         }
 
         _player.Update(gameTime.ElapsedGameTime);
@@ -118,6 +117,26 @@ public class Game1 : Game
 
     private bool IsPressed(KeyboardState cur, Keys key) =>
         cur.IsKeyDown(key) && !_prevKeys.IsKeyDown(key);
+
+    private AnimationChainList LoadAnimations()
+    {
+        using var achxStream = TitleContainer.OpenStream(AchxPath);
+        var save = AnimationChainListSave.FromStream(achxStream);
+        return save.ToAnimationChainList(_ => _spriteSheet);
+    }
+
+    private bool TryReloadAnimations()
+    {
+        try
+        {
+            using var achxStream = TitleContainer.OpenStream(AchxPath);
+            return _animations.TryReloadFrom(achxStream, _ => _spriteSheet);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
 
     private string CurrentStatus() =>
         $"Chain: {_player.CurrentChain?.Name ?? "none"}  ({_player.CurrentChain?.Count ?? 0} frames)";

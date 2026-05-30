@@ -54,6 +54,42 @@ public class AnimationChainList : List<AnimationChain>
         catch (IOException) { return false; }
         catch (System.Xml.XmlException) { return false; }
 
+        ApplyReloadedChains(fresh);
+        return true;
+    }
+
+    /// <summary>
+    /// Re-parses .achx XML from an already-open <paramref name="achxStream"/> and applies
+    /// changes in place so live <see cref="AnimationPlayer"/> references keep working.
+    /// For each chain in the reloaded data, matches by <see cref="AnimationChain.Name"/>:
+    /// existing chains have their frames replaced in place (instance identity preserved);
+    /// new chains are appended.
+    /// <para>
+    /// Returns <c>false</c> on I/O or XML parse failure.
+    /// </para>
+    /// </summary>
+    /// <param name="achxStream">Readable stream containing .achx XML. Caller retains ownership.</param>
+    /// <param name="textureLoader">
+    /// Called with each texture path stored in the .achx data. May return <c>null</c> if
+    /// a texture is unavailable — affected frames keep a <c>null</c> texture.
+    /// </param>
+    public bool TryReloadFrom(Stream achxStream, Func<string, Texture2D?> textureLoader)
+    {
+        AnimationChainList fresh;
+        try
+        {
+            var save = Content.AnimationChainListSave.FromStream(achxStream);
+            fresh = save.ToAnimationChainList(textureLoader);
+        }
+        catch (IOException) { return false; }
+        catch (System.Xml.XmlException) { return false; }
+
+        ApplyReloadedChains(fresh);
+        return true;
+    }
+
+    private void ApplyReloadedChains(AnimationChainList fresh)
+    {
         foreach (var freshChain in fresh)
         {
             var existing = this[freshChain.Name];
@@ -67,6 +103,5 @@ public class AnimationChainList : List<AnimationChain>
                 Add(freshChain);
             }
         }
-        return true;
     }
 }
