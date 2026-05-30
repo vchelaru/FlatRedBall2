@@ -98,6 +98,49 @@ jobs:
       - name: Publish Templates to NuGet
         run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
+  publish-animation-editor:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - packageId: AnimationEditor.MonoGame
+            targetFramework: net10.0
+            flatredballPackageId: FlatRedBall2.MonoGame
+          - packageId: AnimationEditor.KNI
+            targetFramework: net8.0
+            flatredballPackageId: FlatRedBall2.Kni
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore AnimationEditor dependencies
+        run: >
+          dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.Core/AnimationEditor.Core.csproj
+          -p:AnimationEditorTargetFramework=${{ matrix.targetFramework }}
+          -p:FlatRedBallDependencyPackageId=${{ matrix.flatredballPackageId }}
+          -p:FlatRedBallDependencyVersion=${{ needs.resolve-version.outputs.version }}
+
+      - name: Build and Pack (${{ matrix.packageId }})
+        run: >
+          dotnet pack tools/AnimationEditorAvalonia/src/AnimationEditor.Core/AnimationEditor.Core.csproj
+          -c Release
+          -p:AnimationEditorPackageId=${{ matrix.packageId }}
+          -p:AnimationEditorPackageVersion=${{ needs.resolve-version.outputs.version }}
+          -p:AnimationEditorTargetFramework=${{ matrix.targetFramework }}
+          -p:FlatRedBallDependencyPackageId=${{ matrix.flatredballPackageId }}
+          -p:FlatRedBallDependencyVersion=${{ needs.resolve-version.outputs.version }}
+          -o out
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
   publish-animationchain:
     needs: resolve-version
     runs-on: ubuntu-latest

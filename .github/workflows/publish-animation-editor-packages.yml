@@ -1,0 +1,103 @@
+name: Publish AnimationEditor Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version override, e.g. 0.3.1-preview.2 (leave blank to auto-increment)'
+        required: false
+        default: ''
+      flatredballVersion:
+        description: 'FlatRedBall2 dependency version override (leave blank to use latest FlatRedBall2.MonoGame)'
+        required: false
+        default: ''
+
+jobs:
+  resolve-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.resolve.outputs.package_version }}
+      flatredball_version: ${{ steps.resolve.outputs.flatredball_version }}
+    steps:
+      - name: Resolve package/dependency versions
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            PACKAGE_VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual package version: $PACKAGE_VERSION"
+          else
+            LATEST_ANIMATION_EDITOR=$(curl -sf https://api.nuget.org/v3-flatcontainer/animationeditor.monogame/index.json | jq -r '.versions[-1]' || true)
+            if [ -z "$LATEST_ANIMATION_EDITOR" ] || [ "$LATEST_ANIMATION_EDITOR" = "null" ]; then
+              LATEST_FRB=$(curl -sf https://api.nuget.org/v3-flatcontainer/flatredball2.monogame/index.json | jq -r '.versions[-1]')
+              if [ -z "$LATEST_FRB" ] || [ "$LATEST_FRB" = "null" ]; then
+                echo "::error::Could not fetch latest version from NuGet"
+                exit 1
+              fi
+              PACKAGE_VERSION="$LATEST_FRB"
+              echo "No AnimationEditor.MonoGame package exists yet; seeding package version from FlatRedBall2.MonoGame: $PACKAGE_VERSION"
+            else
+              PREFIX="${LATEST_ANIMATION_EDITOR%.*}"
+              LAST="${LATEST_ANIMATION_EDITOR##*.}"
+              PACKAGE_VERSION="$PREFIX.$((LAST + 1))"
+              echo "Latest AnimationEditor.MonoGame version: $LATEST_ANIMATION_EDITOR"
+              echo "Auto-incremented package version to: $PACKAGE_VERSION"
+            fi
+          fi
+
+          if [ -n "${{ github.event.inputs.flatredballVersion }}" ]; then
+            FLATREDBALL_VERSION="${{ github.event.inputs.flatredballVersion }}"
+            echo "Using manual FlatRedBall dependency version: $FLATREDBALL_VERSION"
+          else
+            FLATREDBALL_VERSION=$(curl -sf https://api.nuget.org/v3-flatcontainer/flatredball2.monogame/index.json | jq -r '.versions[-1]')
+            if [ -z "$FLATREDBALL_VERSION" ] || [ "$FLATREDBALL_VERSION" = "null" ]; then
+              echo "::error::Could not fetch latest FlatRedBall2.MonoGame version from NuGet"
+              exit 1
+            fi
+            echo "Using latest FlatRedBall dependency version: $FLATREDBALL_VERSION"
+          fi
+
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "flatredball_version=$FLATREDBALL_VERSION" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: resolve-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - packageId: AnimationEditor.MonoGame
+            targetFramework: net10.0
+            flatredballPackageId: FlatRedBall2.MonoGame
+          - packageId: AnimationEditor.KNI
+            targetFramework: net8.0
+            flatredballPackageId: FlatRedBall2.Kni
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: >
+          dotnet restore tools/AnimationEditorAvalonia/src/AnimationEditor.Core/AnimationEditor.Core.csproj
+          -p:AnimationEditorTargetFramework=${{ matrix.targetFramework }}
+          -p:FlatRedBallDependencyPackageId=${{ matrix.flatredballPackageId }}
+          -p:FlatRedBallDependencyVersion=${{ needs.resolve-versions.outputs.flatredball_version }}
+
+      - name: Build and Pack (${{ matrix.packageId }})
+        run: >
+          dotnet pack tools/AnimationEditorAvalonia/src/AnimationEditor.Core/AnimationEditor.Core.csproj
+          -c Release
+          -p:AnimationEditorPackageId=${{ matrix.packageId }}
+          -p:AnimationEditorPackageVersion=${{ needs.resolve-versions.outputs.package_version }}
+          -p:AnimationEditorTargetFramework=${{ matrix.targetFramework }}
+          -p:FlatRedBallDependencyPackageId=${{ matrix.flatredballPackageId }}
+          -p:FlatRedBallDependencyVersion=${{ needs.resolve-versions.outputs.flatredball_version }}
+          -o out
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
