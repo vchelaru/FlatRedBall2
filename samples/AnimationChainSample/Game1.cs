@@ -7,8 +7,8 @@ using Microsoft.Xna.Framework.Input;
 namespace AnimationChainSample;
 
 /// <summary>
-/// Minimal demo: loads hero.achx (Walk / Run / Idle) and plays each chain
-/// on a procedural spritesheet -- no external art required.
+/// Demo: loads real FRB Guy animations from hero.achx and displays them on screen.
+/// Uses the red character from AnimatedSpritesheet.png.
 ///
 /// Controls:
 ///   Space  -- cycle Walk -> Run -> Idle -> Walk
@@ -17,19 +17,17 @@ namespace AnimationChainSample;
 /// </summary>
 public class Game1 : Game
 {
-    private static readonly string[] ChainOrder = ["Walk", "Run", "Idle"];
-
     private const string AchxPath = "Content/hero.achx";
 
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
 
-    // Procedural 320x32 spritesheet: 10 frames at 32x32 each.
-    // col 0-3 = Walk (reds), col 4-7 = Run (blues), col 8-9 = Idle (grays).
+    // Real spritesheet loaded from AnimatedSpritesheet.png
     private Texture2D _spriteSheet = null!;
 
     private AnimationChainList _animations = null!;
     private AnimationPlayer _player = null!;
+    private string[] _chainOrder = null!;
     private int _chainIndex;
 
     private KeyboardState _prevKeys;
@@ -50,13 +48,20 @@ public class Game1 : Game
         base.Initialize();
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-        _spriteSheet = CreateSpriteSheet(GraphicsDevice);
+        // Load the real spritesheet PNG
+        _spriteSheet = Content.Load<Texture2D>("AnimatedSpritesheet");
 
         var save = AnimationChainListSave.FromFile(AchxPath);
         _animations = save.ToAnimationChainList(_ => _spriteSheet);
 
-        _player = new AnimationPlayer(_animations);
-        _player.Play(ChainOrder[_chainIndex]);
+        // Build the chain order from all available animations
+        _chainOrder = _animations.Select(ac => ac.Name).ToArray();
+
+        if (_chainOrder.Length > 0)
+        {
+            _player = new AnimationPlayer(_animations);
+            _player.Play(_chainOrder[_chainIndex]);
+        }
 
         UpdateTitle();
     }
@@ -70,8 +75,8 @@ public class Game1 : Game
 
         if (IsPressed(keys, Keys.Space))
         {
-            _chainIndex = (_chainIndex + 1) % ChainOrder.Length;
-            _player.Play(ChainOrder[_chainIndex]);
+            _chainIndex = (_chainIndex + 1) % _chainOrder.Length;
+            _player.Play(_chainOrder[_chainIndex]);
         }
 
         if (IsPressed(keys, Keys.R))
@@ -94,7 +99,18 @@ public class Game1 : Game
         GraphicsDevice.Clear(new Color(30, 30, 40));
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-        _spriteBatch.DrawAnimation(_player, new Vector2(400, 300), Color.White, scale: 8f);
+        
+        // Center the animation with a slight vertical offset to account for frame content
+        // Most frames are 16x32 pixels, which when scaled 8x = 128x256 pixels
+        const float scale = 8f;
+        const float frameWidth = 16f;  // Most frames are 16 pixels wide
+        const float frameHeight = 32f; // Most frames are 32 pixels tall
+        float scaledWidth = frameWidth * scale;   // 128
+        float scaledHeight = frameHeight * scale; // 256
+        
+        Vector2 center = new Vector2(GraphicsDevice.Viewport.Width / 2f - scaledWidth / 2f, 
+                                     GraphicsDevice.Viewport.Height / 2f - scaledHeight / 2f);
+        _spriteBatch.DrawAnimation(_player, center, Color.White, scale: scale);
         _spriteBatch.End();
 
         base.Draw(gameTime);
@@ -108,41 +124,4 @@ public class Game1 : Game
 
     private void UpdateTitle() =>
         Window.Title = $"AnimationChain.MonoGame -- {CurrentStatus()}   [Space] cycle  [R] reload  [Esc] quit";
-
-    private static Texture2D CreateSpriteSheet(GraphicsDevice gd)
-    {
-        Color[] palette =
-        [
-            new Color(200,  50,  50),   // Walk 0
-            new Color(230, 100,  50),   // Walk 1
-            new Color(230, 100,  50),   // Walk 2
-            new Color(200,  50,  50),   // Walk 3
-            new Color( 50,  80, 220),   // Run 0
-            new Color( 50, 160, 240),   // Run 1
-            new Color( 80, 210, 255),   // Run 2
-            new Color( 50, 160, 240),   // Run 3
-            new Color(160, 160, 160),   // Idle 0
-            new Color(210, 210, 210),   // Idle 1
-        ];
-
-        const int frameSize  = 32;
-        const int frameCount = 10;
-        int w = frameSize * frameCount;
-        int h = frameSize;
-
-        var texture = new Texture2D(gd, w, h);
-        var data    = new Color[w * h];
-
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
-        {
-            int  frame    = x / frameSize;
-            int  lx       = x % frameSize;
-            bool isBorder = lx == 0 || lx == frameSize - 1 || y == 0 || y == frameSize - 1;
-            data[y * w + x] = isBorder ? Color.Black : palette[frame];
-        }
-
-        texture.SetData(data);
-        return texture;
-    }
 }
