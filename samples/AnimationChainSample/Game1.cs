@@ -17,8 +17,6 @@ namespace AnimationChainSample;
 /// </summary>
 public class Game1 : Game
 {
-    private static readonly string[] ChainOrder = ["Walk", "Run", "Idle"];
-
     private const string AchxPath = "Content/hero.achx";
 
     private readonly GraphicsDeviceManager _graphics;
@@ -29,6 +27,7 @@ public class Game1 : Game
 
     private AnimationChainList _animations = null!;
     private AnimationPlayer _player = null!;
+    private string[] _chainOrder = null!;
     private int _chainIndex;
 
     private KeyboardState _prevKeys;
@@ -55,8 +54,14 @@ public class Game1 : Game
         var save = AnimationChainListSave.FromFile(AchxPath);
         _animations = save.ToAnimationChainList(_ => _spriteSheet);
 
-        _player = new AnimationPlayer(_animations);
-        _player.Play(ChainOrder[_chainIndex]);
+        // Build the chain order from all available animations
+        _chainOrder = _animations.Select(ac => ac.Name).ToArray();
+
+        if (_chainOrder.Length > 0)
+        {
+            _player = new AnimationPlayer(_animations);
+            _player.Play(_chainOrder[_chainIndex]);
+        }
 
         UpdateTitle();
     }
@@ -70,8 +75,8 @@ public class Game1 : Game
 
         if (IsPressed(keys, Keys.Space))
         {
-            _chainIndex = (_chainIndex + 1) % ChainOrder.Length;
-            _player.Play(ChainOrder[_chainIndex]);
+            _chainIndex = (_chainIndex + 1) % _chainOrder.Length;
+            _player.Play(_chainOrder[_chainIndex]);
         }
 
         if (IsPressed(keys, Keys.R))
@@ -94,7 +99,18 @@ public class Game1 : Game
         GraphicsDevice.Clear(new Color(30, 30, 40));
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-        _spriteBatch.DrawAnimation(_player, new Vector2(400, 300), Color.White, scale: 8f);
+        
+        // Center the animation with a slight vertical offset to account for frame content
+        // Most frames are 16x32 pixels, which when scaled 8x = 128x256 pixels
+        const float scale = 8f;
+        const float frameWidth = 16f;  // Most frames are 16 pixels wide
+        const float frameHeight = 32f; // Most frames are 32 pixels tall
+        float scaledWidth = frameWidth * scale;   // 128
+        float scaledHeight = frameHeight * scale; // 256
+        
+        Vector2 center = new Vector2(GraphicsDevice.Viewport.Width / 2f - scaledWidth / 2f, 
+                                     GraphicsDevice.Viewport.Height / 2f - scaledHeight / 2f);
+        _spriteBatch.DrawAnimation(_player, center, Color.White, scale: scale);
         _spriteBatch.End();
 
         base.Draw(gameTime);

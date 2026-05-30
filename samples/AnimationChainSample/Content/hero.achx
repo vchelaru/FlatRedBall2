@@ -1,111 +1,311 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-  Real FRB Guy animation chains from AnimatedSpritesheet.png (red character only).
-  
-  The red character occupies the leftmost 32x32 pixel column of the spritesheet.
-  This demo cycles through Walk -> Run -> Idle animations.
-  
-  Frame layout for red character (x: 0-32):
-    Idle:   y: 0-32    (frames 0-1 for blink animation)
-    Walk:   y: 32-64   (frames 0-3 for walking cycle)
-    Run:    y: 64-96   (frames 0-3 for running cycle)
-    Jump:   y: 96-128  (frames 0-1 for jump poses)
--->
+﻿<?xml version="1.0" encoding="utf-8"?>
 <AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <FileRelativeTextures>true</FileRelativeTextures>
   <TimeMeasurementUnit>Second</TimeMeasurementUnit>
   <CoordinateType>Pixel</CoordinateType>
-
   <AnimationChain>
-    <Name>Walk</Name>
+    <Name>Walk Right</Name>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.1</FrameLength>
-      <LeftCoordinate>0</LeftCoordinate>
+      <LeftCoordinate>-0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>16</LeftCoordinate>
       <RightCoordinate>32</RightCoordinate>
-      <TopCoordinate>32</TopCoordinate>
-      <BottomCoordinate>64</BottomCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Walk Left</Name>
     <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.1</FrameLength>
-      <LeftCoordinate>32</LeftCoordinate>
-      <RightCoordinate>64</RightCoordinate>
-      <TopCoordinate>32</TopCoordinate>
-      <BottomCoordinate>64</BottomCoordinate>
+      <LeftCoordinate>-0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
     <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.1</FrameLength>
-      <LeftCoordinate>64</LeftCoordinate>
-      <RightCoordinate>96</RightCoordinate>
+      <LeftCoordinate>16</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Walk Up</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>144</LeftCoordinate>
+      <RightCoordinate>160</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
       <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
     <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>160</LeftCoordinate>
+      <RightCoordinate>176</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>176</LeftCoordinate>
+      <RightCoordinate>192</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Walk Down</Name>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.1</FrameLength>
       <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>112</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>112</LeftCoordinate>
       <RightCoordinate>128</RightCoordinate>
       <TopCoordinate>32</TopCoordinate>
       <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>128</LeftCoordinate>
+      <RightCoordinate>144</RightCoordinate>
+      <TopCoordinate>32</TopCoordinate>
+      <BottomCoordinate>64</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
   </AnimationChain>
-
   <AnimationChain>
     <Name>Run</Name>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.08</FrameLength>
-      <LeftCoordinate>0</LeftCoordinate>
-      <RightCoordinate>32</RightCoordinate>
-      <TopCoordinate>64</TopCoordinate>
-      <BottomCoordinate>96</BottomCoordinate>
-    </Frame>
-    <Frame>
-      <TextureName>AnimatedSpritesheet.png</TextureName>
-      <FrameLength>0.08</FrameLength>
-      <LeftCoordinate>32</LeftCoordinate>
+      <LeftCoordinate>48</LeftCoordinate>
       <RightCoordinate>64</RightCoordinate>
       <TopCoordinate>64</TopCoordinate>
       <BottomCoordinate>96</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.08</FrameLength>
       <LeftCoordinate>64</LeftCoordinate>
-      <RightCoordinate>96</RightCoordinate>
+      <RightCoordinate>80</RightCoordinate>
       <TopCoordinate>64</TopCoordinate>
       <BottomCoordinate>96</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Swim RIght</Name>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.08</FrameLength>
       <LeftCoordinate>96</LeftCoordinate>
+      <RightCoordinate>112</RightCoordinate>
+      <TopCoordinate>64</TopCoordinate>
+      <BottomCoordinate>96</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.08</FrameLength>
+      <LeftCoordinate>112</LeftCoordinate>
       <RightCoordinate>128</RightCoordinate>
       <TopCoordinate>64</TopCoordinate>
       <BottomCoordinate>96</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.08</FrameLength>
+      <LeftCoordinate>128</LeftCoordinate>
+      <RightCoordinate>144</RightCoordinate>
+      <TopCoordinate>64</TopCoordinate>
+      <BottomCoordinate>96</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
   </AnimationChain>
-
   <AnimationChain>
     <Name>Idle</Name>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.5</FrameLength>
       <LeftCoordinate>0</LeftCoordinate>
-      <RightCoordinate>32</RightCoordinate>
+      <RightCoordinate>16</RightCoordinate>
       <TopCoordinate>0</TopCoordinate>
       <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
     <Frame>
       <TextureName>AnimatedSpritesheet.png</TextureName>
       <FrameLength>0.5</FrameLength>
-      <LeftCoordinate>32</LeftCoordinate>
-      <RightCoordinate>64</RightCoordinate>
-      <TopCoordinate>0</TopCoordinate>
+      <LeftCoordinate>128</LeftCoordinate>
+      <RightCoordinate>144</RightCoordinate>
+      <TopCoordinate>-0</TopCoordinate>
       <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
     </Frame>
   </AnimationChain>
-
+  <AnimationChain>
+    <Name>Slide</Name>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>16</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>-0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>32</LeftCoordinate>
+      <RightCoordinate>48</RightCoordinate>
+      <TopCoordinate>-0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>48</LeftCoordinate>
+      <RightCoordinate>64</RightCoordinate>
+      <TopCoordinate>-0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+      <ShapeCollectionSave>
+        <Shapes />
+        <AxisAlignedCubeSaves />
+        <SphereSaves />
+      </ShapeCollectionSave>
+    </Frame>
+  </AnimationChain>
 </AnimationChainArraySave>
