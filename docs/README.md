@@ -1,3 +1,3 @@
-# Test Page
+# Documentation
 
-Welcome to my first edit
+- [Animation Editor User Guide](animation-editor.md)
