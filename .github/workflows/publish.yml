@@ -97,3 +97,28 @@ jobs:
 
       - name: Publish Templates to NuGet
         run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  publish-animationchain:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore AnimationChain dependencies
+        run: dotnet restore src/AnimationChain.MonoGame/AnimationChain.MonoGame.csproj
+
+      - name: Pack AnimationChain package
+        run: >
+          dotnet pack src/AnimationChain.MonoGame/AnimationChain.MonoGame.csproj
+          -c Release
+          -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
+          -o out
+
+      - name: Publish AnimationChain to NuGet
+        run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate

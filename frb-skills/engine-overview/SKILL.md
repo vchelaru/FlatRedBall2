@@ -126,7 +126,6 @@ public class GameScreen : Screen
 
 | Task | Skill |
 |------|-------|
-| Create a new sample project | `sample-project-setup` |
 | Set up screens and transitions | `screens` |
 | Create entities with shapes | `entities-and-factories` |
 | Load textures and use sprites | `content-and-assets` |
