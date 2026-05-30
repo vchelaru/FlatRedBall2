@@ -11,7 +11,7 @@ The editor uses two main panels:
 
 Most workflows start in the tree view, then move between the wireframe and preview panels.
 
-![Screenshot: Animation Editor overview](images/real/animation-editor-overview-real.png)
+![Screenshot: Animation Editor overview](/docs/images/real/animation-editor-overview-real.png)
 
 ## Getting started
 
@@ -39,7 +39,7 @@ Common chain actions:
 
 The duplicate tools are useful for mirrored directions. For example, duplicate `WalkLeft` to create `WalkRight`.
 
-![Screenshot: Chain list and inspector](images/real/animation-editor-tree-real.png)
+![Screenshot: Chain list and inspector](/docs/images/real/animation-editor-tree-real.png)
 
 ## Frame management
 
@@ -60,7 +60,7 @@ Common frame actions:
 
 If your project uses sprite sheets, the texture viewer can help you select frame regions quickly.
 
-![Screenshot: Frame properties and UV fields](images/real/animation-editor-tree-real.png)
+![Screenshot: Frame properties and UV fields](/docs/images/real/animation-editor-tree-real.png)
 
 ## Shapes and collision boxes
 
@@ -81,7 +81,7 @@ Common shape actions:
 - Edit size, position, and name
 - Drag shapes directly in the wireframe
 
-![Screenshot: Shape handles in the wireframe](images/real/animation-editor-shapes-real.png)
+![Screenshot: Shape handles in the wireframe](/docs/images/real/animation-editor-shapes-real.png)
 
 ## Selection and navigation
 
@@ -108,7 +108,7 @@ Use it to:
 
 Tree state is saved with your editor settings, so expanded nodes can come back the next time you open the file.
 
-![Screenshot: Tree view with selected frame](images/real/animation-editor-tree-real.png)
+![Screenshot: Tree view with selected frame](/docs/images/real/animation-editor-tree-real.png)
 
 ## File I/O and recent files
 
@@ -146,7 +146,7 @@ Use it to:
 
 Onion skin helps compare the current frame to the previous one. It is especially useful for walk cycles and cleanup work.
 
-![Screenshot: Preview playback with onion skin](images/real/animation-editor-preview-onion-real.png)
+![Screenshot: Preview playback with onion skin](/docs/images/real/animation-editor-preview-onion-real.png)
 
 ## Wireframe, camera, zoom, and grid snap
 
@@ -163,7 +163,7 @@ Useful controls:
 
 Avalonia-port improvements include a separate preview zoom, persistent guide settings, and better texture selection in the wireframe toolbar.
 
-![Screenshot: Wireframe zoom and grid settings](images/real/animation-editor-wireframe-grid-real.png)
+![Screenshot: Wireframe zoom and grid settings](/docs/images/real/animation-editor-wireframe-grid-real.png)
 
 ## Texture viewer and drag-and-drop
 
@@ -178,7 +178,7 @@ You can also drag textures onto the editor:
 
 This is one of the fastest ways to build a chain from existing sprites.
 
-![Screenshot: Texture selection and grid overlay](images/real/animation-editor-wireframe-grid-real.png)
+![Screenshot: Texture selection and grid overlay](/docs/images/real/animation-editor-wireframe-grid-real.png)
 
 ## Undo and redo
 
@@ -223,7 +223,7 @@ These features are aimed at making the editor faster for everyday content work.
 5. Use flip horizontal to create the mirrored direction.
 6. Play the preview and adjust timing.
 
-![Screenshot: Walk cycle chain with mirrored direction](images/real/animation-editor-overview-real.png)
+![Screenshot: Walk cycle chain with mirrored direction](/docs/images/real/animation-editor-overview-real.png)
 
 ### 2) Add per-frame hitboxes
 
@@ -233,7 +233,7 @@ These features are aimed at making the editor faster for everyday content work.
 4. Resize it with the handles or edit the properties.
 5. Repeat for each frame that needs a different hitbox.
 
-![Screenshot: Per-frame hitbox shape in a frame](images/real/animation-editor-shapes-real.png)
+![Screenshot: Per-frame hitbox shape in a frame](/docs/images/real/animation-editor-shapes-real.png)
 
 ### 3) Turn a spritesheet into frames
 
@@ -243,7 +243,7 @@ These features are aimed at making the editor faster for everyday content work.
 4. Repeat for each animation cell.
 5. Drag the PNG onto the chain if you want to assign the texture quickly.
 
-![Screenshot: Texture selection and grid overlay](images/real/animation-editor-wireframe-grid-real.png)
+![Screenshot: Texture selection and grid overlay](/docs/images/real/animation-editor-wireframe-grid-real.png)
 
 ### 4) Mirror an existing chain
 
