@@ -58,6 +58,7 @@ public partial class MainWindow : Window
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
+    private bool _suppressInterpolateSync;
     private System.Threading.CancellationTokenSource? _toastCts;
 
     // AppContext.BaseDirectory works under single-file publish; Assembly.Location is empty there (IL3000).
@@ -1339,6 +1340,19 @@ public partial class MainWindow : Window
 
         ShowGuidesCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowGuides = ShowGuidesCheck.IsChecked == true;
+
+        InterpolateToggle.IsCheckedChanged += (_, _) =>
+        {
+            if (_suppressInterpolateSync) return;
+            PreviewCtrl.InterpolateOffsets = InterpolateToggle.IsChecked == true;
+        };
+        // PreviewControl auto-resets InterpolateOffsets when the chain changes; resync the toggle.
+        PreviewCtrl.InterpolateOffsetsChanged += isOn =>
+        {
+            _suppressInterpolateSync = true;
+            InterpolateToggle.IsChecked = isOn;
+            _suppressInterpolateSync = false;
+        };
 
         TimelineStrip.ItemsSource = _timelineFrames;
 

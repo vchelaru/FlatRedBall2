@@ -38,6 +38,7 @@ public class PreviewControl : Control
     // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
     private bool _showGuides;
+    private bool _interpolateOffsets;
 
     // -- Pan drag --------------------------------------------------------------
     private bool  _isPanning;
@@ -76,6 +77,28 @@ public class PreviewControl : Control
         get => _showGuides;
         set { _showGuides = value; InvalidateVisual(); }
     }
+
+    /// <summary>
+    /// When <c>true</c>, the displayed sprite position eases between consecutive frames'
+    /// <c>RelativeX/Y</c> offsets instead of snapping at each frame switch. Preview-only:
+    /// the FlatRedBall runtime always snaps, so this does not reflect in-game behavior and
+    /// is not persisted. Auto-resets to <c>false</c> whenever the selected chain changes.
+    /// </summary>
+    public bool InterpolateOffsets
+    {
+        get => _interpolateOffsets;
+        set
+        {
+            if (_interpolateOffsets == value) return;
+            _interpolateOffsets = value;
+            InvalidateVisual();
+            InterpolateOffsetsChanged?.Invoke(value);
+        }
+    }
+
+    /// <summary>Fired when <see cref="InterpolateOffsets"/> changes, including the automatic
+    /// reset on selection change, so the toolbar toggle can resync its checked state.</summary>
+    public event Action<bool>? InterpolateOffsetsChanged;
 
     public double SpeedMultiplier
     {
@@ -151,12 +174,14 @@ public class PreviewControl : Control
         _thumbnailService.GetBitmap(texPath);
         _thumbnailService.GetBitmap(onionPath);
 
+        var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
+
         var snap   = new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
                                         _showGuides, texPath, onionPath, width, height,
                                         _appState!.OffsetMultiplier,
                                         _hGuides.ToArray(), _vGuides.ToArray(),
                                         _draggedGuideIdx, _draggingHGuide,
-                                        BuildShapeInfos());
+                                        BuildShapeInfos(), frameOffX, frameOffY);
         var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
         RenderSkCore(canvas, snap, _thumbnailService.BitmapCache);
@@ -210,6 +235,12 @@ public class PreviewControl : Control
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
         _playback.FrameIndexChanged += _ => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+        // While interpolating, repaint every tick so the eased motion is smooth, not stepped
+        // to once-per-frame-switch like the snap path.
+        _playback.PlaybackTicked += () =>
+        {
+            if (_interpolateOffsets) Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+        };
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _timer.Tick += OnTimerTick;
@@ -230,7 +261,24 @@ public class PreviewControl : Control
     private void OnSelectionChanged()
     {
         _playback.SetChain(_selectedState!.SelectedChain);
+        // Interpolation is a transient per-chain preview aid; clear it when the chain changes.
+        InterpolateOffsets = false;
         InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Resolves the (X, Y) offset for the display frame. During free playback the offset
+    /// honors <see cref="InterpolateOffsets"/>; when a frame is pinned via tree selection it
+    /// is shown statically at its own stored offset.
+    /// </summary>
+    private (float X, float Y) ResolveFrameOffset(
+        AnimationChainSave? chain, AnimationFrameSave? displayFrame, bool pinned)
+    {
+        if (pinned || displayFrame is null)
+            return (displayFrame?.RelativeX ?? 0f, displayFrame?.RelativeY ?? 0f);
+
+        return OffsetInterpolator.ComputeOffset(
+            chain, _playback.CurrentFrameIndex, _playback.FrameElapsed, _interpolateOffsets);
     }
 
     // -- Public API ------------------------------------------------------------
@@ -453,6 +501,8 @@ public class PreviewControl : Control
         _thumbnailService.GetBitmap(texPath);
         _thumbnailService.GetBitmap(onionPath);
 
+        var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
+
         ctx.Custom(new DrawOp(
             new RenderSnapshot(
                 displayFrame, onionFrame, _zoom, _panX, _panY, _showGuides,
@@ -460,7 +510,7 @@ public class PreviewControl : Control
                 _appState!.OffsetMultiplier,
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
-                BuildShapeInfos()),
+                BuildShapeInfos(), frameOffX, frameOffY),
             _thumbnailService.BitmapCache));
     }
 
@@ -1234,7 +1284,9 @@ public class PreviewControl : Control
         float[] VGuides,
         int    DraggedGuideIdx,
         bool   DraggingHGuide,
-        PreviewShapeInfo[] Shapes);
+        PreviewShapeInfo[] Shapes,
+        // Display-frame offset, already resolved for snap vs interpolate (see ResolveFrameOffset).
+        float  FrameOffsetX, float FrameOffsetY);
 
     // -- Shared SkiaSharp rendering (used by both live and off-screen paths) --
 
@@ -1264,8 +1316,8 @@ public class PreviewControl : Control
             s.TexturePath is not null &&
             cache.TryGetValue(s.TexturePath, out var bm) && bm is not null)
         {
-            float fcx = cx + s.Frame.RelativeX * s.OffsetMultiplier * s.Zoom;
-            float fcy = cy - s.Frame.RelativeY * s.OffsetMultiplier * s.Zoom;
+            float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
+            float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
             DrawFrameCore(canvas, s.Frame, bm, fcx, fcy, s.Zoom, alpha: 1.0f);
         }
 

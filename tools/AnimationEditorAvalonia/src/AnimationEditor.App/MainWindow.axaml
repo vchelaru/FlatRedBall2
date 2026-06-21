@@ -644,6 +644,14 @@
                                     <TextBlock Text="Guides" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
+                            <ToggleButton x:Name="InterpolateToggle"
+                                          Height="26"
+                                          Foreground="{StaticResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          ToolTip.Tip="Ease the sprite between frame offsets during playback (preview only — the game snaps)">
+                                <TextBlock Text="Interpolate" VerticalAlignment="Center" />
+                            </ToggleButton>
 
                             <!-- Divider -->
                             <Border Width="1" Height="18" Background="{StaticResource LineBrush}"
