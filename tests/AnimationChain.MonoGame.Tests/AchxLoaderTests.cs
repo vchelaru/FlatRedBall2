@@ -234,6 +234,66 @@ public class AchxLoaderTests
         Assert.Null(list["NotHere"]);
     }
 
+    // ─── AnimationChainList stream reload ─────────────────────────────────────────
+
+    [Fact]
+    public void TryReloadFrom_Stream_ReplacesExistingFramesAndAddsNewChains()
+    {
+        var list = AnimationChainListSave.FromFile("dummy.achx", XmlStream(SimpleAchx))
+            .ToAnimationChainList(_ => null);
+
+        const string reloadXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <AnimationChainArraySave>
+              <FileRelativeTextures>false</FileRelativeTextures>
+              <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+              <CoordinateType>UV</CoordinateType>
+              <AnimationChain>
+                <Name>Run</Name>
+                <Frame>
+                  <TextureName>tex.png</TextureName>
+                  <FrameLength>0.25</FrameLength>
+                  <LeftCoordinate>0</LeftCoordinate><RightCoordinate>1</RightCoordinate>
+                  <TopCoordinate>0</TopCoordinate><BottomCoordinate>1</BottomCoordinate>
+                </Frame>
+              </AnimationChain>
+              <AnimationChain>
+                <Name>Slide</Name>
+                <Frame>
+                  <TextureName>tex.png</TextureName>
+                  <FrameLength>0.5</FrameLength>
+                  <LeftCoordinate>0</LeftCoordinate><RightCoordinate>1</RightCoordinate>
+                  <TopCoordinate>0</TopCoordinate><BottomCoordinate>1</BottomCoordinate>
+                </Frame>
+              </AnimationChain>
+            </AnimationChainArraySave>
+            """;
+
+        using var reloadStream = new MemoryStream(Encoding.UTF8.GetBytes(reloadXml));
+        var ok = list.TryReloadFrom(reloadStream, _ => null);
+
+        Assert.True(ok);
+        Assert.Single(list["Run"]!);
+        Assert.Equal(TimeSpan.FromSeconds(0.25), list["Run"]![0].FrameLength);
+        Assert.NotNull(list["Slide"]);
+    }
+
+    [Fact]
+    public void TryReloadFrom_Stream_InvalidXml_ReturnsFalseAndLeavesListUntouched()
+    {
+        var list = AnimationChainListSave.FromFile("dummy.achx", XmlStream(SimpleAchx))
+            .ToAnimationChainList(_ => null);
+        var beforeRunFrames = list["Run"]!.Count;
+
+        const string invalidXml = "<AnimationChainArraySave><AnimationChain>";
+        using var reloadStream = new MemoryStream(Encoding.UTF8.GetBytes(invalidXml));
+        var ok = list.TryReloadFrom(reloadStream, _ => null);
+
+        Assert.False(ok);
+        Assert.Equal(beforeRunFrames, list["Run"]!.Count);
+        Assert.Null(list["Slide"]);
+    }
+
     // ─── FromStream ──────────────────────────────────────────────────────────────
 
     [Fact]
