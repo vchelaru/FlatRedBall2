@@ -1,9 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <AnimationEditorTargetFramework Condition="'$(AnimationEditorTargetFramework)' == ''">net10.0</AnimationEditorTargetFramework>
+    <TargetFramework>$(AnimationEditorTargetFramework)</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AnimationEditorPackageId Condition="'$(AnimationEditorPackageId)' == ''">AnimationEditor.Core</AnimationEditorPackageId>
+    <AnimationEditorPackageVersion Condition="'$(AnimationEditorPackageVersion)' == ''">$(PackageVersion)</AnimationEditorPackageVersion>
+    <FlatRedBallDependencyPackageId Condition="'$(FlatRedBallDependencyPackageId)' == ''">FlatRedBall2</FlatRedBallDependencyPackageId>
+    <FlatRedBallDependencyVersion Condition="'$(FlatRedBallDependencyVersion)' == ''">$(AnimationEditorPackageVersion)</FlatRedBallDependencyVersion>
+    <PackageId>$(AnimationEditorPackageId)</PackageId>
+    <PackageVersion>$(AnimationEditorPackageVersion)</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

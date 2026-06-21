@@ -81,6 +81,109 @@ public class AnimationPlayerTests
         Assert.Same(frameBefore, player.CurrentFrame);
     }
 
+    // Parity checklist for issue #388:
+    // [x] play by name/reference without unintended restart
+    // [x] pause/resume playback
+    // [x] stop (rewind + pause)
+    // [x] reset (rewind, preserve playing state)
+    // [x] loop/non-loop seek behavior
+    // [x] explicit frame/time inspection and control
+    //
+    // ─── Playback controls / parity APIs ────────────────────────────────────────
+
+    [Fact]
+    public void Pause_StopsAdvancement_UntilResume()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.1, 0.1 }));
+        var player = new AnimationPlayer(list);
+        player.Play("Run");
+        player.Update(Sec(0.15)); // frame 1
+
+        player.Pause();
+        var pausedFrame = player.CurrentFrame;
+        player.Update(Sec(0.5));
+        Assert.Same(pausedFrame, player.CurrentFrame);
+
+        player.Resume();
+        player.Update(Sec(0.11));
+        Assert.NotSame(pausedFrame, player.CurrentFrame);
+    }
+
+    [Fact]
+    public void Stop_RewindsToFirstFrame_AndDisablesAnimate()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.1, 0.1 }));
+        var player = new AnimationPlayer(list);
+        player.Play("Run");
+        player.Update(Sec(0.15)); // frame 1
+
+        player.Stop();
+
+        Assert.False(player.Animate);
+        Assert.Equal(0, player.CurrentFrameIndex);
+        Assert.Equal(TimeSpan.Zero, player.TimeIntoAnimation);
+        Assert.Same(list["Run"]![0], player.CurrentFrame);
+    }
+
+    [Fact]
+    public void Reset_RewindsWithoutChangingAnimateState()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.1, 0.1 }));
+        var player = new AnimationPlayer(list);
+        player.Play("Run");
+        player.Update(Sec(0.15)); // frame 1
+        player.Pause();
+
+        player.Reset();
+
+        Assert.False(player.Animate);
+        Assert.Equal(0, player.CurrentFrameIndex);
+        Assert.Equal(TimeSpan.Zero, player.TimeIntoAnimation);
+        Assert.Same(list["Run"]![0], player.CurrentFrame);
+    }
+
+    [Fact]
+    public void CurrentFrameIndex_Setter_SeeksToRequestedFrame()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.2, 0.3 }));
+        var player = new AnimationPlayer(list);
+        player.Play("Run");
+
+        player.CurrentFrameIndex = 2;
+
+        Assert.Equal(2, player.CurrentFrameIndex);
+        Assert.Equal(TimeSpan.FromSeconds(0.3), player.TimeIntoAnimation);
+        Assert.Same(list["Run"]![2], player.CurrentFrame);
+    }
+
+    [Fact]
+    public void TimeIntoAnimation_Setter_LoopsWhenIsLooping()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.1 })); // total = 0.2
+        var player = new AnimationPlayer(list) { IsLooping = true };
+        player.Play("Run");
+
+        player.TimeIntoAnimation = Sec(0.25); // wraps to 0.05 => frame 0
+
+        Assert.Equal(0, player.CurrentFrameIndex);
+        Assert.InRange(player.TimeIntoAnimation.TotalSeconds, 0.0499, 0.0501);
+        Assert.Same(list["Run"]![0], player.CurrentFrame);
+    }
+
+    [Fact]
+    public void TimeIntoAnimation_Setter_ClampsWhenNotLooping()
+    {
+        var list = MakeList(("Run", new[] { 0.1, 0.1 })); // total = 0.2
+        var player = new AnimationPlayer(list) { IsLooping = false };
+        player.Play("Run");
+
+        player.TimeIntoAnimation = Sec(0.25);
+
+        Assert.Equal(1, player.CurrentFrameIndex);
+        Assert.Equal(Sec(0.2), player.TimeIntoAnimation);
+        Assert.Same(list["Run"]![1], player.CurrentFrame);
+    }
+
     // ─── Update / frame advancement ─────────────────────────────────────────────
 
     [Fact]
