@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private readonly IObjectFinder _objectFinder;
     private readonly IUndoManager _undoManager;
     private readonly Services.ThumbnailService _thumbnailService;
+    private readonly IFileAssociationService _fileAssociation;
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
@@ -79,7 +80,8 @@ public partial class MainWindow : Window
         IIoManager ioManager,
         IObjectFinder objectFinder,
         IUndoManager undoManager,
-        Services.ThumbnailService thumbnailService)
+        Services.ThumbnailService thumbnailService,
+        IFileAssociationService fileAssociation)
     {
         _projectManager = projectManager;
         _selectedState = selectedState;
@@ -90,6 +92,7 @@ public partial class MainWindow : Window
         _objectFinder = objectFinder;
         _undoManager = undoManager;
         _thumbnailService = thumbnailService;
+        _fileAssociation = fileAssociation;
 
         InitializeComponent();
 
@@ -113,6 +116,7 @@ public partial class MainWindow : Window
         WirePlaybackControls();
         WireKeyboard();
         WireTabBar();
+        WireDefaultHandlerBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService);
@@ -466,6 +470,37 @@ public partial class MainWindow : Window
         {
             _projectManager.AnimationChainListSave =
                 new AnimationChainListSave();
+        }
+
+        ShowDefaultHandlerBannerIfAppropriate();
+    }
+
+    // ── Default-handler prompt banner ─────────────────────────────────────────
+
+    private void WireDefaultHandlerBanner()
+    {
+        MakeDefaultBtn.Click += (_, _) =>
+        {
+            _fileAssociation.RegisterAsDefault();
+            DefaultHandlerBanner.IsVisible = false;
+            ShowStatusMessage("Opened Windows settings — choose Animation Editor for .achx files.");
+        };
+
+        DismissDefaultHandlerBtn.Click += (_, _) =>
+        {
+            _appSettings.SuppressDefaultHandlerPrompt = true;
+            SaveSettingsFile();
+            DefaultHandlerBanner.IsVisible = false;
+        };
+    }
+
+    private void ShowDefaultHandlerBannerIfAppropriate()
+    {
+        bool isDefault = _fileAssociation.IsSupported && _fileAssociation.IsDefault();
+        if (DefaultHandlerPromptDecider.ShouldPrompt(
+                _fileAssociation.IsSupported, isDefault, _appSettings.SuppressDefaultHandlerPrompt))
+        {
+            DefaultHandlerBanner.IsVisible = true;
         }
     }
 

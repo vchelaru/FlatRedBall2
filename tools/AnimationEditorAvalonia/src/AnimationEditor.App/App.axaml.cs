@@ -173,6 +173,13 @@ public partial class App : Application
         sc.AddSingleton<ThumbnailService>(sp =>
             new ThumbnailService(sp.GetRequiredService<IProjectManager>()));
 
+        // File association is registry-based on Windows; other platforms get the no-op
+        // service so the startup prompt simply never appears (IsSupported == false).
+        if (OperatingSystem.IsWindows())
+            sc.AddSingleton<IFileAssociationService, WindowsFileAssociationService>();
+        else
+            sc.AddSingleton<IFileAssociationService, NullFileAssociationService>();
+
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
             sp.GetRequiredService<ISelectedState>(),
@@ -182,7 +189,8 @@ public partial class App : Application
             sp.GetRequiredService<IIoManager>(),
             sp.GetRequiredService<IObjectFinder>(),
             sp.GetRequiredService<IUndoManager>(),
-            sp.GetRequiredService<ThumbnailService>()));
+            sp.GetRequiredService<ThumbnailService>(),
+            sp.GetRequiredService<IFileAssociationService>()));
 
         return sc.BuildServiceProvider();
     }

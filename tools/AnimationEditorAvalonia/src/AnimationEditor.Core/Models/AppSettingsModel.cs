@@ -26,6 +26,14 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public AppTheme Theme { get; set; } = AppTheme.Dark;
 
+        /// <summary>
+        /// When <c>true</c>, the editor never offers to register itself as the default
+        /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
+        /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear
+        /// once on a fresh install.
+        /// </summary>
+        public bool SuppressDefaultHandlerPrompt { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);
