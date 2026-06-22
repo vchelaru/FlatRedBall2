@@ -1,6 +1,7 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
@@ -90,7 +91,9 @@ public class TabSwitchUndoTests
 
             // Switch back to tab A
             var tabManager = GetTabManager(window);
-            var tabA = tabManager.Tabs.First(t => t.Path.FullPath == pathA);
+            // FilePath equality (not raw-string): FullPath is forward-slashed, but pathA
+            // from Path.Combine is backslashed on Windows, so a string compare never matches.
+            var tabA = tabManager.Tabs.First(t => t.Path == new FilePath(pathA));
             await ActivateTabAsync(window, tabA);
             Dispatcher.UIThread.RunJobs();
 
@@ -135,8 +138,8 @@ public class TabSwitchUndoTests
             ctx.UndoManager.Record(new StubUndoCmd("Edit B1"));
 
             var tabManager = GetTabManager(window);
-            var tabA = tabManager.Tabs.First(t => t.Path.FullPath == pathA);
-            var tabB = tabManager.Tabs.First(t => t.Path.FullPath == pathB);
+            var tabA = tabManager.Tabs.First(t => t.Path == new FilePath(pathA));
+            var tabB = tabManager.Tabs.First(t => t.Path == new FilePath(pathB));
 
             // Switch to A — should see A's 2 entries
             await ActivateTabAsync(window, tabA);
