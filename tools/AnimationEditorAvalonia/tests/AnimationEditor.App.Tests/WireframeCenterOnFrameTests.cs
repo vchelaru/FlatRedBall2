@@ -102,7 +102,7 @@ public class WireframeCenterOnFrameTests
             // Zoom should fit the frame at 85 % of the viewport.
             float expectedZoom = Math.Clamp(
                 Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
-                WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+                CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
 
             Assert.True(Math.Abs(ctrl.Zoom - expectedZoom) < 0.01f,
                 $"Zoom should fit frame; expected≈{expectedZoom:F3} actual={ctrl.Zoom:F3}");
@@ -181,7 +181,7 @@ public class WireframeCenterOnFrameTests
             float vpH = (float)sv.Viewport.Height;
             float frameFitZoom = Math.Clamp(
                 Math.Min(vpW / 25f, vpH / 25f) * 0.85f,
-                WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+                CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
             Assert.True(Math.Abs(ctrl.Zoom - frameFitZoom) < 0.01f,
                 $"Zoom should fit 25×25 frame; expected≈{frameFitZoom:F3} actual={ctrl.Zoom:F3}");
 

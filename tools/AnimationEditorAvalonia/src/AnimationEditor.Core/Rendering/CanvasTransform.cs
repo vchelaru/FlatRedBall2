@@ -3,7 +3,9 @@ using System;
 namespace AnimationEditor.Core.Rendering;
 
 /// <summary>
-/// Pure coordinate-transform math for a pan/zoom canvas.
+/// Pure coordinate-transform math for a pan/zoom canvas. Shared by both editor
+/// panels (Wireframe and Preview) so zoom-toward-cursor, fit-centering, and
+/// pan-clamping behave identically and only have to be fixed once.
 /// <para>
 /// Screen-space → texture-space:  textureX = (screenX − panX) / zoom<br/>
 /// Texture-space → screen-space:  screenX  = panX + textureX × zoom
@@ -11,7 +13,7 @@ namespace AnimationEditor.Core.Rendering;
 /// All methods are static and side-effect-free; they can be unit-tested
 /// without any UI or rendering infrastructure.
 /// </summary>
-public static class WireframeTransform
+public static class CanvasTransform
 {
     /// <summary>Minimum allowed zoom factor (5 %).</summary>
     public const float MinZoom = 0.05f;
@@ -96,4 +98,34 @@ public static class WireframeTransform
         float currentX,   float currentY)
         => (anchorPanX + currentX - anchorX,
             anchorPanY + currentY - anchorY);
+
+    /// <summary>
+    /// Clamps a center-relative pan so the displayed content can be scrolled across the
+    /// viewport but never fully off it. The allowed band scales with the content's
+    /// on-screen extent, so zooming in (which grows the extent) keeps every part of the
+    /// content reachable instead of pinning it to one edge.
+    /// <para>
+    /// Pan is the screen-pixel offset of the content origin from the viewport center
+    /// (the Preview panel's convention). The content extent is given in screen pixels
+    /// relative to that same origin: a point at origin-offset <c>e</c> renders at
+    /// <c>center + pan + e</c>. The band lets the content's far edge reach the opposite
+    /// viewport edge plus <paramref name="padding"/>; passing a zero-size extent
+    /// (<c>min == max == 0</c>) reproduces the simple "origin stays on screen" clamp.
+    /// </para>
+    /// </summary>
+    public static (float PanX, float PanY) ClampPan(
+        float panX, float panY,
+        float viewW, float viewH,
+        float contentMinX, float contentMaxX,
+        float contentMinY, float contentMaxY,
+        float padding = 0f)
+    {
+        float maxPanX =  viewW / 2f + padding - contentMinX;
+        float minPanX = -viewW / 2f - padding - contentMaxX;
+        float maxPanY =  viewH / 2f + padding - contentMinY;
+        float minPanY = -viewH / 2f - padding - contentMaxY;
+
+        return (Math.Clamp(panX, minPanX, maxPanX),
+                Math.Clamp(panY, minPanY, maxPanY));
+    }
 }

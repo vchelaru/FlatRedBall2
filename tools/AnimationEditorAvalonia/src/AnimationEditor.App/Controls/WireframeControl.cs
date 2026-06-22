@@ -230,7 +230,7 @@ public class WireframeControl : Control
 
         private static SKRect ToScreen(SKRect r, RenderSnapshot s)
         {
-            var (l, t, rr, b) = WireframeTransform.TextureRectToScreen(
+            var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
                 r.Left, r.Top, r.Right, r.Bottom, s.PanX, s.PanY, s.Zoom);
             return new SKRect(l, t, rr, b);
         }
@@ -926,7 +926,7 @@ public class WireframeControl : Control
     /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit).</summary>
     public void SetZoomPercent(int percent)
     {
-        float newZoom = Math.Clamp(percent / 100f, WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+        float newZoom = Math.Clamp(percent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
         float cx, cy;
         if (_scrollViewer != null && _scrollViewer.Viewport.Width > 1)
         {
@@ -1208,7 +1208,7 @@ public class WireframeControl : Control
         }
         else
         {
-            (_panX, _panY) = WireframeTransform.Pan(
+            (_panX, _panY) = CanvasTransform.Pan(
                 _panAnchorX, _panAnchorY,
                 (float)_panAnchor.X, (float)_panAnchor.Y,
                 vpX, vpY);
@@ -1301,7 +1301,7 @@ public class WireframeControl : Control
     public void CenterFitForSize(int width, int height)
     {
         if (_bitmap is null) return;
-        (_panX, _panY, _zoom) = WireframeTransform.CenterFit(
+        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(
             _bitmap.Width, _bitmap.Height, width, height);
         InvalidateVisual();
     }
@@ -1315,7 +1315,7 @@ public class WireframeControl : Control
     /// </summary>
     /// <summary>
     /// Zooms to fit the frame's bounding box at 85 % of the viewport (same fraction
-    /// as <see cref="WireframeTransform.CenterFit"/> uses for the whole bitmap), then
+    /// as <see cref="CanvasTransform.CenterFit"/> uses for the whole bitmap), then
     /// scrolls so the frame centre lands at the viewport centre.
     /// </summary>
     public void CenterOnFrame(AnimationFrameSave frame)
@@ -1341,7 +1341,7 @@ public class WireframeControl : Control
         // Zoom so the frame fills 85 % of the viewport.
         _zoom = Math.Clamp(
             Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
-            WireframeTransform.MinZoom, WireframeTransform.MaxZoom);
+            CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
 
         // In scroll mode panX/Y must always equal EffectivePaddingX/Y.
         // Update them now — EffectivePaddingX/Y read _zoom which we just set.
@@ -1645,7 +1645,7 @@ public class WireframeControl : Control
                 // hasn't fired yet the two spaces differ by the stale scroll offset,
                 // causing an immediate pan jump on the first move event.
                 var freePanPos = _scrollViewer != null ? e.GetPosition(_scrollViewer) : pos;
-                (_panX, _panY) = WireframeTransform.Pan(
+                (_panX, _panY) = CanvasTransform.Pan(
                     _panAnchorX, _panAnchorY,
                     (float)_panAnchor.X, (float)_panAnchor.Y,
                     (float)freePanPos.X, (float)freePanPos.Y);
@@ -1845,7 +1845,7 @@ public class WireframeControl : Control
     private void ZoomToward(float sx, float sy, float factor)
     {
         float oldZoom = _zoom;
-        var (newPanX, newPanY, newZoom) = WireframeTransform.ZoomToward(sx, sy, factor, _panX, _panY, _zoom);
+        var (newPanX, newPanY, newZoom) = CanvasTransform.ZoomToward(sx, sy, factor, _panX, _panY, _zoom);
         _zoom = newZoom;
 
         if (_scrollViewer != null)
@@ -2173,13 +2173,13 @@ public class WireframeControl : Control
 
     private SKPoint ScreenToTexture(float sx, float sy)
     {
-        var (tx, ty) = WireframeTransform.ScreenToTexture(sx, sy, _panX, _panY, _zoom);
+        var (tx, ty) = CanvasTransform.ScreenToTexture(sx, sy, _panX, _panY, _zoom);
         return new SKPoint(tx, ty);
     }
 
     private SKRect ToScreen(SKRect r)
     {
-        var (l, t, rr, b) = WireframeTransform.TextureRectToScreen(
+        var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
             r.Left, r.Top, r.Right, r.Bottom, _panX, _panY, _zoom);
         return new SKRect(l, t, rr, b);
     }
@@ -2270,7 +2270,7 @@ public class WireframeControl : Control
             ctrlH = (float)(Bounds.Height > 0 ? Bounds.Height : 600);
         }
 
-        (_panX, _panY, _zoom) = WireframeTransform.CenterFit(_bitmap.Width, _bitmap.Height, ctrlW, ctrlH);
+        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(_bitmap.Width, _bitmap.Height, ctrlW, ctrlH);
 
         // After CenterFit the image is centred inside the viewport.  In scroll mode we
         // always apply padding so the scrollbars are active — set panX/panY to

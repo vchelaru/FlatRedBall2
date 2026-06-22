@@ -76,6 +76,39 @@ public class PreviewPanLimitTests
     }
 
     /// <summary>
+    /// Regression guard for #412: zooming in while centered on content that is offset
+    /// from the entity origin must keep that content reachable. The old fixed
+    /// ±viewport/2 pan band ignored zoom and pinned the sprite to the bottom edge.
+    /// </summary>
+    [AvaloniaFact]
+    public void WheelZoom_InOnOffsetShape_KeepsContentReachable()
+    {
+        var ctx = ResetSingletons();
+        ctx.AppState.OffsetMultiplier = 1f;
+
+        // A collision shape 100 world-units above the origin, shown as the selected
+        // frame's content so the content-aware clamp has a non-trivial extent.
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new CircleSave { X = 0f, Y = 100f, Radius = 10f });
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.Measure(new Size(400, 300));
+        ctrl.Arrange(new Rect(0, 0, 400, 300));
+        ctrl.SetZoomPercent(800);
+        ctrl.CenterOnEntityPoint(0f, 100f); // panY = 100 * 1 * 8 = 800
+
+        // Zoom in toward the canvas center; the shape must stay reachable rather than
+        // being clamped back to the old fixed band (≈ viewH/2 = 140).
+        float cx = (400f - 20f) / 2f + 20f; // 210
+        float cy = (300f - 20f) / 2f + 20f; // 160
+        ctrl.SimulateWheelZoom(cx, cy, zoomIn: true);
+
+        Assert.True(ctrl.PanOffset.Y > 300f,
+            $"PanY={ctrl.PanOffset.Y:F1} was pinned near the old fixed limit; content unreachable (#412)");
+    }
+
+    /// <summary>
     /// SetPan must preserve exact values (relied on by CenterOnEntityPoint) —
     /// it must NOT apply clamping.
     /// </summary>

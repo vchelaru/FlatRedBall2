@@ -249,7 +249,7 @@
 | `FloodFillBoundsCalculatorTests.cs` *(new)* | II02 |
 | `AppCommandsSaveAsTests.cs` *(new)* | IO03 |
 | `AESettingsSaveRoundTripTests.cs` *(new)* | IO05 (guides + expanded nodes round-trip) |
-| `WireframeTransformTests.cs` *(new)* | WF01 (coordinate math layer), WF04 (zoom-toward math) |
+| `CanvasTransformTests.cs` *(new)* | WF01 (coordinate math layer), WF04 (zoom-toward math) |
 | `TreeBuilderTests.cs` *(new)* | TV01 (expand-state logic), TV02–TV04 (selection routing) |
 | `GridSnapperTests.cs` *(new)* | WF06 (snap-to-grid math layer) |
 | `FlipScaleCalculatorTests.cs` *(new)* | WF02 math layer, PL06 math layer |
@@ -357,7 +357,7 @@ sts pass in `AnimationEditor.App.Tests` (net8.0, xunit.v3 3.2.2).
 | MEDIUM | Add `AppCommands.FlipFrameHorizontally/Vertically` (F09/F10) | ✅ Done | F09–F10 now covered (+8 tests) |
 | MEDIUM | Wire TV01 two-way `IsExpanded` binding in AXAML | ✅ Done | TV01 fully closed (expand state roundtrips via model) |
 | MEDIUM | Extract flip-scale decision to `FlipScaleCalculator` | ✅ Done | WF02 + PL06 math layer (11 tests) |
-| MEDIUM | Add `WireframeTransform.Pan` + wire `WireframeControl` | ✅ Done | WF05 math layer (5 tests) |
+| MEDIUM | Add `CanvasTransform.Pan` + wire `WireframeControl` | ✅ Done | WF05 math layer (5 tests) |
 | MEDIUM | Extract `UnitConverter.ToDisplay`/`FromDisplay` | ✅ Done | WF08 display math (13 tests) |
 | MEDIUM | Add `AppCommands.RenameChain`/`RenameFrame` | ✅ Done | TV07–TV08 logic layer (8 tests) |
 | LOW | Add Avalonia headless rendering tests | Open | Would cover WF03, WF07 canvas drawing |
@@ -444,8 +444,8 @@ All Core logic is extracted and tested. The table below tracks which features ar
 *Report updated. 595 unit tests across 41 test files (feature inventory: 134 items; 125 covered, 9 untestable/UI-only).*
 *`AnimationEditor.Core.Tests` (net8.0, xUnit 2.9.2): 582 tests passing.*
 *`AnimationEditor.App.Tests` (net8.0, xunit.v3 3.2.2): 13 headless Avalonia tests passing (TV05 multi-select × 4, TV06 context menu × 9).*
-*Core modules: `PlaybackController`, `HandleKind`, `DragHandleHitTester`, `DragHandleApplier`, `BoundsRect`, `FloodFillBoundsCalculator`, `WireframeTransform` (+ `Pan`), `GridSnapper`, `FlipScaleCalculator`, `UnitConverter`, `IFileDialogService`, `NullFileDialogService`, `TreeNodeVm`, `TreeBuilder`, `DirectionNameSuggester`, `AdjustOffsetCalculator`, `FrameTimeScaler`, `BatchFrameBuilder`, `ClipboardPayload`, `TextureResizeAdjuster`, `SpriteAlignment` enum, `SpriteAlignmentOffsetCalculator`, `OffsetMultiplierConverter`, `CommandLineArgParser`, `TextureListBuilder`, `TileCoordinateCalculator`, `PixelFrameEditor`.*
+*Core modules: `PlaybackController`, `HandleKind`, `DragHandleHitTester`, `DragHandleApplier`, `BoundsRect`, `FloodFillBoundsCalculator`, `CanvasTransform` (+ `Pan`), `GridSnapper`, `FlipScaleCalculator`, `UnitConverter`, `IFileDialogService`, `NullFileDialogService`, `TreeNodeVm`, `TreeBuilder`, `DirectionNameSuggester`, `AdjustOffsetCalculator`, `FrameTimeScaler`, `BatchFrameBuilder`, `ClipboardPayload`, `TextureResizeAdjuster`, `SpriteAlignment` enum, `SpriteAlignmentOffsetCalculator`, `OffsetMultiplierConverter`, `CommandLineArgParser`, `TextureListBuilder`, `TileCoordinateCalculator`, `PixelFrameEditor`.*
 *AppCommands additions: `FlipFrameHorizontally`, `FlipFrameVertically`, `RenameChain`, `RenameFrame`, `AdjustOffsetsJustifyBottom`, `AdjustOffsetsAdjustAll`, `ScaleFrameTimesProportional`, `ScaleFrameTimesSetAllSame`, `AddMultipleFrames`, `AdjustUVAfterResize`, `NewFile`, `AddFrameFromPixelBounds`.*
 *AppState additions: `SpriteAlignment`, `OffsetMultiplier`.*
-*App: `AvaloniaFileDialogService`, `IsExpanded` binding via `TreeView.Styles` `{ReflectionBinding}`, `PreviewControl` delegates to `FlipScaleCalculator`, `WireframeControl` delegates to `WireframeTransform.Pan`.*
+*App: `AvaloniaFileDialogService`, `IsExpanded` binding via `TreeView.Styles` `{ReflectionBinding}`, `PreviewControl` delegates to `FlipScaleCalculator`, `WireframeControl` delegates to `CanvasTransform.Pan`.*
 *Test files added (session): `TileCoordinateCalculatorTests.cs`, `PixelFrameEditorTests.cs`.*

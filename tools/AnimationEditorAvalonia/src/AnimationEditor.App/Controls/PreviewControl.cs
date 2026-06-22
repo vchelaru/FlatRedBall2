@@ -311,7 +311,7 @@ public class PreviewControl : Control
 
     public void SetZoomPercent(int pct)
     {
-        _zoom = Math.Clamp(pct / 100f, 0.05f, 32f);
+        _zoom = Math.Clamp(pct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
     }
@@ -431,20 +431,28 @@ public class PreviewControl : Control
     private void ApplyWheelZoom(double x, double y, bool zoomIn)
     {
         float oldZoom = _zoom;
+        float targetZoom;
         if (WheelZoomPresets is { Length: > 0 } presets)
         {
             int newPct = ZoomPresetStepper.StepToNextPreset(_zoom * 100f, presets, zoomIn ? +1 : -1);
-            _zoom = Math.Clamp(newPct / 100f, 0.05f, 32f);
+            targetZoom = Math.Clamp(newPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
         }
         else
         {
-            _zoom = Math.Clamp(_zoom * (zoomIn ? 1.25f : 0.8f), 0.05f, 32f);
+            targetZoom = Math.Clamp(_zoom * (zoomIn ? 1.25f : 0.8f), CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
         }
-        float ratio = _zoom / oldZoom;
+
+        // Preview pan is relative to the canvas center; convert to the absolute pan
+        // (the origin's screen position) that CanvasTransform.ZoomToward operates on,
+        // then convert the result back.
         float cx0 = (float)((Bounds.Width  - RulerSize) / 2f + RulerSize);
         float cy0 = (float)((Bounds.Height - RulerSize) / 2f + RulerSize);
-        _panX = (float)((x - cx0) - (x - cx0 - _panX) * ratio);
-        _panY = (float)((y - cy0) - (y - cy0 - _panY) * ratio);
+        var (absPanX, absPanY, newZoom) = CanvasTransform.ZoomToward(
+            (float)x, (float)y, targetZoom / oldZoom, cx0 + _panX, cy0 + _panY, oldZoom);
+
+        _zoom = newZoom;
+        _panX = absPanX - cx0;
+        _panY = absPanY - cy0;
         ClampPan();
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
@@ -458,8 +466,10 @@ public class PreviewControl : Control
     }
 
     /// <summary>
-    /// Keeps the entity origin within the visible viewport so it never drifts fully off-screen.
-    /// No-op until layout has run (<c>Bounds.Width > 1</c>).
+    /// Keeps the displayed content within reach so it never drifts fully off-screen, while
+    /// letting the user scroll across it. The pan band scales with the content's on-screen
+    /// extent (content × zoom), so zooming in on content offset from the entity origin never
+    /// pins it to one edge (#412). No-op until layout has run (<c>Bounds.Width > 1</c>).
     /// </summary>
     private void ClampPan()
     {
@@ -468,8 +478,62 @@ public class PreviewControl : Control
         float viewW = (float)(Bounds.Width  - RulerSize);
         float viewH = (float)(Bounds.Height - RulerSize);
 
-        _panX = Math.Clamp(_panX, -(viewW / 2f + PanPadding), viewW / 2f + PanPadding);
-        _panY = Math.Clamp(_panY, -(viewH / 2f + PanPadding), viewH / 2f + PanPadding);
+        var (minX, maxX, minY, maxY) = ComputeContentExtentScreenPx();
+        (_panX, _panY) = CanvasTransform.ClampPan(
+            _panX, _panY, viewW, viewH, minX, maxX, minY, maxY, PanPadding);
+    }
+
+    /// <summary>
+    /// Bounding box of the displayed content (sprite frame + collision shapes) in screen
+    /// pixels, relative to the entity origin (world Y up is flipped to screen Y down).
+    /// The origin itself is always included, so empty content collapses the band back to
+    /// the simple "origin stays on screen" clamp.
+    /// </summary>
+    private (float MinX, float MaxX, float MinY, float MaxY) ComputeContentExtentScreenPx()
+    {
+        float minX = 0f, maxX = 0f, minY = 0f, maxY = 0f;
+        float om = _appState!.OffsetMultiplier * _zoom;
+
+        void Include(float cx, float cy, float halfW, float halfH)
+        {
+            minX = Math.Min(minX, cx - halfW); maxX = Math.Max(maxX, cx + halfW);
+            minY = Math.Min(minY, cy - halfH); maxY = Math.Max(maxY, cy + halfH);
+        }
+
+        var chain         = _selectedState!.SelectedChain;
+        var selectedFrame = _selectedState!.SelectedFrame;
+        AnimationFrameSave? displayFrame = selectedFrame;
+        if (displayFrame is null && chain is not null && chain.Frames.Count > 0)
+        {
+            int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+            displayFrame = chain.Frames[idx];
+        }
+
+        if (displayFrame is not null)
+        {
+            var (offX, offY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
+            // Sprite pixel size scales by zoom only (not OffsetMultiplier). Skip it when the
+            // texture isn't cached yet — the offset center alone keeps the frame reachable.
+            float hw = 0f, hh = 0f;
+            string? texPath = _thumbnailService!.ResolveTexturePath(displayFrame);
+            if (texPath is not null &&
+                _thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) && bm is not null)
+            {
+                var (_, _, sw, sh) = ComputeSourceRect(displayFrame, bm.Width, bm.Height);
+                hw = sw * _zoom / 2f;
+                hh = sh * _zoom / 2f;
+            }
+            Include(offX * om, -offY * om, hw, hh);
+        }
+
+        foreach (var sh in BuildShapeInfos())
+        {
+            float halfW = sh.Param1 * om;
+            float halfH = (sh.Kind == PreviewShapeKind.Rect ? sh.Param2 : sh.Param1) * om;
+            Include(sh.X * om, -sh.Y * om, halfW, halfH);
+        }
+
+        return (minX, maxX, minY, maxY);
     }
     // -- Avalonia rendering ----------------------------------------------------
 
