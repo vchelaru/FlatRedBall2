@@ -107,6 +107,7 @@ public partial class MainWindow : Window
         WireWireframeControl();
         WirePreviewControls();
         WireTreeView();
+        WireWindowFileDrop();
         WirePropertyPanel();
         WirePlaybackControls();
         WireKeyboard();
@@ -1708,6 +1709,46 @@ public partial class MainWindow : Window
             .FirstOrDefault(f => f is not null);
         Trace.WriteLine($"[DragDrop] Items fallback resolved={fallback?.Path.LocalPath ?? "(null)"}");
         return fallback?.Path.LocalPath;
+    }
+
+    // ── Window-level OS file drop: open dropped .achx files as tabs ────────────
+    //
+    // Registered on the whole window (handledEventsToo) so an .achx dropped anywhere —
+    // tab strip, editor canvas, or even over the tree — opens as a tab, matching
+    // File > Open. These handlers act ONLY when the payload contains at least one
+    // .achx; for any other payload they stay passive, leaving the tree's PNG-texture
+    // drop (OnTreeDragOver / OnTreeDrop) untouched. handledEventsToo lets the DragOver
+    // override the tree's "no drop" affordance when an .achx is dragged over the tree.
+
+    private void WireWindowFileDrop()
+    {
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnWindowDragOver, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(DragDrop.DropEvent, OnWindowDrop, RoutingStrategies.Bubble, handledEventsToo: true);
+    }
+
+    private static IEnumerable<string?>? DroppedFilePaths(DragEventArgs e) =>
+        e.DataTransfer.TryGetFiles()?.Select(f => f.Path.LocalPath);
+
+    private void OnWindowDragOver(object? sender, DragEventArgs e)
+    {
+        if (AchxDropProcessor.ContainsAchx(DroppedFilePaths(e)))
+        {
+            e.DragEffects = DragDropEffects.Copy;
+            e.Handled = true;
+        }
+    }
+
+    private async void OnWindowDrop(object? sender, DragEventArgs e)
+    {
+        var achxFiles = AchxDropProcessor.SelectAchxFiles(DroppedFilePaths(e));
+        if (achxFiles.Count == 0) return;  // not ours — leave the tree's PNG drop to run
+
+        e.Handled = true;
+        // LoadAnimationFileAsync de-dupes against already-open tabs (focuses instead of
+        // duplicating); awaiting in sequence opens each file and leaves the last active.
+        foreach (var path in achxFiles)
+            await LoadAnimationFileAsync(path);
     }
 
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)

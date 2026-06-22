@@ -1,3 +1,4 @@
+using AnimationEditor.Core.Paths;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -42,10 +43,10 @@ namespace AnimationEditor.Core.HotReload
 
             lock (_lock)
             {
-                _achxPath = achxPath.Replace('\\', '/');
+                _achxPath = Canonicalize(achxPath);
                 _watchedPngPaths.Clear();
                 foreach (var p in pngPaths)
-                    _watchedPngPaths.Add(p.Replace('\\', '/'));
+                    _watchedPngPaths.Add(Canonicalize(p));
 
                 var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -72,7 +73,7 @@ namespace AnimationEditor.Core.HotReload
             lock (_lock)
             {
                 var newSet = new HashSet<string>(
-                    newPngPaths.Select(p => p.Replace('\\', '/')),
+                    newPngPaths.Select(Canonicalize),
                     StringComparer.OrdinalIgnoreCase);
                 var (added, removed) = ReferencedFileDiff.Diff(_watchedPngPaths, newSet);
 
@@ -122,8 +123,18 @@ namespace AnimationEditor.Core.HotReload
 
         public void RecordOwnSave(string filePath)
         {
-            _coalescer.RecordOwnSave(filePath.Replace('\\', '/'),
+            _coalescer.RecordOwnSave(Canonicalize(filePath),
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        }
+
+        // FileSystemWatcher.StartRaisingEvents throws on a directory path containing "../"
+        // segments, and watcher events report fully-resolved paths — so collapse ".." (and
+        // unify slashes) up front. Without this the ctor crashes on textures referenced via
+        // "../" and, even when it didn't, stored paths could never match the resolved events.
+        private static string Canonicalize(string path)
+        {
+            try { return new FilePath(path).StandardizedCaseSensitive ?? path.Replace('\\', '/'); }
+            catch (InvalidOperationException) { return path.Replace('\\', '/'); }
         }
 
         private void AddWatcher(string directory)
