@@ -120,12 +120,24 @@ public static class CanvasTransform
         float contentMinY, float contentMaxY,
         float padding = 0f)
     {
-        float maxPanX =  viewW / 2f + padding - contentMinX;
-        float minPanX = -viewW / 2f - padding - contentMaxX;
-        float maxPanY =  viewH / 2f + padding - contentMinY;
-        float minPanY = -viewH / 2f - padding - contentMaxY;
+        var (minPanX, maxPanX) = PanRange(viewW, contentMinX, contentMaxX, padding);
+        var (minPanY, maxPanY) = PanRange(viewH, contentMinY, contentMaxY, padding);
 
         return (Math.Clamp(panX, minPanX, maxPanX),
                 Math.Clamp(panY, minPanY, maxPanY));
     }
+
+    /// <summary>
+    /// The inclusive <c>[Min, Max]</c> band a single pan axis may take so the content stays
+    /// reachable — the per-axis band that <see cref="ClampPan"/> enforces, exposed so the same
+    /// limits can drive a scrollbar's value range (#415). <paramref name="viewExtent"/> is the
+    /// viewport size on that axis; <paramref name="contentMin"/>/<paramref name="contentMax"/>
+    /// are the content's on-screen extent relative to the origin. A zero-size extent
+    /// (<c>min == max == 0</c>) yields ±<paramref name="viewExtent"/>/2 — the simple
+    /// "origin stays on screen" band.
+    /// </summary>
+    public static (float Min, float Max) PanRange(
+        float viewExtent, float contentMin, float contentMax, float padding = 0f)
+        => (-viewExtent / 2f - padding - contentMax,
+             viewExtent / 2f + padding - contentMin);
 }

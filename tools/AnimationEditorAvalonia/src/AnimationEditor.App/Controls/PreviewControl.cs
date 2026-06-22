@@ -224,9 +224,10 @@ public class PreviewControl : Control
         _thumbnailService = thumbnailService;
 
         _selectedState.SelectionChanged                        += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
-        _events.AnimationChainsChanged                         += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+        // Content edits change the union extent, hence the scrollbar range — refresh alongside the repaint.
+        _events.AnimationChainsChanged                         += () => Dispatcher.UIThread.InvokeAsync(() => { InvalidateVisual(); RaiseViewChanged(); });
         _events.AchxLoaded                                     += _ => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
-        _appCommands.RefreshAnimationFrameDisplayRequested     += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+        _appCommands.RefreshAnimationFrameDisplayRequested     += () => Dispatcher.UIThread.InvokeAsync(() => { InvalidateVisual(); RaiseViewChanged(); });
     }
 
     // -- Constructor -----------------------------------------------------------
@@ -238,6 +239,9 @@ public class PreviewControl : Control
 
         // Repaint when the app theme variant changes so the canvas/ruler colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+
+        // A resize changes the viewport extent, hence the scrollbar range — refresh the host's scrollbars.
+        SizeChanged += (_, _) => RaiseViewChanged();
 
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
@@ -271,6 +275,8 @@ public class PreviewControl : Control
         // Interpolation is a transient per-chain preview aid; clear it when the chain changes.
         InterpolateOffsets = false;
         InvalidateVisual();
+        // A new chain/frame changes the union extent → refresh the host's scrollbars.
+        RaiseViewChanged();
     }
 
     /// <summary>
@@ -300,6 +306,15 @@ public class PreviewControl : Control
     public event Action<float, float>? PanChanged;
 
     /// <summary>
+    /// Fired whenever the view (pan, zoom, content extent, or viewport size) changes, so the
+    /// host can refresh the Preview's scrollbars (#415). Distinct from <see cref="PanChanged"/>,
+    /// which only fires on pan-gesture completion for persistence.
+    /// </summary>
+    public event Action? ViewChanged;
+
+    private void RaiseViewChanged() => ViewChanged?.Invoke();
+
+    /// <summary>
     /// When non-null, mouse-wheel zoom steps through these preset percentages instead
     /// of applying a raw ×1.25/×0.8 multiplier.  Set by <c>MainWindow</c> on startup.
     /// <para>
@@ -312,8 +327,10 @@ public class PreviewControl : Control
     public void SetZoomPercent(int pct)
     {
         _zoom = Math.Clamp(pct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
+        ClampPan();
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseViewChanged();
     }
 
     /// <summary>Current zoom factor (1.0 = 100 %).</summary>
@@ -333,6 +350,7 @@ public class PreviewControl : Control
         _panX = -entityX * offMult * _zoom;
         _panY =  entityY * offMult * _zoom;
         InvalidateVisual();
+        RaiseViewChanged();
     }
 
     /// <summary>Test-only: adds a horizontal guide at the given world-Y coordinate.</summary>
@@ -456,6 +474,7 @@ public class PreviewControl : Control
         ClampPan();
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseViewChanged();
     }
 
     public void SetPan(float panX, float panY)
@@ -463,6 +482,31 @@ public class PreviewControl : Control
         _panX = panX;
         _panY = panY;
         InvalidateVisual();
+        RaiseViewChanged();
+    }
+
+    /// <summary>
+    /// Sets the horizontal pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
+    /// and repaints. Clamped defensively to the pan band.
+    /// </summary>
+    public void SetPanX(float panX)
+    {
+        _panX = panX;
+        ClampPan();
+        InvalidateVisual();
+        RaiseViewChanged();
+    }
+
+    /// <summary>
+    /// Sets the vertical pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
+    /// and repaints. Clamped defensively to the pan band.
+    /// </summary>
+    public void SetPanY(float panY)
+    {
+        _panY = panY;
+        ClampPan();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     /// <summary>
@@ -484,10 +528,15 @@ public class PreviewControl : Control
     }
 
     /// <summary>
-    /// Bounding box of the displayed content (sprite frame + collision shapes) in screen
-    /// pixels, relative to the entity origin (world Y up is flipped to screen Y down).
-    /// The origin itself is always included, so empty content collapses the band back to
-    /// the simple "origin stays on screen" clamp.
+    /// Bounding box of the chain's content (every frame's sprite footprint + collision shapes)
+    /// in screen pixels, relative to the entity origin (world Y up is flipped to screen Y down).
+    /// The origin itself is always included, so empty content collapses the band back to the
+    /// simple "origin stays on screen" clamp.
+    /// <para>
+    /// The union of <b>all</b> frames (at their resting <c>RelativeX/Y</c> offsets) is used, not
+    /// the current playback frame, so the extent — and the scrollbar range and pan clamp derived
+    /// from it — stays stable during playback instead of breathing frame-to-frame (#415).
+    /// </para>
     /// </summary>
     private (float MinX, float MaxX, float MinY, float MaxY) ComputeContentExtentScreenPx()
     {
@@ -500,40 +549,51 @@ public class PreviewControl : Control
             minY = Math.Min(minY, cy - halfH); maxY = Math.Max(maxY, cy + halfH);
         }
 
-        var chain         = _selectedState!.SelectedChain;
-        var selectedFrame = _selectedState!.SelectedFrame;
-        AnimationFrameSave? displayFrame = selectedFrame;
-        if (displayFrame is null && chain is not null && chain.Frames.Count > 0)
+        void IncludeFrame(AnimationFrameSave frame)
         {
-            int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
-            displayFrame = chain.Frames[idx];
-        }
-
-        if (displayFrame is not null)
-        {
-            var (offX, offY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
-            // Sprite pixel size scales by zoom only (not OffsetMultiplier). Skip it when the
-            // texture isn't cached yet — the offset center alone keeps the frame reachable.
-            float hw = 0f, hh = 0f;
-            string? texPath = _thumbnailService!.ResolveTexturePath(displayFrame);
+            // Sprite footprint at the frame's resting offset. Pixel size scales by zoom only
+            // (not OffsetMultiplier). Skip it when the texture isn't cached yet — the offset
+            // center alone still keeps the frame reachable.
+            string? texPath = _thumbnailService!.ResolveTexturePath(frame);
             if (texPath is not null &&
                 _thumbnailService.BitmapCache.TryGetValue(texPath, out var bm) && bm is not null)
             {
-                var (_, _, sw, sh) = ComputeSourceRect(displayFrame, bm.Width, bm.Height);
-                hw = sw * _zoom / 2f;
-                hh = sh * _zoom / 2f;
+                var (_, _, sw, sh) = ComputeSourceRect(frame, bm.Width, bm.Height);
+                Include(frame.RelativeX * om, -frame.RelativeY * om, sw * _zoom / 2f, sh * _zoom / 2f);
             }
-            Include(offX * om, -offY * om, hw, hh);
+
+            if (frame.ShapesSave is null) return;
+            foreach (var r in frame.ShapesSave.AARectSaves)
+                Include(r.X * om, -r.Y * om, r.ScaleX * om, r.ScaleY * om);
+            foreach (var c in frame.ShapesSave.CircleSaves)
+                Include(c.X * om, -c.Y * om, c.Radius * om, c.Radius * om);
         }
 
-        foreach (var sh in BuildShapeInfos())
-        {
-            float halfW = sh.Param1 * om;
-            float halfH = (sh.Kind == PreviewShapeKind.Rect ? sh.Param2 : sh.Param1) * om;
-            Include(sh.X * om, -sh.Y * om, halfW, halfH);
-        }
+        var chain = _selectedState!.SelectedChain;
+        if (chain is not null)
+            foreach (var frame in chain.Frames) IncludeFrame(frame);
+        else if (_selectedState!.SelectedFrame is not null)
+            IncludeFrame(_selectedState!.SelectedFrame);
 
         return (minX, maxX, minY, maxY);
+    }
+
+    /// <summary>
+    /// Scrollbar (Minimum, Maximum, Value, ViewportSize) for each axis, derived from the
+    /// current pan, viewport, and content extent. <c>MainWindow</c> applies these to the
+    /// Preview's two <c>ScrollBar</c>s; the value axis is the negation of the pan axis (see
+    /// <see cref="PanScrollBar"/>). Returns a degenerate (zero) range before layout has run.
+    /// </summary>
+    public (ScrollBarRange Horizontal, ScrollBarRange Vertical) GetScrollBarRanges()
+    {
+        float viewW = (float)(Bounds.Width  - RulerSize);
+        float viewH = (float)(Bounds.Height - RulerSize);
+        if (viewW <= 0 || viewH <= 0)
+            return (new ScrollBarRange(0f, 0f, 0f, 1f), new ScrollBarRange(0f, 0f, 0f, 1f));
+
+        var (minX, maxX, minY, maxY) = ComputeContentExtentScreenPx();
+        return (PanScrollBar.FromPan(_panX, viewW, minX, maxX, PanPadding),
+                PanScrollBar.FromPan(_panY, viewH, minY, maxY, PanPadding));
     }
     // -- Avalonia rendering ----------------------------------------------------
 
@@ -1248,6 +1308,7 @@ public class PreviewControl : Control
             ClampPan();
             _lastMousePt = pos;
             InvalidateVisual();
+            RaiseViewChanged();
             return;
         }
 

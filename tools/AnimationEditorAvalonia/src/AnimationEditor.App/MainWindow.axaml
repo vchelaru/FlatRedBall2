@@ -722,8 +722,25 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Preview panel fills remaining height of the block -->
-                    <controls:PreviewControl x:Name="PreviewCtrl" Grid.Row="1" />
+                    <!-- Preview panel fills remaining height of the block, with scrollbars.
+                         Unlike the Wireframe (a static bitmap in a ScrollViewer), the Preview
+                         draws dynamic content, so its scrollbars drive the manual pan directly
+                         (#415) rather than hosting the content in a ScrollViewer. -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+                        <controls:PreviewControl x:Name="PreviewCtrl"
+                                                 Grid.Row="0" Grid.Column="0" />
+                        <ScrollBar x:Name="PreviewVScroll"
+                                   Grid.Row="0" Grid.Column="1"
+                                   Orientation="Vertical"
+                                   AllowAutoHide="False" />
+                        <ScrollBar x:Name="PreviewHScroll"
+                                   Grid.Row="1" Grid.Column="0"
+                                   Orientation="Horizontal"
+                                   AllowAutoHide="False" />
+                        <!-- Corner where the two scrollbars meet -->
+                        <Border Grid.Row="1" Grid.Column="1"
+                                Background="{DynamicResource BgRail}" />
+                    </Grid>
 
                     <!-- ── Timeline strip ── -->
                     <Grid Grid.Row="2" RowDefinitions="14,*">

@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private bool _suppressTextureComboChanged;
     private bool _suppressZoomComboChanged;
     private bool _suppressPreviewZoomComboChanged;
+    private bool _suppressPreviewScrollSync;
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
@@ -1380,6 +1381,57 @@ public partial class MainWindow : Window
         PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
         PreviewCtrl.Playback.FrameIndexChanged += OnPreviewPlaybackFrameIndexChanged;
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
+
+        // ── Preview scrollbars (#415) ──
+        // Two-way sync between the manual pan and the scrollbars, mirroring the
+        // PreviewZoomCombo ↔ PreviewCtrl suppression pattern above. The scroll axis runs
+        // opposite the pan axis (PanScrollBar handles the inversion).
+        PreviewHScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: true);
+        PreviewVScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: false);
+        // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
+        PreviewHScroll.Scroll += OnPreviewScrollEnded;
+        PreviewVScroll.Scroll += OnPreviewScrollEnded;
+        PreviewCtrl.ViewChanged += RefreshPreviewScrollBars;
+    }
+
+    private void OnPreviewScrollValueChanged(bool horizontal)
+    {
+        if (_suppressPreviewScrollSync) return;
+        _suppressPreviewScrollSync = true;
+        if (horizontal)
+            PreviewCtrl.SetPanX(PanScrollBar.PanFromValue((float)PreviewHScroll.Value));
+        else
+            PreviewCtrl.SetPanY(PanScrollBar.PanFromValue((float)PreviewVScroll.Value));
+        _suppressPreviewScrollSync = false;
+    }
+
+    private void OnPreviewScrollEnded(object? sender, ScrollEventArgs e)
+    {
+        if (e.ScrollEventType == ScrollEventType.EndScroll) SaveCompanionFile();
+    }
+
+    /// <summary>
+    /// Pushes the Preview's current pan/zoom/content extent into the two scrollbars. Fired by
+    /// <see cref="PreviewControl.ViewChanged"/>. The suppression flag stops the resulting
+    /// <c>ValueChanged</c> from looping back into the pan.
+    /// </summary>
+    private void RefreshPreviewScrollBars()
+    {
+        if (_suppressPreviewScrollSync) return;
+        _suppressPreviewScrollSync = true;
+        var (h, v) = PreviewCtrl.GetScrollBarRanges();
+        ApplyScrollRange(PreviewHScroll, h);
+        ApplyScrollRange(PreviewVScroll, v);
+        _suppressPreviewScrollSync = false;
+    }
+
+    // Order matters: set Minimum/Maximum before Value so RangeBase doesn't coerce it.
+    private static void ApplyScrollRange(ScrollBar bar, ScrollBarRange r)
+    {
+        bar.Minimum      = r.Minimum;
+        bar.Maximum      = r.Maximum;
+        bar.ViewportSize = r.ViewportSize;
+        bar.Value        = r.Value;
     }
 
     private void OnPreviewPlaybackFrameIndexChanged(int index)

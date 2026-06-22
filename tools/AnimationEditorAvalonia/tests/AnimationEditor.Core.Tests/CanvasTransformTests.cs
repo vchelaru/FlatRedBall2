@@ -300,4 +300,37 @@ public class CanvasTransformTests
             contentMinX: -10f, contentMaxX: 10f, contentMinY: -880f, contentMaxY: -720f);
         Assert.Equal(800f, panY, 4);
     }
+
+    // ── PanRange ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void PanRange_ZeroExtent_ReturnsViewportHalfBand()
+    {
+        var (min, max) = CanvasTransform.PanRange(380f, 0f, 0f);
+        Assert.Equal(-190f, min, 4);
+        Assert.Equal(190f,  max, 4);
+    }
+
+    [Fact]
+    public void PanRange_OffsetContent_ShiftsBandToKeepContentReachable()
+    {
+        // Content extent [100, 200] (right of origin). Max pan brings its left edge to
+        // the right viewport edge (190 - 100); min pan brings its right edge to the
+        // left viewport edge (-190 - 200).
+        var (min, max) = CanvasTransform.PanRange(380f, 100f, 200f);
+        Assert.Equal(-390f, min, 4);
+        Assert.Equal(90f,   max, 4);
+    }
+
+    [Fact]
+    public void PanRange_MatchesClampPanBand()
+    {
+        // PanRange is exactly the band ClampPan enforces, so clamping past each end
+        // lands on the range's min/max.
+        var (min, max) = CanvasTransform.PanRange(380f, -30f, 60f);
+        var (clampedHigh, _) = CanvasTransform.ClampPan(9999f,  0f, 380f, 280f, -30f, 60f, 0f, 0f);
+        var (clampedLow,  _) = CanvasTransform.ClampPan(-9999f, 0f, 380f, 280f, -30f, 60f, 0f, 0f);
+        Assert.Equal(max, clampedHigh, 4);
+        Assert.Equal(min, clampedLow,  4);
+    }
 }
