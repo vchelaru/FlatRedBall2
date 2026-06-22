@@ -178,6 +178,38 @@
             </ScrollViewer>
         </Border>
 
+        <!-- ── Default-handler prompt: offers to register the editor for .achx files.
+             Shown on startup only when not already the default and not dismissed. ── -->
+        <Border x:Name="DefaultHandlerBanner"
+                DockPanel.Dock="Top"
+                IsVisible="False"
+                Background="{DynamicResource BgRail}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                    <Button x:Name="MakeDefaultBtn"
+                            Content="Make default"
+                            Padding="10,3"
+                            FontSize="12" />
+                    <Button x:Name="DismissDefaultHandlerBtn"
+                            Content="Don't show again"
+                            Padding="10,3"
+                            FontSize="12"
+                            Background="Transparent"
+                            Foreground="{DynamicResource InkMid}" />
+                </StackPanel>
+                <TextBlock Text="Make the Animation Editor the default app for .achx files?"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource Ink}" />
+            </DockPanel>
+        </Border>
+
         <Border DockPanel.Dock="Bottom"
                 Background="{DynamicResource BgRail}"
                 BorderBrush="{DynamicResource LineBrush}"

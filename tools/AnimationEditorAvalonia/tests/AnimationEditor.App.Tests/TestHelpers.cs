@@ -23,6 +23,7 @@ internal sealed class TestServices
     public UndoManager UndoManager { get; }
     public AppCommands AppCommands { get; }
     public ThumbnailService ThumbnailService { get; }
+    public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
 
     public TestServices()
     {
@@ -41,7 +42,8 @@ internal sealed class TestServices
     public MainWindow CreateMainWindow() =>
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
-            ApplicationEvents, IoManager, ObjectFinder, UndoManager, ThumbnailService);
+            ApplicationEvents, IoManager, ObjectFinder, UndoManager, ThumbnailService,
+            FileAssociationService);
 
     public WireframeControl CreateWireframeControl()
     {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AnimationEditor.Core.Models;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -125,5 +126,24 @@ public class AppSettingsModelTests
         model.AddFile(path);
 
         Assert.Single(model.RecentFiles);
+    }
+
+    [Fact]
+    public void SuppressDefaultHandlerPrompt_DefaultsToFalse()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.False(model.SuppressDefaultHandlerPrompt);
+    }
+
+    [Fact]
+    public void SuppressDefaultHandlerPrompt_SurvivesJsonRoundTrip()
+    {
+        var model = new AppSettingsModel { SuppressDefaultHandlerPrompt = true };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.True(restored!.SuppressDefaultHandlerPrompt);
     }
 }
