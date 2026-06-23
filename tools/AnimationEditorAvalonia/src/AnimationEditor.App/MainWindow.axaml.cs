@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private bool _suppressZoomComboChanged;
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressPreviewScrollSync;
+    private bool _suppressWireframeScrollSync;
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
@@ -101,7 +102,6 @@ public partial class MainWindow : Window
 
         InitToast();
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
-        WireframeCtrl.AttachScrollViewer(WireframeScrollViewer);
 
         WireAppCommands();
         LoadSettingsFile();
@@ -765,6 +765,42 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         WireframeCtrl.ZoomChanged            += zoomPct => { SyncZoomCombo(zoomPct); SaveCompanionFile(); };
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
+
+        // ── Wireframe scrollbars (#422) ──
+        // Two-way sync between the manual camera pan and the scrollbars, mirroring the Preview
+        // panel (#415). The scroll axis runs opposite the pan axis (PanScrollBar inverts it).
+        WireframeHScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: true);
+        WireframeVScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: false);
+        // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
+        WireframeHScroll.Scroll += OnPreviewScrollEnded;
+        WireframeVScroll.Scroll += OnPreviewScrollEnded;
+        WireframeCtrl.ViewChanged += RefreshWireframeScrollBars;
+    }
+
+    private void OnWireframeScrollValueChanged(bool horizontal)
+    {
+        if (_suppressWireframeScrollSync) return;
+        _suppressWireframeScrollSync = true;
+        if (horizontal)
+            WireframeCtrl.SetPanX((float)WireframeHScroll.Value);
+        else
+            WireframeCtrl.SetPanY((float)WireframeVScroll.Value);
+        _suppressWireframeScrollSync = false;
+    }
+
+    /// <summary>
+    /// Pushes the wireframe's current pan/zoom/texture size into its two scrollbars. Fired by
+    /// <see cref="WireframeControl.ViewChanged"/>. The suppression flag stops the resulting
+    /// <c>ValueChanged</c> from looping back into the pan.
+    /// </summary>
+    private void RefreshWireframeScrollBars()
+    {
+        if (_suppressWireframeScrollSync) return;
+        _suppressWireframeScrollSync = true;
+        var (h, v) = WireframeCtrl.GetScrollBarRanges();
+        ApplyScrollRange(WireframeHScroll, h);
+        ApplyScrollRange(WireframeVScroll, v);
+        _suppressWireframeScrollSync = false;
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)

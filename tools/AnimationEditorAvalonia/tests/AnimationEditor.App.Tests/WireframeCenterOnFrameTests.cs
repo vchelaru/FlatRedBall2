@@ -84,7 +84,6 @@ public class WireframeCenterOnFrameTests
             Dispatcher.UIThread.RunJobs();
 
             var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
-            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
 
             ctrl.LoadTexture(texPath);
             Dispatcher.UIThread.RunJobs();
@@ -96,8 +95,8 @@ public class WireframeCenterOnFrameTests
             ctrl.CenterOnFrame(frame);
             Dispatcher.UIThread.RunJobs();
 
-            float vpW = (float)sv.Viewport.Width;
-            float vpH = (float)sv.Viewport.Height;
+            float vpW = (float)ctrl.Bounds.Width;
+            float vpH = (float)ctrl.Bounds.Height;
 
             // Zoom should fit the frame at 85 % of the viewport.
             float expectedZoom = Math.Clamp(
@@ -112,15 +111,10 @@ public class WireframeCenterOnFrameTests
             Assert.True(Math.Abs(zoomChangedValue!.Value - expectedZoom * 100f) < 1f,
                 $"ZoomChanged value should be {expectedZoom * 100f:F1}%; got {zoomChangedValue.Value:F1}%");
 
-            // Scroll should centre the frame in the viewport.
+            // The frame centre should land at the viewport centre: screenX = panX + texCX*zoom.
             var (panX, panY, zoom) = ctrl.CameraState;
-            float expectedScrollX = Math.Max(0f, panX + texCX * zoom - vpW / 2f);
-            float expectedScrollY = Math.Max(0f, panY + texCY * zoom - vpH / 2f);
-
-            Assert.True(Math.Abs(sv.Offset.X - expectedScrollX) < 2.0,
-                $"Scroll X should centre frame; expected≈{expectedScrollX:F1} actual={sv.Offset.X:F1}");
-            Assert.True(Math.Abs(sv.Offset.Y - expectedScrollY) < 2.0,
-                $"Scroll Y should centre frame; expected≈{expectedScrollY:F1} actual={sv.Offset.Y:F1}");
+            Assert.Equal(vpW / 2f, panX + texCX * zoom, 1);
+            Assert.Equal(vpH / 2f, panY + texCY * zoom, 1);
 
             window.Close();
         }
@@ -128,11 +122,12 @@ public class WireframeCenterOnFrameTests
     }
 
     /// <summary>
-    /// CenterOnFrame on a tiny frame near the texture corner zooms in,
-    /// clamps to max scroll, and does not leave the pending-scroll flag stuck.
+    /// CenterOnFrame on a tiny frame near the texture corner zooms in to fit the frame and clamps
+    /// the camera to the valid pan band (the frame lands as close to centre as the dead-space
+    /// allows) without pushing the texture off-edge.
     /// </summary>
     [AvaloniaFact]
-    public void CenterOnFrame_FrameNearFarEdge_ZoomsAndClampsToMaxScroll()
+    public void CenterOnFrame_FrameNearFarEdge_ZoomsAndClampsCamera()
     {
         var ctx = ResetSingletons();
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -142,7 +137,6 @@ public class WireframeCenterOnFrameTests
             var texPath = WriteSolidPng(dir, "tex.png", 500, 500);
 
             // Frame at the far corner [0.95, 0.95, 1.0, 1.0] — 25×25 pixels.
-            // CenterOnFrame should zoom in significantly and clamp scroll to max.
             var frame = new AnimationFrameSave
             {
                 LeftCoordinate   = 0.95f,
@@ -156,7 +150,6 @@ public class WireframeCenterOnFrameTests
             Dispatcher.UIThread.RunJobs();
 
             var ctrl = FindCtrl<WireframeControl>(window, "WireframeCtrl");
-            var sv   = FindCtrl<ScrollViewer>(window, "WireframeScrollViewer");
 
             ctrl.LoadTexture(texPath);
             Dispatcher.UIThread.RunJobs();
@@ -164,26 +157,22 @@ public class WireframeCenterOnFrameTests
             ctrl.CenterOnFrame(frame);
             Dispatcher.UIThread.RunJobs();
 
-            // Pending flag must be cleared — scroll was either applied or clamped.
-            Assert.False(ctrl.PendingScrollApply,
-                "PendingScrollApply must be false after CenterOnFrame + RunJobs");
+            float vpW = (float)ctrl.Bounds.Width;
+            float vpH = (float)ctrl.Bounds.Height;
 
-            // Scroll must not exceed max.
-            double maxScrollX = Math.Max(0, sv.Extent.Width  - sv.Viewport.Width);
-            double maxScrollY = Math.Max(0, sv.Extent.Height - sv.Viewport.Height);
-            Assert.True(sv.Offset.X <= maxScrollX + 1.0,
-                $"Scroll X must not exceed max; offset={sv.Offset.X:F1} max={maxScrollX:F1}");
-            Assert.True(sv.Offset.Y <= maxScrollY + 1.0,
-                $"Scroll Y must not exceed max; offset={sv.Offset.Y:F1} max={maxScrollY:F1}");
-
-            // Zoom should be meaningfully higher than the default fit-to-whole-image zoom.
-            float vpW = (float)sv.Viewport.Width;
-            float vpH = (float)sv.Viewport.Height;
+            // Zoom should fit the 25×25 frame at 85 % of the viewport.
             float frameFitZoom = Math.Clamp(
                 Math.Min(vpW / 25f, vpH / 25f) * 0.85f,
                 CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
             Assert.True(Math.Abs(ctrl.Zoom - frameFitZoom) < 0.01f,
                 $"Zoom should fit 25×25 frame; expected≈{frameFitZoom:F3} actual={ctrl.Zoom:F3}");
+
+            // The camera must stay inside the valid pan band — re-clamping is a no-op.
+            var (panX, panY, zoom) = ctrl.CameraState;
+            var (bw, bh) = ctrl.BitmapSize;
+            var (cx, cy) = CanvasTransform.ClampWireframePan(panX, panY, vpW, vpH, bw, bh, zoom, 300f);
+            Assert.Equal(panX, cx, 1);
+            Assert.Equal(panY, cy, 1);
 
             window.Close();
         }

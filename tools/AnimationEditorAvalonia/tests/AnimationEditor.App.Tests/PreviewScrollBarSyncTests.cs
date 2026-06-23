@@ -37,9 +37,8 @@ public class PreviewScrollBarSyncTests
         => w.FindControl<T>(name)
            ?? throw new InvalidOperationException($"Control '{name}' not found");
 
-    // Consistency: both panels' scrollbars auto-hide (thin when idle, expand on hover). The
-    // Wireframe's ScrollViewer defaults to AllowAutoHide; the Preview's standalone ScrollBars
-    // opt in explicitly so they behave the same.
+    // Consistency: both panels now use standalone ScrollBars (#415 Preview, #422 Wireframe) that
+    // auto-hide (thin when idle, expand on hover).
     [AvaloniaFact]
     public void PreviewAndWireframeScrollBars_AllAutoHide()
     {
@@ -50,7 +49,8 @@ public class PreviewScrollBarSyncTests
 
         Assert.True(FindCtrl<ScrollBar>(window, "PreviewHScroll").AllowAutoHide);
         Assert.True(FindCtrl<ScrollBar>(window, "PreviewVScroll").AllowAutoHide);
-        Assert.True(FindCtrl<ScrollViewer>(window, "WireframeScrollViewer").AllowAutoHide);
+        Assert.True(FindCtrl<ScrollBar>(window, "WireframeHScroll").AllowAutoHide);
+        Assert.True(FindCtrl<ScrollBar>(window, "WireframeVScroll").AllowAutoHide);
 
         window.Close();
     }

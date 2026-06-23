@@ -630,14 +630,22 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Wireframe panel fills top, with scrollbars -->
-                <ScrollViewer x:Name="WireframeScrollViewer"
-                              Grid.Row="1"
-                              Background="{DynamicResource BgCanvas}"
-                              HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto">
+                <!-- Wireframe panel fills top. The control draws its texture under a manual
+                     pan/zoom camera and clamps analytically (#422), so its two ScrollBars drive
+                     the pan directly rather than hosting the content in a ScrollViewer — the same
+                     model as the Preview panel below. The bars overlay the canvas edges and
+                     auto-hide so they behave like the old ScrollViewer's scrollbars. -->
+                <Grid Grid.Row="1" Background="{DynamicResource BgCanvas}">
                     <controls:WireframeControl x:Name="WireframeCtrl" />
-                </ScrollViewer>
+                    <ScrollBar x:Name="WireframeVScroll"
+                               Orientation="Vertical"
+                               HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                               AllowAutoHide="True" />
+                    <ScrollBar x:Name="WireframeHScroll"
+                               Orientation="Horizontal"
+                               HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+                               AllowAutoHide="True" />
+                </Grid>
 
                 <!-- Horizontal splitter between wireframe and preview -->
                 <GridSplitter Grid.Row="2"

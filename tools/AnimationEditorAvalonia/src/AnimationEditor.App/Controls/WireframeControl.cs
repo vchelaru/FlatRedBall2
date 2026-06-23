@@ -246,44 +246,27 @@ public class WireframeControl : Control
     private InspectableImage? _inspectableImage;
 
     private float _zoom = 1f;
+    // Camera pan: the screen position (within the control's viewport) of texture pixel (0,0).
+    // screenX = panX + textureX * zoom. Clamped analytically by ClampCamera — there is no
+    // ScrollViewer; the control IS the viewport and two ScrollBars are driven from this pan.
     private float _panX, _panY;
 
-    // Minimum dead-space padding (pixels) around the image so the user can pan
-    // into the empty area on every side.  Always applied at all zoom levels.
+    // Minimum dead-space padding (pixels) around the image so the user can always pan into
+    // the empty area on every side, at every zoom level. Passed as the `padding` argument
+    // to the analytic pan clamp (CanvasTransform.ClampWireframePan).
     private const float PanPadding = 300f;
-
-    // Extra scrollable room (pixels) beyond the centering margin so that the
-    // ScrollViewer always has a non-zero scroll range even for tiny images that
-    // fit well inside the viewport.  This ensures the scrollbar buttons (+/−)
-    // are always active regardless of zoom.
-    private const float ExtraScrollable = 50f;
 
     private bool _showGrid;
     private int _gridSize = 16;
 
     private readonly List<FrameRect> _frameRects = new();
 
-    // ScrollViewer integration (optional — wired up by MainWindow)
-    private ScrollViewer? _scrollViewer;
-    private float _scrollAnchorX, _scrollAnchorY;
-    // Synchronously-maintained mirror of the intended scroll target.  ZoomToward
-    // writes this before queuing the deferred scroll so rapid wheel events each
-    // chain off the correct accumulated target rather than the still-stale visual
-    // scroll offset.
-    private float _scrollTargetX, _scrollTargetY;
-    // Post-layout pending scroll: the offset we intend to apply once the layout
-    // pass after a ZoomToward has completed.  Separate from _scrollTargetX/Y so
-    // that the intermediate ScrollChanged(Offset=0) fired when content grows does
-    // not overwrite the intended value before we have a chance to apply it.
-    private float _pendingScrollX, _pendingScrollY;
-    private bool _pendingScrollApply;
-    // Incremented whenever a new pending scroll is queued or cancelled, so that
-    // stale Background-priority dispatcher callbacks can detect they are outdated.
-    private int _pendingScrollGeneration;
+    // Set when LoadTexture/CenterTexture ran before the control had a real viewport
+    // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
+    private bool _needsInitialCenter;
 
     // ── Debug tooling (toggle with F2 in the live app) ────────────────────────
     private bool _debugMode;
-    private int  _dbgPanMoveCount;
     private static readonly string _debugLogPath =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wireframe_debug.log");
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
@@ -330,9 +313,6 @@ public class WireframeControl : Control
     private void DrawDebugOverlay(DrawingContext ctx)
     {
         if (!_debugMode) return;
-        var vp   = _scrollViewer?.Viewport ?? new Size(Bounds.Width, Bounds.Height);
-        var off  = _scrollViewer?.Offset   ?? new Vector(0, 0);
-        var ext  = _scrollViewer?.Extent   ?? new Size(0, 0);
         int bmpW = _bitmap?.Width  ?? 0;
         int bmpH = _bitmap?.Height ?? 0;
 
@@ -340,15 +320,9 @@ public class WireframeControl : Control
         {
             "── WIREFRAME DEBUG (F2 to hide) ──",
             $"zoom          {_zoom * 100f,7:F1}%",
-            $"sv.Offset     X={off.X,7:F1}  Y={off.Y:F1}",
-            $"sv.Extent     W={ext.Width,6:F0}  H={ext.Height:F0}",
-            $"scrollTarget  X={_scrollTargetX,7:F1}  Y={_scrollTargetY:F1}",
-            $"pendingApply  {(_pendingScrollApply ? "TRUE  ←" : "false")}",
-            $"pendingXY     X={_pendingScrollX,7:F1}  Y={_pendingScrollY:F1}",
             $"panXY         X={_panX,7:F1}  Y={_panY:F1}",
-            $"viewport      {vp.Width:F0} × {vp.Height:F0}",
+            $"viewport      {Bounds.Width:F0} × {Bounds.Height:F0}",
             $"content       {bmpW * _zoom:F0} × {bmpH * _zoom:F0}",
-            $"useScrollPan  {UseScrollPan()}",
             $"isPanning     {_isPanning}",
             "──────────────────────────────────",
             $"log: {System.IO.Path.GetFileName(_debugLogPath)}",
@@ -400,9 +374,9 @@ public class WireframeControl : Control
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
     private static Cursor AddFrameCursor => _addFrameCursorLazy.Value;
 
-    // Per-texture saved camera (texture path → panX, panY, zoom, scrollTargetX, scrollTargetY).
-    // In scroll-pan mode px/py are always epX/epY at save time; sx/sy are the scroll offsets.
-    private readonly Dictionary<string, (float px, float py, float z, float sx, float sy)> _cameraByTexture = new();
+    // Per-texture saved camera (texture path → panX, panY, zoom). panX/panY are the screen
+    // position of texture pixel (0,0) — the full camera pan in the analytic model.
+    private readonly Dictionary<string, (float px, float py, float z)> _cameraByTexture = new();
 
     // ── Public properties ─────────────────────────────────────────────────────
 
@@ -517,308 +491,87 @@ public class WireframeControl : Control
         // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
 
+        // A resize changes the viewport, hence the pan clamp and scrollbar range — re-clamp the
+        // camera and refresh the host's scrollbars. If centering was deferred because the control
+        // had no real viewport yet (Bounds not laid out), do it now.
+        SizeChanged += (_, _) =>
+        {
+            if (_needsInitialCenter && Bounds.Width > 1 && _bitmap != null)
+                CenterTexture();
+            else
+                ClampCamera();
+            RaiseViewChanged();
+        };
+
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
-
-        // Safety-net: LayoutUpdated fires after the FULL layout pass, at which point
-        // sv.Extent is guaranteed to reflect the new (larger) content size.  If the
-        // ScrollChanged(ExtentDelta) path tried to apply the pending scroll but the
-        // extent wasn't ready yet, this catches it.
-        LayoutUpdated += (_, _) =>
-        {
-            DebugLog("LAYOUT_TICK",
-                $"pending={_pendingScrollApply} " +
-                $"offset=({_scrollViewer?.Offset.X:F1},{_scrollViewer?.Offset.Y:F1}) " +
-                $"extent=({_scrollViewer?.Extent.Width:F1},{_scrollViewer?.Extent.Height:F1}) " +
-                $"target=({_scrollTargetX:F1},{_scrollTargetY:F1})");
-            if (_pendingScrollApply && _scrollViewer != null)
-                TryApplyPendingScroll("LAYOUT_UPDATED");
-        };
     }
 
-    // ── ScrollViewer integration ──────────────────────────────────────────────
+    // ── Camera clamping + scrollbar integration ───────────────────────────────
 
     /// <summary>
-    /// Attaches a ScrollViewer so that large textures get horizontal and vertical scrollbars.
-    /// Call once from the hosting window after InitializeComponent.
+    /// Fired whenever the camera (pan, zoom) or the viewport size changes, so the host can
+    /// refresh the wireframe's two <c>ScrollBar</c>s from <see cref="GetScrollBarRanges"/>.
+    /// Distinct from <see cref="PanChanged"/>, which fires only on pan-gesture completion for
+    /// persistence.
     /// </summary>
-    public void AttachScrollViewer(ScrollViewer sv)
+    public event Action? ViewChanged;
+
+    private void RaiseViewChanged() => ViewChanged?.Invoke();
+
+    /// <summary>
+    /// Clamps the camera pan so the texture stays reachable with <see cref="PanPadding"/>
+    /// pixels of dead-space on every side, at the current zoom. Pure analytic clamp
+    /// (<see cref="CanvasTransform.ClampWireframePan"/>) — no ScrollViewer extent dependency,
+    /// which is what makes a symmetric zoom in/out an exact round-trip (#422). No-op until
+    /// layout has produced a real viewport (<c>Bounds.Width &gt; 1</c>) or with no texture.
+    /// </summary>
+    private void ClampCamera()
     {
-        _scrollViewer = sv;
-        // Keep _scrollTargetX/Y in sync when an external source (e.g. user dragging
-        // a scrollbar) changes the offset so subsequent ZoomToward calls use the
-        // correct base.
-        sv.ScrollChanged += (_, e) =>
-        {
-            if (_scrollViewer == null) return;
-
-            // When the content extent grows, attempt to apply the pending scroll now.
-            // TryApplyPendingScroll guards on the extent being large enough; if not ready
-            // it returns without clearing _pendingScrollApply so LayoutUpdated retries.
-            if (_pendingScrollApply && (e.ExtentDelta.X != 0 || e.ExtentDelta.Y != 0))
-            {
-                DebugLog("SCROLL_CHG",
-                    $"[EXTENT_CHANGED] extentDelta=({e.ExtentDelta.X:F1},{e.ExtentDelta.Y:F1}) " +
-                    $"newExtent=({_scrollViewer.Extent.Width:F1},{_scrollViewer.Extent.Height:F1}) " +
-                    $"maxScrollX={Math.Max(0, _scrollViewer.Extent.Width - _scrollViewer.Viewport.Width):F1} " +
-                    $"pendingX={_pendingScrollX:F1}");
-                TryApplyPendingScroll("SCROLL_CHG_EXTENT");
-                return;
-            }
-
-            // Normal path: mirror sv.Offset into _scrollTargetX so ZoomToward chains correctly.
-            // SKIP when a scroll is still pending: _scrollTargetX already holds the intended
-            // target, and sv.Offset.X may be stale/clamped (0) before the pending apply fires.
-            if (_pendingScrollApply)
-            {
-                DebugLog("SCROLL_CHG",
-                    $"[SKIPPED – pending] offset=({_scrollViewer.Offset.X:F1},{_scrollViewer.Offset.Y:F1}) " +
-                    $"keeping _scrollTargetX={_scrollTargetX:F1}");
-                return;
-            }
-
-            float prevX = _scrollTargetX;
-            _scrollTargetX = (float)_scrollViewer.Offset.X;
-            _scrollTargetY = (float)_scrollViewer.Offset.Y;
-            // Warn when the normal path silently resets a non-zero scroll target
-            // to near-zero (the primary signal for diagnosing pan-lock).
-            if (prevX > 5f && _scrollTargetX < 1f)
-                DebugLog("SCROLL_CHG",
-                    $"⚠ ZERO_RESET prevTargetX={prevX:F1} → {_scrollTargetX:F1} " +
-                    $"sv.Offset.X={_scrollViewer.Offset.X:F1} " +
-                    $"extent={_scrollViewer.Extent.Width:F1} vp={_scrollViewer.Viewport.Width:F1}");
-            DebugLog("SCROLL_CHG",
-                $"offset=({_scrollViewer.Offset.X:F1},{_scrollViewer.Offset.Y:F1}) " +
-                $"prevTargetX={prevX:F1} → newTargetX={_scrollTargetX:F1}");
-        };
+        if (_bitmap == null || Bounds.Width <= 1) return;
+        (_panX, _panY) = CanvasTransform.ClampWireframePan(
+            _panX, _panY, (float)Bounds.Width, (float)Bounds.Height,
+            _bitmap.Width, _bitmap.Height, _zoom, PanPadding);
     }
 
     /// <summary>
-    /// Records the intended scroll offset and flags that it should be applied once the
-    /// layout pass after a ZoomToward has completed.  Primary application is done inside
-    /// the <c>ScrollChanged(ExtentDelta)</c> and <c>LayoutUpdated</c> handlers.
-    ///
-    /// A secondary safety net is queued at <c>DispatcherPriority.Background</c> (4).
-    /// Background priority is lower than Render (7) where layout/arrange runs, so this
-    /// dispatcher item is guaranteed to fire AFTER the layout pass that commits the new
-    /// <c>sv.Extent</c>.  If the primary handlers already applied the scroll, this is
-    /// a no-op (generation mismatch or <c>_pendingScrollApply == false</c>).
+    /// Scrollbar (Minimum, Maximum, Value, ViewportSize) for each axis, derived from the
+    /// current pan, viewport, and texture size. <c>MainWindow</c> applies these to the two
+    /// wireframe <c>ScrollBar</c>s; the value axis is the negation of the pan axis (see
+    /// <see cref="PanScrollBar"/>). Returns a degenerate (zero) range before layout has run
+    /// or with no texture loaded.
     /// </summary>
-    private void QueueScrollAfterLayout(float x, float y)
+    public (ScrollBarRange Horizontal, ScrollBarRange Vertical) GetScrollBarRanges()
     {
-        DebugLog("QUEUE_SCROLL",
-            $"x={x:F1} y={y:F1} | prevTargetX={_scrollTargetX:F1} " +
-            $"prevPending=({_pendingScrollX:F1},{_pendingScrollY:F1}) prevApply={_pendingScrollApply}");
-        _scrollTargetX = x;
-        _scrollTargetY = y;
-        _pendingScrollX = x;
-        _pendingScrollY = y;
-        _pendingScrollApply = true;
+        float viewW = (float)Bounds.Width;
+        float viewH = (float)Bounds.Height;
+        if (_bitmap == null || viewW <= 1 || viewH <= 1)
+            return (new ScrollBarRange(0f, 0f, 0f, 1f), new ScrollBarRange(0f, 0f, 0f, 1f));
 
-        // Background dispatcher safety net — fires after layout (DispatcherPriority.Background=4
-        // < Render=7, so it is scheduled AFTER all layout/arrange work).
-        // Generation number ensures only the most recent queue call actually applies.
-        int gen = ++_pendingScrollGeneration;
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (gen != _pendingScrollGeneration || !_pendingScrollApply || _scrollViewer == null)
-            {
-                DebugLog("DISPATCH_BG",
-                    $"skip: gen={gen} curGen={_pendingScrollGeneration} " +
-                    $"apply={_pendingScrollApply}");
-                return;
-            }
-            DebugLog("DISPATCH_BG",
-                $"enter: offset=({_scrollViewer.Offset.X:F1},{_scrollViewer.Offset.Y:F1}) " +
-                $"extent=({_scrollViewer.Extent.Width:F1},{_scrollViewer.Extent.Height:F1}) " +
-                $"pendingX={_pendingScrollX:F1}");
-            TryApplyPendingScroll("DISPATCHER_BG");
-        }, DispatcherPriority.Background);
+        // Centre-relative pan: pan_c = panX − viewW/2; content extent (origin = texture
+        // top-left) is [0, bitmap × zoom]. Mirrors ClampWireframePan's mapping.
+        return (
+            PanScrollBar.FromPan(_panX - viewW / 2f, viewW, 0f, _bitmap.Width  * _zoom, PanPadding),
+            PanScrollBar.FromPan(_panY - viewH / 2f, viewH, 0f, _bitmap.Height * _zoom, PanPadding));
     }
 
-    /// <summary>
-    /// Cancels any queued scroll-after-layout and optionally sets new target values.
-    /// Call before any direct offset write (e.g. CenterTexture) to prevent a stale
-    /// pending zoom-scroll from overriding the new value.
-    /// </summary>
-    private void CancelPendingScrollApply(float? x = null, float? y = null)
+    /// <summary>Sets the horizontal pan from a scrollbar value (see <see cref="PanScrollBar"/>)
+    /// and repaints. Clamped defensively to the pan band.</summary>
+    public void SetPanX(float scrollValue)
     {
-        _pendingScrollApply = false;
-        _pendingScrollGeneration++; // invalidate any queued Background dispatcher item
-        if (x.HasValue) { _pendingScrollX = x.Value; _scrollTargetX = x.Value; }
-        if (y.HasValue) { _pendingScrollY = y.Value; _scrollTargetY = y.Value; }
+        _panX = PanScrollBar.PanFromValue(scrollValue) + (float)Bounds.Width / 2f;
+        ClampCamera();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
-    /// <summary>
-    /// Tries to apply the pending scroll offset.  Guards on <c>sv.Extent</c> having
-    /// grown to accommodate <c>_pendingScrollX/Y</c>.  If the extent hasn't been
-    /// updated yet (layout pass still in progress), returns without clearing
-    /// <c>_pendingScrollApply</c> so the <c>LayoutUpdated</c> handler can retry.
-    /// Legitimate over-shot targets (scroll > maxScroll at the current zoom) are
-    /// clamped to the actual maximum rather than deferred.
-    /// </summary>
-    private void TryApplyPendingScroll(string caller)
+    /// <summary>Sets the vertical pan from a scrollbar value (see <see cref="PanScrollBar"/>)
+    /// and repaints. Clamped defensively to the pan band.</summary>
+    public void SetPanY(float scrollValue)
     {
-        if (!_pendingScrollApply || _scrollViewer == null) return;
-
-        // Guard: is the extent large enough to hold the intended offset?
-        // We need Extent.Width >= _pendingScrollX + Viewport.Width.
-        // If it isn't, the layout pass that grows the content hasn't completed yet —
-        // defer rather than let Avalonia clamp the offset to 0 (which would reset
-        // _scrollTargetX to 0 and cause pan-lock).
-        if (_pendingScrollX > 0)
-        {
-            double minExtentW = _pendingScrollX + _scrollViewer.Viewport.Width;
-            if (_scrollViewer.Extent.Width < minExtentW - 1f)
-            {
-                DebugLog("APPLY_SCROLL",
-                    $"[{caller}] NOT READY (X): need extentW≥{minExtentW:F1} " +
-                    $"actual={_scrollViewer.Extent.Width:F1} – deferring");
-                return;
-            }
-        }
-        if (_pendingScrollY > 0)
-        {
-            double minExtentH = _pendingScrollY + _scrollViewer.Viewport.Height;
-            if (_scrollViewer.Extent.Height < minExtentH - 1f)
-            {
-                DebugLog("APPLY_SCROLL",
-                    $"[{caller}] NOT READY (Y): need extentH≥{minExtentH:F1} " +
-                    $"actual={_scrollViewer.Extent.Height:F1} – deferring");
-                return;
-            }
-        }
-
-        // Clamp to actual max scroll (handles legitimate over-shot when the zoom
-        // pivot is near the far edge of the image).
-        float maxScrollX = (float)Math.Max(0, _scrollViewer.Extent.Width  - _scrollViewer.Viewport.Width);
-        float maxScrollY = (float)Math.Max(0, _scrollViewer.Extent.Height - _scrollViewer.Viewport.Height);
-        float applyX = Math.Min(_pendingScrollX, maxScrollX);
-        float applyY = Math.Min(_pendingScrollY, maxScrollY);
-
-        _pendingScrollApply = false;
-        // Pre-synchronise _scrollTargetX/Y to the value we are about to apply so that
-        // any ScrollChanged(OffsetDelta) that fires synchronously from within the Offset
-        // assignment below does NOT overwrite them with a stale/clamped value.
-        _scrollTargetX = applyX;
-        _scrollTargetY = applyY;
-        _scrollViewer.Offset = new Vector(applyX, applyY);
-
-        float actualX = (float)_scrollViewer.Offset.X;
-        float actualY = (float)_scrollViewer.Offset.Y;
-        DebugLog("APPLY_SCROLL",
-            $"[{caller}] applied=({applyX:F1},{applyY:F1}) actual=({actualX:F1},{actualY:F1}) " +
-            $"extent=({_scrollViewer.Extent.Width:F1},{_scrollViewer.Extent.Height:F1})");
-
-        // Safety net: if the offset was still clamped despite the extent guard (e.g.
-        // Avalonia deferred the Extent update until after the ScrollChanged event),
-        // re-queue so LayoutUpdated retries with the fully-committed extent.
-        if (Math.Abs(actualX - applyX) > 2f || Math.Abs(actualY - applyY) > 2f)
-        {
-            DebugLog("APPLY_SCROLL",
-                $"[{caller}] CLAMPED despite guard – re-queuing. actualX={actualX:F1} expected={applyX:F1}");
-            _pendingScrollApply = true;
-            _scrollTargetX = _pendingScrollX;
-            _scrollTargetY = _pendingScrollY;
-            // Re-queue a fresh Background dispatcher safety net for the retry.
-            int gen = ++_pendingScrollGeneration;
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (gen != _pendingScrollGeneration || !_pendingScrollApply || _scrollViewer == null) return;
-                DebugLog("DISPATCH_BG",
-                    $"RETRY enter: offset=({_scrollViewer.Offset.X:F1},{_scrollViewer.Offset.Y:F1}) " +
-                    $"extent=({_scrollViewer.Extent.Width:F1},{_scrollViewer.Extent.Height:F1}) " +
-                    $"pendingX={_pendingScrollX:F1}");
-                TryApplyPendingScroll("DISPATCHER_BG_RETRY");
-            }, DispatcherPriority.Background);
-        }
-    }
-
-    /// <summary>
-    /// Returns the effective padding (pixels) to add on each side of the image in the X
-    /// direction.  Always at least <see cref="PanPadding"/>; grows dynamically for images
-    /// smaller than the viewport so that the content is always wider than the viewport
-    /// by at least <see cref="ExtraScrollable"/> pixels — keeping the scrollbar active.
-    /// </summary>
-    private float EffectivePaddingX()
-    {
-        if (_scrollViewer == null || _bitmap == null) return PanPadding;
-        float halfFree = ((float)_scrollViewer.Viewport.Width - _bitmap.Width * _zoom) / 2f;
-        return Math.Max(PanPadding, halfFree + ExtraScrollable);
-    }
-
-    /// <summary>
-    /// Returns the effective padding (pixels) to add on each side of the image in the Y
-    /// direction.  See <see cref="EffectivePaddingX"/> for the rationale.
-    /// </summary>
-    private float EffectivePaddingY()
-    {
-        if (_scrollViewer == null || _bitmap == null) return PanPadding;
-        float halfFree = ((float)_scrollViewer.Viewport.Height - _bitmap.Height * _zoom) / 2f;
-        return Math.Max(PanPadding, halfFree + ExtraScrollable);
-    }
-
-    /// <summary>Returns true when the ScrollViewer is attached and has a valid viewport,
-    /// so the control is in scroll mode.  Scroll mode is always active when a ScrollViewer
-    /// is present — padding is added at every zoom level so the scrollbars are always
-    /// usable (the user can always pan to see the entity-origin crosshair).</summary>
-    private bool OverflowX()
-    {
-        if (_scrollViewer == null || _bitmap == null) return false;
-        return _scrollViewer.Viewport.Width > 1;
-    }
-
-    /// <summary>Returns true when the ScrollViewer is attached and has a valid viewport.
-    /// See <see cref="OverflowX"/>.</summary>
-    private bool OverflowY()
-    {
-        if (_scrollViewer == null || _bitmap == null) return false;
-        return _scrollViewer.Viewport.Height > 1;
-    }
-
-    /// <summary>Returns true when the control is hosted in a ScrollViewer with a valid
-    /// viewport — the image is always in scroll-pan mode when a ScrollViewer is present.</summary>
-    private bool UseScrollPan() => OverflowX() || OverflowY();
-
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        if (_bitmap == null)
-            return new Size(0, 0);
-
-        double imageW = _bitmap.Width  * _zoom;
-        double imageH = _bitmap.Height * _zoom;
-
-        // When hosted in a ScrollViewer, always add effective padding on every side so
-        // the user can pan beyond the image boundary at any zoom level.  The padding
-        // grows dynamically for small images to ensure the content is always wider than
-        // the viewport, keeping the scrollbar buttons active.
-        if (_scrollViewer != null && _scrollViewer.Viewport.Width > 1)
-        {
-            float epX = EffectivePaddingX();
-            float epY = EffectivePaddingY();
-            var size = new Size(imageW + 2 * epX, imageH + 2 * epY);
-
-            // If a scroll-after-layout is pending, do nothing here — the scroll will be
-            // applied from the ScrollChanged handler when ExtentDelta != 0 fires, at which
-            // point sv.Extent already reflects the new size and the offset won't be clamped.
-            if (_pendingScrollApply)
-            {
-                DebugLog("MEASURE_PENDING",
-                    $"pendingX={_pendingScrollX:F1} " +
-                    $"content=({imageW:F0},{imageH:F0}) viewport=({_scrollViewer.Viewport.Width:F1},{_scrollViewer.Viewport.Height:F1}) " +
-                    $"epX={epX:F1} epY={epY:F1} — waiting for ScrollChanged(ExtentDelta)");
-            }
-
-            return size;
-        }
-
-        double contentW = double.IsFinite(availableSize.Width)
-            ? Math.Max(availableSize.Width,  imageW)
-            : imageW;
-        double contentH = double.IsFinite(availableSize.Height)
-            ? Math.Max(availableSize.Height, imageH)
-            : imageH;
-
-        return new Size(contentW, contentH);
+        _panY = PanScrollBar.PanFromValue(scrollValue) + (float)Bounds.Height / 2f;
+        ClampCamera();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -844,7 +597,7 @@ public class WireframeControl : Control
 
         // Save camera for the texture we're leaving
         if (_loadedTexturePath != null)
-            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom, _scrollTargetX, _scrollTargetY);
+            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
 
         _loadedTexturePath = norm;
         _image?.Dispose();
@@ -866,24 +619,12 @@ public class WireframeControl : Control
 
             if (_cameraByTexture.TryGetValue(norm!, out var cam))
             {
-                _zoom = cam.z;
-                if (_scrollViewer != null)
-                {
-                    // In scroll-pan mode panX/Y must always equal EffectivePaddingX/Y.
-                    // CenterTexture() sets panX = epX and queues a centred scroll; we then
-                    // override that pending scroll with the saved target if one exists.
-                    CenterTexture();
-                    if (cam.sx != 0f || cam.sy != 0f)
-                    {
-                        CancelPendingScrollApply(x: cam.sx, y: cam.sy);
-                        QueueScrollAfterLayout(cam.sx, cam.sy);
-                    }
-                }
-                else
-                {
-                    (_panX, _panY) = (cam.px, cam.py);
-                    InvalidateMeasure();
-                }
+                // Restore the full camera and re-clamp against the current viewport (window may
+                // have been resized since this texture was last shown).
+                (_panX, _panY, _zoom) = (cam.px, cam.py, cam.z);
+                ClampCamera();
+                RaiseViewChanged();
+                InvalidateVisual();
             }
             else
             {
@@ -923,23 +664,12 @@ public class WireframeControl : Control
         LoadTexture(new FilePath(path).StandardizedCaseSensitive);
     }
 
-    /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit).</summary>
+    /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit). Zooms toward the
+    /// centre of the viewport.</summary>
     public void SetZoomPercent(int percent)
     {
         float newZoom = Math.Clamp(percent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-        float cx, cy;
-        if (_scrollViewer != null && _scrollViewer.Viewport.Width > 1)
-        {
-            // Zoom toward the center of the visible viewport
-            cx = _scrollTargetX + (float)(_scrollViewer.Viewport.Width  / 2);
-            cy = _scrollTargetY + (float)(_scrollViewer.Viewport.Height / 2);
-        }
-        else
-        {
-            cx = (float)Bounds.Width  / 2;
-            cy = (float)Bounds.Height / 2;
-        }
-        ZoomToward(cx, cy, newZoom / _zoom);
+        ZoomToward((float)Bounds.Width / 2f, (float)Bounds.Height / 2f, newZoom / _zoom);
     }
 
     /// <summary>Toggle the grid overlay and update the grid cell size.</summary>
@@ -951,23 +681,24 @@ public class WireframeControl : Control
     }
 
     /// <summary>
-    /// Directly sets the camera state (pan and zoom) without centering logic.
-    /// Useful for tests that need a predictable, axis-aligned view.
+    /// Directly sets the camera state (pan and zoom), then clamps it to the valid pan band.
+    /// Useful for tests and for restoring a persisted camera (companion .aeproperties file).
     /// </summary>
     public void SetCamera(float panX, float panY, float zoom)
     {
         _panX = panX;
         _panY = panY;
-        _zoom = zoom;
+        _zoom = Math.Clamp(zoom, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
+        ClampCamera();
         InvalidateVisual();
+        RaiseViewChanged();
     }
 
     /// <summary>Current grid show/size state. For tests.</summary>
     public (bool ShowGrid, int GridSize) GridState => (_showGrid, _gridSize);
 
-    /// <summary>Raw camera state (panX, panY, zoom). For tests.
-    /// In scroll mode panX/panY equal PanPadding (> 0); the visible region
-    /// is determined by the ScrollViewer offset.</summary>
+    /// <summary>Camera state (panX, panY, zoom). panX/panY are the screen position of texture
+    /// pixel (0,0): screenX = panX + textureX × zoom.</summary>
     public (float PanX, float PanY, float Zoom) CameraState => (_panX, _panY, _zoom);
 
     /// <summary>
@@ -1172,48 +903,7 @@ public class WireframeControl : Control
     public void SimulatePanMove(float vpX, float vpY)
     {
         if (!_isPanning || _bitmap is null) return;
-        if (UseScrollPan())
-        {
-            bool ovX = OverflowX();
-            bool ovY = OverflowY();
-            float dX = vpX - (float)_panAnchor.X;
-            float dY = vpY - (float)_panAnchor.Y;
-
-            float newScrollX = _scrollTargetX;
-            float newScrollY = _scrollTargetY;
-
-            if (ovX)
-            {
-                newScrollX = (float)Math.Max(0, _scrollAnchorX - dX);
-                _scrollTargetX = newScrollX;
-            }
-            else
-            {
-                _panX = _panAnchorX + dX;
-                newScrollX = 0f;
-            }
-
-            if (ovY)
-            {
-                newScrollY = (float)Math.Max(0, _scrollAnchorY - dY);
-                _scrollTargetY = newScrollY;
-            }
-            else
-            {
-                _panY = _panAnchorY + dY;
-                newScrollY = 0f;
-            }
-
-            _scrollViewer!.Offset = new Vector(newScrollX, newScrollY);
-        }
-        else
-        {
-            (_panX, _panY) = CanvasTransform.Pan(
-                _panAnchorX, _panAnchorY,
-                (float)_panAnchor.X, (float)_panAnchor.Y,
-                vpX, vpY);
-            InvalidateVisual();
-        }
+        UpdatePan(vpX, vpY);
     }
 
     /// <summary>Test-only: ends the pan gesture started by <see cref="SimulatePanStart"/>.</summary>
@@ -1221,44 +911,23 @@ public class WireframeControl : Control
 
     /// <summary>
     /// Test-only: simulates a single mouse-wheel zoom event toward the given
-    /// <b>viewport-space</b> point.  Mirrors <see cref="OnPointerWheelChanged"/>
-    /// exactly: converts the viewport-space pivot to content-space by adding
-    /// <c>_scrollTargetX/Y</c>, then calls <see cref="ZoomToward"/>.
-    /// <para><paramref name="factor"/> is the zoom scale factor (e.g. 1.25 to
-    /// zoom in by one wheel notch, 1/1.25 to zoom out).  This overload always
-    /// applies the raw factor regardless of <see cref="WheelZoomPresets"/> — use
-    /// it in tests that need deterministic pivot-point math.</para>
+    /// <b>viewport-space</b> point. Mirrors <see cref="OnPointerWheelChanged"/>.
+    /// <para><paramref name="factor"/> is the zoom scale factor (e.g. 1.25 to zoom in by one
+    /// wheel notch, 1/1.25 to zoom out). This overload always applies the raw factor regardless
+    /// of <see cref="WheelZoomPresets"/> — use it in tests that need deterministic pivot math.</para>
     /// </summary>
-    public void SimulateWheelZoom(float vpX, float vpY, float factor)
-    {
-        float scrollOffX = _scrollViewer is not null ? _scrollTargetX : 0f;
-        float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
-        ZoomToward(vpX + scrollOffX, vpY + scrollOffY, factor);
-    }
+    public void SimulateWheelZoom(float vpX, float vpY, float factor) => ZoomToward(vpX, vpY, factor);
 
     /// <summary>
     /// Test-only: simulates a single mouse-wheel zoom event toward the given
     /// <b>viewport-space</b> point, using preset stepping when <see cref="WheelZoomPresets"/>
-    /// is set.  Mirrors <see cref="OnPointerWheelChanged"/> exactly.
+    /// is set. Mirrors <see cref="OnPointerWheelChanged"/>.
     /// </summary>
-    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn)
-    {
-        float scrollOffX = _scrollViewer is not null ? _scrollTargetX : 0f;
-        float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
-        ZoomToward(vpX + scrollOffX, vpY + scrollOffY, ComputeWheelFactor(zoomIn));
-    }
+    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn) =>
+        ZoomToward(vpX, vpY, ComputeWheelFactor(zoomIn));
 
-    /// <summary>Exposed for tests: the synchronous scroll-target maintained by ZoomToward.</summary>
-    public (float X, float Y) ScrollTarget => (_scrollTargetX, _scrollTargetY);
-
-    /// <summary>Test-only: current free-pan offset (used when overflowX or overflowY is false).</summary>
+    /// <summary>Test-only: current camera pan (screen position of texture pixel (0,0)).</summary>
     public (float X, float Y) PanOffset => (_panX, _panY);
-
-    /// <summary>Test-only: whether a pending post-layout scroll is queued.</summary>
-    public bool PendingScrollApply => _pendingScrollApply;
-
-    /// <summary>Test-only: the pending scroll target values queued by QueueScrollAfterLayout.</summary>
-    public (float X, float Y) PendingScrollTarget => (_pendingScrollX, _pendingScrollY);
 
     // ── Rendering ─────────────────────────────────────────────────────────────
 
@@ -1307,20 +976,15 @@ public class WireframeControl : Control
     }
 
     /// <summary>
-    /// Scrolls the wireframe panel so that <paramref name="frame"/>'s region is
-    /// centred in the viewport.  The current zoom level is preserved.
-    /// <para>
-    /// Does nothing when no bitmap is loaded or no ScrollViewer is attached.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// Zooms to fit the frame's bounding box at 85 % of the viewport (same fraction
-    /// as <see cref="CanvasTransform.CenterFit"/> uses for the whole bitmap), then
-    /// scrolls so the frame centre lands at the viewport centre.
+    /// Zooms to fit <paramref name="frame"/>'s bounding box at 85 % of the viewport (same
+    /// fraction as <see cref="CanvasTransform.CenterFit"/> uses for the whole bitmap), then
+    /// pans so the frame centre lands at the viewport centre. Clamped to the valid pan band, so
+    /// a frame near the texture edge lands as close to centre as the dead-space allows.
+    /// Does nothing when no bitmap is loaded.
     /// </summary>
     public void CenterOnFrame(AnimationFrameSave frame)
     {
-        if (_bitmap is null || _scrollViewer is null) return;
+        if (_bitmap is null) return;
 
         float bmpW = _bitmap.Width;
         float bmpH = _bitmap.Height;
@@ -1335,29 +999,22 @@ public class WireframeControl : Control
         float texCX  = (pixL + pixR) / 2f;
         float texCY  = (pixT + pixB) / 2f;
 
-        float vpW = (float)_scrollViewer.Viewport.Width;
-        float vpH = (float)_scrollViewer.Viewport.Height;
+        float vpW = (float)Bounds.Width;
+        float vpH = (float)Bounds.Height;
 
         // Zoom so the frame fills 85 % of the viewport.
         _zoom = Math.Clamp(
             Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
             CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
 
-        // In scroll mode panX/Y must always equal EffectivePaddingX/Y.
-        // Update them now — EffectivePaddingX/Y read _zoom which we just set.
-        _panX = EffectivePaddingX();
-        _panY = EffectivePaddingY();
+        // Pan so the frame centre maps to the viewport centre (screenX = panX + texX*zoom).
+        _panX = vpW / 2f - texCX * _zoom;
+        _panY = vpH / 2f - texCY * _zoom;
+        ClampCamera();
 
-        float maxScrollX = Math.Max(0f, bmpW * _zoom + 2f * _panX - vpW);
-        float maxScrollY = Math.Max(0f, bmpH * _zoom + 2f * _panY - vpH);
-        float scrollX    = Math.Min(Math.Max(0f, _panX + texCX * _zoom - vpW / 2f), maxScrollX);
-        float scrollY    = Math.Min(Math.Max(0f, _panY + texCY * _zoom - vpH / 2f), maxScrollY);
-
-        CancelPendingScrollApply(x: scrollX, y: scrollY);
-        QueueScrollAfterLayout(scrollX, scrollY);
-        InvalidateMeasure();
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseViewChanged();
     }
 
     /// <summary>
@@ -1415,14 +1072,10 @@ public class WireframeControl : Control
     {
         base.OnPointerWheelChanged(e);
         float factor = ComputeWheelFactor(e.Delta.Y > 0);
-        // e.GetPosition(this) returns content-space coords inside a ScrollViewer
-        // (viewport position + scroll offset).  Using the ScrollViewer as the reference
-        // gives stable viewport-space coords that are independent of the current offset.
-        // Add the scroll offset to convert viewport-space → content-space for ZoomToward.
-        var pivotVp = _scrollViewer != null ? e.GetPosition(_scrollViewer) : e.GetPosition(this);
-        float scrollOffX = _scrollViewer is not null ? _scrollTargetX : 0f;
-        float scrollOffY = _scrollViewer is not null ? _scrollTargetY : 0f;
-        ZoomToward((float)pivotVp.X + scrollOffX, (float)pivotVp.Y + scrollOffY, factor);
+        // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
+        // viewport-space pivot ZoomToward expects.
+        var pivot = e.GetPosition(this);
+        ZoomToward((float)pivot.X, (float)pivot.Y, factor);
         e.Handled = true;
     }
 
@@ -1450,12 +1103,7 @@ public class WireframeControl : Control
         // Middle-mouse or Alt+left → pan
         if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && isAlt))
         {
-            // In scroll-pan mode use the ScrollViewer as the GetPosition reference so
-            // that the anchor is in viewport-space (no scroll offset baked in).
-            // Using GetPosition(this) in scroll mode would give content-space coords
-            // and create a feedback loop that makes the scroll oscillate.
-            var panAnchor = _scrollViewer != null ? e.GetPosition(_scrollViewer) : pos;
-            StartPan(panAnchor);
+            StartPan(pos);
             e.Pointer.Capture(this);
             return;
         }
@@ -1581,76 +1229,7 @@ public class WireframeControl : Control
 
         if (_isPanning)
         {
-            if (UseScrollPan())
-            {
-                bool ovX = OverflowX();
-                bool ovY = OverflowY();
-                // Use the ScrollViewer as the position reference (viewport-space) so the
-                // pan delta is a pure physical displacement independent of scroll offset.
-                // GetPosition(this) is content-space (viewport + scroll), which creates a
-                // feedback loop: changing the offset shifts content-space pos even when the
-                // mouse hasn't moved, causing scroll to oscillate every frame.
-                var vpPos = e.GetPosition(_scrollViewer!);
-                float dX = (float)(vpPos.X - _panAnchor.X);
-                float dY = (float)(vpPos.Y - _panAnchor.Y);
-
-                float newScrollX = _scrollTargetX;
-                float newScrollY = _scrollTargetY;
-                bool needsRedraw = false;
-
-                // Per-axis: overflowing axes use scroll offset; non-overflowing use free-pan (_panX/Y).
-                if (ovX)
-                {
-                    newScrollX = (float)Math.Max(0, _scrollAnchorX - dX);
-                    _scrollTargetX = newScrollX;
-                }
-                else
-                {
-                    _panX = _panAnchorX + dX;
-                    newScrollX = 0f;
-                    needsRedraw = true;
-                }
-
-                if (ovY)
-                {
-                    newScrollY = (float)Math.Max(0, _scrollAnchorY - dY);
-                    _scrollTargetY = newScrollY;
-                }
-                else
-                {
-                    _panY = _panAnchorY + dY;
-                    newScrollY = 0f;
-                    needsRedraw = true;
-                }
-
-                // Keep _scrollTargetX/Y in sync so subsequent ZoomToward or StartPan
-                // calls use the correct offset even before the compositor renders.
-                _scrollViewer!.Offset = new Vector(newScrollX, newScrollY);
-                if (needsRedraw) InvalidateVisual();
-                if (_dbgPanMoveCount++ < 20)
-                    DebugLog("PAN_MOVE",
-                        $"#{_dbgPanMoveCount} ovX={ovX} ovY={ovY} " +
-                        $"anchor=({_scrollAnchorX:F1},{_scrollAnchorY:F1}) " +
-                        $"vpPosX={vpPos.X:F1} dX={dX:F1} → scrollX={newScrollX:F1} panX={_panX:F1} " +
-                        $"actual={_scrollViewer.Offset.X:F1}");
-                // Do NOT call InvalidateVisual() unconditionally here: when both axes are in
-                // scroll mode, the image is at a fixed content position (PanPadding, PanPadding);
-                // the ScrollViewer's compositor update handles the visual shift without a fresh render.
-            }
-            else
-            {
-                // Use viewport-space coordinates (same reference as _panAnchor, which
-                // was captured from e.GetPosition(_scrollViewer) in OnPointerPressed).
-                // e.GetPosition(this) is content-space; when a deferred scroll reset
-                // hasn't fired yet the two spaces differ by the stale scroll offset,
-                // causing an immediate pan jump on the first move event.
-                var freePanPos = _scrollViewer != null ? e.GetPosition(_scrollViewer) : pos;
-                (_panX, _panY) = CanvasTransform.Pan(
-                    _panAnchorX, _panAnchorY,
-                    (float)_panAnchor.X, (float)_panAnchor.Y,
-                    (float)freePanPos.X, (float)freePanPos.Y);
-                InvalidateVisual();
-            }
+            UpdatePan((float)pos.X, (float)pos.Y);
             return;
         }
 
@@ -1785,174 +1364,50 @@ public class WireframeControl : Control
     {
         _isPanning = true;
         _panAnchor = pos;
-        _dbgPanMoveCount = 0;
-        bool ovX = OverflowX();
-        bool ovY = OverflowY();
-        if (ovX || ovY) // UseScrollPan()
-        {
-            // For overflowing axes: anchor the scroll offset so UpdatePan can compute deltas.
-            // For non-overflowing axes: anchor the free-pan position so UpdatePan adjusts _panX/Y directly.
-            // If a post-layout scroll is pending, use the pending (intended) values for scroll axes
-            // and cancel the pending apply so the deferred Post won't override the user's pan.
-            if (_pendingScrollApply)
-            {
-                _scrollAnchorX = ovX ? _pendingScrollX : 0f;
-                _scrollAnchorY = ovY ? _pendingScrollY : 0f;
-                _pendingScrollApply = false;
-                _pendingScrollGeneration++;
-                DebugLog("START_PAN",
-                    $"[PENDING] ovX={ovX} ovY={ovY} anchorX={_scrollAnchorX:F1} anchorY={_scrollAnchorY:F1} " +
-                    $"pos=({pos.X:F1},{pos.Y:F1}) cleared pendingApply");
-            }
-            else
-            {
-                _scrollAnchorX = ovX ? _scrollTargetX : 0f;
-                _scrollAnchorY = ovY ? _scrollTargetY : 0f;
-                DebugLog("START_PAN",
-                    $"ovX={ovX} ovY={ovY} anchorX={_scrollAnchorX:F1} anchorY={_scrollAnchorY:F1} " +
-                    $"sv.Offset.X={_scrollViewer?.Offset.X:F1} pos=({pos.X:F1},{pos.Y:F1})");
-            }
-            if (!ovX) _panAnchorX = _panX;
-            if (!ovY) _panAnchorY = _panY;
-        }
-        else
-        {
-            _panAnchorX = _panX;
-            _panAnchorY = _panY;
-            DebugLog("START_PAN",
-                $"[FREE-PAN] anchorXY=({_panAnchorX:F1},{_panAnchorY:F1}) pos=({pos.X:F1},{pos.Y:F1})");
-        }
+        _panAnchorX = _panX;   // camera pan at drag start
+        _panAnchorY = _panY;
     }
 
     /// <summary>
-    /// Adjusts <c>_panX</c>, <c>_panY</c>, and the pending scroll target so that the
-    /// content-space point beneath viewport position (<paramref name="sx"/>, <paramref name="sy"/>)
-    /// stays fixed after a zoom by <paramref name="factor"/>.
+    /// Free-pan: shifts the camera by the pointer displacement since the drag started, then
+    /// clamps to the valid pan band. <paramref name="vpX"/>/<paramref name="vpY"/> are
+    /// viewport-space (the control IS the viewport — no ScrollViewer offset to compensate).
     /// </summary>
-    /// <remarks>
-    /// Post-conditions when a ScrollViewer is attached:
-    /// <list type="bullet">
-    ///   <item><c>_panX ≥ 0</c> — sprite never pushed off the left edge (#319).</item>
-    ///   <item><c>_panX + bitmap.Width × _zoom / 2 ≥ viewport.Width / 2</c> — sprite always
-    ///         pannable to the viewport centre (#341).</item>
-    /// </list>
-    /// The invariant floor is <c>epX = EffectivePaddingX()</c>, which is defined so that
-    /// <c>centreScroll = epX + imgW × zoom / 2 − vpW / 2 ≥ ExtraScrollable &gt; 0</c>.
-    /// Never substitute <c>0</c> as the clamp target — doing so erases the left-side
-    /// padding buffer and makes the sprite centre map to a negative (unreachable) scroll
-    /// offset (see #319 for the off-screen variant and #341 for the locked-centering variant).
-    /// </remarks>
+    private void UpdatePan(float vpX, float vpY)
+    {
+        _panX = _panAnchorX + (vpX - (float)_panAnchor.X);
+        _panY = _panAnchorY + (vpY - (float)_panAnchor.Y);
+        ClampCamera();
+        InvalidateVisual();
+        RaiseViewChanged();
+    }
+
+    /// <summary>
+    /// Zooms toward the viewport-space pivot (<paramref name="sx"/>, <paramref name="sy"/>) by
+    /// <paramref name="factor"/>, preserving the texture coordinate under the pivot, then clamps
+    /// the camera to the valid pan band. The clamp is the pure analytic
+    /// <see cref="CanvasTransform.ZoomWireframe"/> — no dependency on a layout-resolved extent,
+    /// so a symmetric zoom in/out round-trips and the reachable bounds at a given zoom are
+    /// identical regardless of zoom direction (#422). Subsumes the old #138/#319/#341 point
+    /// fixes: the texture is never pushed off-edge and is always pannable to the viewport centre.
+    /// </summary>
     private void ZoomToward(float sx, float sy, float factor)
     {
-        float oldZoom = _zoom;
-        var (newPanX, newPanY, newZoom) = CanvasTransform.ZoomToward(sx, sy, factor, _panX, _panY, _zoom);
-        _zoom = newZoom;
-
-        if (_scrollViewer != null)
+        if (_bitmap == null || Bounds.Width <= 1)
         {
-            // Read from _scrollTargetX/Y (synchronously maintained) rather than
-            // _scrollViewer.Offset (deferred via Dispatcher.Post).  This ensures
-            // rapid wheel events each chain off the correct accumulated target
-            // instead of repeatedly reading the still-zero visual offset.
-            float scrollX = _scrollTargetX;
-            float scrollY = _scrollTargetY;
-            var vp = _scrollViewer.Viewport;
-
-            // Per-axis mode: in scroll mode (ScrollViewer attached with valid viewport) both axes
-            // always use scroll — padding is always applied so the scrollbars stay active.
-            // Guard vp.Width/Height > 1 to avoid premature scroll mode on uninitialized viewports.
-            bool overflowX = vp.Width  > 1 && _bitmap != null;
-            bool overflowY = vp.Height > 1 && _bitmap != null;
-
-            // Compute effective padding for the new zoom level (already stored in _zoom).
-            float epX = EffectivePaddingX();
-            float epY = EffectivePaddingY();
-
-            // Scroll axes: derive the required scroll offset so the zoom pivot stays fixed.
-            // The image is at content position (epX, epY); pivot preservation gives:
-            //   rawScrollX = scrollX - newPanX + epX
-            // Pre-clamp to maxScrollX so that _panX can absorb any overshoot.  Without
-            // this, TryApplyPendingScroll silently clamps sv.Offset.X while _panX stays
-            // at epX, causing the cursor's content-space coordinate to drift on each
-            // zoom step when the pivot is near the scroll boundary (#138).
-            float rawScrollX = overflowX ? Math.Max(0f, scrollX - newPanX + epX) : 0f;
-            float rawScrollY = overflowY ? Math.Max(0f, scrollY - newPanY + epY) : 0f;
-            float maxScrollX = overflowX
-                ? Math.Max(0f, _bitmap!.Width  * _zoom + 2 * epX - (float)vp.Width)
-                : 0f;
-            float maxScrollY = overflowY
-                ? Math.Max(0f, _bitmap!.Height * _zoom + 2 * epY - (float)vp.Height)
-                : 0f;
-            float newScrollX = Math.Min(rawScrollX, maxScrollX);
-            float newScrollY = Math.Min(rawScrollY, maxScrollY);
-
-            // _panX absorbs the clamped overflow so the cursor pivot is preserved.
-            // When zooming toward blank space far from the image, the overflow
-            // (rawScrollX − maxScrollX) can reduce rawPanX below the threshold needed
-            // to pan/centre the sprite.
-            //
-            // The minimum panX that still allows centering is:
-            //   minPanX = max(0, vpW/2 − imgW*zoom/2)
-            // (centreScroll = panX + imgW*zoom/2 − vpW/2 ≥ 0 requires panX ≥ minPanX)
-            //
-            // When rawPanX falls below this threshold (including going negative as in #319),
-            // clamp to epX instead of 0.  Using 0 (#319 original fix) erased the
-            // effective-padding buffer, making the sprite's centre map to a negative scroll
-            // offset that is unreachable, so the user could no longer pan to centre (#341).
-            // Using epX restores the padding and ensures centreScroll > 0.
-            float rawPanX = overflowX ? epX - (rawScrollX - newScrollX) : newPanX - scrollX;
-            float rawPanY = overflowY ? epY - (rawScrollY - newScrollY) : newPanY - scrollY;
-
-            float minPanX = overflowX && _bitmap != null
-                ? Math.Max(0f, (float)vp.Width  / 2f - _bitmap.Width  * _zoom / 2f)
-                : 0f;
-            float minPanY = overflowY && _bitmap != null
-                ? Math.Max(0f, (float)vp.Height / 2f - _bitmap.Height * _zoom / 2f)
-                : 0f;
-
-            _panX = rawPanX < minPanX ? epX : rawPanX;
-            _panY = rawPanY < minPanY ? epY : rawPanY;
-
-#if DEBUG
-            if (_bitmap != null)
-            {
-                float dbgCentreX = _panX + _bitmap.Width  * _zoom / 2f - (float)vp.Width  / 2f;
-                float dbgCentreY = _panY + _bitmap.Height * _zoom / 2f - (float)vp.Height / 2f;
-                Debug.Assert(dbgCentreX >= 0f,
-                    $"ZoomToward post-cond: centreScrollX={dbgCentreX:F2} < 0 " +
-                    $"(panX={_panX:F1}, imgW={_bitmap.Width}, zoom={_zoom:F3}, vpW={vp.Width:F1})");
-                Debug.Assert(dbgCentreY >= 0f,
-                    $"ZoomToward post-cond: centreScrollY={dbgCentreY:F2} < 0 " +
-                    $"(panY={_panY:F1}, imgH={_bitmap.Height}, zoom={_zoom:F3}, vpH={vp.Height:F1})");
-            }
-#endif
-
-            DebugLog("ZOOM_TOWARD",
-                $"factor={factor:F3} pivot=({sx:F1},{sy:F1}) zoom={oldZoom:F3}→{_zoom:F3} " +
-                $"ovX={overflowX} ovY={overflowY} scrollX={scrollX:F1} " +
-                $"rawScrollX={rawScrollX:F1} newScrollX={newScrollX:F1} vpW={vp.Width:F1} " +
-                $"imgW*zoom={(_bitmap?.Width ?? 0) * _zoom:F1}");
-
-            // Queue the scroll to be applied AFTER the layout pass.
-            // Using LayoutUpdated instead of Dispatcher.Post(Render) is critical:
-            // in Avalonia's live render loop Render (priority 7) runs BEFORE Layout
-            // (priority 5), so a Post(Render) would fire before the content has grown
-            // to its new size and would be clamped to 0, resetting _scrollTargetX/Y
-            // to 0 and locking panning.  LayoutUpdated fires synchronously after
-            // ArrangeCore completes, at which point the content extent is correct.
-            // QueueScrollAfterLayout also updates _scrollTargetX/Y for rapid-zoom
-            // chaining so this replaces the explicit assignments.
-            QueueScrollAfterLayout(newScrollX, newScrollY);
-            InvalidateMeasure();
+            (_panX, _panY, _zoom) = CanvasTransform.ZoomToward(sx, sy, factor, _panX, _panY, _zoom);
         }
         else
         {
-            _panX = newPanX;
-            _panY = newPanY;
+            (_panX, _panY, _zoom) = CanvasTransform.ZoomWireframe(
+                sx, sy, factor, _panX, _panY, _zoom,
+                (float)Bounds.Width, (float)Bounds.Height,
+                _bitmap.Width, _bitmap.Height, PanPadding);
         }
 
         InvalidateVisual();
         ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseViewChanged();
     }
 
     private void ApplyHandleDrag(Point pos)
@@ -2258,47 +1713,22 @@ public class WireframeControl : Control
     {
         if (_bitmap is null) return;
 
-        float ctrlW, ctrlH;
-        if (_scrollViewer != null && _scrollViewer.Viewport.Width > 1)
+        // Defer until layout has produced a real viewport; the first SizeChanged re-centers.
+        if (Bounds.Width <= 1)
         {
-            ctrlW = (float)_scrollViewer.Viewport.Width;
-            ctrlH = (float)_scrollViewer.Viewport.Height;
+            _needsInitialCenter = true;
+            return;
         }
-        else
-        {
-            ctrlW = (float)(Bounds.Width  > 0 ? Bounds.Width  : 800);
-            ctrlH = (float)(Bounds.Height > 0 ? Bounds.Height : 600);
-        }
+        _needsInitialCenter = false;
 
-        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(_bitmap.Width, _bitmap.Height, ctrlW, ctrlH);
+        // CenterFit returns the top-left pan that centres the bitmap inside the viewport at
+        // 85 % fit — exactly the wireframe's pan convention, so it can be used directly.
+        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(
+            _bitmap.Width, _bitmap.Height, (float)Bounds.Width, (float)Bounds.Height);
+        ClampCamera();
 
-        // After CenterFit the image is centred inside the viewport.  In scroll mode we
-        // always apply padding so the scrollbars are active — set panX/panY to
-        // EffectivePaddingX/Y() and scroll to the corresponding centred offset so the
-        // image appears centred just as CenterFit computed it.
-        if (_scrollViewer != null)
-        {
-            // _zoom is now set; compute effective padding at this zoom level.
-            float epX = EffectivePaddingX();
-            float epY = EffectivePaddingY();
-
-            // Content-space: image left edge at epX.  Center the image in the viewport:
-            //   centreScrollX = epX + (bitmapW * zoom) / 2 - ctrlW / 2
-            // When image < viewport: epX ≈ (ctrlW - imgW*zoom)/2 + ExtraScrollable
-            //   → centreScrollX ≈ ExtraScrollable
-            float centreScrollX = Math.Max(0f, epX + _bitmap.Width  * _zoom / 2f - ctrlW / 2f);
-            float centreScrollY = Math.Max(0f, epY + _bitmap.Height * _zoom / 2f - ctrlH / 2f);
-
-            _panX = epX;
-            _panY = epY;
-
-            // Cancel any pending zoom-scroll (would override centering) and queue
-            // the centred offset to be applied after the layout pass.
-            CancelPendingScrollApply(x: centreScrollX, y: centreScrollY);
-            QueueScrollAfterLayout(centreScrollX, centreScrollY);
-        }
-
-        InvalidateMeasure();
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     private string? DetermineTexturePath()

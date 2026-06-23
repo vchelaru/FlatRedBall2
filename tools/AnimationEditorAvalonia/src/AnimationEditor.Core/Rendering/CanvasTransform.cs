@@ -140,4 +140,52 @@ public static class CanvasTransform
         float viewExtent, float contentMin, float contentMax, float padding = 0f)
         => (-viewExtent / 2f - padding - contentMax,
              viewExtent / 2f + padding - contentMin);
+
+    // ── Wireframe camera (top-left pan convention) ─────────────────────────────
+
+    /// <summary>
+    /// Clamps a wireframe pan so the texture stays reachable, with <paramref name="padding"/>
+    /// pixels of dead-space beyond every edge, at any zoom. The wireframe's pan is the screen
+    /// position of texture pixel (0,0): <c>screenX = panX + textureX × zoom</c>.
+    /// <para>
+    /// The clamp is a pure function of <c>(pan, zoom, viewport, bitmap)</c> — it never depends
+    /// on a layout-resolved <c>ScrollViewer.Extent</c>. That is what makes a symmetric zoom
+    /// in/out sequence an exact round-trip and the reachable bounds at a given zoom identical
+    /// regardless of zoom direction (#422). Internally this maps the top-left pan to the
+    /// centre-relative convention <see cref="ClampPan"/> uses (origin = texture top-left,
+    /// on-screen extent <c>[0, bitmap × zoom]</c>) and back.
+    /// </para>
+    /// </summary>
+    public static (float PanX, float PanY) ClampWireframePan(
+        float panX, float panY,
+        float viewW, float viewH,
+        float bitmapW, float bitmapH, float zoom,
+        float padding)
+    {
+        var (cx, cy) = ClampPan(
+            panX - viewW / 2f, panY - viewH / 2f,
+            viewW, viewH,
+            0f, bitmapW * zoom,
+            0f, bitmapH * zoom,
+            padding);
+        return (cx + viewW / 2f, cy + viewH / 2f);
+    }
+
+    /// <summary>
+    /// Zooms the wireframe camera toward a viewport-space pivot and clamps the result, as a
+    /// single pure step shared by the control and its invariant tests. Composes
+    /// <see cref="ZoomToward"/> (pivot preserved) with <see cref="ClampWireframePan"/>. See
+    /// <see cref="ClampWireframePan"/> for the round-trip / direction-independence guarantee.
+    /// </summary>
+    public static (float PanX, float PanY, float Zoom) ZoomWireframe(
+        float pivotX, float pivotY, float factor,
+        float panX, float panY, float zoom,
+        float viewW, float viewH,
+        float bitmapW, float bitmapH,
+        float padding)
+    {
+        var (npx, npy, nz) = ZoomToward(pivotX, pivotY, factor, panX, panY, zoom);
+        var (cpx, cpy) = ClampWireframePan(npx, npy, viewW, viewH, bitmapW, bitmapH, nz, padding);
+        return (cpx, cpy, nz);
+    }
 }
