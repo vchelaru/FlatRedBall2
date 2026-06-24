@@ -972,11 +972,10 @@ public class WireframeControl : Control
     }
 
     /// <summary>
-    /// Zooms to fit <paramref name="frame"/>'s bounding box at 85 % of the viewport (same
-    /// fraction as <see cref="CanvasTransform.CenterFit"/> uses for the whole bitmap), then
-    /// pans so the frame centre lands at the viewport centre. Clamped to the valid pan band, so
-    /// a frame near the texture edge lands as close to centre as the dead-space allows.
-    /// Does nothing when no bitmap is loaded.
+    /// Pans so <paramref name="frame"/>'s centre lands at the viewport centre, preserving the
+    /// current zoom level (the zoom is never changed, so <see cref="ZoomChanged"/> does not fire).
+    /// Clamped to the valid pan band, so a frame near the texture edge lands as close to centre as
+    /// the dead-space allows. Does nothing when no bitmap is loaded.
     /// </summary>
     public void CenterOnFrame(AnimationFrameSave frame)
     {
@@ -990,26 +989,19 @@ public class WireframeControl : Control
         float pixR = frame.RightCoordinate * bmpW;
         float pixB = frame.BottomCoordinate * bmpH;
 
-        float frameW = Math.Max(1f, pixR - pixL);
-        float frameH = Math.Max(1f, pixB - pixT);
-        float texCX  = (pixL + pixR) / 2f;
-        float texCY  = (pixT + pixB) / 2f;
+        float texCX = (pixL + pixR) / 2f;
+        float texCY = (pixT + pixB) / 2f;
 
         float vpW = (float)Bounds.Width;
         float vpH = (float)Bounds.Height;
 
-        // Zoom so the frame fills 85 % of the viewport.
-        _zoom = Math.Clamp(
-            Math.Min(vpW / frameW, vpH / frameH) * 0.85f,
-            CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-
-        // Pan so the frame centre maps to the viewport centre (screenX = panX + texX*zoom).
+        // Pan so the frame centre maps to the viewport centre at the current zoom
+        // (screenX = panX + texX*zoom). The zoom is left untouched.
         _panX = vpW / 2f - texCX * _zoom;
         _panY = vpH / 2f - texCY * _zoom;
         ClampCamera();
 
         InvalidateVisual();
-        ZoomChanged?.Invoke(_zoom * 100f);
         RaiseViewChanged();
     }
 

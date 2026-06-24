@@ -75,7 +75,8 @@ public class HeaderTextDoubleTapTests
             wireframe.LoadTexture(WriteSolidPng(dir, "tex.png", 500, 500));
             Dispatcher.UIThread.RunJobs();
 
-            // Frame UV 0.6–0.8 → a 100×100 region; centering zooms to fit it.
+            // Frame UV 0.6–0.8 → a 100×100 region centred at texture pixel (350, 350).
+            const float texCX = 350f, texCY = 350f;
             var frame = new AnimationFrameSave
             {
                 LeftCoordinate  = 0.6f, TopCoordinate    = 0.6f,
@@ -83,15 +84,19 @@ public class HeaderTextDoubleTapTests
             };
             var vm = new TreeNodeVm { Data = frame };
 
-            float? zoomChanged = null;
-            wireframe.ZoomChanged += v => zoomChanged = v;
-
             window.HandleHeaderTextDoubleTap(vm);
             Dispatcher.UIThread.RunJobs();
 
             Assert.False(vm.IsEditing,
                 "Double-tapping a frame's text label must not start an inline rename.");
-            Assert.NotNull(zoomChanged); // wireframe re-zoomed to fit the frame → it centered
+
+            // Centering scrolls the frame centre to the viewport centre at the current zoom
+            // (screenX = panX + texX*zoom) → it centered on the frame.
+            var (panX, panY, zoom) = wireframe.CameraState;
+            float vpW = (float)wireframe.Bounds.Width;
+            float vpH = (float)wireframe.Bounds.Height;
+            Assert.Equal(vpW / 2f, panX + texCX * zoom, 1);
+            Assert.Equal(vpH / 2f, panY + texCY * zoom, 1);
 
             window.Close();
         }
