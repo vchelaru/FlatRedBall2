@@ -13,57 +13,47 @@ Engine.Audio  // AudioManager instance on FlatRedBallService
 
 ## Loading Audio
 
-### Standard path — MGCB content pipeline (preferred)
+Two paths. In the Common/Desktop template layout, prefer the **direct path** — it matches how every other raw asset (png, tmx, achx) is handled, with audio files living alongside them in `Common/Content/`. Reach for MGCB only when a format limit forces it (MP3).
 
-Add audio files to `Content/Content.mgcb`, then load via `Engine.Content.Load<>`. MGCB handles copying processed output; no raw `<Content>` items needed in the `.csproj`.
+### Direct path — load the raw file (default for OGG/WAV)
 
-**Content.mgcb entries:**
+Drop the file in `Common/Content/` (e.g. `Common/Content/Audio/song.ogg`); it is linked into the Desktop output's `Content/` automatically, no `.mgcb` entry needed. Load by full path with extension.
+
+**Song (music) — OGG only.** `Song.FromUri` accepts only OGG Vorbis on DesktopGL; MP3 fails at runtime (NVorbis backend).
+
+```csharp
+var song = Song.FromUri("song", new Uri(Path.GetFullPath("Content/Audio/song.ogg")));
+```
+
+**SoundEffect — WAV only.** `SoundEffect.FromStream` accepts only PCM WAV. OGG/MP3 effects need the MGCB path below.
+
+```csharp
+using var stream = File.OpenRead("Content/Audio/hit.wav");
+var sfx = SoundEffect.FromStream(stream);
+Engine.Content.Track(sfx);  // disposes on screen transition
+```
+
+Usings: `System.IO`, `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
+
+### MGCB pipeline — for MP3 or compressed formats
+
+Needed only when the direct path's format limits bite. The `.mgcb` lives in the **`.Desktop` head**, not `Common`: `MonoGame.Content.Builder.Task` runs only on the head, so a mgcb added to `Common` is silently never built. Put the `#begin` entry *and* the source file under `Desktop/Content/`. See `multiplatform-conversion` for the content-split rationale.
 
 ```
-#begin MySong.mp3
+#begin Audio/song.mp3
 /importer:Mp3Importer
 /processor:SongProcessor
-/build:MySong.mp3
-
-#begin Hit.wav
-/importer:WavImporter
-/processor:SoundEffectProcessor
-/build:Hit.wav
+/build:Audio/song.mp3
 ```
 
-**Code:**
+Load with the asset name **minus the source extension** — `/build:Audio/song.mp3` builds to `Audio/song.xnb`:
 
 ```csharp
-var song = Engine.Content.Load<Song>("MySong");
-var sfx  = Engine.Content.Load<SoundEffect>("Hit");
-// No manual tracking needed — ContentLoader disposes on screen transition
+var song = Engine.Content.Load<Song>("Audio/song");  // not "Audio/song.mp3"
+// ContentLoader disposes Load<>'d assets on screen transition — no Track() needed
 ```
 
-Usings required: `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
-
-### Direct path — loading from file without MGCB
-
-Use MonoGame's static methods to load audio files directly from disk, bypassing the content pipeline entirely. Each method has format restrictions.
-
-**Song (music) — OGG only:**
-
-`Song.FromUri` only accepts OGG Vorbis on DesktopGL. MP3 fails at runtime because the backend uses NVorbis. Use the MGCB pipeline above for MP3 files.
-
-```csharp
-var song = Song.FromUri("MySong", new Uri(Path.GetFullPath("Content/MySong.ogg")));
-```
-
-**SoundEffect — WAV only:**
-
-`SoundEffect.FromStream` only accepts WAV format (PCM, uncompressed). OGG and MP3 sound effects require the MGCB pipeline.
-
-```csharp
-using var stream = File.OpenRead("Content/Hit.wav");
-var sfx = SoundEffect.FromStream(stream);
-Engine.Content.Track(sfx);  // required — ensures disposal on screen transition
-```
-
-Usings required: `System.IO`, `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
+Usings: `Microsoft.Xna.Framework.Audio`, `Microsoft.Xna.Framework.Media`.
 
 ## Sound Effects
 
@@ -104,5 +94,6 @@ Engine.Audio.MusicEnabled = false; // pauses current song immediately; true resu
 
 - **Music does not stop automatically on screen transition** — call `Engine.Audio.StopSong()` in `CustomDestroy`, or music keeps playing into the next screen.
 - **`Song.FromUri` only works with OGG** — on DesktopGL (NVorbis), `Song.FromUri` fails at runtime with MP3. Use the MGCB pipeline and `Engine.Content.Load<Song>` for MP3 files.
+- **`Load<>` name drops the source extension** — `Load<Song>("Audio/song")`, not `"Audio/song.ogg"`. Passing the extension makes MonoGame look for `song.ogg.xnb` (the pipeline builds `song.xnb`) and throws `FileNotFoundException`. The `.mgcb` defining it must be in the `.Desktop` head, not `Common`.
 - **Track SoundEffect only when loaded via `FromStream`** — call `Engine.Content.Track(sfx)` when using `SoundEffect.FromStream` so it is disposed on screen transition. MGCB-loaded assets (`Engine.Content.Load<SoundEffect>`) are disposed automatically by the ContentLoader — do not call `Track` for those.
 - **Per-frame dedup in collision handlers** — `Play(sfx)` in a `CollisionOccurred` handler is safe to call unconditionally; it fires at most once per frame regardless of how many pairs collide.

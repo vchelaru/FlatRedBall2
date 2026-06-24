@@ -107,6 +107,8 @@ sprite.Destroy();   // removes from parent entity
 
 To use textures, you need a `Content/Content.mgcb` file in your sample project.
 
+**Which project owns it?** The flat `samples/*` layout keeps the `.mgcb` in the single game project (shown below). The `frb2-desktop` / `frb2-multiplatform` **templates** split into `*.Common` + `*.Desktop`: there the `.mgcb` and its pipeline source files live in the **`.Desktop` head** — only the head runs `MonoGame.Content.Builder.Task`, so a mgcb added to `Common` is silently never built. `Common/Content` holds raw, runtime-loaded assets (png-with-extension, tmx, achx, audio), which are linked into the head's output. See `multiplatform-conversion`.
+
 ### 1. Create the Content directory and `.mgcb` file
 
 ```
