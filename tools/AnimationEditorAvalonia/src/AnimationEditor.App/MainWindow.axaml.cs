@@ -765,7 +765,13 @@ public partial class MainWindow : Window
         WireframeCtrl.ChainRegionChanged     += OnChainRegionChanged;
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
-        WireframeCtrl.ZoomChanged            += zoomPct => { SyncZoomCombo(zoomPct); SaveCompanionFile(); };
+        // The combo follows every tick of a smooth wheel-zoom (#425); the companion file is only
+        // persisted once the animation settles (IsZoomAnimating == false), not on every frame.
+        WireframeCtrl.ZoomChanged            += zoomPct =>
+        {
+            SyncZoomCombo(zoomPct);
+            if (!WireframeCtrl.IsZoomAnimating) SaveCompanionFile();
+        };
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
 
         // ── Wireframe scrollbars (#422) ──

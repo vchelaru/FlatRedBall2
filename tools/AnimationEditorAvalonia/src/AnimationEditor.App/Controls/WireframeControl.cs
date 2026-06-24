@@ -251,6 +251,19 @@ public class WireframeControl : Control
     // ScrollViewer; the control IS the viewport and two ScrollBars are driven from this pan.
     private float _panX, _panY;
 
+    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
+    // A wheel notch retargets _zoomTarget; the timer eases _zoom toward it via ZoomChase,
+    // applying each stepped value through the existing pivot-preserving ZoomToward. The pivot
+    // is stored in VIEWPORT space and re-used every tick, so the point under the cursor stays
+    // fixed for the whole animation — the per-tick factors compose to the same result as one
+    // instant notch. Rapid notches retarget the in-flight animation rather than stacking.
+    private DispatcherTimer? _zoomTimer;
+    private bool  _zoomAnimating;
+    private float _zoomTarget;      // destination zoom factor (1.0 = 100 %)
+    private float _zoomPivotVpX;    // cursor pivot, viewport space
+    private float _zoomPivotVpY;
+    private const float ZoomAnimIntervalSeconds = 1f / 60f;
+
     private bool _showGrid;
     private int _gridSize = 16;
 
@@ -498,6 +511,9 @@ public class WireframeControl : Control
             RaiseViewChanged();
         };
 
+        // Stop the smooth-zoom timer if the control leaves the tree mid-animation.
+        DetachedFromVisualTree += (_, _) => StopZoomTimer();
+
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
     }
 
@@ -664,6 +680,7 @@ public class WireframeControl : Control
     /// centre of the viewport.</summary>
     public void SetZoomPercent(int percent)
     {
+        CancelZoomAnimation();   // an explicit zoom overrides any in-flight wheel ease
         float newZoom = Math.Clamp(percent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
         ZoomToward((float)Bounds.Width / 2f, (float)Bounds.Height / 2f, newZoom / _zoom);
     }
@@ -683,6 +700,7 @@ public class WireframeControl : Control
     /// </summary>
     public void SetCamera(float panX, float panY, float zoom)
     {
+        CancelZoomAnimation();
         _panX = panX;
         _panY = panY;
         _zoom = zoom;
@@ -915,12 +933,65 @@ public class WireframeControl : Control
     public void SimulateWheelZoom(float vpX, float vpY, float factor) => ZoomToward(vpX, vpY, factor);
 
     /// <summary>
-    /// Test-only: simulates a single mouse-wheel zoom event toward the given
-    /// <b>viewport-space</b> point, using preset stepping when <see cref="WheelZoomPresets"/>
-    /// is set. Mirrors <see cref="OnPointerWheelChanged"/>.
+    /// Test-only: simulates one mouse-wheel notch toward the given <b>viewport-space</b> point
+    /// using preset stepping (<see cref="WheelZoomPresets"/>) and runs the resulting smooth-zoom
+    /// animation to completion synchronously, so the camera lands on its settled state. Use
+    /// <see cref="SimulateWheelZoomBegin"/> instead to observe the animation mid-flight.
     /// </summary>
-    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn) =>
-        ZoomToward(vpX, vpY, ComputeWheelFactor(zoomIn));
+    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn)
+    {
+        BeginAnimatedZoom(vpX, vpY, zoomIn);
+        SettleZoomAnimation();
+    }
+
+    /// <summary>
+    /// Test-only: begins a smooth wheel-zoom toward the <b>viewport-space</b> pivot WITHOUT
+    /// settling, so a test can drive <see cref="StepZoomAnimation"/> tick-by-tick and observe the
+    /// ease and retargeting. Mirrors the live <see cref="OnPointerWheelChanged"/> path.
+    /// </summary>
+    public void SimulateWheelZoomBegin(float vpX, float vpY, bool zoomIn) =>
+        BeginAnimatedZoom(vpX, vpY, zoomIn);
+
+    /// <summary>True while a smooth wheel-zoom (#425) is easing toward its target. The host gates
+    /// per-frame companion-file persistence on this so only the settled state is saved, not every
+    /// intermediate tick.</summary>
+    public bool IsZoomAnimating => _zoomAnimating;
+
+    /// <summary>Test-only: the zoom factor the in-flight animation is easing toward (1.0 = 100 %).</summary>
+    public float TargetZoom => _zoomTarget;
+
+    /// <summary>
+    /// Advances the in-flight smooth zoom by <paramref name="dtSeconds"/>, easing toward the
+    /// target via <see cref="ZoomChase"/> and applying each step through the pivot-preserving
+    /// <see cref="ZoomToward"/>. Returns <c>true</c> while still animating, <c>false</c> once
+    /// settled (at which point the timer is stopped). The live 60 fps timer calls this; tests
+    /// call it directly for deterministic stepping.
+    /// </summary>
+    public bool StepZoomAnimation(float dtSeconds)
+    {
+        if (!_zoomAnimating) return false;
+
+        float next = ZoomChase.Step(_zoom, _zoomTarget, dtSeconds);
+        bool settling = ZoomChase.IsSettled(next, _zoomTarget);
+
+        // Clear the flag BEFORE ZoomToward fires ZoomChanged on the settling tick, so the host
+        // sees IsZoomAnimating == false and persists the companion file exactly once (on settle).
+        if (settling) { _zoomAnimating = false; StopZoomTimer(); }
+
+        // factor is relative to the current zoom; the viewport pivot is constant across ticks, so
+        // the factors compose to the same result as a single notch (the pivot stays anchored).
+        ZoomToward(_zoomPivotVpX, _zoomPivotVpY, next / _zoom);
+        return !settling;
+    }
+
+    /// <summary>Runs <see cref="StepZoomAnimation"/> to completion synchronously. Used by the
+    /// instant test overloads and available to any caller that must force the settled state.</summary>
+    public void SettleZoomAnimation()
+    {
+        // The 1000-iteration cap is a non-convergence backstop; ZoomChase settles far sooner.
+        for (int i = 0; _zoomAnimating && i < 1000; i++)
+            StepZoomAnimation(ZoomAnimIntervalSeconds);
+    }
 
     /// <summary>Test-only: current camera pan (screen position of texture pixel (0,0)).</summary>
     public (float X, float Y) PanOffset => (_panX, _panY);
@@ -966,6 +1037,7 @@ public class WireframeControl : Control
     public void CenterFitForSize(int width, int height)
     {
         if (_bitmap is null) return;
+        CancelZoomAnimation();
         (_panX, _panY, _zoom) = CanvasTransform.CenterFit(
             _bitmap.Width, _bitmap.Height, width, height);
         InvalidateVisual();
@@ -980,6 +1052,7 @@ public class WireframeControl : Control
     public void CenterOnFrame(AnimationFrameSave frame)
     {
         if (_bitmap is null) return;
+        CancelZoomAnimation();   // double-click centring overrides any in-flight wheel ease
 
         float bmpW = _bitmap.Width;
         float bmpH = _bitmap.Height;
@@ -1059,23 +1132,66 @@ public class WireframeControl : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        float factor = ComputeWheelFactor(e.Delta.Y > 0);
         // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
-        // viewport-space pivot ZoomToward expects.
+        // viewport-space pivot. Smooth-zoom retargets and eases toward the next preset (#425).
         var pivot = e.GetPosition(this);
-        ZoomToward((float)pivot.X, (float)pivot.Y, factor);
+        BeginAnimatedZoom((float)pivot.X, (float)pivot.Y, e.Delta.Y > 0);
+        StartZoomTimer();   // live driver; tests drive StepZoomAnimation directly instead
         e.Handled = true;
     }
 
-    /// <summary>Computes the zoom factor for one wheel notch, using preset stepping when available.</summary>
-    private float ComputeWheelFactor(bool zoomIn)
+    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
+
+    /// <summary>
+    /// Retargets the smooth zoom toward the next/previous preset from the given viewport-space
+    /// pivot. A notch while already animating steps from the in-flight <see cref="_zoomTarget"/>,
+    /// so rapid spins accumulate through the presets rather than re-targeting the same one from the
+    /// mid-animation zoom. Does NOT start the driving timer — the live wheel handler starts it;
+    /// tests drive <see cref="StepZoomAnimation"/> directly for determinism.
+    /// </summary>
+    private void BeginAnimatedZoom(float pivotVpX, float pivotVpY, bool zoomIn)
     {
-        if (WheelZoomPresets is { Length: > 0 } presets)
-        {
-            int newPct = ZoomPresetStepper.StepToNextPreset(_zoom * 100f, presets, zoomIn ? +1 : -1);
-            return newPct / 100f / _zoom;
-        }
-        return zoomIn ? 1.25f : 1f / 1.25f;
+        float basis = _zoomAnimating ? _zoomTarget : _zoom;
+        _zoomTarget   = ComputeTargetZoom(basis, zoomIn);
+        _zoomPivotVpX = pivotVpX;
+        _zoomPivotVpY = pivotVpY;
+        _zoomAnimating = true;
+    }
+
+    /// <summary>Stops any in-flight wheel-zoom animation, holding the camera at its current value.
+    /// Competing camera actions (pan, combo zoom, centre-on-frame, load) call this so they don't
+    /// fight the easing timer.</summary>
+    private void CancelZoomAnimation()
+    {
+        if (!_zoomAnimating) return;
+        _zoomAnimating = false;
+        StopZoomTimer();
+    }
+
+    /// <summary>The zoom factor one wheel notch targets from <paramref name="basisZoom"/>, using
+    /// preset stepping when <see cref="WheelZoomPresets"/> is set, else a 1.25× multiplier. Clamped
+    /// to [<see cref="CanvasTransform.MinZoom"/>, <see cref="CanvasTransform.MaxZoom"/>].</summary>
+    private float ComputeTargetZoom(float basisZoom, bool zoomIn)
+    {
+        float targetPct = WheelZoomPresets is { Length: > 0 } presets
+            ? ZoomPresetStepper.StepToNextPreset(basisZoom * 100f, presets, zoomIn ? +1 : -1)
+            : basisZoom * 100f * (zoomIn ? 1.25f : 1f / 1.25f);
+        return Math.Clamp(targetPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
+    }
+
+    private void StartZoomTimer()
+    {
+        _zoomTimer ??= CreateZoomTimer();
+        _zoomTimer.Start();
+    }
+
+    private void StopZoomTimer() => _zoomTimer?.Stop();
+
+    private DispatcherTimer CreateZoomTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ZoomAnimIntervalSeconds) };
+        timer.Tick += (_, _) => StepZoomAnimation(ZoomAnimIntervalSeconds);
+        return timer;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -1350,6 +1466,7 @@ public class WireframeControl : Control
 
     private void StartPan(Point pos)
     {
+        CancelZoomAnimation();   // panning takes over from any in-flight wheel ease
         _isPanning = true;
         _panAnchor = pos;
         _panAnchorX = _panX;   // camera pan at drag start
@@ -1700,6 +1817,7 @@ public class WireframeControl : Control
     private void CenterTexture()
     {
         if (_bitmap is null) return;
+        CancelZoomAnimation();   // a fresh texture/centre overrides any in-flight wheel ease
 
         // Defer until layout has produced a real viewport; the first SizeChanged re-centers.
         if (Bounds.Width <= 1)
