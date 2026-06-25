@@ -31,6 +31,32 @@ public class AnimationFrameColorTests
     }
 
     [Fact]
+    public void Save_ThenFromFile_RoundTripsColorOperationAndOmitsNull()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Flash" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png", ColorOperation = ColorOperation.Add });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "b.png" }); // no operation -> element omitted
+        save.AnimationChains.Add(chain);
+
+        var path = Path.Combine(Path.GetTempPath(), $"frbcolorop_{Guid.NewGuid():N}.achx");
+        try
+        {
+            save.Save(path);
+            // Only the first frame authored an operation; the null frame must omit the element.
+            (File.ReadAllText(path).Split("<ColorOperation>").Length - 1).ShouldBe(1);
+
+            var frames = AnimationChainListSave.FromFile(path).AnimationChains[0].Frames;
+            frames[0].ColorOperation.ShouldBe(ColorOperation.Add);
+            frames[1].ColorOperation.ShouldBeNull();
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Save_ThenFromFile_RoundTripsSetChannelsAndOmitsNullChannel()
     {
         // Red and Blue are authored; Green is left null to prove null channels are not written.
@@ -71,5 +97,18 @@ public class AnimationFrameColorTests
         frame.Red.ShouldBe(255);
         frame.Green.ShouldBe(200);
         frame.Blue.ShouldBe(128);
+    }
+
+    [Fact]
+    public void ToAnimationChainList_CopiesColorOperationToRuntimeFrame()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Flash" };
+        chain.Frames.Add(new AnimationFrameSave { ColorOperation = ColorOperation.Multiply });
+        save.AnimationChains.Add(chain);
+
+        var frame = save.ToAnimationChainList(null!)[0][0];
+
+        frame.ColorOperation.ShouldBe(ColorOperation.Multiply);
     }
 }

@@ -50,6 +50,13 @@ public class AnimationFrameSave
     public int? Blue;
 
     /// <summary>
+    /// Optional per-frame color operation describing how <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/>
+    /// combine with the texture. <c>null</c> (the default) means none and is omitted from the saved
+    /// <c>.achx</c>. Like the channels, runtimes interpret this as they choose. See <see cref="FlatRedBall2.Animation.ColorOperation"/>.
+    /// </summary>
+    public ColorOperation? ColorOperation;
+
+    /// <summary>
     /// User-visible display label for this frame in the Animation Editor tree.
     /// Only meaningful when <see cref="HasCustomName"/> is <c>true</c>; when
     /// <c>false</c> the editor shows a dynamic position-based label ("Frame N")

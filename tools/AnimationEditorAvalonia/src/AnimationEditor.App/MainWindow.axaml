@@ -1027,18 +1027,28 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- GAME-CONSUMED section: per-frame values the engine stores but never applies -->
+                                <!-- COLOR section: per-frame tint. Mode previews as a reference; runtimes apply it as they choose. -->
                                 <Border BorderBrush="{DynamicResource LineBrush}"
                                         BorderThickness="0,0,0,1"
                                         Padding="12,8,12,10">
                                     <StackPanel Spacing="8">
-                                        <TextBlock Text="GAME-CONSUMED (NOT PREVIEWED)"
+                                        <TextBlock Text="COLOR"
                                                    FontSize="11"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource InkMid}" />
                                         <TextBlock TextWrapping="Wrap" FontSize="10"
                                                    Foreground="{DynamicResource InkDim}"
-                                                   Text="Saved per-frame but not applied by the editor or engine. Your game reads sprite.CurrentFrame (Red/Green/Blue) and decides how to use them. Leave a field blank to omit it." />
+                                                   Text="Mode previews here as a reference; each runtime decides how to apply these. Your game can also read R/G/B from sprite.CurrentFrame. Leave a field blank to omit it." />
+                                        <Grid ColumnDefinitions="44,*">
+                                            <TextBlock Text="Mode" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                            <ComboBox x:Name="PropColorMode" Grid.Column="1"
+                                                      HorizontalAlignment="Stretch">
+                                                <ComboBoxItem>None</ComboBoxItem>
+                                                <ComboBoxItem>Multiply</ComboBoxItem>
+                                                <ComboBoxItem>Add</ComboBoxItem>
+                                            </ComboBox>
+                                        </Grid>
                                         <Grid ColumnDefinitions="*,6,*,6,*">
                                             <Grid Grid.Column="0" ColumnDefinitions="14,*">
                                                 <TextBlock Text="R" VerticalAlignment="Center"

@@ -1,6 +1,7 @@
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
@@ -134,6 +135,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetFrameLength(AnimationFrameSave frame, float newLength);
         void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY);
         void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue);
+        void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation);
         void SetFramePixelRegion(AnimationFrameSave frame, int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);

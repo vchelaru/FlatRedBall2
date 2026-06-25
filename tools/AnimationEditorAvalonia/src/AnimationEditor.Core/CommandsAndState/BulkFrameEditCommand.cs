@@ -1,3 +1,4 @@
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
@@ -15,12 +16,13 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         float FrameLength,
         float RelativeX, float RelativeY,
         float Left, float Right, float Top, float Bottom,
-        int? Red, int? Green, int? Blue)
+        int? Red, int? Green, int? Blue,
+        ColorOperation? ColorOperation)
     {
         public static FrameFieldSnapshot Capture(AnimationFrameSave f) =>
             new(f, f.FrameLength, f.RelativeX, f.RelativeY,
                 f.LeftCoordinate, f.RightCoordinate, f.TopCoordinate, f.BottomCoordinate,
-                f.Red, f.Green, f.Blue);
+                f.Red, f.Green, f.Blue, f.ColorOperation);
 
         public void RestoreToFrame()
         {
@@ -34,6 +36,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             Frame.Red              = Red;
             Frame.Green            = Green;
             Frame.Blue             = Blue;
+            Frame.ColorOperation   = ColorOperation;
         }
     }
 

@@ -207,6 +207,7 @@ public class AnimationChainListSave
         if (frame.Red.HasValue) el.Add(new XElement("Red", frame.Red.Value));
         if (frame.Green.HasValue) el.Add(new XElement("Green", frame.Green.Value));
         if (frame.Blue.HasValue) el.Add(new XElement("Blue", frame.Blue.Value));
+        if (frame.ColorOperation.HasValue) el.Add(new XElement("ColorOperation", frame.ColorOperation.Value.ToString()));
 
         if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
         {
@@ -285,6 +286,7 @@ public class AnimationChainListSave
         frame.Red = IntElNullable(el, "Red");
         frame.Green = IntElNullable(el, "Green");
         frame.Blue = IntElNullable(el, "Blue");
+        frame.ColorOperation = ColorOperationEl(el, "ColorOperation");
         frame.Name = (string?)el.Element("Name") ?? string.Empty;
         frame.HasCustomName = BoolEl(el, "HasCustomName");
 
@@ -437,6 +439,12 @@ public class AnimationChainListSave
         return el != null ? int.Parse(el.Value, CultureInfo.InvariantCulture) : null;
     }
 
+    private static ColorOperation? ColorOperationEl(XElement parent, string name)
+    {
+        var el = parent.Element(name);
+        return el != null ? Enum.Parse<ColorOperation>(el.Value) : null;
+    }
+
     /// <summary>
     /// Converts this save object to a runtime <see cref="AnimationChainList"/>, loading
     /// all referenced textures through <see cref="ContentLoader.Load{T}"/>.
@@ -488,6 +496,7 @@ public class AnimationChainListSave
                     Red = frameSave.Red,
                     Green = frameSave.Green,
                     Blue = frameSave.Blue,
+                    ColorOperation = frameSave.ColorOperation,
                 };
 
                 frame.Texture = loadTexture(frameSave);

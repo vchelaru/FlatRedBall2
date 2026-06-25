@@ -19,6 +19,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
@@ -2456,6 +2457,7 @@ public partial class MainWindow : Window
         PropRed.ValueChanged       += (_, _) => ApplyFrameColor();
         PropGreen.ValueChanged     += (_, _) => ApplyFrameColor();
         PropBlue.ValueChanged      += (_, _) => ApplyFrameColor();
+        PropColorMode.SelectionChanged += (_, _) => ApplyFrameColorOperation();
         PropPixelX.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelY.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
@@ -2662,6 +2664,12 @@ public partial class MainWindow : Window
                 PropRed.Value        = frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null;
                 PropGreen.Value      = frame.Green.HasValue ? frame.Green.Value : (decimal?)null;
                 PropBlue.Value       = frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null;
+                PropColorMode.SelectedIndex = frame.ColorOperation switch
+                {
+                    ColorOperation.Multiply => 1,
+                    ColorOperation.Add      => 2,
+                    _                       => 0, // None / null
+                };
                 PropTextureName.Text = TexturePathHelper.ComputeDisplayPath(
                     frame.TextureName, _projectManager.FileName);
 
@@ -2737,6 +2745,21 @@ public partial class MainWindow : Window
         // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
         static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
         _appCommands.SetFrameColor(frame, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
+    }
+
+    private void ApplyFrameColorOperation()
+    {
+        if (_suppressPropRefresh) return;
+        var frame = _selectedState.SelectedFrame;
+        if (frame is null) return;
+        // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
+        ColorOperation? operation = PropColorMode.SelectedIndex switch
+        {
+            1 => ColorOperation.Multiply,
+            2 => ColorOperation.Add,
+            _ => null,
+        };
+        _appCommands.SetFrameColorOperation(frame, operation);
     }
 
     private void ApplyFramePixelCoords()

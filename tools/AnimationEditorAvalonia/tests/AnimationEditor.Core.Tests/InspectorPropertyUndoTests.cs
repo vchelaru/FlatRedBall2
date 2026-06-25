@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using Xunit;
 
@@ -41,6 +42,39 @@ public class InspectorPropertyUndoTests
         chain.Frames.Add(frame);
 
         ctx.AppCommands.SetFrameColor(frame, 255, 200, 128);
+
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    // ── SetFrameColorOperation ────────────────────────────────────────────────
+
+    [Fact]
+    public void SetFrameColorOperation_Undo_RestoresOperation()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Flash");
+        var frame = TestHelpers.MakeFrame(); // starts with null operation
+        chain.Frames.Add(frame);
+
+        ctx.AppCommands.SetFrameColorOperation(frame, ColorOperation.Add);
+        Assert.True(ctx.UndoManager.CanUndo);
+        Assert.Equal(ColorOperation.Add, frame.ColorOperation);
+
+        ctx.UndoManager.Undo();
+
+        Assert.Null(frame.ColorOperation);
+    }
+
+    [Fact]
+    public void SetFrameColorOperation_SameValue_DoesNotCreateUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Flash");
+        var frame = TestHelpers.MakeFrame();
+        frame.ColorOperation = ColorOperation.Multiply;
+        chain.Frames.Add(frame);
+
+        ctx.AppCommands.SetFrameColorOperation(frame, ColorOperation.Multiply);
 
         Assert.False(ctx.UndoManager.CanUndo);
     }

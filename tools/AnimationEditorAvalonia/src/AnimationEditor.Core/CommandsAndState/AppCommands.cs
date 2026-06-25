@@ -2,6 +2,7 @@
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Rendering;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
@@ -1048,6 +1049,14 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new BulkFrameEditCommand(
                 [frame], () => { frame.Red = red; frame.Green = green; frame.Blue = blue; },
                 this, _events, false, "Set Frame Color"));
+        }
+
+        public void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation)
+        {
+            // Mode is game-consumed; not previewed by the engine, so no wireframe refresh is needed.
+            _undoManager.Execute(new BulkFrameEditCommand(
+                [frame], () => frame.ColorOperation = operation,
+                this, _events, false, "Set Frame Color Mode"));
         }
 
         public void SetFramePixelRegion(AnimationFrameSave frame,

@@ -59,6 +59,13 @@ public class AnimationFrame
     public int? Blue;
 
     /// <summary>
+    /// Optional per-frame color operation for how <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/>
+    /// combine with the texture, or <c>null</c> for none. Not applied by the engine — read it (with the
+    /// channels) via <see cref="FlatRedBall2.Rendering.Sprite.CurrentFrame"/> and apply it in game code.
+    /// </summary>
+    public ColorOperation? ColorOperation;
+
+    /// <summary>
     /// Per-frame shape definitions reconciled against the parent entity at frame switch time.
     /// Each entry must have a non-empty unique <see cref="AnimationShapeFrame.Name"/>. See
     /// <see cref="AnimationChainList"/> for the ownership rule that decides which entity shapes

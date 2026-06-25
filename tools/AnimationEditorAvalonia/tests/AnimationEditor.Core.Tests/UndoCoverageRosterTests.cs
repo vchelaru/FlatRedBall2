@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
@@ -99,6 +100,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFrameLength)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameRelative)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColor)]                = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFramePixelRegion)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectProps)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
@@ -274,6 +276,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameRelative(Zebra(ctx).Frames[0], 99f, 88f)));
         yield return Row(nameof(IAppCommands.SetFrameColor),
             ctx => Sync(() => ctx.AppCommands.SetFrameColor(Zebra(ctx).Frames[0], 255, 200, 128)));
+        yield return Row(nameof(IAppCommands.SetFrameColorOperation),
+            ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(Zebra(ctx).Frames[0], ColorOperation.Add)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
             ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(Zebra(ctx).Frames[0], 4, 8, 12, 16, 64, 64)));
         yield return Row(nameof(IAppCommands.SetRectProps),
