@@ -68,12 +68,16 @@ public partial class MainWindow : Window
     private bool _suppressInterpolateSync;
     private System.Threading.CancellationTokenSource? _toastCts;
 
+    // The platform application-data root under which settings live. Injected (not read from
+    // Environment here) so headless tests can redirect it to a temp dir and never touch the
+    // developer's real %APPDATA%\AnimationEditor\AESettings.json (see issue #438).
+    private readonly string _applicationDataRoot;
+
     // Shared per-user config dir, NOT the build output — so recent files / tabs / theme survive
     // rebuilds, dotnet clean, and switching git worktrees (see issue #424). AppContext.BaseDirectory
     // resolves to bin/<Config>/<TFM>/, which is per-build / per-checkout.
     private FilePath SettingsFilePath =>
-        AppSettingsLocation.ForApplicationDataRoot(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
 
     public MainWindow(
         IProjectManager projectManager,
@@ -85,8 +89,11 @@ public partial class MainWindow : Window
         IObjectFinder objectFinder,
         IUndoManager undoManager,
         Services.ThumbnailService thumbnailService,
-        IFileAssociationService fileAssociation)
+        IFileAssociationService fileAssociation,
+        string applicationDataRoot)
     {
+        _applicationDataRoot = applicationDataRoot;
+
         _projectManager = projectManager;
         _selectedState = selectedState;
         _appCommands = appCommands;

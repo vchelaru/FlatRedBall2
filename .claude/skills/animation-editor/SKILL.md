@@ -75,6 +75,10 @@ Tests build their own fresh graph per test via `TestHelpers.BuildServices()` (Ap
 
 When constructing an Avalonia control directly (`WireframeControl` / `PreviewControl`) — because Avalonia requires a parameterless constructor for XAML — call `ctx.CreateWireframeControl()` / `ctx.CreatePreviewControl()`, which wraps `new WireframeControl()` and `InitializeServices(...)` so the control's injected fields are populated before any method runs.
 
+## Tests must never write the developer's real settings
+
+`MainWindow` persists app settings (recent files, open tabs, theme) to `%APPDATA%\AnimationEditor\AESettings.json` in its `Closed` handler. A headless test that constructs and closes a window would otherwise overwrite the developer's real settings with test fixtures (issue #438). The application-data root is a `MainWindow` constructor parameter precisely so tests can redirect it: `ctx.CreateMainWindow()` passes `ctx.SettingsRoot` (a unique temp dir), while production (`App.axaml.cs`) passes `Environment.GetFolderPath(SpecialFolder.ApplicationData)`. Build the window through `ctx.CreateMainWindow()` — never reconstruct one with the production root in a test. General rule: any component that reads or writes a real per-user location (config, registry, recent-files) takes its root as an injected dependency, so tests land in temp and never on real user data.
+
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 
 **Never use `System.IO.Path.GetFileName`, `Path.GetDirectoryName`, or `Path.Combine` on paths stored in `ProjectManager.FileName` or any user-supplied path.** These methods are OS-native: on Linux they only recognise `/` as a separator, so a Windows-authored `C:\foo\bar.achx` path would be returned whole by `Path.GetFileName`.

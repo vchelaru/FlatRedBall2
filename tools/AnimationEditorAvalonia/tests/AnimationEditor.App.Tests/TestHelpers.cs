@@ -25,6 +25,14 @@ internal sealed class TestServices
     public ThumbnailService ThumbnailService { get; }
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
 
+    /// <summary>
+    /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
+    /// so its settings file resolves under here instead of the developer's real %APPDATA%
+    /// (issue #438). A fresh Guid also isolates tests from one another.
+    /// </summary>
+    public string SettingsRoot { get; } =
+        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditorTests", System.Guid.NewGuid().ToString("N"));
+
     public TestServices()
     {
         ProjectManager    = new ProjectManager();
@@ -43,7 +51,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, ThumbnailService,
-            FileAssociationService);
+            FileAssociationService, SettingsRoot);
 
     public WireframeControl CreateWireframeControl()
     {

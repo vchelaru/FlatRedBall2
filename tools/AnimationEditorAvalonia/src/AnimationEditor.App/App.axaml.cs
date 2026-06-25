@@ -190,7 +190,8 @@ public partial class App : Application
             sp.GetRequiredService<IObjectFinder>(),
             sp.GetRequiredService<IUndoManager>(),
             sp.GetRequiredService<ThumbnailService>(),
-            sp.GetRequiredService<IFileAssociationService>()));
+            sp.GetRequiredService<IFileAssociationService>(),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));
 
         return sc.BuildServiceProvider();
     }
