@@ -37,9 +37,16 @@ public class Game1 : Game
     {
         base.Initialize();
         // Path is relative to the MonoGame Content root; do NOT prepend "Content/".
+        // Gum 2026.6 selects loose vs. bundle purely from the extension (no sibling probing),
+        // so this must match the deployed artifact. The build defines GUM_BUNDLE when
+        // UseGumPackage=true (the default) — see Solitaire.GumPackage.targets.
         FlatRedBallService.Default.Initialize(this, new EngineInitSettings
         {
+#if GUM_BUNDLE
+            GumProjectFile = "GumProject/GumProject.gumpkg"
+#else
             GumProjectFile = "GumProject/GumProject.gumx"
+#endif
         });
         FlatRedBallService.Default.Start<GameScreen>();
     }

@@ -1,22 +1,27 @@
 <Project>
   <!--
     ================================================================
-    Gum content deployment mode (loose vs. .gumpkg)
+    Gum content deployment mode (loose .gumx vs. bundled .gumpkg)
     ================================================================
-    Imported by every Solitaire .csproj. Centralizes the toggle so
-    Common, Desktop, and BlazorGL all flip together.
+    Imported by every Solitaire .csproj so Common, Desktop, and
+    BlazorGL flip together.
 
     Toggle:
-      dotnet build -p:UseGumPackage=true   # ship .gumpkg only
-      dotnet build -p:UseGumPackage=false  # ship loose files (default)
+      dotnet build -p:UseGumPackage=true    # bundle: pack + ship .gumpkg only (DEFAULT)
+      dotnet build -p:UseGumPackage=false   # loose: ship the raw .gumx + project files
 
-    Default is loose so the Gum editor's saved files round-trip
-    cleanly during authoring (and FRB2 hot reload sees them).
-    Switch to true to test the bundled load path or to produce a
-    leaner publish. Runtime code does not change either way: the
-    engine looks for a sibling .gumpkg when the loose .gumx is
-    absent, so we exclude the loose files from output in bundle
-    mode.
+    Default is BUNDLE. Gum 2026.6 picks the load mode purely from the
+    file EXTENSION the game passes to GumProjectFile (.gumpkg = bundle,
+    .gumx = loose) with NO sibling probing — a probe would be a
+    guaranteed 404 on Blazor/WASM. So the deployed artifact and the
+    path in code must agree: this file defines the GUM_BUNDLE compile
+    constant when bundling, and Game1 selects the extension from it
+    (#if GUM_BUNDLE).
+
+    Web needs the bundle — loose .ganx animation files can't be
+    enumerated over HTTP, so animations silently don't load in loose
+    mode on WASM. Flip to loose for desktop authoring when you want
+    Gum-editor round-trip + FRB2 hot reload on the raw files.
 
     See frb-skills/gum-packaging/SKILL.md for the full story.
     ================================================================
@@ -24,6 +29,13 @@
 
   <PropertyGroup>
     <UseGumPackage Condition="'$(UseGumPackage)' == ''">true</UseGumPackage>
+
+    <!--
+      Surface the build-time mode to game code as a compile constant. Gum 2026.6 loads
+      bundle-vs-loose purely from the path extension, so Game1 must pass GumProject.gumpkg
+      in bundle mode and GumProject.gumx in loose mode — this is the flag it switches on.
+    -->
+    <DefineConstants Condition="'$(UseGumPackage)' == 'true'">$(DefineConstants);GUM_BUNDLE</DefineConstants>
 
     <!-- Common owns the canonical Gum project; everyone else links to it. -->
     <SolitaireCommonDir>$(MSBuildThisFileDirectory)Solitaire.Common\</SolitaireCommonDir>
