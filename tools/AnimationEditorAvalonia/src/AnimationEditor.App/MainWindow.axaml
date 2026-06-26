@@ -1038,13 +1038,23 @@
                                         BorderThickness="0,0,0,1"
                                         Padding="12,8,12,10">
                                     <StackPanel Spacing="8">
-                                        <TextBlock Text="COLOR"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <TextBlock TextWrapping="Wrap" FontSize="10"
-                                                   Foreground="{DynamicResource InkDim}"
-                                                   Text="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it." />
+                                        <!-- Header + info badge. The explanatory text lives in the badge's tooltip
+                                             (instead of an always-on wrapping paragraph that grew the panel when narrow). -->
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="COLOR"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource InkMid}"
+                                                       VerticalAlignment="Center" />
+                                            <Border Width="14" Height="14" CornerRadius="7"
+                                                    BorderBrush="{DynamicResource InkDim}" BorderThickness="1"
+                                                    VerticalAlignment="Center" Cursor="Help"
+                                                    ToolTip.Tip="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it.">
+                                                <TextBlock Text="i" FontSize="9"
+                                                           Foreground="{DynamicResource InkDim}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                        </StackPanel>
                                         <Grid ColumnDefinitions="44,*">
                                             <TextBlock Text="Mode" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource InkMid}" FontSize="11" />
