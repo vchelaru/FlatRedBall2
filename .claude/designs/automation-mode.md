@@ -117,6 +117,25 @@ A `{"cmd":"screenshot"}` command that returns a base64-encoded PNG of the curren
 
 ---
 
+## Channel Decision — stdout sharing & diagnostics
+
+**Status:** decided (resolves the former "stdout collision" open question). Issue #436.
+
+**Context.** Protocol responses and any game-code `Console.WriteLine` share one stdout stream. A strict line-by-line JSON reader chokes on a non-JSON line, so logging *can* corrupt the protocol — but whether it does depends on the reader and on whether game code writes to stdout at all. It's a possibility, not a certainty; the original skill note ("any `Console.WriteLine` corrupts the stream") overstated it as inevitable.
+
+**Options considered.**
+
+- **A — Share stdout, document a best-effort filter.** The reader skips lines that don't parse as JSON; every response starts with `{`, which acts as a de-facto prefix. Zero code change. Cost: a game log line that itself starts with `{` still collides, and a partial `Console.Write` (no trailing newline) can prepend a fragment onto a response line, silently dropping it. Best-effort, not framing.
+- **B — Explicit prefix on every response** (e.g. `@@FRB@@{...}`). Same mechanism as A with a less collision-prone marker. Cost: every consumer must implement the same framing, and it still doesn't fix partial-write splicing.
+- **C — Redirect `Console.Out` to stderr on activation.** The protocol keeps a private handle to the real stdout; game `Console.WriteLine` is repointed at stderr, so it physically can't reach the protocol channel. Robust, needs no reader cooperation. Cost: it silently changes where game logging lands *while `--frb-auto` is active* — a hidden behavior change, and tooling that treats "stderr has content" as failure trips on it. The log-to-file variant dodges the stderr footgun but adds machinery.
+- **D — Dedicated transport** (named pipe / localhost socket). The protocol gets its own channel; stdout is left entirely to the game — no collision, no redirect. Cost: rendezvous (agree on a pipe name / port) plus connection lifecycle that the free stdin/stdout inheritance gave us for nothing.
+
+**Decision.** Default to **A**: stdout transport with documented best-effort `{`-line filtering, diagnostics kept off stdout by convention (`Debug.WriteLine` / stderr — also the code-style rule). Keep **D** open as an opt-in escape hatch for consumers needing guaranteed isolation. This is cheap to honor because `AutomationMode` already takes injectable `TextReader`/`TextWriter` (today `Console.In`/`Console.Out`); a pipe's streams drop into the same seam with no change to protocol logic.
+
+**Why not the others now.** B over A buys little for FRB2's own use, where we own both ends, and still taxes every external consumer. C is the most robust single-stream option, but the rug-pull / stderr-as-error surprise isn't worth it while A is adequate. D is the right answer for the cross-engine interface-spec use case (others reusing this protocol — see #436), but building it now is a speculative transport with no current consumer (`design/TODOS.md`: no speculative items) — add it when a real need lands.
+
+---
+
 ## Open Questions
 
 1. **State registration API shape.** `RegisterStateProvider(string name, Func<object> provider)` vs. a typed generic `RegisterStateProvider<T>(string name, Func<T> provider)` with JSON serialization. Generic is cleaner but adds reflection at serialization time — may not matter given this is dev-only.
@@ -125,6 +144,4 @@ A `{"cmd":"screenshot"}` command that returns a base64-encoded PNG of the curren
 
 3. **Security / accidental activation.** Should there be a compile-time guard (`#if DEBUG`) so `EnableAutomationMode` is a no-op in Release builds? Probably yes — automation mode exposes internal game state and arbitrary value-forcing.
 
-4. **Stdout collision.** If game code also writes to stdout (e.g., `Console.WriteLine` for debugging), it will corrupt the NDJSON stream. Either document "don't write to stdout in automation mode" or route game stdout to stderr in automation mode.
-
-5. **Frame timing in step mode.** Stepped frames use whatever `GameTime` MonoGame provides. Should step mode synthesize a fixed `GameTime` (e.g., always 16.67ms per frame) so physics is deterministic regardless of wall-clock time?
+4. **Frame timing in step mode.** Stepped frames use whatever `GameTime` MonoGame provides. Should step mode synthesize a fixed `GameTime` (e.g., always 16.67ms per frame) so physics is deterministic regardless of wall-clock time?

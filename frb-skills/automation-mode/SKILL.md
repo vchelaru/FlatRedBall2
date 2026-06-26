@@ -105,7 +105,7 @@ Providers and setters live on the screen that registered them and disappear on s
 
 ## Gotchas
 
-- **stdout is the protocol channel.** Any `Console.WriteLine` in game code corrupts the NDJSON stream. Use `System.Diagnostics.Debug.WriteLine` for diagnostics — also the project's code-style rule.
+- **stdout is the default protocol channel — keep other output off it.** Responses are single-line JSON objects; anything else written to stdout (a stray `Console.WriteLine`) shares the stream, so a strict line reader chokes on it. Have the reader skip lines that don't parse as JSON (responses start with `{`) — best-effort, not framing: a log line that itself begins with `{` still collides. Send diagnostics to `System.Diagnostics.Debug.WriteLine` or stderr (also the code-style rule). For guaranteed isolation, give the protocol its own transport — see the channel decision in `.claude/designs/automation-mode.md`.
 - **Type names, not lowercase aliases.** `query target:"Player"` works; `query target:"player"` returns `unknown query target` unless you explicitly registered a `"player"` provider.
 - **Screen-scoped providers.** Custom providers registered in `GameScreen.CustomInitialize` don't exist while on `TitleScreen`. Reflection-based entity queries work only for types whose factories have been created — i.e., on the screen that owns them.
 - **`quit` calls `Game.Exit()`.** If the game is not yet initialized (e.g. in tests), the call is swallowed silently.
