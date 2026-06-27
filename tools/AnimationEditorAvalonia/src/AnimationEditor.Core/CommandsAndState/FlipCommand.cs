@@ -37,8 +37,23 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             foreach (var frame in _frames)
             {
-                if (_horizontal) frame.FlipHorizontal = !frame.FlipHorizontal;
-                else frame.FlipVertical = !frame.FlipVertical;
+                if (_horizontal)
+                {
+                    frame.FlipHorizontal = !frame.FlipHorizontal;
+                    frame.RelativeX = -frame.RelativeX;   // mirror sprite offset about the entity origin
+                }
+                else
+                {
+                    frame.FlipVertical = !frame.FlipVertical;
+                    frame.RelativeY = -frame.RelativeY;
+                }
+
+                // Mirror attached shape offsets about the same origin so collision geometry tracks
+                // the flipped sprite. Negation is its own inverse, so undo/redo (which re-toggle)
+                // restore both the sprite offset and the shape offsets exactly.
+                if (frame.ShapesSave != null)
+                    foreach (var shape in frame.ShapesSave.Shapes)
+                        ShapeFlip.Mirror(shape, _horizontal, !_horizontal);
             }
             _refresh();
             _events.RaiseAnimationChainsChanged();
