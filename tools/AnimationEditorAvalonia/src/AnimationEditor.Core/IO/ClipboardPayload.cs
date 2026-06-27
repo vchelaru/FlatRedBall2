@@ -1,15 +1,21 @@
 using FlatRedBall2.Animation.Content;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace AnimationEditor.Core.IO;
 
 /// <summary>
 /// Handles the textual clipboard format used for copy/paste (IO14).
 ///
-/// Format:  "TypeName:&lt;xml&gt;"
+/// Format:  "TypeName:&lt;payload&gt;"
 ///   • TypeName is the simple C# type name, e.g.
 ///     "List&lt;AnimationChainSave&gt;", "List&lt;AnimationFrameSave&gt;",
 ///     "AARectSave", or "CircleSave".
-///   • The XML is produced by <see cref="XmlFile.SerializeToString"/>.
+///   • Chains and frames are serialized through the engine's own .achx serializer
+///     (<see cref="AnimationChainListSave.ToXmlString"/> / <see cref="AnimationChainListSave.FromString"/>)
+///     so per-frame shapes — which live in a polymorphic <c>List&lt;object&gt;</c> that
+///     <c>XmlSerializer</c> cannot serialize — round-trip exactly as the on-disk format does.
+///   • Single shapes are flat POCOs and stay on the simple <see cref="XmlFile"/> path.
 ///
 /// This class handles only serialization/deserialization — clipboard I/O is the
 /// responsibility of the app layer.
@@ -19,10 +25,22 @@ public static class ClipboardPayload
     // ── Serialization ─────────────────────────────────────────────────────
 
     public static string Serialize(List<AnimationChainSave> chains)
-        => Encode(chains);
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.AddRange(chains);
+        return $"{TypeName<List<AnimationChainSave>>()}:{acls.ToXmlString()}";
+    }
 
     public static string Serialize(List<AnimationFrameSave> frames)
-        => Encode(frames);
+    {
+        // Wrap the loose frames in a single throwaway chain so they go through the same
+        // .achx serializer as a chain copy. Deserialize unwraps them back to a flat list.
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave();
+        chain.Frames.AddRange(frames);
+        acls.AnimationChains.Add(chain);
+        return $"{TypeName<List<AnimationFrameSave>>()}:{acls.ToXmlString()}";
+    }
 
     public static string Serialize(AARectSave rectangle)
         => Encode(rectangle);
@@ -55,34 +73,35 @@ public static class ClipboardPayload
         if (sep < 0) return false;
 
         var typeName = text[..sep];
-        var xml      = text[(sep + 1)..];
+        var payload  = text[(sep + 1)..];
 
         try
         {
             if (typeName == TypeName<List<AnimationChainSave>>())
             {
-                chains = XmlFile.DeserializeFromString<List<AnimationChainSave>>(xml);
-                return chains != null;
+                chains = AnimationChainListSave.FromString(payload).AnimationChains;
+                return true;
             }
             if (typeName == TypeName<List<AnimationFrameSave>>())
             {
-                frames = XmlFile.DeserializeFromString<List<AnimationFrameSave>>(xml);
-                return frames != null;
+                frames = AnimationChainListSave.FromString(payload)
+                    .AnimationChains.SelectMany(c => c.Frames).ToList();
+                return true;
             }
             if (typeName == nameof(AARectSave))
             {
-                rectangle = XmlFile.DeserializeFromString<AARectSave>(xml);
+                rectangle = XmlFile.DeserializeFromString<AARectSave>(payload);
                 return rectangle != null;
             }
             if (typeName == nameof(CircleSave))
             {
-                circle = XmlFile.DeserializeFromString<CircleSave>(xml);
+                circle = XmlFile.DeserializeFromString<CircleSave>(payload);
                 return circle != null;
             }
         }
         catch
         {
-            // Malformed XML — return false
+            // Malformed payload — return false
         }
 
         return false;

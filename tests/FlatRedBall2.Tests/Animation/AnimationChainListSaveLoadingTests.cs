@@ -64,6 +64,26 @@ public class AnimationChainListSaveLoadingTests
         save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe("Sword");
     }
 
+    // ToXmlString is the in-memory companion to Save(path): the Animation Editor clipboard
+    // serializes copied frames/chains through it, so it must round-trip per-frame shapes.
+    [Fact]
+    public void ToXmlString_RoundTripsFrameShapesViaFromString()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Attack" };
+        var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
+        frame.ShapesSave = new ShapesSave();
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Sword", X = 5f, Y = 0f, ScaleX = 15f, ScaleY = 5f });
+        chain.Frames.Add(frame);
+        save.AnimationChains.Add(chain);
+
+        var roundTripped = AnimationChainListSave.FromString(save.ToXmlString());
+
+        var rect = roundTripped.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.Single();
+        rect.Name.ShouldBe("Sword");
+        rect.ScaleX.ShouldBe(15f);
+    }
+
     [Fact]
     public void FromFile_CircleShape_DeserializesFields()
     {
