@@ -1248,6 +1248,7 @@ public partial class MainWindow : Window
         MenuAbout.Click  += OnAboutClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
+        MenuDuplicate.Click     += (_, _) => HandleDuplicate();
         MenuResizeTexture.Click += (_, _) => _ = DoResizeTextureAsync();
 
         MenuReloadFromDisk.Click += (_, _) =>
@@ -1309,6 +1310,7 @@ public partial class MainWindow : Window
         Redo:            () => _undoManager.Redo(),
         Copy:            () => _ = HandleCopyAsync(),
         Paste:           () => _ = HandlePasteAsync(),
+        Duplicate:       () => HandleDuplicate(),
         ReloadFromDisk:  () => { if (!string.IsNullOrEmpty(_projectManager.FileName)) _appCommands.ReloadAchxFromDisk(_projectManager.FileName); },
         ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
         ResizeTexture:   () => _ = DoResizeTextureAsync(),
@@ -3447,6 +3449,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 _ = HandlePasteAsync();
             }
+            else if (e.Key == Key.D && HasCommandModifier(e.KeyModifiers))
+            {
+                if (IsTextInputFocused()) return;
+                e.Handled = true;
+                HandleDuplicate();
+            }
             else if (e.Key == Key.Delete)
             {
                 if (IsTextInputFocused()) return;
@@ -3612,6 +3620,28 @@ public partial class MainWindow : Window
             circle.Name = StringFunctions.MakeStringUnique(
                 circle.Name, existingNames, 2);
             _appCommands.PasteCircle(frame, circle);
+        }
+    }
+
+    // ── Duplicate ─────────────────────────────────────────────────────────────
+
+    // Mirrors HandleCopyAsync's selection dispatch: a chain duplicates to a plain
+    // copy, a frame duplicates within its containing chain. Flip-H/flip-V variants
+    // stay menu-only. The underlying commands select the new item themselves.
+    private void HandleDuplicate()
+    {
+        if (IsTextInputFocused()) return;
+
+        var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
+        if (selectedVm?.Data is AnimationChainSave chain)
+        {
+            _appCommands.DuplicateChain(chain);
+        }
+        else if (selectedVm?.Data is AnimationFrameSave frame)
+        {
+            var containingChain = _objectFinder.GetAnimationChainContaining(frame);
+            if (containingChain is null) return;
+            _appCommands.DuplicateFrame(frame, containingChain);
         }
     }
 

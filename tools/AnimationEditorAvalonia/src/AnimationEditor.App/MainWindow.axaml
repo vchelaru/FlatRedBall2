@@ -94,6 +94,7 @@
                         <Separator />
                         <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
                         <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
+                        <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate"     InputGesture="Ctrl+D" />
                         <Separator />
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
                         <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />

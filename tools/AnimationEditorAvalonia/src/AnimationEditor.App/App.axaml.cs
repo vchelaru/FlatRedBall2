@@ -99,6 +99,7 @@ public partial class App : Application
         editMenu.Add(new NativeMenuItemSeparator());
         editMenu.Add(new NativeMenuItem("Copy")  { Command = Cmd(a.Copy),  Gesture = new KeyGesture(Key.C, KeyModifiers.Meta) });
         editMenu.Add(new NativeMenuItem("Paste") { Command = Cmd(a.Paste), Gesture = new KeyGesture(Key.V, KeyModifiers.Meta) });
+        editMenu.Add(new NativeMenuItem("Duplicate") { Command = Cmd(a.Duplicate), Gesture = new KeyGesture(Key.D, KeyModifiers.Meta) });
         editMenu.Add(new NativeMenuItemSeparator());
         editMenu.Add(new NativeMenuItem("Reload from Disk")  { Command = Cmd(a.ReloadFromDisk) });
         editMenu.Add(new NativeMenuItem("Enable Hot Reload") { Command = Cmd(a.ToggleHotReload) });
