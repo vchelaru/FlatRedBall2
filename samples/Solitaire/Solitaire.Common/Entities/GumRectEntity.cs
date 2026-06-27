@@ -1,24 +1,25 @@
 using FlatRedBall2;
-using MonoGameGum.GueDeriving;
+using Gum.GueDeriving;
 using RenderingLibrary.Graphics;
 
 namespace Solitaire.Entities;
 
 // Minimal repro for the entity-attached Gum visual positioning bug:
-// an Entity that owns a ColoredRectangleRuntime via Entity.Add(GraphicalUiElement).
+// an Entity that owns a RectangleRuntime via Entity.Add(GraphicalUiElement).
 public class GumRectEntity : Entity
 {
     public override void CustomInitialize()
     {
-        var rect = new ColoredRectangleRuntime
+        var rect = new RectangleRuntime
         {
             Width = 40,
             Height = 40,
             XOrigin = HorizontalAlignment.Center,
             YOrigin = VerticalAlignment.Center,
-            Red = 255,
-            Green = 0,
-            Blue = 0,
+            IsFilled = true,
+            FillRed = 255,
+            FillGreen = 0,
+            FillBlue = 0,
         };
         Add(rect);
     }

@@ -27,7 +27,7 @@ public class ShapesBatch : IRenderBatch
     //   3. Copying the new XNBs into src/PrecompiledShaders/<platform>/
     //   4. Verifying each sample runs correctly with the new shaders
     //
-    internal const string AposShapesVersion = "0.6.8";
+    internal const string AposShapesVersion = "0.6.10-alpha";
 
     /// <summary>The shared singleton instance.</summary>
     public static readonly ShapesBatch Instance = new();
