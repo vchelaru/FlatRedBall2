@@ -1307,8 +1307,8 @@
             </Grid>
         </Grid>
     </DockPanel>
-        <!-- Frame-deleted undo toast -->
-        <Border x:Name="FrameDeletedToastPanel"
+        <!-- Item-deleted undo toast (frames, shapes, animation chains) -->
+        <Border x:Name="ItemDeletedToastPanel"
                 IsVisible="False"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
@@ -1318,11 +1318,11 @@
                 Padding="12,6"
                 ZIndex="50">
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <TextBlock x:Name="FrameDeletedToastLabel"
+                <TextBlock x:Name="ItemDeletedToastLabel"
                            Foreground="White"
                            VerticalAlignment="Center"
                            FontSize="12" />
-                <Button x:Name="FrameDeletedToastUndoBtn"
+                <Button x:Name="ItemDeletedToastUndoBtn"
                         Content="Undo"
                         Padding="8,3"
                         FontSize="12" />

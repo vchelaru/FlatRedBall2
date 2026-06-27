@@ -13,51 +13,51 @@ namespace AnimationEditor.Core.Tests;
 public class DeleteChainsSelectionTests
 {
     [Fact]
-    public async Task DeleteChains_ClearsSelectedChain_WhenSelectedChainIsDeleted()
+    public void DeleteChains_ClearsSelectedChain_WhenSelectedChainIsDeleted()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 2);
         ctx.SelectedState.SelectedChain = chain;
 
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { chain });
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain });
 
         Assert.Null(ctx.SelectedState.SelectedChain);
     }
 
     [Fact]
-    public async Task DeleteChains_KeepsSelectedChain_WhenADifferentChainIsDeleted()
+    public void DeleteChains_KeepsSelectedChain_WhenADifferentChainIsDeleted()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var first = TestHelpers.MakeChain(ctx.Acls, "Walk");
         var keep  = TestHelpers.MakeChain(ctx.Acls, "Run");
         ctx.SelectedState.SelectedChain = keep;
 
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { first });
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { first });
 
         Assert.Same(keep, ctx.SelectedState.SelectedChain);
     }
 
     [Fact]
-    public async Task DeleteChains_RemovesDeletedChainsFromMultiSelection()
+    public void DeleteChains_RemovesDeletedChainsFromMultiSelection()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var a = TestHelpers.MakeChain(ctx.Acls, "A");
         var b = TestHelpers.MakeChain(ctx.Acls, "B");
         ctx.SelectedState.SelectedNodes = new List<object> { a, b };
 
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { a, b });
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { a, b });
 
         Assert.Empty(ctx.SelectedState.SelectedNodes);
     }
 
     [Fact]
-    public async Task DeleteChains_Redo_ClearsSelectionAgain()
+    public void DeleteChains_Redo_ClearsSelectionAgain()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
         ctx.SelectedState.SelectedChain = chain;
 
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { chain });
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain });
         ctx.UndoManager.Undo();
 
         // User re-selects the restored chain, then redoes the delete.

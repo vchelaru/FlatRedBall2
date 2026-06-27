@@ -568,13 +568,13 @@ public partial class MainWindow : Window
         _events.AnimationChainsChanged    += HandleAnimationChainsChanged;
         _selectedState.SelectionChanged   += HandleSelectionChanged;
 
-        _appCommands.FramesDeleted += label =>
-            Dispatcher.UIThread.InvokeAsync(() => ShowFrameDeletedToast(label));
+        _appCommands.ItemsDeleted += label =>
+            Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
 
-        FrameDeletedToastUndoBtn.Click += (_, _) =>
+        ItemDeletedToastUndoBtn.Click += (_, _) =>
         {
             _toastCts?.Cancel();
-            FrameDeletedToastPanel.IsVisible = false;
+            ItemDeletedToastPanel.IsVisible = false;
             _undoManager.Undo();
         };
 
@@ -2305,12 +2305,20 @@ public partial class MainWindow : Window
                 }
             });
             AddMenuItem("Delete Rectangle", () =>
-                _ = _appCommands.AskToDeleteRectangles(new() { rect }));
+            {
+                var frame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (frame is not null)
+                    _appCommands.DeleteShapes(frame, new() { rect }, new());
+            });
         }
         else if (vm?.Data is CircleSave circle)
         {
             AddMenuItem("Delete Circle", () =>
-                _ = _appCommands.AskToDeleteCircles(new() { circle }));
+            {
+                var frame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (frame is not null)
+                    _appCommands.DeleteShapes(frame, new(), new() { circle });
+            });
         }
         else if (vm?.Data is AnimationFrameSave frame2)
         {
@@ -2375,12 +2383,7 @@ public partial class MainWindow : Window
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
             AddMenuItem("Delete Animation", () =>
-            {
-                if (chain.Frames.Count > 0)
-                    ShowDeleteChainConfirm(chain);
-                else
-                    _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain });
-            });
+                _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain }));
         }
         else
         {
@@ -3260,76 +3263,6 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds a danger-styled delete confirmation dialog. ENTER confirms (Delete), ESC cancels,
-    /// and closing by any other means resolves <paramref name="tcs"/> to false.
-    /// </summary>
-    internal static Window BuildDeleteConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            SizeToContent = SizeToContent.Height,
-            CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-
-        var panel = new StackPanel { Margin = new Avalonia.Thickness(20, 16, 20, 16), Spacing = 8 };
-        panel.Children.Add(new TextBlock
-        {
-            Text = message,
-            FontSize = 13,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = "This action cannot be undone.",
-            FontSize = 11,
-            Foreground = ThemedBrush("InkMid")
-        });
-
-        var deleteBtn = new Button
-        {
-            Content = "Delete",
-            Background = ThemedBrush("Accent"),
-            Foreground = Avalonia.Media.Brushes.White,
-            Padding = new Avalonia.Thickness(16, 6)
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-            Padding = new Avalonia.Thickness(16, 6)
-        };
-
-        deleteBtn.Click += (_, _) => { tcs.TrySetResult(true);  dialog.Close(); };
-        cancelBtn.Click += (_, _) => { tcs.TrySetResult(false); dialog.Close(); };
-
-        var buttons = new StackPanel
-        {
-            Orientation = Avalonia.Layout.Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-            Margin = new Avalonia.Thickness(0, 4, 0, 0)
-        };
-        buttons.Children.Add(cancelBtn);
-        buttons.Children.Add(deleteBtn);
-        panel.Children.Add(buttons);
-
-        dialog.Content = panel;
-        dialog.Closed += (_, _) => tcs.TrySetResult(false);
-
-        WireDialogKeyboard(dialog,
-            onConfirm: () => { tcs.TrySetResult(true);  dialog.Close(); },
-            onCancel:  () => { tcs.TrySetResult(false); dialog.Close(); });
-
-        // Ensure ENTER confirms (Delete) by focusing the delete button last — it overrides
-        // WireDialogKeyboard's Opened handler which would otherwise land on Cancel (first child).
-        dialog.Opened += (_, _) => deleteBtn.Focus();
-
-        return dialog;
-    }
-
-    /// <summary>
     /// Wires ENTER → <paramref name="onConfirm"/> and ESC → <paramref name="onCancel"/>
     /// on a modal dialog. The handler is attached at the window with
     /// <c>handledEventsToo: true</c> so it still fires when a focused input control
@@ -3729,17 +3662,15 @@ public partial class MainWindow : Window
     private void HandleDelete()
     {
         // Delete the whole multi-selection of the focused node's kind, not just the
-        // focused node — AskToDelete* batches them into a single undo step.
+        // focused node — the delete commands batch them into a single undo step.
+        // All kinds are fully undoable, so they delete immediately and surface an
+        // undo toast rather than a confirmation dialog.
         switch (SelectedData)
         {
             case AnimationChainSave chainToDel:
             {
                 var chains = _selectedState.SelectedChains;
-                List<AnimationChainSave> toDelete = chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel };
-                if (toDelete.Any(c => c.Frames.Count > 0))
-                    ShowDeleteChainConfirm(toDelete);
-                else
-                    _appCommands.DeleteAnimationChains(toDelete);
+                _appCommands.DeleteAnimationChains(chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel });
                 break;
             }
             case AnimationFrameSave frameToDel:
@@ -3753,10 +3684,7 @@ public partial class MainWindow : Window
                 var frame   = _selectedState.SelectedFrame!;
                 var rects   = _selectedState.SelectedRectangles;
                 var circles = _selectedState.SelectedCircles;
-                ShowDeleteShapeConfirm(
-                    frame,
-                    rects.Count > 0 ? rects : new() { rectToDel },
-                    circles);
+                _appCommands.DeleteShapes(frame, rects.Count > 0 ? rects : new() { rectToDel }, circles);
                 break;
             }
             case CircleSave circleToDel:
@@ -3764,59 +3692,27 @@ public partial class MainWindow : Window
                 var frame   = _selectedState.SelectedFrame!;
                 var circles = _selectedState.SelectedCircles;
                 var rects   = _selectedState.SelectedRectangles;
-                ShowDeleteShapeConfirm(
-                    frame,
-                    rects,
-                    circles.Count > 0 ? circles : new() { circleToDel });
+                _appCommands.DeleteShapes(frame, rects, circles.Count > 0 ? circles : new() { circleToDel });
                 break;
             }
         }
     }
 
-    private async void ShowFrameDeletedToast(string label)
+    private async void ShowItemDeletedToast(string label)
     {
         _toastCts?.Cancel();
         _toastCts = new System.Threading.CancellationTokenSource();
         System.Threading.CancellationToken token = _toastCts.Token;
 
-        FrameDeletedToastLabel.Text = $"\"{label}\" deleted";
-        FrameDeletedToastPanel.IsVisible = true;
+        ItemDeletedToastLabel.Text = $"\"{label}\" deleted";
+        ItemDeletedToastPanel.IsVisible = true;
 
         try
         {
             await System.Threading.Tasks.Task.Delay(4000, token);
-            FrameDeletedToastPanel.IsVisible = false;
+            ItemDeletedToastPanel.IsVisible = false;
         }
         catch (System.Threading.Tasks.TaskCanceledException) { }
-    }
-
-    private void ShowDeleteChainConfirm(AnimationChainSave chain) =>
-        ShowDeleteChainConfirm(new List<AnimationChainSave> { chain });
-
-    private async void ShowDeleteChainConfirm(List<AnimationChainSave> chains)
-    {
-        string msg = chains.Count == 1
-            ? $"Delete animation \"{chains[0].Name}\"? It has {chains[0].Frames.Count} frame(s)."
-            : $"Delete {chains.Count} animations?";
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = BuildDeleteConfirmDialog(msg, "Delete Animation", tcs);
-        await dialog.ShowDialog(this);
-        if (await tcs.Task)
-            _appCommands.DeleteAnimationChains(chains);
-    }
-
-    private async void ShowDeleteShapeConfirm(AnimationFrameSave frame, List<AARectSave> rects, List<CircleSave> circles)
-    {
-        int total = rects.Count + circles.Count;
-        string name = rects.Count > 0 ? rects[0].Name : circles[0].Name;
-        string msg = total == 1
-            ? $"Delete shape \"{name}\"?"
-            : $"Delete {total} shape(s)?";
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = BuildDeleteConfirmDialog(msg, "Delete Shape", tcs);
-        await dialog.ShowDialog(this);
-        if (await tcs.Task)
-            _appCommands.DeleteShapes(frame, rects, circles);
     }
 
     /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>

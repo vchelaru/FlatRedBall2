@@ -9,7 +9,7 @@ using Xunit;
 
 namespace AnimationEditor.App.Tests;
 
-public class FrameDeletedToastTests
+public class ItemDeletedToastTests
 {
     private static (MainWindow Window, TestServices Ctx) CreateWindow()
     {
@@ -27,7 +27,7 @@ public class FrameDeletedToastTests
         var (window, _) = CreateWindow();
         try
         {
-            Border toast = window.FindControl<Border>("FrameDeletedToastPanel")!;
+            Border toast = window.FindControl<Border>("ItemDeletedToastPanel")!;
             Assert.False(toast.IsVisible);
         }
         finally { window.Close(); }
@@ -49,7 +49,7 @@ public class FrameDeletedToastTests
             ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             Dispatcher.UIThread.RunJobs();
 
-            Border toast = window.FindControl<Border>("FrameDeletedToastPanel")!;
+            Border toast = window.FindControl<Border>("ItemDeletedToastPanel")!;
             Assert.True(toast.IsVisible);
         }
         finally { window.Close(); }
@@ -71,7 +71,7 @@ public class FrameDeletedToastTests
             ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             Dispatcher.UIThread.RunJobs();
 
-            TextBlock label = window.FindControl<TextBlock>("FrameDeletedToastLabel")!;
+            TextBlock label = window.FindControl<TextBlock>("ItemDeletedToastLabel")!;
             Assert.Contains("Frame 1", label.Text);
         }
         finally { window.Close(); }
@@ -93,14 +93,14 @@ public class FrameDeletedToastTests
             ctx.AppCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             Dispatcher.UIThread.RunJobs();
 
-            Button undoBtn = window.FindControl<Button>("FrameDeletedToastUndoBtn")!;
+            Button undoBtn = window.FindControl<Button>("ItemDeletedToastUndoBtn")!;
             undoBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(2, chain.Frames.Count);
             Assert.Contains(frame, chain.Frames);
 
-            Border toast = window.FindControl<Border>("FrameDeletedToastPanel")!;
+            Border toast = window.FindControl<Border>("ItemDeletedToastPanel")!;
             Assert.False(toast.IsVisible);
         }
         finally { window.Close(); }

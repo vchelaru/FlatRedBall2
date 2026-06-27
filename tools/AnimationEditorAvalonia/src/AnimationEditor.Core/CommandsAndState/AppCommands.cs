@@ -108,7 +108,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <inheritdoc cref="IAppCommands.HotReloadWatcher"/>
         public IHotReloadWatcher HotReloadWatcher { get; set; } = NullHotReloadWatcher.Instance;
 
-        public event Action<string>? FramesDeleted;
+        /// <summary>
+        /// Raised after a frame, shape, or animation chain is deleted. The argument is a
+        /// short label for the deleted item(s) (e.g. <c>"Frame 2"</c>, <c>"Hitbox"</c>,
+        /// <c>"3 shapes"</c>). The app layer shows an undo toast in response.
+        /// </summary>
+        public event Action<string>? ItemsDeleted;
 
         /// <summary>
         /// Fired after <see cref="SaveCurrentAnimationChainListAsync"/> successfully saves a file.
@@ -275,7 +280,15 @@ namespace AnimationEditor.Core.CommandsAndState
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
+            // Capture which chains will actually be removed (so the toast count is honest)
+            // before the command runs and removes them.
+            var valid = animationChains.Where(c => acls.AnimationChains.Contains(c)).ToList();
             _undoManager.Execute(new DeleteChainsCommand(animationChains, acls, this, _events, _selectedState));
+            if (valid.Count > 0)
+            {
+                string label = valid.Count == 1 ? valid[0].Name : $"{valid.Count} animations";
+                ItemsDeleted?.Invoke(label);
+            }
         }
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
@@ -351,74 +364,6 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events, _selectedState));
         }
 
-        public async Task AskToDeleteRectangles(List<AARectSave> rectangles)
-        {
-            var message = "Delete the following rectangle(s)?\n\n" +
-                string.Join("\n", rectangles.Select(r => r.Name));
-
-            if (await ConfirmAsync(message, "Delete?"))
-            {
-                // One composite entry so deleting several shapes is a single undo step.
-                var commands = new List<IUndoableCommand>();
-                foreach (var rectangle in rectangles.ToArray())
-                {
-                    var frame = _objectFinder.GetAnimationFrameContaining(rectangle);
-                    if (frame != null)
-                        commands.Add(new DeleteAxisAlignedRectangleCommand(rectangle, frame, this, _events, _selectedState));
-                }
-                if (commands.Count > 0)
-                {
-                    var desc = rectangles.Count == 1
-                        ? $"Delete Rectangle '{rectangles[0].Name}'"
-                        : $"Delete {rectangles.Count} Rectangles";
-                    _undoManager.Execute(new CompositeCommand(commands, desc));
-                }
-            }
-        }
-
-        public async Task AskToDeleteCircles(List<CircleSave> circles)
-        {
-            var message = "Delete the following circle(s)?\n\n" +
-                string.Join("\n", circles.Select(c => c.Name));
-
-            if (await ConfirmAsync(message, "Delete?"))
-            {
-                // One composite entry so deleting several shapes is a single undo step.
-                var commands = new List<IUndoableCommand>();
-                foreach (var circle in circles.ToArray())
-                {
-                    var frame = _objectFinder.GetAnimationFrameContaining(circle);
-                    if (frame != null)
-                        commands.Add(new DeleteCircleCommand(circle, frame, this, _events, _selectedState));
-                }
-                if (commands.Count > 0)
-                {
-                    var desc = circles.Count == 1
-                        ? $"Delete Circle '{circles[0].Name}'"
-                        : $"Delete {circles.Count} Circles";
-                    _undoManager.Execute(new CompositeCommand(commands, desc));
-                }
-            }
-        }
-
-        public async Task AskToDeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
-        {
-            var allNames = rectangles.Select(r => r.Name).Concat(circles.Select(c => c.Name));
-            var message = "Delete the following shape(s)?\n\n" +
-                string.Join("\n", allNames);
-
-            if (!await ConfirmAsync(message, "Delete?")) return;
-
-            AnimationFrameSave? frame = null;
-            if (rectangles.Count > 0)
-                frame = _objectFinder.GetAnimationFrameContaining(rectangles[0]);
-            if (frame == null && circles.Count > 0)
-                frame = _objectFinder.GetAnimationFrameContaining(circles[0]);
-            if (frame == null) return;
-
-            DeleteShapes(frame, rectangles, circles);
-        }
-
         public void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles)
         {
             var commands = new List<IUndoableCommand>();
@@ -426,19 +371,18 @@ namespace AnimationEditor.Core.CommandsAndState
                 commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events, _selectedState));
             foreach (var circle in circles.ToArray())
                 commands.Add(new DeleteCircleCommand(circle, frame, this, _events, _selectedState));
-            if (commands.Count > 0)
-                _undoManager.Execute(new CompositeCommand(commands));
-        }
+            if (commands.Count == 0) return;
 
-        public async Task AskToDeleteAnimationChains(List<AnimationChainSave> animationChains)
-        {
-            var message = "Delete the following animation(s)?\n\n" +
-                string.Join("\n", animationChains.Select(c => c.Name));
+            int total = commands.Count;
+            // Single shape reuses its own command's "Delete Rectangle 'X'" / "Delete Circle 'X'"
+            // text so the History panel reads naturally instead of "Composite Action".
+            string desc = total == 1 ? commands[0].Description : $"Delete {total} Shapes";
+            _undoManager.Execute(new CompositeCommand(commands, desc));
 
-            if (await ConfirmAsync(message, "Delete?"))
-            {
-                DeleteAnimationChains(animationChains);
-            }
+            string label = total == 1
+                ? (rectangles.Count == 1 ? rectangles[0].Name : circles[0].Name)
+                : $"{total} shapes";
+            ItemsDeleted?.Invoke(label);
         }
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
@@ -452,7 +396,7 @@ namespace AnimationEditor.Core.CommandsAndState
                     : $"{validFrames.Count} frames";
                 _undoManager.Execute(new DeleteFramesCommand(frames, chain, this, _events, _selectedState));
                 if (validFrames.Count > 0)
-                    FramesDeleted?.Invoke(label);
+                    ItemsDeleted?.Invoke(label);
             }
 
             RefreshWireframeRequested?.Invoke();

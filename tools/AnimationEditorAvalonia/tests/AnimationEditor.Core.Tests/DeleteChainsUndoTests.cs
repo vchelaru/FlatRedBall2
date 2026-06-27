@@ -12,7 +12,7 @@ public class DeleteChainsUndoTests
     // ── DeleteAnimationChains + Undo ──────────────────────────────────────────
 
     [Fact]
-    public async Task DeleteAnimationChains_Undo_RestoresChainsAtOriginalPositions()
+    public void DeleteAnimationChains_Undo_RestoresChainsAtOriginalPositions()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
@@ -21,8 +21,8 @@ public class DeleteChainsUndoTests
         var chainC = TestHelpers.MakeChain(acls, "C");
         Assert.Equal(3, acls.AnimationChains.Count);
 
-        // Delete B (index 1) and confirm
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { chainB });
+        // Delete B (index 1)
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { chainB });
         Assert.Equal(2, acls.AnimationChains.Count);
 
         ctx.UndoManager.Undo();
@@ -32,14 +32,14 @@ public class DeleteChainsUndoTests
     }
 
     [Fact]
-    public async Task DeleteAnimationChains_UndoThenRedo_RemovesChainAgain()
+    public void DeleteAnimationChains_UndoThenRedo_RemovesChainAgain()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var acls = ctx.Acls;
         var chainA = TestHelpers.MakeChain(acls, "A");
         var chainB = TestHelpers.MakeChain(acls, "B");
 
-        await ctx.AppCommands.AskToDeleteAnimationChains(new List<AnimationChainSave> { chainA });
+        ctx.AppCommands.DeleteAnimationChains(new List<AnimationChainSave> { chainA });
         ctx.UndoManager.Undo();
         Assert.Equal(2, acls.AnimationChains.Count);
 
