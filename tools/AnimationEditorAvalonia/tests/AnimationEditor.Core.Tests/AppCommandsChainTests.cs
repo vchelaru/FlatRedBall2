@@ -442,6 +442,21 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_InsertsCopyImmediatelyAfterSource()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        TestHelpers.MakeChain(acls, "A");
+        var source = TestHelpers.MakeChain(acls, "B");
+        TestHelpers.MakeChain(acls, "C");   // acls order: A, B, C
+
+        var copy = ctx.AppCommands.DuplicateChain(source);
+
+        // The copy must land directly after its source (index 2), not at the end.
+        Assert.Equal(2, acls.AnimationChains.IndexOf(copy!));
+    }
+
+    [Fact]
     public void DuplicateChain_WhenAclsIsNull_ReturnsNull()
     {
         var ctx = TestHelpers.SetupFreshAcls();

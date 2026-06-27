@@ -724,25 +724,17 @@ namespace AnimationEditor.Core.CommandsAndState
                 };
                 if (frame.ShapesSave != null)
                 {
-                    foreach (var shape in frame.ShapesSave!.Shapes)
-                    {
-                        switch (shape)
-                        {
-                            case AARectSave r:
-                                fCopy.ShapesSave!.Shapes.Add(
-                                    new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                                break;
-                            case CircleSave c:
-                                fCopy.ShapesSave!.Shapes.Add(
-                                    new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
-                                break;
-                        }
-                    }
+                    foreach (var shape in frame.ShapesSave.Shapes)
+                        if (CloneShape(shape) is { } shapeCopy)
+                            fCopy.ShapesSave!.Shapes.Add(shapeCopy);
                 }
                 copy.Frames.Add(fCopy);
             }
 
-            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events, _selectedState));
+            // Place the copy right after its source so it appears adjacent in the tree.
+            int sourceIndex = acls.AnimationChains.IndexOf(source);
+            int? insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : null;
+            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events, _selectedState, insertIndex));
             return copy;
         }
 
@@ -768,24 +760,54 @@ namespace AnimationEditor.Core.CommandsAndState
             if (source.ShapesSave != null)
             {
                 foreach (var shape in source.ShapesSave.Shapes)
-                {
-                    switch (shape)
-                    {
-                        case AARectSave r:
-                            copy.ShapesSave!.Shapes.Add(
-                                new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY });
-                            break;
-                        case CircleSave c:
-                            copy.ShapesSave!.Shapes.Add(
-                                new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius });
-                            break;
-                    }
-                }
+                    if (CloneShape(shape) is { } shapeCopy)
+                        copy.ShapesSave!.Shapes.Add(shapeCopy);
             }
 
             _undoManager.Execute(new DuplicateFrameCommand(source, copy, chain, this, _events, _selectedState));
             return copy;
         }
+
+        /// <inheritdoc cref="IAppCommands.DuplicateShape"/>
+        public object? DuplicateShape(object source)
+        {
+            var frame = source switch
+            {
+                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
+                CircleSave  c => _objectFinder.GetAnimationFrameContaining(c),
+                _ => null,
+            };
+            if (frame is null) return null;
+            if (CloneShape(source) is not { } copy) return null;
+
+            frame.ShapesSave ??= new FlatRedBall2.Animation.Content.ShapesSave();
+            var existingNames = frame.ShapesSave.AARectSaves.Select(r => r.Name)
+                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name)).ToList();
+
+            switch (copy)
+            {
+                case AARectSave r:
+                    r.Name = StringFunctions.MakeStringUnique(r.Name, existingNames, 2);
+                    _undoManager.Execute(new AddAxisAlignedRectangleCommand(r, frame, this, _events, _selectedState));
+                    break;
+                case CircleSave c:
+                    c.Name = StringFunctions.MakeStringUnique(c.Name, existingNames, 2);
+                    _undoManager.Execute(new AddCircleCommand(c, frame, this, _events, _selectedState));
+                    break;
+            }
+            return copy;
+        }
+
+        // Deep-copies one shape entry (rect/circle). Shared by DuplicateChain,
+        // DuplicateFrame, and DuplicateShape so the field-copy lives in one place.
+        // Returns null for shape kinds that aren't duplicable yet (e.g. polygons),
+        // matching what Copy/Paste supports.
+        private static object? CloneShape(object shape) => shape switch
+        {
+            AARectSave r => new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY },
+            CircleSave  c => new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius },
+            _ => null,
+        };
 
         public void SortAnimationsAlphabetically()
         {

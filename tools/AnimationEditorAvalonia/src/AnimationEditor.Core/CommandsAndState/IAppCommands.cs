@@ -115,6 +115,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// and attached shapes are copied. Undoable.
         /// </summary>
         AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain);
+
+        /// <summary>
+        /// Deep-copies a shape (<see cref="AARectSave"/> or <see cref="CircleSave"/>) into the
+        /// frame that contains it, with a unique name, and selects the copy. Returns the copy,
+        /// or <c>null</c> if the shape isn't in any frame or its kind isn't duplicable. Undoable.
+        /// </summary>
+        object? DuplicateShape(object source);
         void SortAnimationsAlphabetically();
         void AdjustOffsetsJustifyBottom(AnimationChainSave chain, Func<AnimationFrameSave, float?> getTextureHeight, float offsetMultiplier = 1f);
         void AdjustOffsetsAdjustAll(AnimationChainSave chain, float? deltaX, float? deltaY, bool relative);

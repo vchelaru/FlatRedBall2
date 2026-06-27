@@ -3625,23 +3625,28 @@ public partial class MainWindow : Window
 
     // ── Duplicate ─────────────────────────────────────────────────────────────
 
-    // Mirrors HandleCopyAsync's selection dispatch: a chain duplicates to a plain
-    // copy, a frame duplicates within its containing chain. Flip-H/flip-V variants
-    // stay menu-only. The underlying commands select the new item themselves.
+    // Mirrors HandleCopyAsync's selection dispatch exactly (chain/frame/rect/circle) so
+    // every type that can be copied can also be duplicated. Each duplicate places the copy
+    // adjacent to its source and selects it; flip-H/flip-V chain variants stay menu-only.
     private void HandleDuplicate()
     {
         if (IsTextInputFocused()) return;
 
-        var selectedVm = AnimTree.SelectedItem as TreeNodeVm;
-        if (selectedVm?.Data is AnimationChainSave chain)
+        switch ((AnimTree.SelectedItem as TreeNodeVm)?.Data)
         {
-            _appCommands.DuplicateChain(chain);
-        }
-        else if (selectedVm?.Data is AnimationFrameSave frame)
-        {
-            var containingChain = _objectFinder.GetAnimationChainContaining(frame);
-            if (containingChain is null) return;
-            _appCommands.DuplicateFrame(frame, containingChain);
+            case AnimationChainSave chain:
+                _appCommands.DuplicateChain(chain);
+                break;
+            case AnimationFrameSave frame
+                when _objectFinder.GetAnimationChainContaining(frame) is { } chain:
+                _appCommands.DuplicateFrame(frame, chain);
+                break;
+            case AARectSave rect:
+                _appCommands.DuplicateShape(rect);
+                break;
+            case CircleSave circle:
+                _appCommands.DuplicateShape(circle);
+                break;
         }
     }
 

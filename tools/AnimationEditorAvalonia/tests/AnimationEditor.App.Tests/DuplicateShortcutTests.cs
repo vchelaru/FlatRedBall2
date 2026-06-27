@@ -112,6 +112,59 @@ public class DuplicateShortcutTests
     }
 
     /// <summary>
+    /// Rectangle selected → Ctrl+D duplicates the shape into its frame. Guards
+    /// against the regression where Ctrl+D handled chains/frames but not shapes.
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlD_RectangleSelected_DuplicatesShape()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { TextureName = "run.png" };
+            frame.ShapesSave = new ShapesSave();
+            var rect = new AARectSave { Name = "HitBox" };
+            frame.ShapesSave.Shapes.Add(rect);
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            SeedAndSelect(window, rect, "HitBox");
+
+            window.KeyPress(Key.D, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(2, frame.ShapesSave!.AARectSaves.Count());
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Circle selected → Ctrl+D duplicates the shape into its frame.
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlD_CircleSelected_DuplicatesShape()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { TextureName = "run.png" };
+            frame.ShapesSave = new ShapesSave();
+            var circle = new CircleSave { Name = "Hurt", Radius = 4 };
+            frame.ShapesSave.Shapes.Add(circle);
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            SeedAndSelect(window, circle, "Hurt");
+
+            window.KeyPress(Key.D, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(2, frame.ShapesSave!.CircleSaves.Count());
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
     /// Text box focused → Ctrl+D must not duplicate; the keystroke belongs to the
     /// text editor, not the window-level handler.
     /// </summary>
