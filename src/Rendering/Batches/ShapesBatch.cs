@@ -20,8 +20,13 @@ public class ShapesBatch : IRenderBatch
     // users don't need Wine for shader compilation. This constant must match the
     // version of Apos.Shapes whose shader was used to produce those XNBs.
     //
+    // The PACKAGE version lives in MSBuild as $(AposShapesVersion)
+    // (src/PrecompiledShaders/AposShapes.props) — the single source of truth that
+    // drives every csproj. A C# const can't read MSBuild, so this mirrors it by
+    // hand; keep the two equal. See AposShapes.props for the full rebuild procedure.
+    //
     // ONLY UPDATE THIS AFTER:
-    //   1. Updating the Apos.Shapes NuGet version in FlatRedBall2.csproj
+    //   1. Bumping $(AposShapesVersion) in src/PrecompiledShaders/AposShapes.props
     //   2. Rebuilding a sample on each platform (DesktopGL, BlazorGL) so the
     //      content pipeline compiles fresh apos-shapes.xnb files
     //   3. Copying the new XNBs into src/PrecompiledShaders/<platform>/

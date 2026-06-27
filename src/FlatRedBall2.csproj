@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- Single source of truth for $(AposShapesVersion); see that file before bumping it. -->
+  <Import Project="PrecompiledShaders/AposShapes.props" />
+
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
@@ -57,7 +60,7 @@
 
   <!-- MonoGame backend -->
   <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
-    <PackageReference Include="Apos.Shapes" Version="0.6.10-alpha" />
+    <PackageReference Include="Apos.Shapes" Version="$(AposShapesVersion)" />
     <PackageReference Include="Gum.MonoGame" Version="2026.6.26.1" />
     <PackageReference Include="Gum.Shapes.MonoGame" Version="2026.6.26.1" />
     <PackageReference Include="KernSmith.MonoGameGum" Version="0.13.*" />
@@ -69,7 +72,7 @@
 
   <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
   <ItemGroup Condition="'$(Backend)' == 'Kni'">
-    <PackageReference Include="Apos.Shapes.KNI" Version="0.6.10-alpha" />
+    <PackageReference Include="Apos.Shapes.KNI" Version="$(AposShapesVersion)" />
     <PackageReference Include="Gum.KNI" Version="2026.6.26.1" />
     <PackageReference Include="Gum.Shapes.KNI" Version="2026.6.26.1" />
     <PackageReference Include="KernSmith.KniGum" Version="0.13.*" />

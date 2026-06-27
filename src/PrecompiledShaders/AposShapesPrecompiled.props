@@ -8,12 +8,15 @@
 
     Unknown platforms fall back to normal compilation (Apos.Shapes' own MSBuild targets handle it).
 
+    The Apos.Shapes PACKAGE version is centralized in AposShapes.props (sibling file) as
+    $(AposShapesVersion) — see that file for the rule on rebuilding these XNBs after a bump.
+
     ALLOWLIST: Only platforms with a verified precompiled XNB in this directory are listed.
     To add a new platform:
       1. Build a sample on that platform so the content pipeline compiles apos-shapes.xnb
       2. Copy the resulting .xnb into a new subfolder here (e.g. DirectX/)
       3. Add the platform to the condition below
-      4. Update AposShapesVersion in FlatRedBall2's source to match (see ShapesBatch.cs)
+      4. Update ShapesBatch.AposShapesVersion (C# const) to match $(AposShapesVersion)
   -->
 
   <PropertyGroup>

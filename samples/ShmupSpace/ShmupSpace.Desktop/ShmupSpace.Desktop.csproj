@@ -11,8 +11,11 @@
     <RootNamespace>ShmupSpace</RootNamespace>
   </PropertyGroup>
 
+  <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
+       the engine, which is the single source of truth ($(AposShapesVersion) in
+       src/PrecompiledShaders/AposShapes.props). The precompiled apos-shapes.xnb shader is
+       wired up by AposShapesPrecompiled.props, imported at the top of this file. -->
   <ItemGroup>
-    <PackageReference Include="Apos.Shapes" Version="0.6.10-alpha" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>
