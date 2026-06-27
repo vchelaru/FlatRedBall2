@@ -163,6 +163,20 @@ public class AnimationChainListSave
     /// </remarks>
     public void Save(string path)
     {
+        using var stream = File.Create(path);
+        ToXDocument().Save(stream);
+    }
+
+    /// <summary>
+    /// Serializes this save to a .achx XML string using the same dialect as <see cref="Save"/>.
+    /// Lets the Animation Editor clipboard share one serializer with file I/O, so copy/paste of
+    /// frames and chains round-trips per-frame shapes exactly as the on-disk format does. Pair
+    /// with <see cref="FromString"/> to read it back.
+    /// </summary>
+    public string ToXmlString() => ToXDocument().ToString();
+
+    private XDocument ToXDocument()
+    {
         var root = new XElement("AnimationChainArraySave",
             new XAttribute(XNamespace.Xmlns + "xsi", "http://www.w3.org/2001/XMLSchema-instance"),
             new XAttribute(XNamespace.Xmlns + "xsd", "http://www.w3.org/2001/XMLSchema"),
@@ -182,9 +196,7 @@ public class AnimationChainListSave
         if (ProjectFile != null)
             root.Add(new XElement("ProjectFile", ProjectFile));
 
-        var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
-        using var stream = File.Create(path);
-        doc.Save(stream);
+        return new XDocument(new XDeclaration("1.0", "utf-8", null), root);
     }
 
     private static XElement WriteFrame(AnimationFrameSave frame)

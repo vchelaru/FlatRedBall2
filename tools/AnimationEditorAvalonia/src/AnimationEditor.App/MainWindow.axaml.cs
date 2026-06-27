@@ -1628,6 +1628,9 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<TimelineFrameVm> _timelineFrames = new();
     private double _timelineEffectivePps = TimelineBuilder.PixelsPerSecond;
     private int _currentTimelineFrameIndex = -1;
+    // Structure of the strip the cells were last built from; compared on each refresh so a
+    // pure selection change (scrub) skips the clear-and-rebuild (#452).
+    private TimelineStripSignature? _timelineSignature;
 
     private void WireTreeView()
     {
@@ -2053,6 +2056,10 @@ public partial class MainWindow : Window
             }
         }
         RefreshTreeThumbnails();
+        // A PNG changing on disk alters the thumbnail content without changing any frame field, so
+        // the strip signature is unchanged. Force the next refresh to rebuild so stale crops are
+        // regenerated from the invalidated cache (mirrors the tree-thumbnail reset above).
+        _timelineSignature = null;
         RefreshTimelineStrip();
         _appCommands.RefreshAnimationFrameDisplay();
         ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
@@ -2123,13 +2130,45 @@ public partial class MainWindow : Window
             TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
         if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
-            AnimTree.SelectedItem = target;
+        {
+            // This is a one-way push of model selection into the tree. Suppress OnTreeSelectionChanged
+            // so the assignment doesn't loop back through SelectedNodes/RouteNodeSelection and re-fire
+            // the whole SelectionChanged cascade (a second timeline + inspector rebuild) — and so it
+            // can't clobber SelectedChain when selecting a frame under a collapsed chain (#452).
+            // Save/restore rather than bare reset so nesting under another suppressed refresh is safe.
+            bool prior = _suppressTreeSelectionHandling;
+            _suppressTreeSelectionHandling = true;
+            try { AnimTree.SelectedItem = target; }
+            finally { _suppressTreeSelectionHandling = prior; }
+        }
     }
 
     private void RefreshTimelineStrip()
     {
         var chain = GetTimelineChain();
 
+        // Only clear-and-rebuild the cells when the frame structure (chain identity, count,
+        // durations, or any thumbnail-affecting field) actually changed. A scrub that crosses a
+        // frame boundary changes only the selection, so the signature stays equal and we keep the
+        // existing cell VMs alive — skipping the per-frame Skia thumbnail regeneration and the
+        // playhead-VM teardown that caused the visible pop/fall-behind (#452). The highlight and
+        // playhead offset below run on every call regardless.
+        var signature = TimelineStripSignature.From(chain);
+        if (!signature.Equals(_timelineSignature))
+        {
+            RebuildTimelineStripCells(chain);
+            _timelineSignature = signature;
+        }
+
+        int preferred = GetPreferredTimelineFrameIndex(chain);
+        UpdateTimelineScrubber(preferred);
+        // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
+        // sub-frame offset instead of snapping to the cell's left edge (#432).
+        ApplyScrubberOffsetFromPlayback(preferred);
+    }
+
+    private void RebuildTimelineStripCells(AnimationChainSave? chain)
+    {
         // Capture old thumbnails before clearing so we dispose after the collection is empty
         // (avoids briefly holding disposed Bitmaps in bound Image controls)
         var oldThumbnails = _timelineFrames.Select(vm => vm.Thumbnail as IDisposable).ToList();
@@ -2148,12 +2187,8 @@ public partial class MainWindow : Window
                 _timelineFrames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], 22, 18);
         }
 
+        // Cells were just recreated, so no frame is current until UpdateTimelineScrubber runs.
         _currentTimelineFrameIndex = -1;
-        int preferred = GetPreferredTimelineFrameIndex(chain);
-        UpdateTimelineScrubber(preferred);
-        // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
-        // sub-frame offset across the rebuild instead of snapping to the cell's left edge (#432).
-        ApplyScrubberOffsetFromPlayback(preferred);
     }
 
     private void ApplyScrubberOffsetFromPlayback(int frameIndex)

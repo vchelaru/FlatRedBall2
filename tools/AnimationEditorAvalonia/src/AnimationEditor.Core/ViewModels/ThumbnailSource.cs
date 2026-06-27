@@ -18,23 +18,20 @@ public readonly record struct ThumbnailSource(
     bool FlipHorizontal,
     bool FlipVertical)
 {
-    /// <summary>
-    /// Returns the signature of <paramref name="chain"/>'s first frame, or <c>null</c>
-    /// when the chain has no frames (the tree falls back to the generic chain icon).
-    /// </summary>
-    public static ThumbnailSource? FromChain(AnimationChainSave chain)
-    {
-        if (chain.Frames.Count == 0)
-            return null;
-
-        var frame = chain.Frames[0];
-        return new ThumbnailSource(
-            frame.TextureName,
+    /// <summary>Returns the signature of a single frame's thumbnail-relevant visual state.</summary>
+    public static ThumbnailSource FromFrame(AnimationFrameSave frame) =>
+        new(frame.TextureName,
             frame.LeftCoordinate,
             frame.RightCoordinate,
             frame.TopCoordinate,
             frame.BottomCoordinate,
             frame.FlipHorizontal,
             frame.FlipVertical);
-    }
+
+    /// <summary>
+    /// Returns the signature of <paramref name="chain"/>'s first frame, or <c>null</c>
+    /// when the chain has no frames (the tree falls back to the generic chain icon).
+    /// </summary>
+    public static ThumbnailSource? FromChain(AnimationChainSave chain) =>
+        chain.Frames.Count == 0 ? null : FromFrame(chain.Frames[0]);
 }
