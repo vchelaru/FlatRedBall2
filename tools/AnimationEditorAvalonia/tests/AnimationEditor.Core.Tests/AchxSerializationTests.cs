@@ -200,6 +200,78 @@ public class AchxSerializationTests
         Assert.Equal(20f, loadedCircle.Radius);
     }
 
+    [Fact]
+    public void Save_FrameWithNullShapes_OmitsShapeCollectionElement()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var path = dir.Path + "/noshapes.achx";
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Idle" };
+        // Mirrors an old (FRB1-authored) frame loaded with no shape data.
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "hero.png", ShapesSave = null });
+        acls.AnimationChains.Add(chain);
+
+        acls.Save(path);
+        var xml = File.ReadAllText(path);
+
+        Assert.DoesNotContain("ShapeCollectionSave", xml);
+    }
+
+    [Fact]
+    public void Save_FrameWithEmptyShapes_OmitsShapeCollectionElement()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var path = dir.Path + "/emptyshapes.achx";
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Idle" };
+        chain.Frames.Add(TestHelpers.MakeFrame()); // non-null but zero shapes
+        acls.AnimationChains.Add(chain);
+
+        acls.Save(path);
+        var xml = File.ReadAllText(path);
+
+        Assert.DoesNotContain("ShapeCollectionSave", xml);
+    }
+
+    [Fact]
+    public void LoadThenSave_OldFrameWithNoShapeWrapper_DoesNotInjectShapeCollection()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var path = dir.Path + "/old.achx";
+
+        // Hand-authored FRB1-era frame with no <ShapeCollectionSave> wrapper at all.
+        var oldXml =
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <FileRelativeTextures>true</FileRelativeTextures>
+              <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+              <CoordinateType>Pixel</CoordinateType>
+              <AnimationChain>
+                <Name>Walk</Name>
+                <Frame>
+                  <TextureName>a.png</TextureName>
+                  <FrameLength>0.1</FrameLength>
+                  <LeftCoordinate>0</LeftCoordinate>
+                  <RightCoordinate>1</RightCoordinate>
+                  <TopCoordinate>0</TopCoordinate>
+                  <BottomCoordinate>1</BottomCoordinate>
+                </Frame>
+              </AnimationChain>
+            </AnimationChainArraySave>
+            """;
+        File.WriteAllText(path, oldXml);
+
+        // Open-and-save with no edits should not inject the empty shapes wrapper.
+        AnimationChainListSave.FromFile(path).Save(path);
+        var resaved = File.ReadAllText(path);
+
+        Assert.DoesNotContain("ShapeCollectionSave", resaved);
+    }
+
     // ── Multiple chains ───────────────────────────────────────────────────────
 
     [Fact]

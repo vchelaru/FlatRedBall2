@@ -228,14 +228,16 @@ public class AnimationChainListSave
             el.Add(new XElement("HasCustomName", "true"));
         }
 
-        el.Add(WriteShapes(frame.ShapesSave));
+        // Only emit the shape wrapper when the frame actually has shapes, so frames without
+        // shapes (e.g. old FRB1-authored files) round-trip byte-identical instead of gaining
+        // an empty <ShapeCollectionSave> on every save.
+        if (frame.ShapesSave is { Shapes.Count: > 0 } shapes)
+            el.Add(WriteShapes(shapes));
         return el;
     }
 
-    private static XElement WriteShapes(ShapesSave? shapes)
+    private static XElement WriteShapes(ShapesSave shapes)
     {
-        shapes ??= new ShapesSave();
-
         var shapesEl = new XElement("Shapes");
         foreach (var shape in shapes.Shapes)
         {
