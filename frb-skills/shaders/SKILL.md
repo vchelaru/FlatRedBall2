@@ -16,9 +16,11 @@ FlatRedBall2 ships precompiled `.xnb` shaders for its built-in Apos.Shapes depen
 
 Projects import `AposShapesPrecompiled.props` to use these instead of compiling from source. Unknown platforms fall back to normal Apos.Shapes shader compilation.
 
+The package version is centralized in `$(AposShapesVersion)` (`src/PrecompiledShaders/AposShapes.props`), imported by the engine. Apos.Shapes ships only `buildTransitive` assets, so both the version and the `SkipAposShapeContent` precompiled-XNB skip flow identically whether the package is referenced directly or transitively — sample Desktop projects inherit it from the engine and don't pin it. Re-adding a per-sample pin only reintroduces the drift `NU1605` then fails the build on; bump the prop instead.
+
 ### Version Guard
 
-`ShapesBatch.AposShapesVersion` (in `src/Rendering/Batches/ShapesBatch.cs`) must match the Apos.Shapes NuGet version. In Debug builds, a mismatch throws `InvalidOperationException`. See the comment on that constant for the update checklist.
+`ShapesBatch.AposShapesVersion` (in `src/Rendering/Batches/ShapesBatch.cs`) is a C# const that can't read MSBuild, so it mirrors `$(AposShapesVersion)` by hand. In Debug builds, a mismatch against the loaded Apos.Shapes assembly throws `InvalidOperationException`. See the comment on that constant (and `AposShapes.props`) for the rebuild checklist.
 
 ## Custom Shaders
 

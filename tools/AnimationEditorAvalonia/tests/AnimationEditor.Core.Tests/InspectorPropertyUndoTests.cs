@@ -8,6 +8,40 @@ namespace AnimationEditor.Core.Tests;
 [Collection("SequentialSingletons")]
 public class InspectorPropertyUndoTests
 {
+    // ── SetFrameAlpha ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SetFrameAlpha_Undo_RestoresAlpha()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Fade");
+        var frame = TestHelpers.MakeFrame(); // starts with null alpha
+        chain.Frames.Add(frame);
+
+        ctx.AppCommands.SetFrameAlpha(frame, 128);
+        // A single committed edit must record exactly one undo entry (not one per keystroke — #445).
+        Assert.Single(ctx.UndoManager.UndoHistory);
+        Assert.Equal(128, frame.Alpha);
+
+        ctx.UndoManager.Undo();
+
+        Assert.Null(frame.Alpha);
+    }
+
+    [Fact]
+    public void SetFrameAlpha_SameValue_DoesNotCreateUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Fade");
+        var frame = TestHelpers.MakeFrame();
+        frame.Alpha = 128;
+        chain.Frames.Add(frame);
+
+        ctx.AppCommands.SetFrameAlpha(frame, 128);
+
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
     // ── SetFrameColor ─────────────────────────────────────────────────────────
 
     [Fact]

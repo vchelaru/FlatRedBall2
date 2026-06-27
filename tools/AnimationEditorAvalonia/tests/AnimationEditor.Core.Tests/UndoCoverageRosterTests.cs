@@ -99,6 +99,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetAllFramesTextureName)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameLength)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameRelative)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameAlpha)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColor)]                = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFrameColorOperation)]       = Category.MutatingUndoable,
         [nameof(IAppCommands.SetFramePixelRegion)]          = Category.MutatingUndoable,
@@ -274,6 +275,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetFrameLength(Zebra(ctx).Frames[0], 0.99f)));
         yield return Row(nameof(IAppCommands.SetFrameRelative),
             ctx => Sync(() => ctx.AppCommands.SetFrameRelative(Zebra(ctx).Frames[0], 99f, 88f)));
+        yield return Row(nameof(IAppCommands.SetFrameAlpha),
+            ctx => Sync(() => ctx.AppCommands.SetFrameAlpha(Zebra(ctx).Frames[0], 128)));
         yield return Row(nameof(IAppCommands.SetFrameColor),
             ctx => Sync(() => ctx.AppCommands.SetFrameColor(Zebra(ctx).Frames[0], 255, 200, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColorOperation),

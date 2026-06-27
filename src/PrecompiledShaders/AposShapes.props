@@ -1,0 +1,39 @@
+<Project>
+  <!--
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │  SINGLE SOURCE OF TRUTH for the Apos.Shapes package version.              │
+    └─────────────────────────────────────────────────────────────────────────┘
+
+    The engine (src/FlatRedBall2.csproj) imports this file and drives both its
+    Apos.Shapes (MonoGame) and Apos.Shapes.KNI (BlazorGL/KNI) PackageReferences
+    from $(AposShapesVersion). Sample projects pick the version up transitively
+    through their reference to the engine — they do NOT pin it themselves.
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │  ⚠  WHEN YOU CHANGE THIS VERSION, YOU MUST REBUILD THE PRECOMPILED XNBs.  │
+    └─────────────────────────────────────────────────────────────────────────┘
+
+    Apos.Shapes ships an .fx shader that the MonoGame/KNI content pipeline must
+    compile. So macOS/Linux users don't need Wine, FlatRedBall2 ships precompiled
+    apos-shapes.xnb files under src/PrecompiledShaders/<platform>/ and skips the
+    library's own shader compilation (see AposShapesPrecompiled.props). Those XNBs
+    are produced from a SPECIFIC Apos.Shapes version's shader source — bumping the
+    package without rebuilding them ships a stale shader against a new runtime.
+
+    After changing $(AposShapesVersion):
+      1. Rebuild a sample on each platform (DesktopGL, BlazorGL) so the content
+         pipeline compiles fresh apos-shapes.xnb files.
+      2. Copy the new XNBs into src/PrecompiledShaders/<platform>/.
+      3. Update ShapesBatch.AposShapesVersion (a C# const — it can't read MSBuild)
+         to match this value.
+      4. Verify each sample runs and renders shapes correctly.
+
+    The runtime guard in ShapesBatch.ValidateAposShapesVersion() throws (DEBUG
+    builds) if the loaded Apos.Shapes assembly version doesn't match the const,
+    catching a forgotten rebuild — but it can only check the const, not this prop,
+    so keep the two in sync by hand.
+  -->
+  <PropertyGroup>
+    <AposShapesVersion>0.6.10-alpha</AposShapesVersion>
+  </PropertyGroup>
+</Project>

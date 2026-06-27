@@ -117,14 +117,39 @@ A `{"cmd":"screenshot"}` command that returns a base64-encoded PNG of the curren
 
 ---
 
+## Channel Decision — stdout sharing & diagnostics
+
+**Status:** decided (resolves the former "stdout collision" open question). Issue #436.
+
+**Context.** Protocol responses and any game-code `Console.WriteLine` share one stdout stream. A strict line-by-line JSON reader chokes on a non-JSON line, so logging *can* corrupt the protocol — but whether it does depends on the reader and on whether game code writes to stdout at all. It's a possibility, not a certainty; the original skill note ("any `Console.WriteLine` corrupts the stream") overstated it as inevitable.
+
+**Options considered.**
+
+- **A — Share stdout, document a best-effort filter.** The reader skips lines that don't parse as JSON; every response starts with `{`, which acts as a de-facto prefix. Zero code change. Cost: a game log line that itself starts with `{` still collides, and a partial `Console.Write` (no trailing newline) can prepend a fragment onto a response line, silently dropping it. Best-effort, not framing.
+- **B — Explicit prefix on every response** (e.g. `@@FRB@@{...}`). Same mechanism as A with a less collision-prone marker. Cost: every consumer must implement the same framing, and it still doesn't fix partial-write splicing.
+- **C — Redirect `Console.Out` to stderr on activation.** The protocol keeps a private handle to the real stdout; game `Console.WriteLine` is repointed at stderr, so it physically can't reach the protocol channel. Robust, needs no reader cooperation. Cost: it silently changes where game logging lands *while `--frb-auto` is active* — a hidden behavior change, and tooling that treats "stderr has content" as failure trips on it. The log-to-file variant dodges the stderr footgun but adds machinery.
+- **D — Dedicated transport** (named pipe / localhost socket). The protocol gets its own channel; stdout is left entirely to the game — no collision, no redirect. Cost: rendezvous (agree on a pipe name / port) plus connection lifecycle that the free stdin/stdout inheritance gave us for nothing.
+
+**Decision.** Default to **A**: stdout transport with documented best-effort `{`-line filtering, diagnostics kept off stdout by convention (`Debug.WriteLine` / stderr — also the code-style rule).
+
+**Fallback (if A proves inadequate).** If best-effort filtering causes real problems in practice — recurring collisions, or a consumer such as another engine reusing this protocol needing a hard guarantee — escalate to **D**, a dedicated transport (named pipe / localhost socket) that gives the protocol its own channel and leaves stdout entirely to the game. D is the designated escape hatch, not B or C: it dominates both on robustness (no shared stream at all, no `Console.Out` redirect, no reader cooperation). It's cheap to reach for because `AutomationMode` already takes injectable `TextReader`/`TextWriter` (today `Console.In`/`Console.Out`); a pipe's streams drop into the same seam with no change to protocol logic. Not built now because it's a speculative transport with no current consumer (`design/TODOS.md`: no speculative items) — add it when a real need lands.
+
+**Why not B or C.** B over A buys little for FRB2's own use, where we own both ends, and still taxes every external consumer. C is the most robust single-stream option, but the rug-pull / stderr-as-error surprise isn't worth it while A is adequate.
+
+---
+
+## Release Guard — decided
+
+**Status:** decided — yes, guarded (resolves the former "security / accidental activation" open question).
+
+Automation mode exposes internal entity state and arbitrary value-forcing, so it must never be reachable in a shipped build. The entire automation block in `src/FlatRedBallService.cs` is wrapped in `#if DEBUG`; the `#else` branch compiles `EnableAutomationMode`, `RegisterStateProvider`, and `RegisterValueSetter` to empty no-op stubs. A Release build therefore cannot activate automation even if a game ships the `EnableAutomationMode()` call and is launched with `--frb-auto`.
+
+---
+
 ## Open Questions
 
 1. **State registration API shape.** `RegisterStateProvider(string name, Func<object> provider)` vs. a typed generic `RegisterStateProvider<T>(string name, Func<T> provider)` with JSON serialization. Generic is cleaner but adds reflection at serialization time — may not matter given this is dev-only.
 
 2. **Input injection model.** Inject at the `InputManager` level (fake `GamePadState` / `KeyboardState`) vs. at the `FlatRedBallService.Input` abstraction layer. The abstraction layer is cleaner for FRB2 game code; injecting at MonoGame's state level also covers raw `Keyboard.GetState()` calls in `Game1.Update`.
 
-3. **Security / accidental activation.** Should there be a compile-time guard (`#if DEBUG`) so `EnableAutomationMode` is a no-op in Release builds? Probably yes — automation mode exposes internal game state and arbitrary value-forcing.
-
-4. **Stdout collision.** If game code also writes to stdout (e.g., `Console.WriteLine` for debugging), it will corrupt the NDJSON stream. Either document "don't write to stdout in automation mode" or route game stdout to stderr in automation mode.
-
-5. **Frame timing in step mode.** Stepped frames use whatever `GameTime` MonoGame provides. Should step mode synthesize a fixed `GameTime` (e.g., always 16.67ms per frame) so physics is deterministic regardless of wall-clock time?
+3. **Frame timing in step mode.** Stepped frames use whatever `GameTime` MonoGame provides. Should step mode synthesize a fixed `GameTime` (e.g., always 16.67ms per frame) so physics is deterministic regardless of wall-clock time?

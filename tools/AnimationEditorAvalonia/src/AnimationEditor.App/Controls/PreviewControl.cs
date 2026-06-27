@@ -1713,7 +1713,8 @@ public class PreviewControl : Control
 
         using var paint = new SKPaint
         {
-            Color = new SKColor(255, 255, 255, (byte)(255 * alpha))
+            // Per-frame Alpha previews as opacity (reference render); runtimes apply it however they choose.
+            Color = new SKColor(255, 255, 255, FramePreviewOpacity.Resolve(frame.Alpha, alpha))
         };
         // Reference render of the frame's color operation; runtimes apply it however they choose.
         using var colorFilter = FrameColorFilter.Create(frame.ColorOperation, frame.Red, frame.Green, frame.Blue);

@@ -214,11 +214,12 @@ public class AnimationChainListSave
         if (frame.RelativeX != 0f) el.Add(new XElement("RelativeX", FloatStr(frame.RelativeX)));
         if (frame.RelativeY != 0f) el.Add(new XElement("RelativeY", FloatStr(frame.RelativeY)));
 
-        // Per-frame color channels are game-consumed and optional: write each only when set
+        // Per-frame color/alpha channels are game-consumed and optional: write each only when set
         // so frames without color stay byte-identical.
         if (frame.Red.HasValue) el.Add(new XElement("Red", frame.Red.Value));
         if (frame.Green.HasValue) el.Add(new XElement("Green", frame.Green.Value));
         if (frame.Blue.HasValue) el.Add(new XElement("Blue", frame.Blue.Value));
+        if (frame.Alpha.HasValue) el.Add(new XElement("Alpha", frame.Alpha.Value));
         if (frame.ColorOperation.HasValue) el.Add(new XElement("ColorOperation", frame.ColorOperation.Value.ToString()));
 
         if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
@@ -298,6 +299,7 @@ public class AnimationChainListSave
         frame.Red = IntElNullable(el, "Red");
         frame.Green = IntElNullable(el, "Green");
         frame.Blue = IntElNullable(el, "Blue");
+        frame.Alpha = IntElNullable(el, "Alpha");
         frame.ColorOperation = ColorOperationEl(el, "ColorOperation");
         frame.Name = (string?)el.Element("Name") ?? string.Empty;
         frame.HasCustomName = BoolEl(el, "HasCustomName");
@@ -508,6 +510,7 @@ public class AnimationChainListSave
                     Red = frameSave.Red,
                     Green = frameSave.Green,
                     Blue = frameSave.Blue,
+                    Alpha = frameSave.Alpha,
                     ColorOperation = frameSave.ColorOperation,
                 };
 

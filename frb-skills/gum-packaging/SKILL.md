@@ -5,7 +5,7 @@ description: "Bundle a Gum project into a single .gumpkg file (tar+brotli) for d
 
 # Gum Packaging (.gumpkg)
 
-`gumcli pack` walks a `.gumx` project's dependencies and writes a single tar+brotli bundle (`.gumpkg`) containing the elements, font cache, and external textures. At runtime the engine transparently loads from the bundle when the loose `.gumx` is absent.
+`gumcli pack` walks a `.gumx` project's dependencies and writes a single tar+brotli bundle (`.gumpkg`) containing the elements, font cache, and external textures. At runtime, Gum (2026.6+) picks loose vs. bundle **from the extension of the path you pass** — `.gumx` loads loose, `.gumpkg` loads the bundle. There is **no sibling probing**: the extension is the single source of truth (a probe would be a guaranteed-404 HTTP request on Blazor/WASM). So the path your code passes must match the artifact your build deployed.
 
 ## When to use
 
@@ -27,7 +27,7 @@ Default output is `GumProject.gumpkg` next to the `.gumx`. Override with `-o`:
 "$GUMCLI" pack Content/GumProject/GumProject.gumx -o build/GumProject.gumpkg
 ```
 
-See the [gumcli skill](../gumcli/SKILL.md) for how to locate `gumcli.exe`.
+gumcli is the `GumCli` .NET tool — `dotnet tool install -g GumCli`, or pin it in a local `.config/dotnet-tools.json` and invoke via `dotnet gumcli` (preferred in a build, so the tool version tracks the Gum NuGet version). See the [gumcli skill](../gumcli/SKILL.md).
 
 ## Categories (`--include`)
 
@@ -43,22 +43,26 @@ Default is `core,fontcache,external` — everything. Trim if your build pipeline
 
 ## Runtime loading
 
-**Code does not change.** Continue passing the `.gumx` path:
+**Pass the extension that matches the deployed artifact** — `.gumpkg` in bundle builds, `.gumx` in loose builds. The build already knows the mode, so surface it as a compile constant and switch on it:
 
 ```csharp
 FlatRedBallService.Default.Initialize(this, new EngineInitSettings
 {
+#if GUM_BUNDLE
+    GumProjectFile = "GumProject/GumProject.gumpkg"
+#else
     GumProjectFile = "GumProject/GumProject.gumx"
+#endif
 });
 ```
 
-The loader looks for a sibling `.gumpkg` (same directory, same basename) and uses it when the loose `.gumx` is **not** present in the deployed Content directory.
+Define `GUM_BUNDLE` from the same MSBuild property that flips deployment (see the csproj pattern below). **Do not** probe `File.Exists` to choose at runtime — on streaming platforms (Blazor/WASM) that miss is a 404, which is exactly what the extension-as-source-of-truth design avoids.
 
-**Loose wins when both exist.** This is by design: in dev you keep loose files (with hot reload); in a published build you ship only the `.gumpkg`. To test the bundle path, you must exclude the loose files from your output — having both deployed silently falls back to loose mode.
+**Web must bundle.** Loose `.ganx` animation files can't be enumerated over HTTP, so in loose mode on WASM animations silently don't load. Ship web as `.gumpkg`.
 
 ## .NET version requirement
 
-The bundle loader requires **.NET 7+**. On older targets the `.gumpkg` is ignored and the loader falls back to loose-file resolution.
+The bundle loader requires **.NET 7+** (pure-managed brotli + tar). FRB2 targets net8.0+, so this is always satisfied.
 
 ## Blazor / KNI WASM target
 
@@ -75,6 +79,8 @@ Gate pack-vs-loose behind an MSBuild property so you can flip between modes for 
 ```xml
 <PropertyGroup>
   <UseGumPackage Condition="'$(UseGumPackage)' == ''">false</UseGumPackage>
+  <!-- Surface the mode to game code; Game1 switches GumProjectFile's extension on it. -->
+  <DefineConstants Condition="'$(UseGumPackage)' == 'true'">$(DefineConstants);GUM_BUNDLE</DefineConstants>
 </PropertyGroup>
 
 <!-- Loose mode: copy every Gum file into Content/GumProject/. -->
@@ -98,7 +104,9 @@ Gate pack-vs-loose behind an MSBuild property so you can flip between modes for 
         Condition="'$(UseGumPackage)' == 'true'"
         Inputs="@(GumSourceFiles)"
         Outputs="Content\GumProject\GumProject.gumpkg">
-  <Exec Command="&quot;$(GumCliPath)&quot; pack Content\GumProject\GumProject.gumx" />
+  <!-- gumcli = the GumCli dotnet tool pinned in .config/dotnet-tools.json; restore is idempotent. -->
+  <Exec Command="dotnet tool restore" />
+  <Exec Command="dotnet gumcli pack Content\GumProject\GumProject.gumx" />
 </Target>
 ```
 
@@ -115,7 +123,7 @@ Always `.gitignore` the generated `.gumpkg` — it's a build output, not source.
 
 After a packed build, confirm the deployed `Content/GumProject/` contains **only** `GumProject.gumpkg` (no `.gumx`, no `Screens/`, no `FontCache/`). If you still see loose files, the bundle code path won't run and you're not actually testing it.
 
-For a quick log line at runtime, watch for whether `GumService` reports loose vs. bundle source — or temporarily rename the deployed `.gumx` to force bundle mode.
+To confirm which mode actually loaded at runtime, check `GumService.Default.CurrentProjectResolution?.UsedBundle`. The mode is driven by the extension your code passes (the `GUM_BUNDLE` switch), not by which files happen to be on disk — renaming deployed files won't change it.
 
 ## Exit codes
 

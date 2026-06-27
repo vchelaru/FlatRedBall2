@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "gumcli": {
+      "version": "2026.6.26.1",
+      "commands": ["gumcli"]
+    }
+  }
+}

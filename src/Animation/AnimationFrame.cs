@@ -59,6 +59,14 @@ public class AnimationFrame
     public int? Blue;
 
     /// <summary>
+    /// Optional per-frame alpha (transparency) channel, 0–255, or <c>null</c> when unset. Straight
+    /// transparency, independent of <see cref="ColorOperation"/>. Like the color channels it is <b>not</b>
+    /// applied by the engine: read it via <see cref="FlatRedBall2.Rendering.Sprite.CurrentFrame"/> and apply
+    /// it in game code (fade, dissolve, etc.).
+    /// </summary>
+    public int? Alpha;
+
+    /// <summary>
     /// Optional per-frame color operation for how <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/>
     /// combine with the texture, or <c>null</c> for none. Not applied by the engine — read it (with the
     /// channels) via <see cref="FlatRedBall2.Rendering.Sprite.CurrentFrame"/> and apply it in game code.

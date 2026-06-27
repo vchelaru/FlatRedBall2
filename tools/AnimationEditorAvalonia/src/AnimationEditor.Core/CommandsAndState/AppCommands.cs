@@ -1059,6 +1059,14 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, "Set Frame Color Mode"));
         }
 
+        public void SetFrameAlpha(AnimationFrameSave frame, int? alpha)
+        {
+            // Alpha is straight transparency, game-consumed and not previewed, so no wireframe refresh is needed.
+            _undoManager.Execute(new BulkFrameEditCommand(
+                [frame], () => frame.Alpha = alpha,
+                this, _events, false, "Set Frame Alpha"));
+        }
+
         public void SetFramePixelRegion(AnimationFrameSave frame,
             int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH)
         {

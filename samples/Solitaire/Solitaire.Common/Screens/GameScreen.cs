@@ -9,8 +9,8 @@ using Gum.Wireframe;
 using System.Numerics;
 using Solitaire.Cards;
 using Solitaire.Entities;
-using MonoGameGum;
-using MonoGameGum.Input;
+using Gum;
+using Gum.Input;
 
 namespace Solitaire.Screens;
 

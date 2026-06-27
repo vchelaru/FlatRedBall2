@@ -1,6 +1,6 @@
 using FlatRedBall2.Rendering;
 using Gum.Wireframe;
-using MonoGameGum.GueDeriving;
+using Gum.GueDeriving;
 using Shouldly;
 using Xunit;
 using FlatRedBall2;

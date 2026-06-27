@@ -8,7 +8,7 @@ using Xunit;
 
 namespace FlatRedBall2.Tests.Animation;
 
-// Per-frame Red/Green/Blue (0-255, nullable) are stored on the frame and surfaced to game code,
+// Per-frame Red/Green/Blue/Alpha (0-255, nullable) are stored on the frame and surfaced to game code,
 // but are NOT applied by the engine — game code reads Sprite.CurrentFrame and decides how to use them.
 public class AnimationFrameColorTests
 {
@@ -16,7 +16,7 @@ public class AnimationFrameColorTests
     public void CurrentFrame_ReflectsPlaybackState()
     {
         var chain = new AnimationChain { Name = "Flash" };
-        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), Red = 255 });
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1), Red = 255, Alpha = 128 });
         var list = new AnimationChainList();
         list.Add(chain);
 
@@ -28,6 +28,34 @@ public class AnimationFrameColorTests
 
         sprite.CurrentFrame.ShouldNotBeNull();
         sprite.CurrentFrame!.Red.ShouldBe(255);
+        sprite.CurrentFrame!.Alpha.ShouldBe(128);
+    }
+
+    [Fact]
+    public void Save_ThenFromFile_RoundTripsAlphaAndOmitsNull()
+    {
+        // First frame authors Alpha; second leaves it null to prove null alpha is not written.
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Fade" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png", Alpha = 128 });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "b.png" }); // no alpha -> element omitted
+        save.AnimationChains.Add(chain);
+
+        var path = Path.Combine(Path.GetTempPath(), $"frbalpha_{Guid.NewGuid():N}.achx");
+        try
+        {
+            save.Save(path);
+            // Only the first frame authored alpha; the null frame must omit the element.
+            (File.ReadAllText(path).Split("<Alpha>").Length - 1).ShouldBe(1);
+
+            var frames = AnimationChainListSave.FromFile(path).AnimationChains[0].Frames;
+            frames[0].Alpha.ShouldBe(128);
+            frames[1].Alpha.ShouldBeNull();
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
     }
 
     [Fact]
@@ -81,6 +109,20 @@ public class AnimationFrameColorTests
         {
             if (File.Exists(path)) File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void ToAnimationChainList_CopiesAlphaToRuntimeFrame()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Fade" };
+        // Empty TextureName so conversion skips texture loading and the null ContentLoader is never used.
+        chain.Frames.Add(new AnimationFrameSave { Alpha = 128 });
+        save.AnimationChains.Add(chain);
+
+        var frame = save.ToAnimationChainList(null!)[0][0];
+
+        frame.Alpha.ShouldBe(128);
     }
 
     [Fact]
