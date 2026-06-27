@@ -684,8 +684,10 @@ namespace AnimationEditor.Core.CommandsAndState
                     FrameLength      = frame.FrameLength,
                     FlipHorizontal   = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal,
                     FlipVertical     = flipV ? !frame.FlipVertical   : frame.FlipVertical,
-                    RelativeX        = frame.RelativeX,
-                    RelativeY        = frame.RelativeY,
+                    // Mirror the sprite offset about the entity origin so an off-center frame stays
+                    // aligned with its (also-mirrored) shapes after the flip.
+                    RelativeX        = flipH ? -frame.RelativeX : frame.RelativeX,
+                    RelativeY        = flipV ? -frame.RelativeY : frame.RelativeY,
                     ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
                 };
                 if (frame.ShapesSave != null)

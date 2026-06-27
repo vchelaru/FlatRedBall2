@@ -441,6 +441,24 @@ public class AppCommandsChainTests
     }
 
     [Fact]
+    public void DuplicateChain_WithFlipH_NegatesFrameRelativeX()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var source = TestHelpers.MakeChain(acls, "Walk", 1);
+        source.Frames[0].RelativeX = 20;
+        source.Frames[0].RelativeY = 7;
+
+        var copy = ctx.AppCommands.DuplicateChain(source, flipH: true);
+
+        // Sprite offset mirrors about the entity origin, same pivot as the shapes,
+        // so an off-center frame stays aligned with its collision after the flip.
+        Assert.Equal(-20, copy!.Frames[0].RelativeX);
+        Assert.Equal(7, copy.Frames[0].RelativeY);   // vertical offset untouched
+        Assert.Equal(20, source.Frames[0].RelativeX); // source untouched
+    }
+
+    [Fact]
     public void DuplicateChain_CopiedChainNameIsUnique()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -598,6 +616,30 @@ public class AppCommandsChainTests
         ctx.AppCommands.FlipFrameHorizontally(frame);
 
         Assert.False(frame.FlipHorizontal);
+    }
+
+    [Fact]
+    public void FlipFrameHorizontally_NegatesFrameRelativeX()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+
+        Assert.Equal(-20, frame.RelativeX);   // sprite offset mirrors about the origin
+        Assert.Equal(7, frame.RelativeY);      // vertical offset untouched
+    }
+
+    [Fact]
+    public void FlipFrameHorizontally_TwiceRestoresFrameRelativeX()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { RelativeX = 20 };
+
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.FlipFrameHorizontally(frame);
+
+        Assert.Equal(20, frame.RelativeX);     // negation is its own inverse
     }
 
     [Fact]
