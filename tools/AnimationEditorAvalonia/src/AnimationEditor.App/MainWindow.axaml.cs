@@ -124,6 +124,7 @@ public partial class MainWindow : Window
         WireWindowFileDrop();
         WirePropertyPanel();
         WirePlaybackControls();
+        WireTimelineTransport();
         WireKeyboard();
         WireTabBar();
         WireDefaultHandlerBanner();
@@ -137,6 +138,7 @@ public partial class MainWindow : Window
             SaveTabsToSettings();
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
+            PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon;
             foreach (var vm in _timelineFrames)
                 (vm.Thumbnail as IDisposable)?.Dispose();
             DisposeTreeThumbnails();
@@ -2112,18 +2114,11 @@ public partial class MainWindow : Window
 
         var target = sel is not null ? TreeBuilder.FindNodeForData(_treeRoots, sel) : null;
 
-        // When a shape is selected, ensure its parent frame node is expanded so
-        // the shape node is visible in the tree (Avalonia does not auto-expand parents).
-        if (sel is AARectSave or CircleSave)
-        {
-            var frame = _selectedState.SelectedFrame;
-            if (frame is not null)
-            {
-                var frameNode = TreeBuilder.FindNodeForData(_treeRoots, frame);
-                if (frameNode is not null)
-                    frameNode.IsExpanded = true;
-            }
-        }
+        // Expand the selected node's ancestors so its row is visible even if its chain (or, for a
+        // shape, its frame) was collapsed — e.g. a frame selected by scrubbing the timeline.
+        // Avalonia does not auto-expand parents.
+        if (sel is not null)
+            TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
         if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
             AnimTree.SelectedItem = target;
@@ -2152,7 +2147,19 @@ public partial class MainWindow : Window
         }
 
         _currentTimelineFrameIndex = -1;
-        UpdateTimelineScrubber(GetPreferredTimelineFrameIndex(chain));
+        int preferred = GetPreferredTimelineFrameIndex(chain);
+        UpdateTimelineScrubber(preferred);
+        // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
+        // sub-frame offset across the rebuild instead of snapping to the cell's left edge (#432).
+        ApplyScrubberOffsetFromPlayback(preferred);
+    }
+
+    private void ApplyScrubberOffsetFromPlayback(int frameIndex)
+    {
+        if (frameIndex < 0 || frameIndex >= _timelineFrames.Count) return;
+        double elapsed = PreviewCtrl.Playback.FrameElapsed;
+        double travelWidth = Math.Max(0, _timelineFrames[frameIndex].Width - TimelineFrameVm.PlayheadWidth);
+        _timelineFrames[frameIndex].ScrubberOffset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
     }
 
     private AnimationChainSave? GetTimelineChain()
@@ -2858,6 +2865,75 @@ public partial class MainWindow : Window
         };
     }
 
+    // ── Timeline transport: Play/Pause button + click-drag scrubbing (#432) ───
+
+    private bool _isTimelineScrubbing;
+
+    private void WireTimelineTransport()
+    {
+        PlayPauseBtn.Click += (_, _) => PreviewCtrl.TogglePlayPause();
+        PreviewCtrl.IsPlayingChanged += UpdatePlayPauseIcon;
+        UpdatePlayPauseIcon(PreviewCtrl.IsPlaying);
+
+        // Handle on the scrub surface in both phases (handledEventsToo) so the gesture works
+        // even if a child inside the timeline marks the pointer event handled first.
+        TimelineScrubSurface.AddHandler(InputElement.PointerPressedEvent, OnTimelinePointerPressed,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        TimelineScrubSurface.AddHandler(InputElement.PointerMovedEvent, OnTimelinePointerMoved,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        TimelineScrubSurface.AddHandler(InputElement.PointerReleasedEvent, OnTimelinePointerReleased,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+    }
+
+    private void UpdatePlayPauseIcon(bool isPlaying)
+    {
+        PlayPauseIcon.Path = isPlaying
+            ? "avares://AnimationEditor/Assets/icons/svg/IconPause.svg"
+            : "avares://AnimationEditor/Assets/icons/svg/IconPlay.svg";
+        ToolTip.SetTip(PlayPauseBtn, isPlaying ? "Pause (Space)" : "Play (Space)");
+    }
+
+    private void OnTimelinePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(TimelineScrubSurface).Properties.IsLeftButtonPressed) return;
+        _isTimelineScrubbing = true;
+        e.Pointer.Capture(TimelineScrubSurface);
+        ScrubTimelineToPointer(e);
+    }
+
+    private void OnTimelinePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_isTimelineScrubbing) ScrubTimelineToPointer(e);
+    }
+
+    private void OnTimelinePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isTimelineScrubbing) return;
+        _isTimelineScrubbing = false;
+        e.Pointer.Capture(null);
+    }
+
+    private void ScrubTimelineToPointer(PointerEventArgs e)
+    {
+        if (_timelineFrames.Count == 0) return;
+
+        // Position relative to the strip's content (the ItemsControl) already accounts for scroll.
+        double contentX = e.GetPosition(TimelineStrip).X;
+        var widths = new double[_timelineFrames.Count];
+        for (int i = 0; i < widths.Length; i++)
+            widths[i] = _timelineFrames[i].Width;
+
+        var result = TimelineScrubMapper.Resolve(contentX, widths);
+        PreviewCtrl.ScrubToFrame(result.FrameIndex, result.Fraction);
+
+        UpdateTimelineScrubber(result.FrameIndex);
+        if (result.FrameIndex >= 0 && result.FrameIndex < _timelineFrames.Count)
+        {
+            double travelWidth = Math.Max(0, _timelineFrames[result.FrameIndex].Width - TimelineFrameVm.PlayheadWidth);
+            _timelineFrames[result.FrameIndex].ScrubberOffset = Math.Min(result.LocalX, travelWidth);
+        }
+    }
+
     private double GetSpeedFromInput() =>
         double.TryParse(SpeedInput.Text, System.Globalization.NumberStyles.Any,
             System.Globalization.CultureInfo.InvariantCulture, out double v)
@@ -3411,6 +3487,14 @@ public partial class MainWindow : Window
             {
                 e.Handled = true;
                 _undoManager.Redo();
+            }
+            else if (e.Key == Key.Space)
+            {
+                if (IsTextInputFocused()) return;
+                // Let a focused button receive Space to activate itself rather than hijacking it.
+                if (FocusManager?.GetFocusedElement() is Button) return;
+                e.Handled = true;
+                PreviewCtrl.TogglePlayPause();
             }
             else if ((e.Key == Key.Up || e.Key == Key.Down) &&
                      e.KeyModifiers.HasFlag(KeyModifiers.Alt))

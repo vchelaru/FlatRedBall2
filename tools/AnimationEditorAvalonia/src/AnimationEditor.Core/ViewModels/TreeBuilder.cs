@@ -411,4 +411,24 @@ public static class TreeBuilder
         }
         return null;
     }
+
+    /// <summary>
+    /// Expands every ancestor of the node holding <paramref name="target"/> so its row is visible,
+    /// without changing the target's own expand state. Needed because a frame can now be selected
+    /// without its chain being expanded first (e.g. scrubbing the timeline selects a frame while
+    /// the chain node is collapsed). Returns <c>true</c> if the target was found.
+    /// </summary>
+    public static bool ExpandAncestorsOf(IEnumerable<TreeNodeVm> roots, object target)
+    {
+        foreach (var node in roots)
+        {
+            if (ReferenceEquals(node.Data, target)) return true;
+            if (ExpandAncestorsOf(node.Children, target))
+            {
+                node.IsExpanded = true;
+                return true;
+            }
+        }
+        return false;
+    }
 }

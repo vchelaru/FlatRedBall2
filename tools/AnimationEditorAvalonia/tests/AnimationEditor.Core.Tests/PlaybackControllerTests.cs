@@ -431,4 +431,94 @@ public class PlaybackControllerTests
 
         Assert.Equal(0.05, elapsedAtFrameChange, precision: 6);
     }
+
+    // ── IsPlayingChanged (timeline transport button sync) ─────────────────────
+
+    [Fact]
+    public void Pause_FiresIsPlayingChanged_WithFalse()
+    {
+        var ctrl = new PlaybackController();
+        bool? fired = null;
+        ctrl.IsPlayingChanged += v => fired = v;
+
+        ctrl.Pause();
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void Play_DoesNotFireIsPlayingChanged_WhenAlreadyPlaying()
+    {
+        var ctrl = new PlaybackController(); // defaults to playing
+        int count = 0;
+        ctrl.IsPlayingChanged += _ => count++;
+
+        ctrl.Play(); // no change → no event
+
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public void Play_FiresIsPlayingChanged_WithTrue_AfterPause()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.Pause();
+        bool? fired = null;
+        ctrl.IsPlayingChanged += v => fired = v;
+
+        ctrl.Play();
+
+        Assert.True(fired);
+    }
+
+    // ── SeekToFrame (timeline scrubbing) ──────────────────────────────────────
+
+    [Fact]
+    public void SeekToFrame_FiresFrameIndexChanged_WithTargetIndex()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        int fired = -1;
+        ctrl.FrameIndexChanged += i => fired = i;
+
+        ctrl.SeekToFrame(2);
+
+        Assert.Equal(2, fired);
+    }
+
+    [Fact]
+    public void SeekToFrame_SetsCurrentFrameIndex()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+
+        ctrl.SeekToFrame(2);
+
+        Assert.Equal(2, ctrl.CurrentFrameIndex);
+    }
+
+    [Fact]
+    public void SeekToFrame_WhilePaused_StillSeeks()
+    {
+        // Scrubbing happens while paused, so the seek must not be gated by IsPlaying.
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Pause();
+
+        ctrl.SeekToFrame(2);
+
+        Assert.Equal(2, ctrl.CurrentFrameIndex);
+    }
+
+    [Fact]
+    public void SeekToFrame_WithFraction_SetsAnimTimeAndFrameElapsed()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f)); // each frame 0.1 s; frame 1 starts at 0.1 s
+
+        ctrl.SeekToFrame(1, 0.5); // halfway into frame 1
+
+        Assert.Equal(0.15, ctrl.AnimTime, precision: 6);
+        Assert.Equal(0.05, ctrl.FrameElapsed, precision: 6);
+    }
 }

@@ -557,6 +557,46 @@ public class TreeBuilderPureTests
         Assert.Equal("Idle", nodes[0].Children[1].Header);
         Assert.Equal("Walk", nodes[0].Children[2].Header);
     }
+
+    // ── ExpandAncestorsOf ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void ExpandAncestorsOf_FrameTarget_ExpandsParentChainButNotTheFrame()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Run" };
+        var frame = new AnimationFrameSave { TextureName = "a.png" };
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        var roots = TreeBuilder.BuildTree(acls);
+        foreach (var r in roots) TreeNodeVm.SetExpandedRecursive(r, false);
+
+        TreeBuilder.ExpandAncestorsOf(roots, frame);
+
+        Assert.True(roots[0].IsExpanded);                 // parent chain revealed
+        Assert.False(roots[0].Children[0].IsExpanded);    // target frame itself not expanded
+    }
+
+    [Fact]
+    public void ExpandAncestorsOf_ShapeTarget_ExpandsParentFrameAndChain()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Run" };
+        var circle = new CircleSave { Radius = 4 };
+        var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
+        frame.ShapesSave.Shapes.Add(circle);
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        var roots = TreeBuilder.BuildTree(acls);
+        foreach (var r in roots) TreeNodeVm.SetExpandedRecursive(r, false);
+
+        TreeBuilder.ExpandAncestorsOf(roots, circle);
+
+        Assert.True(roots[0].IsExpanded);                 // chain
+        Assert.True(roots[0].Children[0].IsExpanded);     // parent frame
+    }
 }
 
 // ── SyncShapesInto tests ──────────────────────────────────────────────────────

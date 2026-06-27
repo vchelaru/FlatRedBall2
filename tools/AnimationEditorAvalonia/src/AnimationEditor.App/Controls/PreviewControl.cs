@@ -113,6 +113,76 @@ public class PreviewControl : Control
     public void Pause() => _playback.Pause();
     public void StopPlayback() { _playback.Reset(); InvalidateVisual(); }
 
+    /// <summary>Whether the animation is currently playing.</summary>
+    public bool IsPlaying => _playback.IsPlaying;
+
+    /// <summary>Fires when play/pause state changes, so a transport button can resync its icon.</summary>
+    public event Action<bool>? IsPlayingChanged
+    {
+        add    => _playback.IsPlayingChanged += value;
+        remove => _playback.IsPlayingChanged -= value;
+    }
+
+    /// <summary>Toggles between playing (<see cref="ResumePlayback"/>) and paused (<see cref="PausePlayback"/>).</summary>
+    public void TogglePlayPause()
+    {
+        if (_playback.IsPlaying) PausePlayback();
+        else                     ResumePlayback();
+    }
+
+    /// <summary>
+    /// Resumes playback from the current playhead position, clearing any pinned-frame selection so
+    /// the preview animates again. Does not reset to the start (#432: resume-from-playhead).
+    /// </summary>
+    public void ResumePlayback()
+    {
+        // Clearing the pinned frame lets OnSelectionChanged keep the playback position (it only
+        // re-seeks when the chain changes), so playback continues from where the playhead sits.
+        if (_selectedState!.SelectedFrame is not null)
+            _selectedState!.SelectedFrame = null;
+        _playback.Play();
+        _timer.Start();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Pauses playback and pins the frame currently showing so the inspector/wireframe reflect it.
+    /// Keeps the sub-frame playhead position (does not snap to the frame's start).
+    /// </summary>
+    public void PausePlayback()
+    {
+        _playback.Pause();
+        var chain = _selectedState!.SelectedChain;
+        if (chain is not null && chain.Frames.Count > 0)
+        {
+            int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+            var frame = chain.Frames[idx];
+            if (!ReferenceEquals(_selectedState!.SelectedFrame, frame))
+                _selectedState!.SelectedFrame = frame;
+        }
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Scrubs to <paramref name="frameIndex"/> at <paramref name="fraction"/> through that frame:
+    /// pauses, seeks playback, and selects that frame so the inspector/wireframe follow. The
+    /// selection does not snap the playhead back to the frame start because the seek already set
+    /// the sub-frame position (#432).
+    /// </summary>
+    public void ScrubToFrame(int frameIndex, double fraction)
+    {
+        _playback.Pause();
+        _playback.SeekToFrame(frameIndex, fraction);
+        var chain = _selectedState!.SelectedChain;
+        if (chain is not null && frameIndex >= 0 && frameIndex < chain.Frames.Count)
+        {
+            var frame = chain.Frames[frameIndex];
+            if (!ReferenceEquals(_selectedState!.SelectedFrame, frame))
+                _selectedState!.SelectedFrame = frame;
+        }
+        InvalidateVisual();
+    }
+
     /// <summary>
     /// Direct access to the playback state machine.
     /// Agents and tests can call <see cref="PlaybackController.Advance"/>,
@@ -271,8 +341,30 @@ public class PreviewControl : Control
 
     private void OnSelectionChanged()
     {
-        _playback.SetChain(_selectedState!.SelectedChain);
-        // Interpolation is a transient per-chain preview aid; clear it when the chain changes.
+        var chain = _selectedState!.SelectedChain;
+        var frame = _selectedState!.SelectedFrame;
+
+        // Only reload (which resets to the start) when the chain itself changes; a frame select or
+        // a resume on the same chain must keep the current playhead position.
+        if (!ReferenceEquals(chain, _playback.Chain))
+            _playback.SetChain(chain);
+
+        if (frame is not null && chain is not null)
+        {
+            // Selecting a frame pauses at its start — but skip the seek when playback is already on
+            // that frame, so a scrub/pause that set a sub-frame position does not snap to the start.
+            int idx = chain.Frames.IndexOf(frame);
+            if (idx >= 0 && _playback.CurrentFrameIndex != idx)
+                _playback.SeekToFrame(idx);
+            _playback.Pause();
+        }
+        else if (chain is not null)
+        {
+            // Selecting a whole animation auto-plays, overriding any prior paused state.
+            _playback.Play();
+        }
+
+        // Interpolation is a transient per-chain preview aid; clear it when the selection changes.
         InterpolateOffsets = false;
         InvalidateVisual();
         // A new chain/frame changes the union extent → refresh the host's scrollbars.

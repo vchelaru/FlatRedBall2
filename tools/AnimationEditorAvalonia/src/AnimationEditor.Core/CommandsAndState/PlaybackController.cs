@@ -22,6 +22,9 @@ public class PlaybackController
 
     // ── Public state ──────────────────────────────────────────────────────────
 
+    /// <summary>The chain currently being played, or <c>null</c> when none is set.</summary>
+    public AnimationChainSave? Chain => _chain;
+
     /// <summary>Current frame index into the active chain.</summary>
     public int CurrentFrameIndex => _currentFrameIndex;
 
@@ -60,6 +63,12 @@ public class PlaybackController
     /// </summary>
     public event Action? PlaybackTicked;
 
+    /// <summary>
+    /// Fired only when <see cref="IsPlaying"/> actually changes value, so a transport
+    /// button can keep its play/pause icon in sync. The argument is the new state.
+    /// </summary>
+    public event Action<bool>? IsPlayingChanged;
+
     // ── Commands ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -73,10 +82,52 @@ public class PlaybackController
     }
 
     /// <summary>Resume playback (undoes <see cref="Pause"/>).</summary>
-    public void Play() => IsPlaying = true;
+    public void Play()
+    {
+        if (IsPlaying) return;
+        IsPlaying = true;
+        IsPlayingChanged?.Invoke(true);
+    }
 
     /// <summary>Pause playback at the current frame without resetting time or frame index.</summary>
-    public void Pause() => IsPlaying = false;
+    public void Pause()
+    {
+        if (!IsPlaying) return;
+        IsPlaying = false;
+        IsPlayingChanged?.Invoke(false);
+    }
+
+    /// <summary>
+    /// Jumps playback to <paramref name="frameIndex"/> at <paramref name="fraction"/> of the way
+    /// through that frame (0 = its start, 1 = its end), without changing <see cref="IsPlaying"/>.
+    /// Used by timeline scrubbing, which seeks while paused. Index and fraction are clamped to
+    /// valid ranges; a no-op when no chain is set. Fires <see cref="FrameIndexChanged"/> if the
+    /// frame changed and always fires <see cref="PlaybackTicked"/>.
+    /// </summary>
+    public void SeekToFrame(int frameIndex, double fraction = 0)
+    {
+        var chain = _chain;
+        if (chain is null || chain.Frames.Count == 0) return;
+
+        int idx = Math.Clamp(frameIndex, 0, chain.Frames.Count - 1);
+        double frac = Math.Clamp(fraction, 0.0, 1.0);
+
+        double start = 0;
+        for (int i = 0; i < idx; i++)
+            start += FrameLength(chain.Frames[i]);
+
+        // Set _frameStartTime before events so FrameElapsed is correct inside handlers.
+        _frameStartTime = start;
+        _animTime = start + frac * FrameLength(chain.Frames[idx]);
+
+        if (idx != _currentFrameIndex)
+        {
+            _currentFrameIndex = idx;
+            FrameIndexChanged?.Invoke(idx);
+        }
+
+        PlaybackTicked?.Invoke();
+    }
 
     /// <summary>Reset time and frame index to zero without changing the active chain.</summary>
     public void Reset()
@@ -104,7 +155,7 @@ public class PlaybackController
 
         double totalTime = 0;
         foreach (var f in chain.Frames)
-            totalTime += f.FrameLength > 0 ? f.FrameLength : 0.1;
+            totalTime += FrameLength(f);
         if (totalTime <= 0) return;
 
         _animTime %= totalTime;
@@ -114,7 +165,7 @@ public class PlaybackController
         double newFrameStart = 0;
         for (int i = 0; i < chain.Frames.Count; i++)
         {
-            double fl = chain.Frames[i].FrameLength > 0 ? chain.Frames[i].FrameLength : 0.1;
+            double fl = FrameLength(chain.Frames[i]);
             if (_animTime < t + fl) { newIdx = i; newFrameStart = t; break; }
             t += fl;
         }
@@ -131,4 +182,8 @@ public class PlaybackController
 
         PlaybackTicked?.Invoke();
     }
+
+    // Zero/negative authored lengths fall back to 100 ms so playback still steps through them.
+    private static double FrameLength(AnimationFrameSave frame) =>
+        frame.FrameLength > 0 ? frame.FrameLength : 0.1;
 }

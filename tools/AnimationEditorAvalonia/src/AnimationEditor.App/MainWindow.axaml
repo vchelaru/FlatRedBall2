@@ -735,30 +735,6 @@
                                     </AutoCompleteBox>
                                 </DockPanel>
                             </Border>
-
-                            <!-- Divider -->
-                            <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
-                                    Margin="4,0" VerticalAlignment="Center" />
-
-                            <TextBlock Text="Speed:" VerticalAlignment="Center"
-                                       Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
-                                       FontSize="11" />
-                            <Border BorderBrush="{DynamicResource LineBrush}"
-                                    BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                    Height="26" Width="110" VerticalAlignment="Center">
-                                <DockPanel>
-                                    <Button x:Name="SpeedDownBtn" DockPanel.Dock="Left"
-                                            Classes="flanker" Content="−" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" />
-                                    <Button x:Name="SpeedUpBtn" DockPanel.Dock="Right"
-                                            Classes="flanker" Content="+" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0" />
-                                    <TextBox x:Name="SpeedInput" Text="1.0"
-                                             HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                             Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
-                                             Height="26" VerticalAlignment="Center" />
-                                </DockPanel>
-                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -781,24 +757,70 @@
                                    AllowAutoHide="True" />
                     </Grid>
 
-                    <!-- ── Timeline strip ── -->
-                    <Grid Grid.Row="2" RowDefinitions="14,*">
-                        <!-- ruler header — BgRail matches the wireframe/preview toolbars -->
-                        <Border Grid.Row="0"
+                    <!-- ── Transport + timeline strip ── -->
+                    <!-- Play/Pause and Speed live here, next to the scrubber they drive (#432),
+                         rather than up in the view-options toolbar. -->
+                    <Grid Grid.Row="2" ColumnDefinitions="Auto,*">
+
+                        <!-- Transport: Play/Pause + Speed -->
+                        <Border Grid.Column="0"
                                 Background="{DynamicResource BgRail}"
                                 BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="0,1,0,1">
-                            <TextBlock Text="TIMELINE"
-                                       FontSize="9" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource InkDim}"
-                                       VerticalAlignment="Center"
-                                       Margin="6,0" />
+                                BorderThickness="0,1,1,0"
+                                Padding="6,0">
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <Button x:Name="PlayPauseBtn"
+                                        Height="26" Width="32"
+                                        Foreground="{DynamicResource Ink}"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="Play / Pause (Space)">
+                                    <svg:Svg x:Name="PlayPauseIcon" Width="14" Height="14"
+                                             Path="avares://AnimationEditor/Assets/icons/svg/IconPlay.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </Button>
+                                <Border BorderBrush="{DynamicResource LineBrush}"
+                                        BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                                        Height="26" Width="92" VerticalAlignment="Center"
+                                        ToolTip.Tip="Playback speed (1.0 = runtime speed)">
+                                    <DockPanel>
+                                        <Button x:Name="SpeedDownBtn" DockPanel.Dock="Left"
+                                                Classes="flanker" Content="−" Width="22"
+                                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" />
+                                        <Button x:Name="SpeedUpBtn" DockPanel.Dock="Right"
+                                                Classes="flanker" Content="+" Width="22"
+                                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0" />
+                                        <TextBox x:Name="SpeedInput" Text="1.0"
+                                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                 Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
+                                                 Height="26" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
                         </Border>
-                        <!-- frame cells — BgCanvas background so cells (BgPanel) contrast against it -->
-                        <Border Grid.Row="1"
-                                Background="{DynamicResource BgCanvas}"
-                                BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="0,0,0,0">
+
+                        <!-- Timeline strip -->
+                        <Grid Grid.Column="1" RowDefinitions="14,*">
+                            <!-- ruler header — BgRail matches the wireframe/preview toolbars -->
+                            <Border Grid.Row="0"
+                                    Background="{DynamicResource BgRail}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="0,1,0,1">
+                                <TextBlock Text="TIMELINE"
+                                           FontSize="9" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkDim}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0" />
+                            </Border>
+                            <!-- frame cells — BgCanvas background so cells (BgPanel) contrast against it.
+                                 This border is the scrub surface: click/drag anywhere on it to move the
+                                 playhead (#432). Pointer handlers are wired in MainWindow.axaml.cs. -->
+                            <Border x:Name="TimelineScrubSurface"
+                                    Grid.Row="1"
+                                    Background="{DynamicResource BgCanvas}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="0,0,0,0"
+                                    Cursor="Hand">
                             <ScrollViewer HorizontalScrollBarVisibility="Auto"
                                           VerticalScrollBarVisibility="Disabled">
                                 <ItemsControl x:Name="TimelineStrip">
@@ -844,7 +866,8 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
-                        </Border>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>
