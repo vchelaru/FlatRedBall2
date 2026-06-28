@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private readonly IUndoManager _undoManager;
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly IFileAssociationService _fileAssociation;
+    private readonly PngFolderWatcher _pngFolderWatcher = new();
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
@@ -133,6 +134,9 @@ public partial class MainWindow : Window
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager);
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService);
+        FilesPanel.Initialize(_thumbnailService, this, msg => ShowStatusMessage(msg, isError: true));
+        _pngFolderWatcher.FolderContentsChanged += () =>
+            Dispatcher.UIThread.InvokeAsync(RefreshFilesPanel);
 
         Opened += OnOpened;
         Closed += (_, _) =>
@@ -144,6 +148,7 @@ public partial class MainWindow : Window
             // The thumbnail service owns every cached chain/timeline icon; disposing it here
             // releases them all (and the decoded source sheets) as the window tears down.
             _thumbnailService.Dispose();
+            _pngFolderWatcher.Dispose();
         };
     }
 
@@ -432,6 +437,7 @@ public partial class MainWindow : Window
             _selectedState.Reset();
             _undoManager.Clear();
             RefreshTreeView();
+            RefreshFilesPanel();
             UpdateTitle();
             UpdateStatusBar();
         }
@@ -500,6 +506,7 @@ public partial class MainWindow : Window
                 new AnimationChainListSave();
         }
 
+        RefreshFilesPanel();
         ShowDefaultHandlerBannerIfAppropriate();
     }
 
@@ -567,6 +574,7 @@ public partial class MainWindow : Window
             RefreshRecentFiles();
             UpdateTitle();
             UpdateStatusBar();
+            RefreshFilesPanel();
 
             // If the active tab was an Untitled sentinel, promote it to the real file path.
             var active = _tabManager.ActiveTab;
@@ -1789,11 +1797,9 @@ public partial class MainWindow : Window
 
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
-        // Use TryGetFiles() — the correct Avalonia 12 API for OS file drops
-        string? firstFile = e.DataTransfer.TryGetFiles()?                  
+        string? firstFile = e.DataTransfer.TryGetFiles()?
             .FirstOrDefault()?.Path.LocalPath;
 
-        // Fallback for internal drag sources that use the Items API
         if (firstFile is null)
         {
             firstFile = e.DataTransfer.Items?
@@ -1801,16 +1807,24 @@ public partial class MainWindow : Window
                 .FirstOrDefault(f => f is not null)?.Path.LocalPath;
         }
 
-        if (!string.IsNullOrEmpty(firstFile) &&
-            string.Equals(Path.GetExtension(firstFile), ".png", StringComparison.OrdinalIgnoreCase))
-        {
-            e.DragEffects = DragDropEffects.Copy;
-        }
-        else
+        if (string.IsNullOrEmpty(firstFile) ||
+            !string.Equals(Path.GetExtension(firstFile), ".png", StringComparison.OrdinalIgnoreCase))
         {
             e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
         }
 
+        var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
+        var wouldApply = TextureDropProcessor.ComputePngDrop(
+            targetChain,
+            targetFrame,
+            firstFile,
+            _projectManager.FileName,
+            e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
+            != TextureDropResult.NotApplied;
+
+        e.DragEffects = wouldApply ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -1832,15 +1846,7 @@ public partial class MainWindow : Window
             Trace.WriteLine("[DragDrop] Warning: no ACHX file saved yet — texture path will be absolute");
         }
 
-        var targetNode = AnimTree.SelectedItem as TreeNodeVm;
-
-        var targetFrame = targetNode?.Data as AnimationFrameSave;
-        var targetChain = targetNode?.Data as AnimationChainSave;
-
-        if (targetFrame is not null)
-        {
-            targetChain = _objectFinder.GetAnimationChainContaining(targetFrame);
-        }
+        var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
@@ -1920,6 +1926,25 @@ public partial class MainWindow : Window
         return fallback?.Path.LocalPath;
     }
 
+    private TreeNodeVm? GetTreeNodeAtDropPosition(DragEventArgs e)
+    {
+        var position = e.GetPosition(AnimTree);
+        var hit = AnimTree.InputHitTest(position);
+        if (hit is not Control src)
+            return null;
+
+        var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        return tvi?.DataContext as TreeNodeVm;
+    }
+
+    private (AnimationChainSave? Chain, AnimationFrameSave? Frame) ResolveTreePngDropTarget(DragEventArgs e)
+    {
+        var targetNode = GetTreeNodeAtDropPosition(e);
+        return TreePngDropTarget.FromNodeData(
+            targetNode?.Data,
+            frame => _objectFinder.GetAnimationChainContaining(frame));
+    }
+
     // ── Window-level OS file drop: open dropped .achx files as tabs ────────────
     //
     // Registered on the whole window (handledEventsToo) so an .achx dropped anywhere —
@@ -1975,6 +2000,17 @@ public partial class MainWindow : Window
         TreeBuilder.RouteNodeSelection(vm.Data, _selectedState, _projectManager.AnimationChainListSave);
     }
 
+    // ── Files panel ───────────────────────────────────────────────────────────
+
+    private void RefreshFilesPanel()
+    {
+        string? achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? null
+            : Path.GetDirectoryName(_projectManager.FileName);
+        FilesPanel.Refresh(achxFolder);
+        _pngFolderWatcher.Watch(achxFolder);
+    }
+
     // ── Tree refresh ──────────────────────────────────────────────────────────
 
     private void RefreshTreeView()
@@ -1983,7 +2019,7 @@ public partial class MainWindow : Window
         try
         {
             var acls = _projectManager.AnimationChainListSave;
-            if (acls is null) { _treeRoots.Clear(); return; }
+            if (acls is null) { _treeRoots.Clear(); RefreshFilesPanel(); return; }
 
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
@@ -2014,12 +2050,17 @@ public partial class MainWindow : Window
             _treeRoots.Clear();
 
             var acls = _projectManager.AnimationChainListSave;
-            if (acls is null) return;
+            if (acls is null)
+            {
+                RefreshFilesPanel();
+                return;
+            }
 
             // Empty expandedChainNames (not null) collapses every chain; null would
             // default them all to expanded.
             foreach (var node in TreeBuilder.BuildTree(acls, System.Array.Empty<string>()))
                 _treeRoots.Add(node);
+            RefreshFilesPanel();
 
             RefreshTreeThumbnails();
             SyncTreeSelection();
@@ -2120,6 +2161,7 @@ public partial class MainWindow : Window
         _timelineSignature = null;
         RefreshTimelineStrip();
         _appCommands.RefreshAnimationFrameDisplay();
+        RefreshFilesPanel();
         ShowToast($"Reloaded {System.IO.Path.GetFileName(absolutePath)}");
     }
 
@@ -4411,14 +4453,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        try
-        {
-            Process.Start("explorer.exe", $"/select,\"{absPath}\"");
-        }
-        catch (Exception ex)
-        {
-            ShowStatusMessage($"⚠ Could not open Explorer: {ex.Message}", isError: true);
-        }
+        var error = Services.ShellExplorer.RevealFile(absPath);
+        if (error is not null)
+            ShowStatusMessage($"⚠ {error}", isError: true);
     }
 }
 

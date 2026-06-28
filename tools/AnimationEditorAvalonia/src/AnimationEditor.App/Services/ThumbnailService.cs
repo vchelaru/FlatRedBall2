@@ -138,6 +138,29 @@ public sealed class ThumbnailService : IDisposable
     }
 
     /// <summary>
+    /// Returns a downscaled Avalonia bitmap of the full PNG at <paramref name="path"/>.
+    /// Used by the Files panel; the result is owned by the caller.
+    /// </summary>
+    public Avalonia.Media.Imaging.Bitmap? GetFullImageThumbnail(string? path, int maxWidth, int maxHeight)
+    {
+        var bm = GetBitmap(path);
+        if (bm is null) return null;
+
+        float scale = Math.Min((float)maxWidth / bm.Width, (float)maxHeight / bm.Height);
+        scale = Math.Min(scale, 1f);
+        int finalW = Math.Max(1, (int)(bm.Width * scale));
+        int finalH = Math.Max(1, (int)(bm.Height * scale));
+
+        using var thumb = new SKBitmap(finalW, finalH);
+        using var canvas = new SKCanvas(thumb);
+        canvas.Clear(SKColors.Transparent);
+        using var img = SKImage.FromBitmap(bm);
+        canvas.DrawImage(img, SKRect.Create(0, 0, finalW, finalH),
+            new SKSamplingOptions(SKFilterMode.Linear));
+        return ToAvaloniaBitmap(thumb);
+    }
+
+    /// <summary>
     /// Returns an Avalonia Bitmap of the frame's texture region, scaled to fit within
     /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (preserving aspect ratio).
     /// Returns <c>null</c> if the texture cannot be resolved, is not loaded, or the frame

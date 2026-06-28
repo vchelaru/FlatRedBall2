@@ -274,9 +274,12 @@
         <!-- ── Main content: TreeView | Property Panel | [Wireframe / Preview] ── -->
         <Grid x:Name="MainContentGrid" ColumnDefinitions="280,4,240,4,*">
 
-            <!-- ── Left: Animation tree ── -->
-            <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
+            <!-- ── Left: Animation tree + Files panel ── -->
+            <Grid Grid.Column="0" RowDefinitions="*,4,*"
                   Background="{DynamicResource BgCanvas}">
+
+                <!-- Animations block: header + tree + add button stay grouped -->
+                <Grid Grid.Row="0" RowDefinitions="Auto,*,Auto">
 
                 <!-- ── Tree pane header ── -->
                 <Border Grid.Row="0"
@@ -484,6 +487,37 @@
                             Height="30"
                             Foreground="{DynamicResource Ink}" />
                 </Border>
+
+                </Grid>
+
+                <!-- Splitter between animations block and files block -->
+                <GridSplitter Grid.Row="1"
+                              ResizeDirection="Rows"
+                              Background="{DynamicResource LineStrong}"
+                              HorizontalAlignment="Stretch" />
+
+                <!-- Files block -->
+                <Grid Grid.Row="2" RowDefinitions="Auto,*" MinHeight="80">
+
+                <!-- ── Files pane header ── -->
+                <Border Grid.Row="0"
+                        Background="{DynamicResource BgRail}"
+                        BorderBrush="{DynamicResource LineBrush}"
+                        BorderThickness="0,1,0,0"
+                        Height="36">
+                    <DockPanel Margin="10,0">
+                        <TextBlock Text="FILES"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource InkMid}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <controls:FilesPanelControl x:Name="FilesPanel"
+                                            Grid.Row="1" />
+
+                </Grid>
             </Grid>
 
             <!-- ── Splitter (left | middle) ── -->
