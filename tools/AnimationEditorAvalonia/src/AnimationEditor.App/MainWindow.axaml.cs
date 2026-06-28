@@ -66,6 +66,7 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
+    private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
     private System.Threading.CancellationTokenSource? _toastCts;
 
     // The platform application-data root under which settings live. Injected (not read from
@@ -3625,6 +3626,7 @@ public partial class MainWindow : Window
                      e.KeyModifiers.HasFlag(KeyModifiers.Alt))
             {
                 e.Handled = true;
+                _altMenuActivationSuppressor.ArmFromAltArrowReorder();
                 int delta = e.Key == Key.Up ? -1 : +1;
                 _appCommands.HandleReorder(delta);
                 // Restore focus to the tree — reorder can cause Avalonia to shift focus
@@ -3632,6 +3634,18 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
                 if (_selectedState.SelectedFrame is not null)
                     ShowStatusMessage("Frame labels updated to reflect new positions");
+            }
+        }), RoutingStrategies.Tunnel);
+
+        // Avalonia activates the title-bar menu on Alt KeyUp. Alt+Arrow reorder handles only
+        // the arrow KeyDown, so consume the matching Alt release when we armed suppression.
+        AddHandler(KeyUpEvent, (EventHandler<KeyEventArgs>)((_, e) =>
+        {
+            if (e.Handled) return;
+            if (e.Key is Key.LeftAlt or Key.RightAlt &&
+                _altMenuActivationSuppressor.TryConsumeIfArmed())
+            {
+                e.Handled = true;
             }
         }), RoutingStrategies.Tunnel);
     }
