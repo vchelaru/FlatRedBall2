@@ -41,6 +41,27 @@ public class TileMapTests
     }
 
     [Fact]
+    public void GetCellAt_IsInverseOfGetCellWorldPosition()
+    {
+        var map = CreateTestMap(160f, 160f, 16, 16, ["GameplayLayer"], x: 100f, y: 200f);
+
+        foreach (var (col, row) in new[] { (0, 0), (2, 3), (9, 9) })
+            map.GetCellAt(map.GetCellWorldPosition(col, row)).ShouldBe((col, row));
+    }
+
+    [Fact]
+    public void GetCellAt_RespectsTiledRowFlip_AndFloorsNegatives()
+    {
+        // Top-left at (0, 0), 16x16 tiles. Row 0 is the top, rows increase downward (world Y down).
+        var map = CreateTestMap(160f, 160f, 16, 16, ["GameplayLayer"]);
+
+        map.GetCellAt(new Vector2(8f, -8f)).ShouldBe((0, 0));     // top-left tile center
+        map.GetCellAt(new Vector2(40f, -56f)).ShouldBe((2, 3));   // matches GetCellWorldPosition(2, 3)
+        // Left of / above the origin: must floor toward negative, not truncate toward zero.
+        map.GetCellAt(new Vector2(-1f, 1f)).ShouldBe((-1, -1));
+    }
+
+    [Fact]
     public void Bounds_AtOrigin_CenterIsHalfWidthAndNegativeHalfHeight()
     {
         var map = CreateTestMap(320f, 240f, 16, 16, ["GameplayLayer"]);

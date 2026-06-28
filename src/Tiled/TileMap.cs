@@ -231,6 +231,18 @@ public class TileMap
         _y - row * _tileHeight - _tileHeight / 2f);
 
     /// <summary>
+    /// Returns the (col, row) of the tile containing <paramref name="worldPoint"/> —
+    /// the inverse of <see cref="GetCellWorldPosition"/>. Uses Tiled's row convention
+    /// (row 0 is the top row; increasing row moves downward / decreasing world Y).
+    /// Floors toward negative infinity, so points left of or above the map origin yield
+    /// negative indices rather than truncating toward zero. No bounds check — callers may
+    /// receive indices outside the map.
+    /// </summary>
+    public (int col, int row) GetCellAt(Vector2 worldPoint) => (
+        (int)MathF.Floor((worldPoint.X - _x) / _tileWidth),
+        (int)MathF.Floor((_y - worldPoint.Y) / _tileHeight));
+
+    /// <summary>
     /// Returns a <see cref="BoundsRectangle"/> suitable for
     /// <see cref="Entities.CameraControllingEntity.Map"/>.
     /// Computed from the current <see cref="X"/>, <see cref="Y"/>,
