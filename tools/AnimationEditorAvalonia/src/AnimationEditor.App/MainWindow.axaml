@@ -1329,6 +1329,43 @@
                         FontSize="12" />
             </StackPanel>
         </Border>
+        <!-- ── Error banner ── prominent, framed, top-centre so failures can't be missed.
+             Self-contained dark+red styling (theme-independent, like ItemDeletedToastPanel). -->
+        <Border x:Name="ErrorBanner"
+                IsVisible="False"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,16,0,0"
+                MaxWidth="640"
+                Background="#2D2122"
+                BorderBrush="#E0533F"
+                BorderThickness="1.5"
+                CornerRadius="6"
+                Padding="14,10"
+                ZIndex="60">
+            <DockPanel>
+                <Button x:Name="ErrorBannerDismissBtn"
+                        DockPanel.Dock="Right"
+                        Content="✕"
+                        Width="24" Height="22"
+                        Margin="10,0,0,0"
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        Foreground="#E8B0A8"
+                        VerticalAlignment="Top" />
+                <TextBlock DockPanel.Dock="Left"
+                           Text="⚠"
+                           FontSize="15"
+                           Foreground="#F2A03E"
+                           Margin="0,0,10,0"
+                           VerticalAlignment="Top" />
+                <TextBlock x:Name="ErrorBannerText"
+                           FontSize="12"
+                           Foreground="#F5E2DF"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
         <!-- ── Toast notification overlay ── -->
         <Border x:Name="ToastPanel"
                 IsVisible="False"

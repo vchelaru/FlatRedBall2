@@ -21,8 +21,11 @@ public class StatusMessageTests
         return (window, ctx);
     }
 
+    // Errors route to the prominent top-centre ErrorBanner, not the thin bottom status bar,
+    // so failures can't be missed (#479 follow-up). The bottom StatusMessage stays for info.
+
     [AvaloniaFact]
-    public void CommitInlineRename_EmptyName_ShowsStatusMessage()
+    public void CommitInlineRename_EmptyName_ShowsErrorBanner()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -34,16 +37,20 @@ public class StatusMessageTests
             window.CommitInlineRenamePublic(vm, "");
             Dispatcher.UIThread.RunJobs();
 
-            var msg = window.FindControl<TextBlock>("StatusMessage")!;
-            Assert.True(msg.IsVisible);
-            Assert.Contains("cannot be empty", msg.Text);
+            var banner = window.FindControl<Border>("ErrorBanner")!;
+            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            Assert.True(banner.IsVisible);
+            Assert.Contains("cannot be empty", text.Text);
             Assert.Equal("Walk", chain.Name);
+
+            // The informational bottom bar is not used for errors.
+            Assert.False(window.FindControl<TextBlock>("StatusMessage")!.IsVisible);
         }
         finally { window.Close(); }
     }
 
     [AvaloniaFact]
-    public void LoadFailed_Event_ShowsStatusBarMessage()
+    public void LoadFailed_Event_ShowsErrorBanner()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -51,10 +58,35 @@ public class StatusMessageTests
             ctx.AppCommands.LoadAnimationChain("hero.achx");
             Dispatcher.UIThread.RunJobs();
 
-            var msg = window.FindControl<TextBlock>("StatusMessage")!;
-            Assert.True(msg.IsVisible);
-            Assert.Contains("hero.achx", msg.Text);
+            var banner = window.FindControl<Border>("ErrorBanner")!;
+            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            Assert.True(banner.IsVisible);
+            Assert.Contains("hero.achx", text.Text);
         }
         finally { window.Close(); }
     }
+
+    [AvaloniaFact]
+    public void ErrorBanner_Dismiss_HidesBanner()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.AppCommands.LoadAnimationChain("hero.achx");
+            Dispatcher.UIThread.RunJobs();
+
+            var banner  = window.FindControl<Border>("ErrorBanner")!;
+            Assert.True(banner.IsVisible);
+
+            var dismiss = window.FindControl<Button>("ErrorBannerDismissBtn")!;
+            RaiseClick(dismiss);   // Click handler is wired in InitErrorBanner
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(banner.IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    private static void RaiseClick(Button button) =>
+        button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 }

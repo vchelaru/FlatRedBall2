@@ -13,7 +13,7 @@ namespace AnimationEditor.App.Tests;
 /// Copy/Paste run fire-and-forget (<c>_ = HandleCopyAsync()</c>), so before this
 /// guard an exception in them vanished as an unobserved task exception — which is
 /// exactly why a clipboard-serialization failure looked like "nothing happened".
-/// RunGuardedAsync must surface any failure as a visible error status message.
+/// RunGuardedAsync must surface any failure as a visible error banner.
 /// </summary>
 public class GuardedActionTests
 {
@@ -41,10 +41,11 @@ public class GuardedActionTests
                 () => throw new InvalidOperationException("boom"), "Copy");
             Dispatcher.UIThread.RunJobs();
 
-            var msg = window.FindControl<TextBlock>("StatusMessage")!;
-            Assert.True(msg.IsVisible);
-            Assert.Contains("Copy", msg.Text);
-            Assert.Contains("boom", msg.Text);
+            var banner = window.FindControl<Border>("ErrorBanner")!;
+            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            Assert.True(banner.IsVisible);
+            Assert.Contains("Copy", text.Text);
+            Assert.Contains("boom", text.Text);
         }
         finally { window.Close(); }
     }

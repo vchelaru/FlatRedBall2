@@ -111,6 +111,7 @@ public partial class MainWindow : Window
             ApplyMacOSWindowChrome();
 
         InitToast();
+        InitErrorBanner();
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
 
         WireAppCommands();
@@ -3412,10 +3413,16 @@ public partial class MainWindow : Window
 
     private void ShowStatusMessage(string text, bool isError = false)
     {
+        // Errors route to the prominent top-centre banner so they can't be missed; the thin
+        // bottom status bar (low-contrast, easy to overlook) is reserved for informational text.
+        if (isError)
+        {
+            ShowErrorBanner(text);
+            return;
+        }
+
         StatusMessage.Text = text;
-        StatusMessage.Foreground = isError
-            ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(220, 80, 60))
-            : ThemedBrush("InkMid");
+        StatusMessage.Foreground = ThemedBrush("InkMid");
         StatusMessage.IsVisible = true;
 
         _statusMessageTimer?.Stop();
@@ -3427,6 +3434,37 @@ public partial class MainWindow : Window
             StatusMessage.Text = string.Empty;
         };
         _statusMessageTimer.Start();
+    }
+
+    // ── Error banner ──────────────────────────────────────────────────────────
+
+    private DispatcherTimer? _errorBannerTimer;
+
+    private void InitErrorBanner()
+    {
+        ErrorBannerDismissBtn.Click += (_, _) => HideErrorBanner();
+    }
+
+    /// <summary>
+    /// Shows the prominent top-centre error banner. Auto-dismisses after 8s (longer than the
+    /// informational status bar's 5s — errors deserve more dwell time) or on manual dismiss.
+    /// </summary>
+    private void ShowErrorBanner(string text)
+    {
+        ErrorBannerText.Text = text;
+        ErrorBanner.IsVisible = true;
+
+        _errorBannerTimer?.Stop();
+        _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        _errorBannerTimer.Tick += (_, _) => HideErrorBanner();
+        _errorBannerTimer.Start();
+    }
+
+    private void HideErrorBanner()
+    {
+        _errorBannerTimer?.Stop();
+        ErrorBanner.IsVisible = false;
+        ErrorBannerText.Text = string.Empty;
     }
 
     // ── Toast notification ────────────────────────────────────────────────────
