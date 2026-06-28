@@ -9,10 +9,11 @@ namespace AnimationEditor.Core.Export;
 /// <summary>Result of a PixiJS export: the JSON text plus any non-fatal warnings to surface.</summary>
 public sealed class PixiJsExportResult
 {
-    public PixiJsExportResult(string json, IReadOnlyList<string> warnings)
+    public PixiJsExportResult(string json, IReadOnlyList<string> warnings, IReadOnlyList<string> referencedTextures)
     {
         Json = json;
         Warnings = warnings;
+        ReferencedTextures = referencedTextures;
     }
 
     /// <summary>The serialized PixiJS spritesheet JSON.</summary>
@@ -20,6 +21,13 @@ public sealed class PixiJsExportResult
 
     /// <summary>Human-readable warnings (dropped duration, multiple textures, missing PNGs).</summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>
+    /// Distinct texture names referenced by the exported frames, in first-seen order. The app
+    /// layer copies these alongside the JSON when exporting to a different directory so the
+    /// PixiJS loader can resolve <c>meta.image</c>.
+    /// </summary>
+    public IReadOnlyList<string> ReferencedTextures { get; }
 }
 
 /// <summary>
@@ -59,7 +67,7 @@ public static class PixiJsSpriteSheetExporter
         var sheet = new PixiJsSpriteSheet();
         var warnings = new List<string>();
         var distinctTextures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        string firstTexture = string.Empty;
+        var orderedTextures = new List<string>();
         bool anyDurationDropped = false;
 
         foreach (var chain in acls.AnimationChains)
@@ -75,11 +83,8 @@ public static class PixiJsSpriteSheetExporter
 
                 if (frame.FrameLength != 0f) anyDurationDropped = true;
 
-                if (!string.IsNullOrEmpty(frame.TextureName))
-                {
-                    if (distinctTextures.Add(frame.TextureName) && firstTexture.Length == 0)
-                        firstTexture = frame.TextureName;
-                }
+                if (!string.IsNullOrEmpty(frame.TextureName) && distinctTextures.Add(frame.TextureName))
+                    orderedTextures.Add(frame.TextureName);
 
                 if (!TryBuildRect(frame, acls.CoordinateType, textureSizeResolver, out var rect))
                 {
@@ -101,15 +106,16 @@ public static class PixiJsSpriteSheetExporter
             sheet.Animations[animationName] = frameKeys;
         }
 
+        string firstTexture = orderedTextures.Count > 0 ? orderedTextures[0] : string.Empty;
         sheet.Meta.Image = firstTexture;
 
-        if (distinctTextures.Count > 1)
-            warnings.Add($"This .achx references {distinctTextures.Count} textures, but a PixiJS " +
+        if (orderedTextures.Count > 1)
+            warnings.Add($"This .achx references {orderedTextures.Count} textures, but a PixiJS " +
                          $"spritesheet is a single sheet; meta.image was set to '{firstTexture}'.");
         if (anyDurationDropped)
             warnings.Add("Per-frame durations are not part of the PixiJS spritesheet format and were dropped.");
 
-        return new PixiJsExportResult(JsonSerializer.Serialize(sheet, Options), warnings);
+        return new PixiJsExportResult(JsonSerializer.Serialize(sheet, Options), warnings, orderedTextures);
     }
 
     private static bool TryBuildRect(

@@ -87,7 +87,6 @@
                         <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="_Save"          x:Name="MenuSave"   InputGesture="Ctrl+S" />
                         <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
-                        <Separator />
                         <MenuItem Header="_Export to PixiJS..." x:Name="MenuExportPixiJs" />
                     </MenuItem>
                     <MenuItem Header="_Edit">

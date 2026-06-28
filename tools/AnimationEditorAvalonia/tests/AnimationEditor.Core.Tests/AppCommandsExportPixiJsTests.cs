@@ -29,6 +29,33 @@ public class AppCommandsExportPixiJsTests : IDisposable
     }
 
     [Fact]
+    public async Task ExportToPixiJsAsync_WhenExportDirDiffers_CopiesReferencedTexture()
+    {
+        var sourceDir = Path.Combine(_dir.Path, "src");
+        var exportDir = Path.Combine(_dir.Path, "out");
+        Directory.CreateDirectory(sourceDir);
+        Directory.CreateDirectory(exportDir);
+        File.WriteAllBytes(Path.Combine(sourceDir, "hero.png"), new byte[] { 1, 2, 3 });
+
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        // Pixel coords so the export needs no on-disk PNG to resolve sizes.
+        acls.CoordinateType = TextureCoordinateType.Pixel;
+        acls.AnimationChains.Add(new AnimationChainSave
+        {
+            Name = "Walk",
+            Frames = { new AnimationFrameSave { TextureName = "hero.png", RightCoordinate = 32f, BottomCoordinate = 32f } },
+        });
+        ctx.ProjectManager.AnimationChainListSave = acls;
+        ctx.ProjectManager.FileName = Path.Combine(sourceDir, "hero.achx");
+        ctx.AppCommands.FileDialogService = new StubFileDialogService(Path.Combine(exportDir, "sheet.json"));
+
+        await ctx.AppCommands.ExportToPixiJsAsync();
+
+        Assert.True(File.Exists(Path.Combine(exportDir, "hero.png")));
+    }
+
+    [Fact]
     public async Task ExportToPixiJsAsync_WhenPathReturned_WritesParseableJsonWithAnimation()
     {
         var target = Path.Combine(_dir.Path, "sheet.json");
