@@ -246,7 +246,8 @@ public class TimelineScrubberTests
                     ?? throw new InvalidOperationException("TimelineStrip not found");
                 var items = Assert.IsType<ObservableCollection<TimelineFrameVm>>(timeline.ItemsSource);
                 Assert.Single(items);
-                Assert.IsType<Bitmap>(items[0].Thumbnail);
+                // WriteableBitmap (a Bitmap subclass) since the crop is wrapped without a PNG round-trip.
+                Assert.IsAssignableFrom<Bitmap>(items[0].Thumbnail);
             }
             finally
             {

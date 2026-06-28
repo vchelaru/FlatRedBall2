@@ -1,5 +1,8 @@
+using System;
+using System.IO;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
+using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
@@ -116,6 +119,80 @@ public class ThumbnailServiceTests
         var rightPx = thumb.GetPixel(thumb.Width - 1, 4);
         Assert.True(rightPx.Red > rightPx.Blue,
             $"Right edge pixel {rightPx} should be red after horizontal flip.");
+    }
+
+    // -- Finished-thumbnail cache tests (Issue #474) --------------------------
+    //
+    // GetFrameThumbnail caches the finished Avalonia Bitmap keyed by (resolved texture
+    // path + UV region + flips + target size) and wraps the Skia crop directly as a
+    // WriteableBitmap — no PNG encode/decode round-trip. These tests use [AvaloniaFact]
+    // because constructing an Avalonia Bitmap needs the headless platform's render
+    // interface. They write a real PNG to a temp file so ResolveTexturePath finds it.
+
+    /// <summary>Writes a solid-green PNG to a unique temp file and returns its absolute path.</summary>
+    private static string WriteTempPng(int width, int height)
+    {
+        var dir  = Path.Combine(Path.GetTempPath(), "AnimationEditorTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "sheet.png");
+        using var bm = new SKBitmap(width, height);
+        bm.Erase(SKColors.Green);
+        using var img  = SKImage.FromBitmap(bm);
+        using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+        using var fs   = File.OpenWrite(path);
+        data.SaveTo(fs);
+        return path;
+    }
+
+    [AvaloniaFact]
+    public void GetFrameThumbnail_AfterInvalidatePath_ReturnsDifferentInstance()
+    {
+        var svc   = MakeSvc();
+        var path  = WriteTempPng(8, 8);
+        var frame = Frame();
+        frame.TextureName = path;
+
+        var first = svc.GetFrameThumbnail(frame, 56, 56);
+        svc.InvalidatePath(path);
+        var afterInvalidate = svc.GetFrameThumbnail(frame, 56, 56);
+
+        Assert.NotNull(first);
+        Assert.NotNull(afterInvalidate);
+        // Invalidation must drop the cached finished thumbnail so the next call re-renders.
+        Assert.NotSame(first, afterInvalidate);
+    }
+
+    [AvaloniaFact]
+    public void GetFrameThumbnail_CalledTwiceForSameFrame_ReturnsSameCachedInstance()
+    {
+        var svc   = MakeSvc();
+        var path  = WriteTempPng(8, 8);
+        var frame = Frame();
+        frame.TextureName = path;
+
+        var first  = svc.GetFrameThumbnail(frame, 56, 56);
+        var second = svc.GetFrameThumbnail(frame, 56, 56);
+
+        Assert.NotNull(first);
+        // Second call must hit the finished-thumbnail cache, not crop+wrap a fresh bitmap.
+        Assert.Same(first, second);
+    }
+
+    [AvaloniaFact]
+    public void GetFrameThumbnail_SquareSource_ReturnsBitmapAtRequestedSize()
+    {
+        // Exercises the WriteableBitmap conversion (no PNG round-trip): a 64×64 source
+        // asked for 56×56 must come back 56×56.
+        var svc   = MakeSvc();
+        var path  = WriteTempPng(64, 64);
+        var frame = Frame();
+        frame.TextureName = path;
+
+        var thumb = svc.GetFrameThumbnail(frame, 56, 56);
+
+        Assert.NotNull(thumb);
+        Assert.Equal(56, thumb!.PixelSize.Width);
+        Assert.Equal(56, thumb.PixelSize.Height);
     }
 
     // -- InvalidatePath path-normalization tests (Issue #310) -----------------

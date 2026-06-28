@@ -86,7 +86,7 @@ public class TimelineStripRebuildTests
                 // Capture identities before the scrub-like selection change.
                 var vm0 = items[0]; var vm1 = items[1]; var vm2 = items[2];
                 var thumb0 = items[0].Thumbnail;
-                Assert.IsType<Bitmap>(thumb0); // textures resolve, so thumbnails are real bitmaps
+                Assert.IsAssignableFrom<Bitmap>(thumb0); // textures resolve, so thumbnails are real bitmaps (WriteableBitmap)
 
                 // Crossing a frame boundary while scrubbing sets SelectedFrame — a non-structural
                 // selection change.

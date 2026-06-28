@@ -139,9 +139,9 @@ public partial class MainWindow : Window
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
             PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon;
-            foreach (var vm in _timelineFrames)
-                (vm.Thumbnail as IDisposable)?.Dispose();
-            DisposeTreeThumbnails();
+            // The thumbnail service owns every cached chain/timeline icon; disposing it here
+            // releases them all (and the decoded source sheets) as the window tears down.
+            _thumbnailService.Dispose();
         };
     }
 
@@ -1935,7 +1935,7 @@ public partial class MainWindow : Window
         try
         {
             var acls = _projectManager.AnimationChainListSave;
-            if (acls is null) { DisposeTreeThumbnails(); _treeRoots.Clear(); return; }
+            if (acls is null) { _treeRoots.Clear(); return; }
 
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
@@ -1963,7 +1963,6 @@ public partial class MainWindow : Window
         _suppressTreeSelectionHandling = true;
         try
         {
-            DisposeTreeThumbnails();
             _treeRoots.Clear();
 
             var acls = _projectManager.AnimationChainListSave;
@@ -2059,8 +2058,9 @@ public partial class MainWindow : Window
                 chain.Frames.Count > 0 &&
                 !string.IsNullOrEmpty(chain.Frames[0].TextureName))
             {
-                // Force thumbnail regeneration regardless of source equality
-                (node.Thumbnail as IDisposable)?.Dispose();
+                // Force thumbnail regeneration regardless of source equality. The cached bitmap
+                // was already dropped by InvalidatePath above; clearing the node fields makes the
+                // change-detection in RefreshTreeThumbnails re-render from the reloaded sheet.
                 node.Thumbnail = null;
                 node.ThumbnailSource = null;
             }
@@ -2105,21 +2105,13 @@ public partial class MainWindow : Window
             if (!needsRegen)
                 continue;
 
-            (node.Thumbnail as IDisposable)?.Dispose();
+            // The previous bitmap (if any) is cache-owned — drop the reference, don't dispose it.
             node.Thumbnail = source is null
                 ? null
                 : _thumbnailService.GetFrameThumbnail(
                     chain.Frames[0], TreeChainThumbnailPixelSize, TreeChainThumbnailPixelSize);
             node.ThumbnailSource = source;
         }
-    }
-
-    /// <summary>Releases every chain node's first-frame thumbnail bitmap. Call before clearing
-    /// <c>_treeRoots</c> or on window close so the cropped bitmaps are not leaked.</summary>
-    private void DisposeTreeThumbnails()
-    {
-        foreach (var node in _treeRoots)
-            (node.Thumbnail as IDisposable)?.Dispose();
     }
 
     private void SyncTreeSelection()
@@ -2179,12 +2171,9 @@ public partial class MainWindow : Window
 
     private void RebuildTimelineStripCells(AnimationChainSave? chain)
     {
-        // Capture old thumbnails before clearing so we dispose after the collection is empty
-        // (avoids briefly holding disposed Bitmaps in bound Image controls)
-        var oldThumbnails = _timelineFrames.Select(vm => vm.Thumbnail as IDisposable).ToList();
+        // Timeline thumbnails are cache-owned by the ThumbnailService, so just drop the cells —
+        // no per-cell dispose (that would invalidate a bitmap a later cache hit returns).
         _timelineFrames.Clear();
-        foreach (var d in oldThumbnails)
-            d?.Dispose();
 
         foreach (var item in TimelineBuilder.BuildFrameItems(chain))
             _timelineFrames.Add(item);

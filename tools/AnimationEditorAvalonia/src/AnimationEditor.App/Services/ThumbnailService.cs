@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AnimationEditor.Core;
+using Avalonia;
+using Avalonia.Platform;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -12,8 +14,14 @@ namespace AnimationEditor.App.Services;
 /// Decodes texture PNGs once, caches them, and crops frame-region thumbnails.
 /// Shared by the preview render path, the timeline strip, and the animation-tree
 /// first-frame chain icons so a sprite sheet is only decoded a single time.
+/// <para>
+/// Finished per-frame thumbnails are cached too (see <see cref="GetFrameThumbnail"/>),
+/// so switching back to a previously-viewed tab re-uses the existing icons instead of
+/// re-cropping every chain. The service owns those bitmaps; callers must not dispose
+/// the returned <see cref="Avalonia.Media.Imaging.Bitmap"/>.
+/// </para>
 /// </summary>
-public sealed class ThumbnailService
+public sealed class ThumbnailService : IDisposable
 {
     private readonly IProjectManager _projectManager;
 
@@ -24,16 +32,54 @@ public sealed class ThumbnailService
     public Dictionary<string, SKBitmap?> BitmapCache { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Cache signature for a finished thumbnail. Two equal keys produce a pixel-identical
+    /// bitmap, so a tab switch (or strip rebuild) re-uses the cached icon. The resolved
+    /// <em>absolute</em> texture path is part of the key — two tabs in different folders can
+    /// share the same relative <c>TextureName</c> yet must not collide on one cached crop.
+    /// </summary>
+    private readonly record struct ThumbnailKey(
+        string Path, float Left, float Right, float Top, float Bottom,
+        bool FlipHorizontal, bool FlipVertical, int MaxWidth, int MaxHeight);
+
+    /// <summary>
+    /// Finished-thumbnail cache. The service owns these bitmaps and is their sole disposer
+    /// (on eviction the reference is simply dropped — GC reclaims it once no UI control holds
+    /// it, which avoids disposing a bitmap a live <c>Image</c> is still bound to).
+    /// </summary>
+    private readonly Dictionary<ThumbnailKey, Avalonia.Media.Imaging.Bitmap> _thumbnailCache = new();
+
+    /// <summary>Insertion order for FIFO eviction once <see cref="MaxCachedThumbnails"/> is exceeded.
+    /// A key may linger here after <see cref="InvalidatePath"/> removed it from the cache; the
+    /// eviction loop tolerates that (the dictionary <c>Remove</c> simply reports it absent).</summary>
+    private readonly Queue<ThumbnailKey> _thumbnailOrder = new();
+
+    /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a UV slider, which
+    /// mints a new key per tick) can't grow the cache without bound. Each entry is tiny
+    /// (≤ 56×56×4 bytes), so this is a few MB worst case.</summary>
+    private const int MaxCachedThumbnails = 512;
+
     public ThumbnailService(IProjectManager projectManager) =>
         _projectManager = projectManager;
 
     /// <summary>Evict a specific path from the bitmap cache so it is re-decoded on next access.
     /// Normalises backslashes to forward slashes before lookup so FSW-reported paths (backslash
     /// on Windows) evict entries that were stored via <c>FilePath.FullPath</c> (forward slash).
+    /// Also drops every finished thumbnail cropped from this texture, so a hot-reloaded sheet
+    /// re-renders its chain/timeline icons instead of showing the stale crop.
     /// </summary>
     public void InvalidatePath(string absolutePath)
     {
-        BitmapCache.Remove(absolutePath.Replace('\\', '/'));
+        var key = absolutePath.Replace('\\', '/');
+        BitmapCache.Remove(key);
+
+        List<ThumbnailKey>? stale = null;
+        foreach (var k in _thumbnailCache.Keys)
+            if (string.Equals(k.Path, key, StringComparison.OrdinalIgnoreCase))
+                (stale ??= new()).Add(k);
+        if (stale is not null)
+            foreach (var k in stale)
+                _thumbnailCache.Remove(k);
     }
 
     /// <summary>
@@ -95,20 +141,78 @@ public sealed class ThumbnailService
     /// Returns an Avalonia Bitmap of the frame's texture region, scaled to fit within
     /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (preserving aspect ratio).
     /// Returns <c>null</c> if the texture cannot be resolved, is not loaded, or the frame
-    /// has no valid UV region. Caller owns the returned bitmap.
+    /// has no valid UV region.
+    /// <para>
+    /// The result is cached (keyed by resolved texture path + UV region + flips + target
+    /// size) and <em>owned by this service</em> — do not dispose it. Re-calling with the same
+    /// frame state returns the same cached instance, so a tab switch re-uses every unchanged
+    /// icon. The Skia crop is wrapped directly as a <see cref="Avalonia.Media.Imaging.WriteableBitmap"/>;
+    /// there is no PNG encode/decode round-trip.
+    /// </para>
     /// </summary>
     public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(AnimationFrameSave frame, int maxWidth, int maxHeight)
     {
-        var bm = GetBitmap(ResolveTexturePath(frame));
+        var path = ResolveTexturePath(frame);
+        var bm   = GetBitmap(path);
         if (bm is null) return null;
+
+        var key = new ThumbnailKey(
+            path!.Replace('\\', '/'),
+            frame.LeftCoordinate, frame.RightCoordinate, frame.TopCoordinate, frame.BottomCoordinate,
+            frame.FlipHorizontal, frame.FlipVertical, maxWidth, maxHeight);
+        if (_thumbnailCache.TryGetValue(key, out var cachedBitmap))
+            return cachedBitmap;
 
         using var thumb = RenderFrameThumbnail(bm, frame, maxWidth, maxHeight);
         if (thumb is null) return null;
 
-        using var ms = new MemoryStream();
-        thumb.Encode(ms, SKEncodedImageFormat.Png, 100);
-        ms.Position = 0;
-        return new Avalonia.Media.Imaging.Bitmap(ms);
+        var bitmap = ToAvaloniaBitmap(thumb);
+        _thumbnailCache[key] = bitmap;
+        _thumbnailOrder.Enqueue(key);
+        EvictExcessThumbnails();
+        return bitmap;
+    }
+
+    /// <summary>
+    /// Wraps a Skia bitmap as an Avalonia <see cref="Avalonia.Media.Imaging.WriteableBitmap"/> by
+    /// copying its pixels straight into the framebuffer — no PNG encode/decode. Skia converts to
+    /// the destination BGRA/premultiplied layout during <see cref="SKBitmap.ReadPixels(SKImageInfo,
+    /// IntPtr, int, int, int)"/>, so the source colour/alpha type does not matter.
+    /// </summary>
+    private static Avalonia.Media.Imaging.Bitmap ToAvaloniaBitmap(SKBitmap thumb)
+    {
+        var size   = new PixelSize(thumb.Width, thumb.Height);
+        var bitmap = new Avalonia.Media.Imaging.WriteableBitmap(
+            size, new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
+        using (var fb = bitmap.Lock())
+        using (var pixmap = thumb.PeekPixels())
+        {
+            var dstInfo = new SKImageInfo(thumb.Width, thumb.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            pixmap.ReadPixels(dstInfo, fb.Address, fb.RowBytes, 0, 0);
+        }
+        return bitmap;
+    }
+
+    /// <summary>Drops the oldest finished thumbnails once the cache exceeds its cap. The reference
+    /// is released (not disposed) so a bitmap still bound to a live <c>Image</c> stays valid until
+    /// GC reclaims it after the control lets go.</summary>
+    private void EvictExcessThumbnails()
+    {
+        while (_thumbnailCache.Count > MaxCachedThumbnails && _thumbnailOrder.Count > 0)
+            _thumbnailCache.Remove(_thumbnailOrder.Dequeue());
+    }
+
+    /// <summary>Disposes every cached source sheet and finished thumbnail. Call on window close;
+    /// any bitmaps still bound to UI are released as the window tears down.</summary>
+    public void Dispose()
+    {
+        foreach (var bm in BitmapCache.Values)
+            bm?.Dispose();
+        BitmapCache.Clear();
+        foreach (var bitmap in _thumbnailCache.Values)
+            bitmap.Dispose();
+        _thumbnailCache.Clear();
+        _thumbnailOrder.Clear();
     }
 
     /// <summary>
