@@ -460,12 +460,6 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
-        public void RenameFrame(AnimationFrameSave frame, string newName)
-        {
-            if (frame.HasCustomName && frame.Name == newName) return;
-            _undoManager.Execute(new RenameFrameCommand(frame, newName, this, _events));
-        }
-
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             var frame = new AnimationFrameSave

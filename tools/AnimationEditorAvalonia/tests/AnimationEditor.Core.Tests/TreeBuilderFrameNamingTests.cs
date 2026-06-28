@@ -9,39 +9,19 @@ public class TreeBuilderFrameNamingTests
     // ── BuildFrameHeader ──────────────────────────────────────────────────────
 
     [Fact]
-    public void BuildFrameHeader_HasCustomName_ReturnsCustomName()
+    public void BuildFrameHeader_AnyFrame_ReturnsPositionalLabel()
     {
-        var frame = new AnimationFrameSave { HasCustomName = true, Name = "Hit Frame" };
-        Assert.Equal("Hit Frame", TreeBuilder.BuildFrameHeader(frame, index: 0));
+        // Frame names are not user-overridable: identity is the index. The label is
+        // always the computed "Frame N".
+        var frame = new AnimationFrameSave { TextureName = "walk.png" };
+        Assert.Equal("Frame 1", TreeBuilder.BuildFrameHeader(frame, index: 0));
     }
 
     [Fact]
-    public void BuildFrameHeader_NoCustomName_ReturnsDynamicPositionalLabel()
-    {
-        var frame = new AnimationFrameSave { HasCustomName = false };
-        Assert.Equal("Frame 3", TreeBuilder.BuildFrameHeader(frame, index: 2));
-    }
-
-    [Fact]
-    public void BuildFrameHeader_NoCustomNameButNameSet_IgnoresNameAndReturnsDynamic()
-    {
-        // Old persisted data: Name is set but HasCustomName was not (pre-migration).
-        // The editor must display positional label, not the stale Name.
-        var frame = new AnimationFrameSave { HasCustomName = false, Name = "Frame 1" };
-        Assert.Equal("Frame 3", TreeBuilder.BuildFrameHeader(frame, index: 2));
-    }
-
-    // ── BuildFrameNode ────────────────────────────────────────────────────────
-
-    [Fact]
-    public void BuildFrameNode_AutoNamed_DoesNotPersistNameToModel()
+    public void BuildFrameHeader_NonZeroIndex_ReturnsDynamicPositionalLabel()
     {
         var frame = new AnimationFrameSave();
-
-        TreeBuilder.BuildFrameNode(frame, 0);
-
-        Assert.False(frame.HasCustomName);
-        Assert.Equal(string.Empty, frame.Name);
+        Assert.Equal("Frame 3", TreeBuilder.BuildFrameHeader(frame, index: 2));
     }
 
     // ── SyncFramesInto ────────────────────────────────────────────────────────
@@ -72,26 +52,4 @@ public class TreeBuilderFrameNamingTests
         Assert.Equal("Frame 2", chainNode.Children[1].Header);
     }
 
-    [Fact]
-    public void SyncFramesInto_CustomNamedFrame_LabelDoesNotChangeOnReorder()
-    {
-        var chain = new AnimationChainSave { Name = "Walk" };
-        var f1 = new AnimationFrameSave { HasCustomName = true, Name = "Jump Frame" };
-        var f2 = new AnimationFrameSave();
-        chain.Frames.Add(f1);
-        chain.Frames.Add(f2);
-
-        var chainNode = TreeBuilder.BuildChainNode(chain);
-
-        // Reorder: move f2 to front
-        chain.Frames.RemoveAt(1);
-        chain.Frames.Insert(0, f2);
-
-        TreeBuilder.SyncFramesInto(chainNode, chain.Frames);
-
-        // f2 at index 0 → dynamic "Frame 1"
-        Assert.Equal("Frame 1", chainNode.Children[0].Header);
-        // f1 at index 1 → custom name survives
-        Assert.Equal("Jump Frame", chainNode.Children[1].Header);
-    }
 }

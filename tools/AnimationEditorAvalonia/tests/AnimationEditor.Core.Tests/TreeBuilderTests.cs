@@ -153,18 +153,12 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
-    public void BuildFrameHeader_NameOverridesTextureFilename()
+    public void BuildFrameHeader_TexturedFrame_StillReturnsPositionalLabel()
     {
-        // A user-assigned Name (HasCustomName=true) takes precedence over the
-        // texture filename so that inline rename on a textured frame changes the
-        // display label without touching the texture reference.
-        var frame = new AnimationFrameSave
-        {
-            TextureName = "sprites/walk1.png",
-            HasCustomName = true,
-            Name = "Walk Start",
-        };
-        Assert.Equal("Walk Start", TreeBuilder.BuildFrameHeader(frame));
+        // A frame's label is always the positional "Frame N" — it never reflects the
+        // texture filename or any per-frame name (frames are not renameable).
+        var frame = new AnimationFrameSave { TextureName = "sprites/walk1.png" };
+        Assert.Equal("Frame 1", TreeBuilder.BuildFrameHeader(frame, 0));
     }
 
     [Fact]
@@ -499,63 +493,26 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
-    public void BuildFrameNode_AutoNamed_DoesNotPersistNameToModel()
+    public void BuildTree_FramesReordered_ShowPositionalLabels()
     {
-        // Dynamic-label design: auto-named frames display "Frame N" at render time;
-        // the Name field is intentionally left empty so reorder updates the label.
-        var frame = new AnimationFrameSave { TextureName = "" };
-
-        TreeBuilder.BuildFrameNode(frame, 2);  // position 2 → display "Frame 3", but Name stays empty
-
-        Assert.False(frame.HasCustomName);
-        Assert.Equal(string.Empty, frame.Name);
-    }
-
-    [Fact]
-    public void BuildFrameNode_AutoNamed_TexturedFrameDoesNotPersistName()
-    {
-        // Textured frames are also auto-named dynamically — Name must not be set.
-        var frame = new AnimationFrameSave { TextureName = "sprites/walk1.png" };
-
-        TreeBuilder.BuildFrameNode(frame, 0);
-
-        Assert.False(frame.HasCustomName);
-        Assert.Equal(string.Empty, frame.Name);
-    }
-
-    [Fact]
-    public void BuildFrameNode_CustomNamed_PreservesNameAndFlag()
-    {
-        // A frame with HasCustomName=true keeps its Name through BuildFrameNode.
-        var frame = new AnimationFrameSave { HasCustomName = true, Name = "Jump Frame" };
-
-        TreeBuilder.BuildFrameNode(frame, 0);
-
-        Assert.True(frame.HasCustomName);
-        Assert.Equal("Jump Frame", frame.Name);
-    }
-
-    [Fact]
-    public void BuildTree_CustomNamedFramesReordered_PreservesCustomLabels()
-    {
-        // Custom-named frames (HasCustomName=true) keep their display name regardless
-        // of position — the label is sticky, not positional.
-        var frameA = new AnimationFrameSave { HasCustomName = true, Name = "Idle" };
-        var frameB = new AnimationFrameSave { HasCustomName = true, Name = "Walk" };
-        var frameC = new AnimationFrameSave { HasCustomName = true, Name = "Run" };
+        // Frames are not renameable — every frame shows the positional "Frame N"
+        // label for its current index, regardless of order.
+        var frameA = new AnimationFrameSave { TextureName = "a.png" };
+        var frameB = new AnimationFrameSave { TextureName = "b.png" };
+        var frameC = new AnimationFrameSave { TextureName = "c.png" };
 
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Anim" };
-        chain.Frames.Add(frameC);  // reordered: C first
+        chain.Frames.Add(frameC);
         chain.Frames.Add(frameA);
         chain.Frames.Add(frameB);
         acls.AnimationChains.Add(chain);
 
         var nodes = TreeBuilder.BuildTree(acls);
 
-        Assert.Equal("Run",  nodes[0].Children[0].Header);
-        Assert.Equal("Idle", nodes[0].Children[1].Header);
-        Assert.Equal("Walk", nodes[0].Children[2].Header);
+        Assert.Equal("Frame 1", nodes[0].Children[0].Header);
+        Assert.Equal("Frame 2", nodes[0].Children[1].Header);
+        Assert.Equal("Frame 3", nodes[0].Children[2].Header);
     }
 
     // ── ExpandAncestorsOf ─────────────────────────────────────────────────────

@@ -65,7 +65,6 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AddAnimationChain)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChainWithName)]    = Category.MutatingUndoable,
         [nameof(IAppCommands.RenameChain)]                  = Category.MutatingUndoable,
-        [nameof(IAppCommands.RenameFrame)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrame)]                     = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChain)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToTop)]               = Category.MutatingUndoable,
@@ -206,8 +205,6 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddAnimationChainWithName("Brand New")));
         yield return Row(nameof(IAppCommands.RenameChain),
             ctx => Sync(() => ctx.AppCommands.RenameChain(Zebra(ctx), "Renamed")));
-        yield return Row(nameof(IAppCommands.RenameFrame),
-            ctx => Sync(() => ctx.AppCommands.RenameFrame(Zebra(ctx).Frames[0], "CustomName")));
         yield return Row(nameof(IAppCommands.AddFrame),
             ctx => Sync(() => ctx.AppCommands.AddFrame(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.MoveChain),
@@ -318,7 +315,6 @@ public class UndoCoverageRosterTests
             zebra.Frames.Add(new AnimationFrameSave
             {
                 TextureName      = "sheet.png",
-                Name             = $"Frame{i}",
                 FrameLength      = 0.1f * (i + 1),
                 LeftCoordinate   = 0.25f,
                 RightCoordinate  = 0.5f,
@@ -342,7 +338,6 @@ public class UndoCoverageRosterTests
         alpha.Frames.Add(new AnimationFrameSave
         {
             TextureName      = "sheet.png",
-            Name             = "Frame0",
             FrameLength      = 0.1f,
             LeftCoordinate   = 0.1f,
             RightCoordinate  = 0.2f,

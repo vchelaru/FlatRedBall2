@@ -90,9 +90,6 @@ namespace AnimationEditor.Core.CommandsAndState
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
         bool RenameChain(AnimationChainSave chain, string newName);
-        /// <summary>Sets a user-defined display name for a frame. The name is sticky — it
-        /// survives reorders and is persisted to the .achx file. Undoable.</summary>
-        void RenameFrame(AnimationFrameSave frame, string newName);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
         void MoveChain(AnimationChainSave chain, int delta);
         void MoveChainToTop(AnimationChainSave chain);

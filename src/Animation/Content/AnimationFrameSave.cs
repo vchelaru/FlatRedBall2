@@ -65,19 +65,6 @@ public class AnimationFrameSave
     /// </summary>
     public ColorOperation? ColorOperation;
 
-    /// <summary>
-    /// User-visible display label for this frame in the Animation Editor tree.
-    /// Only meaningful when <see cref="HasCustomName"/> is <c>true</c>; when
-    /// <c>false</c> the editor shows a dynamic position-based label ("Frame N")
-    /// that updates automatically on reorder.
-    /// </summary>
-    public string Name = string.Empty;
-
-    /// <summary>When <c>true</c>, <see cref="Name"/> was explicitly set by the user and
-    /// the editor displays it as-is. When <c>false</c> (the default), the editor shows
-    /// a dynamic position-based label ("Frame N") that updates automatically on reorder.</summary>
-    public bool HasCustomName;
-
     /// <summary>Per-frame shape definitions. Empty by default.</summary>
     public ShapesSave? ShapesSave;
 }

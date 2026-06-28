@@ -315,10 +315,8 @@ public class AnimationChainListSave
             RelativeY = FloatEl(el, "RelativeY"),
         };
 
-        var nameEl = el.Element("Name");
-        var hasCustomEl = el.Element("HasCustomName");
-        if (nameEl != null) frame.Name = nameEl.Value;
-        if (hasCustomEl != null) frame.HasCustomName = bool.Parse(hasCustomEl.Value);
+        // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
+        // identity is its index, so the editor always shows a positional "Frame N" label.
 
         // New dialect: <Shapes> wrapper; old dialect: <ShapeCollectionSave> wrapper.
         var shapesEl = el.Element("Shapes") ?? el.Element("ShapeCollectionSave");
@@ -431,11 +429,6 @@ public class AnimationChainListSave
         el.Add(new XElement("BottomCoordinate", FloatStr(frame.BottomCoordinate)));
         if (frame.RelativeX != 0f) el.Add(new XElement("RelativeX", FloatStr(frame.RelativeX)));
         if (frame.RelativeY != 0f) el.Add(new XElement("RelativeY", FloatStr(frame.RelativeY)));
-        if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
-        {
-            el.Add(new XElement("Name", frame.Name));
-            el.Add(new XElement("HasCustomName", "true"));
-        }
         el.Add(WriteShapesElement(frame.ShapesSave));
         return el;
     }

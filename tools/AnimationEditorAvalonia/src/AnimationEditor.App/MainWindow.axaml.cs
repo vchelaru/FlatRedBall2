@@ -2378,8 +2378,6 @@ public partial class MainWindow : Window
                 AddMenuItem("Duplicate", () => _appCommands.DuplicateFrame(frame2, chain2));
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
-            AddMenuItem("Rename…", () =>
-                BeginInlineRename(vm!, frame2.HasCustomName ? frame2.Name : string.Empty));
             AddSeparator();
             AddMenuItem("Delete Frame", () =>
                 _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
@@ -3561,10 +3559,10 @@ public partial class MainWindow : Window
 
                 if (vm is not null)
                 {
+                    // Frame nodes are intentionally not renameable: a frame's identity is its
+                    // index, so its label is the computed positional "Frame N" (see TreeBuilder).
                     if (vm.Data is AnimationChainSave chain)
                         BeginInlineRename(vm, chain.Name);
-                    else if (vm.Data is AnimationFrameSave frame)
-                        BeginInlineRename(vm, frame.HasCustomName ? frame.Name : string.Empty);
                     else if (vm.Data is AARectSave rect)
                         BeginInlineRename(vm, rect.Name);
                     else if (vm.Data is CircleSave circle)
@@ -3603,8 +3601,8 @@ public partial class MainWindow : Window
                 // Restore focus to the tree — reorder can cause Avalonia to shift focus
                 // away, which would make F2 fall through to WireframeCtrl.ToggleDebugMode.
                 Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
-                if (_selectedState.SelectedFrame is { HasCustomName: false })
-                    ShowStatusMessage("Frame labels updated to reflect new positions  ·  F2 to assign a custom name");
+                if (_selectedState.SelectedFrame is not null)
+                    ShowStatusMessage("Frame labels updated to reflect new positions");
             }
         }), RoutingStrategies.Tunnel);
     }
@@ -3715,7 +3713,6 @@ public partial class MainWindow : Window
             foreach (var pasted in frames)
                 pasted.ShapesSave ??= new ShapesSave();
 
-            FramePasteLogic.AssignUniqueNames(targetChain.Frames, frames);
             _appCommands.PasteFrames(targetChain, frames, insertIndex);
             _selectedState.SelectedFrame = frames[^1];
             _appCommands.RefreshWireframe();
@@ -4323,11 +4320,6 @@ public partial class MainWindow : Window
             {
                 _appCommands.RenameChain(chain, newName);
             }
-        }
-        else if (vm.Data is AnimationFrameSave frame)
-        {
-            if (!string.IsNullOrEmpty(newName))
-                _appCommands.RenameFrame(frame, newName);
         }
         else if (vm.Data is AARectSave rect)
         {

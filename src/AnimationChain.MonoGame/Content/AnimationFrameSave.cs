@@ -35,15 +35,6 @@ public class AnimationFrameSave
     /// <summary>Per-frame Y offset.</summary>
     public float RelativeY;
 
-    /// <summary>
-    /// User-visible display label. Only meaningful when <see cref="HasCustomName"/> is <c>true</c>;
-    /// otherwise the editor shows a dynamic position-based label ("Frame N").
-    /// </summary>
-    public string Name = string.Empty;
-
-    /// <summary>When <c>true</c>, <see cref="Name"/> was explicitly set by the user.</summary>
-    public bool HasCustomName;
-
     /// <summary>Per-frame shape definitions. <c>null</c> when no shapes are defined.</summary>
     public ShapesSave? ShapesSave;
 }

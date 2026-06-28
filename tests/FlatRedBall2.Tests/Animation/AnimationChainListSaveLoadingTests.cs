@@ -111,6 +111,30 @@ public class AnimationChainListSaveLoadingTests
         circle.Radius.ShouldBe(12f);
     }
 
+    // Frames are not renameable — their identity is the index. Legacy .achx that carry a
+    // per-frame <Name>/<HasCustomName> (written by older Animation Editor builds) must still
+    // load cleanly; the elements are simply ignored rather than throwing or being honored.
+    [Fact]
+    public void FromFile_FrameWithLegacyNameElements_IgnoresThemAndLoads()
+    {
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <AnimationChain><Name>Walk</Name>" +
+            "    <Frame><TextureName>walk.png</TextureName><FrameLength>0.1</FrameLength>" +
+            "      <Name>Hit Frame</Name><HasCustomName>true</HasCustomName>" +
+            "    </Frame>" +
+            "  </AnimationChain>" +
+            "</AnimationChainArraySave>";
+
+        var save = AnimationChainListSave.FromFile("any.achx",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
+
+        var frame = save.AnimationChains[0].Frames[0];
+        frame.TextureName.ShouldBe("walk.png");
+        frame.FrameLength.ShouldBe(0.1f);
+    }
+
     [Fact]
     public void FromFile_FrameCoordinatesAndFlip_DeserializesAllFields()
     {

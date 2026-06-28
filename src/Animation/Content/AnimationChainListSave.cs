@@ -242,12 +242,6 @@ public class AnimationChainListSave
         if (frame.Alpha.HasValue) el.Add(new XElement("Alpha", frame.Alpha.Value));
         if (frame.ColorOperation.HasValue) el.Add(new XElement("ColorOperation", frame.ColorOperation.Value.ToString()));
 
-        if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
-        {
-            el.Add(new XElement("Name", frame.Name));
-            el.Add(new XElement("HasCustomName", "true"));
-        }
-
         // Preserve wrapper presence so every FRB1 file round-trips byte-identical: the loader sets
         // ShapesSave non-null iff the frame had a <ShapeCollectionSave> element. Some FRB1 files
         // omit it for shapeless frames (-> null here), others write an empty one (-> non-null,
@@ -346,8 +340,8 @@ public class AnimationChainListSave
         frame.Blue = IntElNullable(el, "Blue");
         frame.Alpha = IntElNullable(el, "Alpha");
         frame.ColorOperation = ColorOperationEl(el, "ColorOperation");
-        frame.Name = (string?)el.Element("Name") ?? string.Empty;
-        frame.HasCustomName = BoolEl(el, "HasCustomName");
+        // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
+        // identity is its index, so the editor always shows a positional "Frame N" label.
 
         // FRB1 dialect: shape wrapper is <ShapeCollectionSave>. FRB2's <ShapesSave> is not
         // accepted — no .achx files exist in the wild using it (the FRB2 writer didn't exist

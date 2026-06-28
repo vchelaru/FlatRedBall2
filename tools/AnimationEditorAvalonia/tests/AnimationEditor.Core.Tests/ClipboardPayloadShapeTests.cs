@@ -119,8 +119,6 @@ public class ClipboardPayloadShapeTests
             Green           = 20,
             Blue            = 30,
             ColorOperation  = ColorOperation.Add,
-            Name            = "CustomLabel",
-            HasCustomName   = true,
         };
         frame.ShapesSave = new ShapesSave();
         frame.ShapesSave.Shapes.Add(new AARectSave { Name = "BulletOrigin" });
@@ -141,8 +139,6 @@ public class ClipboardPayloadShapeTests
         Assert.Equal(20, rt.Green);
         Assert.Equal(30, rt.Blue);
         Assert.Equal(ColorOperation.Add, rt.ColorOperation);
-        Assert.Equal("CustomLabel", rt.Name);
-        Assert.True(rt.HasCustomName);
         Assert.Equal("BulletOrigin", rt.ShapesSave!.AARectSaves.Single().Name);
     }
 

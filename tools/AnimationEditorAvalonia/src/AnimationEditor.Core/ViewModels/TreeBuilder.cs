@@ -58,11 +58,9 @@ public static class TreeBuilder
 
     /// <summary>
     /// Builds a single frame node with any shape children from
-    /// <see cref="AnimationFrameSave.ShapesSave"/>.
-    /// Auto-named frames (those without a user-set name) are NOT given a
-    /// persisted name — they display a dynamic position-based label ("Frame N")
-    /// computed at display time. Custom-named frames (<see cref="AnimationFrameSave.HasCustomName"/>
-    /// = <c>true</c>) keep their name regardless of position.
+    /// <see cref="AnimationFrameSave.ShapesSave"/>. Frames always display a dynamic
+    /// position-based label ("Frame N") computed at display time — see
+    /// <see cref="BuildFrameHeader"/>.
     /// </summary>
     public static TreeNodeVm BuildFrameNode(AnimationFrameSave frame, int index = 0)
     {
@@ -105,18 +103,12 @@ public static class TreeBuilder
     }
 
     /// <summary>
-    /// Returns the display label for a frame node.
-    /// When <see cref="AnimationFrameSave.HasCustomName"/> is <c>true</c>, the
-    /// user-assigned <see cref="AnimationFrameSave.Name"/> is returned as-is.
-    /// Otherwise a dynamic position-based label "Frame N" is returned based on
-    /// <paramref name="index"/>, so labels update automatically on reorder.
+    /// Returns the display label for a frame node: the dynamic position-based label
+    /// "Frame N" based on <paramref name="index"/>, so labels update automatically on
+    /// reorder. Frame names are not user-overridable — a frame's identity is its index.
     /// </summary>
-    public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0)
-    {
-        if (frame.HasCustomName && !string.IsNullOrEmpty(frame.Name))
-            return frame.Name;
-        return $"Frame {index + 1}";
-    }
+    public static string BuildFrameHeader(AnimationFrameSave frame, int index = 0) =>
+        $"Frame {index + 1}";
 
     // ── Diff-update helpers ───────────────────────────────────────────────────
 
@@ -195,10 +187,8 @@ public static class TreeBuilder
     /// (and Avalonia's TreeView keeps them in its <c>SelectedItems</c> because selection
     /// uses object identity).  Headers and Meta are always refreshed.
     /// <para>
-    /// Dynamic frames (those with <see cref="AnimationFrameSave.HasCustomName"/> = <c>false</c>)
-    /// display "Frame N" based on their current position — labels update automatically on reorder.
-    /// Custom-named frames (<see cref="AnimationFrameSave.HasCustomName"/> = <c>true</c>) always
-    /// display their user-assigned <see cref="AnimationFrameSave.Name"/> regardless of position.
+    /// Frames display "Frame N" based on their current position — labels update
+    /// automatically on reorder.
     /// </para>
     /// </summary>
     public static void SyncFramesInto(TreeNodeVm chainNode, IList<AnimationFrameSave> frames)
