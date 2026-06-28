@@ -16,10 +16,17 @@ public interface IFileAssociationService
     bool IsSupported { get; }
 
     /// <summary>
-    /// Whether this editor is the current default handler for <c>.achx</c> files. Only
+    /// Whether this editor is the current default handler for <c>.achx</c> files — i.e. our
+    /// ProgId is registered and its open command targets this build's executable. Only
     /// meaningful when <see cref="IsSupported"/> is true.
     /// </summary>
     bool IsDefault();
+
+    /// <summary>
+    /// Detailed association state for settings UI. Returns
+    /// <see cref="AchxFileAssociationStatus.NotSupported"/> when <see cref="IsSupported"/> is false.
+    /// </summary>
+    AchxFileAssociationStatus GetStatus();
 
     /// <summary>
     /// Registers the editor's file-type association and surfaces the OS confirmation UI.
