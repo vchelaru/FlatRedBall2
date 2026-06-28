@@ -1023,19 +1023,24 @@ public partial class MainWindow : Window
         var undoHistory = _undoManager.UndoHistory;
         var redoHistory = _undoManager.RedoHistory;
         var items = new List<Models.HistoryEntryVm>();
-        // Applied (undo) rows use full-strength ink; redo rows are muted. Pick per theme.
+        // Applied (undo) rows use full-strength ink; redo rows are muted. All brushes come from
+        // theme tokens so the panel stays legible in both light and dark (this method re-runs on
+        // ActualThemeVariantChanged). The current entry gets an accent fill with on-accent text —
+        // reusing the body ink there would paint dark-on-red and fail contrast in light mode.
         bool dark = ActualThemeVariant != ThemeVariant.Light;
-        string appliedInk = dark ? "#e6e8ec" : "#1a1d22";
-        string redoInk     = dark ? "#6a6e76" : "#9aa1ad";
+        IBrush appliedInk = ThemedBrush("Ink");
+        IBrush redoInk    = new SolidColorBrush(Color.Parse(dark ? "#6a6e76" : "#9aa1ad"));
+        IBrush accentFill = ThemedBrush("Accent");
+        IBrush onAccent   = ThemedBrush("OnAccent");
         // Photoshop order: oldest applied at top, newest applied at bottom, redo items below.
         foreach (var cmd in undoHistory)
-            items.Add(new Models.HistoryEntryVm(cmd.Description, appliedInk));
+            items.Add(new Models.HistoryEntryVm(cmd.Description, appliedInk, Brushes.Transparent));
         // Mark the most recently applied command as "you are here".
         if (items.Count > 0)
-            items[^1] = items[^1] with { IsCurrent = true };
+            items[^1] = items[^1] with { IsCurrent = true, Foreground = onAccent, Background = accentFill };
         // Redo items follow: next-to-redo first, furthest future last.
         foreach (var cmd in redoHistory)
-            items.Add(new Models.HistoryEntryVm(cmd.Description, redoInk));
+            items.Add(new Models.HistoryEntryVm(cmd.Description, redoInk, Brushes.Transparent));
         HistoryList.ItemsSource = items;
         int currentIndex = undoHistory.Count - 1;
         ScrollHistoryToCurrent(currentIndex, items.Count);
@@ -3388,7 +3393,7 @@ public partial class MainWindow : Window
         StatusMessage.Text = text;
         StatusMessage.Foreground = isError
             ? new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(220, 80, 60))
-            : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromArgb(255, 160, 160, 160));
+            : ThemedBrush("InkMid");
         StatusMessage.IsVisible = true;
 
         _statusMessageTimer?.Stop();
@@ -3629,9 +3634,16 @@ public partial class MainWindow : Window
         else if (frames is { Count: > 0 })
         {
             AnimationChainSave? targetChain = null;
+            // With a frame selected, insert right after it (matching Duplicate). With a chain
+            // selected (or nothing), append (null index).
+            int? insertIndex = null;
             if (selectedData is AnimationChainSave c) targetChain = c;
             else if (selectedData is AnimationFrameSave f)
+            {
                 targetChain = _objectFinder.GetAnimationChainContaining(f);
+                int idx = targetChain?.Frames.IndexOf(f) ?? -1;
+                if (idx >= 0) insertIndex = idx + 1;
+            }
 
             if (targetChain is null && acls.AnimationChains.Count > 0)
                 targetChain = acls.AnimationChains[^1];
@@ -3642,7 +3654,7 @@ public partial class MainWindow : Window
                 pasted.ShapesSave ??= new ShapesSave();
 
             FramePasteLogic.AssignUniqueNames(targetChain.Frames, frames);
-            _appCommands.PasteFrames(targetChain, frames);
+            _appCommands.PasteFrames(targetChain, frames, insertIndex);
             _selectedState.SelectedFrame = frames[^1];
             _appCommands.RefreshWireframe();
         }

@@ -188,8 +188,11 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void PasteChains(IReadOnlyList<AnimationChainSave> chains);
 
-        /// <summary>Appends clipboard frames to <paramref name="chain"/>. Undoable.</summary>
-        void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames);
+        /// <summary>Adds clipboard frames to <paramref name="chain"/>. Undoable.
+        /// <paramref name="insertIndex"/> <c>null</c> appends; a value inserts the frames
+        /// there in order (paste after the selected frame).</summary>
+        void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
+            int? insertIndex = null);
 
         /// <summary>Adds a clipboard rectangle to <paramref name="frame"/>. Undoable.</summary>
         void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle);

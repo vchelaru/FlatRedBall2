@@ -27,6 +27,7 @@
                     <SolidColorBrush x:Key="InkMid"      Color="#9098a4" />
                     <SolidColorBrush x:Key="InkDim"      Color="#5d6573" />
                     <SolidColorBrush x:Key="Accent"      Color="#d83a3a" />
+                    <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
                     <SolidColorBrush x:Key="AccentSoft"  Color="#f0c674" />
                     <SolidColorBrush x:Key="AccentCool"  Color="#5fb6e8" />
                     <SolidColorBrush x:Key="Ok"          Color="#6dd28d" />
@@ -60,6 +61,7 @@
                     <SolidColorBrush x:Key="InkMid"      Color="#5a626e" />
                     <SolidColorBrush x:Key="InkDim"      Color="#8b93a0" />
                     <SolidColorBrush x:Key="Accent"      Color="#d83a3a" />
+                    <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
                     <SolidColorBrush x:Key="AccentSoft"  Color="#b8860b" />
                     <SolidColorBrush x:Key="AccentCool"  Color="#2b7fc0" />
                     <SolidColorBrush x:Key="Ok"          Color="#2f9e54" />

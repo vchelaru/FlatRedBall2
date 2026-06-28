@@ -36,19 +36,43 @@ public class AppCommandsPasteTests
     }
 
     [Fact]
-    public void PasteFrames_AppendsFramesToTargetChainAndIsUndoable()
+    public void PasteFrames_WithoutInsertIndex_AppendsToTargetChainAndIsUndoable()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var original = chain.Frames[0];
         var f1 = TestHelpers.MakeFrame("a.png");
         var f2 = TestHelpers.MakeFrame("b.png");
 
         ctx.AppCommands.PasteFrames(chain, new List<AnimationFrameSave> { f1, f2 });
 
-        Assert.Equal(new[] { chain.Frames[0], f1, f2 }, chain.Frames);
+        Assert.Equal(new[] { original, f1, f2 }, chain.Frames);
 
         ctx.UndoManager.Undo();
-        Assert.Single(chain.Frames);
+        Assert.Equal(new[] { original }, chain.Frames);
+    }
+
+    [Fact]
+    public void PasteFrames_WithInsertIndex_InsertsAfterSelectionInOrderAndIsUndoable()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        var f0 = chain.Frames[0];
+        var f1 = chain.Frames[1];
+        var f2 = chain.Frames[2];
+        var p1 = TestHelpers.MakeFrame("a.png");
+        var p2 = TestHelpers.MakeFrame("b.png");
+
+        // Selected frame is f1 (index 1) → pasted frames land at indices 2,3, keeping order.
+        ctx.AppCommands.PasteFrames(chain, new List<AnimationFrameSave> { p1, p2 }, insertIndex: 2);
+
+        Assert.Equal(new[] { f0, f1, p1, p2, f2 }, chain.Frames);
+
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { f0, f1, f2 }, chain.Frames);
+
+        ctx.UndoManager.Redo();
+        Assert.Equal(new[] { f0, f1, p1, p2, f2 }, chain.Frames);
     }
 
     [Fact]

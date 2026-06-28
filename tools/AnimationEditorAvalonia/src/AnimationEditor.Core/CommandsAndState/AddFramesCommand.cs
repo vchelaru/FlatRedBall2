@@ -15,18 +15,25 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
         private readonly AnimationFrameSave? _preAddFrame;
+        private readonly int? _insertIndex;
 
         public string Description { get; }
 
+        /// <param name="insertIndex">Where to place the frames. <c>null</c> appends at the
+        /// end (Add Multiple Frames, or pasting into a chain with no frame selected); a value
+        /// inserts the frames there in order (paste after the selected frame, matching
+        /// Duplicate). Out-of-range values fall back to appending.</param>
         public AddFramesCommand(
             AnimationFrameSave[] frames, AnimationChainSave chain,
-            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
+            IAppCommands commands, IApplicationEvents events, ISelectedState selectedState,
+            int? insertIndex = null)
         {
             _frames = frames;
             _chain = chain;
             _commands = commands;
             _events = events;
             _selectedState = selectedState;
+            _insertIndex = insertIndex;
             _preAddFrame = selectedState.SelectedFrame;
             Description = frames.Length == 1
                 ? $"Add Frame to '{chain.Name}'"
@@ -36,8 +43,16 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         public bool Do()
         {
             if (_frames.Length == 0) return false;
-            foreach (var frame in _frames)
-                _chain.Frames.Add(frame);
+            if (_insertIndex is int start && start >= 0 && start <= _chain.Frames.Count)
+            {
+                for (int i = 0; i < _frames.Length; i++)
+                    _chain.Frames.Insert(start + i, _frames[i]);
+            }
+            else
+            {
+                foreach (var frame in _frames)
+                    _chain.Frames.Add(frame);
+            }
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();

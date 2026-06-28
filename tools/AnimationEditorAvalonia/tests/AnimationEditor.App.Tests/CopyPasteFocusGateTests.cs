@@ -102,6 +102,46 @@ public class CopyPasteFocusGateTests
     }
 
     /// <summary>
+    /// Issue #462: with a frame selected mid-chain, Ctrl+V inserts the pasted frame
+    /// immediately after the selected frame (matching Duplicate), not at the chain end.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task CtrlV_FrameSelectedMidChain_InsertsAfterSelectedFrame()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var a = new AnimationFrameSave { TextureName = "a.png" };
+            var b = new AnimationFrameSave { TextureName = "b.png" };
+            var c = new AnimationFrameSave { TextureName = "c.png" };
+            chain.Frames.Add(a);
+            chain.Frames.Add(b);
+            chain.Frames.Add(c);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedFrame = b; // mid-list selection
+
+            var xml = ClipboardPayload.Serialize(
+                new List<AnimationFrameSave> { new() { TextureName = "pasted.png", FrameLength = 0.1f } });
+            await window.Clipboard!.SetTextAsync(xml);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            tree.Focus();
+            Dispatcher.UIThread.RunJobs();
+
+            window.KeyPress(Key.V, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(4, chain.Frames.Count);
+            Assert.Same(a, chain.Frames[0]);
+            Assert.Same(b, chain.Frames[1]);
+            Assert.Equal("pasted.png", chain.Frames[2].TextureName); // inserted after b
+            Assert.Same(c, chain.Frames[3]);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
     /// Ctrl+C with a TextBox focused must not overwrite clipboard text with
     /// frame XML (nothing in the tree is being copied from a text-editor context).
     /// </summary>

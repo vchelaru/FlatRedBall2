@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Threading;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.App.Models;
@@ -180,13 +181,15 @@ public class HistoryPanelButtonStateTests
             Assert.Equal("A", items[0].Description); // oldest applied at top
             Assert.Equal("B", items[1].Description); // redo item at bottom
 
-            // A is bright (applied), B is dimmed (redo)
-            Assert.Equal("#e6e8ec", items[0].Foreground);
-            Assert.Equal("#6a6e76", items[1].Foreground);
-
-            // A is the current "you are here" entry
+            // A is the current "you are here" entry: accent fill + on-accent text.
             Assert.True(items[0].IsCurrent);
+            Assert.Same(ThemeBrush(window, "Accent"), items[0].Background);
+            Assert.Same(ThemeBrush(window, "OnAccent"), items[0].Foreground);
+
+            // B is a dimmed redo row: muted ink, transparent fill.
             Assert.False(items[1].IsCurrent);
+            Assert.Same(Brushes.Transparent, items[1].Background);
+            Assert.Equal(Color.Parse("#6a6e76"), ((SolidColorBrush)items[1].Foreground).Color);
         }
         finally { window.Close(); }
     }
@@ -218,7 +221,40 @@ public class HistoryPanelButtonStateTests
         finally { window.Close(); }
     }
 
+    // ── Current-entry highlight (issue #461) ──────────────────────────────────
+
+    /// <summary>
+    /// The "you are here" row must use the theme accent fill with on-accent text, never the
+    /// body ink — reusing the ink painted dark-on-red and failed contrast in light mode.
+    /// </summary>
+    [AvaloniaFact]
+    public void HistoryList_CurrentEntry_UsesAccentFillWithContrastingText()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.UndoManager.Record(new StubCmd("A"));
+            Dispatcher.UIThread.RunJobs();
+
+            var list = window.FindControl<ItemsControl>("HistoryList")!;
+            var current = Assert.Single((IEnumerable<HistoryEntryVm>)list.ItemsSource!);
+
+            Assert.True(current.IsCurrent);
+            Assert.Same(ThemeBrush(window, "Accent"), current.Background);
+            Assert.Same(ThemeBrush(window, "OnAccent"), current.Foreground);
+            // Regression guard: the current row must not reuse the body ink (the light-mode bug).
+            Assert.NotSame(ThemeBrush(window, "Ink"), current.Foreground);
+        }
+        finally { window.Close(); }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>Resolves a theme-token brush for the window's active variant, mirroring the
+    /// app's own <c>ThemedBrush</c> lookup so assertions compare the exact brush instance.</summary>
+    private static IBrush? ThemeBrush(MainWindow window, string key) =>
+        Avalonia.Application.Current!.TryFindResource(key, window.ActualThemeVariant, out var v)
+            ? v as IBrush : null;
 
     private sealed class StubCmd(string description = "Stub") : IUndoableCommand
     {

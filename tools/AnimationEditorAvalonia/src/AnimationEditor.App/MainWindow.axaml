@@ -430,7 +430,7 @@
                                         <!-- Inline-edit mode: match TextBlock font/padding so it sits in the same spot -->
                                         <TextBox Text="{Binding EditingText, Mode=TwoWay}"
                                                  IsVisible="{Binding IsEditing}"
-                                                 Background="#2a2e36"
+                                                 Background="{DynamicResource BgActive}"
                                                  Foreground="{DynamicResource Ink}"
                                                  CaretBrush="{DynamicResource Ink}"
                                                  SelectionBrush="#4466aa"
@@ -932,13 +932,13 @@
                                             <WrapPanel>
                                                 <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                     <TextBlock Text="X" VerticalAlignment="Center"
-                                                               Foreground="#f48b8b" FontSize="11" FontWeight="SemiBold" />
+                                                               Foreground="{DynamicResource Accent}" FontSize="11" FontWeight="SemiBold" />
                                                     <NumericUpDown x:Name="PropPixelX" Grid.Column="1" MinWidth="66"
                                                                    Minimum="-16384" Maximum="16384" Increment="1" />
                                                 </Grid>
                                                 <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                     <TextBlock Text="Y" VerticalAlignment="Center"
-                                                               Foreground="#8bb6f4" FontSize="11" FontWeight="SemiBold" />
+                                                               Foreground="{DynamicResource AccentCool}" FontSize="11" FontWeight="SemiBold" />
                                                     <NumericUpDown x:Name="PropPixelY" Grid.Column="1" MinWidth="66"
                                                                    Minimum="-16384" Maximum="16384" Increment="1" />
                                                 </Grid>
@@ -946,13 +946,13 @@
                                             <WrapPanel>
                                                 <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                     <TextBlock Text="W" VerticalAlignment="Center"
-                                                               Foreground="#f0c674" FontSize="11" FontWeight="SemiBold" />
+                                                               Foreground="{DynamicResource AccentSoft}" FontSize="11" FontWeight="SemiBold" />
                                                     <NumericUpDown x:Name="PropPixelW" Grid.Column="1" MinWidth="66"
                                                                    Minimum="1" Maximum="16384" Increment="1" />
                                                 </Grid>
                                                 <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                     <TextBlock Text="H" VerticalAlignment="Center"
-                                                               Foreground="#6dd28d" FontSize="11" FontWeight="SemiBold" />
+                                                               Foreground="{DynamicResource Ok}" FontSize="11" FontWeight="SemiBold" />
                                                     <NumericUpDown x:Name="PropPixelH" Grid.Column="1" MinWidth="66"
                                                                    Minimum="1" Maximum="16384" Increment="1" />
                                                 </Grid>
@@ -1095,19 +1095,19 @@
                                         <WrapPanel>
                                             <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                 <TextBlock Text="R" VerticalAlignment="Center"
-                                                           Foreground="#f48b8b" FontSize="11" FontWeight="SemiBold" />
+                                                           Foreground="{DynamicResource Accent}" FontSize="11" FontWeight="SemiBold" />
                                                 <NumericUpDown x:Name="PropRed" Grid.Column="1" MinWidth="66"
                                                                Minimum="0" Maximum="255" Increment="1" FormatString="0" />
                                             </Grid>
                                             <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                 <TextBlock Text="G" VerticalAlignment="Center"
-                                                           Foreground="#6dd28d" FontSize="11" FontWeight="SemiBold" />
+                                                           Foreground="{DynamicResource Ok}" FontSize="11" FontWeight="SemiBold" />
                                                 <NumericUpDown x:Name="PropGreen" Grid.Column="1" MinWidth="66"
                                                                Minimum="0" Maximum="255" Increment="1" FormatString="0" />
                                             </Grid>
                                             <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
                                                 <TextBlock Text="B" VerticalAlignment="Center"
-                                                           Foreground="#8bb6f4" FontSize="11" FontWeight="SemiBold" />
+                                                           Foreground="{DynamicResource AccentCool}" FontSize="11" FontWeight="SemiBold" />
                                                 <NumericUpDown x:Name="PropBlue" Grid.Column="1" MinWidth="66"
                                                                Minimum="0" Maximum="255" Increment="1" FormatString="0" />
                                             </Grid>

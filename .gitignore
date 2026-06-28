@@ -17,6 +17,7 @@ CLAUDE.local.md
 # Engine / tooling scratch
 .claude/skill_change_log.jsonl
 /.claude/worktrees
+/.claude/hooks
 /design/edc
 /out
 
