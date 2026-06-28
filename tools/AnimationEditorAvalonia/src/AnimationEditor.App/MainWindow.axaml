@@ -445,8 +445,8 @@
                                 </StackPanel>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Meta}"
-                                           Foreground="{DynamicResource InkDim}"
-                                           FontSize="10"
+                                           Foreground="{DynamicResource AccentCool}"
+                                           FontSize="11"
                                            Margin="8,0,6,0"
                                            HorizontalAlignment="Right"
                                            TextAlignment="Right"
