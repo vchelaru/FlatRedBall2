@@ -67,7 +67,7 @@
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="MonoGame.Extended" Version="6.0.0-preview.*" />
+    <PackageReference Include="MonoGame.Extended" Version="6.0.0" />
   </ItemGroup>
 
   <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
@@ -76,7 +76,7 @@
     <PackageReference Include="Gum.KNI" Version="2026.6.26.1" />
     <PackageReference Include="Gum.Shapes.KNI" Version="2026.6.26.1" />
     <PackageReference Include="KernSmith.KniGum" Version="0.13.*" />
-    <PackageReference Include="KNI.Extended" Version="6.0.0-preview.*" />
+    <PackageReference Include="KNI.Extended" Version="6.0.0" />
     <PackageReference Include="nkast.Xna.Framework" Version="4.2.9001" />
     <PackageReference Include="nkast.Xna.Framework.Content" Version="4.2.9001" />
     <PackageReference Include="nkast.Xna.Framework.Graphics" Version="4.2.9001" />
