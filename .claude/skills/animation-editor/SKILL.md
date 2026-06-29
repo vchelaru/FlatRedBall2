@@ -75,3 +75,7 @@ Both panels have their own zoom combo box wired in `MainWindow.axaml.cs` (`ZoomC
 | Equality / comparison | `new FilePath(a) == new FilePath(b)` |
 
 Tests that exercise path logic **must** use Windows-style backslash literals (e.g. `@"C:\projects\MyAnim.achx"`) to prove the cross-platform handling works — not `Path.Combine`, which would only exercise the current OS's separator.
+
+## Tree reorder — frames only; shape order is fixed
+
+Drag-and-drop tree reorder is **frames only** (see GitHub issues for frame DnD). **Do not add shape DnD reorder:** collision shapes in `.achx` keep a **fixed list order** for FRB1 runtime compatibility — order is meaningful to legacy consumers, not a cosmetic tree sort. Menu/Alt+Arrow shape reorder exists in `AppCommands.MoveShape` today; treat new reorder UX as frame-only unless an issue explicitly revisits shape ordering across runtimes.
