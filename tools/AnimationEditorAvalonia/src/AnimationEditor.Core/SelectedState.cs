@@ -116,7 +116,11 @@ namespace AnimationEditor.Core
             get => _selectedNodes;
             set
             {
-                _selectedNodes = value ?? new List<object>();
+                var newList = value ?? new List<object>();
+                if (_selectedNodes.Count == newList.Count
+                    && _selectedNodes.SequenceEqual(newList))
+                    return;
+                _selectedNodes = newList;
                 SelectionChanged?.Invoke();
             }
         }

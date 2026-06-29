@@ -40,16 +40,18 @@ public class AppCommandsPasteTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
-        var original = chain.Frames[0];
         var f1 = TestHelpers.MakeFrame("a.png");
         var f2 = TestHelpers.MakeFrame("b.png");
 
         ctx.AppCommands.PasteFrames(chain, new List<AnimationFrameSave> { f1, f2 });
 
-        Assert.Equal(new[] { original, f1, f2 }, chain.Frames);
+        Assert.Equal(new[] { "frame0.png", "a.png", "b.png" },
+            chain.Frames.Select(f => f.TextureName));
+        Assert.DoesNotContain(f1, chain.Frames);
+        Assert.DoesNotContain(f2, chain.Frames);
 
         ctx.UndoManager.Undo();
-        Assert.Equal(new[] { original }, chain.Frames);
+        Assert.Equal(new[] { "frame0.png" }, chain.Frames.Select(f => f.TextureName));
     }
 
     [Fact]
@@ -57,22 +59,22 @@ public class AppCommandsPasteTests
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
-        var f0 = chain.Frames[0];
-        var f1 = chain.Frames[1];
-        var f2 = chain.Frames[2];
         var p1 = TestHelpers.MakeFrame("a.png");
         var p2 = TestHelpers.MakeFrame("b.png");
 
         // Selected frame is f1 (index 1) → pasted frames land at indices 2,3, keeping order.
         ctx.AppCommands.PasteFrames(chain, new List<AnimationFrameSave> { p1, p2 }, insertIndex: 2);
 
-        Assert.Equal(new[] { f0, f1, p1, p2, f2 }, chain.Frames);
+        Assert.Equal(new[] { "frame0.png", "frame1.png", "a.png", "b.png", "frame2.png" },
+            chain.Frames.Select(f => f.TextureName));
 
         ctx.UndoManager.Undo();
-        Assert.Equal(new[] { f0, f1, f2 }, chain.Frames);
+        Assert.Equal(new[] { "frame0.png", "frame1.png", "frame2.png" },
+            chain.Frames.Select(f => f.TextureName));
 
         ctx.UndoManager.Redo();
-        Assert.Equal(new[] { f0, f1, p1, p2, f2 }, chain.Frames);
+        Assert.Equal(new[] { "frame0.png", "frame1.png", "a.png", "b.png", "frame2.png" },
+            chain.Frames.Select(f => f.TextureName));
     }
 
     [Fact]
@@ -85,7 +87,7 @@ public class AppCommandsPasteTests
 
         ctx.AppCommands.PasteRectangle(frame, rect);
 
-        Assert.Same(rect, frame.ShapesSave!.AARectSaves.First());
+        Assert.Equal("Pasted", frame.ShapesSave!.AARectSaves.First().Name);
 
         ctx.UndoManager.Undo();
         Assert.Empty(frame.ShapesSave!.AARectSaves);
@@ -101,7 +103,7 @@ public class AppCommandsPasteTests
 
         ctx.AppCommands.PasteCircle(frame, circle);
 
-        Assert.Same(circle, frame.ShapesSave!.CircleSaves.First());
+        Assert.Equal("Pasted", frame.ShapesSave!.CircleSaves.First().Name);
 
         ctx.UndoManager.Undo();
         Assert.Empty(frame.ShapesSave!.CircleSaves);

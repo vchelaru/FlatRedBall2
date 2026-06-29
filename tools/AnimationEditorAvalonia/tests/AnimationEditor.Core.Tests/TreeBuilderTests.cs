@@ -276,8 +276,7 @@ public class TreeBuilderPureTests
     [Fact]
     public void SyncChainsInto_AddedChain_InsertsExpandedVm()
     {
-        // Regression (#237): a pasted chain is new — it gets the default expanded
-        // state, while the pre-existing collapsed chain keeps its state.
+        // Default for a new chain VM (before App-layer paste inherit) is expanded.
         var existing = new AnimationChainSave { Name = "Walk" };
         var roots = new ObservableCollection<TreeNodeVm> { TreeBuilder.BuildChainNode(existing) };
         roots[0].IsExpanded = false;  // user collapsed the existing chain
@@ -289,6 +288,36 @@ public class TreeBuilderPureTests
         Assert.False(roots[0].IsExpanded);   // pre-existing chain stays collapsed
         Assert.Same(pasted, roots[1].Data);
         Assert.True(roots[1].IsExpanded);    // new chain defaults to expanded
+    }
+
+    [Fact]
+    public void ExpandStatesForChainNames_ReadsCollapsedSource()
+    {
+        var walk = new AnimationChainSave { Name = "Walk" };
+        var run = new AnimationChainSave { Name = "Run" };
+        var roots = new List<TreeNodeVm>
+        {
+            TreeBuilder.BuildChainNode(walk),
+            TreeBuilder.BuildChainNode(run),
+        };
+        roots[0].IsExpanded = false;
+        roots[1].IsExpanded = true;
+
+        var states = TreeBuilder.ExpandStatesForChainNames(roots, new[] { "Walk", "Run" });
+
+        Assert.Equal(new[] { false, true }, states);
+    }
+
+    [Fact]
+    public void ApplyExpandStates_CollapsesPastedChainVm()
+    {
+        var pasted = new AnimationChainSave { Name = "Walk2" };
+        var roots = new List<TreeNodeVm> { TreeBuilder.BuildChainNode(pasted) };
+        Assert.True(roots[0].IsExpanded);
+
+        TreeBuilder.ApplyExpandStates(roots, new[] { pasted }, new[] { false });
+
+        Assert.False(roots[0].IsExpanded);
     }
 
     [Fact]

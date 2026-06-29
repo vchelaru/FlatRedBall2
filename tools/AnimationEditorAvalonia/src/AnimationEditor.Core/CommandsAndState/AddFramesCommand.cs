@@ -1,4 +1,5 @@
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 
 namespace AnimationEditor.Core.CommandsAndState.Commands
 {
@@ -14,7 +15,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
-        private readonly AnimationFrameSave? _preAddFrame;
+        private readonly List<object> _preSelection;
         private readonly int? _insertIndex;
 
         public string Description { get; }
@@ -34,7 +35,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             _selectedState = selectedState;
             _insertIndex = insertIndex;
-            _preAddFrame = selectedState.SelectedFrame;
+            _preSelection = new List<object>(selectedState.SelectedNodes);
             Description = frames.Length == 1
                 ? $"Add Frame to '{chain.Name}'"
                 : $"Add {frames.Length} Frames to '{chain.Name}'";
@@ -56,6 +57,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
+            _selectedState.SelectedNodes = _frames.Cast<object>().ToList();
             _selectedState.SelectedFrame = _frames[^1];
             return true;
         }
@@ -67,7 +69,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands.RefreshTreeNode(_chain);
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
-            _selectedState.SelectedFrame = _preAddFrame;
+            _selectedState.SelectedNodes = _preSelection;
+            _selectedState.SelectedFrame = _preSelection.OfType<AnimationFrameSave>().LastOrDefault();
         }
     }
 }

@@ -11,6 +11,50 @@ namespace AnimationEditor.Core.IO;
 public static class ChainPasteLogic
 {
     /// <summary>
+    /// Index immediately after the last anchor chain in project order.
+    /// </summary>
+    public static int ResolveBlockInsertIndexAfterAnchors(
+        AnimationChainListSave acls,
+        IReadOnlyList<AnimationChainSave> anchors)
+    {
+        int insertIndex = -1;
+        foreach (var anchor in anchors)
+        {
+            int idx = acls.AnimationChains.IndexOf(anchor);
+            if (idx >= 0)
+                insertIndex = Math.Max(insertIndex, idx + 1);
+        }
+        return insertIndex >= 0 ? insertIndex : acls.AnimationChains.Count;
+    }
+
+    /// <summary>
+    /// Index immediately after the last chain whose name appears in
+    /// <paramref name="anchorNames"/>, scanning in project order.
+    /// </summary>
+    public static int ResolveBlockInsertIndexAfterAnchorNames(
+        AnimationChainListSave acls,
+        IReadOnlyCollection<string> anchorNames)
+    {
+        int insertIndex = acls.AnimationChains.Count;
+        for (int i = 0; i < acls.AnimationChains.Count; i++)
+        {
+            if (anchorNames.Contains(acls.AnimationChains[i].Name))
+                insertIndex = i + 1;
+        }
+        return insertIndex;
+    }
+
+    /// <summary>Inserts <paramref name="chains"/> contiguously at <paramref name="insertIndex"/>.</summary>
+    public static void InsertChainBlockAt(
+        AnimationChainListSave acls,
+        IReadOnlyList<AnimationChainSave> chains,
+        int insertIndex)
+    {
+        for (int i = 0; i < chains.Count; i++)
+            acls.AnimationChains.Insert(Math.Min(insertIndex + i, acls.AnimationChains.Count), chains[i]);
+    }
+
+    /// <summary>
     /// Renames each pasted chain to be unique within <paramref name="acls"/>, then inserts
     /// the block directly below the lowest (last) source chain the copy was made from —
     /// matched by the names the pasted chains still carry from the clipboard. When no
@@ -20,27 +64,23 @@ public static class ChainPasteLogic
     /// </summary>
     public static void InsertPastedChains(
         AnimationChainListSave acls,
-        IReadOnlyList<AnimationChainSave> pastedChains)
+        IReadOnlyList<AnimationChainSave> pastedChains,
+        IReadOnlyList<AnimationChainSave>? anchorChains = null)
     {
         if (pastedChains.Count == 0) return;
 
-        // The pasted chains still carry their source names at this point (renaming
-        // happens below), so they double as the lookup key for the source rows.
         var sourceNames = pastedChains.Select(c => c.Name).ToHashSet();
-        int insertIndex = acls.AnimationChains.Count;
-        for (int i = 0; i < acls.AnimationChains.Count; i++)
-        {
-            if (sourceNames.Contains(acls.AnimationChains[i].Name))
-                insertIndex = i + 1;
-        }
+        int insertIndex = anchorChains is { Count: > 0 }
+            ? ResolveBlockInsertIndexAfterAnchors(acls, anchorChains)
+            : ResolveBlockInsertIndexAfterAnchorNames(acls, sourceNames);
 
         var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
         foreach (var chain in pastedChains)
         {
             chain.Name = StringFunctions.MakeStringUnique(chain.Name, existingNames, 2);
             existingNames.Add(chain.Name);
-            acls.AnimationChains.Insert(insertIndex, chain);
-            insertIndex++;
         }
+
+        InsertChainBlockAt(acls, pastedChains, insertIndex);
     }
 }

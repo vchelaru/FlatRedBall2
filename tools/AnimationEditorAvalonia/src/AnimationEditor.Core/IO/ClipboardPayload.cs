@@ -10,18 +10,14 @@ namespace AnimationEditor.Core.IO;
 /// Format:  "TypeName:&lt;payload&gt;"
 ///   • TypeName is the simple C# type name, e.g.
 ///     "List&lt;AnimationChainSave&gt;", "List&lt;AnimationFrameSave&gt;",
-///     "AARectSave", or "CircleSave".
-///   • Chains and frames are serialized through the engine's own .achx serializer
-///     (<see cref="AnimationChainListSave.ToXmlString"/> / <see cref="AnimationChainListSave.FromString"/>)
-///     so per-frame shapes — which live in a polymorphic <c>List&lt;object&gt;</c> that
-///     <c>XmlSerializer</c> cannot serialize — round-trip exactly as the on-disk format does.
-///   • Single shapes are flat POCOs and stay on the simple <see cref="XmlFile"/> path.
-///
-/// This class handles only serialization/deserialization — clipboard I/O is the
-/// responsibility of the app layer.
+///     "ShapesSave", "AARectSave", or "CircleSave".
+///   • Chains, frames, and multi-shape payloads use the engine's .achx serializer.
+///   • Single shapes are flat POCOs on the simple <see cref="XmlFile"/> path.
 /// </summary>
 public static class ClipboardPayload
 {
+    private const string ShapesTypeName = nameof(ShapesSave);
+
     // ── Serialization ─────────────────────────────────────────────────────
 
     public static string Serialize(List<AnimationChainSave> chains)
@@ -33,13 +29,23 @@ public static class ClipboardPayload
 
     public static string Serialize(List<AnimationFrameSave> frames)
     {
-        // Wrap the loose frames in a single throwaway chain so they go through the same
-        // .achx serializer as a chain copy. Deserialize unwraps them back to a flat list.
         var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave();
         chain.Frames.AddRange(frames);
         acls.AnimationChains.Add(chain);
         return $"{TypeName<List<AnimationFrameSave>>()}:{acls.ToXmlString()}";
+    }
+
+    public static string SerializeShapes(IReadOnlyList<object> shapes)
+    {
+        var frame = new AnimationFrameSave { TextureName = "_", ShapesSave = new ShapesSave() };
+        foreach (var shape in shapes)
+            frame.ShapesSave!.Shapes.Add(shape);
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave();
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+        return $"{ShapesTypeName}:{acls.ToXmlString()}";
     }
 
     public static string Serialize(AARectSave rectangle)
@@ -48,25 +54,33 @@ public static class ClipboardPayload
     public static string Serialize(CircleSave circle)
         => Encode(circle);
 
+  public static string SerializeFromPayload(CopySelectionPayload payload) => payload.Kind switch
+    {
+        CopySelectionKind.Chain => Serialize(payload.Chains.Select(AnimationCloneHelper.CloneChain).ToList()),
+        CopySelectionKind.Frame => Serialize(payload.Frames.Select(AnimationCloneHelper.CloneFrame).ToList()),
+        CopySelectionKind.Shape => payload.Shapes.Count == 1 && payload.Shapes[0] is AARectSave r
+            ? Serialize((AARectSave)AnimationCloneHelper.CloneShape(r)!)
+            : payload.Shapes.Count == 1 && payload.Shapes[0] is CircleSave c
+            ? Serialize((CircleSave)AnimationCloneHelper.CloneShape(c)!)
+            : SerializeShapes(payload.Shapes
+                .Select(s => AnimationCloneHelper.CloneShape(s)!)
+                .ToList()),
+        _ => throw new System.ArgumentOutOfRangeException(nameof(payload)),
+    };
+
     // ── Deserialization ───────────────────────────────────────────────────
 
-    /// <summary>
-    /// Attempts to parse a clipboard string into one of the supported payload types.
-    /// Returns <c>true</c> when the string was valid and the appropriate out-parameter
-    /// is populated; all other out-parameters will be <c>null</c>.
-    /// Returns <c>false</c> when the string is unrecognised or malformed.
-    /// </summary>
     public static bool TryDeserialize(
         string? text,
         out List<AnimationChainSave>? chains,
         out List<AnimationFrameSave>? frames,
-        out AARectSave? rectangle,
-        out CircleSave? circle)
+        out List<AARectSave>? rectangles,
+        out List<CircleSave>? circles)
     {
-        chains    = null;
-        frames    = null;
-        rectangle = null;
-        circle    = null;
+        chains     = null;
+        frames     = null;
+        rectangles = null;
+        circles    = null;
 
         if (string.IsNullOrEmpty(text)) return false;
         int sep = text.IndexOf(':');
@@ -88,15 +102,29 @@ public static class ClipboardPayload
                     .AnimationChains.SelectMany(c => c.Frames).ToList();
                 return true;
             }
+            if (typeName == ShapesTypeName)
+            {
+                var shapes = AnimationChainListSave.FromString(payload)
+                    .AnimationChains.SelectMany(c => c.Frames)
+                    .SelectMany(f => f.ShapesSave?.Shapes ?? [])
+                    .ToList();
+                rectangles = shapes.OfType<AARectSave>().ToList();
+                circles    = shapes.OfType<CircleSave>().ToList();
+                return rectangles.Count + circles.Count > 0;
+            }
             if (typeName == nameof(AARectSave))
             {
-                rectangle = XmlFile.DeserializeFromString<AARectSave>(payload);
-                return rectangle != null;
+                var rect = XmlFile.DeserializeFromString<AARectSave>(payload);
+                if (rect is null) return false;
+                rectangles = new List<AARectSave> { rect };
+                return true;
             }
             if (typeName == nameof(CircleSave))
             {
-                circle = XmlFile.DeserializeFromString<CircleSave>(payload);
-                return circle != null;
+                var circle = XmlFile.DeserializeFromString<CircleSave>(payload);
+                if (circle is null) return false;
+                circles = new List<CircleSave> { circle };
+                return true;
             }
         }
         catch

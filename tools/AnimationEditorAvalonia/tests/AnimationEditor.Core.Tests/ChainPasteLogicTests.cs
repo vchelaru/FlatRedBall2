@@ -63,6 +63,23 @@ public class ChainPasteLogicTests
     }
 
     [Fact]
+    public void InsertPastedChains_WithSelectionAnchor_InsertsBelowSelectedBlock()
+    {
+        var acls = Acls("Anim1", "Anim2", "Anim1Copy", "Anim2Copy");
+
+        ChainPasteLogic.InsertPastedChains(
+            acls,
+            new[] { Chain("Anim1"), Chain("Anim2") },
+            anchorChains: new[] { acls.AnimationChains[2], acls.AnimationChains[3] });
+
+        Assert.Equal(6, acls.AnimationChains.Count);
+        Assert.Equal(new[] { "Anim1", "Anim2", "Anim1Copy", "Anim2Copy" },
+            acls.AnimationChains.Take(4).Select(c => c.Name));
+        Assert.Equal(new[] { "Anim3", "Anim4" },
+            acls.AnimationChains.Skip(4).Select(c => c.Name));
+    }
+
+    [Fact]
     public void InsertPastedChains_EmptyInput_LeavesListUnchanged()
     {
         var acls = Acls("Walk", "Run");

@@ -401,6 +401,34 @@ public static class TreeBuilder
     }
 
     /// <summary>
+    /// Reads each source chain's current <see cref="TreeNodeVm.IsExpanded"/> from the
+    /// tree, matched by name. Used when pasting/duplicating so copies inherit collapse state.
+    /// </summary>
+    public static IReadOnlyList<bool> ExpandStatesForChainNames(
+        IEnumerable<TreeNodeVm> roots,
+        IReadOnlyList<string> sourceNames) =>
+        sourceNames
+            .Select(name => roots.FirstOrDefault(n =>
+                n.Data is AnimationChainSave c && c.Name == name)?.IsExpanded ?? false)
+            .ToList();
+
+    /// <summary>
+    /// Applies per-chain expand flags to the VMs for <paramref name="chains"/>.
+    /// </summary>
+    public static void ApplyExpandStates(
+        IEnumerable<TreeNodeVm> roots,
+        IReadOnlyList<AnimationChainSave> chains,
+        IReadOnlyList<bool> expanded)
+    {
+        for (int i = 0; i < chains.Count && i < expanded.Count; i++)
+        {
+            var node = FindNodeForData(roots, chains[i]);
+            if (node is not null)
+                node.IsExpanded = expanded[i];
+        }
+    }
+
+    /// <summary>
     /// Expands every ancestor of the node holding <paramref name="target"/> so its row is visible,
     /// without changing the target's own expand state. Needed because a frame can now be selected
     /// without its chain being expanded first (e.g. scrubbing the timeline selects a frame while

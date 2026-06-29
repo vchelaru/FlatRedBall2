@@ -230,5 +230,12 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <summary>Adds a clipboard circle to <paramref name="frame"/>. Undoable.</summary>
         void PasteCircle(AnimationFrameSave frame, CircleSave circle);
+
+        /// <summary>Adds multiple clipboard shapes to <paramref name="frame"/> in one undo step.</summary>
+        void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
+            IReadOnlyList<CircleSave> circles);
+
+        /// <summary>Duplicates the homogeneous multi-selection as one undo step.</summary>
+        void DuplicateSelection(CopySelectionPayload payload);
     }
 }

@@ -823,7 +823,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 if (frame.ShapesSave != null)
                 {
                     foreach (var shape in frame.ShapesSave.Shapes)
-                        if (CloneShape(shape) is { } shapeCopy)
+                        if (AnimationCloneHelper.CloneShape(shape) is { } shapeCopy)
                         {
                             // Mirror the copy's offsets so collision tracks the flipped sprite.
                             ShapeFlip.Mirror(shapeCopy, flipH, flipV);
@@ -843,73 +843,141 @@ namespace AnimationEditor.Core.CommandsAndState
         public AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain)
         {
             if (!chain.Frames.Contains(source)) return null;
-
-            var copy = new AnimationFrameSave
-            {
-                TextureName      = source.TextureName,
-                LeftCoordinate   = source.LeftCoordinate,
-                RightCoordinate  = source.RightCoordinate,
-                TopCoordinate    = source.TopCoordinate,
-                BottomCoordinate = source.BottomCoordinate,
-                FrameLength      = source.FrameLength,
-                FlipHorizontal   = source.FlipHorizontal,
-                FlipVertical     = source.FlipVertical,
-                RelativeX        = source.RelativeX,
-                RelativeY        = source.RelativeY,
-                ShapesSave       = new FlatRedBall2.Animation.Content.ShapesSave()
-            };
-
-            if (source.ShapesSave != null)
-            {
-                foreach (var shape in source.ShapesSave.Shapes)
-                    if (CloneShape(shape) is { } shapeCopy)
-                        copy.ShapesSave!.Shapes.Add(shapeCopy);
-            }
-
-            _undoManager.Execute(new DuplicateFrameCommand(source, copy, chain, this, _events, _selectedState));
-            return copy;
+            var copies = DuplicateFramesBatch(new[] { source });
+            return copies.Count > 0 ? copies[0] : null;
         }
 
         /// <inheritdoc cref="IAppCommands.DuplicateShape"/>
         public object? DuplicateShape(object source)
         {
-            var frame = source switch
-            {
-                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
-                CircleSave  c => _objectFinder.GetAnimationFrameContaining(c),
-                _ => null,
-            };
-            if (frame is null) return null;
-            if (CloneShape(source) is not { } copy) return null;
-
-            frame.ShapesSave ??= new FlatRedBall2.Animation.Content.ShapesSave();
-            var existingNames = frame.ShapesSave.AARectSaves.Select(r => r.Name)
-                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name)).ToList();
-
-            switch (copy)
-            {
-                case AARectSave r:
-                    r.Name = StringFunctions.MakeStringUnique(r.Name, existingNames, 2);
-                    _undoManager.Execute(new AddAxisAlignedRectangleCommand(r, frame, this, _events, _selectedState));
-                    break;
-                case CircleSave c:
-                    c.Name = StringFunctions.MakeStringUnique(c.Name, existingNames, 2);
-                    _undoManager.Execute(new AddCircleCommand(c, frame, this, _events, _selectedState));
-                    break;
-            }
-            return copy;
+            var copies = DuplicateShapesBatch(new[] { source });
+            return copies.Count > 0 ? copies[0] : null;
         }
 
-        // Deep-copies one shape entry (rect/circle). Shared by DuplicateChain,
-        // DuplicateFrame, and DuplicateShape so the field-copy lives in one place.
-        // Returns null for shape kinds that aren't duplicable yet (e.g. polygons),
-        // matching what Copy/Paste supports.
-        private static object? CloneShape(object shape) => shape switch
+        /// <inheritdoc cref="IAppCommands.DuplicateSelection"/>
+        public void DuplicateSelection(CopySelectionPayload payload)
         {
-            AARectSave r => new AARectSave { Name = r.Name, X = r.X, Y = r.Y, ScaleX = r.ScaleX, ScaleY = r.ScaleY },
-            CircleSave  c => new CircleSave { Name = c.Name, X = c.X, Y = c.Y, Radius = c.Radius },
-            _ => null,
-        };
+            switch (payload.Kind)
+            {
+                case CopySelectionKind.Chain:
+                    DuplicateChainsBatch(payload.Chains);
+                    break;
+                case CopySelectionKind.Frame:
+                    DuplicateFramesBatch(payload.Frames);
+                    break;
+                case CopySelectionKind.Shape:
+                    DuplicateShapesBatch(payload.Shapes);
+                    break;
+            }
+        }
+
+        private IReadOnlyList<AnimationChainSave> DuplicateChainsBatch(IReadOnlyList<AnimationChainSave> sources)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls is null || sources.Count == 0) return Array.Empty<AnimationChainSave>();
+
+            var ordered = sources
+                .OrderBy(c => acls.AnimationChains.IndexOf(c))
+                .ToList();
+            var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
+            var items = new List<(AnimationChainSave Source, AnimationChainSave Copy)>();
+            foreach (var source in ordered)
+            {
+                var copy = AnimationCloneHelper.CloneChain(source);
+                copy.Name = StringFunctions.MakeStringUnique(source.Name + "Copy", existingNames, 2);
+                existingNames.Add(copy.Name);
+                items.Add((source, copy));
+            }
+
+            _undoManager.Execute(new DuplicateChainsCommand(acls, items, this, _events, _selectedState));
+            return items.Select(i => i.Copy).ToList();
+        }
+
+        private IReadOnlyList<AnimationFrameSave> DuplicateFramesBatch(IReadOnlyList<AnimationFrameSave> sources)
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls is null || sources.Count == 0) return Array.Empty<AnimationFrameSave>();
+
+            var ops = new List<DuplicateFrameInsertOp>();
+            var allCopies = new List<AnimationFrameSave>();
+
+            var grouped = sources
+                .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
+                .Where(x => x.Chain is not null)
+                .GroupBy(x => x.Chain!);
+
+            foreach (var group in grouped)
+            {
+                var chain = group.Key;
+                var frames = group.Select(x => x.Frame)
+                    .OrderBy(f => chain.Frames.IndexOf(f))
+                    .ToList();
+                var indices = frames.Select(f => chain.Frames.IndexOf(f)).ToList();
+                bool contiguous = frames.Count > 1
+                    && indices.Zip(indices.Skip(1), (a, b) => b == a + 1).All(x => x);
+
+                if (contiguous)
+                {
+                    var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
+                    allCopies.AddRange(clones);
+                    ops.Add(new DuplicateFrameBlockOp(chain, clones, indices[^1] + 1));
+                }
+                else
+                {
+                    foreach (var frame in frames.OrderByDescending(f => chain.Frames.IndexOf(f)))
+                    {
+                        var copy = AnimationCloneHelper.CloneFrame(frame);
+                        allCopies.Add(copy);
+                        ops.Add(new DuplicateFrameAdjacentOp(chain, frame, copy));
+                    }
+                }
+            }
+
+            if (ops.Count == 0) return Array.Empty<AnimationFrameSave>();
+            _undoManager.Execute(new DuplicateFramesCommand(ops, this, _events, _selectedState));
+            return allCopies;
+        }
+
+        private IReadOnlyList<object> DuplicateShapesBatch(IReadOnlyList<object> sources)
+        {
+            if (sources.Count == 0) return Array.Empty<object>();
+            var frame = sources[0] switch
+            {
+                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
+                CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
+                _ => null,
+            };
+            if (frame is null) return Array.Empty<object>();
+
+            frame.ShapesSave ??= new ShapesSave();
+            var existingNames = GetShapeNames(frame);
+            var copies = new List<object>();
+            foreach (var source in sources)
+            {
+                if (AnimationCloneHelper.CloneShape(source) is not { } copy) continue;
+                switch (copy)
+                {
+                    case AARectSave r:
+                        r.Name = StringFunctions.MakeStringUnique(r.Name, existingNames, 2);
+                        existingNames.Add(r.Name);
+                        copies.Add(r);
+                        break;
+                    case CircleSave c:
+                        c.Name = StringFunctions.MakeStringUnique(c.Name, existingNames, 2);
+                        existingNames.Add(c.Name);
+                        copies.Add(c);
+                        break;
+                }
+            }
+            if (copies.Count == 0) return Array.Empty<object>();
+            _undoManager.Execute(new DuplicateShapesCommand(frame, copies, this, _events, _selectedState));
+            return copies;
+        }
+
+        private static List<string> GetShapeNames(AnimationFrameSave frame) =>
+            frame.ShapesSave!.AARectSaves.Select(r => r.Name)
+                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
+                .ToList();
 
         public void SortAnimationsAlphabetically()
         {
@@ -1226,16 +1294,44 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc cref="IAppCommands.PasteFrames"/>
         public void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
-            int? insertIndex = null) =>
-            _undoManager.Execute(new AddFramesCommand(frames.ToArray(), chain, this, _events, _selectedState, insertIndex));
-
-        /// <inheritdoc cref="IAppCommands.PasteRectangle"/>
-        public void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle) =>
-            _undoManager.Execute(new AddAxisAlignedRectangleCommand(rectangle, frame, this, _events, _selectedState));
+            int? insertIndex = null)
+        {
+            var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
+            _undoManager.Execute(new AddFramesCommand(clones, chain, this, _events, _selectedState, insertIndex));
+        }
 
         /// <inheritdoc cref="IAppCommands.PasteCircle"/>
         public void PasteCircle(AnimationFrameSave frame, CircleSave circle) =>
-            _undoManager.Execute(new AddCircleCommand(circle, frame, this, _events, _selectedState));
+            PasteShapes(frame, Array.Empty<AARectSave>(), new[] { circle });
+
+        /// <inheritdoc cref="IAppCommands.PasteRectangle"/>
+        public void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle) =>
+            PasteShapes(frame, new[] { rectangle }, Array.Empty<CircleSave>());
+
+        /// <inheritdoc cref="IAppCommands.PasteShapes"/>
+        public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
+            IReadOnlyList<CircleSave> circles)
+        {
+            frame.ShapesSave ??= new ShapesSave();
+            var existingNames = GetShapeNames(frame);
+            var clones = new List<object>();
+            foreach (var rect in rectangles)
+            {
+                if (AnimationCloneHelper.CloneShape(rect) is not AARectSave copy) continue;
+                copy.Name = StringFunctions.MakeStringUnique(copy.Name, existingNames, 2);
+                existingNames.Add(copy.Name);
+                clones.Add(copy);
+            }
+            foreach (var circle in circles)
+            {
+                if (AnimationCloneHelper.CloneShape(circle) is not CircleSave copy) continue;
+                copy.Name = StringFunctions.MakeStringUnique(copy.Name, existingNames, 2);
+                existingNames.Add(copy.Name);
+                clones.Add(copy);
+            }
+            if (clones.Count == 0) return;
+            _undoManager.Execute(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+        }
 
         // ── Hot Reload ────────────────────────────────────────────────────────────
 

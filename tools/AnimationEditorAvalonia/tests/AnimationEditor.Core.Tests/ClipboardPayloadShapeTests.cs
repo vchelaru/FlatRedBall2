@@ -181,9 +181,9 @@ public class ClipboardPayloadShapeTests
         var rect = new AARectSave { Name = "BulletOrigin", X = 1f, Y = 2f, ScaleX = 3f, ScaleY = 4f };
 
         var xml = ClipboardPayload.Serialize(rect);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out var rt, out _));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out var rects, out _));
 
-        Assert.NotNull(rt);
+        var rt = Assert.Single(rects!);
         Assert.Equal("BulletOrigin", rt!.Name);
         Assert.Equal(3f, rt.ScaleX);
     }
@@ -194,9 +194,9 @@ public class ClipboardPayloadShapeTests
         var circle = new CircleSave { Name = "Hit", X = 5f, Y = 6f, Radius = 7f };
 
         var xml = ClipboardPayload.Serialize(circle);
-        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out _, out var rt));
+        Assert.True(ClipboardPayload.TryDeserialize(xml, out _, out _, out _, out var circles));
 
-        Assert.NotNull(rt);
+        var rt = Assert.Single(circles!);
         Assert.Equal("Hit", rt!.Name);
         Assert.Equal(7f, rt.Radius);
     }

@@ -64,6 +64,40 @@ public partial class MainWindow : Window
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressPreviewScrollSync;
     private bool _suppressWireframeScrollSync;
+    private List<AnimationChainSave>? _pendingPastedChains;
+    private List<bool>? _pendingPastedChainExpand;
+
+    private ScrollViewer? GetAnimTreeScrollViewer() =>
+        AnimTree.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+
+    private void WithPreservedAnimTreeScroll(Action action)
+    {
+        var scroll = GetAnimTreeScrollViewer();
+        var offset = scroll?.Offset ?? default;
+        action();
+        if (scroll is not null)
+            scroll.Offset = offset;
+    }
+
+    private void QueuePastedChainExpandFromSources(
+        IReadOnlyList<AnimationChainSave> sources,
+        IReadOnlyList<AnimationChainSave> pasted)
+    {
+        _pendingPastedChains = pasted.ToList();
+        _pendingPastedChainExpand = TreeBuilder
+            .ExpandStatesForChainNames(_treeRoots, sources.Select(c => c.Name).ToList())
+            .ToList();
+    }
+
+    private void ApplyPendingPastedChainExpand()
+    {
+        if (_pendingPastedChains is null || _pendingPastedChainExpand is null)
+            return;
+        TreeBuilder.ApplyExpandStates(_treeRoots, _pendingPastedChains, _pendingPastedChainExpand);
+        _pendingPastedChains = null;
+        _pendingPastedChainExpand = null;
+    }
+
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
@@ -2050,6 +2084,7 @@ public partial class MainWindow : Window
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
             TreeBuilder.SyncChainsInto(_treeRoots, acls.AnimationChains);
+            ApplyPendingPastedChainExpand();
             RefreshTreeThumbnails();
 
             // Re-select to keep visual state
@@ -2232,6 +2267,12 @@ public partial class MainWindow : Window
 
     private void SyncTreeSelection()
     {
+        if (_selectedState.SelectedNodes.Count > 1)
+        {
+            SyncTreeMultiSelection(_selectedState.SelectedNodes);
+            return;
+        }
+
         // Shapes are more specific than frames — prefer them so clicking a circle or
         // rect in the tree (or preview panel) keeps the shape node highlighted.
         object? sel = (object?)_selectedState.SelectedCircle
@@ -2256,7 +2297,10 @@ public partial class MainWindow : Window
             // Save/restore rather than bare reset so nesting under another suppressed refresh is safe.
             bool prior = _suppressTreeSelectionHandling;
             _suppressTreeSelectionHandling = true;
-            try { AnimTree.SelectedItem = target; }
+            try
+            {
+                WithPreservedAnimTreeScroll(() => AnimTree.SelectedItem = target);
+            }
             finally { _suppressTreeSelectionHandling = prior; }
         }
     }
@@ -3763,17 +3807,19 @@ public partial class MainWindow : Window
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null) return;
 
-        string? xml = SelectedData switch
+        if (!SelectionCopyContext.TryGet(
+                _selectedState, _objectFinder, _projectManager.AnimationChainListSave,
+                out var payload, out var failureMessage))
         {
-            AnimationChainSave chainToCopy => ClipboardPayload.Serialize(new List<AnimationChainSave> { chainToCopy }),
-            AnimationFrameSave frameToCopy => ClipboardPayload.Serialize(new List<AnimationFrameSave> { frameToCopy }),
-            AARectSave rectToCopy          => ClipboardPayload.Serialize(rectToCopy),
-            CircleSave circleToCopy        => ClipboardPayload.Serialize(circleToCopy),
-            _ => null,
-        };
+            if (failureMessage is not null)
+            {
+                ShowStatusMessage(failureMessage, isError: true);
+                await clipboard.SetTextAsync(string.Empty);
+            }
+            return;
+        }
 
-        if (xml is not null)
-            await clipboard.SetTextAsync(xml);
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
     }
 
     private async Task HandlePasteCoreAsync()
@@ -3786,7 +3832,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(text)) return;
 
         bool ok = ClipboardPayload.TryDeserialize(text,
-            out var chains, out var frames, out var rectangle, out var circle);
+            out var chains, out var frames, out var rectangles, out var circles);
         if (!ok) return;
 
         var acls = _projectManager.AnimationChainListSave;
@@ -3794,65 +3840,83 @@ public partial class MainWindow : Window
 
         var selectedData = SelectedData;
 
-        // Each branch hands the mutation to an undoable command via _appCommands;
-        // the read-side prep (target resolution, ShapesSave init, name uniquing)
-        // stays here. The commands raise refresh/save events themselves.
         if (chains is { Count: > 0 })
         {
+            QueuePastedChainExpandFromSources(chains, chains);
             _appCommands.PasteChains(chains);
-            _selectedState.SelectedChain = chains[^1];
         }
         else if (frames is { Count: > 0 })
         {
-            AnimationChainSave? targetChain = null;
-            // With a frame selected, insert right after it (matching Duplicate). With a chain
-            // selected (or nothing), append (null index).
-            int? insertIndex = null;
-            if (selectedData is AnimationChainSave c) targetChain = c;
-            else if (selectedData is AnimationFrameSave f)
-            {
-                targetChain = _objectFinder.GetAnimationChainContaining(f);
-                int idx = targetChain?.Frames.IndexOf(f) ?? -1;
-                if (idx >= 0) insertIndex = idx + 1;
-            }
-
-            if (targetChain is null && acls.AnimationChains.Count > 0)
-                targetChain = acls.AnimationChains[^1];
-
+            var (targetChain, insertIndex) = PastePlacementLogic.ResolveFramePasteTarget(
+                acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
 
             foreach (var pasted in frames)
                 pasted.ShapesSave ??= new ShapesSave();
 
             _appCommands.PasteFrames(targetChain, frames, insertIndex);
-            _selectedState.SelectedFrame = frames[^1];
+            // Refresh synchronously so SyncTreeSelection can resolve new frame nodes.
+            RefreshChainNode(targetChain);
             _appCommands.RefreshWireframe();
+            SyncTreeSelection();
         }
-        else if (rectangle is not null)
+        else if (rectangles is { Count: > 0 } || circles is { Count: > 0 })
         {
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
-            frame.ShapesSave ??= new ShapesSave();
-            var existingNames = frame.ShapesSave.AARectSaves
-                .Select(r => r.Name)
-                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
-                .ToList();
-            rectangle.Name = StringFunctions.MakeStringUnique(
-                rectangle.Name, existingNames, 2);
-            _appCommands.PasteRectangle(frame, rectangle);
+            _appCommands.PasteShapes(frame, rectangles ?? [], circles ?? []);
+            RefreshFrameNode(frame);
+            SyncTreeSelection();
         }
-        else if (circle is not null)
+    }
+
+    private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)
+    {
+        if (AnimTree.SelectedItems is null) return dataObjects.Count == 0;
+        var selected = AnimTree.SelectedItems.OfType<TreeNodeVm>().ToList();
+        if (selected.Count != dataObjects.Count) return false;
+        var dataSet = new HashSet<object>(dataObjects);
+        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data));
+    }
+
+    /// <summary>
+    /// One-way push of model multi-selection into the tree. Must not write back to
+    /// <see cref="ISelectedState.SelectedNodes"/> or call <see cref="TreeBuilder.RouteNodeSelection"/> —
+    /// that is <see cref="OnTreeSelectionChanged"/>'s job and causes a SelectionChanged loop.
+    /// </summary>
+    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects)
+    {
+        if (TreeMultiSelectionAlreadySynced(dataObjects))
+            return;
+
+        var nodes = new List<TreeNodeVm>();
+        bool chainsOnly = dataObjects.All(d => d is AnimationChainSave);
+        foreach (var data in dataObjects)
         {
-            var frame = _selectedState.SelectedFrame;
-            if (frame is null) return;
-            frame.ShapesSave ??= new ShapesSave();
-            var existingNames = frame.ShapesSave.AARectSaves
-                .Select(r => r.Name)
-                .Concat(frame.ShapesSave.CircleSaves.Select(c => c.Name))
-                .ToList();
-            circle.Name = StringFunctions.MakeStringUnique(
-                circle.Name, existingNames, 2);
-            _appCommands.PasteCircle(frame, circle);
+            if (!chainsOnly)
+                TreeBuilder.ExpandAncestorsOf(_treeRoots, data);
+            var node = TreeBuilder.FindNodeForData(_treeRoots, data);
+            if (node is not null)
+                nodes.Add(node);
+        }
+
+        if (nodes.Count == 0 && dataObjects.Count > 0)
+            return;
+
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try
+        {
+            WithPreservedAnimTreeScroll(() =>
+            {
+                AnimTree.SelectedItems!.Clear();
+                foreach (var node in nodes)
+                    AnimTree.SelectedItems.Add(node);
+            });
+        }
+        finally
+        {
+            _suppressTreeSelectionHandling = prior;
         }
     }
 
@@ -3865,21 +3929,33 @@ public partial class MainWindow : Window
     {
         if (IsTextInputFocused()) return;
 
-        switch (SelectedData)
+        if (!SelectionCopyContext.TryGet(
+                _selectedState, _objectFinder, _projectManager.AnimationChainListSave,
+                out var payload, out var failureMessage))
         {
-            case AnimationChainSave chain:
-                _appCommands.DuplicateChain(chain);
-                break;
-            case AnimationFrameSave frame
-                when _objectFinder.GetAnimationChainContaining(frame) is { } chain:
-                _appCommands.DuplicateFrame(frame, chain);
-                break;
-            case AARectSave rect:
-                _appCommands.DuplicateShape(rect);
-                break;
-            case CircleSave circle:
-                _appCommands.DuplicateShape(circle);
-                break;
+            if (failureMessage is not null)
+                ShowStatusMessage(failureMessage, isError: true);
+            return;
+        }
+
+        _appCommands.DuplicateSelection(payload);
+        if (payload.Kind == CopySelectionKind.Chain)
+        {
+            var copies = _selectedState.SelectedChains;
+            QueuePastedChainExpandFromSources(payload.Chains, copies);
+            RefreshTreeView();
+        }
+        else if (payload.Kind == CopySelectionKind.Frame && payload.Frames.Count > 0)
+        {
+            var chain = _objectFinder.GetAnimationChainContaining(payload.Frames[0]);
+            if (chain is not null) RefreshChainNode(chain);
+            SyncTreeSelection();
+        }
+        else if (payload.Kind == CopySelectionKind.Shape && payload.Shapes.Count > 0
+                 && _selectedState.SelectedFrame is { } shapeFrame)
+        {
+            RefreshFrameNode(shapeFrame);
+            SyncTreeSelection();
         }
     }
 

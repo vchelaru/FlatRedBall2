@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.IO;
 using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
@@ -111,6 +112,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteCircle)]                  = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteShapes)]                  = Category.MutatingUndoable,
+        [nameof(IAppCommands.DuplicateSelection)]           = Category.MutatingUndoable,
 
         // Hot reload — mutates the project but deliberately not undoable (reloads from disk)
         [nameof(IAppCommands.WireHotReloadWatcher)]    = Category.NonMutating,
@@ -301,6 +304,17 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.PasteCircle),
             ctx => Sync(() => ctx.AppCommands.PasteCircle(
                 Zebra(ctx).Frames[1], new CircleSave { Name = "Pasted" })));
+        yield return Row(nameof(IAppCommands.PasteShapes),
+            ctx => Sync(() => ctx.AppCommands.PasteShapes(
+                Zebra(ctx).Frames[1],
+                new List<AARectSave> { new() { Name = "P1" } },
+                new List<CircleSave> { new() { Name = "C1" } })));
+        yield return Row(nameof(IAppCommands.DuplicateSelection),
+            ctx => Sync(() => ctx.AppCommands.DuplicateSelection(new CopySelectionPayload
+            {
+                Kind = CopySelectionKind.Frame,
+                Frames = new List<AnimationFrameSave> { Zebra(ctx).Frames[1] },
+            })));
     }
 
     // ── Fixture ───────────────────────────────────────────────────────────────

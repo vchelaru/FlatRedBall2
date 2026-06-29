@@ -20,7 +20,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly IAppCommands _commands;
         private readonly IApplicationEvents _events;
         private readonly ISelectedState _selectedState;
-        private readonly AnimationChainSave? _preAddChain;
+        private readonly List<object> _preSelection;
+        private readonly List<AnimationChainSave> _anchorChains;
 
         private int[] _insertedIndices = [];
 
@@ -38,7 +39,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands = commands;
             _events = events;
             _selectedState = selectedState;
-            _preAddChain = selectedState.SelectedChain;
+            _preSelection = new List<object>(selectedState.SelectedNodes);
+            _anchorChains = selectedState.SelectedChains;
             Description = chains.Count == 1 ? "Paste Animation" : $"Paste {chains.Count} Animations";
         }
 
@@ -46,13 +48,14 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         {
             if (_chains.Count == 0) return false;
 
-            ChainPasteLogic.InsertPastedChains(_acls, _chains);
+            ChainPasteLogic.InsertPastedChains(_acls, _chains, _anchorChains);
             _insertedIndices = _chains
                 .Select(c => _acls.AnimationChains.IndexOf(c))
                 .ToArray();
 
             RaiseSideEffects();
-            _selectedState.SelectedChain = _chains[0];
+            _selectedState.SelectedNodes = _chains.Cast<object>().ToList();
+            _selectedState.SelectedChain = _chains[^1];
             return true;
         }
 
@@ -61,7 +64,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             foreach (var chain in _chains)
                 _acls.AnimationChains.Remove(chain);
             RaiseSideEffects();
-            _selectedState.SelectedChain = _preAddChain;
+            _selectedState.SelectedNodes = _preSelection;
+            _selectedState.SelectedChain = _preSelection.OfType<AnimationChainSave>().LastOrDefault();
         }
 
         public void Redo()
@@ -72,7 +76,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 _acls.AnimationChains.Insert(idx, _chains[i]);
             }
             RaiseSideEffects();
-            _selectedState.SelectedChain = _chains[0];
+            _selectedState.SelectedNodes = _chains.Cast<object>().ToList();
+            _selectedState.SelectedChain = _chains[^1];
         }
 
         private void RaiseSideEffects()
