@@ -277,7 +277,7 @@
         <Grid x:Name="MainContentGrid" ColumnDefinitions="280,4,240,4,*">
 
             <!-- ── Left: Animation tree + Files panel ── -->
-            <Grid Grid.Column="0" RowDefinitions="*,4,*"
+            <Grid Grid.Column="0" RowDefinitions="2*,4,*"
                   Background="{DynamicResource BgCanvas}">
 
                 <!-- Animations block: header + tree + add button stay grouped -->
