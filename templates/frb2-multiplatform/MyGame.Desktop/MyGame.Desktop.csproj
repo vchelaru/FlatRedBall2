@@ -12,8 +12,10 @@
          the shader from source (which requires Wine on macOS/Linux). -->
     <SkipAposShapeContent>true</SkipAposShapeContent>
   </PropertyGroup>
+  <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
+       FlatRedBall2.MonoGame (see $(AposShapesVersion) in the engine's AposShapes.props).
+       Pinning an older version causes NU1605 package-downgrade build failures. -->
   <ItemGroup>
-    <PackageReference Include="Apos.Shapes" Version="0.6.8" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>

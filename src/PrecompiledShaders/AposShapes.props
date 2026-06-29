@@ -6,8 +6,8 @@
 
     The engine (src/FlatRedBall2.csproj) imports this file and drives both its
     Apos.Shapes (MonoGame) and Apos.Shapes.KNI (BlazorGL/KNI) PackageReferences
-    from $(AposShapesVersion). Sample projects pick the version up transitively
-    through their reference to the engine — they do NOT pin it themselves.
+    from $(AposShapesVersion). Sample projects and dotnet-new templates pick the version up
+    transitively through FlatRedBall2 — they do NOT pin it themselves.
 
     ┌─────────────────────────────────────────────────────────────────────────┐
     │  ⚠  WHEN YOU CHANGE THIS VERSION, YOU MUST REBUILD THE PRECOMPILED XNBs.  │
