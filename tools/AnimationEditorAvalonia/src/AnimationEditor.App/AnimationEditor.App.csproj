@@ -11,6 +11,9 @@
          The human-readable "Animation Editor" label is used for bundled .app
          distribution via CFBundleName / CFBundleDisplayName in Info.plist. -->
     <AssemblyName>AnimationEditor</AssemblyName>
+    <!-- Windows shell icons (taskbar pin, Explorer, .achx association) come from the embedded
+         .exe resource, not Avalonia's runtime window icon. -->
+    <ApplicationIcon>Assets\icons\AppIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- MainWindow is DI-only; runtime XAML instantiation is intentionally not supported -->
