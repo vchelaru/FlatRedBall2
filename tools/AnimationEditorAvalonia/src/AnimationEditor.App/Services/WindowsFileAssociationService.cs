@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.Versioning;
 using AnimationEditor.Core.IO;
 using Microsoft.Win32;
@@ -33,12 +34,14 @@ internal sealed class WindowsFileAssociationService : IFileAssociationService
 
     public bool IsSupported => OperatingSystem.IsWindows();
 
-    public bool IsDefault()
+    public bool IsDefault() => GetStatus() == AchxFileAssociationStatus.AssociatedWithThisBuild;
+
+    public AchxFileAssociationStatus GetStatus()
     {
         if (!OperatingSystem.IsWindows())
-            return false;
+            return AchxFileAssociationStatus.NotSupported;
 
-        return IsDefaultWindows();
+        return GetStatusWindows();
     }
 
     public void RegisterAsDefault()
@@ -59,17 +62,35 @@ internal sealed class WindowsFileAssociationService : IFileAssociationService
         string.Equals(registeredProgId, ProgId, StringComparison.OrdinalIgnoreCase);
 
     [SupportedOSPlatform("windows")]
-    private static bool IsDefaultWindows()
+    private static AchxFileAssociationStatus GetStatusWindows()
     {
-        // An explicit per-user choice (set via the Windows "Open with" / default-apps UI) wins.
+        string? activeProgId = ReadActiveProgId();
+        bool isOurProgId = IsOurProgId(activeProgId);
+        string? registeredExe = isOurProgId ? ReadOpenCommandExe(activeProgId!) : null;
+        string? currentExe = Environment.ProcessPath;
+        bool registeredExeExists = !string.IsNullOrEmpty(registeredExe) && File.Exists(registeredExe);
+
+        return AchxFileAssociationEvaluator.Classify(
+            isOurProgId, registeredExe, currentExe, registeredExeExists);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static string? ReadActiveProgId()
+    {
         var userChoice = Registry.GetValue(
             $@"{ClassesRoot}\{Extension}\UserChoice", "ProgId", null) as string;
         if (!string.IsNullOrEmpty(userChoice))
-            return IsOurProgId(userChoice);
+            return userChoice;
 
-        // No explicit choice — fall back to the extension's default ProgId (what RegisterAsDefault sets).
-        var fallback = Registry.GetValue($@"{ClassesRoot}\{Extension}", null, null) as string;
-        return IsOurProgId(fallback);
+        return Registry.GetValue($@"{ClassesRoot}\{Extension}", null, null) as string;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static string? ReadOpenCommandExe(string progId)
+    {
+        var openCommand = Registry.GetValue(
+            $@"{ClassesRoot}\{progId}\shell\open\command", null, null) as string;
+        return FileAssociationCommandLine.TryParseExePath(openCommand);
     }
 
     [SupportedOSPlatform("windows")]

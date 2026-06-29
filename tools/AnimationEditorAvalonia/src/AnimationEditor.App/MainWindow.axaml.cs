@@ -514,12 +514,7 @@ public partial class MainWindow : Window
 
     private void WireDefaultHandlerBanner()
     {
-        MakeDefaultBtn.Click += (_, _) =>
-        {
-            _fileAssociation.RegisterAsDefault();
-            DefaultHandlerBanner.IsVisible = false;
-            ShowStatusMessage("Opened Windows settings — choose Animation Editor for .achx files.");
-        };
+        MakeDefaultBtn.Click += (_, _) => RegisterAsDefaultAchxHandler(hideBanner: true);
 
         DismissDefaultHandlerBtn.Click += (_, _) =>
         {
@@ -527,6 +522,14 @@ public partial class MainWindow : Window
             SaveSettingsFile();
             DefaultHandlerBanner.IsVisible = false;
         };
+    }
+
+    private void RegisterAsDefaultAchxHandler(bool hideBanner)
+    {
+        _fileAssociation.RegisterAsDefault();
+        if (hideBanner)
+            DefaultHandlerBanner.IsVisible = false;
+        ShowStatusMessage("Opened Windows settings — choose Animation Editor for .achx files.");
     }
 
     private void ShowDefaultHandlerBannerIfAppropriate()
@@ -1284,6 +1287,7 @@ public partial class MainWindow : Window
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
+        MenuSettings.Click += OnSettingsClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuPaste.Click         += (_, _) => _ = HandlePasteAsync();
         MenuDuplicate.Click     += (_, _) => HandleDuplicate();
@@ -1433,6 +1437,28 @@ public partial class MainWindow : Window
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
         => _ = BuildAboutWindow().ShowDialog(this);
+
+    private void OnSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = Settings.SettingsWindowBuilder.Build(
+            new Settings.SettingsWindowModel
+            {
+                FileAssociationSupported = _fileAssociation.IsSupported,
+                FileAssociationStatus = _fileAssociation.GetStatus(),
+                SuppressDefaultHandlerPrompt = _appSettings.SuppressDefaultHandlerPrompt,
+            },
+            new Settings.SettingsWindowCallbacks
+            {
+                OnSetDefaultAchx = () => RegisterAsDefaultAchxHandler(hideBanner: false),
+                OnSuppressDefaultHandlerPromptChanged = suppressed =>
+                {
+                    _appSettings.SuppressDefaultHandlerPrompt = suppressed;
+                    SaveSettingsFile();
+                    ShowDefaultHandlerBannerIfAppropriate();
+                },
+            });
+        _ = dialog.ShowDialog(this);
+    }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)
     {

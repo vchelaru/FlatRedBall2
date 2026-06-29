@@ -103,6 +103,8 @@
                         <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />
                         <Separator />
                         <MenuItem Header="Resize _Texture…" x:Name="MenuResizeTexture" />
+                        <Separator />
+                        <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
                     <MenuItem Header="_View">
                         <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+OemPlus" />
