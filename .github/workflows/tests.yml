@@ -33,6 +33,11 @@ jobs:
       - name: Test engine
         run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      - name: Build dotnet new templates
+        run: |
+          dotnet build templates/frb2-desktop/MyGame.slnx --verbosity minimal
+          dotnet build templates/frb2-multiplatform/MyGame.slnx --verbosity minimal
+
       - name: Test AnimationEditor.Core
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
