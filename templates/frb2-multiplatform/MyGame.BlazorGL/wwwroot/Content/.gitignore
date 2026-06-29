@@ -1,7 +1,5 @@
 # Copied from MyGame.Common/Content/ at build time by the CopyCommonRawAssetsToWwwroot
 # MSBuild target (in MyGame.BlazorGL.csproj). Source of truth lives in Common.
-# XNBs from the KNI content pipeline are also deposited here at build time.
-# apos-shapes.xnb is checked in (precompiled to avoid Wine dependency on macOS/Linux).
+# apos-shapes.xnb is copied at build time from templates/build/BlazorGL/ by
+# AposShapesPrecompiled.props.
 *
-!.gitignore
-!apos-shapes.xnb

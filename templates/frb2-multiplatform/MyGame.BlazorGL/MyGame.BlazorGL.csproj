@@ -9,10 +9,10 @@
     <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
     <KniPlatform>BlazorGL</KniPlatform>
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
-    <!-- Use the precompiled apos-shapes.xnb shipped in wwwroot/Content/ instead of
-         compiling the shader from source (which requires Wine on macOS/Linux). -->
-    <SkipAposShapeContent>true</SkipAposShapeContent>
   </PropertyGroup>
+
+  <!-- Must be after KniPlatform is set so the allowlist can match. -->
+  <Import Project="..\build\AposShapesPrecompiled.props" />
 
   <!-- KNI XNA + Blazor host packages. The version pin must match the JS shim version
        in wwwroot/frb-host.js (`v = '8.0.11'`). -->
@@ -35,9 +35,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.17" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.17" PrivateAssets="all" />
-    <!-- Apos.Shapes.KNI provides the shader compile path; we skip its content (above)
-         and ship the precompiled XNB instead. -->
-    <PackageReference Include="Apos.Shapes.KNI" Version="*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -62,13 +59,4 @@
           DestinationFiles="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
-
-  <!--
-    Apos.Shapes.KNI's MSBuild props runs BEFORE the project body, so SkipAposShapeContent
-    is too late to keep it from adding apos-shapes.fx to the KNI content pipeline. Remove
-    it explicitly here. We ship the precompiled XNB directly in wwwroot/Content/.
-  -->
-  <ItemGroup>
-    <KniContentReference Remove="$(AposShapesPath)" />
-  </ItemGroup>
 </Project>

@@ -21,6 +21,7 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\src\PrecompiledShaders\AposShapesPrecompiled.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -31,7 +32,6 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Apos.Shapes" Version="0.6.8" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>
@@ -40,6 +40,8 @@ Copy the structure from an existing sample (e.g., `PlatformerSample`). The minim
   </ItemGroup>
 </Project>
 ```
+
+Do **not** pin `Apos.Shapes` — version flows transitively from the engine (`$(AposShapesVersion)` in `src/PrecompiledShaders/AposShapes.props`).
 
 ### 1b. Add `YourSample.slnx` (REQUIRED — easy to forget)
 
