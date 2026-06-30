@@ -678,6 +678,15 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Frame to Bottom"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveFrames"/>
+        public void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
+            AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex)
+        {
+            if (frames.Count == 0) return;
+            _undoManager.Execute(new MoveFramesCommand(
+                frames, sourceChain, targetChain, insertIndex, this, _events, _selectedState));
+        }
+
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             var shapes = frame.ShapesSave?.Shapes;
