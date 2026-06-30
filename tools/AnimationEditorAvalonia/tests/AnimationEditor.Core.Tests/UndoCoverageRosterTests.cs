@@ -113,6 +113,9 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteCircle)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteShapes)]                  = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteChainsCut)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteFramesCut)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.PasteShapesCut)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateSelection)]           = Category.MutatingUndoable,
 
         // Hot reload — mutates the project but deliberately not undoable (reloads from disk)
@@ -309,6 +312,37 @@ public class UndoCoverageRosterTests
                 Zebra(ctx).Frames[1],
                 new List<AARectSave> { new() { Name = "P1" } },
                 new List<CircleSave> { new() { Name = "C1" } })));
+        yield return Row(nameof(IAppCommands.PasteChainsCut),
+            ctx => Sync(() =>
+            {
+                var source = Zebra(ctx);
+                ctx.AppCommands.PasteChainsCut(
+                    new List<AnimationChainSave> { new() { Name = "PastedCut" } },
+                    new List<AnimationChainSave> { source });
+            }));
+        yield return Row(nameof(IAppCommands.PasteFramesCut),
+            ctx => Sync(() =>
+            {
+                var chain = Zebra(ctx);
+                var source = chain.Frames[1];
+                ctx.AppCommands.PasteFramesCut(
+                    chain,
+                    new List<AnimationFrameSave> { new() { ShapesSave = new ShapesSave() } },
+                    insertIndex: 2,
+                    sourcesToRemove: new List<AnimationFrameSave> { source });
+            }));
+        yield return Row(nameof(IAppCommands.PasteShapesCut),
+            ctx => Sync(() =>
+            {
+                var frame = Zebra(ctx).Frames[1];
+                var source = Rect(ctx);
+                ctx.AppCommands.PasteShapesCut(
+                    frame,
+                    new List<AARectSave> { new() { Name = "PastedCut" } },
+                    new List<CircleSave>(),
+                    new List<object> { source },
+                    frame);
+            }));
         yield return Row(nameof(IAppCommands.DuplicateSelection),
             ctx => Sync(() => ctx.AppCommands.DuplicateSelection(new CopySelectionPayload
             {
