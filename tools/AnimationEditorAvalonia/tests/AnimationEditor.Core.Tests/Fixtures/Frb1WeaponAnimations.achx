@@ -19,7 +19,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-7.416666</X>
-            <Y>-18.0208321</Y>
+            <Y>-18.020832</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -109,7 +109,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-8.479166</X>
-            <Y>-19.3333321</Y>
+            <Y>-19.333332</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -136,7 +136,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-8.416666</X>
-            <Y>-16.9583321</Y>
+            <Y>-16.958332</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -163,7 +163,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-8.354166</X>
-            <Y>-18.0208321</Y>
+            <Y>-18.020832</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -190,7 +190,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-8.541666</X>
-            <Y>-17.0833321</Y>
+            <Y>-17.083332</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -331,7 +331,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-17.6875</X>
-            <Y>-16.4791679</Y>
+            <Y>-16.479168</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -357,7 +357,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>-14.6249962</X>
+            <X>-14.624996</X>
             <Y>-17.3125</Y>
             <Z>0</Z>
             <Radius>2</Radius>
@@ -384,8 +384,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>-14.6458321</X>
-            <Y>-13.2916689</Y>
+            <X>-14.645832</X>
+            <Y>-13.291669</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -411,7 +411,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>-15.5416641</X>
+            <X>-15.541664</X>
             <Y>-17.520834</Y>
             <Z>0</Z>
             <Radius>2</Radius>
@@ -469,7 +469,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-24.75</X>
-            <Y>-10.6666679</Y>
+            <Y>-10.666668</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -523,7 +523,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-25.0625</X>
-            <Y>-10.1666679</Y>
+            <Y>-10.166668</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -553,7 +553,7 @@
         <CircleSaves>
           <CircleSave>
             <X>-13.749999</X>
-            <Y>-14.9791679</Y>
+            <Y>-14.979168</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -613,7 +613,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>22.0833359</X>
+            <X>22.083336</X>
             <Y>2.062498</Y>
             <Z>0</Z>
             <Radius>2</Radius>
@@ -670,8 +670,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>22.5625038</X>
-            <Y>0.749999046</Y>
+            <X>22.562504</X>
+            <Y>0.74999905</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -697,7 +697,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>21.0833359</X>
+            <X>21.083336</X>
             <Y>2.229166</Y>
             <Z>0</Z>
             <Radius>2</Radius>
@@ -724,8 +724,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>24.1458359</X>
-            <Y>1.04166508</Y>
+            <X>24.145836</X>
+            <Y>1.0416651</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -755,7 +755,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>26.3958378</X>
+            <X>26.395838</X>
             <Y>-8.354168</Y>
             <Z>0</Z>
             <Radius>2</Radius>
@@ -783,8 +783,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>25.4999981</X>
-            <Y>-11.0416679</Y>
+            <X>25.499998</X>
+            <Y>-11.041668</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -812,7 +812,7 @@
         <CircleSaves>
           <CircleSave>
             <X>24.5625</X>
-            <Y>-10.2291679</Y>
+            <Y>-10.229168</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -839,8 +839,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>25.5833359</X>
-            <Y>-11.1250019</Y>
+            <X>25.583336</X>
+            <Y>-11.125002</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -870,7 +870,7 @@
         <CircleSaves>
           <CircleSave>
             <X>4.458336</X>
-            <Y>-18.3125019</Y>
+            <Y>-18.312502</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -926,8 +926,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>4.62500334</X>
-            <Y>-18.2083359</Y>
+            <X>4.6250033</X>
+            <Y>-18.208336</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -953,8 +953,8 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>3.52083588</X>
-            <Y>-16.5208359</Y>
+            <X>3.5208359</X>
+            <Y>-16.520836</Y>
             <Z>0</Z>
             <Radius>2</Radius>
             <Name>BulletOrigin</Name>
@@ -980,7 +980,7 @@
         <PolygonSaves />
         <CircleSaves>
           <CircleSave>
-            <X>5.00000238</X>
+            <X>5.0000024</X>
             <Y>-18.333334</Y>
             <Z>0</Z>
             <Radius>2</Radius>

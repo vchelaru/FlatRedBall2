@@ -157,8 +157,8 @@ public class AnimationChainListSave
     /// so existing .achx files in the wild keep their byte shape.
     /// </summary>
     /// <remarks>
-    /// Output is byte-faithful to FRB1: no UTF-8 BOM, CRLF newlines, the .NET-Framework float
-    /// format (7 significant digits, falling back to 9 when that doesn't round-trip), shapes in
+    /// Output is byte-faithful to FRB1: no UTF-8 BOM, CRLF newlines, floats written as the shortest
+    /// round-trippable decimal (the "R" format, matching FRB1's XmlConvert output), shapes in
     /// FRB1's typed lists, and per-shape Z/Alpha/Red/Green/Blue preserved verbatim (see
     /// <see cref="Frb1ShapeData"/>). Opening and re-saving an unedited file is a no-op diff.
     /// Frame defaults are omitted to keep diffs small: <c>FlipHorizontal</c>/<c>FlipVertical</c>
@@ -311,16 +311,14 @@ public class AnimationChainListSave
         new XElement("Blue", FloatStr(s.Blue)),
     ];
 
-    // Reproduces .NET Framework's float "R" format (what FRB1 wrote): the shortest 7-significant-
-    // digit form if it round-trips, otherwise 9 digits. .NET's modern "R"/shortest differs
-    // (e.g. -18.0208321 would collapse to -18.020832), which would diff every coordinate.
+    // Reproduces FRB1's float text: the shortest decimal string that round-trips to the same
+    // IEEE-754 value. FRB1's XmlSerializer wrote this via .NET Framework's XmlConvert.ToString,
+    // and modern .NET's "R" format produces the identical shortest form (e.g. -25.635418,
+    // -5.0416665), so re-saving an unedited legacy file is a no-op diff (issue #503). The old
+    // G7-then-G9 approach drifted ~45% of coordinates (-5.0416665 -> -5.04166651) because G7
+    // rarely round-trips and G9 over-pads to a fixed 9 significant digits.
     private static string FloatStr(float value)
-    {
-        var s = value.ToString("G7", CultureInfo.InvariantCulture);
-        if (float.Parse(s, CultureInfo.InvariantCulture) != value)
-            s = value.ToString("G9", CultureInfo.InvariantCulture);
-        return s;
-    }
+        => value.ToString("R", CultureInfo.InvariantCulture);
 
     private static AnimationFrameSave ParseFrame(XElement el)
     {

@@ -51,6 +51,38 @@ public class AchxByteSnapshotTests
         return save;
     }
 
+    // Loading a real FRB1-authored .achx and saving it back must be byte-identical: re-saving an
+    // unedited legacy file should produce a no-op git diff (issue #503). The earlier failure was
+    // float-literal drift — FRB1 wrote the shortest round-trippable form (e.g. -5.0416665) but the
+    // writer's G7-then-G9 fallback re-emitted a longer string (-5.04166651) for the same IEEE-754
+    // value, churning ~45% of coordinates on every save.
+    [Theory]
+    [InlineData("KidDefenseFireball_FlatTextures.achx")]
+    [InlineData("KidDefenseFireball_ParentTraversal.achx")]
+    public void Save_AfterLoadingFrb1Corpus_IsByteIdentical(string corpusFileName)
+    {
+        var corpusPath = Path.Combine(AppContext.BaseDirectory,
+            "Animation", "Content", "Corpus", corpusFileName);
+        var expected = File.ReadAllBytes(corpusPath);
+
+        var loaded = AnimationChainListSave.FromFile(corpusPath);
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".achx");
+        try
+        {
+            loaded.Save(tempPath);
+            var actual = File.ReadAllBytes(tempPath);
+
+            if (!actual.AsSpan().SequenceEqual(expected))
+            {
+                var actualPath = corpusPath + ".actual";
+                File.WriteAllBytes(actualPath, actual);
+                throw new Shouldly.ShouldAssertException(
+                    $"{corpusFileName} re-save drifted from the FRB1 original. Actual written to {actualPath}; diff against the corpus file to inspect.");
+            }
+        }
+        finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
+    }
+
     [Fact]
     public void Save_CanonicalMinimal_MatchesCheckedInBytes()
     {

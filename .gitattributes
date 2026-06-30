@@ -1,0 +1,5 @@
+# .achx is a CRLF-canonical format: FRB1's XmlSerializer wrote CRLF, and
+# AnimationChainListSave.Save pins CRLF (XmlWriterSettings.NewLineChars). Force CRLF on
+# checkout for every platform so byte-snapshot/round-trip tests (which compare Save output
+# against the checked-in file) pass on Linux CI as well as Windows.
+*.achx text eol=crlf
