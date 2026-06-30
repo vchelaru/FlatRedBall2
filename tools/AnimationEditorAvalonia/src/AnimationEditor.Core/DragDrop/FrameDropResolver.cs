@@ -78,6 +78,20 @@ public static class FrameDropResolver
     }
 
     /// <summary>
+    /// True when <paramref name="candidate"/> is one of several frames in a homogeneous
+    /// frame multi-selection. Pressing such a frame must NOT collapse the selection (so a
+    /// drag can move the whole set); a plain click that never drags collapses on release
+    /// instead. Returns false for single selections or any selection containing a non-frame.
+    /// </summary>
+    public static bool IsFrameMultiSelectionContaining(
+        IReadOnlyList<object>? selection, AnimationFrameSave candidate)
+    {
+        if (selection is null || selection.Count < 2) return false;
+        if (!selection.All(n => n is AnimationFrameSave)) return false;
+        return selection.Any(n => ReferenceEquals(n, candidate));
+    }
+
+    /// <summary>
     /// Resolves where a frame drag would land given the tree node currently under the
     /// pointer. <paramref name="nodeData"/> is the node's underlying model object: a frame
     /// resolves to upper-half-before / lower-half-after that frame; a chain appends to the

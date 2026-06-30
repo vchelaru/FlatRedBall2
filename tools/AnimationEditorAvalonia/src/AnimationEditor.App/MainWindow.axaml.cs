@@ -70,6 +70,7 @@ public partial class MainWindow : Window
     private PointerPressedEventArgs? _frameDragPressArgs;
     private AnimationFrameSave? _frameDragCandidate;
     private List<object>? _frameDragSelectionSnapshot;
+    private AnimationFrameSave? _pendingSingleSelectFrame;
     private bool _frameDragInProgress;
     private Border? _frameDropLine;
     private int _untitledCounter;
@@ -2083,6 +2084,14 @@ public partial class MainWindow : Window
         _frameDragPressPoint = null;
         _frameDragPressArgs = null;
         _frameDragSelectionSnapshot = null;
+        _pendingSingleSelectFrame = null;
+    }
+
+    private void SelectSingleFrame(AnimationFrameSave frame)
+    {
+        _selectedState.SelectedNodes = new List<object> { frame };
+        _selectedState.SelectedFrame = frame;
+        SyncTreeSelection();
     }
 
     private async void OnTreeFrameDragPointerMoved(object? sender, PointerEventArgs e)
@@ -2108,6 +2117,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A drag is happening, so the deferred single-select must not fire on release.
+        _pendingSingleSelectFrame = null;
+        e.Pointer.Capture(null); // release our press-capture so the drag system can take over
         _pendingFrameDrag = dragSource;
         _frameDragInProgress = true;
 
@@ -2130,8 +2142,17 @@ public partial class MainWindow : Window
 
     private void OnTreeFrameDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (!_frameDragInProgress)
-            ClearFrameDragCandidate();
+        if (_frameDragInProgress) return;
+
+        // A press on an already-multi-selected frame that did not turn into a drag collapses
+        // the selection to that single frame now (the select-on-press was suppressed so the
+        // multi-selection could survive a potential drag).
+        if (_pendingSingleSelectFrame is { } frame)
+        {
+            e.Pointer.Capture(null);
+            SelectSingleFrame(frame);
+        }
+        ClearFrameDragCandidate();
     }
 
     /// <summary>
@@ -2689,6 +2710,24 @@ public partial class MainWindow : Window
                 _frameDragPressPoint = e.GetPosition(AnimTree);
                 _frameDragPressArgs = e;
                 _frameDragSelectionSnapshot = new List<object>(_selectedState.SelectedNodes);
+
+                // Pressing a frame that's part of a frame multi-selection (no modifiers) must
+                // not collapse the selection — otherwise a drag would only move one frame. Mark
+                // the press handled to suppress the TreeView's select-on-press, capture so the
+                // move/release still arrive here, and defer the single-select to release if no
+                // drag happens. Ctrl/Shift presses fall through to normal selection editing.
+                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                if (noModifiers &&
+                    FrameDropResolver.IsFrameMultiSelectionContaining(_frameDragSelectionSnapshot, frame))
+                {
+                    _pendingSingleSelectFrame = frame;
+                    e.Pointer.Capture(AnimTree);
+                    e.Handled = true;
+                }
+                else
+                {
+                    _pendingSingleSelectFrame = null;
+                }
             }
             else
             {

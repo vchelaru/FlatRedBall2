@@ -69,6 +69,42 @@ public class FrameDropResolverTests
     }
 
     [Fact]
+    public void IsFrameMultiSelectionContaining_FrameInMultiFrameSelection_True()
+    {
+        var chain = ChainWithFrames(3, out var frames);
+        var selection = new List<object> { frames[0], frames[2] };
+
+        Assert.True(FrameDropResolver.IsFrameMultiSelectionContaining(selection, frames[0]));
+    }
+
+    [Fact]
+    public void IsFrameMultiSelectionContaining_SingleSelection_False()
+    {
+        var chain = ChainWithFrames(2, out var frames);
+        var selection = new List<object> { frames[0] };
+
+        Assert.False(FrameDropResolver.IsFrameMultiSelectionContaining(selection, frames[0]));
+    }
+
+    [Fact]
+    public void IsFrameMultiSelectionContaining_MixedSelection_False()
+    {
+        var chain = ChainWithFrames(2, out var frames);
+        var selection = new List<object> { frames[0], chain };
+
+        Assert.False(FrameDropResolver.IsFrameMultiSelectionContaining(selection, frames[0]));
+    }
+
+    [Fact]
+    public void IsFrameMultiSelectionContaining_CandidateNotInSelection_False()
+    {
+        var chain = ChainWithFrames(3, out var frames);
+        var selection = new List<object> { frames[0], frames[1] };
+
+        Assert.False(FrameDropResolver.IsFrameMultiSelectionContaining(selection, frames[2]));
+    }
+
+    [Fact]
     public void Resolve_ChainNode_AppendsToEnd()
     {
         var source = ChainWithFrames(2, out var srcFrames);
