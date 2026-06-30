@@ -73,6 +73,7 @@ public partial class MainWindow : Window
     private AnimationFrameSave? _pendingSingleSelectFrame;
     private bool _frameDragInProgress;
     private Border? _frameDropLine;
+    private Border? _frameDropBox;
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
@@ -1905,12 +1906,12 @@ public partial class MainWindow : Window
             if (target.IsValid)
             {
                 e.DragEffects = DragDropEffects.Move;
-                ShowFrameDropLine(e);
+                ShowFrameDropIndicator(e);
             }
             else
             {
                 e.DragEffects = DragDropEffects.None;
-                RemoveFrameDropLine();
+                RemoveFrameDropIndicators();
             }
             e.Handled = true;
             return;
@@ -1953,7 +1954,7 @@ public partial class MainWindow : Window
         // stay untouched (external file drags never carry the frame marker format).
         if (e.DataTransfer.Contains(FrameDragDataFormat) && _pendingFrameDrag is { IsValid: true } drag)
         {
-            RemoveFrameDropLine();
+            RemoveFrameDropIndicators();
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
                 _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
@@ -2144,7 +2145,7 @@ public partial class MainWindow : Window
         {
             _pendingFrameDrag = null;
             _frameDragInProgress = false;
-            RemoveFrameDropLine();
+            RemoveFrameDropIndicators();
             ClearFrameDragCandidate();
         }
     }
@@ -2240,12 +2241,12 @@ public partial class MainWindow : Window
         return (vm.Data, half, tvi);
     }
 
-    private void ShowFrameDropLine(DragEventArgs e)
+    private void ShowFrameDropIndicator(DragEventArgs e)
     {
         var (nodeData, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
         if (tvi is null)
         {
-            RemoveFrameDropLine();
+            RemoveFrameDropIndicators();
             return;
         }
 
@@ -2253,16 +2254,32 @@ public partial class MainWindow : Window
         var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
         if (topLeft is null || treeOrigin is null)
         {
-            RemoveFrameDropLine();
+            RemoveFrameDropIndicators();
             return;
         }
 
-        // A chain target appends, so the line sits below the chain's whole subtree (after its
-        // last frame). A frame target lands at the top or bottom edge of that row.
-        double y = nodeData is AnimationChainSave
-            ? topLeft.Value.Y + tvi.Bounds.Height
-            : topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
 
+        if (nodeData is AnimationChainSave)
+        {
+            // Appending into an animation: outline the whole animation row/subtree so it reads as
+            // "drop inside this animation" — a box conveys containment in a way a line can't,
+            // which matters most for a collapsed chain where a line would look top-level.
+            RemoveDropLine();
+            ShowDropBox(topLeft.Value.X, topLeft.Value.Y, treeRight, tvi.Bounds.Height);
+            return;
+        }
+
+        // Reordering at a specific frame: a thin line at the precise insert position, indented to
+        // the frame content so it clearly belongs inside the animation rather than at the top level.
+        RemoveDropBox();
+        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        double left = HeaderContentLeft(tvi);
+        ShowDropLine(left, treeRight, y);
+    }
+
+    private void ShowDropLine(double left, double treeRight, double y)
+    {
         _frameDropLine ??= new Border
         {
             Height = 2,
@@ -2272,15 +2289,54 @@ public partial class MainWindow : Window
         if (!DragOverlayCanvas.Children.Contains(_frameDropLine))
             DragOverlayCanvas.Children.Add(_frameDropLine);
 
-        _frameDropLine.Width = AnimTree.Bounds.Width;
-        Canvas.SetLeft(_frameDropLine, treeOrigin.Value.X);
+        _frameDropLine.Width = Math.Max(0, treeRight - left);
+        Canvas.SetLeft(_frameDropLine, left);
         Canvas.SetTop(_frameDropLine, y - 1);
     }
 
-    private void RemoveFrameDropLine()
+    private void ShowDropBox(double left, double top, double treeRight, double height)
+    {
+        _frameDropBox ??= new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.Parse("#4a90d9")),
+            BorderThickness = new Avalonia.Thickness(2),
+            CornerRadius = new Avalonia.CornerRadius(3),
+            Background = new SolidColorBrush(Color.Parse("#334a90d9")), // faint fill to suggest the target area
+            IsHitTestVisible = false,
+        };
+        if (!DragOverlayCanvas.Children.Contains(_frameDropBox))
+            DragOverlayCanvas.Children.Add(_frameDropBox);
+
+        _frameDropBox.Width = Math.Max(0, treeRight - left - 2);
+        _frameDropBox.Height = Math.Max(0, height);
+        Canvas.SetLeft(_frameDropBox, left);
+        Canvas.SetTop(_frameDropBox, top);
+    }
+
+    /// <summary>X of a tree row's header content (after the indent + chevron) in canvas coords.</summary>
+    private double HeaderContentLeft(TreeViewItem tvi)
+    {
+        Control anchor = tvi.GetVisualDescendants().OfType<Control>()
+            .FirstOrDefault(c => c.Name == "PART_HeaderPresenter") ?? tvi;
+        return Avalonia.VisualExtensions.TranslatePoint(anchor, new Avalonia.Point(0, 0), DragOverlayCanvas)?.X ?? 0;
+    }
+
+    private void RemoveDropLine()
     {
         if (_frameDropLine is not null)
             DragOverlayCanvas.Children.Remove(_frameDropLine);
+    }
+
+    private void RemoveDropBox()
+    {
+        if (_frameDropBox is not null)
+            DragOverlayCanvas.Children.Remove(_frameDropBox);
+    }
+
+    private void RemoveFrameDropIndicators()
+    {
+        RemoveDropLine();
+        RemoveDropBox();
     }
 
     // ── Window-level OS file drop: open dropped .achx files as tabs ────────────
