@@ -123,6 +123,8 @@
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Help">
+                        <MenuItem Header="Show _Render Diagnostics" x:Name="MenuShowDiagnostics"
+                                  ToggleType="CheckBox" InputGesture="F3" />
                         <MenuItem Header="View _Log"      x:Name="MenuViewLog" />
                         <MenuItem Header="_About"         x:Name="MenuAbout" />
                     </MenuItem>

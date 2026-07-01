@@ -74,24 +74,56 @@ public class WireframeControl : Control
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
+    // Skia GPU resource-cache budget. The sheet's GPU texture (a 4096² sheet is ~64 MB) must fit
+    // in this budget to stay cached across frames; otherwise Skia evicts and re-uploads it every
+    // frame, which is what made zoomed-out drawing crawl (#514). Letting Skia own the cache (rather
+    // than hand-holding an SKImage.ToTextureImage) also means Skia re-uploads correctly after a
+    // context purge — e.g. when a menu popup opens — so the texture never goes dangling/blank.
+    private const long GpuResourceCacheBytes = 512L * 1024 * 1024;
+
     private sealed class DrawOp : ICustomDrawOperation
     {
         private readonly RenderSnapshot _s;
         private readonly CanvasPalette _palette;
+        private readonly RollingAverage? _drawTimes;   // non-null only when diagnostics are on
 
-        public DrawOp(RenderSnapshot s, CanvasPalette palette) { _s = s; _palette = palette; Bounds = new Rect(0, 0, s.Width, s.Height); }
+        public DrawOp(RenderSnapshot s, CanvasPalette palette, RollingAverage? drawTimes)
+        {
+            _s = s; _palette = palette; _drawTimes = drawTimes;
+            Bounds = new Rect(0, 0, s.Width, s.Height);
+        }
 
         public Rect Bounds { get; }
         public bool HitTest(Point p) => true;
         public bool Equals(ICustomDrawOperation? other) => false;
-        public void Dispose() => _s.Image?.Dispose();
+        // _s.Image is the control's shared, cached SKImage — owned by the control, NOT this op —
+        // so the op must not dispose it. Its lifetime is managed in LoadTexture via deferred drop.
+        public void Dispose() { }
 
         public void Render(ImmediateDrawingContext ctx)
         {
             var lease = ctx.TryGetFeature<ISkiaSharpApiLeaseFeature>()?.Lease();
             if (lease is null) return;
             using (lease)
-                RenderSk(lease.SkCanvas, _s, _palette);
+            {
+                // Raise the GPU cache budget so Skia retains the sheet's texture across frames
+                // instead of re-uploading it (#514). Idempotent — the setter just stores the cap.
+                if (lease.GrContext is { } gr && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
+                    gr.SetResourceCacheLimit(GpuResourceCacheBytes);
+
+                if (_drawTimes is not null)
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    RenderSk(lease.SkCanvas, _s, _palette);
+                    sw.Stop();
+                    _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
+                    // GrContext is non-null only on the GPU (ANGLE) backend; null = software raster.
+                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average,
+                        lease.GrContext != null ? "GPU" : "CPU");
+                }
+                else
+                    RenderSk(lease.SkCanvas, _s, _palette);
+            }
         }
 
         // ── Static rendering logic ────────────────────────────────────────────
@@ -107,7 +139,10 @@ public class WireframeControl : Control
                     s.PanX + s.ImageWidth * s.Zoom,
                     s.PanY + s.ImageHeight * s.Zoom);
 
-                // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity
+                // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity.
+                // s.Image is a GPU-resident texture on the accelerated path (see DrawOp.Render),
+                // so sampling this 4096² sheet is constant-time instead of re-uploading the visible
+                // slice from CPU memory every frame — the #514 zoom-out cost.
                 var sampling = s.Zoom >= 1f
                     ? new SKSamplingOptions(SKFilterMode.Nearest)
                     : new SKSamplingOptions(SKFilterMode.Linear);
@@ -290,10 +325,14 @@ public class WireframeControl : Control
     // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
     private bool _needsInitialCenter;
 
-    // ── Debug tooling (toggle with F2 in the live app) ────────────────────────
-    private bool _debugMode;
-    private static readonly string _debugLogPath =
-        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wireframe_debug.log");
+    // ── Render diagnostics (#514): one overlay, toggled at runtime by F3 / Help menu ──
+    // When enabled the panel shows the rolling-average Skia render time (ms/frame + fps, drawn
+    // top-left inside the custom draw op) AND a camera-stats panel stacked below it. This is THE
+    // panel to watch for the #514 slowdown — panning/zooming a large sheet redraws it (60fps during
+    // smooth-zoom). Toggle via DiagnosticsEnabled; MainWindow wires F3 and the Help menu item.
+    private bool _showDiagnostics;
+    private readonly RollingAverage _drawTimes = new(10);
+    private DispatcherTimer? _diagnosticsTimer;
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
     // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
     private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
@@ -304,64 +343,65 @@ public class WireframeControl : Control
     private CanvasPalette _palette = CanvasPalette.Dark;
 
     /// <summary>
-    /// Toggle the real-time debug overlay + event log.  Bind to F2 in MainWindow.
-    /// Log is written to <see cref="DebugLogPath"/>.
+    /// Shows/hides the render-diagnostics overlay (draw-time readout + camera stats). Toggled at
+    /// runtime from MainWindow (F3 and the Help ▸ Show Render Diagnostics menu item).
     /// </summary>
-    public void ToggleDebugMode()
+    public bool DiagnosticsEnabled
     {
-        _debugMode = !_debugMode;
-        if (_debugMode)
+        get => _showDiagnostics;
+        set
         {
-            File.WriteAllText(_debugLogPath,
-                $"=== WireframeControl debug log {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n" +
-                $"Repro: add anim → add frame → load sprite → grid on → zoom 100% → " +
-                $"1 wheel notch → pan right\n\n");
-            DebugLog("DEBUG_ON", $"log={_debugLogPath}");
+            if (_showDiagnostics == value) return;
+            _showDiagnostics = value;
+            // The panel only repaints on demand (pan/zoom/selection), so an idle overlay would show
+            // a frozen ms/frame. While diagnostics are on, tick a 1 fps repaint so the readout stays
+            // live even when nothing else changes; stop it otherwise to keep the panel idle.
+            if (value)
+            {
+                _diagnosticsTimer ??= CreateDiagnosticsTimer();
+                _diagnosticsTimer.Start();
+            }
+            else
+                _diagnosticsTimer?.Stop();
+            InvalidateVisual();
         }
-        else
-        {
-            DebugLog("DEBUG_OFF", "overlay hidden");
-        }
-        InvalidateVisual();
     }
 
-    /// <summary>Path to the active debug event log file.</summary>
-    public static string DebugLogPath => _debugLogPath;
-
-    private void DebugLog(string category, string msg)
+    private DispatcherTimer CreateDiagnosticsTimer()
     {
-        if (!_debugMode) return;
-        var line = $"{DateTime.Now:HH:mm:ss.fff} [{category,-14}] {msg}";
-        File.AppendAllText(_debugLogPath, line + "\n");
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => InvalidateVisual();
+        return timer;
     }
 
+    // Camera-stats panel. Sits below the ms/frame box (drawn by the custom op via DrawTimeOverlay),
+    // so it starts at TopOffset to avoid overlapping it — both are left-aligned under one toggle.
     private void DrawDebugOverlay(DrawingContext ctx)
     {
-        if (!_debugMode) return;
+        if (!_showDiagnostics) return;
         int bmpW = _bitmap?.Width  ?? 0;
         int bmpH = _bitmap?.Height ?? 0;
 
         var lines = new[]
         {
-            "── WIREFRAME DEBUG (F2 to hide) ──",
+            "── WIREFRAME (F3 to hide) ──",
             $"zoom          {_zoom * 100f,7:F1}%",
             $"panXY         X={_panX,7:F1}  Y={_panY:F1}",
             $"viewport      {Bounds.Width:F0} × {Bounds.Height:F0}",
             $"content       {bmpW * _zoom:F0} × {bmpH * _zoom:F0}",
             $"isPanning     {_isPanning}",
-            "──────────────────────────────────",
-            $"log: {System.IO.Path.GetFileName(_debugLogPath)}",
         };
 
         const double fsz  = 12;
         const double lineH = 15;
         const double padX  = 6;
         const double padY  = 4;
+        const double topOffset = 28;   // clears the ms/frame box the draw op renders at the top
         double panelW = 310;
         double panelH = lines.Length * lineH + padY * 2;
 
-        ctx.FillRectangle(_dbgBg, new Rect(0, 0, panelW, panelH));
-        double y = padY;
+        ctx.FillRectangle(_dbgBg, new Rect(0, topOffset, panelW, panelH));
+        double y = topOffset + padY;
         foreach (var line in lines)
         {
             ctx.DrawText(new FormattedText(
@@ -532,8 +572,8 @@ public class WireframeControl : Control
             RaiseViewChanged();
         };
 
-        // Stop the smooth-zoom timer if the control leaves the tree mid-animation.
-        DetachedFromVisualTree += (_, _) => StopZoomTimer();
+        // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
+        DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
 
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
     }
@@ -642,7 +682,11 @@ public class WireframeControl : Control
             _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
 
         _loadedTexturePath = norm;
-        _image?.Dispose();
+        // Drop (don't Dispose) the previous image: a render op on the compositor thread may still be
+        // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
+        // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
+        // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
+        // copy from FromBitmap), so disposing it here stays safe.
         _image = null;
         _bitmap?.Dispose();
         _bitmap = null;
@@ -1050,7 +1094,7 @@ public class WireframeControl : Control
     {
         UpdatePalette();
         var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette));
+        ctx.Custom(new DrawOp(snap, _palette, _showDiagnostics ? _drawTimes : null));
         DrawDebugOverlay(ctx);
     }
 
@@ -1071,17 +1115,12 @@ public class WireframeControl : Control
     {
         UpdatePalette();
         var snap   = BuildSnapshot(width, height);
-        try
-        {
-            var bitmap = new SKBitmap(width, height);
-            using var canvas = new SKCanvas(bitmap);
-            DrawOp.RenderSk(canvas, snap, _palette);
-            return bitmap;
-        }
-        finally
-        {
-            snap.Image?.Dispose();
-        }
+        // snap.Image is the shared, control-owned _image (not a per-call clone) — must NOT be
+        // disposed here, or the next live render would draw a disposed image (#514).
+        var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        DrawOp.RenderSk(canvas, snap, _palette);
+        return bitmap;
     }
 
     /// <summary>
@@ -1145,8 +1184,12 @@ public class WireframeControl : Control
     {
         var snap = new RenderSnapshot
         {
-            // Per-draw-op clone so LoadTexture can dispose _image without racing the render thread.
-            Image        = CloneBitmapAsImage(_bitmap),
+            // Reuse the immutable image built once per load (issue #514). SKImage is safe to read on
+            // the render thread, so a single instance serves every frame — NO per-op atlas copy.
+            // 1665108 regressed this to a full bitmap.Copy() per op (67 MB/render on a 4096² sheet);
+            // LoadTexture now drops (never synchronously disposes) the old image, so sharing it here
+            // can't race a render op mid-draw.
+            Image        = _image,
             ImageWidth   = _bitmap?.Width ?? 0,
             ImageHeight  = _bitmap?.Height ?? 0,
             PanX         = _panX,
@@ -1183,18 +1226,6 @@ public class WireframeControl : Control
         // Move-drag still works via HitTestHandle, which uses _frameRects directly.
 
         return snap;
-    }
-
-    /// <summary>
-    /// Builds an <see cref="SKImage"/> owned by a single <see cref="DrawOp"/> so the UI thread
-    /// can replace <see cref="_image"/> in <see cref="LoadTexture"/> without use-after-dispose on
-    /// the render thread.
-    /// </summary>
-    private static SKImage? CloneBitmapAsImage(SKBitmap? bitmap)
-    {
-        if (bitmap is null) return null;
-        var copy = bitmap.Copy();
-        return SKImage.FromBitmap(copy);
     }
 
     // ── Mouse input ───────────────────────────────────────────────────────────

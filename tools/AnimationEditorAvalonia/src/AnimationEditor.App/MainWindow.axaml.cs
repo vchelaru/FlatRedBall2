@@ -1350,6 +1350,10 @@ public partial class MainWindow : Window
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
+        // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
+        // F3 is handled separately in the global KeyDown handler (InputGesture on a MenuItem is
+        // display-only here — the same reason Ctrl+Z has its own KeyDown branch).
+        MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         MenuSettings.Click += OnSettingsClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
         MenuCut.Click           += (_, _) => _ = HandleCutAsync();
@@ -1523,6 +1527,21 @@ public partial class MainWindow : Window
                 },
             });
         _ = dialog.ShowDialog(this);
+    }
+
+    /// <summary>Flips the render-diagnostics overlay on both canvas panels and syncs the menu
+    /// checkmark. Called by the F3 accelerator; the menu Click applies its own already-toggled state.</summary>
+    private void ToggleDiagnostics()
+    {
+        bool on = MenuShowDiagnostics.IsChecked != true;
+        MenuShowDiagnostics.IsChecked = on;   // setting IsChecked does not raise Click, so no re-entry
+        ApplyDiagnostics(on);
+    }
+
+    private void ApplyDiagnostics(bool on)
+    {
+        WireframeCtrl.DiagnosticsEnabled = on;
+        PreviewCtrl.DiagnosticsEnabled   = on;
     }
 
     private void OnViewLogClick(object? sender, RoutedEventArgs e)
@@ -4221,8 +4240,13 @@ public partial class MainWindow : Window
                     else if (vm.Data is CircleSave circle)
                         BeginInlineRename(vm, circle.Name);
                 }
-                else
-                    WireframeCtrl.ToggleDebugMode();
+                // F2 is rename-only. Render diagnostics moved to F3 / Help ▸ Show Render Diagnostics
+                // (the old F2 fallback was unreachable — a tree node is essentially always selected).
+            }
+            else if (e.Key == Key.F3)
+            {
+                e.Handled = true;
+                ToggleDiagnostics();
             }
             else if (e.Key == Key.Z && HasCommandModifier(e.KeyModifiers) &&
                      !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
@@ -4252,8 +4276,8 @@ public partial class MainWindow : Window
                 _altMenuActivationSuppressor.ArmFromAltArrowReorder();
                 int delta = e.Key == Key.Up ? -1 : +1;
                 _appCommands.HandleReorder(delta);
-                // Restore focus to the tree — reorder can cause Avalonia to shift focus
-                // away, which would make F2 fall through to WireframeCtrl.ToggleDebugMode.
+                // Restore focus to the tree — reorder can cause Avalonia to shift focus away, which
+                // would let F2 hit the wrong target for a subsequent rename.
                 Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
                 if (_selectedState.SelectedFrame is not null)
                     ShowStatusMessage("Frame labels updated to reflect new positions");

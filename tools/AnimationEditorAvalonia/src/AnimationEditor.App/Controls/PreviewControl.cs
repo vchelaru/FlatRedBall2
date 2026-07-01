@@ -50,6 +50,47 @@ public class PreviewControl : Control
     private float _zoomPivotVpY;
     private const float ZoomAnimIntervalSeconds = 1f / 60f;
 
+    // -- Render diagnostics (#514) ---------------------------------------------
+    // When enabled, overlays the rolling-average Skia render time (ms/frame + fps) top-left.
+    // Measures the compositor-thread render — where the cost actually lands (the UI-thread
+    // Render() only builds the snapshot). Toggled at runtime via DiagnosticsEnabled; MainWindow
+    // wires F3 and the Help menu item to flip this in lock-step with the wireframe panel.
+    private bool _showDiagnostics;
+    private readonly RollingAverage _drawTimes = new(10);
+    private DispatcherTimer? _diagnosticsTimer;
+
+    /// <summary>
+    /// Shows/hides the draw-time diagnostics overlay. Toggled at runtime from MainWindow
+    /// (F3 and the Help ▸ Show Render Diagnostics menu item).
+    /// </summary>
+    public bool DiagnosticsEnabled
+    {
+        get => _showDiagnostics;
+        set
+        {
+            if (_showDiagnostics == value) return;
+            _showDiagnostics = value;
+            // The panel only repaints on demand (playback/zoom/pan), so an idle overlay would show
+            // a frozen ms/frame. While diagnostics are on, tick a 1 fps repaint so the readout stays
+            // live even when nothing else changes; stop it otherwise to keep the panel idle.
+            if (value)
+            {
+                _diagnosticsTimer ??= CreateDiagnosticsTimer();
+                _diagnosticsTimer.Start();
+            }
+            else
+                _diagnosticsTimer?.Stop();
+            InvalidateVisual();
+        }
+    }
+
+    private DispatcherTimer CreateDiagnosticsTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => InvalidateVisual();
+        return timer;
+    }
+
     // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
     private bool _showGuides;
@@ -257,8 +298,9 @@ public class PreviewControl : Control
 
         string? texPath   = _thumbnailService!.ResolveTexturePath(displayFrame);
         string? onionPath = _thumbnailService!.ResolveTexturePath(onionFrame);
-        _thumbnailService.GetBitmap(texPath);
-        _thumbnailService.GetBitmap(onionPath);
+        // GetImage warms both the image cache (drawn below) and the bitmap cache it decodes from.
+        _thumbnailService.GetImage(texPath);
+        _thumbnailService.GetImage(onionPath);
 
         var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
 
@@ -271,7 +313,7 @@ public class PreviewControl : Control
         UpdatePalette();
         var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
-        RenderSkCore(canvas, snap, _thumbnailService.BitmapCache, _palette);
+        RenderSkCore(canvas, snap, _thumbnailService.ImageCache, _palette);
         return bitmap;
     }
 
@@ -332,8 +374,8 @@ public class PreviewControl : Control
         // A resize changes the viewport extent, hence the scrollbar range — refresh the host's scrollbars.
         SizeChanged += (_, _) => RaiseViewChanged();
 
-        // Stop the smooth-zoom timer if the control leaves the tree mid-animation.
-        DetachedFromVisualTree += (_, _) => StopZoomTimer();
+        // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
+        DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
 
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
@@ -846,11 +888,13 @@ public class PreviewControl : Control
         double h = Bounds.Height;
         if (w <= 0 || h <= 0) return;
 
-        // Pre-fill bitmap cache synchronously before handing off to render thread
+        // Pre-fill the image cache synchronously before handing off to the render thread.
+        // GetImage warms both the image cache (drawn by the render op) and the bitmap cache it
+        // decodes from — the cached SKImage is what avoids a per-frame full-atlas copy (#514).
         string? texPath   = _thumbnailService!.ResolveTexturePath(displayFrame);
         string? onionPath = _thumbnailService!.ResolveTexturePath(onionFrame);
-        _thumbnailService.GetBitmap(texPath);
-        _thumbnailService.GetBitmap(onionPath);
+        _thumbnailService.GetImage(texPath);
+        _thumbnailService.GetImage(onionPath);
 
         var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
 
@@ -863,7 +907,7 @@ public class PreviewControl : Control
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
                 BuildShapeInfos(), frameOffX, frameOffY),
-            _thumbnailService.BitmapCache, _palette));
+            _thumbnailService.ImageCache, _palette, _showDiagnostics ? _drawTimes : null));
     }
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
@@ -1660,7 +1704,7 @@ public class PreviewControl : Control
     // -- Shared SkiaSharp rendering (used by both live and off-screen paths) --
 
     private static void RenderSkCore(
-        SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKBitmap?> cache, CanvasPalette palette)
+        SKCanvas canvas, RenderSnapshot s, Dictionary<string, SKImage?> cache, CanvasPalette palette)
     {
         canvas.Clear(palette.Background);
 
@@ -1674,20 +1718,20 @@ public class PreviewControl : Control
 
         if (s.OnionFrame is not null &&
             s.OnionTexturePath is not null &&
-            cache.TryGetValue(s.OnionTexturePath, out var onionBm) && onionBm is not null)
+            cache.TryGetValue(s.OnionTexturePath, out var onionImg) && onionImg is not null)
         {
             float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
             float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
-            DrawFrameCore(canvas, s.OnionFrame, onionBm, ocx, ocy, s.Zoom, alpha: 0.4f);
+            DrawFrameCore(canvas, s.OnionFrame, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f);
         }
 
         if (s.Frame is not null &&
             s.TexturePath is not null &&
-            cache.TryGetValue(s.TexturePath, out var bm) && bm is not null)
+            cache.TryGetValue(s.TexturePath, out var img) && img is not null)
         {
             float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
             float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-            DrawFrameCore(canvas, s.Frame, bm, fcx, fcy, s.Zoom, alpha: 1.0f);
+            DrawFrameCore(canvas, s.Frame, img, fcx, fcy, s.Zoom, alpha: 1.0f);
         }
 
         // Origin crosshair (toggled by ShowGuides)
@@ -1951,10 +1995,10 @@ public class PreviewControl : Control
     }
 
     private static void DrawFrameCore(
-        SKCanvas canvas, AnimationFrameSave frame, SKBitmap bm,
+        SKCanvas canvas, AnimationFrameSave frame, SKImage img,
         float cx, float cy, float zoom, float alpha)
     {
-        var (sx, sy, sw, sh) = ComputeSourceRect(frame, bm.Width, bm.Height);
+        var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
 
         var src = SKRectI.Create(sx, sy, sw, sh);
         float dw = sw * zoom;
@@ -1984,7 +2028,9 @@ public class PreviewControl : Control
             canvas.Scale(scaleX, scaleY, cx, cy);
         }
 
-        using var img = SKImage.FromBitmap(bm);
+        // img is a cached, immutable SKImage owned by ThumbnailService — drawn directly, NOT
+        // rebuilt from the source bitmap here. Rebuilding it per frame was a full-atlas copy +
+        // GPU re-upload (67 MB/frame for a 4096² sheet), the #514 preview-framerate bottleneck.
         canvas.DrawImage(img, src, dst, sampling, paint);
 
         if (flip) canvas.Restore();
@@ -2030,14 +2076,17 @@ public class PreviewControl : Control
     private sealed class DrawOp : ICustomDrawOperation
     {
         private readonly RenderSnapshot              _snap;
-        private readonly Dictionary<string, SKBitmap?> _cache;
+        private readonly Dictionary<string, SKImage?> _cache;
         private readonly CanvasPalette                _palette;
+        private readonly RollingAverage?             _drawTimes;   // non-null only when diagnostics are on
 
-        public DrawOp(RenderSnapshot snap, Dictionary<string, SKBitmap?> cache, CanvasPalette palette)
+        public DrawOp(RenderSnapshot snap, Dictionary<string, SKImage?> cache, CanvasPalette palette,
+            RollingAverage? drawTimes)
         {
-            _snap    = snap;
-            _cache   = cache;
-            _palette = palette;
+            _snap      = snap;
+            _cache     = cache;
+            _palette   = palette;
+            _drawTimes = drawTimes;
         }
 
         public Rect Bounds => new(0, 0, _snap.Width, _snap.Height);
@@ -2050,7 +2099,21 @@ public class PreviewControl : Control
             var feature = ctx.TryGetFeature<ISkiaSharpApiLeaseFeature>();
             if (feature is null) return;
             using var lease = feature.Lease();
-            PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
+
+            if (_drawTimes is not null)
+            {
+                // Time only the Skia render — it runs on the compositor/render thread, where the
+                // frame cost actually lands (the UI-thread Render() just builds the snapshot).
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
+                sw.Stop();
+                _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
+                DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average);
+            }
+            else
+            {
+                PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
+            }
         }
     }
 }

@@ -195,6 +195,51 @@ public class ThumbnailServiceTests
         Assert.Equal(56, thumb.PixelSize.Height);
     }
 
+    // -- Immutable-image cache tests (Issue #514) -----------------------------
+    //
+    // The preview render path draws a cached SKImage per texture instead of rebuilding one
+    // from the source bitmap every frame. For a 4096×4096 sheet that per-frame
+    // SKImage.FromBitmap was a 67 MB copy + GPU re-upload 60×/sec — the framerate bottleneck.
+    // SKImage.FromBitmap is pure SkiaSharp, so these are plain [Fact] (no Avalonia needed).
+
+    [Fact]
+    public void GetImage_AfterInvalidatePath_ReturnsDifferentInstance()
+    {
+        var svc  = MakeSvc();
+        var path = WriteTempPng(8, 8);
+
+        var first = svc.GetImage(path);
+        svc.InvalidatePath(path);
+        var afterInvalidate = svc.GetImage(path);
+
+        Assert.NotNull(first);
+        Assert.NotNull(afterInvalidate);
+        // Invalidation must drop the cached image so a hot-reloaded sheet re-uploads.
+        Assert.NotSame(first, afterInvalidate);
+    }
+
+    [Fact]
+    public void GetImage_CalledTwiceForSamePath_ReturnsSameCachedInstance()
+    {
+        var svc  = MakeSvc();
+        var path = WriteTempPng(8, 8);
+
+        var first  = svc.GetImage(path);
+        var second = svc.GetImage(path);
+
+        Assert.NotNull(first);
+        // Second call must hit the image cache, not rebuild the SKImage (the #514 hot path).
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void GetImage_NullPath_ReturnsNull()
+    {
+        var svc = MakeSvc();
+
+        Assert.Null(svc.GetImage(null));
+    }
+
     // -- InvalidatePath path-normalization tests (Issue #310) -----------------
 
     private static ThumbnailService MakeSvc() => new(new TestServices().ProjectManager);
