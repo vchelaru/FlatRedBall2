@@ -608,12 +608,11 @@
                         BorderThickness="0,0,0,1"
                         Background="{DynamicResource BgRail}"
                         Padding="4,3">
-                    <!-- Horizontal scroll (not wrap/collapse) keeps every control reachable via a
-                         drag/wheel-scroll when the window is narrower than the toolbar's natural
-                         width (#510), without changing control order or hiding anything. -->
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                    <!-- WrapPanel (not scroll) reflows overflow controls onto a second row when the
+                         window is narrower than the toolbar's natural width (#510) — every control
+                         stays fully visible with no scroll gesture needed, matching the WrapPanel
+                         convention already used for the property panel's coordinate fields. -->
+                    <WrapPanel VerticalAlignment="Center">
                         <!-- Texture label + combo hidden for now — multi-texture support is planned for a future milestone.
                              Do not remove; set IsVisible="True" and re-enable when the multi-texture feature is implemented. -->
                         <TextBlock Text="Texture:" VerticalAlignment="Center" Margin="0,0,4,0"
@@ -709,7 +708,7 @@
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
                         <Border BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                Height="26" Width="130" VerticalAlignment="Center">
+                                Height="26" Width="130" Margin="0,0,2,0" VerticalAlignment="Center">
                             <DockPanel>
                                 <Button x:Name="ZoomMinusBtn" DockPanel.Dock="Left"
                                         Classes="flanker" Content="−" Width="22"
@@ -751,8 +750,7 @@
                                    Foreground="{DynamicResource InkMid}"
                                    Margin="4,0,0,0"
                                    IsVisible="False" />
-                    </StackPanel>
-                    </ScrollViewer>
+                    </WrapPanel>
                 </Border>
 
                 <!-- Wireframe panel fills top. The control draws its texture under a manual
@@ -788,12 +786,11 @@
                             BorderThickness="0,0,0,1"
                             Background="{DynamicResource BgRail}"
                             Padding="4,3">
-                        <!-- Horizontal scroll (not wrap/collapse) keeps every control reachable via a
-                             drag/wheel-scroll when the window is narrower than the toolbar's natural
-                             width (#510), without changing control order or hiding anything. -->
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                      VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                        <!-- WrapPanel (not scroll) reflows overflow controls onto a second row when the
+                             window is narrower than the toolbar's natural width (#510) — every control
+                             stays fully visible with no scroll gesture needed, matching the WrapPanel
+                             convention already used for the property panel's coordinate fields. -->
+                        <WrapPanel VerticalAlignment="Center">
                             <ToggleButton x:Name="OnionSkinToggle"
                                           Height="26"
                                           Foreground="{DynamicResource Ink}"
@@ -865,8 +862,7 @@
                                     </AutoCompleteBox>
                                 </DockPanel>
                             </Border>
-                        </StackPanel>
-                        </ScrollViewer>
+                        </WrapPanel>
                     </Border>
 
                     <!-- Preview panel fills remaining height of the block. Unlike the Wireframe
