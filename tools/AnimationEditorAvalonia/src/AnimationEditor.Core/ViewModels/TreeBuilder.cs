@@ -400,10 +400,41 @@ public static class TreeBuilder
     /// Returns the subset of <paramref name="chainNames"/> that match
     /// <paramref name="query"/> under <see cref="MatchesFilter"/>, preserving input
     /// order. An empty/whitespace query returns every name; a query matching nothing
-    /// returns an empty list.
+    /// returns an empty list. This is the query-change path: it may shrink the set.
     /// </summary>
     public static List<string> FilterChainNames(IEnumerable<string> chainNames, string? query) =>
         chainNames.Where(n => MatchesFilter(n, query)).ToList();
+
+    /// <summary>
+    /// Computes which chains should be visible after a <b>model mutation</b> while the
+    /// search <paramref name="query"/> is unchanged (rename, add, delete, undo/redo,
+    /// hot-reload). This is <b>grow-only</b>: it never hides a chain that was already
+    /// visible, so the chain the user is editing can't vanish out from under them.
+    /// A chain is visible when it was <paramref name="previouslyVisible"/>, is
+    /// <paramref name="brandNew"/> to the tree (just created or undo-restored), or its
+    /// current name matches <paramref name="query"/> (newly relevant, or no filter).
+    /// <para>
+    /// Identity is by reference — a renamed chain keeps the same object, so it stays
+    /// visible via <paramref name="previouslyVisible"/> even though its name changed.
+    /// The <b>selected</b> chain is intentionally not handled here (folding it in would
+    /// permanently pin every chain the user ever clicked); selection is kept visible
+    /// reactively at the view layer via a <c>PinnedVisible || IsSelected</c> binding.
+    /// </para>
+    /// </summary>
+    public static HashSet<AnimationChainSave> ComputeVisibleAfterModelChange(
+        IEnumerable<AnimationChainSave> previouslyVisible,
+        IReadOnlyList<AnimationChainSave> currentChains,
+        string? query,
+        IEnumerable<AnimationChainSave> brandNew)
+    {
+        var prev = new HashSet<AnimationChainSave>(previouslyVisible, ReferenceEqualityComparer.Instance);
+        var brand = new HashSet<AnimationChainSave>(brandNew, ReferenceEqualityComparer.Instance);
+        var result = new HashSet<AnimationChainSave>(ReferenceEqualityComparer.Instance);
+        foreach (var chain in currentChains)
+            if (prev.Contains(chain) || brand.Contains(chain) || MatchesFilter(chain.Name, query))
+                result.Add(chain);
+        return result;
+    }
 
     // ── Node search ───────────────────────────────────────────────────────────
 

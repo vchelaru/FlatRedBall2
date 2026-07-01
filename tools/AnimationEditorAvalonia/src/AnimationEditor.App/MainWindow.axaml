@@ -293,7 +293,9 @@
                     <DockPanel Margin="10,0">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
                                     VerticalAlignment="Center">
-                            <!-- Inline search box: hidden until the search icon is clicked. -->
+                            <!-- Inline search box: hidden until the search icon is clicked.
+                                 The trailing ✕ button is a discoverable way to clear the sticky
+                                 filter (Escape / toggling the icon also clear it). -->
                             <TextBox x:Name="SearchBox"
                                      Width="140" Height="24"
                                      Padding="6,2"
@@ -301,7 +303,22 @@
                                      VerticalAlignment="Center"
                                      VerticalContentAlignment="Center"
                                      IsVisible="False"
-                                     PlaceholderText="Filter animations…" />
+                                     PlaceholderText="Filter animations…">
+                                <TextBox.InnerRightContent>
+                                    <Button x:Name="SearchClearBtn"
+                                            Width="20" Height="20"
+                                            Padding="0"
+                                            Margin="0,0,2,0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{DynamicResource InkMid}"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            ToolTip.Tip="Clear filter">
+                                        <TextBlock Text="&#x2715;" FontSize="10" />
+                                    </Button>
+                                </TextBox.InnerRightContent>
+                            </TextBox>
                             <!-- Search icon button: toggles the inline search box. -->
                             <Button x:Name="SearchToggleBtn"
                                     Width="24" Height="24"
@@ -352,6 +369,17 @@
                         <Style Selector="TreeViewItem">
                             <Setter Property="IsExpanded"
                                     Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+                            <!-- Search filter: hide rows the filter excludes, but always keep the
+                                 selected row visible (safety net for off-filter programmatic selection). -->
+                            <Setter Property="IsVisible">
+                                <Setter.Value>
+                                    <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                                        <ReflectionBinding Path="PinnedVisible" />
+                                        <ReflectionBinding Path="IsSelected"
+                                                           RelativeSource="{RelativeSource Self}" />
+                                    </MultiBinding>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                         <!-- Expand chevron hit area to a full-height square; icon stays 12×12 centered. -->
                         <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">

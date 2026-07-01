@@ -1865,17 +1865,27 @@ public partial class MainWindow : Window
     }
 
     // Current ANIMATIONS tree filter text. Empty/whitespace = no filter (full tree).
-    // RebuildTreeView honours this so only matching chain nodes are shown.
+    // The filter is *sticky*: it survives selection and model edits. Two triggers apply
+    // it differently — ApplyQueryFilter (typing) may hide rows; the model-change paths
+    // (RefreshTreeView/RefreshChainNode) are grow-only and never hide a visible row.
     private string _treeFilterQuery = string.Empty;
 
     private void WireTreeSearch()
     {
         SearchToggleBtn.Click += (_, _) => ToggleSearchBox();
 
+        // Typing recomputes visibility from scratch — this is the only path allowed to hide.
         SearchBox.TextChanged += (_, _) =>
         {
             _treeFilterQuery = SearchBox.Text ?? string.Empty;
-            RebuildTreeView();
+            ApplyQueryFilter();
+        };
+
+        // ✕ clears the filter but leaves the box open (discoverable exit affordance).
+        SearchClearBtn.Click += (_, _) =>
+        {
+            SearchBox.Text = string.Empty; // fires TextChanged → ApplyQueryFilter restores all
+            SearchBox.Focus();
         };
 
         // Escape clears the filter and collapses the box; handled tunnel-phase so it
@@ -1891,6 +1901,16 @@ public partial class MainWindow : Window
                 }
             },
             RoutingStrategies.Tunnel);
+    }
+
+    // Query-change path: hard-set each chain row's visibility to whether it matches the
+    // query. This is the only place allowed to HIDE a chain (typing/refining shrinks the
+    // set); an empty query shows all. The selected row stays visible via its IsVisible binding.
+    private void ApplyQueryFilter()
+    {
+        foreach (var node in _treeRoots)
+            if (node.Data is AnimationChainSave)
+                node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
     }
 
     private void ToggleSearchBox()
@@ -2466,10 +2486,31 @@ public partial class MainWindow : Window
             var acls = _projectManager.AnimationChainListSave;
             if (acls is null) { _treeRoots.Clear(); RefreshFilesPanel(); return; }
 
+            // Capture filter state BEFORE the diff mutates the tree: which chains are
+            // currently visible, and which existing chains have nodes. Used for the
+            // grow-only visibility recompute below.
+            var chains = acls.AnimationChains;
+            var previouslyVisible = _treeRoots
+                .Where(n => n.Data is AnimationChainSave && n.PinnedVisible)
+                .Select(n => (AnimationChainSave)n.Data!)
+                .ToList();
+            var existingChains = new HashSet<AnimationChainSave>(
+                _treeRoots.Where(n => n.Data is AnimationChainSave).Select(n => (AnimationChainSave)n.Data!),
+                ReferenceEqualityComparer.Instance);
+            var brandNew = chains.Where(c => !existingChains.Contains(c)).ToList();
+
             // Diff-update the root nodes instead of clearing and rebuilding, so each
             // chain's collapse state (and selection) survives copy/paste and reorder.
-            TreeBuilder.SyncChainsInto(_treeRoots, acls.AnimationChains);
+            TreeBuilder.SyncChainsInto(_treeRoots, chains);
             ApplyPendingPastedChainExpand();
+
+            // Grow-only: never hide a chain that was visible; add newly-relevant ones.
+            var visible = TreeBuilder.ComputeVisibleAfterModelChange(
+                previouslyVisible, chains, _treeFilterQuery, brandNew);
+            foreach (var node in _treeRoots)
+                if (node.Data is AnimationChainSave c)
+                    node.PinnedVisible = visible.Contains(c);
+
             RefreshTreeThumbnails();
 
             // Re-select to keep visual state
@@ -2503,11 +2544,14 @@ public partial class MainWindow : Window
             }
 
             // Empty expandedChainNames (not null) collapses every chain; null would
-            // default them all to expanded. When a search filter is active, only chain
-            // nodes whose name matches the query are added (children stay intact).
+            // default them all to expanded. All nodes are added (membership always
+            // mirrors the model); an active filter is applied as per-node visibility so
+            // it persists across a full rebuild without dropping nodes from the tree.
             foreach (var node in TreeBuilder.BuildTree(acls, System.Array.Empty<string>()))
-                if (TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery))
-                    _treeRoots.Add(node);
+            {
+                node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
+                _treeRoots.Add(node);
+            }
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
@@ -2527,6 +2571,7 @@ public partial class MainWindow : Window
             var node = FindChainNode(chain);
             if (node is null)
             {
+                // Brand-new node defaults to visible (never hide something just created).
                 _treeRoots.Add(TreeBuilder.BuildChainNode(chain));
             }
             else
@@ -2534,6 +2579,9 @@ public partial class MainWindow : Window
                 node.Header = chain.Name;
                 node.Meta   = $"{chain.Frames.Count} fr";
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
+                // Grow-only: keep it visible if it already was, or if it now matches.
+                node.PinnedVisible = node.PinnedVisible
+                    || TreeBuilder.MatchesFilter(chain.Name, _treeFilterQuery);
             }
             RefreshTreeThumbnails();
             SyncTreeSelection();

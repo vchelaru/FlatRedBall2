@@ -89,6 +89,20 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>True when this node represents a CircleSave shape. Set once at construction time.</summary>
     public bool IsCircleNode { get; set; }
 
+    private bool _pinnedVisible = true;
+    /// <summary>
+    /// Whether this row is shown by the ANIMATIONS search filter. Defaults to
+    /// <c>true</c> (no filter). Only chain (root) nodes are toggled — frame/shape
+    /// nodes stay <c>true</c> and are hidden only when their parent chain is.
+    /// The tree row binds <c>IsVisible</c> to <c>PinnedVisible || IsSelected</c>, so
+    /// the currently-selected chain stays visible even when filtered out.
+    /// </summary>
+    public bool PinnedVisible
+    {
+        get => _pinnedVisible;
+        set { if (_pinnedVisible != value) { _pinnedVisible = value; Notify(); } }
+    }
+
     private bool _isPendingCut;
     /// <summary>True while this item is part of a pending cut (Ctrl+X, not yet pasted).</summary>
     public bool IsPendingCut
