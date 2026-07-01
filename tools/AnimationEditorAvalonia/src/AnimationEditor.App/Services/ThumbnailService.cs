@@ -33,6 +33,18 @@ public sealed class ThumbnailService : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Immutable-image cache keyed by absolute file path (case-insensitive), parallel to
+    /// <see cref="BitmapCache"/>. The preview render path draws these directly on the Avalonia
+    /// render thread (via <see cref="GetImage"/>) instead of rebuilding an <see cref="SKImage"/>
+    /// from the source bitmap every frame. For a 4096×4096 sheet that per-frame
+    /// <see cref="SKImage.FromBitmap"/> was a 67 MB copy + GPU re-upload 60×/sec — the preview
+    /// framerate bottleneck (issue #514). <see cref="SKImage"/> is immutable, so a single cached
+    /// instance is safe to draw off-thread across frames.
+    /// </summary>
+    public Dictionary<string, SKImage?> ImageCache { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Cache signature for a finished thumbnail. Two equal keys produce a pixel-identical
     /// bitmap, so a tab switch (or strip rebuild) re-uses the cached icon. The resolved
     /// <em>absolute</em> texture path is part of the key — two tabs in different folders can
@@ -72,6 +84,10 @@ public sealed class ThumbnailService : IDisposable
     {
         var key = absolutePath.Replace('\\', '/');
         BitmapCache.Remove(key);
+        // Drop (don't Dispose) the cached image: a render on the compositor thread may still be
+        // drawing it. Removing the reference re-decodes on next access; GC reclaims the old image
+        // once no in-flight draw holds it. Mirrors the non-disposing BitmapCache.Remove above.
+        ImageCache.Remove(key);
 
         List<ThumbnailKey>? stale = null;
         foreach (var k in _thumbnailCache.Keys)
@@ -109,6 +125,24 @@ public sealed class ThumbnailService : IDisposable
             BitmapCache[key] = null;
             return null;
         }
+    }
+
+    /// <summary>
+    /// Returns a cached immutable <see cref="SKImage"/> for <paramref name="path"/>, built once
+    /// from the decoded bitmap. Returns <c>null</c> for a null/empty path or a texture that fails
+    /// to decode (the failure is cached, so a missing texture is not retried every frame). Reusing
+    /// one image across frames avoids the per-frame <see cref="SKImage.FromBitmap"/> full-atlas
+    /// copy that made large-sheet previews crawl (issue #514).
+    /// </summary>
+    public SKImage? GetImage(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        var key = path.Replace('\\', '/');
+        if (ImageCache.TryGetValue(key, out var cached)) return cached;
+        var bm  = GetBitmap(path);
+        var img = bm is null ? null : SKImage.FromBitmap(bm);
+        ImageCache[key] = img;
+        return img;
     }
 
     /// <summary>
@@ -232,6 +266,9 @@ public sealed class ThumbnailService : IDisposable
         foreach (var bm in BitmapCache.Values)
             bm?.Dispose();
         BitmapCache.Clear();
+        foreach (var img in ImageCache.Values)
+            img?.Dispose();
+        ImageCache.Clear();
         foreach (var bitmap in _thumbnailCache.Values)
             bitmap.Dispose();
         _thumbnailCache.Clear();
