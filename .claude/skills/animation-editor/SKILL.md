@@ -61,6 +61,16 @@ Test commands and headless-test discipline live in the `animation-editor-testing
 
 Both panels have their own zoom combo box wired in `MainWindow.axaml.cs` (`ZoomCombo` ↔ `WireframeCtrl`, `PreviewZoomCombo` ↔ `PreviewCtrl`). Each control raises a `ZoomChanged` event that `MainWindow` syncs back into the combo using a suppression flag to break the feedback loop. Mirror that pattern for any new bidirectional control ↔ combo wiring.
 
+## Rendering & performance
+
+Both panels render through a SkiaSharp `ICustomDrawOperation` on Avalonia's render thread (top: `WireframeControl.DrawOp.Render`; bottom: `PreviewControl.DrawFrameCore`). `lease.GrContext != null` means the GPU (ANGLE) path; null means CPU (software) — the two behave differently, so always know which you're on before reasoning about cost.
+
+**A "used to be smooth, now it's slow" report is a git signal, not an architecture signal.** Before theorizing about the pipeline, `git log` the render files — a recent commit that changed *how an image is drawn* is far more often the cause than a long-standing pattern suddenly biting. Chasing the architecture first wastes rounds.
+
+**Measure before guessing.** An on-canvas draw-time overlay (rolling ms/frame + a GPU/CPU tag) toggles with **F3** (`DiagnosticsEnabled` on each control, rendered by `DrawTimeOverlay`). Turn it on first: the ms reading plus the GPU/CPU tag localize the cost and rule out whole categories of hypothesis immediately.
+
+**Landmine — a raster `SKImage` re-uploads to the GPU every frame.** An `SKImage` from `SKImage.FromBitmap` is CPU-resident; on the GPU path Skia re-uploads the *visible source region* on each draw, so cost scales inversely with zoom — **zoomed out is slower**, which misdirects toward mipmaps/filtering. Fix: let Skia keep the texture cached by raising the GPU resource-cache budget once per lease (`GRContext.SetResourceCacheLimit`), sized to hold the image. Do **not** hand-manage a GPU copy via `SKImage.ToTextureImage` held across frames — opening a menu/popup purges the `GRContext`, leaving that cached texture dangling so it draws nothing (blank/flicker of *only* the image, while vector draws in the same pass survive). Skia's own cache re-uploads correctly after a purge; a hand-held texture does not.
+
 ## Cross-platform path operations — use `FilePath`, not `System.IO.Path`
 
 **Never use `System.IO.Path.GetFileName`, `Path.GetDirectoryName`, or `Path.Combine` on paths stored in `ProjectManager.FileName` or any user-supplied path.** These methods are OS-native: on Linux they only recognise `/` as a separator, so a Windows-authored `C:\foo\bar.achx` path would be returned whole by `Path.GetFileName`.

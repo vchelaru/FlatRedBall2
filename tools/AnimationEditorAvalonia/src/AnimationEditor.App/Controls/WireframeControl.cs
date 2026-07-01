@@ -74,6 +74,13 @@ public class WireframeControl : Control
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
+    // Skia GPU resource-cache budget. The sheet's GPU texture (a 4096² sheet is ~64 MB) must fit
+    // in this budget to stay cached across frames; otherwise Skia evicts and re-uploads it every
+    // frame, which is what made zoomed-out drawing crawl (#514). Letting Skia own the cache (rather
+    // than hand-holding an SKImage.ToTextureImage) also means Skia re-uploads correctly after a
+    // context purge — e.g. when a menu popup opens — so the texture never goes dangling/blank.
+    private const long GpuResourceCacheBytes = 512L * 1024 * 1024;
+
     private sealed class DrawOp : ICustomDrawOperation
     {
         private readonly RenderSnapshot _s;
@@ -99,13 +106,20 @@ public class WireframeControl : Control
             if (lease is null) return;
             using (lease)
             {
+                // Raise the GPU cache budget so Skia retains the sheet's texture across frames
+                // instead of re-uploading it (#514). Idempotent — the setter just stores the cap.
+                if (lease.GrContext is { } gr && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
+                    gr.SetResourceCacheLimit(GpuResourceCacheBytes);
+
                 if (_drawTimes is not null)
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     RenderSk(lease.SkCanvas, _s, _palette);
                     sw.Stop();
                     _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
-                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average);
+                    // GrContext is non-null only on the GPU (ANGLE) backend; null = software raster.
+                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average,
+                        lease.GrContext != null ? "GPU" : "CPU");
                 }
                 else
                     RenderSk(lease.SkCanvas, _s, _palette);
@@ -125,7 +139,10 @@ public class WireframeControl : Control
                     s.PanX + s.ImageWidth * s.Zoom,
                     s.PanY + s.ImageHeight * s.Zoom);
 
-                // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity
+                // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity.
+                // s.Image is a GPU-resident texture on the accelerated path (see DrawOp.Render),
+                // so sampling this 4096² sheet is constant-time instead of re-uploading the visible
+                // slice from CPU memory every frame — the #514 zoom-out cost.
                 var sampling = s.Zoom >= 1f
                     ? new SKSamplingOptions(SKFilterMode.Nearest)
                     : new SKSamplingOptions(SKFilterMode.Linear);

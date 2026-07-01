@@ -11,11 +11,12 @@ namespace AnimationEditor.App.Controls;
 /// </summary>
 internal static class DrawTimeOverlay
 {
-    public static void Draw(SKCanvas canvas, double avgMs)
+    public static void Draw(SKCanvas canvas, double avgMs, string? note = null)
     {
-        string text = avgMs > 0
+        string baseText = avgMs > 0
             ? $"draw: {avgMs:F2} ms  (~{1000.0 / avgMs:F0} fps)"
             : "draw: —";
+        string text = note is null ? baseText : $"{baseText}  [{note}]";
 
         using var font = new SKFont { Size = 12f };
         float textW = font.MeasureText(text);
