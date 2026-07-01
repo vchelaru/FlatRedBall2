@@ -31,6 +31,9 @@
                     <SolidColorBrush x:Key="AccentSoft"  Color="#f0c674" />
                     <SolidColorBrush x:Key="AccentCool"  Color="#5fb6e8" />
                     <SolidColorBrush x:Key="Ok"          Color="#6dd28d" />
+                    <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
+                         distinct from passive BgRail chrome, without the loud Accent red. -->
+                    <SolidColorBrush x:Key="InfoBannerBg" Color="#202d38" />
 
                     <!-- SVG icon CurrentColor tokens (Color, not Brush). -->
                     <Color x:Key="IconInk">#e6e8ec</Color>
@@ -65,6 +68,9 @@
                     <SolidColorBrush x:Key="AccentSoft"  Color="#b8860b" />
                     <SolidColorBrush x:Key="AccentCool"  Color="#2b7fc0" />
                     <SolidColorBrush x:Key="Ok"          Color="#2f9e54" />
+                    <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
+                         distinct from passive BgRail chrome, without the loud Accent red. -->
+                    <SolidColorBrush x:Key="InfoBannerBg" Color="#dae5ee" />
 
                     <Color x:Key="IconInk">#2a2e35</Color>
                     <Color x:Key="IconInkMuted">#5a626e</Color>
