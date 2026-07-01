@@ -131,6 +131,17 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);
         void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain);
         void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain);
+
+        /// <summary>
+        /// Moves <paramref name="frames"/> (the same instances, not clones) from
+        /// <paramref name="sourceChain"/> to <paramref name="targetChain"/> at
+        /// <paramref name="insertIndex"/> as one undo step. Drives drag-and-drop reorder
+        /// within a chain (source == target) and cross-animation moves. The frames are
+        /// sorted by source index and inserted as a contiguous block; <paramref name="insertIndex"/>
+        /// is interpreted against the target's current frame list before source removal.
+        /// </summary>
+        void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
+            AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex);
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);

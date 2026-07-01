@@ -242,9 +242,10 @@ public class AchxSerializationTests
     [Fact]
     public void LoadThenSave_Frb1FileWithShapes_IsByteIdentical()
     {
-        // Real FRB1-authored .achx (16 chains, 40 frames, per-frame CircleSave shapes with
-        // Z/Alpha/Red/Green/Blue). Opening and re-saving must reproduce the file byte-for-byte:
-        // FRB1's typed shape lists, element order, float text (9-digit fallback), no BOM.
+        // FRB1-shaped .achx (16 chains, 40 frames, per-frame CircleSave shapes with
+        // Z/Alpha/Red/Green/Blue), normalized to FRB2's canonical output: FRB1's typed shape
+        // lists, element order, floats as shortest round-trippable text ("R"), no BOM. Opening
+        // and re-saving must reproduce the file byte-for-byte (the writer is idempotent, #503).
         var ctx = TestHelpers.SetupFreshAcls();
         using var dir = new TestHelpers.TempDir();
         var fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Frb1WeaponAnimations.achx");

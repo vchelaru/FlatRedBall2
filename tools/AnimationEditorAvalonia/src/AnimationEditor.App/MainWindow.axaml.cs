@@ -58,6 +58,22 @@ public partial class MainWindow : Window
     private double _dragStartX;
     private bool _isDragging;
     private Border? _ghostBorder;
+
+    // ── Frame drag-and-drop reorder state (issue #500) ──────────────────────────
+    // The DataTransfer only carries a marker token; the actual frames + source chain
+    // live in _pendingFrameDrag because the drag is always same-process.
+    private static readonly DataFormat<string> FrameDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("animationeditor-frame-drag");
+    private const string FrameDragToken = "frame";
+    private FrameDragSource? _pendingFrameDrag;
+    private Avalonia.Point? _frameDragPressPoint;
+    private PointerPressedEventArgs? _frameDragPressArgs;
+    private AnimationFrameSave? _frameDragCandidate;
+    private List<object>? _frameDragSelectionSnapshot;
+    private AnimationFrameSave? _pendingSingleSelectFrame;
+    private bool _frameDragInProgress;
+    private Border? _frameDropLine;
+    private Border? _frameDropBox;
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
@@ -1795,6 +1811,17 @@ public partial class MainWindow : Window
             OnTreePointerPressed,
             RoutingStrategies.Tunnel);
 
+        // Frame drag-and-drop reorder: a press on a frame row arms a drag candidate, a
+        // pointer move past the threshold starts the Avalonia drag (issue #500).
+        AnimTree.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeFrameDragPointerMoved,
+            RoutingStrategies.Bubble);
+        AnimTree.AddHandler(
+            InputElement.PointerReleasedEvent,
+            OnTreeFrameDragPointerReleased,
+            RoutingStrategies.Bubble);
+
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) =>
         {
@@ -1872,6 +1899,24 @@ public partial class MainWindow : Window
 
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
+        // Internal frame reorder drag — distinct from the external .png file drag below.
+        if (e.DataTransfer.Contains(FrameDragDataFormat) && _pendingFrameDrag is { IsValid: true } drag)
+        {
+            var target = ResolveFrameDrop(e, drag);
+            if (target.IsValid)
+            {
+                e.DragEffects = DragDropEffects.Move;
+                ShowFrameDropIndicator(e);
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+                RemoveFrameDropIndicators();
+            }
+            e.Handled = true;
+            return;
+        }
+
         string? firstFile = e.DataTransfer.TryGetFiles()?
             .FirstOrDefault()?.Path.LocalPath;
 
@@ -1905,6 +1950,18 @@ public partial class MainWindow : Window
 
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
+        // Internal frame reorder drop — perform the move and let the external .png path below
+        // stay untouched (external file drags never carry the frame marker format).
+        if (e.DataTransfer.Contains(FrameDragDataFormat) && _pendingFrameDrag is { IsValid: true } drag)
+        {
+            RemoveFrameDropIndicators();
+            var target = ResolveFrameDrop(e, drag);
+            if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
+                _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
+            e.Handled = true;
+            return;
+        }
+
         var firstFile = GetFirstDroppedFilePath(e);
         Trace.WriteLine($"[DragDrop] OnTreeDrop: firstFile={firstFile ?? "(null)"}, FileName={_projectManager.FileName ?? "(null)"}");
 
@@ -2018,6 +2075,268 @@ public partial class MainWindow : Window
         return TreePngDropTarget.FromNodeData(
             targetNode?.Data,
             frame => _objectFinder.GetAnimationChainContaining(frame));
+    }
+
+    // ── Internal frame drag-and-drop reorder (issue #500) ──────────────────────
+
+    private void ClearFrameDragCandidate()
+    {
+        _frameDragCandidate = null;
+        _frameDragPressPoint = null;
+        _frameDragPressArgs = null;
+        _frameDragSelectionSnapshot = null;
+        _pendingSingleSelectFrame = null;
+    }
+
+    private void SelectSingleFrame(AnimationFrameSave frame)
+    {
+        var vm = TreeBuilder.FindNodeForData(_treeRoots, frame);
+        if (vm is null) return;
+
+        // The tree still visually holds the whole multi-selection (the select-on-press was
+        // suppressed), and SyncTreeSelection won't collapse it because the clicked frame is
+        // already among SelectedItems. Drive the tree directly: clear the others silently,
+        // then set the single item so the normal selection cascade updates SelectedState.
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try { AnimTree.SelectedItems?.Clear(); }
+        finally { _suppressTreeSelectionHandling = prior; }
+        AnimTree.SelectedItem = vm;
+    }
+
+    private async void OnTreeFrameDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_frameDragInProgress || _frameDragCandidate is null ||
+            _frameDragPressPoint is null || _frameDragPressArgs is null)
+            return;
+
+        if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
+        {
+            ClearFrameDragCandidate();
+            return;
+        }
+
+        var pos = e.GetPosition(AnimTree);
+        if (Math.Abs(pos.X - _frameDragPressPoint.Value.X) <= 4 &&
+            Math.Abs(pos.Y - _frameDragPressPoint.Value.Y) <= 4)
+            return;
+
+        if (!TryBuildFrameDragSource(out var dragSource))
+        {
+            ClearFrameDragCandidate();
+            return;
+        }
+
+        // A drag is happening, so the deferred single-select must not fire on release.
+        _pendingSingleSelectFrame = null;
+        e.Pointer.Capture(null); // release our press-capture so the drag system can take over
+        _pendingFrameDrag = dragSource;
+        _frameDragInProgress = true;
+
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(FrameDragDataFormat, FrameDragToken));
+        try
+        {
+            // DoDragDropAsync needs the originating press args; the move past the threshold
+            // is what gates when we begin, so the platform drag never starts on a plain click.
+            await DragDrop.DoDragDropAsync(_frameDragPressArgs, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _pendingFrameDrag = null;
+            _frameDragInProgress = false;
+            RemoveFrameDropIndicators();
+            ClearFrameDragCandidate();
+        }
+    }
+
+    private void OnTreeFrameDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_frameDragInProgress) return;
+
+        // A press on an already-multi-selected frame that did not turn into a drag collapses
+        // the selection to that single frame now (the select-on-press was suppressed so the
+        // multi-selection could survive a potential drag).
+        if (_pendingSingleSelectFrame is { } frame)
+        {
+            e.Pointer.Capture(null);
+            SelectSingleFrame(frame);
+        }
+        ClearFrameDragCandidate();
+    }
+
+    /// <summary>
+    /// Decides which frames a drag moves. Dragging a frame that is part of a valid frame
+    /// multi-selection moves the whole set; a mixed or multi-chain selection that includes
+    /// the dragged frame is rejected with a toast; otherwise just the dragged frame moves.
+    /// </summary>
+    private bool TryBuildFrameDragSource(out FrameDragSource dragSource)
+    {
+        dragSource = default;
+        var candidate = _frameDragCandidate;
+        if (candidate is null) return false;
+
+        var snapshot = _frameDragSelectionSnapshot ?? new List<object>();
+        bool candidateInSnapshot = snapshot.Any(n => ReferenceEquals(n, candidate));
+        var classified = FrameDropResolver.ClassifySelection(
+            snapshot, f => _objectFinder.GetAnimationChainContaining(f));
+
+        if (candidateInSnapshot)
+        {
+            if (classified.IsValid)
+            {
+                dragSource = classified;
+                return true;
+            }
+            if (classified.Validity is FrameDragValidity.MixedTypes
+                or FrameDragValidity.MultipleSourceChains)
+            {
+                ShowFrameDragRejectedToast(classified.Validity);
+                return false;
+            }
+        }
+
+        // Drag just the single pressed frame.
+        var chain = _objectFinder.GetAnimationChainContaining(candidate);
+        if (chain is null) return false;
+        dragSource = new FrameDragSource(new[] { candidate }, chain, FrameDragValidity.Valid);
+        return true;
+    }
+
+    private void ShowFrameDragRejectedToast(FrameDragValidity validity)
+    {
+        string message = validity == FrameDragValidity.MultipleSourceChains
+            ? "Can't drag frames from multiple animations yet — select frames from one animation."
+            : "Can't reorder a mixed selection — select only frames.";
+        ShowStatusMessage(message, isError: true);
+    }
+
+    private FrameDropTarget ResolveFrameDrop(DragEventArgs e, FrameDragSource drag)
+    {
+        if (drag.SourceChain is null) return FrameDropTarget.None;
+        var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
+        return FrameDropResolver.Resolve(
+            nodeData, half, drag.Frames, drag.SourceChain,
+            f => _objectFinder.GetAnimationChainContaining(f));
+    }
+
+    /// <summary>
+    /// Maps a pointer position over the tree to the node under it, which half of that row
+    /// the pointer is in, and the realized container (used to place the drop indicator).
+    /// </summary>
+    private (object? NodeData, FrameRowHalf Half, TreeViewItem? Item) HitTestFrameRow(Avalonia.Point posInTree)
+    {
+        if (AnimTree.InputHitTest(posInTree) is not Control hit)
+            return (null, FrameRowHalf.Upper, null);
+
+        var tvi = hit.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        if (tvi?.DataContext is not TreeNodeVm vm)
+            return (null, FrameRowHalf.Upper, null);
+
+        // Frame rows are leaves, so the container height is the row height. The half only
+        // matters for frame targets; chain targets always append regardless.
+        var topLeft = Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), AnimTree) ?? posInTree;
+        double rowHeight = tvi.Bounds.Height;
+        var half = (posInTree.Y - topLeft.Y) < rowHeight / 2 ? FrameRowHalf.Upper : FrameRowHalf.Lower;
+        return (vm.Data, half, tvi);
+    }
+
+    private void ShowFrameDropIndicator(DragEventArgs e)
+    {
+        var (nodeData, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
+        if (tvi is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        var topLeft = Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        if (topLeft is null || treeOrigin is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
+
+        if (nodeData is AnimationChainSave)
+        {
+            // Appending into an animation: outline the whole animation row/subtree so it reads as
+            // "drop inside this animation" — a box conveys containment in a way a line can't,
+            // which matters most for a collapsed chain where a line would look top-level.
+            RemoveDropLine();
+            ShowDropBox(topLeft.Value.X, topLeft.Value.Y, treeRight, tvi.Bounds.Height);
+            return;
+        }
+
+        // Reordering at a specific frame: a thin line at the precise insert position, indented to
+        // the frame content so it clearly belongs inside the animation rather than at the top level.
+        RemoveDropBox();
+        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        double left = HeaderContentLeft(tvi);
+        ShowDropLine(left, treeRight, y);
+    }
+
+    private void ShowDropLine(double left, double treeRight, double y)
+    {
+        _frameDropLine ??= new Border
+        {
+            Height = 2,
+            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            IsHitTestVisible = false,
+        };
+        if (!DragOverlayCanvas.Children.Contains(_frameDropLine))
+            DragOverlayCanvas.Children.Add(_frameDropLine);
+
+        _frameDropLine.Width = Math.Max(0, treeRight - left);
+        Canvas.SetLeft(_frameDropLine, left);
+        Canvas.SetTop(_frameDropLine, y - 1);
+    }
+
+    private void ShowDropBox(double left, double top, double treeRight, double height)
+    {
+        _frameDropBox ??= new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.Parse("#4a90d9")),
+            BorderThickness = new Avalonia.Thickness(2),
+            CornerRadius = new Avalonia.CornerRadius(3),
+            Background = new SolidColorBrush(Color.Parse("#334a90d9")), // faint fill to suggest the target area
+            IsHitTestVisible = false,
+        };
+        if (!DragOverlayCanvas.Children.Contains(_frameDropBox))
+            DragOverlayCanvas.Children.Add(_frameDropBox);
+
+        _frameDropBox.Width = Math.Max(0, treeRight - left - 2);
+        _frameDropBox.Height = Math.Max(0, height);
+        Canvas.SetLeft(_frameDropBox, left);
+        Canvas.SetTop(_frameDropBox, top);
+    }
+
+    /// <summary>X of a tree row's header content (after the indent + chevron) in canvas coords.</summary>
+    private double HeaderContentLeft(TreeViewItem tvi)
+    {
+        Control anchor = tvi.GetVisualDescendants().OfType<Control>()
+            .FirstOrDefault(c => c.Name == "PART_HeaderPresenter") ?? tvi;
+        return Avalonia.VisualExtensions.TranslatePoint(anchor, new Avalonia.Point(0, 0), DragOverlayCanvas)?.X ?? 0;
+    }
+
+    private void RemoveDropLine()
+    {
+        if (_frameDropLine is not null)
+            DragOverlayCanvas.Children.Remove(_frameDropLine);
+    }
+
+    private void RemoveDropBox()
+    {
+        if (_frameDropBox is not null)
+            DragOverlayCanvas.Children.Remove(_frameDropBox);
+    }
+
+    private void RemoveFrameDropIndicators()
+    {
+        RemoveDropLine();
+        RemoveDropBox();
     }
 
     // ── Window-level OS file drop: open dropped .achx files as tabs ────────────
@@ -2442,6 +2761,43 @@ public partial class MainWindow : Window
             var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
             if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
                 AnimTree.SelectedItem = vm;
+        }
+        else if (props.IsLeftButtonPressed && e.ClickCount == 1)
+        {
+            // Arm a frame-drag candidate. Snapshot the selection BEFORE the TreeView mutates
+            // it on press, so dragging a frame that is part of a multi-selection can move the
+            // whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
+            if (e.Source is Control src &&
+                src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
+                    is TreeNodeVm { Data: AnimationFrameSave frame })
+            {
+                _frameDragCandidate = frame;
+                _frameDragPressPoint = e.GetPosition(AnimTree);
+                _frameDragPressArgs = e;
+                _frameDragSelectionSnapshot = new List<object>(_selectedState.SelectedNodes);
+
+                // Pressing a frame that's part of a frame multi-selection (no modifiers) must
+                // not collapse the selection — otherwise a drag would only move one frame. Mark
+                // the press handled to suppress the TreeView's select-on-press, capture so the
+                // move/release still arrive here, and defer the single-select to release if no
+                // drag happens. Ctrl/Shift presses fall through to normal selection editing.
+                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                if (noModifiers &&
+                    FrameDropResolver.IsFrameMultiSelectionContaining(_frameDragSelectionSnapshot, frame))
+                {
+                    _pendingSingleSelectFrame = frame;
+                    e.Pointer.Capture(AnimTree);
+                    e.Handled = true;
+                }
+                else
+                {
+                    _pendingSingleSelectFrame = null;
+                }
+            }
+            else
+            {
+                ClearFrameDragCandidate();
+            }
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 2)
         {
