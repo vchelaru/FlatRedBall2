@@ -2042,29 +2042,6 @@ public class PreviewControl : Control
         }
     }
 
-    /// <summary>
-    /// Draws the rolling-average draw-time readout (ms/frame + approximate fps) in the top-left
-    /// corner. Diagnostic-only (gated by <see cref="ShowDrawDiagnostics"/>); the <paramref name="avgMs"/>
-    /// is the average of the last N Skia renders, so a large sheet that stalls the preview shows an
-    /// obviously high number. Untested thin Skia wiring — the averaging math is covered by
-    /// <c>RollingAverageTests</c>.
-    /// </summary>
-    private static void DrawDiagnosticsOverlay(SKCanvas canvas, double avgMs)
-    {
-        string text = avgMs > 0
-            ? $"draw: {avgMs:F2} ms  (~{1000.0 / avgMs:F0} fps)"
-            : "draw: —";
-
-        using var font = new SKFont { Size = 12f };
-        float textW = font.MeasureText(text);
-        var box = new SKRect(4f, 4f, 4f + textW + 12f, 4f + 20f);
-
-        using var bg = new SKPaint { Color = new SKColor(0, 0, 0, 210) };
-        canvas.DrawRect(box, bg);
-        using var fg = new SKPaint { Color = new SKColor(0, 255, 80), IsAntialias = true };
-        canvas.DrawText(text, box.Left + 6f, box.Bottom - 6f, font, fg);
-    }
-
     private sealed class DrawOp : ICustomDrawOperation
     {
         private readonly RenderSnapshot              _snap;
@@ -2102,7 +2079,7 @@ public class PreviewControl : Control
                 PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
                 sw.Stop();
                 _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
-                DrawDiagnosticsOverlay(lease.SkCanvas, _drawTimes.Average);
+                DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average);
             }
             else
             {

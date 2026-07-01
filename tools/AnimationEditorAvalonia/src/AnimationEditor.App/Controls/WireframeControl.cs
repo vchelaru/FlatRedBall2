@@ -78,20 +78,38 @@ public class WireframeControl : Control
     {
         private readonly RenderSnapshot _s;
         private readonly CanvasPalette _palette;
+        private readonly RollingAverage? _drawTimes;   // non-null only when diagnostics are on
 
-        public DrawOp(RenderSnapshot s, CanvasPalette palette) { _s = s; _palette = palette; Bounds = new Rect(0, 0, s.Width, s.Height); }
+        public DrawOp(RenderSnapshot s, CanvasPalette palette, RollingAverage? drawTimes)
+        {
+            _s = s; _palette = palette; _drawTimes = drawTimes;
+            Bounds = new Rect(0, 0, s.Width, s.Height);
+        }
 
         public Rect Bounds { get; }
         public bool HitTest(Point p) => true;
         public bool Equals(ICustomDrawOperation? other) => false;
-        public void Dispose() => _s.Image?.Dispose();
+        // _s.Image is the control's shared, cached SKImage — owned by the control, NOT this op —
+        // so the op must not dispose it. Its lifetime is managed in LoadTexture via deferred drop.
+        public void Dispose() { }
 
         public void Render(ImmediateDrawingContext ctx)
         {
             var lease = ctx.TryGetFeature<ISkiaSharpApiLeaseFeature>()?.Lease();
             if (lease is null) return;
             using (lease)
-                RenderSk(lease.SkCanvas, _s, _palette);
+            {
+                if (_drawTimes is not null)
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    RenderSk(lease.SkCanvas, _s, _palette);
+                    sw.Stop();
+                    _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
+                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average);
+                }
+                else
+                    RenderSk(lease.SkCanvas, _s, _palette);
+            }
         }
 
         // ── Static rendering logic ────────────────────────────────────────────
@@ -289,6 +307,14 @@ public class WireframeControl : Control
     // Set when LoadTexture/CenterTexture ran before the control had a real viewport
     // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
     private bool _needsInitialCenter;
+
+    // ── Draw-time diagnostics (#514) ──────────────────────────────────────────
+    // Flip ShowDrawDiagnostics to overlay the rolling-average Skia render time (ms/frame + fps),
+    // top-left. This is the panel to watch for the #514 slowdown — panning/zooming a large sheet
+    // redraws it (60fps during smooth-zoom). static readonly, NOT const: a const false would let
+    // the compiler prove the timing branch unreachable and trip CS0162 (an error here).
+    private static readonly bool ShowDrawDiagnostics = false;
+    private readonly RollingAverage _drawTimes = new(10);
 
     // ── Debug tooling (toggle with F2 in the live app) ────────────────────────
     private bool _debugMode;
@@ -642,7 +668,11 @@ public class WireframeControl : Control
             _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
 
         _loadedTexturePath = norm;
-        _image?.Dispose();
+        // Drop (don't Dispose) the previous image: a render op on the compositor thread may still be
+        // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
+        // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
+        // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
+        // copy from FromBitmap), so disposing it here stays safe.
         _image = null;
         _bitmap?.Dispose();
         _bitmap = null;
@@ -1050,7 +1080,7 @@ public class WireframeControl : Control
     {
         UpdatePalette();
         var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette));
+        ctx.Custom(new DrawOp(snap, _palette, ShowDrawDiagnostics ? _drawTimes : null));
         DrawDebugOverlay(ctx);
     }
 
@@ -1071,17 +1101,12 @@ public class WireframeControl : Control
     {
         UpdatePalette();
         var snap   = BuildSnapshot(width, height);
-        try
-        {
-            var bitmap = new SKBitmap(width, height);
-            using var canvas = new SKCanvas(bitmap);
-            DrawOp.RenderSk(canvas, snap, _palette);
-            return bitmap;
-        }
-        finally
-        {
-            snap.Image?.Dispose();
-        }
+        // snap.Image is the shared, control-owned _image (not a per-call clone) — must NOT be
+        // disposed here, or the next live render would draw a disposed image (#514).
+        var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        DrawOp.RenderSk(canvas, snap, _palette);
+        return bitmap;
     }
 
     /// <summary>
@@ -1145,8 +1170,12 @@ public class WireframeControl : Control
     {
         var snap = new RenderSnapshot
         {
-            // Per-draw-op clone so LoadTexture can dispose _image without racing the render thread.
-            Image        = CloneBitmapAsImage(_bitmap),
+            // Reuse the immutable image built once per load (issue #514). SKImage is safe to read on
+            // the render thread, so a single instance serves every frame — NO per-op atlas copy.
+            // 1665108 regressed this to a full bitmap.Copy() per op (67 MB/render on a 4096² sheet);
+            // LoadTexture now drops (never synchronously disposes) the old image, so sharing it here
+            // can't race a render op mid-draw.
+            Image        = _image,
             ImageWidth   = _bitmap?.Width ?? 0,
             ImageHeight  = _bitmap?.Height ?? 0,
             PanX         = _panX,
@@ -1183,18 +1212,6 @@ public class WireframeControl : Control
         // Move-drag still works via HitTestHandle, which uses _frameRects directly.
 
         return snap;
-    }
-
-    /// <summary>
-    /// Builds an <see cref="SKImage"/> owned by a single <see cref="DrawOp"/> so the UI thread
-    /// can replace <see cref="_image"/> in <see cref="LoadTexture"/> without use-after-dispose on
-    /// the render thread.
-    /// </summary>
-    private static SKImage? CloneBitmapAsImage(SKBitmap? bitmap)
-    {
-        if (bitmap is null) return null;
-        var copy = bitmap.Copy();
-        return SKImage.FromBitmap(copy);
     }
 
     // ── Mouse input ───────────────────────────────────────────────────────────
