@@ -1,4 +1,5 @@
 using AnimationEditor.Core.ViewModels;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using Xunit;
 
@@ -31,7 +32,48 @@ public class ThumbnailSourceTests
 
         var source = ThumbnailSource.FromChain(chain);
 
-        Assert.Equal(new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false), source);
+        // An uncolored first frame resolves to all-null color channels.
+        Assert.Equal(
+            new ThumbnailSource("sheet.png", 0f, 0.5f, 0f, 1f, false, false, null, null, null, null, null),
+            source);
+    }
+
+    [Fact]
+    public void FromChain_FirstFrameColorChange_ProducesUnequalSignature()
+    {
+        // A color/alpha edit on the first frame must invalidate the cached chain icon so the tree
+        // re-tints it. (Untinted vs Multiply-red.)
+        var plain = new AnimationChainSave { Name = "Plain" };
+        plain.Frames.Add(new AnimationFrameSave { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f });
+        var tinted = new AnimationChainSave { Name = "Tinted" };
+        tinted.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f,
+            ColorOperation = ColorOperation.Multiply, Red = 255, Green = 0, Blue = 0,
+        });
+
+        Assert.NotEqual(ThumbnailSource.FromChain(plain), ThumbnailSource.FromChain(tinted));
+    }
+
+    // ── FromFrame effective (sticky) color ─────────────────────────────────────
+
+    [Fact]
+    public void FromFrame_CapturesEffectiveStickyColor_NotJustTheFramesOwnChannels()
+    {
+        // Frame 0 sets Multiply red; frame 1 sets nothing. Frame 1's signature must carry the
+        // inherited (sticky) red so the timeline cell it tints rebuilds when frame 0's color changes.
+        var frames = new System.Collections.Generic.List<AnimationFrameSave>
+        {
+            new() { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f,
+                    ColorOperation = ColorOperation.Multiply, Red = 200 },
+            new() { TextureName = "sheet.png", RightCoordinate = 1f, BottomCoordinate = 1f },
+        };
+        var colors = Rendering.EffectiveFrameColor.ResolveAll(frames);
+
+        var frame1Source = ThumbnailSource.FromFrame(frames[1], colors[1]);
+
+        Assert.Equal(200, frame1Source.Red);
+        Assert.Equal(ColorOperation.Multiply, frame1Source.Operation);
     }
 
     [Fact]

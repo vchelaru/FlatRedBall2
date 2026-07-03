@@ -1247,7 +1247,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue)
         {
-            // Color is game-consumed and not previewed, so no wireframe refresh is needed.
+            // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
+            // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
                 [frame], () => { frame.Red = red; frame.Green = green; frame.Blue = blue; },
                 this, _events, false, "Set Frame Color"));
@@ -1255,7 +1256,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation)
         {
-            // Mode is game-consumed; not previewed by the engine, so no wireframe refresh is needed.
+            // Mode drives how the preview + timeline/tree thumbnails tint; it doesn't touch the
+            // wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
                 [frame], () => frame.ColorOperation = operation,
                 this, _events, false, "Set Frame Color Mode"));
@@ -1263,7 +1265,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameAlpha(AnimationFrameSave frame, int? alpha)
         {
-            // Alpha is straight transparency, game-consumed and not previewed, so no wireframe refresh is needed.
+            // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
+            // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
                 [frame], () => frame.Alpha = alpha,
                 this, _events, false, "Set Frame Alpha"));

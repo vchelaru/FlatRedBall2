@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using AnimationEditor.Core;
+using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Platform;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -49,10 +51,16 @@ public sealed class ThumbnailService : IDisposable
     /// bitmap, so a tab switch (or strip rebuild) re-uses the cached icon. The resolved
     /// <em>absolute</em> texture path is part of the key — two tabs in different folders can
     /// share the same relative <c>TextureName</c> yet must not collide on one cached crop.
+    /// <para>
+    /// The effective color/alpha/operation are part of the key too: two frames with the same crop
+    /// but a different tint must not collide on one cached bitmap, and a tinted thumbnail is rendered
+    /// once and reused until its (crop or color) inputs change.
+    /// </para>
     /// </summary>
     private readonly record struct ThumbnailKey(
         string Path, float Left, float Right, float Top, float Bottom,
-        bool FlipHorizontal, bool FlipVertical, int MaxWidth, int MaxHeight);
+        bool FlipHorizontal, bool FlipVertical, int MaxWidth, int MaxHeight,
+        int? Red, int? Green, int? Blue, int? Alpha, ColorOperation? Operation);
 
     /// <summary>
     /// Finished-thumbnail cache. The service owns these bitmaps and is their sole disposer
@@ -200,14 +208,20 @@ public sealed class ThumbnailService : IDisposable
     /// Returns <c>null</c> if the texture cannot be resolved, is not loaded, or the frame
     /// has no valid UV region.
     /// <para>
-    /// The result is cached (keyed by resolved texture path + UV region + flips + target
-    /// size) and <em>owned by this service</em> — do not dispose it. Re-calling with the same
-    /// frame state returns the same cached instance, so a tab switch re-uses every unchanged
-    /// icon. The Skia crop is wrapped directly as a <see cref="Avalonia.Media.Imaging.WriteableBitmap"/>;
-    /// there is no PNG encode/decode round-trip.
+    /// The result is cached (keyed by resolved texture path + UV region + flips + effective
+    /// color/alpha + target size) and <em>owned by this service</em> — do not dispose it. Re-calling
+    /// with the same frame state returns the same cached instance, so a tab switch re-uses every
+    /// unchanged icon and playback never re-renders a cell. The Skia crop is wrapped directly as a
+    /// <see cref="Avalonia.Media.Imaging.WriteableBitmap"/>; there is no PNG encode/decode round-trip.
+    /// </para>
+    /// <para>
+    /// <paramref name="color"/> is the frame's <em>effective</em> (sticky) color — resolve it once per
+    /// data change via <see cref="EffectiveFrameColor.ResolveAll"/> and pass it in; do not resolve
+    /// inside the playback render loop. <c>default</c> means no tint / full opacity.
     /// </para>
     /// </summary>
-    public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(AnimationFrameSave frame, int maxWidth, int maxHeight)
+    public Avalonia.Media.Imaging.Bitmap? GetFrameThumbnail(
+        AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
     {
         var path = ResolveTexturePath(frame);
         var bm   = GetBitmap(path);
@@ -216,11 +230,12 @@ public sealed class ThumbnailService : IDisposable
         var key = new ThumbnailKey(
             path!.Replace('\\', '/'),
             frame.LeftCoordinate, frame.RightCoordinate, frame.TopCoordinate, frame.BottomCoordinate,
-            frame.FlipHorizontal, frame.FlipVertical, maxWidth, maxHeight);
+            frame.FlipHorizontal, frame.FlipVertical, maxWidth, maxHeight,
+            color.Red, color.Green, color.Blue, color.Alpha, color.Operation);
         if (_thumbnailCache.TryGetValue(key, out var cachedBitmap))
             return cachedBitmap;
 
-        using var thumb = RenderFrameThumbnail(bm, frame, maxWidth, maxHeight);
+        using var thumb = RenderFrameThumbnail(bm, frame, color, maxWidth, maxHeight);
         if (thumb is null) return null;
 
         var bitmap = ToAvaloniaBitmap(thumb);
@@ -277,13 +292,20 @@ public sealed class ThumbnailService : IDisposable
 
     /// <summary>
     /// Pure SkiaSharp core of <see cref="GetFrameThumbnail"/>: crops <paramref name="frame"/>'s
-    /// UV region out of <paramref name="source"/> and scales it to fit within
-    /// <paramref name="maxWidth"/> × <paramref name="maxHeight"/> (aspect-preserving).
-    /// Returns <c>null</c> for a degenerate UV region. Exposed (internal) so tests can verify
-    /// crop/scale/sampling behaviour without going through file decode or Avalonia bitmap wrapping.
+    /// UV region out of <paramref name="source"/>, applies the effective (sticky) <paramref name="color"/>
+    /// and alpha, and scales it to fit within <paramref name="maxWidth"/> × <paramref name="maxHeight"/>
+    /// (aspect-preserving). Returns <c>null</c> for a degenerate UV region. Exposed (internal) so tests
+    /// can verify crop/scale/sampling/tint behaviour without going through file decode or Avalonia
+    /// bitmap wrapping.
+    /// <para>
+    /// The tint reuses <see cref="FrameColorFilter"/> + <see cref="FramePreviewOpacity"/> — the same
+    /// reference interpretation the preview panel applies — so a timeline/tree thumbnail and the
+    /// preview render a given frame identically. A <c>default</c> color leaves the crop untinted at
+    /// full opacity.
+    /// </para>
     /// </summary>
     internal static SKBitmap? RenderFrameThumbnail(
-        SKBitmap source, AnimationFrameSave frame, int maxWidth, int maxHeight)
+        SKBitmap source, AnimationFrameSave frame, ResolvedFrameColor color, int maxWidth, int maxHeight)
     {
         float uvW = frame.RightCoordinate  - frame.LeftCoordinate;
         float uvH = frame.BottomCoordinate - frame.TopCoordinate;
@@ -310,7 +332,17 @@ public sealed class ThumbnailService : IDisposable
         var thumb = new SKBitmap(finalW, finalH);
         using var canvas = new SKCanvas(thumb);
         canvas.Clear(SKColors.Transparent);
-        using var paint  = new SKPaint { Color = SKColors.White };
+
+        // Same reference interpretation the preview panel uses (PreviewControl.DrawFrameCore): the
+        // sticky effective alpha previews as opacity, and the effective color operation as a filter.
+        // A default color yields alpha 255 + a null filter, i.e. the untinted crop.
+        using var paint  = new SKPaint
+        {
+            Color = new SKColor(255, 255, 255, FramePreviewOpacity.Resolve(color.Alpha, 1f)),
+        };
+        using var colorFilter = FrameColorFilter.Create(color.Operation, color.Red, color.Green, color.Blue);
+        if (colorFilter is not null)
+            paint.ColorFilter = colorFilter;
 
         bool anyFlip = frame.FlipHorizontal || frame.FlipVertical;
         if (anyFlip)

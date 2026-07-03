@@ -1,4 +1,5 @@
 using AnimationEditor.Core.ViewModels;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using Xunit;
 
@@ -83,6 +84,41 @@ public class TimelineStripSignatureTests
         var before = TimelineStripSignature.From(chain);
 
         (chain.Frames[0], chain.Frames[1]) = (chain.Frames[1], chain.Frames[0]);
+        var after = TimelineStripSignature.From(chain);
+
+        Assert.NotEqual(before, after);
+    }
+
+    [Fact]
+    public void From_FrameColorChanged_AreNotEqual()
+    {
+        // A color edit changes the tinted thumbnail even though width is unchanged, so the strip
+        // must rebuild — otherwise the cell would show the old color.
+        var chain = new AnimationChainSave { Name = "Run" };
+        var frame = Frame(0.1f);
+        chain.Frames.Add(frame);
+        var before = TimelineStripSignature.From(chain);
+
+        frame.ColorOperation = ColorOperation.Multiply;
+        frame.Red = 255; frame.Green = 0; frame.Blue = 0;
+        var after = TimelineStripSignature.From(chain);
+
+        Assert.NotEqual(before, after);
+    }
+
+    [Fact]
+    public void From_EarlierFrameColorChanged_ChangesDownstreamSignature()
+    {
+        // Sticky color: editing frame 0's color must change frame 1's effective color too, so the
+        // whole-strip signature differs and RefreshTimelineStrip rebuilds the downstream cell.
+        var chain = new AnimationChainSave { Name = "Run" };
+        var frame0 = Frame(0.1f);
+        chain.Frames.Add(frame0);
+        chain.Frames.Add(Frame(0.1f));   // frame 1 sets no color → inherits frame 0's
+        var before = TimelineStripSignature.From(chain);
+
+        frame0.ColorOperation = ColorOperation.Multiply;
+        frame0.Red = 128;
         var after = TimelineStripSignature.From(chain);
 
         Assert.NotEqual(before, after);

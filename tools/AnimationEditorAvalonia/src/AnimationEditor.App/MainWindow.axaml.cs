@@ -2740,10 +2740,13 @@ public partial class MainWindow : Window
                 continue;
 
             // The previous bitmap (if any) is cache-owned — drop the reference, don't dispose it.
+            // Tint by frame 0's effective color (nothing precedes it, so this is just its own set
+            // channels) so the tree icon renders the frame the same way the preview/timeline does.
             node.Thumbnail = source is null
                 ? null
                 : _thumbnailService.GetFrameThumbnail(
-                    chain.Frames[0], TreeChainThumbnailPixelSize, TreeChainThumbnailPixelSize);
+                    chain.Frames[0], EffectiveFrameColor.Resolve(chain.Frames, 0),
+                    TreeChainThumbnailPixelSize, TreeChainThumbnailPixelSize);
             node.ThumbnailSource = source;
         }
     }
@@ -2822,11 +2825,14 @@ public partial class MainWindow : Window
             _timelineFrames.Add(item);
         _timelineEffectivePps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
 
-        // Populate frame thumbnails (texture crop, no shapes)
+        // Populate frame thumbnails (texture crop tinted by the frame's effective color, no shapes).
+        // Resolve all effective colors in one O(n) pass here — on data change, never in the playback
+        // loop. Cells whose effective color is unchanged hit the ThumbnailService cache and skip re-render.
         if (chain is not null)
         {
+            var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
             for (int i = 0; i < chain.Frames.Count && i < _timelineFrames.Count; i++)
-                _timelineFrames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], 22, 18);
+                _timelineFrames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], colors[i], 22, 18);
         }
 
         // Cells were just recreated, so no frame is current until UpdateTimelineScrubber runs.

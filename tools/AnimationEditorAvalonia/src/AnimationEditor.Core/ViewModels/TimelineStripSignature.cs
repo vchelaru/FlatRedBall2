@@ -1,4 +1,5 @@
 using System;
+using AnimationEditor.Core.Rendering;
 using FlatRedBall2.Animation.Content;
 
 namespace AnimationEditor.Core.ViewModels;
@@ -30,11 +31,15 @@ public sealed class TimelineStripSignature : IEquatable<TimelineStripSignature>
         if (chain is null)
             return new TimelineStripSignature(null, Array.Empty<(float, ThumbnailSource)>());
 
+        // Resolve every frame's effective (sticky) color in one O(n) pass so a color edit on frame
+        // N shows up in the signature of frames N…(next frame that re-sets that channel) — that's how
+        // the strip knows to rebuild the downstream cells the edit re-tints, not just the edited one.
+        var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
         var frames = new (float, ThumbnailSource)[chain.Frames.Count];
         for (int i = 0; i < chain.Frames.Count; i++)
         {
             var frame = chain.Frames[i];
-            frames[i] = (frame.FrameLength, ThumbnailSource.FromFrame(frame));
+            frames[i] = (frame.FrameLength, ThumbnailSource.FromFrame(frame, colors[i]));
         }
         return new TimelineStripSignature(chain, frames);
     }

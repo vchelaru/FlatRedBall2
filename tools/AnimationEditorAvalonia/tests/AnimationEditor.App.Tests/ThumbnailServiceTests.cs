@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using Xunit;
@@ -50,7 +52,7 @@ public class ThumbnailServiceTests
         using var source = new SKBitmap(64, 64);
         source.Erase(SKColors.Red);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), 56, 56);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 56, 56);
 
         Assert.NotNull(thumb);
         Assert.Equal(56, thumb!.Width);
@@ -65,7 +67,7 @@ public class ThumbnailServiceTests
         using var source = SplitSheet(16, 8, SKColors.Red, SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(right: 0.5f), 56, 56);
+            source, Frame(right: 0.5f), default, 56, 56);
 
         Assert.NotNull(thumb);
         for (int y = 0; y < thumb!.Height; y++)
@@ -85,7 +87,7 @@ public class ThumbnailServiceTests
         // would smear a band of blended pixels across the middle.
         using var source = SplitSheet(2, 1, SKColors.Red, SKColors.Blue);
 
-        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), 40, 40);
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 40, 40);
 
         Assert.NotNull(thumb);
         for (int y = 0; y < thumb!.Height; y++)
@@ -108,7 +110,7 @@ public class ThumbnailServiceTests
         using var source = SplitSheet(16, 8, SKColors.Red, SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(flipH: true), 16, 8);
+            source, Frame(flipH: true), default, 16, 8);
 
         Assert.NotNull(thumb);
         // Leftmost pixel should be blue (was originally on the right).
@@ -119,6 +121,81 @@ public class ThumbnailServiceTests
         var rightPx = thumb.GetPixel(thumb.Width - 1, 4);
         Assert.True(rightPx.Red > rightPx.Blue,
             $"Right edge pixel {rightPx} should be red after horizontal flip.");
+    }
+
+    // -- Effective-color tint tests (Issue #528) ------------------------------
+    //
+    // RenderFrameThumbnail applies the frame's effective (sticky) color/alpha via the same
+    // FrameColorFilter + FramePreviewOpacity the preview panel uses, so a timeline/tree cell
+    // renders a tinted frame identically to the preview.
+
+    [Fact]
+    public void RenderFrameThumbnail_MultiplyColor_TintsTheCrop()
+    {
+        // A white source multiplied by (0,0,255) must come back pure blue — red/green zeroed out.
+        using var source = new SKBitmap(8, 8);
+        source.Erase(SKColors.White);
+        var blue = new ResolvedFrameColor(0, 0, 255, null, ColorOperation.Multiply);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), blue, 8, 8);
+
+        Assert.NotNull(thumb);
+        var p = thumb!.GetPixel(4, 4);
+        Assert.True(p.Blue > 200 && p.Red < 55 && p.Green < 55,
+            $"Center pixel {p} — a Multiply-blue tint should zero red/green and keep blue.");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_EffectiveAlpha_ReducesOpacity()
+    {
+        // An opaque source drawn at effective alpha 64 must come back semi-transparent, matching
+        // FramePreviewOpacity's reference interpretation.
+        using var source = new SKBitmap(8, 8);
+        source.Erase(SKColors.White);
+        var faded = new ResolvedFrameColor(null, null, null, 64, null);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), faded, 8, 8);
+
+        Assert.NotNull(thumb);
+        var p = thumb!.GetPixel(4, 4);
+        Assert.True(p.Alpha is > 20 and < 128,
+            $"Center pixel alpha {p.Alpha} — effective alpha 64 should render roughly 64, not opaque.");
+    }
+
+    [AvaloniaFact]
+    public void GetFrameThumbnail_DifferentEffectiveColor_ProducesDifferentCachedInstance()
+    {
+        // The cache key must include the effective color: two calls for the same crop but different
+        // tints must not collide on one cached bitmap (that would show a stale/wrong color).
+        var svc   = MakeSvc();
+        var path  = WriteTempPng(8, 8);
+        var frame = Frame();
+        frame.TextureName = path;
+
+        var plain = svc.GetFrameThumbnail(frame, default, 56, 56);
+        var tinted = svc.GetFrameThumbnail(
+            frame, new ResolvedFrameColor(255, 0, 0, null, ColorOperation.Multiply), 56, 56);
+
+        Assert.NotNull(plain);
+        Assert.NotNull(tinted);
+        Assert.NotSame(plain, tinted);
+    }
+
+    [AvaloniaFact]
+    public void GetFrameThumbnail_SameEffectiveColor_ReturnsSameCachedInstance()
+    {
+        // A tinted thumbnail must be rendered once and reused (no per-playback-frame re-render).
+        var svc   = MakeSvc();
+        var path  = WriteTempPng(8, 8);
+        var frame = Frame();
+        frame.TextureName = path;
+        var color = new ResolvedFrameColor(255, 0, 0, null, ColorOperation.Multiply);
+
+        var first  = svc.GetFrameThumbnail(frame, color, 56, 56);
+        var second = svc.GetFrameThumbnail(frame, color, 56, 56);
+
+        Assert.NotNull(first);
+        Assert.Same(first, second);
     }
 
     // -- Finished-thumbnail cache tests (Issue #474) --------------------------
@@ -152,9 +229,9 @@ public class ThumbnailServiceTests
         var frame = Frame();
         frame.TextureName = path;
 
-        var first = svc.GetFrameThumbnail(frame, 56, 56);
+        var first = svc.GetFrameThumbnail(frame, default, 56, 56);
         svc.InvalidatePath(path);
-        var afterInvalidate = svc.GetFrameThumbnail(frame, 56, 56);
+        var afterInvalidate = svc.GetFrameThumbnail(frame, default, 56, 56);
 
         Assert.NotNull(first);
         Assert.NotNull(afterInvalidate);
@@ -170,8 +247,8 @@ public class ThumbnailServiceTests
         var frame = Frame();
         frame.TextureName = path;
 
-        var first  = svc.GetFrameThumbnail(frame, 56, 56);
-        var second = svc.GetFrameThumbnail(frame, 56, 56);
+        var first  = svc.GetFrameThumbnail(frame, default, 56, 56);
+        var second = svc.GetFrameThumbnail(frame, default, 56, 56);
 
         Assert.NotNull(first);
         // Second call must hit the finished-thumbnail cache, not crop+wrap a fresh bitmap.
@@ -188,7 +265,7 @@ public class ThumbnailServiceTests
         var frame = Frame();
         frame.TextureName = path;
 
-        var thumb = svc.GetFrameThumbnail(frame, 56, 56);
+        var thumb = svc.GetFrameThumbnail(frame, default, 56, 56);
 
         Assert.NotNull(thumb);
         Assert.Equal(56, thumb!.PixelSize.Width);
@@ -351,7 +428,7 @@ public class ThumbnailServiceTests
                 source.SetPixel(x, y, y < 8 ? SKColors.Red : SKColors.Blue);
 
         using var thumb = ThumbnailService.RenderFrameThumbnail(
-            source, Frame(flipV: true), 8, 16);
+            source, Frame(flipV: true), default, 8, 16);
 
         Assert.NotNull(thumb);
         // Top pixel should be blue (was originally at the bottom).
