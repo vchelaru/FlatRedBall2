@@ -14,13 +14,14 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Issue #261: the chain ("animation") icon in the TreeView — the first-frame preview
-/// thumbnail, or the generic chain glyph when a chain has no frames — should be enlarged
-/// to fill the empty space in the 32px row. Frame and shape icons are deliberately left
-/// at the compact 14px size, and no row may grow taller.
+/// thumbnail, or the generic chain glyph when a chain has no frames — is enlarged past the
+/// compact 14px glyph size. Frame and shape icons deliberately stay at 14px. Rows hug their
+/// content, so the chain row is as tall as its enlarged icon while frame/shape rows stay
+/// compact — the enlarged chain icon must not inflate the other rows.
 /// </summary>
 public class TreeNodeIconSizeTests
 {
-    /// <summary>Avalonia Fluent's <c>TreeViewItemMinHeight</c> — the row height we must not exceed.</summary>
+    /// <summary>The legacy Fluent <c>TreeViewItemMinHeight</c> (32px); the chain icon must still fit within it.</summary>
     private const double RowHeight = 32;
 
     /// <summary>The compact icon size frame and shape glyphs keep (unchanged by #261).</summary>
@@ -137,16 +138,35 @@ public class TreeNodeIconSizeTests
         var window = CreateWindowWithFullTree();
         try
         {
-            var tree = window.FindControl<TreeView>("AnimTree")!;
-
-            // The tree has exactly 4 rows: chain → frame → (rect, circle). The root chain
-            // TreeViewItem's Bounds span the whole subtree. Every row has a 32px MinHeight,
-            // so if the total is exactly 4×32 then no individual header grew with the icon.
-            var rootItem = tree.GetVisualDescendants()
+            var items = window.FindControl<TreeView>("AnimTree")!
+                .GetVisualDescendants()
                 .OfType<TreeViewItem>()
-                .Single(tvi => tvi.DataContext is TreeNodeVm { IsChainNode: true });
+                .ToList();
 
-            Assert.Equal(RowHeight * 4, rootItem.Bounds.Height);
+            // Rows now hug their content (the Fluent 32px min-height was removed), so each row
+            // is as tall as its own icon/text. The chain row is driven by the enlarged chain
+            // icon; the regression to guard is that the enlarged icon must NOT leak its height
+            // into the compact (14px-icon) frame and shape rows.
+            //
+            // The tree is chain → frame → (rect, circle). A leaf item's Bounds is its own row;
+            // a parent's Bounds spans its subtree, so a parent row's height is the parent minus
+            // its children's subtrees.
+            var chainItem = items.Single(i => i.DataContext is TreeNodeVm { IsChainNode: true });
+            var frameItem = items.Single(i => i.DataContext is TreeNodeVm { IsFrameNode: true });
+            var shapeLeaf = items.First(i => i.DataContext is TreeNodeVm { IsRectNode: true }
+                                          or TreeNodeVm { IsCircleNode: true });
+
+            double chainRowHeight  = chainItem.Bounds.Height - frameItem.Bounds.Height;
+            double chainIconHeight = IconSvg(window, "IconChain.svg").Height;
+
+            // Chain row is driven by its enlarged icon — as tall as the icon plus only a couple
+            // px of text padding, not inflated further.
+            Assert.InRange(chainRowHeight, chainIconHeight, chainIconHeight + 4);
+            // Shape rows stay compact — strictly shorter than the chain row, i.e. the enlarged
+            // chain icon did not make them taller.
+            Assert.True(shapeLeaf.Bounds.Height < chainRowHeight,
+                $"Shape row height {shapeLeaf.Bounds.Height} should stay shorter than the " +
+                $"{chainRowHeight}px chain row; the enlarged chain icon must not inflate other rows.");
         }
         finally { window.Close(); }
     }
