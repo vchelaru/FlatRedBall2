@@ -33,6 +33,16 @@ public class PreviewControl : Control
     private readonly DispatcherTimer _timer;
     private readonly AnimationEditor.Core.CommandsAndState.PlaybackController _playback = new();
 
+    // Measures real wall-clock time between timer ticks so playback advances by true
+    // elapsed time, not the timer's nominal interval (a DispatcherTimer fires later than
+    // its Interval, which otherwise makes the animation run slow — see #526).
+    private readonly AnimationEditor.Core.CommandsAndState.TickClock _clock =
+        new(System.Diagnostics.Stopwatch.GetTimestamp, System.Diagnostics.Stopwatch.Frequency);
+
+    // A stall (window drag, GC pause) shouldn't fast-forward playback by the whole frozen
+    // span; cap a single tick's advance so one bad frame doesn't jump the animation.
+    private const double MaxTickSeconds = 0.25;
+
     // -- Camera ----------------------------------------------------------------
     private float _zoom = 1f;
     private float _panX, _panY;
@@ -397,9 +407,13 @@ public class PreviewControl : Control
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
+        // Tick every time so the baseline stays current even while paused/pinned; this keeps
+        // a resume from crediting the whole paused span as one huge delta.
+        double delta = _clock.Tick();
+
         // Only advance when the whole chain is playing (no specific frame pinned)
         if (_selectedState!.SelectedFrame is not null) return;
-        _playback.Advance(0.016);
+        _playback.Advance(Math.Min(delta, MaxTickSeconds));
     }
 
     // -- State reset -----------------------------------------------------------
