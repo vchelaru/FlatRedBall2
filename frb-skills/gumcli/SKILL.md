@@ -5,6 +5,8 @@ description: "Gum CLI tool for FlatRedBall2. Trigger at game/sample START — be
 
 # Gum CLI Setup
 
+> **This skill is the mechanical setup only.** `gumcli` scaffolds the project and flat named controls; the user owns visual layout and composition in the Gum editor afterward — see the `content-boundary` skill for that AI/human split.
+
 **Ask the Gum mode question at game-start time** — before any code is written, not when Gum UI is about to be implemented. This affects project structure and cannot be changed easily mid-build.
 
 When starting any new game or sample, ask:

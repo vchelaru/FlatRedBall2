@@ -2,6 +2,7 @@ using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
@@ -452,14 +453,14 @@ public class GridRenderTests
     }
 
     /// <summary>
-    /// A frame whose pixel bounds are not aligned to the grid should have its
-    /// <em>displayed</em> bounds snapped to the nearest grid line when grid mode
-    /// is active.  The underlying UV coordinates must remain unchanged — the snap
-    /// is display-only so the wireframe gives visual grid alignment feedback
-    /// without destructively modifying animation data.
+    /// Issue #538: turning the grid on must never alter how an existing frame is
+    /// displayed. Grid only affects active drags in the editor — it must not snap
+    /// or resize a frame's displayed bounds just because it is on. A small,
+    /// off-grid frame must render at its true UV pixel bounds, not ballooned to a
+    /// grid cell.
     /// </summary>
     [AvaloniaFact]
-    public void GridEnabled_NonAlignedFrameBounds_DisplayBoundsSnapToNearestGridLine()
+    public void GridEnabled_SmallOffGridFrame_DisplayBoundsMatchRawUVAndPreserveSize()
     {
         var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -471,11 +472,12 @@ public class GridRenderTests
         var frame = new AnimationFrameSave
         {
             TextureName      = System.IO.Path.GetFileName(png),
-            // Bounds in pixels: left=13, top=23, right=47, bottom=58 — none on the 10px grid.
+            // A tiny 4×4 frame at (13,23) — the issue #538 repro shape. None of the
+            // edges land on the 10px grid, so a display-snap would balloon it to a cell.
             LeftCoordinate   = 13f / 100f,
             TopCoordinate    = 23f / 100f,
-            RightCoordinate  = 47f / 100f,
-            BottomCoordinate = 58f / 100f,
+            RightCoordinate  = 17f / 100f,
+            BottomCoordinate = 27f / 100f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -497,17 +499,68 @@ public class GridRenderTests
             Assert.Single(rects);
             var bounds = rects[0].Bounds;
 
-            // Display bounds snapped to 10-pixel grid for visual feedback.
-            Assert.Equal(0, (int)bounds.Left   % 10);
-            Assert.Equal(0, (int)bounds.Top    % 10);
-            Assert.Equal(0, (int)bounds.Right  % 10);
-            Assert.Equal(0, (int)bounds.Bottom % 10);
+            // Display bounds equal raw UV pixels — no snapping, no resizing.
+            Assert.Equal(13f, bounds.Left,   precision: 2);
+            Assert.Equal(23f, bounds.Top,    precision: 2);
+            Assert.Equal(17f, bounds.Right,  precision: 2);
+            Assert.Equal(27f, bounds.Bottom, precision: 2);
+            // Size stays 4×4 — grid never resizes an existing frame.
+            Assert.Equal(4f, bounds.Right  - bounds.Left, precision: 2);
+            Assert.Equal(4f, bounds.Bottom - bounds.Top,  precision: 2);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 
-            // UV data on the frame itself must NOT be snapped.
-            Assert.Equal(13f / 100f, frame.LeftCoordinate);
-            Assert.Equal(23f / 100f, frame.TopCoordinate);
-            Assert.Equal(47f / 100f, frame.RightCoordinate);
-            Assert.Equal(58f / 100f, frame.BottomCoordinate);
+    /// <summary>
+    /// Bug from issue #538 discussion: changing a frame's coordinates through a
+    /// means other than a visual drag (e.g. typing a new Y in the property panel,
+    /// which calls <see cref="WireframeControl.RefreshFrames"/>) must not snap the
+    /// displayed bounds to the grid. The wireframe must reflect the exact value the
+    /// user typed while grid is on.
+    /// </summary>
+    [AvaloniaFact]
+    public void RefreshFrames_GridEnabled_CoordinateChange_DisplayBoundsMatchRawUV()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
+
+        var chain = new AnimationChainSave { Name = "C" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            LeftCoordinate   = 10f / 100f,
+            TopCoordinate    = 20f / 100f,
+            RightCoordinate  = 30f / 100f,
+            BottomCoordinate = 40f / 100f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);
+
+        try
+        {
+            ctrl.SetGrid(true, 10);
+
+            // Simulate the property-panel edit: user types Y = 23 (off-grid).
+            frame.TopCoordinate    = 23f / 100f;
+            frame.BottomCoordinate = 43f / 100f;
+            ctrl.RefreshFrames();
+
+            var bounds = ctrl.GetFrameRects()[0].Bounds;
+
+            // Display must show the typed value, not a grid-snapped one.
+            Assert.Equal(23f, bounds.Top,    precision: 2);
+            Assert.Equal(43f, bounds.Bottom, precision: 2);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -616,11 +669,11 @@ public class GridRenderTests
     // ── Double-click: ApplyRegionToSelectedFrame ──────────────────────────────
 
     /// <summary>
-    /// Helper: loads a 64×64 texture, creates a single full-sheet frame (UV 0→1),
-    /// selects it, and returns both the control and the frame.
+    /// Helper: loads a 64×64 texture, creates a single frame of the given pixel size
+    /// at pixel origin (frameX, frameY), selects it, and returns the control and frame.
     /// </summary>
     private static (WireframeControl ctrl, AnimationFrameSave frame, string dir)
-        BuildCtrlWithFullSheetFrame(TestServices ctx)
+        BuildCtrlWithFrame(TestServices ctx, int frameX, int frameY, int frameW, int frameH)
     {
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(dir);
@@ -630,10 +683,10 @@ public class GridRenderTests
         var frame = new AnimationFrameSave
         {
             TextureName      = System.IO.Path.GetFileName(png),
-            LeftCoordinate   = 0f,
-            TopCoordinate    = 0f,
-            RightCoordinate  = 1f,
-            BottomCoordinate = 1f,
+            LeftCoordinate   = frameX / 64f,
+            TopCoordinate    = frameY / 64f,
+            RightCoordinate  = (frameX + frameW) / 64f,
+            BottomCoordinate = (frameY + frameH) / 64f,
         };
         chain.Frames.Add(frame);
         ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
@@ -649,49 +702,53 @@ public class GridRenderTests
     }
 
     /// <summary>
-    /// Double-clicking at screen (20, 20) with cellSize=16, pan=(0,0), zoom=1 on a full-sheet
-    /// frame should update that frame's UV coordinates to the cell (16,16)→(32,32) (i.e. 0.25–0.5
-    /// on a 64×64 texture).
+    /// Issue #538: grid double-click relocates the frame's origin to the clicked
+    /// grid cell but must preserve its existing size. A 4×4 frame double-clicked at
+    /// screen (20,20) with cellSize=16 snaps its origin to (16,16) and stays 4×4 →
+    /// bounds (16,16,20,20), never (16,16,32,32).
     /// </summary>
     [AvaloniaFact]
-    public void GridSnapDoubleClick_WithFullSheetFrame_UpdatesFrameUVToClickedCell()
+    public void GridSnapDoubleClick_SmallFrame_SnapsOriginAndPreservesSize()
     {
         var ctx = ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        // 4×4 frame at pixel (5,5).
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
         try
         {
             ctrl.SetGrid(true, 16);
 
             ctrl.SimulateGridSnapDoubleClick(20f, 20f);
 
-            // Screen (20,20) → texture (20,20) → snap to 16 → cell (16,16,32,32) on 64×64
+            // Origin snaps to (16,16); size stays 4×4 → (16,16,20,20) on 64×64.
             Assert.Equal(16f / 64f, frame.LeftCoordinate,   precision: 5);
             Assert.Equal(16f / 64f, frame.TopCoordinate,    precision: 5);
-            Assert.Equal(32f / 64f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(32f / 64f, frame.BottomCoordinate, precision: 5);
+            Assert.Equal(20f / 64f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(20f / 64f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
     /// <summary>
-    /// Verifies the grid-snap math: clicking at (0, 0) should map to the top-left cell (0,0,16,16).
+    /// Verifies the grid-snap math preserves size at the top-left cell: a 4×4 frame
+    /// double-clicked at (5,5) snaps its origin to (0,0) and stays 4×4 → (0,0,4,4).
     /// </summary>
     [AvaloniaFact]
-    public void GridSnapDoubleClick_SnapsToCorrectGridCell()
+    public void GridSnapDoubleClick_SnapsOriginToGridCell_PreservesSize()
     {
         var ctx = ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        // 4×4 frame at pixel (13,23) — deliberately off-grid.
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 13, frameY: 23, frameW: 4, frameH: 4);
         try
         {
             ctrl.SetGrid(true, 16);
 
             ctrl.SimulateGridSnapDoubleClick(5f, 5f);
 
-            // (5,5) snaps to (0,0,16,16) on 64×64 texture
-            Assert.Equal(0f,        frame.LeftCoordinate,   precision: 5);
-            Assert.Equal(0f,        frame.TopCoordinate,    precision: 5);
-            Assert.Equal(16f / 64f, frame.RightCoordinate,  precision: 5);
-            Assert.Equal(16f / 64f, frame.BottomCoordinate, precision: 5);
+            // (5,5) snaps origin to (0,0); size stays 4×4 → (0,0,4,4) on 64×64.
+            Assert.Equal(0f,       frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(0f,       frame.TopCoordinate,    precision: 5);
+            Assert.Equal(4f / 64f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(4f / 64f, frame.BottomCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
@@ -703,7 +760,7 @@ public class GridRenderTests
     public void GridSnapDoubleClick_GridDisabled_IsNoOp()
     {
         var ctx = ResetSingletons();
-        var (ctrl, frame, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 0, frameY: 0, frameW: 64, frameH: 64);
         try
         {
             ctrl.SetGrid(false, 16);
@@ -726,7 +783,7 @@ public class GridRenderTests
     public void GridSnapDoubleClick_NoSelectedFrame_IsNoOp()
     {
         var ctx = ResetSingletons();
-        var (ctrl, _, dir) = BuildCtrlWithFullSheetFrame(ctx);
+        var (ctrl, _, dir) = BuildCtrlWithFrame(ctx, frameX: 0, frameY: 0, frameW: 64, frameH: 64);
         try
         {
             ctx.SelectedState.SelectedFrame = null;
@@ -735,6 +792,111 @@ public class GridRenderTests
             // Must not throw
             var ex = Record.Exception(() => ctrl.SimulateGridSnapDoubleClick(20f, 20f));
             Assert.Null(ex);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    // ── Resize: dragging a size handle must not snap position ──────────────────
+
+    /// <summary>
+    /// Resizing a frame with the grid on must snap only the dragged edges — the
+    /// opposite (position) edges must stay exactly where they were, even if they
+    /// are off-grid. Regression guard: before the display-snap removal the drag
+    /// started from the grid-snapped display rect, so resizing also yanked the
+    /// frame's position to the grid.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateHandleDrag_ResizeWithGridOn_PreservesOffGridPositionEdges()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
+
+        var chain = new AnimationChainSave { Name = "C" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            // Off-grid origin at (13,23); 4×4 → bottom-right at (17,27).
+            LeftCoordinate   = 13f / 100f,
+            TopCoordinate    = 23f / 100f,
+            RightCoordinate  = 17f / 100f,
+            BottomCoordinate = 27f / 100f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);
+
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            // Drag the bottom-right handle from (17,27) to (44,44): right/bottom snap
+            // to 48 (nearest 16); left/top must remain the off-grid 13/23.
+            ctrl.SimulateHandleDrag(HandleKind.BotRight, 17f, 27f, 44f, 44f);
+
+            Assert.Equal(13f / 100f, frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(23f / 100f, frame.TopCoordinate,    precision: 5);
+            Assert.Equal(48f / 100f, frame.RightCoordinate,  precision: 5);
+            Assert.Equal(48f / 100f, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Dragging the right handle left past an off-grid left edge with grid on must
+    /// not invert the frame (Right &lt; Left, handles rendering on the inside). The
+    /// right edge stays clamped to the left edge; the frame never flips.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateHandleDrag_ResizeRightEdgePastOffGridLeftWithGridOn_DoesNotInvert()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var png = WriteSolidPng(dir, SKColors.Black, 100, 100);
+
+        var chain = new AnimationChainSave { Name = "C" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName      = System.IO.Path.GetFileName(png),
+            // Off-grid X and width: left=21, right=45 (width 24).
+            LeftCoordinate   = 21f / 100f,
+            TopCoordinate    = 21f / 100f,
+            RightCoordinate  = 45f / 100f,
+            BottomCoordinate = 45f / 100f,
+        };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        var ctrl = ctx.CreateWireframeControl();
+        ctrl.LoadTexture(png);
+        ctrl.SetCamera(0, 0, 1);
+
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            // Grab the right edge at x=45 and drag far left to x=5 (past left=21).
+            ctrl.SimulateHandleDrag(HandleKind.MidRight, 45f, 33f, 5f, 33f);
+
+            // Frame must stay non-inverted; left edge stays put at 21.
+            Assert.True(frame.RightCoordinate > frame.LeftCoordinate,
+                $"Frame inverted: Left={frame.LeftCoordinate}, Right={frame.RightCoordinate}");
+            Assert.Equal(21f / 100f, frame.LeftCoordinate, precision: 5);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }

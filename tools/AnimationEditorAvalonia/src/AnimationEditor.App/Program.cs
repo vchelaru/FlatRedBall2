@@ -37,6 +37,10 @@ class Program
         // (inside UsePlatformDetect). The Dock caches the process name at that point;
         // calling setProcessName: afterwards has no visible effect on the Dock label.
         MacOSDockIcon.SetProcessName("Animation Editor");
+
+        // Give the process a stable Windows shell identity before any window is created, so
+        // the (unpinned) taskbar button can resolve the exe's icon instead of a blank default.
+        WindowsTaskbarIdentity.Set();
         App.SingleInstance = singleInstance;
         try
         {

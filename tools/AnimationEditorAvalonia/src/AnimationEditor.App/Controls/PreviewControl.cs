@@ -36,7 +36,8 @@ public class PreviewControl : Control
     // Measures real wall-clock time between timer ticks so playback advances by true
     // elapsed time, not the timer's nominal interval (a DispatcherTimer fires later than
     // its Interval, which otherwise makes the animation run slow — see #526).
-    private readonly AnimationEditor.Core.CommandsAndState.TickClock _clock =
+    // Not readonly: tests swap in a controllable clock via SetPlaybackClock for determinism.
+    private AnimationEditor.Core.CommandsAndState.TickClock _clock =
         new(System.Diagnostics.Stopwatch.GetTimestamp, System.Diagnostics.Stopwatch.Frequency);
 
     // A stall (window drag, GC pause) shouldn't fast-forward playback by the whole frozen
@@ -117,6 +118,25 @@ public class PreviewControl : Control
     // Neutral canvas/ruler colors for the active theme variant. Refreshed from
     // ActualThemeVariant on every render and whenever the variant changes.
     private CanvasPalette _palette = CanvasPalette.Dark;
+
+    private uint? _canvasBackgroundOverride;
+
+    /// <summary>
+    /// Optional user-chosen canvas background as a packed <c>0xAARRGGBB</c> value; <c>null</c>
+    /// follows the theme. Setting it re-resolves the palette and repaints. Chrome (rulers, guides)
+    /// stays theme-driven.
+    /// </summary>
+    public uint? CanvasBackgroundOverride
+    {
+        get => _canvasBackgroundOverride;
+        set
+        {
+            if (_canvasBackgroundOverride == value) return;
+            _canvasBackgroundOverride = value;
+            UpdatePalette();
+            InvalidateVisual();
+        }
+    }
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
@@ -205,7 +225,7 @@ public class PreviewControl : Control
         if (_selectedState!.SelectedFrame is not null)
             _selectedState!.SelectedFrame = null;
         _playback.Play();
-        _timer.Start();
+        StartAutoTimer();
         InvalidateVisual();
     }
 
@@ -269,8 +289,27 @@ public class PreviewControl : Control
     public void ResumeAutoPlayback()
     {
         _playback.Play();
+        StartAutoTimer();
+    }
+
+    /// <summary>
+    /// (Re)starts the playback timer, first resetting the tick clock so the span during
+    /// which the timer was stopped is not credited as one huge delta on the first tick.
+    /// Without this, resuming after <see cref="PauseAutoPlayback"/> (which stops the timer,
+    /// letting the clock baseline go stale) fast-forwards the playhead by up to
+    /// <see cref="MaxTickSeconds"/> on the next tick — jumping a frame nondeterministically.
+    /// </summary>
+    private void StartAutoTimer()
+    {
+        _clock.Reset();
         _timer.Start();
     }
+
+    /// <summary>
+    /// Test hook: replaces the wall-clock tick source with a controllable one so playback
+    /// advancement is fully deterministic under test (no dependency on real elapsed time).
+    /// </summary>
+    internal void SetPlaybackClock(TickClock clock) => _clock = clock;
 
     /// <summary>
     /// Renders the current preview state to an off-screen bitmap of the given size.
@@ -928,7 +967,8 @@ public class PreviewControl : Control
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
     // "is it Light?" check correctly handles the follow-system case.
-    private void UpdatePalette() => _palette = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light);
+    private void UpdatePalette() =>
+        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride);
 
     // -- Guide helpers ---------------------------------------------------------
 
