@@ -45,13 +45,33 @@ public static class DragHandleApplier
         if (handle == HandleKind.Move)
             return nb;
 
-        // Resize: enforce minimum 1-pixel size; frame may extend outside bitmap.
-        float l  = Math.Min(nb.Left,   nb.Right  - 1f);
-        float t  = Math.Min(nb.Top,    nb.Bottom - 1f);
-        float r  = Math.Max(nb.Right,  nb.Left   + 1f);
-        float bm = Math.Max(nb.Bottom, nb.Top    + 1f);
+        // Resize: enforce a 1-pixel minimum by clamping the dragged edge against the
+        // fixed opposite edge; frame may extend outside bitmap.
+        return ClampDraggedEdgesMinSize(nb, handle);
+    }
 
-        return new(l, t, r, bm);
+    /// <summary>Which of the four edges a resize handle moves (false for all with Move/None).</summary>
+    private static (bool Left, bool Right, bool Top, bool Bottom) DraggedEdges(HandleKind handle) => (
+        handle is HandleKind.TopLeft  or HandleKind.MidLeft   or HandleKind.BotLeft,
+        handle is HandleKind.TopRight or HandleKind.MidRight  or HandleKind.BotRight,
+        handle is HandleKind.TopLeft  or HandleKind.TopCenter or HandleKind.TopRight,
+        handle is HandleKind.BotLeft  or HandleKind.BotCenter or HandleKind.BotRight);
+
+    /// <summary>
+    /// Clamps each dragged edge so it stays at least 1 pixel from the fixed opposite
+    /// edge, keeping the fixed edge anchored. Dragging (or snapping) an edge past the
+    /// far side collapses the frame to 1 pixel instead of moving the fixed edge — which
+    /// would slide the frame sideways and/or invert it (handles rendering on the inside).
+    /// </summary>
+    private static BoundsRect ClampDraggedEdgesMinSize(BoundsRect b, HandleKind handle)
+    {
+        var (dl, dr, dt, db) = DraggedEdges(handle);
+        float l = b.Left, t = b.Top, r = b.Right, bm = b.Bottom;
+        if (dl) l  = MathF.Min(l,  r  - 1f);
+        if (dr) r  = MathF.Max(r,  l  + 1f);
+        if (dt) t  = MathF.Min(t,  bm - 1f);
+        if (db) bm = MathF.Max(bm, t  + 1f);
+        return new BoundsRect(l, t, r, bm);
     }
 
     /// <summary>
@@ -63,6 +83,10 @@ public static class DragHandleApplier
     /// <remarks>
     /// For <see cref="HandleKind.Move"/> the top-left corner is snapped and the
     /// original width/height is preserved so the frame does not drift in size.
+    /// For resize handles a snapped edge is clamped so it never crosses the fixed
+    /// opposite edge (minimum 1 pixel, matching <see cref="Apply"/>): otherwise,
+    /// when the fixed edge is off-grid, snapping the dragged edge could land it past
+    /// the fixed edge and invert the frame.
     /// </remarks>
     public static BoundsRect SnapEdges(BoundsRect bounds, HandleKind handle, int snapSize)
     {
@@ -71,21 +95,20 @@ public static class DragHandleApplier
         float Snap(float v) => MathF.Round(v / snapSize) * snapSize;
 
         float l = bounds.Left, t = bounds.Top, r = bounds.Right, b = bounds.Bottom;
-        return handle switch
-        {
-            HandleKind.Move =>
-                // Preserve size; snap top-left corner only.
-                new BoundsRect(Snap(l), Snap(t), Snap(l) + (r - l), Snap(t) + (b - t)),
-            HandleKind.TopLeft   => new BoundsRect(Snap(l), Snap(t), r, b),
-            HandleKind.TopCenter => new BoundsRect(l, Snap(t), r, b),
-            HandleKind.TopRight  => new BoundsRect(l, Snap(t), Snap(r), b),
-            HandleKind.MidLeft   => new BoundsRect(Snap(l), t, r, b),
-            HandleKind.MidRight  => new BoundsRect(l, t, Snap(r), b),
-            HandleKind.BotLeft   => new BoundsRect(Snap(l), t, r, Snap(b)),
-            HandleKind.BotCenter => new BoundsRect(l, t, r, Snap(b)),
-            HandleKind.BotRight  => new BoundsRect(l, t, Snap(r), Snap(b)),
-            _                    => bounds,
-        };
+
+        if (handle == HandleKind.Move)
+            // Preserve size; snap top-left corner only.
+            return new BoundsRect(Snap(l), Snap(t), Snap(l) + (r - l), Snap(t) + (b - t));
+
+        var (dl, dr, dt, db) = DraggedEdges(handle);
+        if (dl) l = Snap(l);
+        if (dr) r = Snap(r);
+        if (dt) t = Snap(t);
+        if (db) b = Snap(b);
+
+        // A snap can land the dragged edge past the (possibly off-grid) fixed edge —
+        // clamp it so the frame collapses to 1px instead of inverting.
+        return ClampDraggedEdgesMinSize(new BoundsRect(l, t, r, b), handle);
     }
 
     /// <summary>

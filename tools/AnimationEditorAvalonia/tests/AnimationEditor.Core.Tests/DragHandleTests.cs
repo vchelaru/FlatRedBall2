@@ -374,6 +374,43 @@ public class DragHandleApplierTests
         Assert.Equal(input, DragHandleApplier.SnapEdges(input, HandleKind.Move, -1));
     }
 
+    // ── SnapEdges – dragged edge must not cross the fixed opposite edge ────────
+    //
+    // When the fixed edge is off-grid, snapping the dragged edge to a grid line
+    // can land it past the fixed edge and invert the rect (right < left) — the
+    // handles then render on the inside. The dragged edge must stay clamped to the
+    // fixed edge (min 1px), matching Apply's minimum-size behaviour.
+
+    [Fact]
+    public void SnapEdges_MidRightSnappedPastOffGridLeftEdge_ClampsRightToLeftPlusOne()
+    {
+        // Left=20 is off the 16px grid. Right=22 snaps to 16 (< 20) → would invert.
+        var input = new BoundsRect(20f, 0f, 22f, 10f);
+        var result = DragHandleApplier.SnapEdges(input, HandleKind.MidRight, 16);
+        Assert.Equal(20f, result.Left);   // fixed edge unchanged
+        Assert.Equal(21f, result.Right);  // clamped to Left+1, not snapped below Left
+    }
+
+    [Fact]
+    public void SnapEdges_MidLeftSnappedPastOffGridRightEdge_ClampsLeftToRightMinusOne()
+    {
+        // Right=12 is off-grid. Left=10 snaps to 16 (> 12) → would invert.
+        var input = new BoundsRect(10f, 0f, 12f, 10f);
+        var result = DragHandleApplier.SnapEdges(input, HandleKind.MidLeft, 16);
+        Assert.Equal(11f, result.Left);   // clamped to Right-1
+        Assert.Equal(12f, result.Right);  // fixed edge unchanged
+    }
+
+    [Fact]
+    public void SnapEdges_BotCenterSnappedPastOffGridTopEdge_ClampsBottomToTopPlusOne()
+    {
+        // Top=20 is off-grid. Bottom=22 snaps to 16 (< 20) → would invert.
+        var input = new BoundsRect(0f, 20f, 10f, 22f);
+        var result = DragHandleApplier.SnapEdges(input, HandleKind.BotCenter, 16);
+        Assert.Equal(20f, result.Top);     // fixed edge unchanged
+        Assert.Equal(21f, result.Bottom);  // clamped to Top+1
+    }
+
     // ── Move handle boundary clamping bug ─────────────────────────────────────
     //
     // BUG: when a Move drag carries the entire frame past the right or left

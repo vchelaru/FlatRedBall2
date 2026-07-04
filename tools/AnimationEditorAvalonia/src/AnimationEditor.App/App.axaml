@@ -156,6 +156,10 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- ColorView/ColorPicker (Avalonia.Controls.ColorPicker) ships its control templates
+             in a separate theme dictionary; without this include the controls have no template
+             and render at zero size. Must match the FluentTheme above. -->
+        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
         <!-- Compact buttons: override FluentTheme MinHeight so small +/- buttons aren't stretched -->
         <Style Selector="Button.compact">
             <Setter Property="MinHeight" Value="0"/>

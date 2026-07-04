@@ -129,6 +129,26 @@ public class AppSettingsModelTests
     }
 
     [Fact]
+    public void CanvasBackgroundArgb_DefaultsToNull()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.Null(model.CanvasBackgroundArgb);
+    }
+
+    [Fact]
+    public void CanvasBackgroundArgb_SurvivesJsonRoundTrip()
+    {
+        // Packed 0xAARRGGBB — opaque dark slate.
+        var model = new AppSettingsModel { CanvasBackgroundArgb = 0xFF102030 };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.Equal(0xFF102030u, restored!.CanvasBackgroundArgb);
+    }
+
+    [Fact]
     public void SuppressDefaultHandlerPrompt_DefaultsToFalse()
     {
         var model = new AppSettingsModel();

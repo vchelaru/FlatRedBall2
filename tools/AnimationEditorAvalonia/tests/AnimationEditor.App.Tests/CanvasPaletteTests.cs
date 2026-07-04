@@ -41,6 +41,42 @@ public class CanvasPaletteTests
     }
 
     [Fact]
+    public void Resolve_NullOverride_UsesThemeBackground()
+    {
+        var expected = CanvasPalette.For(isDark: true).Background;
+
+        Assert.Equal(expected, CanvasPalette.Resolve(isDark: true, overrideArgb: null).Background);
+    }
+
+    [Fact]
+    public void Resolve_WithOverride_UsesOverrideBackgroundAndKeepsChrome()
+    {
+        // Opaque steel blue as a packed 0xAARRGGBB value.
+        uint argb = 0xFF4080C0;
+        var themed = CanvasPalette.For(isDark: true);
+
+        var result = CanvasPalette.Resolve(isDark: true, overrideArgb: argb);
+
+        Assert.Equal(new SKColor(argb), result.Background);
+        // Chrome stays theme-driven — only the background is overridden.
+        Assert.Equal(themed.GridLine, result.GridLine);
+        Assert.Equal(themed.GuideLine, result.GuideLine);
+    }
+
+    [Fact]
+    public void WithBackground_ReplacesBackgroundAndKeepsChrome()
+    {
+        var basePalette = CanvasPalette.For(isDark: true);
+        var custom = new SKColor(0x40, 0x80, 0xC0);
+
+        var result = basePalette.WithBackground(custom);
+
+        Assert.Equal(custom, result.Background);
+        Assert.Equal(basePalette.GridLine, result.GridLine);
+        Assert.Equal(basePalette.RulerBackground, result.RulerBackground);
+    }
+
+    [Fact]
     public void For_LightGuideLine_IsDarkerThanDarkGuideLine()
     {
         // The dark-theme guide is bright cyan; on a light canvas that washes out, so the

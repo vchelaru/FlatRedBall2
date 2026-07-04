@@ -27,6 +27,13 @@ namespace AnimationEditor.Core.Models
         public AppTheme Theme { get; set; } = AppTheme.Dark;
 
         /// <summary>
+        /// Optional override for the canvas background behind both editor panels, as a packed
+        /// <c>0xAARRGGBB</c> value. <c>null</c> follows the theme default. This is a per-user
+        /// viewing preference only — it is never written into the <c>.achx</c>.
+        /// </summary>
+        public uint? CanvasBackgroundArgb { get; set; }
+
+        /// <summary>
         /// When <c>true</c>, the editor never offers to register itself as the default
         /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
         /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear
