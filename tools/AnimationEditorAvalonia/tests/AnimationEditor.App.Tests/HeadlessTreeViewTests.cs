@@ -884,10 +884,11 @@ public class HeadlessTreeViewTests
     public void ZebraBands_ConsecutiveRows_HaveNoVerticalSeam()
     {
         // Issue #551: a group's per-row bands must read as one continuous block. Each row band is
-        // the background of its PART_LayoutRoot; at fractional display scales, independent layout
-        // rounding can leave a 1px transparent seam between rows. A 1px downward bleed makes each
-        // band overlap the next, so the next row's top must never sit *below* the previous row's
-        // bottom (a positive gap). Verified in tree space across the chain→frame boundaries.
+        // the background of its PART_LayoutRoot; because rows land on fractional pixel positions,
+        // two adjacent opaque bands anti-alias against the canvas at their shared edge and leave a
+        // faint seam. A downward bleed (Margin + ClipToBounds off) makes each band overlap the next,
+        // so the next row's top must never sit *below* the previous row's bottom (a positive gap).
+        // Verified in tree space across the chain→frame boundaries.
         var (window, ctx) = CreateWindow();
         try
         {
