@@ -50,4 +50,23 @@ internal readonly record struct CanvasPalette(
         GuideLine:       new SKColor(0, 105, 180));
 
     public static CanvasPalette For(bool isDark) => isDark ? Dark : Light;
+
+    /// <summary>
+    /// Returns a copy with <see cref="Background"/> replaced by <paramref name="background"/>.
+    /// Chrome colors (grid, rulers, outline, guides) are intentionally left untouched — they
+    /// stay theme-driven, so a user-chosen background that is very close to the theme's chrome
+    /// can reduce their contrast. See the canvas-background feature caveat.
+    /// </summary>
+    public CanvasPalette WithBackground(SKColor background) => this with { Background = background };
+
+    /// <summary>
+    /// Resolves the palette for a theme variant, applying an optional user background override
+    /// (packed <c>0xAARRGGBB</c>). <c>null</c> keeps the theme background; a value replaces only
+    /// the background via <see cref="WithBackground"/>, leaving chrome theme-driven.
+    /// </summary>
+    public static CanvasPalette Resolve(bool isDark, uint? overrideArgb)
+    {
+        var palette = For(isDark);
+        return overrideArgb is uint argb ? palette.WithBackground(new SKColor(argb)) : palette;
+    }
 }

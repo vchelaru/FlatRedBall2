@@ -172,6 +172,7 @@ public partial class MainWindow : Window
         WireAppCommands();
         LoadSettingsFile();
         ApplyPersistedTheme();
+        ApplyPersistedCanvasBackground();
         WireMenuEvents();
         WireWireframeToolbar();
         WireWireframeControl();
@@ -627,7 +628,7 @@ public partial class MainWindow : Window
 
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
-        _appCommands.RebuildTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RebuildTreeView);
+        _appCommands.RebuildTreeViewRequested           += expandedChainNames => Dispatcher.UIThread.InvokeAsync(() => RebuildTreeView(expandedChainNames));
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
@@ -1392,6 +1393,12 @@ public partial class MainWindow : Window
         MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
         MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
         MenuThemeSystem.Click += (_, _) => SetTheme(AppTheme.System);
+
+        MenuBgThemeDefault.Click += (_, _) => SetCanvasBackground(null);
+        MenuBgBlack.Click        += (_, _) => SetCanvasBackground(CanvasBgBlack);
+        MenuBgWhite.Click        += (_, _) => SetCanvasBackground(CanvasBgWhite);
+        MenuBgMidGray.Click      += (_, _) => SetCanvasBackground(CanvasBgMidGray);
+        MenuBgCustom.Click       += async (_, _) => await PickCustomCanvasBackgroundAsync();
         // C#-built surfaces (tab strip, history rows) hold static brush snapshots, so
         // rebuild them when the variant changes. XAML surfaces follow via DynamicResource.
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
@@ -2571,13 +2578,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Fully rebuilds the tree from scratch with every chain collapsed. Used on
-    /// .achx load (File &gt; Open, recent files, drag-drop, startup reopen) so a
-    /// freshly-opened file presents a scannable, collapsed overview. Contrast with
-    /// <see cref="RefreshTreeView"/>, which diff-updates and preserves each chain's
-    /// collapse state across edits.
+    /// Fully rebuilds the tree from scratch, expanding only the chains named in
+    /// <paramref name="expandedChainNames"/> (empty for a fresh, never-before-seen file,
+    /// so it presents a scannable, collapsed overview). Used on .achx load (File &gt; Open,
+    /// recent files, drag-drop, startup reopen, tab switch). Building the correct expand
+    /// state up front — rather than collapsing here and correcting it once companion-file
+    /// settings load — avoids a collapse-then-expand flicker on tab switch, since those two
+    /// steps land in separate dispatcher jobs. Contrast with <see cref="RefreshTreeView"/>,
+    /// which diff-updates and preserves each chain's collapse state across edits.
     /// </summary>
-    private void RebuildTreeView()
+    private void RebuildTreeView(IReadOnlyList<string> expandedChainNames)
     {
         _suppressTreeSelectionHandling = true;
         try
@@ -2591,11 +2601,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Empty expandedChainNames (not null) collapses every chain; null would
-            // default them all to expanded. All nodes are added (membership always
-            // mirrors the model); an active filter is applied as per-node visibility so
-            // it persists across a full rebuild without dropping nodes from the tree.
-            foreach (var node in TreeBuilder.BuildTree(acls, System.Array.Empty<string>()))
+            // All nodes are added (membership always mirrors the model); an active filter
+            // is applied as per-node visibility so it persists across a full rebuild
+            // without dropping nodes from the tree.
+            foreach (var node in TreeBuilder.BuildTree(acls, expandedChainNames))
             {
                 node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
                 _treeRoots.Add(node);
@@ -3914,6 +3923,94 @@ public partial class MainWindow : Window
         MenuThemeLight.IsChecked  = _appSettings.Theme == AppTheme.Light;
         MenuThemeDark.IsChecked   = _appSettings.Theme == AppTheme.Dark;
         MenuThemeSystem.IsChecked = _appSettings.Theme == AppTheme.System;
+    }
+
+    // ── Canvas background ──────────────────────────────────────────────────────
+    // Preset backgrounds for the View → Canvas Background menu (packed 0xAARRGGBB, opaque).
+    private const uint CanvasBgBlack   = 0xFF000000;
+    private const uint CanvasBgWhite   = 0xFFFFFFFF;
+    private const uint CanvasBgMidGray = 0xFF808080;
+
+    /// <summary>Pushes the persisted canvas-background override onto both canvases and syncs the menu.</summary>
+    private void ApplyPersistedCanvasBackground()
+    {
+        WireframeCtrl.CanvasBackgroundOverride = _appSettings.CanvasBackgroundArgb;
+        PreviewCtrl.CanvasBackgroundOverride   = _appSettings.CanvasBackgroundArgb;
+        SyncCanvasBackgroundMenuChecks();
+    }
+
+    private void SetCanvasBackground(uint? argb)
+    {
+        _appSettings.CanvasBackgroundArgb = argb;
+        WireframeCtrl.CanvasBackgroundOverride = argb;
+        PreviewCtrl.CanvasBackgroundOverride   = argb;
+        SyncCanvasBackgroundMenuChecks();
+        SaveSettingsFile();
+    }
+
+    private void SyncCanvasBackgroundMenuChecks()
+    {
+        var argb = _appSettings.CanvasBackgroundArgb;
+        MenuBgThemeDefault.IsChecked = argb is null;
+        MenuBgBlack.IsChecked        = argb == CanvasBgBlack;
+        MenuBgWhite.IsChecked        = argb == CanvasBgWhite;
+        MenuBgMidGray.IsChecked      = argb == CanvasBgMidGray;
+        // "Custom" covers any opaque color that isn't one of the named presets.
+        MenuBgCustom.IsChecked =
+            argb is uint v && v != CanvasBgBlack && v != CanvasBgWhite && v != CanvasBgMidGray;
+    }
+
+    /// <summary>
+    /// Opens a color picker seeded with the current background, and on OK stores the chosen
+    /// color (forced opaque) as the custom canvas background.
+    /// </summary>
+    private async Task PickCustomCanvasBackgroundAsync()
+    {
+        var themed = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light).Background;
+        var seed = _appSettings.CanvasBackgroundArgb is uint v
+            ? Color.FromUInt32(v)
+            : Color.FromArgb(themed.Alpha, themed.Red, themed.Green, themed.Blue);
+
+        var colorView = new ColorView { Color = seed };
+
+        var okBtn     = new Button { Content = "OK",     MinWidth = 80 };
+        var cancelBtn = new Button { Content = "Cancel", MinWidth = 80 };
+        var buttons = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 8,
+            Margin = new Avalonia.Thickness(0, 12, 0, 0),
+            Children = { okBtn, cancelBtn },
+        };
+
+        var root = new DockPanel { Margin = new Avalonia.Thickness(12) };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        root.Children.Add(buttons);
+        root.Children.Add(colorView);
+
+        var dialog = new Window
+        {
+            Title = "Canvas Background",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = root,
+        };
+        okBtn.Click     += (_, _) => dialog.Close(true);
+        cancelBtn.Click += (_, _) => dialog.Close(false);
+
+        if (await dialog.ShowDialog<bool>(this))
+        {
+            // Force opaque — a translucent canvas fill would composite unpredictably.
+            uint argb = 0xFF000000u | (colorView.Color.ToUInt32() & 0x00FFFFFFu);
+            SetCanvasBackground(argb);
+        }
+        else
+        {
+            // Re-sync so the "Custom…" radio doesn't stay selected after a cancel.
+            SyncCanvasBackgroundMenuChecks();
+        }
     }
 
     /// <summary>

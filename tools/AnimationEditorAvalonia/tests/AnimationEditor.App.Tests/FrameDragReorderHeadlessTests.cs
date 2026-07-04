@@ -37,7 +37,7 @@ public class FrameDragReorderHeadlessTests
     {
         typeof(MainWindow)
             .GetMethod("RebuildTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(window, null);
+            .Invoke(window, new object[] { Array.Empty<string>() });
     }
 
     private static ObservableCollection<TreeNodeVm> Roots(MainWindow window)

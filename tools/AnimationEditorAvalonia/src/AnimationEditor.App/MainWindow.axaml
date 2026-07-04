@@ -121,6 +121,14 @@
                             <MenuItem Header="_Dark"          x:Name="MenuThemeDark"   ToggleType="Radio" />
                             <MenuItem Header="Follow _System" x:Name="MenuThemeSystem" ToggleType="Radio" />
                         </MenuItem>
+                        <MenuItem Header="Canvas _Background">
+                            <MenuItem Header="Theme _Default" x:Name="MenuBgThemeDefault" ToggleType="Radio" GroupName="CanvasBg" />
+                            <MenuItem Header="_Black"         x:Name="MenuBgBlack"        ToggleType="Radio" GroupName="CanvasBg" />
+                            <MenuItem Header="_White"         x:Name="MenuBgWhite"        ToggleType="Radio" GroupName="CanvasBg" />
+                            <MenuItem Header="Mid _Gray"      x:Name="MenuBgMidGray"      ToggleType="Radio" GroupName="CanvasBg" />
+                            <Separator />
+                            <MenuItem Header="_Custom…"       x:Name="MenuBgCustom"       ToggleType="Radio" GroupName="CanvasBg" />
+                        </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem Header="Show _Render Diagnostics" x:Name="MenuShowDiagnostics"

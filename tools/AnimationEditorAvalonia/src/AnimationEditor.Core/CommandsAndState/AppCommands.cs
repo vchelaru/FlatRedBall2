@@ -78,7 +78,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action? RefreshTreeViewRequested;
 
         /// <inheritdoc cref="IAppCommands.RebuildTreeViewRequested"/>
-        public event Action? RebuildTreeViewRequested;
+        public event Action<IReadOnlyList<string>>? RebuildTreeViewRequested;
 
         /// <summary>
         /// Request a single chain's tree node to refresh.
@@ -231,8 +231,12 @@ namespace AnimationEditor.Core.CommandsAndState
             _selectedState.Reset();
             _selectedState.SelectedChain = _pm.AnimationChainListSave?.AnimationChains.FirstOrDefault();
             // Rebuild (not refresh): a freshly-opened file should present a collapsed,
-            // scannable overview rather than every chain's frames expanded.
-            RebuildTreeViewRequested?.Invoke();
+            // scannable overview rather than every chain's frames expanded — unless a
+            // companion file already recorded which chains were expanded, in which case
+            // build the tree pre-expanded to that state in one pass. Building collapsed
+            // and correcting it once LoadAndApplyCompanionFileFor's settings land would
+            // flicker (two separately-dispatched UI updates).
+            RebuildTreeViewRequested?.Invoke((IReadOnlyList<string>?)_ioManager.TryLoadCompanionSettings(fileName)?.ExpandedNodes ?? Array.Empty<string>());
             _ioManager.LoadAndApplyCompanionFileFor(fileName);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();
@@ -262,7 +266,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
             _selectedState.Reset();
             _selectedState.SelectedChain = tab.CachedEditorModel?.AnimationChains.FirstOrDefault();
-            RebuildTreeViewRequested?.Invoke();
+            // See the comment in FinishLoadIntoEditor: build already-expanded from the
+            // companion file so reactivating a tab doesn't flicker collapsed-then-expanded.
+            RebuildTreeViewRequested?.Invoke((IReadOnlyList<string>?)_ioManager.TryLoadCompanionSettings(tab.Path.FullPath)?.ExpandedNodes ?? Array.Empty<string>());
             _ioManager.LoadAndApplyCompanionFileFor(tab.Path.FullPath);
             RefreshWireframeRequested?.Invoke();
             RefreshAnimationFrameDisplayRequested?.Invoke();

@@ -34,7 +34,7 @@ public class MultiCopyPasteAppTests
     private static void RebuildTree(MainWindow window)
     {
         typeof(MainWindow).GetMethod("RebuildTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(window, null);
+            .Invoke(window, new object[] { Array.Empty<string>() });
         FlushUi();
     }
 

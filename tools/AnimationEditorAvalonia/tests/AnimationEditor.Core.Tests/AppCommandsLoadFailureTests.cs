@@ -46,7 +46,7 @@ public class AppCommandsLoadFailureTests : IDisposable
     {
         var ctx = TestHelpers.SetupFreshAcls();
         bool fired = false;
-        ctx.AppCommands.RebuildTreeViewRequested += () => fired = true;
+        ctx.AppCommands.RebuildTreeViewRequested += _ => fired = true;
 
         ctx.AppCommands.LoadAnimationChain(TestPaths.Abs("does", "not", "exist.achx"));
 
@@ -100,7 +100,7 @@ public class AppCommandsLoadFailureTests : IDisposable
         var badFile = Path.Combine(_dir.Path, "bad2.achx");
         File.WriteAllText(badFile, "this is not valid xml");
         bool fired = false;
-        ctx.AppCommands.RebuildTreeViewRequested += () => fired = true;
+        ctx.AppCommands.RebuildTreeViewRequested += _ => fired = true;
 
         ctx.AppCommands.LoadAnimationChain(badFile);
 
