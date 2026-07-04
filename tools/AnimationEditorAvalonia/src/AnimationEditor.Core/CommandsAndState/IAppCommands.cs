@@ -130,6 +130,15 @@ namespace AnimationEditor.Core.CommandsAndState
         bool RenameChain(AnimationChainSave chain, string newName);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
         void MoveChain(AnimationChainSave chain, int delta);
+
+        /// <summary>
+        /// Moves <paramref name="chain"/> to an absolute slot in the chain list as one undo
+        /// step — the drag-and-drop reorder entry point (parallel to <see cref="MoveFrames"/>
+        /// for frames). <paramref name="insertIndex"/> is interpreted against the current list
+        /// <em>before</em> the chain is removed, so it is adjusted internally for the removal;
+        /// an index landing on the chain's own slot is a no-op with no undo entry.
+        /// </summary>
+        void MoveChainToIndex(AnimationChainSave chain, int insertIndex);
         void MoveChainToTop(AnimationChainSave chain);
         void MoveChainToBottom(AnimationChainSave chain);
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);

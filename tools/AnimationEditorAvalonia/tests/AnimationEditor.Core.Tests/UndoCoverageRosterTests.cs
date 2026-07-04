@@ -72,6 +72,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.RenameChain)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrame)]                     = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChain)]                    = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveChainToIndex)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrame)]                    = Category.MutatingUndoable,
@@ -221,6 +222,9 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.AddFrame(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.MoveChain),
             ctx => Sync(() => ctx.AppCommands.MoveChain(Zebra(ctx), +1)));
+        yield return Row(nameof(IAppCommands.MoveChainToIndex),
+            // Drag Alpha (index 1) to the front of the two-chain list.
+            ctx => Sync(() => ctx.AppCommands.MoveChainToIndex(Alpha(ctx), 0)));
         yield return Row(nameof(IAppCommands.MoveChainToTop),
             ctx => Sync(() => ctx.AppCommands.MoveChainToTop(Alpha(ctx))));
         yield return Row(nameof(IAppCommands.MoveChainToBottom),

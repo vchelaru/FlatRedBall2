@@ -56,6 +56,85 @@ public class AppCommandsReorderTests
         Assert.Equal(walk, acls.AnimationChains[0]);
     }
 
+    // ── MoveChainToIndex ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void MoveChainToIndex_EarlierPosition_MovesChainUp()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var a = TestHelpers.MakeChain(acls, "A");
+        var b = TestHelpers.MakeChain(acls, "B");
+        var c = TestHelpers.MakeChain(acls, "C");
+
+        // Insert C before A (index 0).
+        ctx.AppCommands.MoveChainToIndex(c, 0);
+
+        Assert.Equal(new[] { c, a, b }, acls.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void MoveChainToIndex_LaterPosition_AdjustsForRemoval()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var a = TestHelpers.MakeChain(acls, "A");
+        var b = TestHelpers.MakeChain(acls, "B");
+        var c = TestHelpers.MakeChain(acls, "C");
+
+        // insertIndex 3 (after C) is interpreted against the pre-removal list; removing A
+        // ahead of it shifts the landing spot left by one → A ends up last.
+        ctx.AppCommands.MoveChainToIndex(a, 3);
+
+        Assert.Equal(new[] { b, c, a }, acls.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void MoveChainToIndex_OwnIndex_IsNoOp()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var a = TestHelpers.MakeChain(acls, "A");
+        var b = TestHelpers.MakeChain(acls, "B");
+
+        ctx.AppCommands.MoveChainToIndex(a, 0);
+
+        Assert.Equal(new[] { a, b }, acls.AnimationChains.ToArray());
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void MoveChainToIndex_SingleUndo_RestoresOriginalOrder()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var a = TestHelpers.MakeChain(acls, "A");
+        var b = TestHelpers.MakeChain(acls, "B");
+        var c = TestHelpers.MakeChain(acls, "C");
+
+        ctx.AppCommands.MoveChainToIndex(c, 0);
+        ctx.UndoManager.Undo();
+
+        // One undo step fully restores the prior order.
+        Assert.Equal(new[] { a, b, c }, acls.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void MoveChainToIndex_Redo_ReappliesMove()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var a = TestHelpers.MakeChain(acls, "A");
+        var b = TestHelpers.MakeChain(acls, "B");
+        var c = TestHelpers.MakeChain(acls, "C");
+
+        ctx.AppCommands.MoveChainToIndex(c, 0);
+        ctx.UndoManager.Undo();
+        ctx.UndoManager.Redo();
+
+        Assert.Equal(new[] { c, a, b }, acls.AnimationChains.ToArray());
+    }
+
     // ── HandleReorder — frame selected ───────────────────────────────────────
 
     [Fact]

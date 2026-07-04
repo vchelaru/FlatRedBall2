@@ -632,6 +632,28 @@ namespace AnimationEditor.Core.CommandsAndState
                 delta > 0 ? "Move Animation Down" : "Move Animation Up"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveChainToIndex"/>
+        public void MoveChainToIndex(AnimationChainSave chain, int insertIndex)
+        {
+            var chains = _pm.AnimationChainListSave?.AnimationChains;
+            if (chains is null) return;
+            int currentIndex = chains.IndexOf(chain);
+            if (currentIndex < 0) return;
+
+            // insertIndex is measured against the list before removal; removing the chain from
+            // ahead of the target shifts the landing spot left by one (mirrors MoveFramesCommand).
+            int insertAt = insertIndex;
+            if (insertIndex > currentIndex) insertAt--;
+            insertAt = Math.Clamp(insertAt, 0, chains.Count - 1);
+            if (insertAt == currentIndex) return;
+
+            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+                chains,
+                () => { chains.RemoveAt(currentIndex); chains.Insert(insertAt, chain); },
+                this, _events, RefreshTreeView,
+                "Move Animation"));
+        }
+
         public void MoveChainToTop(AnimationChainSave chain)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
