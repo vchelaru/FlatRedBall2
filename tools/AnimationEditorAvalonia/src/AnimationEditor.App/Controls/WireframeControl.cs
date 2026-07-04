@@ -851,9 +851,7 @@ public class WireframeControl : Control
     {
         if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
         var world = ScreenToTexture(screenX, screenY);
-        int gx = GridSnapper.Snap(world.X, _gridSize);
-        int gy = GridSnapper.Snap(world.Y, _gridSize);
-        ApplyRegionToSelectedFrame(gx, gy, gx + _gridSize, gy + _gridSize);
+        SnapSelectedFrameToGridCell(world.X, world.Y);
     }
 
     /// <summary>
@@ -1341,9 +1339,7 @@ public class WireframeControl : Control
         if (!isCtrl && !_isMagicWandMode && e.ClickCount == 2 && _showGrid && _gridSize > 0 && _bitmap != null)
         {
             var dblWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
-            int gx = GridSnapper.Snap(dblWorld.X, _gridSize);
-            int gy = GridSnapper.Snap(dblWorld.Y, _gridSize);
-            ApplyRegionToSelectedFrame(gx, gy, gx + _gridSize, gy + _gridSize);
+            SnapSelectedFrameToGridCell(dblWorld.X, dblWorld.Y);
             return;
         }
 
@@ -1421,15 +1417,18 @@ public class WireframeControl : Control
             return;
         }
 
-        // 3. Grid mode: Ctrl+click → create frame; plain click → set region of selected frame
+        // 3. Grid mode: Ctrl+click → create a new cell-sized frame; plain click →
+        //    reposition the selected frame's origin to the cell, preserving its size.
         if (_showGrid && _gridSize > 0)
         {
-            int gx = GridSnapper.Snap(world.X, _gridSize);
-            int gy = GridSnapper.Snap(world.Y, _gridSize);
             if (isCtrl)
+            {
+                int gx = GridSnapper.Snap(world.X, _gridSize);
+                int gy = GridSnapper.Snap(world.Y, _gridSize);
                 FrameCreatedFromRegion?.Invoke(gx, gy, gx + _gridSize, gy + _gridSize);
+            }
             else
-                ApplyRegionToSelectedFrame(gx, gy, gx + _gridSize, gy + _gridSize);
+                SnapSelectedFrameToGridCell(world.X, world.Y);
             return;
         }
 
@@ -1838,6 +1837,24 @@ public class WireframeControl : Control
     }
 
     /// <summary>
+    /// Grid click-to-place: snaps the selected frame's origin to the grid cell
+    /// containing (<paramref name="worldX"/>, <paramref name="worldY"/>) while
+    /// preserving its current pixel size. Grid must never resize an existing
+    /// frame — only reposition it (issue #538).
+    /// </summary>
+    private void SnapSelectedFrameToGridCell(float worldX, float worldY)
+    {
+        if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
+        var frame = _selectedState!.SelectedFrame;
+        float w = _bitmap.Width, h = _bitmap.Height;
+        int frameW = (int)MathF.Round(frame.RightCoordinate  * w) - (int)MathF.Round(frame.LeftCoordinate * w);
+        int frameH = (int)MathF.Round(frame.BottomCoordinate * h) - (int)MathF.Round(frame.TopCoordinate  * h);
+        var (minX, minY, maxX, maxY) = GridPlacementCalculator.SnapOriginPreserveSize(
+            worldX, worldY, _gridSize, frameW, frameH);
+        ApplyRegionToSelectedFrame(minX, minY, maxX, maxY);
+    }
+
+    /// <summary>
     /// Applies the current hover-preview rect (<see cref="_previewRect"/>) to the selected frame.
     /// Used by Magic Wand double-click to commit the dashed-outline selection.
     /// No-op when no frame is selected, no bitmap is loaded, or no preview is active.
@@ -1905,24 +1922,13 @@ public class WireframeControl : Control
                 if (!fp.Equals(new FilePath(_loadedTexturePath))) continue;
             }
 
+            // Displayed bounds always reflect the frame's true UV pixel bounds.
+            // Grid must never snap or resize an existing frame's display — it only
+            // affects active drags and click-to-place (issue #538).
             float pixL = frame.LeftCoordinate   * w;
             float pixT = frame.TopCoordinate    * h;
             float pixR = frame.RightCoordinate  * w;
             float pixB = frame.BottomCoordinate * h;
-
-            if (_showGrid && _gridSize > 0)
-            {
-                // Snap the display coordinates to grid line intersections for
-                // visual feedback.  UV write-back is intentionally omitted —
-                // grid is a future-edit setting and must never modify existing frames.
-                static float Snap(float v, int g) => MathF.Round(v / g) * g;
-                pixL = Snap(pixL, _gridSize);
-                pixT = Snap(pixT, _gridSize);
-                pixR = Snap(pixR, _gridSize);
-                pixB = Snap(pixB, _gridSize);
-                if (pixR <= pixL) pixR = pixL + _gridSize;
-                if (pixB <= pixT) pixB = pixT + _gridSize;
-            }
 
             _frameRects.Add(new FrameRect
             {
