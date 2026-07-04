@@ -133,7 +133,7 @@ public class AppCommandsLoadTests : IDisposable
     {
         var path = WriteAchx("Walk");
         AnimationChainSave? observedDuringRebuild = null;
-        _ctx.AppCommands.RebuildTreeViewRequested += () =>
+        _ctx.AppCommands.RebuildTreeViewRequested += _ =>
             observedDuringRebuild = _ctx.SelectedState.SelectedChain;
 
         _ctx.AppCommands.LoadAnimationChain(path);
@@ -155,7 +155,7 @@ public class AppCommandsLoadTests : IDisposable
     {
         var path = WriteAchx("Walk");
         bool rebuildFired = false;
-        _ctx.AppCommands.RebuildTreeViewRequested += () => rebuildFired = true;
+        _ctx.AppCommands.RebuildTreeViewRequested += _ => rebuildFired = true;
 
         _ctx.AppCommands.LoadAnimationChain(path);
 

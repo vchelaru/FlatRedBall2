@@ -49,7 +49,7 @@ public class TimelineStripRebuildTests
         ctx.ProjectManager.AnimationChainListSave = acls;
         typeof(MainWindow)
             .GetMethod("RebuildTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(window, null);
+            .Invoke(window, new object[] { Array.Empty<string>() });
         Dispatcher.UIThread.RunJobs();
     }
 

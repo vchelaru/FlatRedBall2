@@ -627,7 +627,7 @@ public partial class MainWindow : Window
 
         // Tree events — fully wired (WireTreeView connects these after tree is constructed)
         _appCommands.RefreshTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RefreshTreeView);
-        _appCommands.RebuildTreeViewRequested           += () => Dispatcher.UIThread.InvokeAsync(RebuildTreeView);
+        _appCommands.RebuildTreeViewRequested           += expandedChainNames => Dispatcher.UIThread.InvokeAsync(() => RebuildTreeView(expandedChainNames));
         _appCommands.RefreshChainNodeRequested          += c  => Dispatcher.UIThread.InvokeAsync(() => RefreshChainNode(c));
         _appCommands.RefreshFrameNodeRequested          += f  => Dispatcher.UIThread.InvokeAsync(() => RefreshFrameNode(f));
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
@@ -2571,13 +2571,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Fully rebuilds the tree from scratch with every chain collapsed. Used on
-    /// .achx load (File &gt; Open, recent files, drag-drop, startup reopen) so a
-    /// freshly-opened file presents a scannable, collapsed overview. Contrast with
-    /// <see cref="RefreshTreeView"/>, which diff-updates and preserves each chain's
-    /// collapse state across edits.
+    /// Fully rebuilds the tree from scratch, expanding only the chains named in
+    /// <paramref name="expandedChainNames"/> (empty for a fresh, never-before-seen file,
+    /// so it presents a scannable, collapsed overview). Used on .achx load (File &gt; Open,
+    /// recent files, drag-drop, startup reopen, tab switch). Building the correct expand
+    /// state up front — rather than collapsing here and correcting it once companion-file
+    /// settings load — avoids a collapse-then-expand flicker on tab switch, since those two
+    /// steps land in separate dispatcher jobs. Contrast with <see cref="RefreshTreeView"/>,
+    /// which diff-updates and preserves each chain's collapse state across edits.
     /// </summary>
-    private void RebuildTreeView()
+    private void RebuildTreeView(IReadOnlyList<string> expandedChainNames)
     {
         _suppressTreeSelectionHandling = true;
         try
@@ -2591,11 +2594,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Empty expandedChainNames (not null) collapses every chain; null would
-            // default them all to expanded. All nodes are added (membership always
-            // mirrors the model); an active filter is applied as per-node visibility so
-            // it persists across a full rebuild without dropping nodes from the tree.
-            foreach (var node in TreeBuilder.BuildTree(acls, System.Array.Empty<string>()))
+            // All nodes are added (membership always mirrors the model); an active filter
+            // is applied as per-node visibility so it persists across a full rebuild
+            // without dropping nodes from the tree.
+            foreach (var node in TreeBuilder.BuildTree(acls, expandedChainNames))
             {
                 node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
                 _treeRoots.Add(node);

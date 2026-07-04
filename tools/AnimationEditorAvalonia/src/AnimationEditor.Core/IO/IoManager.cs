@@ -40,23 +40,26 @@ namespace AnimationEditor.Core.IO
 
         public void LoadAndApplyCompanionFileFor(string achxFile)
         {
-            var fileToLoad = GetCompanionFileFor(new FilePath(achxFile));
-
-            if (!fileToLoad.Exists()) return;
-
-            AESettingsSave? loadedInstance = null;
-            try
-            {
-                loadedInstance = XmlFile.Deserialize<AESettingsSave>(fileToLoad.FullPath);
-            }
-            catch
-            {
-                return;
-            }
-
+            var loadedInstance = TryLoadCompanionSettings(achxFile);
             if (loadedInstance != null)
             {
                 ApplySettings(loadedInstance);
+            }
+        }
+
+        public AESettingsSave? TryLoadCompanionSettings(string achxFile)
+        {
+            var fileToLoad = GetCompanionFileFor(new FilePath(achxFile));
+
+            if (!fileToLoad.Exists()) return null;
+
+            try
+            {
+                return XmlFile.Deserialize<AESettingsSave>(fileToLoad.FullPath);
+            }
+            catch
+            {
+                return null;
             }
         }
 

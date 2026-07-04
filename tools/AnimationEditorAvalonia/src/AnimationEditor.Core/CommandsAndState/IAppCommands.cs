@@ -24,12 +24,16 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action RefreshTreeViewRequested;
 
         /// <summary>
-        /// Request a full tree-view rebuild from scratch with every chain collapsed.
-        /// Raised on .achx load (File &gt; Open, recent files, drag-drop, startup reopen).
-        /// Differs from <see cref="RefreshTreeViewRequested"/>, which diff-updates the
-        /// existing tree and preserves each chain's collapse state across edits.
+        /// Request a full tree-view rebuild from scratch. Raised on .achx load (File &gt; Open,
+        /// recent files, drag-drop, startup reopen, tab switch). The argument is the set of
+        /// chain names to expand — the saved companion-file expand state when one exists, or
+        /// empty for a genuinely new file, so the tree is built already in its final state
+        /// instead of collapsing first and correcting itself once settings load (which flickers
+        /// on tab switch since the two steps land in separate dispatcher jobs). Differs from
+        /// <see cref="RefreshTreeViewRequested"/>, which diff-updates the existing tree and
+        /// preserves each chain's collapse state across edits.
         /// </summary>
-        event Action RebuildTreeViewRequested;
+        event Action<IReadOnlyList<string>> RebuildTreeViewRequested;
 
         event Action<AnimationChainSave> RefreshChainNodeRequested;
         event Action<AnimationFrameSave> RefreshFrameNodeRequested;
