@@ -1,4 +1,5 @@
 using AnimationEditor.App.Controls;
+using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
@@ -126,16 +127,49 @@ public class TimelinePlaybackControlsTests
             preview.ScrubToFrame(1, 0.5);         // paused, mid frame 1
             Dispatcher.UIThread.RunJobs();
 
-            preview.TogglePlayPause();            // resume — sets state synchronously
-            // Assert the resume state immediately. Do NOT pump the dispatcher here:
-            // ResumePlayback restarts the real 60 fps timer, and a pumped tick would
-            // credit up to MaxTickSeconds (0.25s) of elapsed time — far more than the
-            // 0.05s left in frame 1 — advancing the playhead to frame 2 and making the
-            // CurrentFrameIndex assertion flaky. IsPlaying, the un-pin, and the frame
-            // index are all set synchronously by ResumePlayback.
+            preview.TogglePlayPause();            // resume
+            Dispatcher.UIThread.RunJobs();
+
             Assert.True(preview.IsPlaying);
             Assert.Null(ctx.SelectedState.SelectedFrame);          // un-pinned
             Assert.Equal(1, preview.Playback.CurrentFrameIndex);   // resumed from playhead, not reset to 0
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Root cause of the resume flake: PauseAutoPlayback stops the tick timer, so its clock
+    /// baseline goes stale. Resuming must reset that clock, otherwise the first tick credits
+    /// the entire paused span (capped at MaxTickSeconds) and fast-forwards the playhead.
+    /// This drives the clock deterministically (no dependency on real elapsed time): a 100s
+    /// simulated pause must NOT be credited on the first tick after resume.
+    /// </summary>
+    [AvaloniaFact]
+    public void ResumePlayback_AfterAutoTimerStopped_ResetsClockSoStalePauseIsNotCredited()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var chain = MakeThreeFrameChain();
+        var (window, preview, _) = ShowWindowWithChain(ctx, chain);
+
+        try
+        {
+            // Controllable clock: frequency 1 → one timestamp unit == one second.
+            long fakeNow = 0;
+            var clock = new TickClock(() => fakeNow, 1);
+            preview.SetPlaybackClock(clock);
+            clock.Tick();                         // establish the baseline at t=0
+
+            preview.PauseAutoPlayback();          // stops the timer → baseline now stale
+            preview.ScrubToFrame(1, 0.5);
+            Dispatcher.UIThread.RunJobs();
+
+            fakeNow += 100;                        // 100 seconds "pass" while paused
+
+            preview.TogglePlayPause();            // resume — must reset the clock
+
+            // First tick after resume must credit ~0, not the 100s stale span. Without the
+            // reset this returns 100 (then Advance would cap it at MaxTickSeconds and jump a frame).
+            Assert.Equal(0.0, clock.Tick(), precision: 6);
         }
         finally { window.Close(); }
     }
