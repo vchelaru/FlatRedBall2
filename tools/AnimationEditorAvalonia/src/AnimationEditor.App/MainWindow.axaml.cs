@@ -2633,6 +2633,8 @@ public partial class MainWindow : Window
                 node.PinnedVisible = node.PinnedVisible
                     || TreeBuilder.MatchesFilter(chain.Name, _treeFilterQuery);
             }
+            // Striping is positional and cascades — recompute after a chain add/frame sync.
+            TreeBuilder.RestripeRoots(_treeRoots);
             RefreshTreeThumbnails();
             SyncTreeSelection();
         }
@@ -2666,6 +2668,8 @@ public partial class MainWindow : Window
             frameNode.Meta       = rebuiltFrameNode.Meta;
             TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
         }
+        // A new frame/shape node must inherit its chain group's zebra parity.
+        TreeBuilder.RestripeRoots(_treeRoots);
         RefreshTreeThumbnails();
     }
 

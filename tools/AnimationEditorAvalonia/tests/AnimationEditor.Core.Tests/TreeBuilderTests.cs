@@ -845,6 +845,130 @@ public class TreeBuilderSyncFramesTests
     }
 }
 
+// ── Zebra-stripe parity tests ─────────────────────────────────────────────────
+
+public class TreeBuilderStripeTests
+{
+    private static AnimationChainSave ChainWithFrameAndShape(string name)
+    {
+        var chain = new AnimationChainSave { Name = name };
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox" });
+        chain.Frames.Add(frame);
+        return chain;
+    }
+
+    [Fact]
+    public void BuildTree_AssignsAlternatingStripeParityToRootChains()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "A" });
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "B" });
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "C" });
+
+        var roots = TreeBuilder.BuildTree(acls);
+
+        Assert.False(roots[0].IsOddStripe); // index 0 → even
+        Assert.True(roots[1].IsOddStripe);  // index 1 → odd
+        Assert.False(roots[2].IsOddStripe); // index 2 → even
+    }
+
+    [Fact]
+    public void BuildTree_CascadesStripeParityToFramesAndShapes()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(ChainWithFrameAndShape("A")); // even
+        acls.AnimationChains.Add(ChainWithFrameAndShape("B")); // odd
+
+        var roots = TreeBuilder.BuildTree(acls);
+
+        // Chain B (index 1, odd) — its frame and the shape under that frame all inherit odd.
+        var chainB = roots[1];
+        var frameB = chainB.Children[0];
+        var shapeB = frameB.Children[0];
+        Assert.True(chainB.IsOddStripe);
+        Assert.True(frameB.IsOddStripe);
+        Assert.True(shapeB.IsOddStripe);
+
+        // Chain A (index 0, even) — the whole group is even.
+        var chainA = roots[0];
+        Assert.False(chainA.IsOddStripe);
+        Assert.False(chainA.Children[0].IsOddStripe);
+        Assert.False(chainA.Children[0].Children[0].IsOddStripe);
+    }
+
+    [Fact]
+    public void SyncChainsInto_Reorder_RederivesStripeParity()
+    {
+        var chainA = new AnimationChainSave { Name = "A" };
+        var chainB = new AnimationChainSave { Name = "B" };
+        var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(
+            new AnimationChainListSave { AnimationChains = { chainA, chainB } }));
+        Assert.False(roots[0].IsOddStripe); // A even
+        Assert.True(roots[1].IsOddStripe);  // B odd
+
+        // Swap order: B now index 0 (even), A now index 1 (odd).
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainA });
+
+        Assert.Same(chainB, roots[0].Data);
+        Assert.Same(chainA, roots[1].Data);
+        Assert.False(roots[0].IsOddStripe); // B is now even
+        Assert.True(roots[1].IsOddStripe);  // A is now odd
+    }
+
+    [Fact]
+    public void SyncChainsInto_RemovedChain_RestripesRemaining()
+    {
+        var chainA = new AnimationChainSave { Name = "A" };
+        var chainB = new AnimationChainSave { Name = "B" };
+        var chainC = new AnimationChainSave { Name = "C" };
+        var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(
+            new AnimationChainListSave { AnimationChains = { chainA, chainB, chainC } }));
+
+        // Remove A: B slides to index 0 (even), C to index 1 (odd).
+        TreeBuilder.SyncChainsInto(roots, new[] { chainB, chainC });
+
+        Assert.False(roots[0].IsOddStripe); // B now even
+        Assert.True(roots[1].IsOddStripe);  // C now odd
+    }
+
+    [Fact]
+    public void SyncChainsInto_AddedChainWithFrames_CascadesStripeToNewChildren()
+    {
+        var chainA = new AnimationChainSave { Name = "A" };
+        var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(
+            new AnimationChainListSave { AnimationChains = { chainA } }));
+
+        var chainB = ChainWithFrameAndShape("B"); // will be index 1 → odd
+        TreeBuilder.SyncChainsInto(roots, new[] { chainA, chainB });
+
+        var newChain = roots[1];
+        Assert.True(newChain.IsOddStripe);
+        Assert.True(newChain.Children[0].IsOddStripe);              // frame
+        Assert.True(newChain.Children[0].Children[0].IsOddStripe);  // shape
+    }
+
+    [Fact]
+    public void RestripeRoots_IsPositional_AndCascades()
+    {
+        var chainA = ChainWithFrameAndShape("A");
+        var chainB = ChainWithFrameAndShape("B");
+        // Build detached nodes (BuildChainNode leaves parity at its default).
+        var roots = new List<TreeNodeVm>
+        {
+            TreeBuilder.BuildChainNode(chainA),
+            TreeBuilder.BuildChainNode(chainB),
+        };
+
+        TreeBuilder.RestripeRoots(roots);
+
+        Assert.False(roots[0].IsOddStripe);
+        Assert.False(roots[0].Children[0].Children[0].IsOddStripe);
+        Assert.True(roots[1].IsOddStripe);
+        Assert.True(roots[1].Children[0].Children[0].IsOddStripe);
+    }
+}
+
 // ── Singleton-touching tests (RouteNodeSelection) ─────────────────────────────
 
 [Collection("SequentialSingletons")]

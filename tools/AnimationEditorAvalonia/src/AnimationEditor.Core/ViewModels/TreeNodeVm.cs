@@ -103,6 +103,21 @@ public class TreeNodeVm : INotifyPropertyChanged
         set { if (_pinnedVisible != value) { _pinnedVisible = value; Notify(); } }
     }
 
+    private bool _isOddStripe;
+    /// <summary>
+    /// Zebra-stripe parity for this row: <c>false</c> for even-indexed chain groups,
+    /// <c>true</c> for odd. Derived from the owning root chain's position and cascaded to
+    /// every frame/shape descendant so an animation and all its children share one band,
+    /// making it easy to see where one animation ends and the next begins. UI-only
+    /// readability aid — never serialized to <c>.achx</c>. Positional, so it is
+    /// recomputed on every add/remove/reorder via <see cref="TreeBuilder.RestripeRoots"/>.
+    /// </summary>
+    public bool IsOddStripe
+    {
+        get => _isOddStripe;
+        set { if (_isOddStripe != value) { _isOddStripe = value; Notify(); } }
+    }
+
     private bool _isPendingCut;
     /// <summary>True while this item is part of a pending cut (Ctrl+X, not yet pasted).</summary>
     public bool IsPendingCut

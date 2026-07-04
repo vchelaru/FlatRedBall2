@@ -36,7 +36,31 @@ public static class TreeBuilder
             node.IsExpanded = expanded is null || expanded.Contains(chain.Name);
             result.Add(node);
         }
+        RestripeRoots(result);
         return result;
+    }
+
+    // ── Zebra striping ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Reassigns <see cref="TreeNodeVm.IsOddStripe"/> across all root chain nodes by their
+    /// current position — even index → <c>false</c>, odd index → <c>true</c> — and cascades
+    /// each root's parity to every frame/shape descendant so an animation and all its children
+    /// share one zebra band. Purely positional, so it must be re-run after any add, remove, or
+    /// reorder; <see cref="BuildTree"/> and <see cref="SyncChainsInto"/> call it automatically,
+    /// and partial-refresh paths that mutate the tree directly should call it too.
+    /// </summary>
+    public static void RestripeRoots(IReadOnlyList<TreeNodeVm> roots)
+    {
+        for (int i = 0; i < roots.Count; i++)
+            SetStripeRecursive(roots[i], (i & 1) == 1);
+    }
+
+    private static void SetStripeRecursive(TreeNodeVm node, bool isOdd)
+    {
+        node.IsOddStripe = isOdd;
+        foreach (var child in node.Children)
+            SetStripeRecursive(child, isOdd);
     }
 
     /// <summary>Builds a single chain node with all its frame children.</summary>
@@ -293,6 +317,10 @@ public static class TreeBuilder
             roots[i].Meta   = $"{target.Frames.Count} fr";
             SyncFramesInto(roots[i], target.Frames);
         }
+
+        // Striping is positional and cascades to descendants; recompute after the diff so
+        // reorder/add/delete land correct parity (and newly-synced frames/shapes inherit it).
+        RestripeRoots(roots);
     }
 
     // ── Expand-state persistence ──────────────────────────────────────────────

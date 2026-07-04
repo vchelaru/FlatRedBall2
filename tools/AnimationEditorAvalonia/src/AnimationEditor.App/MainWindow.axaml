@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
+        xmlns:conv="clr-namespace:AnimationEditor.App.Converters"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
         xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
@@ -395,6 +396,22 @@
                                  rows hug their content (icon/text) instead of floating in centered air. -->
                             <Setter Property="MinHeight" Value="0" />
                             <Setter Property="Padding" Value="0" />
+                            <!-- Zebra band per animation group: the container Background is the row's
+                                 lowest layer (Fluent paints :selected / :pointerover on top of it), and
+                                 it spans the full row width including the indent column — so the band
+                                 reads as a clean horizontal stripe rather than a staircase. IsOddStripe
+                                 is cascaded from the root chain to every frame/shape child, so the whole
+                                 group shares one band. The ActualThemeVariant binding is only there to
+                                 re-resolve the brush when the user toggles light/dark at runtime. -->
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <MultiBinding Converter="{x:Static conv:StripeBrushConverter.Instance}">
+                                        <ReflectionBinding Path="IsOddStripe" />
+                                        <Binding Path="ActualThemeVariant"
+                                                 RelativeSource="{RelativeSource Self}" />
+                                    </MultiBinding>
+                                </Setter.Value>
+                            </Setter>
                             <!-- Search filter: hide rows the filter excludes, but always keep the
                                  selected row visible (safety net for off-filter programmatic selection). -->
                             <Setter Property="IsVisible">
