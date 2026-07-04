@@ -342,6 +342,25 @@ public class WireframeControl : Control
     // ActualThemeVariant on every render and whenever the variant changes.
     private CanvasPalette _palette = CanvasPalette.Dark;
 
+    private uint? _canvasBackgroundOverride;
+
+    /// <summary>
+    /// Optional user-chosen canvas background as a packed <c>0xAARRGGBB</c> value; <c>null</c>
+    /// follows the theme. Setting it re-resolves the palette and repaints. Chrome (grid, rulers,
+    /// outline) stays theme-driven.
+    /// </summary>
+    public uint? CanvasBackgroundOverride
+    {
+        get => _canvasBackgroundOverride;
+        set
+        {
+            if (_canvasBackgroundOverride == value) return;
+            _canvasBackgroundOverride = value;
+            UpdatePalette();
+            InvalidateVisual();
+        }
+    }
+
     /// <summary>
     /// Shows/hides the render-diagnostics overlay (draw-time readout + camera stats). Toggled at
     /// runtime from MainWindow (F3 and the Help ▸ Show Render Diagnostics menu item).
@@ -1100,7 +1119,8 @@ public class WireframeControl : Control
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
     // "is it Light?" check correctly handles the follow-system case.
-    private void UpdatePalette() => _palette = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light);
+    private void UpdatePalette() =>
+        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride);
 
     /// <summary>
     /// Renders the current wireframe state to an off-screen bitmap of the given size.

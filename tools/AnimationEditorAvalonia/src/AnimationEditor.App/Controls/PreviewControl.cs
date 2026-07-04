@@ -117,6 +117,25 @@ public class PreviewControl : Control
     // Neutral canvas/ruler colors for the active theme variant. Refreshed from
     // ActualThemeVariant on every render and whenever the variant changes.
     private CanvasPalette _palette = CanvasPalette.Dark;
+
+    private uint? _canvasBackgroundOverride;
+
+    /// <summary>
+    /// Optional user-chosen canvas background as a packed <c>0xAARRGGBB</c> value; <c>null</c>
+    /// follows the theme. Setting it re-resolves the palette and repaints. Chrome (rulers, guides)
+    /// stays theme-driven.
+    /// </summary>
+    public uint? CanvasBackgroundOverride
+    {
+        get => _canvasBackgroundOverride;
+        set
+        {
+            if (_canvasBackgroundOverride == value) return;
+            _canvasBackgroundOverride = value;
+            UpdatePalette();
+            InvalidateVisual();
+        }
+    }
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
@@ -928,7 +947,8 @@ public class PreviewControl : Control
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
     // "is it Light?" check correctly handles the follow-system case.
-    private void UpdatePalette() => _palette = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light);
+    private void UpdatePalette() =>
+        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride);
 
     // -- Guide helpers ---------------------------------------------------------
 
