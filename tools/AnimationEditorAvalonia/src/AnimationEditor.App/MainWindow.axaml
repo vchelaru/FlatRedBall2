@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
+        xmlns:conv="clr-namespace:AnimationEditor.App.Converters"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
         xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
@@ -403,6 +404,32 @@
                                  rows hug their content (icon/text) instead of floating in centered air. -->
                             <Setter Property="MinHeight" Value="0" />
                             <Setter Property="Padding" Value="0" />
+                            <!-- Let the band's 1px bleed (below) render past the row bounds instead of
+                                 being clipped, so adjacent bands overlap and no seam shows. -->
+                            <Setter Property="ClipToBounds" Value="False" />
+                            <!-- Flatten Fluent's rounded row corners (ControlCornerRadius). PART_LayoutRoot
+                                 carries both the zebra band and the selection highlight via
+                                 CornerRadius="{TemplateBinding CornerRadius}"; with the default radius the
+                                 stacked per-row bands leave rounded-corner notches between them, so a
+                                 group's band reads as broken. Square corners let consecutive rows' bands
+                                 tile flush into one continuous block. -->
+                            <Setter Property="CornerRadius" Value="0" />
+                            <!-- Zebra band per animation group: the container Background is the row's
+                                 lowest layer (Fluent paints :selected / :pointerover on top of it), and
+                                 it spans the full row width including the indent column — so the band
+                                 reads as a clean horizontal stripe rather than a staircase. IsOddStripe
+                                 is cascaded from the root chain to every frame/shape child, so the whole
+                                 group shares one band. The ActualThemeVariant binding is only there to
+                                 re-resolve the brush when the user toggles light/dark at runtime. -->
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <MultiBinding Converter="{x:Static conv:StripeBrushConverter.Instance}">
+                                        <ReflectionBinding Path="IsOddStripe" />
+                                        <Binding Path="ActualThemeVariant"
+                                                 RelativeSource="{RelativeSource Self}" />
+                                    </MultiBinding>
+                                </Setter.Value>
+                            </Setter>
                             <!-- Search filter: hide rows the filter excludes, but always keep the
                                  selected row visible (safety net for off-filter programmatic selection). -->
                             <Setter Property="IsVisible">
@@ -420,6 +447,18 @@
                         <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
                             <Setter Property="Margin" Value="0" />
                             <Setter Property="Width" Value="10" />
+                        </Style>
+                        <!-- Zebra bands must read as one continuous block per animation group. Each row's
+                             band is its own PART_LayoutRoot background; because rows land on fractional pixel
+                             positions, two adjacent opaque bands anti-alias against the canvas at their shared
+                             edge and never composite to full opacity there — a faint seam at every row
+                             boundary. A 2px downward bleed (with clipping off, above) makes each band overlap
+                             the next so the overlapping band fully covers the boundary pixels. Rows in a group
+                             share a color so the overlap is invisible; the last band of a group bleeds 2px of
+                             its low-contrast color past the group, which is imperceptible against the canvas. -->
+                        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+                            <Setter Property="Margin" Value="0,0,0,-2" />
+                            <Setter Property="ClipToBounds" Value="False" />
                         </Style>
                         <!-- The Fluent theme's :empty style overrides the panel width to 12px for
                              leaf items, causing their content to start ~20px left of non-leaf items.

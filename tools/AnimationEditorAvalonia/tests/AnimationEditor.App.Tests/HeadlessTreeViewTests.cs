@@ -5,6 +5,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
@@ -850,6 +851,73 @@ public class HeadlessTreeViewTests
         {
             var tree = GetTree(window);
             Assert.False(ScrollViewer.GetAllowAutoHide(tree));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void TreeViewItem_CornerRadius_IsZero_SoZebraBandsTileFlush()
+    {
+        // Issue #551: the zebra band lives on the TreeViewItem's PART_LayoutRoot, which also
+        // carries CornerRadius via TemplateBinding. Fluent's default rounded corners would leave
+        // notch-shaped gaps between a group's stacked row bands. CornerRadius must resolve to 0
+        // so consecutive rows tile flush into one continuous band.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var items = tree.GetVisualDescendants().OfType<TreeViewItem>().ToList();
+            Assert.NotEmpty(items);
+            Assert.All(items, tvi => Assert.Equal(new Avalonia.CornerRadius(0), tvi.CornerRadius));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void ZebraBands_ConsecutiveRows_HaveNoVerticalSeam()
+    {
+        // Issue #551: a group's per-row bands must read as one continuous block. Each row band is
+        // the background of its PART_LayoutRoot; because rows land on fractional pixel positions,
+        // two adjacent opaque bands anti-alias against the canvas at their shared edge and leave a
+        // faint seam. A downward bleed (Margin + ClipToBounds off) makes each band overlap the next,
+        // so the next row's top must never sit *below* the previous row's bottom (a positive gap).
+        // Verified in tree space across the chain→frame boundaries.
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            for (int i = 0; i < 3; i++)
+                chain.Frames.Add(new AnimationFrameSave { TextureName = $"f{i}.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+            var tree = GetTree(window);
+            foreach (var r in GetRoots(tree)) r.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var bands = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .Select(tvi => tvi.GetVisualDescendants().OfType<Border>()
+                    .First(b => b.Name == "PART_LayoutRoot"))
+                .Select(lr => new
+                {
+                    Top = lr.TranslatePoint(new Avalonia.Point(0, 0), tree)!.Value.Y,
+                    Bottom = lr.TranslatePoint(new Avalonia.Point(0, lr.Bounds.Height), tree)!.Value.Y,
+                })
+                .OrderBy(x => x.Top)
+                .ToList();
+
+            Assert.True(bands.Count >= 4); // chain + 3 frames
+            for (int i = 1; i < bands.Count; i++)
+                Assert.True(bands[i].Top <= bands[i - 1].Bottom,
+                    $"Row {i} top ({bands[i].Top}) must not leave a gap below row {i - 1} bottom ({bands[i - 1].Bottom}).");
         }
         finally { window.Close(); }
     }
