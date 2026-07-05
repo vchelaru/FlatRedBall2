@@ -1194,25 +1194,8 @@ public partial class MainWindow : Window
         }, Avalonia.Threading.DispatcherPriority.Render);
     }
 
-    private void SetHistoryVisible(bool visible)
-    {
-        HistorySplitter.IsVisible = visible;
-        HistorySectionGrid.IsVisible = visible;
-        if (visible)
-        {
-            // Share space: inspector content gets 2/3, history list gets 1/3
-            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(2, GridUnitType.Star);
-            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(4);
-            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(1, GridUnitType.Star);
-        }
-        else
-        {
-            InspectorColumnGrid.RowDefinitions[1].Height = new GridLength(1, GridUnitType.Star);
-            InspectorColumnGrid.RowDefinitions[2].Height = new GridLength(0);
-            InspectorColumnGrid.RowDefinitions[3].Height = new GridLength(0);
-        }
-        MenuShowHistory.IsEnabled = !visible;
-    }
+    // History is a tab in the sidebar tab strip (#544), so "show history" is just selecting it.
+    private void SelectHistoryTab() => SidebarTabs.SelectedItem = HistoryTab;
 
     // ── Texture combo helpers ─────────────────────────────────────────────────
 
@@ -1417,11 +1400,9 @@ public partial class MainWindow : Window
         };
         RefreshHistoryPanel();
 
-        HistoryUndoButton.Click  += (_, _) => _undoManager.Undo();
-        HistoryRedoButton.Click  += (_, _) => _undoManager.Redo();
-        HistoryCloseButton.Click += (_, _) => SetHistoryVisible(false);
-        MenuShowHistory.Click    += (_, _) => SetHistoryVisible(true);
-        MenuShowHistory.IsEnabled = false;
+        HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
+        HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
+        MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
 
         MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
         MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
@@ -1459,7 +1440,7 @@ public partial class MainWindow : Window
         ReloadFromDisk:  () => { if (!string.IsNullOrEmpty(_projectManager.FileName)) _appCommands.ReloadAchxFromDisk(_projectManager.FileName); },
         ToggleHotReload: () => { _appCommands.HotReloadWatcher.IsEnabled = !_appCommands.HotReloadWatcher.IsEnabled; },
         ResizeTexture:   () => _ = DoResizeTextureAsync(),
-        ShowHistory:     () => SetHistoryVisible(true),
+        ShowHistory:     () => SelectHistoryTab(),
         ViewLog:         () => OnViewLogClick(null, null!),
         About:           () => _ = BuildAboutWindow().ShowDialog(this));
 

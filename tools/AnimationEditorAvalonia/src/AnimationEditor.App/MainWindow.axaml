@@ -301,11 +301,11 @@
             </DockPanel>
         </Border>
 
-        <!-- ── Main content: TreeView | Property Panel | [Wireframe / Preview] ── -->
-        <Grid x:Name="MainContentGrid" ColumnDefinitions="280,4,240,4,*">
+        <!-- ── Main content: [ANIMATIONS tree + Inspector/Files/History tabs] | [Wireframe / Preview] ── -->
+        <Grid x:Name="MainContentGrid" ColumnDefinitions="300,4,*">
 
-            <!-- ── Left: Animation tree + Files panel ── -->
-            <Grid Grid.Column="0" RowDefinitions="2*,4,*"
+            <!-- ── Left: ANIMATIONS tree (fixed, top) + tabbed Inspector/Files/History (bottom) ── -->
+            <Grid Grid.Column="0" RowDefinitions="2*,4,3*"
                   Background="{DynamicResource BgCanvas}">
 
                 <!-- Animations block: header + tree + add button stay grouped -->
@@ -618,34 +618,422 @@
 
                 </Grid>
 
-                <!-- Splitter between animations block and files block -->
+                <!-- Splitter between the ANIMATIONS tree and the tabbed tool panel -->
                 <GridSplitter Grid.Row="1"
                               ResizeDirection="Rows"
                               Background="{DynamicResource LineStrong}"
                               HorizontalAlignment="Stretch" />
 
-                <!-- Files block -->
-                <Grid Grid.Row="2" RowDefinitions="Auto,*" MinHeight="80">
+                <!-- ── Tool panel: Inspector / Files / History tabs (#544) ──
+                     A single tab strip below the always-visible ANIMATIONS tree. Inspector is the
+                     default tab (it's referenced constantly while clicking through frames/chains);
+                     Files and History sit behind it. The tree above is never covered by a tab. -->
+                <TabControl x:Name="SidebarTabs" Grid.Row="2"
+                            Padding="0"
+                            MinHeight="80"
+                            Background="{DynamicResource BgRail}">
+                    <TabControl.Styles>
+                        <!-- Compact tabs matching the 11px SemiBold pane headers they replace,
+                             rather than Fluent's tall default tab. -->
+                        <Style Selector="TabItem">
+                            <Setter Property="FontSize" Value="11" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="Foreground" Value="{DynamicResource InkMid}" />
+                            <Setter Property="Padding" Value="12,0" />
+                            <Setter Property="MinHeight" Value="36" />
+                            <Setter Property="Height" Value="36" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                        </Style>
+                        <Style Selector="TabItem:selected">
+                            <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+                        </Style>
+                    </TabControl.Styles>
 
-                <!-- ── Files pane header ── -->
-                <Border Grid.Row="0"
-                        Background="{DynamicResource BgRail}"
-                        BorderBrush="{DynamicResource LineBrush}"
-                        BorderThickness="0,1,0,0"
-                        Height="36">
-                    <DockPanel Margin="10,0">
-                        <TextBlock Text="FILES"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource InkMid}"
-                                   VerticalAlignment="Center" />
-                    </DockPanel>
-                </Border>
+                    <!-- Inspector (default tab) -->
+                    <TabItem Header="Inspector">
+                        <Border x:Name="InspectorTabContent"
+                                Background="{DynamicResource BgPanel}">
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="0" Spacing="0">
 
-                <controls:FilesPanelControl x:Name="FilesPanel"
-                                            Grid.Row="1" />
+                                    <!-- No selection placeholder -->
+                                    <TextBlock x:Name="PropNoneLabel"
+                                               Text="No selection"
+                                               Foreground="{DynamicResource InkDim}"
+                                               FontStyle="Italic"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,12,0,0" />
 
-                </Grid>
+                                    <!-- ── Frame properties ── -->
+                                    <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">
+
+                                        <!-- COORDINATES section -->
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="COORDINATES"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <!-- Pixel coord fields — two pair-rows preserving the position/size pairing:
+                                                     a position row (X, Y) then a size row (W, H). Each row is its own responsive
+                                                     WrapPanel of [label][box] units (MinWidth 86) that reflows 2-across → 1-per-row
+                                                     independently as the panel narrows. No overlap at any width. -->
+                                                <StackPanel x:Name="PropPixelSection">
+                                                    <WrapPanel>
+                                                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                            <TextBlock Text="X" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                            <NumericUpDown x:Name="PropPixelX" Grid.Column="1" MinWidth="66"
+                                                                           Minimum="-16384" Maximum="16384" Increment="1" />
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                            <TextBlock Text="Y" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                            <NumericUpDown x:Name="PropPixelY" Grid.Column="1" MinWidth="66"
+                                                                           Minimum="-16384" Maximum="16384" Increment="1" />
+                                                        </Grid>
+                                                    </WrapPanel>
+                                                    <WrapPanel>
+                                                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                            <TextBlock Text="W" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                            <NumericUpDown x:Name="PropPixelW" Grid.Column="1" MinWidth="66"
+                                                                           Minimum="1" Maximum="16384" Increment="1" />
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                            <TextBlock Text="H" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                            <NumericUpDown x:Name="PropPixelH" Grid.Column="1" MinWidth="66"
+                                                                           Minimum="1" Maximum="16384" Increment="1" />
+                                                        </Grid>
+                                                    </WrapPanel>
+                                                </StackPanel>
+
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- TIMING section -->
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="TIMING"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*,Auto">
+                                                    <TextBlock Text="Length" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropFrameLen" Grid.Column="1"
+                                                                   ShowButtonSpinner="True"
+                                                                   Minimum="0.001" Maximum="60"
+                                                                   Increment="0.05" FormatString="0.000" />
+                                                    <TextBlock Text="s" Grid.Column="2"
+                                                               VerticalAlignment="Center" Margin="4,0,0,0"
+                                                               Foreground="{DynamicResource InkDim}" FontSize="11" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- TRANSFORM section -->
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="TRANSFORM"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Relative X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRelX" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Relative Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRelY" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <ToggleButton x:Name="PropFlipH"
+                                                                  ToolTip.Tip="Flip Horizontal"
+                                                                  Width="32" Height="26"
+                                                                  HorizontalContentAlignment="Center"
+                                                                  VerticalContentAlignment="Center">
+                                                        <svg:Svg Width="16" Height="16"
+                                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconFlipH.svg"
+                                                                 CurrentColor="{DynamicResource IconInk}"
+                                                                 VerticalAlignment="Center" />
+                                                    </ToggleButton>
+                                                    <ToggleButton x:Name="PropFlipV"
+                                                                  ToolTip.Tip="Flip Vertical"
+                                                                  Width="32" Height="26"
+                                                                  HorizontalContentAlignment="Center"
+                                                                  VerticalContentAlignment="Center">
+                                                        <svg:Svg Width="16" Height="16"
+                                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconFlipV.svg"
+                                                                 CurrentColor="{DynamicResource IconInk}"
+                                                                 VerticalAlignment="Center" />
+                                                    </ToggleButton>
+                                                    <ToggleButton x:Name="PropFlipD"
+                                                                  ToolTip.Tip="Flip Diagonal"
+                                                                  Width="32" Height="26"
+                                                                  HorizontalContentAlignment="Center"
+                                                                  VerticalContentAlignment="Center">
+                                                        <svg:Svg Width="16" Height="16"
+                                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconFlipD.svg"
+                                                                 CurrentColor="{DynamicResource IconInk}"
+                                                                 VerticalAlignment="Center" />
+                                                    </ToggleButton>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- TEXTURE section -->
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="TEXTURE"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="*,24">
+                                                    <TextBox x:Name="PropTextureName" Grid.Column="0"
+                                                             FontSize="10" />
+                                                    <Button x:Name="PropTextureBrowseBtn" Grid.Column="1"
+                                                            Content="…" FontSize="10"
+                                                            Width="24" Height="22"
+                                                            Padding="0" HorizontalContentAlignment="Center"
+                                                            VerticalContentAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Margin="4,0,0,0"
+                                                            ToolTip.Tip="Browse for texture file" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- COLOR section: per-frame tint. Mode previews as a reference; runtimes apply it as they choose. -->
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <!-- Header + info badge. The explanatory text lives in the badge's tooltip
+                                                     (instead of an always-on wrapping paragraph that grew the panel when narrow). -->
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="COLOR"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource InkMid}"
+                                                               VerticalAlignment="Center" />
+                                                    <Border Width="14" Height="14" CornerRadius="7"
+                                                            BorderBrush="{DynamicResource InkDim}" BorderThickness="1"
+                                                            VerticalAlignment="Center" Cursor="Help"
+                                                            ToolTip.Tip="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it.">
+                                                        <TextBlock Text="i" FontSize="9"
+                                                                   Foreground="{DynamicResource InkDim}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <Grid ColumnDefinitions="44,*">
+                                                    <TextBlock Text="Mode" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <ComboBox x:Name="PropColorMode" Grid.Column="1"
+                                                              HorizontalAlignment="Stretch">
+                                                        <ComboBoxItem>None</ComboBoxItem>
+                                                        <ComboBoxItem>Multiply</ComboBoxItem>
+                                                        <ComboBoxItem>Add</ComboBoxItem>
+                                                    </ComboBox>
+                                                </Grid>
+                                                <!-- Channel fields — responsive WrapPanel: each [label][textbox] unit has a MinWidth,
+                                                     so units sit side-by-side when there's room and reflow one-per-row as the panel
+                                                     narrows (the per-unit MinWidth is the wrap threshold). No overlap at any width. -->
+                                                <WrapPanel>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="R" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource Accent}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropRed" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                                                    </Grid>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="G" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource Ok}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropGreen" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                                                    </Grid>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="B" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource AccentCool}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropBlue" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                                                    </Grid>
+                                                    <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                                                        <TextBlock Text="A" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                                                        <NumericUpDown x:Name="PropAlpha" Grid.Column="1" MinWidth="66"
+                                                                       Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                                                    </Grid>
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- ── Rectangle properties ── -->
+                                    <StackPanel x:Name="PropRectPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="RECTANGLE"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Name" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <TextBox x:Name="PropRectName" Grid.Column="1" FontSize="11" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRectX" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRectY" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Scale X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRectScaleX" Grid.Column="1"
+                                                                   Minimum="0.001" Maximum="10000"
+                                                                   Increment="0.5" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Scale Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropRectScaleY" Grid.Column="1"
+                                                                   Minimum="0.001" Maximum="10000"
+                                                                   Increment="0.5" FormatString="0.000" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- ── Circle properties ── -->
+                                    <StackPanel x:Name="PropCirclePanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="CIRCLE"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Name" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <TextBox x:Name="PropCircleName" Grid.Column="1" FontSize="11" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="X" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropCircleX" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Y" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropCircleY" Grid.Column="1"
+                                                                   Minimum="-10000" Maximum="10000"
+                                                                   Increment="1" FormatString="0.000" />
+                                                </Grid>
+                                                <Grid ColumnDefinitions="78,*">
+                                                    <TextBlock Text="Radius" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource InkMid}" FontSize="11" />
+                                                    <NumericUpDown x:Name="PropCircleRadius" Grid.Column="1"
+                                                                   Minimum="0.001" Maximum="10000"
+                                                                   Increment="0.5" FormatString="0.000" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </TabItem>
+
+                    <!-- Files -->
+                    <TabItem Header="Files">
+                        <controls:FilesPanelControl x:Name="FilesPanel" />
+                    </TabItem>
+
+                    <!-- History (Undo/Redo toolbar + read-only history list) -->
+                    <TabItem x:Name="HistoryTab" Header="History">
+                        <Grid RowDefinitions="Auto,*" Background="{DynamicResource BgPanel}">
+                            <Border Grid.Row="0"
+                                    Background="{DynamicResource BgRail}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Height="30">
+                                <StackPanel Orientation="Horizontal" Spacing="2"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            Margin="0,0,4,0">
+                                    <Button x:Name="HistoryUndoButton"
+                                            Width="26" Height="26" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            ToolTip.Tip="Undo">
+                                        <svg:Svg Width="14" Height="14"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconUndo.svg"
+                                                 CurrentColor="{DynamicResource IconInk}" />
+                                    </Button>
+                                    <Button x:Name="HistoryRedoButton"
+                                            Width="26" Height="26" Padding="0"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            ToolTip.Tip="Redo">
+                                        <svg:Svg Width="14" Height="14"
+                                                 Path="avares://AnimationEditor/Assets/icons/svg/IconRedo.svg"
+                                                 CurrentColor="{DynamicResource IconInk}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                            <ScrollViewer x:Name="HistoryScrollViewer"
+                                          Grid.Row="1"
+                                          Background="{DynamicResource BgPanel}"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="HistoryList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="appModels:HistoryEntryVm">
+                                            <Border Background="{Binding Background}">
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="11"
+                                                           Foreground="{Binding Foreground}"
+                                                           Padding="8,3"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
             </Grid>
 
             <!-- ── Splitter (left | middle) ── -->
@@ -655,7 +1043,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Right: Wireframe toolbar + Wireframe + Preview ── -->
-            <Grid Grid.Column="4" RowDefinitions="Auto,*,4,250">
+            <Grid Grid.Column="2" RowDefinitions="Auto,*,4,250">
 
                 <!-- ── Wireframe toolbar ── -->
                 <Border Grid.Row="0"
@@ -1157,448 +1545,6 @@
                 </Grid>
             </Grid>
 
-            <!-- ── Splitter (middle | right) ── -->
-            <GridSplitter Grid.Column="3"
-                          ResizeDirection="Columns"
-                          Background="{DynamicResource LineStrong}"
-                          HorizontalAlignment="Stretch" />
-
-            <!-- ── Middle: Property Inspector ── -->
-            <Grid x:Name="InspectorColumnGrid" Grid.Column="2" RowDefinitions="Auto,2*,4,*">
-
-                <!-- ── Inspector pane header ── -->
-                <Border Grid.Row="0"
-                        Background="{DynamicResource BgRail}"
-                        BorderBrush="{DynamicResource LineBrush}"
-                        BorderThickness="0,0,0,1"
-                        Height="36">
-                    <TextBlock Text="INSPECTOR"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource InkMid}"
-                               VerticalAlignment="Center"
-                               Margin="10,0" />
-                </Border>
-
-                <Border Grid.Row="1"
-                        BorderBrush="{DynamicResource LineBrush}"
-                        BorderThickness="1,0,0,0"
-                        Background="{DynamicResource BgPanel}">
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="0" Spacing="0">
-
-                            <!-- No selection placeholder -->
-                            <TextBlock x:Name="PropNoneLabel"
-                                       Text="No selection"
-                                       Foreground="{DynamicResource InkDim}"
-                                       FontStyle="Italic"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,12,0,0" />
-
-                            <!-- ── Frame properties ── -->
-                            <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">
-
-                                <!-- COORDINATES section -->
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="COORDINATES"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <!-- Pixel coord fields — two pair-rows preserving the position/size pairing:
-                                             a position row (X, Y) then a size row (W, H). Each row is its own responsive
-                                             WrapPanel of [label][box] units (MinWidth 86) that reflows 2-across → 1-per-row
-                                             independently as the panel narrows. No overlap at any width. -->
-                                        <StackPanel x:Name="PropPixelSection">
-                                            <WrapPanel>
-                                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                    <TextBlock Text="X" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                                    <NumericUpDown x:Name="PropPixelX" Grid.Column="1" MinWidth="66"
-                                                                   Minimum="-16384" Maximum="16384" Increment="1" />
-                                                </Grid>
-                                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                    <TextBlock Text="Y" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                                    <NumericUpDown x:Name="PropPixelY" Grid.Column="1" MinWidth="66"
-                                                                   Minimum="-16384" Maximum="16384" Increment="1" />
-                                                </Grid>
-                                            </WrapPanel>
-                                            <WrapPanel>
-                                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                    <TextBlock Text="W" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                                    <NumericUpDown x:Name="PropPixelW" Grid.Column="1" MinWidth="66"
-                                                                   Minimum="1" Maximum="16384" Increment="1" />
-                                                </Grid>
-                                                <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                    <TextBlock Text="H" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                                    <NumericUpDown x:Name="PropPixelH" Grid.Column="1" MinWidth="66"
-                                                                   Minimum="1" Maximum="16384" Increment="1" />
-                                                </Grid>
-                                            </WrapPanel>
-                                        </StackPanel>
-
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- TIMING section -->
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="TIMING"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <Grid ColumnDefinitions="78,*,Auto">
-                                            <TextBlock Text="Length" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropFrameLen" Grid.Column="1"
-                                                           ShowButtonSpinner="True"
-                                                           Minimum="0.001" Maximum="60"
-                                                           Increment="0.05" FormatString="0.000" />
-                                            <TextBlock Text="s" Grid.Column="2"
-                                                       VerticalAlignment="Center" Margin="4,0,0,0"
-                                                       Foreground="{DynamicResource InkDim}" FontSize="11" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- TRANSFORM section -->
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="TRANSFORM"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Relative X" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRelX" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Relative Y" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRelY" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <ToggleButton x:Name="PropFlipH"
-                                                          ToolTip.Tip="Flip Horizontal"
-                                                          Width="32" Height="26"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center">
-                                                <svg:Svg Width="16" Height="16"
-                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipH.svg"
-                                                         CurrentColor="{DynamicResource IconInk}"
-                                                         VerticalAlignment="Center" />
-                                            </ToggleButton>
-                                            <ToggleButton x:Name="PropFlipV"
-                                                          ToolTip.Tip="Flip Vertical"
-                                                          Width="32" Height="26"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center">
-                                                <svg:Svg Width="16" Height="16"
-                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipV.svg"
-                                                         CurrentColor="{DynamicResource IconInk}"
-                                                         VerticalAlignment="Center" />
-                                            </ToggleButton>
-                                            <ToggleButton x:Name="PropFlipD"
-                                                          ToolTip.Tip="Flip Diagonal"
-                                                          Width="32" Height="26"
-                                                          HorizontalContentAlignment="Center"
-                                                          VerticalContentAlignment="Center">
-                                                <svg:Svg Width="16" Height="16"
-                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipD.svg"
-                                                         CurrentColor="{DynamicResource IconInk}"
-                                                         VerticalAlignment="Center" />
-                                            </ToggleButton>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- TEXTURE section -->
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="TEXTURE"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <Grid ColumnDefinitions="*,24">
-                                            <TextBox x:Name="PropTextureName" Grid.Column="0"
-                                                     FontSize="10" />
-                                            <Button x:Name="PropTextureBrowseBtn" Grid.Column="1"
-                                                    Content="…" FontSize="10"
-                                                    Width="24" Height="22"
-                                                    Padding="0" HorizontalContentAlignment="Center"
-                                                    VerticalContentAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Margin="4,0,0,0"
-                                                    ToolTip.Tip="Browse for texture file" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- COLOR section: per-frame tint. Mode previews as a reference; runtimes apply it as they choose. -->
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <!-- Header + info badge. The explanatory text lives in the badge's tooltip
-                                             (instead of an always-on wrapping paragraph that grew the panel when narrow). -->
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="COLOR"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource InkMid}"
-                                                       VerticalAlignment="Center" />
-                                            <Border Width="14" Height="14" CornerRadius="7"
-                                                    BorderBrush="{DynamicResource InkDim}" BorderThickness="1"
-                                                    VerticalAlignment="Center" Cursor="Help"
-                                                    ToolTip.Tip="Previewed here as a reference — R/G/B tint via Mode, A as opacity. Each runtime applies these as it chooses; your game can also read R/G/B/A from sprite.CurrentFrame. Leave a field blank to omit it.">
-                                                <TextBlock Text="i" FontSize="9"
-                                                           Foreground="{DynamicResource InkDim}"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                        </StackPanel>
-                                        <Grid ColumnDefinitions="44,*">
-                                            <TextBlock Text="Mode" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <ComboBox x:Name="PropColorMode" Grid.Column="1"
-                                                      HorizontalAlignment="Stretch">
-                                                <ComboBoxItem>None</ComboBoxItem>
-                                                <ComboBoxItem>Multiply</ComboBoxItem>
-                                                <ComboBoxItem>Add</ComboBoxItem>
-                                            </ComboBox>
-                                        </Grid>
-                                        <!-- Channel fields — responsive WrapPanel: each [label][textbox] unit has a MinWidth,
-                                             so units sit side-by-side when there's room and reflow one-per-row as the panel
-                                             narrows (the per-unit MinWidth is the wrap threshold). No overlap at any width. -->
-                                        <WrapPanel>
-                                            <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                <TextBlock Text="R" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource Accent}" FontSize="11" FontWeight="SemiBold" />
-                                                <NumericUpDown x:Name="PropRed" Grid.Column="1" MinWidth="66"
-                                                               Minimum="0" Maximum="255" Increment="1" FormatString="0" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                <TextBlock Text="G" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource Ok}" FontSize="11" FontWeight="SemiBold" />
-                                                <NumericUpDown x:Name="PropGreen" Grid.Column="1" MinWidth="66"
-                                                               Minimum="0" Maximum="255" Increment="1" FormatString="0" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                <TextBlock Text="B" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource AccentCool}" FontSize="11" FontWeight="SemiBold" />
-                                                <NumericUpDown x:Name="PropBlue" Grid.Column="1" MinWidth="66"
-                                                               Minimum="0" Maximum="255" Increment="1" FormatString="0" />
-                                            </Grid>
-                                            <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
-                                                <TextBlock Text="A" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
-                                                <NumericUpDown x:Name="PropAlpha" Grid.Column="1" MinWidth="66"
-                                                               Minimum="0" Maximum="255" Increment="1" FormatString="0" />
-                                            </Grid>
-                                        </WrapPanel>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-
-                            <!-- ── Rectangle properties ── -->
-                            <StackPanel x:Name="PropRectPanel" IsVisible="False" Spacing="0">
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="RECTANGLE"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Name" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <TextBox x:Name="PropRectName" Grid.Column="1" FontSize="11" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="X" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRectX" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Y" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRectY" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Scale X" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRectScaleX" Grid.Column="1"
-                                                           Minimum="0.001" Maximum="10000"
-                                                           Increment="0.5" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Scale Y" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropRectScaleY" Grid.Column="1"
-                                                           Minimum="0.001" Maximum="10000"
-                                                           Increment="0.5" FormatString="0.000" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-
-                            <!-- ── Circle properties ── -->
-                            <StackPanel x:Name="PropCirclePanel" IsVisible="False" Spacing="0">
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="0,0,0,1"
-                                        Padding="12,8,12,10">
-                                    <StackPanel Spacing="8">
-                                        <TextBlock Text="CIRCLE"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource InkMid}" />
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Name" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <TextBox x:Name="PropCircleName" Grid.Column="1" FontSize="11" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="X" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropCircleX" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Y" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropCircleY" Grid.Column="1"
-                                                           Minimum="-10000" Maximum="10000"
-                                                           Increment="1" FormatString="0.000" />
-                                        </Grid>
-                                        <Grid ColumnDefinitions="78,*">
-                                            <TextBlock Text="Radius" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                            <NumericUpDown x:Name="PropCircleRadius" Grid.Column="1"
-                                                           Minimum="0.001" Maximum="10000"
-                                                           Increment="0.5" FormatString="0.000" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-
-                        </StackPanel>
-                    </ScrollViewer>
-                </Border>
-
-                <!-- ── History pane splitter ── -->
-                <GridSplitter x:Name="HistorySplitter"
-                              Grid.Row="2"
-                              ResizeDirection="Rows"
-                              Background="{DynamicResource LineBrush}"
-                              HorizontalAlignment="Stretch"
-                              Height="4" />
-
-                <!-- ── History section (header + list) ── -->
-                <Grid x:Name="HistorySectionGrid"
-                      Grid.Row="3"
-                      RowDefinitions="Auto,*">
-
-                    <!-- ── History pane header ── -->
-                    <Border x:Name="HistoryHeaderBorder"
-                            Grid.Row="0"
-                            Background="{DynamicResource BgRail}"
-                            BorderBrush="{DynamicResource LineBrush}"
-                            BorderThickness="1,1,0,1"
-                            Height="36">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0"
-                                       Text="HISTORY"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource InkMid}"
-                                       VerticalAlignment="Center"
-                                       Margin="10,0" />
-                            <StackPanel Grid.Column="1"
-                                        Orientation="Horizontal"
-                                        Spacing="2"
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,4,0">
-                                <Button x:Name="HistoryUndoButton"
-                                        Width="26" Height="26"
-                                        Padding="0"
-                                        HorizontalContentAlignment="Center"
-                                        VerticalContentAlignment="Center"
-                                        ToolTip.Tip="Undo">
-                                    <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor/Assets/icons/svg/IconUndo.svg"
-                                             CurrentColor="{DynamicResource IconInk}" />
-                                </Button>
-                                <Button x:Name="HistoryRedoButton"
-                                        Width="26" Height="26"
-                                        Padding="0"
-                                        HorizontalContentAlignment="Center"
-                                        VerticalContentAlignment="Center"
-                                        ToolTip.Tip="Redo">
-                                    <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor/Assets/icons/svg/IconRedo.svg"
-                                             CurrentColor="{DynamicResource IconInk}" />
-                                </Button>
-                                <Button x:Name="HistoryCloseButton"
-                                        Width="26" Height="26"
-                                        Padding="0"
-                                        HorizontalContentAlignment="Center"
-                                        VerticalContentAlignment="Center"
-                                        ToolTip.Tip="Close History">
-                                    <svg:Svg Width="14" Height="14"
-                                             Path="avares://AnimationEditor/Assets/icons/svg/IconClose.svg"
-                                             CurrentColor="{DynamicResource IconInk}" />
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- ── History list (read-only — no user selection) ── -->
-                    <ScrollViewer x:Name="HistoryScrollViewer"
-                                  Grid.Row="1"
-                                  Background="{DynamicResource BgPanel}"
-                                  BorderBrush="{DynamicResource LineBrush}"
-                                  BorderThickness="1,0,0,0"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="HistoryList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="appModels:HistoryEntryVm">
-                                    <Border Background="{Binding Background}">
-                                        <TextBlock Text="{Binding Description}"
-                                                   FontSize="11"
-                                                   Foreground="{Binding Foreground}"
-                                                   Padding="8,3"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-
-                </Grid>
-
-            </Grid>
         </Grid>
     </DockPanel>
         <!-- Item-deleted undo toast (frames, shapes, animation chains) -->
