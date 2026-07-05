@@ -2,6 +2,8 @@ using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
@@ -183,5 +185,40 @@ public class WireframeMagicWandModeTests
                 $"BottomCoordinate expected ≈{IslandMax}/64 but was {frame.BottomCoordinate}");
         }
         finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    // ── Test 3: toolbar toggle-off falls back to Move mode ────────────────────
+
+    /// <summary>
+    /// Regression test for issue #575: clicking the Magic Wand toolbar toggle a second
+    /// time (turning it off) must fall back to Move mode rather than leaving both
+    /// toolbar toggles unchecked with <see cref="WireframeControl.IsMagicWandMode"/> stuck true.
+    /// </summary>
+    [AvaloniaFact]
+    public void MagicWandToggle_ClickedTwice_FallsBackToMoveMode()
+    {
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var moveToggle = window.FindControl<ToggleButton>("MoveModeToggle")!;
+            var wandToggle = window.FindControl<ToggleButton>("MagicWandToggle")!;
+
+            // Turn Magic Wand on.
+            wandToggle.IsChecked = true;
+            Assert.False(moveToggle.IsChecked);
+            Assert.True(wandToggle.IsChecked);
+
+            // Turn Magic Wand off again by clicking it a second time.
+            wandToggle.IsChecked = false;
+
+            Assert.True(moveToggle.IsChecked);
+            Assert.False(wandToggle.IsChecked);
+
+            var wireframeCtrl = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            Assert.False(wireframeCtrl.IsMagicWandMode);
+        }
+        finally { window.Close(); }
     }
 }
