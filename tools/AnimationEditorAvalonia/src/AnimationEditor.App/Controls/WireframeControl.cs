@@ -552,6 +552,7 @@ public class WireframeControl : Control
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
     private IUndoManager? _undoManager;
+    private Action<string>? _showError;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -564,7 +565,8 @@ public class WireframeControl : Control
         IApplicationEvents events,
         IProjectManager projectManager,
         IUndoManager undoManager,
-        IPendingCutState pendingCutState)
+        IPendingCutState pendingCutState,
+        Action<string>? showError = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -573,6 +575,7 @@ public class WireframeControl : Control
         _events          = events;
         _projectManager  = projectManager;
         _undoManager     = undoManager;
+        _showError       = showError;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -586,6 +589,12 @@ public class WireframeControl : Control
     {
         ClipToBounds = true;
         Focusable = true;
+
+        // Right-click opens this menu with a "View <filename> in Explorer" item for the
+        // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
+        var contextMenu = new ContextMenu();
+        contextMenu.Opening += OnContextMenuOpening;
+        ContextMenu = contextMenu;
 
         // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
@@ -1252,6 +1261,14 @@ public class WireframeControl : Control
     public IReadOnlyList<(SKRect Bounds, bool IsSelected)> GetFrameRects() =>
         _frameRects.Select(fr => (fr.Bounds, fr.IsSelected)).ToList();
 
+    /// <summary>
+    /// Test-only: exposes the drag/hover hit-test result at a screen-space point.
+    /// Avoids asserting on the Avalonia <see cref="Control.Cursor"/> property, which
+    /// exposes no equality on <c>StandardCursorType</c>.
+    /// </summary>
+    public HandleKind HitTestHandleKindAt(float screenX, float screenY) =>
+        HitTestHandle(new Point(screenX, screenY)).handle;
+
     private RenderSnapshot BuildSnapshot(double width, double height)
     {
         var snap = new RenderSnapshot
@@ -1772,20 +1789,6 @@ public class WireframeControl : Control
         InvalidateVisual();
     }
 
-    private SKRect ComputeChainBoundingRect()
-    {
-        float l = float.MaxValue, t = float.MaxValue;
-        float r = float.MinValue, b = float.MinValue;
-        foreach (var fr in _frameRects)
-        {
-            l = MathF.Min(l, fr.Bounds.Left);
-            t = MathF.Min(t, fr.Bounds.Top);
-            r = MathF.Max(r, fr.Bounds.Right);
-            b = MathF.Max(b, fr.Bounds.Bottom);
-        }
-        return new SKRect(l, t, r, b);
-    }
-
     private void UpdatePreview(Point pos)
     {
         if (_bitmap is null) { ClearPreview(); return; }
@@ -1846,19 +1849,23 @@ public class WireframeControl : Control
             // No per-frame handle hit — fall through to composite Move.
         }
 
-        // Single chain or multi-chain composite Move handle.
-        // All hits are treated as Move since resizing the group via the bounding rect is not supported.
+        // Single chain or multi-chain composite Move handle: grab any visible frame to
+        // drag the whole group together. Tested against each individual frame's actual
+        // body (not the union bounding box, and no handle-offset expansion) so a point
+        // in a gap between non-tiling frames — even a narrow gap between two frames
+        // whose expanded handle-hit zones would otherwise overlap — is correctly not a
+        // hit (issue #587). All hits are treated as Move since resizing the group via
+        // the bounding rect is not supported, so there's no need to test handle zones.
         if (_selectedState?.SelectedChain != null && _frameRects.Count > 0)
         {
-            var chainRect = ComputeChainBoundingRect();
-            var sr = ToScreen(chainRect);
+            bool overAnyFrame = _frameRects.Any(fr =>
+            {
+                var sr = ToScreen(fr.Bounds);
+                return pos.X >= sr.Left && pos.X <= sr.Right &&
+                       pos.Y >= sr.Top  && pos.Y <= sr.Bottom;
+            });
 
-            var kind = DragHandleHitTester.GetHandleAt(
-                (float)pos.X, (float)pos.Y,
-                sr.Left, sr.Top, sr.Right, sr.Bottom,
-                handleOffset: 5f);
-
-            if (kind != HandleKind.None)
+            if (overAnyFrame)
                 return (null, HandleKind.Move);
         }
 
@@ -2049,7 +2056,30 @@ public class WireframeControl : Control
         RaiseViewChanged();
     }
 
-    private string? DetermineTexturePath()
+    /// <summary>
+    /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
+    /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
+    /// </summary>
+    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var absPath = DetermineTexturePath();
+        if (ContextMenu is not { } menu || absPath is null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        menu.Items.Clear();
+        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
+        item.Click += (_, _) =>
+        {
+            var error = ShellExplorer.RevealFile(absPath);
+            if (error is not null) _showError?.Invoke(error);
+        };
+        menu.Items.Add(item);
+    }
+
+    internal string? DetermineTexturePath()
     {
         string? textureName = _selectedState!.SelectedFrame?.TextureName
                            ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
