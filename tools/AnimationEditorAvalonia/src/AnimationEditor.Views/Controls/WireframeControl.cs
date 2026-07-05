@@ -846,8 +846,17 @@ public class WireframeControl : Control
     {
         var path = _loadedTexturePath;
         if (path == null) return;
+        // LoadTexture only restores a saved camera when _cameraByTexture has an entry for this
+        // path, which is populated on cross-texture switches, not on the very first load of a
+        // texture. Without saving/restoring here, a hot-reload of the only texture ever opened
+        // would find no entry and fall through to CenterTexture(), resetting pan/zoom (#584).
+        var savedCamera = (_panX, _panY, _zoom);
         _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
         LoadTexture(new FilePath(path).StandardizedCaseSensitive);
+        (_panX, _panY, _zoom) = savedCamera;
+        ClampCamera();
+        RaiseViewChanged();
+        InvalidateVisual();
     }
 
     /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit). Zooms toward the
