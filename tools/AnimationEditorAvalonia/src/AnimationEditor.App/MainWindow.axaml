@@ -468,11 +468,17 @@
                         <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
                             <Setter Property="Width" Value="10" />
                         </Style>
+                        <!-- Issue #586: the 10px indent column above (kept narrow so tree content isn't
+                             pushed right) makes a poor click target on its own. A negative margin lets
+                             the ToggleButton overflow that column — enlarging the hit-test area — while
+                             the container's own width, and the 12×12 chevron icon centered inside, stay
+                             visually unchanged. -->
                         <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
                             <Setter Property="VerticalAlignment" Value="Stretch" />
                             <Setter Property="HorizontalAlignment" Value="Stretch" />
                             <Setter Property="Width" Value="NaN" />
                             <Setter Property="Height" Value="NaN" />
+                            <Setter Property="Margin" Value="-6,-3,-6,-3" />
                             <Setter Property="Template">
                                 <ControlTemplate>
                                     <Border Background="Transparent">
@@ -681,8 +687,12 @@
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"
                                 Height="26" Margin="0,0,2,0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
+                                <!-- MinHeight 0 + Padding override (#501-style): Fluent forces a
+                                     ToggleButton min height of ~32 and a vertical Padding that, combined
+                                     with this Border's Height=26 + ClipToBounds, squeezed and clipped
+                                     text descenders (e.g. the "g" in "Magic"). -->
                                 <ToggleButton x:Name="MoveModeToggle"
-                                              Height="26"
+                                              Height="26" MinHeight="0" Padding="10,0"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="3,0,0,3"
                                               ToolTip.Tip="Move mode — drag handles to resize/move frames">
@@ -696,7 +706,7 @@
                                 </ToggleButton>
                                 <Border Width="1" Background="{DynamicResource LineBrush}" />
                                 <ToggleButton x:Name="MagicWandToggle"
-                                              Height="26"
+                                              Height="26" MinHeight="0" Padding="10,0"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="0,3,3,0"
                                               ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">
@@ -830,7 +840,15 @@
 
                 <!-- ── Preview block: toolbar + animated canvas + timeline ── -->
                 <!-- GridSplitter at Row 2 resizes Row 1 (wireframe) and Row 3 (this block). -->
-                <Grid Grid.Row="3" RowDefinitions="Auto,*,52" MinHeight="80">
+                <Grid x:Name="PreviewBlockGrid" Grid.Row="3" MinHeight="80">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <!-- Fixed height for the single-row timeline; grown in code-behind (see
+                             PreviewBlockGrid.RowDefinitions[2]) while the multi-select group
+                             preview (#576) shows 2+ track rows. -->
+                        <RowDefinition Height="52" />
+                    </Grid.RowDefinitions>
 
                     <!-- ── Preview toolbar ── -->
                     <Border Grid.Row="0"
@@ -1050,6 +1068,92 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
+                            </Border>
+
+                            <!-- Multi-select group preview timeline (#576): one row per selected
+                                 AnimationChain, each with its own frame cells and playhead. Shown
+                                 instead of TimelineScrubSurface when 2+ chains are selected. -->
+                            <Border x:Name="GroupTimelineScrubHost"
+                                    Grid.Row="1"
+                                    Background="{DynamicResource BgCanvas}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="0,0,0,0"
+                                    IsVisible="False">
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="GroupTimelineTracks">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:ChainTimelineTrackVm">
+                                                <Grid ColumnDefinitions="70,*" Height="40">
+                                                    <Border Grid.Column="0"
+                                                            Background="{DynamicResource BgRail}"
+                                                            BorderBrush="{DynamicResource LineBrush}"
+                                                            BorderThickness="0,0,1,1"
+                                                            Padding="6,0">
+                                                        <TextBlock Text="{Binding ChainName}"
+                                                                   FontSize="9" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource InkDim}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </Border>
+                                                    <Border Grid.Column="1"
+                                                            Background="{DynamicResource BgCanvas}"
+                                                            BorderBrush="{DynamicResource LineBrush}"
+                                                            BorderThickness="0,0,0,1"
+                                                            Cursor="Hand">
+                                                        <ItemsControl x:Name="TrackFramesList"
+                                                                      ItemsSource="{Binding Frames}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="models:TimelineFrameVm">
+                                                                    <Grid Width="{Binding Width}" Height="38">
+                                                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                                                BorderThickness="0,0,1,0"
+                                                                                Background="{DynamicResource BgPanel}">
+                                                                            <StackPanel VerticalAlignment="Center"
+                                                                                        HorizontalAlignment="Center"
+                                                                                        Spacing="2">
+                                                                                <Border Width="22" Height="18"
+                                                                                        Background="{DynamicResource BgCanvas}"
+                                                                                        BorderBrush="{DynamicResource LineStrong}"
+                                                                                        BorderThickness="1"
+                                                                                        CornerRadius="2">
+                                                                                    <Image Source="{Binding Thumbnail}"
+                                                                                           Stretch="Uniform" />
+                                                                                </Border>
+                                                                                <TextBlock Text="{Binding IndexLabel}"
+                                                                                           HorizontalAlignment="Center"
+                                                                                           FontSize="9"
+                                                                                           Foreground="{DynamicResource InkDim}" />
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                        <Canvas ClipToBounds="True"
+                                                                                IsHitTestVisible="False"
+                                                                                IsVisible="{Binding IsCurrent}">
+                                                                            <Border Width="2"
+                                                                                    Height="38"
+                                                                                    Background="{DynamicResource Accent}"
+                                                                                    Canvas.Left="{Binding ScrubberOffset}" />
+                                                                        </Canvas>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </Border>
                         </Grid>
                     </Grid>

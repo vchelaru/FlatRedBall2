@@ -190,8 +190,15 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
         void HandleReorder(int delta);
-        void FlipFrameHorizontally(AnimationFrameSave frame);
-        void FlipFrameVertically(AnimationFrameSave frame);
+        /// <summary>
+        /// Sets the horizontal/vertical flip flags on every frame in <paramref name="frames"/> as one
+        /// undo step. Each axis is absolute (not a toggle): pass <c>null</c> for an axis to leave it
+        /// untouched (used when the inspector checkbox is showing a mixed/indeterminate multi-selection
+        /// state and the user didn't interact with it). Only frames whose flag actually changes are
+        /// mirrored (offset and attached shapes negated) — a frame already at the target state is a
+        /// no-op for that axis.
+        /// </summary>
+        void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical);
         void FlipChainHorizontally(AnimationChainSave chain);
         void FlipChainVertically(AnimationChainSave chain);
         void InvertFrameOrder(AnimationChainSave chain);
@@ -239,12 +246,27 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
 
-        void SetFrameLength(AnimationFrameSave frame, float newLength);
-        void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY);
-        void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue);
-        void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation);
-        void SetFrameAlpha(AnimationFrameSave frame, int? alpha);
-        void SetFramePixelRegion(AnimationFrameSave frame, int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH);
+        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength);
+
+        /// <summary>
+        /// Sets RelativeX/Y on every frame in <paramref name="frames"/>. Either axis may be
+        /// <c>null</c> to leave it untouched per-frame (its own existing value survives) — used when
+        /// the inspector field is showing "(mixed)" and the user only edited the other axis. Unlike
+        /// color channels, there is no legitimate "clear to null" target for this field, so <c>null</c>
+        /// unambiguously means "don't touch".
+        /// </summary>
+        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY);
+        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
+        void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
+        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
+
+        /// <summary>
+        /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the
+        /// four may be <c>null</c> to leave that component untouched per-frame — used when the
+        /// inspector field is showing "(mixed)" and the user only edited one of the four. See
+        /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
+        /// </summary>
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 

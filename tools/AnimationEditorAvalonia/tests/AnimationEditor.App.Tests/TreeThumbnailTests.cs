@@ -91,7 +91,7 @@ public class TreeThumbnailTests
             Assert.NotNull(initialThumbnail);
 
             // Flip the first frame and notify the system via the event bus (the same path
-            // taken by FlipFrameHorizontally and undo/redo).
+            // taken by SetFrameFlip and undo/redo).
             chain.Frames[0].FlipHorizontal = true;
             ctx.ApplicationEvents.RaiseAnimationChainsChanged();
             Dispatcher.UIThread.RunJobs();

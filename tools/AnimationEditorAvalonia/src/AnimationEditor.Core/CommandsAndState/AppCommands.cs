@@ -925,16 +925,29 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        public void FlipFrameHorizontally(AnimationFrameSave frame)
+        public void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical)
         {
-            _undoManager.Execute(new FlipCommand(
-                new[] { frame }, horizontal: true, this, _events, RefreshWireframe));
-        }
+            // Absolute set, not toggle: only the frames whose flag actually differs from the target
+            // get flipped (and their offset/shapes mirrored), so a frame already at the target state
+            // is untouched. Reuses FlipCommand's toggle for exactly those frames, grouped into one
+            // undo step via CompositeCommand.
+            var commands = new List<IUndoableCommand>();
 
-        public void FlipFrameVertically(AnimationFrameSave frame)
-        {
-            _undoManager.Execute(new FlipCommand(
-                new[] { frame }, horizontal: false, this, _events, RefreshWireframe));
+            if (flipHorizontal.HasValue)
+            {
+                var toFlip = frames.Where(f => f.FlipHorizontal != flipHorizontal.Value).ToArray();
+                if (toFlip.Length > 0)
+                    commands.Add(new FlipCommand(toFlip, horizontal: true, this, _events, RefreshWireframe));
+            }
+            if (flipVertical.HasValue)
+            {
+                var toFlip = frames.Where(f => f.FlipVertical != flipVertical.Value).ToArray();
+                if (toFlip.Length > 0)
+                    commands.Add(new FlipCommand(toFlip, horizontal: false, this, _events, RefreshWireframe));
+            }
+
+            if (commands.Count == 0) return;
+            _undoManager.Execute(new CompositeCommand(commands, "Set Flip"));
         }
 
         public void FlipChainHorizontally(AnimationChainSave chain)
@@ -1388,62 +1401,73 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }
 
-        public void SetFrameLength(AnimationFrameSave frame, float newLength)
+        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength)
         {
-            var desc = $"Set Length: {frame.FrameLength:0.###}s → {newLength:0.###}s";
+            var desc = $"Set Length: {newLength:0.###}s";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.FrameLength = newLength,
+                frames, () => { foreach (var f in frames) f.FrameLength = newLength; },
                 this, _events, false, desc));
         }
 
-        public void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY)
+        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
         {
-            var desc = $"Set Offset: ({newRelX:0.##}, {newRelY:0.##})";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => { frame.RelativeX = newRelX; frame.RelativeY = newRelY; },
-                this, _events, true, desc));
+                frames, () =>
+                {
+                    foreach (var f in frames)
+                    {
+                        if (newRelX.HasValue) f.RelativeX = newRelX.Value;
+                        if (newRelY.HasValue) f.RelativeY = newRelY.Value;
+                    }
+                },
+                this, _events, true, "Set Offset"));
         }
 
-        public void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue)
+        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
         {
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
             // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => { frame.Red = red; frame.Green = green; frame.Blue = blue; },
+                frames, () => { foreach (var f in frames) { f.Red = red; f.Green = green; f.Blue = blue; } },
                 this, _events, false, "Set Frame Color"));
         }
 
-        public void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation)
+        public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
         {
             // Mode drives how the preview + timeline/tree thumbnails tint; it doesn't touch the
             // wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.ColorOperation = operation,
+                frames, () => { foreach (var f in frames) f.ColorOperation = operation; },
                 this, _events, false, "Set Frame Color Mode"));
         }
 
-        public void SetFrameAlpha(AnimationFrameSave frame, int? alpha)
+        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
         {
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
             // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.Alpha = alpha,
+                frames, () => { foreach (var f in frames) f.Alpha = alpha; },
                 this, _events, false, "Set Frame Alpha"));
         }
 
-        public void SetFramePixelRegion(AnimationFrameSave frame,
-            int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH)
+        public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
+            int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
         {
-            var desc = $"Set Region: ({pixelX}, {pixelY}) {pixelW}×{pixelH}";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () =>
+                frames, () =>
                 {
-                    PixelFrameEditor.SetX(frame, pixelX, bmpW);
-                    PixelFrameEditor.SetY(frame, pixelY, bmpH);
-                    PixelFrameEditor.SetWidth(frame, pixelW, bmpW);
-                    PixelFrameEditor.SetHeight(frame, pixelH, bmpH);
+                    foreach (var f in frames)
+                    {
+                        // Order matters: SetX/SetY preserve each frame's own current width/height, so
+                        // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
+                        // (possibly just-moved) Left/Top.
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                    }
                 },
-                this, _events, true, desc));
+                this, _events, true, "Set Region"));
         }
 
         public void SetRectProps(AnimationFrameSave? frame, AARectSave rect,
