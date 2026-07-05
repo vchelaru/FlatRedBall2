@@ -1,4 +1,5 @@
-﻿using AnimationEditor.App.Theming;
+﻿using AnimationEditor.App.Services;
+using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
@@ -890,6 +891,8 @@ public partial class MainWindow : Window
         WireframeCtrl.ChainRegionChanged     += OnChainRegionChanged;
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
+        // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
+        WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // The combo follows every tick of a smooth wheel-zoom (#425); the companion file is only
         // persisted once the animation settles (IsZoomAnimating == false), not on every frame.
         WireframeCtrl.ZoomChanged            += zoomPct =>
@@ -2076,15 +2079,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        string? firstFile = e.DataTransfer.TryGetFiles()?
-            .FirstOrDefault()?.Path.LocalPath;
-
-        if (firstFile is null)
-        {
-            firstFile = e.DataTransfer.Items?
-                .Select(i => i.TryGetFile())
-                .FirstOrDefault(f => f is not null)?.Path.LocalPath;
-        }
+        string? firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
 
         if (string.IsNullOrEmpty(firstFile) ||
             !string.Equals(Path.GetExtension(firstFile), ".png", StringComparison.OrdinalIgnoreCase))
@@ -2107,7 +2102,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OnTreeDrop(object? sender, DragEventArgs e)
+    private async void OnTreeDrop(object? sender, DragEventArgs e)
     {
         // Internal frame reorder drop — perform the move and let the external .png path below
         // stay untouched (external file drags never carry the frame marker format).
@@ -2132,7 +2127,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var firstFile = GetFirstDroppedFilePath(e);
+        var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
         Trace.WriteLine($"[DragDrop] OnTreeDrop: firstFile={firstFile ?? "(null)"}, FileName={_projectManager.FileName ?? "(null)"}");
 
         if (string.IsNullOrEmpty(firstFile))
@@ -2141,91 +2136,74 @@ public partial class MainWindow : Window
             return;
         }
 
-        // If no ACHX is saved yet, allow the drop but use an absolute texture path.
-        // Relative-path conversion requires a base directory; without one we fall back to absolute.
-        if (string.IsNullOrEmpty(_projectManager.FileName))
-        {
-            Trace.WriteLine("[DragDrop] Warning: no ACHX file saved yet — texture path will be absolute");
-        }
-
         var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
+        bool applied = await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        if (applied)
+            e.Handled = true;
+    }
+
+    /// <summary>
+    /// Single apply path for every PNG-drop entry point (ANIMATIONS tree — including PNGs
+    /// dragged in from the Files panel, which already ride the same OS drag/drop payload —
+    /// and the wireframe canvas, see issue #560). Prompts to copy the file alongside the .achx
+    /// when it lives outside the achx/project folder (<see cref="TextureCopyDecider"/>), computes
+    /// the drop via <see cref="TextureDropProcessor.ComputePngDrop"/>, and applies + refreshes.
+    /// Returns <see langword="true"/> when the drop actually changed something.
+    /// </summary>
+    private async Task<bool> HandlePngDropAsync(
+        AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
+        string droppedFilePath, bool createFrameOnCtrl)
+    {
+        if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string resolvedFilePath = droppedFilePath;
+        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+
+        if (!string.IsNullOrEmpty(achxFolder) &&
+            TextureCopyDecider.ShouldPromptToCopy(droppedFilePath, achxFolder, _appState.ProjectFolder))
+        {
+            var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
+            if (choice == TextureCopyChoice.Cancel) return false;
+
+            if (choice == TextureCopyChoice.Copy)
+            {
+                string destination = Path.Combine(achxFolder, Path.GetFileName(droppedFilePath));
+                try
+                {
+                    File.Copy(droppedFilePath, destination, overwrite: true);
+                    resolvedFilePath = destination;
+                }
+                catch (Exception ex)
+                {
+                    ShowToast($"Could not copy: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
         var (result, relPath) = TextureDropProcessor.ComputePngDrop(
-            targetChain,
-            targetFrame,
-            firstFile,
-            _projectManager.FileName,
-            e.KeyModifiers.HasFlag(KeyModifiers.Control));
+            targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
         Trace.WriteLine($"[DragDrop] Result={result}");
 
-        if (result == TextureDropResult.NotApplied)
+        bool applied = TextureDropApplier.Apply(_appCommands, _selectedState, targetChain, targetFrame, result, relPath);
+        if (!applied)
         {
             Trace.WriteLine("[DragDrop] NotApplied — no chain or frame targeted, or non-PNG dropped");
-            return;
-        }
-
-        switch (result)
-        {
-            case TextureDropResult.UpdatedFrame:
-                _appCommands.SetFrameTextureName(targetFrame!, relPath);
-                _appCommands.RefreshTreeNode(targetFrame!);
-                _selectedState.SelectedFrame = targetFrame!;
-                break;
-
-            case TextureDropResult.CreatedFrame:
-                _appCommands.AddFrame(targetChain!, relPath);
-                var createdFrame = targetChain!.Frames.LastOrDefault();
-                if (createdFrame is not null)
-                    _selectedState.SelectedFrame = createdFrame;
-                break;
-
-            case TextureDropResult.UpdatedChainFrames:
-                _appCommands.SetAllFramesTextureName(targetChain!, relPath);
-                _appCommands.RefreshTreeNode(targetChain!);
-                _selectedState.SelectedChain = targetChain;
-                break;
+            return false;
         }
 
         RefreshTextureCombo();
         _appCommands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
         _appCommands.SyncHotReloadWatcher();  // watch the newly-referenced PNG directory
-        e.Handled = true;
-    }
-
-    private static string? GetFirstDroppedFilePath(DragEventArgs e)
-    {
-        // Log item formats so we can see exactly what the OS provides
-        var itemFormats = e.DataTransfer.Items?
-            .Select(i => "[" + string.Join(",", i.Formats) + "]")
-            .ToList();
-        Trace.WriteLine($"[DragDrop] Items and their formats: {(itemFormats == null ? "(null)" : string.Join(" ", itemFormats))}");
-        Trace.WriteLine($"[DragDrop] Contains(DataFormat.File)={e.DataTransfer.Contains(DataFormat.File)}");
-
-        // Correct Avalonia 12 API for OS file drops
-        var files = e.DataTransfer.TryGetFiles()?.ToList();
-        Trace.WriteLine($"[DragDrop] TryGetFiles() count={files?.Count ?? -1}");
-        if (files?.Count > 0)
-        {
-            var path = files[0].Path.LocalPath;
-            Trace.WriteLine($"[DragDrop] resolved path={path}");
-            return path;
-        }
-
-        // Fallback: per-item TryGetFile()
-        var items = e.DataTransfer.Items?.ToList();
-        Trace.WriteLine($"[DragDrop] Items count={items?.Count ?? -1}");
-        foreach (var item in items ?? new())
-            Trace.WriteLine($"[DragDrop] Item: Formats=[{string.Join(",", item.Formats)}] TryGetFile={item.TryGetFile()?.Path?.LocalPath ?? "(null)"}");
-
-        var fallback = items?
-            .Select(item => item.TryGetFile())
-            .FirstOrDefault(f => f is not null);
-        Trace.WriteLine($"[DragDrop] Items fallback resolved={fallback?.Path.LocalPath ?? "(null)"}");
-        return fallback?.Path.LocalPath;
+        return true;
     }
 
     private TreeNodeVm? GetTreeNodeAtDropPosition(DragEventArgs e)
@@ -3491,11 +3469,7 @@ public partial class MainWindow : Window
 
         if (!string.IsNullOrEmpty(achxFolder))
         {
-            bool isInAchxFolder    = IsPathUnder(pickedPath, achxFolder);
-            bool isInProjectFolder = !string.IsNullOrEmpty(_appState.ProjectFolder)
-                                     && IsPathUnder(pickedPath, _appState.ProjectFolder);
-
-            if (!isInAchxFolder && !isInProjectFolder)
+            if (TextureCopyDecider.ShouldPromptToCopy(pickedPath, achxFolder, _appState.ProjectFolder))
             {
                 var choice = await ShowTextureCopyDialogAsync(pickedPath);
                 if (choice == TextureCopyChoice.Cancel) return;
@@ -3580,14 +3554,6 @@ public partial class MainWindow : Window
 
         await dialog.ShowDialog(this);
         return await tcs.Task;
-    }
-
-    private static bool IsPathUnder(string path, string folder)
-    {
-        char sep = Path.DirectorySeparatorChar;
-        string normPath   = Path.GetFullPath(path).TrimEnd(sep);
-        string normFolder = Path.GetFullPath(folder).TrimEnd(sep) + sep;
-        return normPath.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase);
     }
 
     private void RefreshPropertyPanel()
