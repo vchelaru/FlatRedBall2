@@ -830,7 +830,15 @@
 
                 <!-- ── Preview block: toolbar + animated canvas + timeline ── -->
                 <!-- GridSplitter at Row 2 resizes Row 1 (wireframe) and Row 3 (this block). -->
-                <Grid Grid.Row="3" RowDefinitions="Auto,*,52" MinHeight="80">
+                <Grid x:Name="PreviewBlockGrid" Grid.Row="3" MinHeight="80">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <!-- Fixed height for the single-row timeline; grown in code-behind (see
+                             PreviewBlockGrid.RowDefinitions[2]) while the multi-select group
+                             preview (#576) shows 2+ track rows. -->
+                        <RowDefinition Height="52" />
+                    </Grid.RowDefinitions>
 
                     <!-- ── Preview toolbar ── -->
                     <Border Grid.Row="0"
@@ -1050,6 +1058,92 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
+                            </Border>
+
+                            <!-- Multi-select group preview timeline (#576): one row per selected
+                                 AnimationChain, each with its own frame cells and playhead. Shown
+                                 instead of TimelineScrubSurface when 2+ chains are selected. -->
+                            <Border x:Name="GroupTimelineScrubHost"
+                                    Grid.Row="1"
+                                    Background="{DynamicResource BgCanvas}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="0,0,0,0"
+                                    IsVisible="False">
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl x:Name="GroupTimelineTracks">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:ChainTimelineTrackVm">
+                                                <Grid ColumnDefinitions="70,*" Height="40">
+                                                    <Border Grid.Column="0"
+                                                            Background="{DynamicResource BgRail}"
+                                                            BorderBrush="{DynamicResource LineBrush}"
+                                                            BorderThickness="0,0,1,1"
+                                                            Padding="6,0">
+                                                        <TextBlock Text="{Binding ChainName}"
+                                                                   FontSize="9" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource InkDim}"
+                                                                   VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </Border>
+                                                    <Border Grid.Column="1"
+                                                            Background="{DynamicResource BgCanvas}"
+                                                            BorderBrush="{DynamicResource LineBrush}"
+                                                            BorderThickness="0,0,0,1"
+                                                            Cursor="Hand">
+                                                        <ItemsControl x:Name="TrackFramesList"
+                                                                      ItemsSource="{Binding Frames}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="models:TimelineFrameVm">
+                                                                    <Grid Width="{Binding Width}" Height="38">
+                                                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                                                BorderThickness="0,0,1,0"
+                                                                                Background="{DynamicResource BgPanel}">
+                                                                            <StackPanel VerticalAlignment="Center"
+                                                                                        HorizontalAlignment="Center"
+                                                                                        Spacing="2">
+                                                                                <Border Width="22" Height="18"
+                                                                                        Background="{DynamicResource BgCanvas}"
+                                                                                        BorderBrush="{DynamicResource LineStrong}"
+                                                                                        BorderThickness="1"
+                                                                                        CornerRadius="2">
+                                                                                    <Image Source="{Binding Thumbnail}"
+                                                                                           Stretch="Uniform" />
+                                                                                </Border>
+                                                                                <TextBlock Text="{Binding IndexLabel}"
+                                                                                           HorizontalAlignment="Center"
+                                                                                           FontSize="9"
+                                                                                           Foreground="{DynamicResource InkDim}" />
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                        <Canvas ClipToBounds="True"
+                                                                                IsHitTestVisible="False"
+                                                                                IsVisible="{Binding IsCurrent}">
+                                                                            <Border Width="2"
+                                                                                    Height="38"
+                                                                                    Background="{DynamicResource Accent}"
+                                                                                    Canvas.Left="{Binding ScrubberOffset}" />
+                                                                        </Canvas>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </Border>
                         </Grid>
                     </Grid>
