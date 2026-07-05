@@ -1658,6 +1658,7 @@ public partial class MainWindow : Window
         };
 
         TimelineStrip.ItemsSource = _timelineFrames;
+        GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
         PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
         PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
@@ -1677,6 +1678,8 @@ public partial class MainWindow : Window
         PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
         PreviewCtrl.Playback.FrameIndexChanged += OnPreviewPlaybackFrameIndexChanged;
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
+        PreviewCtrl.GroupTracksChanged += RefreshGroupTimelineTracks;
+        PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
         // Two-way sync between the manual pan and the scrollbars, mirroring the
@@ -1831,6 +1834,14 @@ public partial class MainWindow : Window
     // Structure of the strip the cells were last built from; compared on each refresh so a
     // pure selection change (scrub) skips the clear-and-rebuild (#452).
     private TimelineStripSignature? _timelineSignature;
+
+    // ── Multi-select group preview timeline (#576) ──────────────────────────────
+    // One row per selected chain, rebuilt whenever PreviewCtrl.GroupTracksChanged fires
+    // (chain added/removed from the group) — never on every render or unrelated selection change.
+    private readonly ObservableCollection<ChainTimelineTrackVm> _groupTimelineTracks = new();
+    private bool _isGroupTimelineScrubbing;
+    private ChainTimelineTrackVm? _groupScrubTrack;
+    private ItemsControl? _groupScrubFramesList;
 
     private void WireTreeView()
     {
@@ -2990,8 +3001,29 @@ public partial class MainWindow : Window
         }
     }
 
+    // The single-row timeline's fixed height (14px ruler + one ~38px frame-cell row).
+    private const double SingleTimelineAreaHeight = 52;
+    // Group-preview timeline area (#576): tall enough for ~4 track rows at once; more chains
+    // scroll within GroupTimelineScrubHost's ScrollViewer rather than growing the row further.
+    private const double GroupTimelineAreaHeight = 160;
+
     private void RefreshTimelineStrip()
     {
+        // Multi-select group preview (#576): 2+ whole chains selected swaps the single-row strip
+        // for a per-chain track stack. TimelineScrubSurface/GroupTimelineScrubHost occupy the same
+        // grid cell, so only one is ever visible. The host row is also grown so the extra track
+        // rows aren't clipped to the single-row strip's original fixed height.
+        bool groupActive = _selectedState.SelectedChains.Count >= 2;
+        TimelineScrubSurface.IsVisible = !groupActive;
+        GroupTimelineScrubHost.IsVisible = groupActive;
+        PreviewBlockGrid.RowDefinitions[2].Height =
+            new GridLength(groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight);
+        if (groupActive)
+        {
+            RefreshGroupTimelineTracks();
+            return;
+        }
+
         var chain = GetTimelineChain();
 
         // Only clear-and-rebuild the cells when the frame structure (chain identity, count,
@@ -3044,6 +3076,110 @@ public partial class MainWindow : Window
         double elapsed = PreviewCtrl.Playback.FrameElapsed;
         double travelWidth = Math.Max(0, _timelineFrames[frameIndex].Width - TimelineFrameVm.PlayheadWidth);
         _timelineFrames[frameIndex].ScrubberOffset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
+    }
+
+    // ── Multi-select group preview timeline (#576) ──────────────────────────────
+
+    /// <summary>
+    /// Rebuilds the per-chain track rows from <see cref="PreviewControl.GroupTracks"/>. Fired by
+    /// <see cref="PreviewControl.GroupTracksChanged"/> — only when the group's chain membership
+    /// actually changes, not on every render or unrelated selection change.
+    /// </summary>
+    private void RefreshGroupTimelineTracks()
+    {
+        _groupTimelineTracks.Clear();
+
+        foreach (var (chain, _) in PreviewCtrl.GroupTracks)
+        {
+            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain));
+            if (chain.Frames.Count > 0)
+            {
+                var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
+                for (int i = 0; i < chain.Frames.Count && i < track.Frames.Count; i++)
+                    track.Frames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], colors[i], 22, 18);
+            }
+            _groupTimelineTracks.Add(track);
+        }
+
+        RefreshGroupTimelineScrubbers();
+    }
+
+    /// <summary>
+    /// Updates every track's current-frame highlight and sub-frame playhead offset from its own
+    /// PlaybackController. Fired by <see cref="PreviewControl.GroupPlaybackTicked"/> on every
+    /// group-mode timer tick and after a per-track scrub.
+    /// </summary>
+    private void RefreshGroupTimelineScrubbers()
+    {
+        foreach (var (chain, playback) in PreviewCtrl.GroupTracks)
+        {
+            var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
+            if (track is null || track.Frames.Count == 0) continue;
+
+            int idx = Math.Clamp(playback.CurrentFrameIndex, 0, track.Frames.Count - 1);
+            for (int i = 0; i < track.Frames.Count; i++)
+                track.Frames[i].IsCurrent = i == idx;
+
+            double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
+            double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
+            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * pps, travelWidth);
+        }
+    }
+
+    private (ChainTimelineTrackVm Track, ItemsControl FramesList)? FindGroupTrackAndFramesList(PointerEventArgs e)
+    {
+        if (e.Source is not Avalonia.Visual source) return null;
+        var self = new[] { source }.Concat(source.GetVisualAncestors());
+        var framesList = self.OfType<ItemsControl>().FirstOrDefault(ic => ic.Name == "TrackFramesList");
+        return framesList?.DataContext is ChainTimelineTrackVm track ? (track, framesList) : null;
+    }
+
+    private void OnGroupTimelinePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(GroupTimelineTracks).Properties.IsLeftButtonPressed) return;
+        var hit = FindGroupTrackAndFramesList(e);
+        if (hit is null) return;
+
+        _isGroupTimelineScrubbing = true;
+        _groupScrubTrack = hit.Value.Track;
+        _groupScrubFramesList = hit.Value.FramesList;
+        e.Pointer.Capture(GroupTimelineTracks);
+        ScrubGroupTimelineToPointer(e);
+    }
+
+    private void OnGroupTimelinePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_isGroupTimelineScrubbing) ScrubGroupTimelineToPointer(e);
+    }
+
+    private void OnGroupTimelinePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isGroupTimelineScrubbing) return;
+        _isGroupTimelineScrubbing = false;
+        _groupScrubTrack = null;
+        _groupScrubFramesList = null;
+        e.Pointer.Capture(null);
+    }
+
+    /// <summary>
+    /// Scrubs the track captured at press time to the pointer's position within its own frames
+    /// list. Position is resolved against the captured <see cref="_groupScrubFramesList"/>, not
+    /// <c>e.Source</c>, since pointer capture keeps routing move/release events to
+    /// <c>GroupTimelineTracks</c> regardless of which row is physically under the cursor.
+    /// </summary>
+    private void ScrubGroupTimelineToPointer(PointerEventArgs e)
+    {
+        var track = _groupScrubTrack;
+        var framesList = _groupScrubFramesList;
+        if (track is null || framesList is null || track.Frames.Count == 0) return;
+
+        double contentX = e.GetPosition(framesList).X;
+        var widths = new double[track.Frames.Count];
+        for (int i = 0; i < widths.Length; i++) widths[i] = track.Frames[i].Width;
+
+        var result = TimelineScrubMapper.Resolve(contentX, widths);
+        // Fires GroupPlaybackTicked synchronously, which refreshes every track's playhead.
+        PreviewCtrl.ScrubGroupTrack(track.Chain, result.FrameIndex, result.Fraction);
     }
 
     private AnimationChainSave? GetTimelineChain()
@@ -3902,6 +4038,15 @@ public partial class MainWindow : Window
         TimelineScrubSurface.AddHandler(InputElement.PointerMovedEvent, OnTimelinePointerMoved,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         TimelineScrubSurface.AddHandler(InputElement.PointerReleasedEvent, OnTimelinePointerReleased,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+
+        // Multi-select group preview timeline (#576) — same tunnel+bubble pattern, scoped to
+        // whichever track row's frames list is under the pointer at press time.
+        GroupTimelineTracks.AddHandler(InputElement.PointerPressedEvent, OnGroupTimelinePointerPressed,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        GroupTimelineTracks.AddHandler(InputElement.PointerMovedEvent, OnGroupTimelinePointerMoved,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        GroupTimelineTracks.AddHandler(InputElement.PointerReleasedEvent, OnGroupTimelinePointerReleased,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
