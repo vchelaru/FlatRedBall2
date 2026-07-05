@@ -20,6 +20,9 @@ using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using AnimationEditor.App.Services;
+using AnimationEditor.Core.DragDrop;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.App.Controls;
@@ -532,6 +535,14 @@ public class WireframeControl : Control
     /// </summary>
     public event Action<int, int, int, int>? FrameCreatedFromRegion;
 
+    /// <summary>
+    /// Set by <c>MainWindow</c> to apply a PNG dropped onto the canvas — the same path used by
+    /// the ANIMATIONS tree's PNG drop (issue #560): (targetChain, targetFrame, droppedFilePath,
+    /// ctrlHeld) → true if the drop was applied. Left null in standalone/test contexts, where
+    /// a drop is simply ignored.
+    /// </summary>
+    public Func<AnimationChainSave?, AnimationFrameSave?, string, bool, Task<bool>>? HandlePngDrop { get; set; }
+
     // ── Injected services ─────────────────────────────────────────────────────
 
     private ISelectedState? _selectedState;
@@ -594,7 +605,50 @@ public class WireframeControl : Control
         // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
         DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
 
+        // PNG drop (issue #560) — same DragOver/Drop plumbing as the ANIMATIONS tree
+        // (OnTreeDragOver/OnTreeDrop in MainWindow), targeting the current selection instead
+        // of a hovered tree node.
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnPngDragOver);
+        AddHandler(DragDrop.DropEvent, OnPngDrop);
+
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
+    }
+
+    // ── PNG drop ──────────────────────────────────────────────────────────────
+
+    private void OnPngDragOver(object? sender, DragEventArgs e)
+    {
+        var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
+
+        var wouldApply = !string.IsNullOrEmpty(firstFile) &&
+            TextureDropProcessor.ComputePngDrop(
+                _selectedState?.SelectedChain,
+                _selectedState?.SelectedFrame,
+                firstFile,
+                _projectManager?.FileName,
+                e.KeyModifiers.HasFlag(KeyModifiers.Control)).Result
+            != TextureDropResult.NotApplied;
+
+        e.DragEffects = wouldApply ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnPngDrop(object? sender, DragEventArgs e)
+    {
+        var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
+        if (string.IsNullOrEmpty(firstFile) || HandlePngDrop is null)
+            return;
+
+        // SelectedFrame's setter keeps SelectedChain in sync with its parent, so this already
+        // falls back to the selected chain (whole-chain retexture/create-first-frame) the same
+        // way SyncTextureCombo's texture-preview lookup does when no frame is selected.
+        var applied = await HandlePngDrop(
+            _selectedState?.SelectedChain, _selectedState?.SelectedFrame,
+            firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
+
+        if (applied)
+            e.Handled = true;
     }
 
     // ── Camera clamping + scrollbar integration ───────────────────────────────

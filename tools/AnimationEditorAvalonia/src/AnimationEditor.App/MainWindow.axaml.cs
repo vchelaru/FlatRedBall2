@@ -1,4 +1,5 @@
-﻿using AnimationEditor.App.Theming;
+﻿using AnimationEditor.App.Services;
+using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
@@ -75,16 +76,18 @@ public partial class MainWindow : Window
     private Border? _frameDropLine;
     private Border? _frameDropBox;
 
-    // ── Chain drag-and-drop reorder state ──────────────────────────────────────
-    // Mirrors the frame path above, but for top-level animation-chain nodes. Single-chain
-    // drag only; the dragged chain lives in _pendingChainDrag since the drag is same-process.
+    // ── Chain drag-and-drop reorder state (issue #566) ──────────────────────────
+    // Mirrors the frame path above, but for top-level animation-chain nodes. The
+    // dragged chain(s) live in _pendingChainDrag since the drag is always same-process.
     private static readonly DataFormat<string> ChainDragDataFormat =
         DataFormat.CreateStringApplicationFormat("animationeditor-chain-drag");
     private const string ChainDragToken = "chain";
-    private AnimationChainSave? _pendingChainDrag;
+    private ChainDragSource? _pendingChainDrag;
     private AnimationChainSave? _chainDragCandidate;
     private Avalonia.Point? _chainDragPressPoint;
     private PointerPressedEventArgs? _chainDragPressArgs;
+    private List<object>? _chainDragSelectionSnapshot;
+    private AnimationChainSave? _pendingSingleSelectChain;
     private bool _chainDragInProgress;
     private int _untitledCounter;
     private bool _suppressPropRefresh;
@@ -754,7 +757,15 @@ public partial class MainWindow : Window
     private void OnMoveModeToggled(object? sender, RoutedEventArgs e)
     {
         if (_suppressModeToggle) return;
-        if (MoveModeToggle.IsChecked != true) return;
+
+        // Move can't be toggled off directly — clicking it again while it's already
+        // the active mode has no effect, matching a radio group's behavior.
+        if (MoveModeToggle.IsChecked != true)
+        {
+            MoveModeToggle.IsChecked = true;
+            return;
+        }
+
         _suppressModeToggle = true;
         MagicWandToggle.IsChecked = false;
         _suppressModeToggle = false;
@@ -764,7 +775,15 @@ public partial class MainWindow : Window
     private void OnMagicWandToggled(object? sender, RoutedEventArgs e)
     {
         if (_suppressModeToggle) return;
-        if (MagicWandToggle.IsChecked != true) return;
+
+        // Toggling Magic Wand off falls back to Move mode rather than leaving both
+        // toolbar toggles unchecked with IsMagicWandMode stuck on (issue #575).
+        if (MagicWandToggle.IsChecked != true)
+        {
+            MoveModeToggle.IsChecked = true;
+            return;
+        }
+
         _suppressModeToggle = true;
         MoveModeToggle.IsChecked = false;
         _suppressModeToggle = false;
@@ -890,6 +909,8 @@ public partial class MainWindow : Window
         WireframeCtrl.ChainRegionChanged     += OnChainRegionChanged;
         WireframeCtrl.FrameLiveUpdated       += OnFrameLiveUpdated;
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
+        // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
+        WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // The combo follows every tick of a smooth wheel-zoom (#425); the companion file is only
         // persisted once the animation settles (IsZoomAnimating == false), not on every frame.
         WireframeCtrl.ZoomChanged            += zoomPct =>
@@ -1653,6 +1674,7 @@ public partial class MainWindow : Window
         };
 
         TimelineStrip.ItemsSource = _timelineFrames;
+        GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
         PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
         PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
@@ -1672,6 +1694,8 @@ public partial class MainWindow : Window
         PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
         PreviewCtrl.Playback.FrameIndexChanged += OnPreviewPlaybackFrameIndexChanged;
         PreviewCtrl.Playback.PlaybackTicked += OnPlaybackTicked;
+        PreviewCtrl.GroupTracksChanged += RefreshGroupTimelineTracks;
+        PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
         // Two-way sync between the manual pan and the scrollbars, mirroring the
@@ -1827,6 +1851,14 @@ public partial class MainWindow : Window
     // pure selection change (scrub) skips the clear-and-rebuild (#452).
     private TimelineStripSignature? _timelineSignature;
 
+    // ── Multi-select group preview timeline (#576) ──────────────────────────────
+    // One row per selected chain, rebuilt whenever PreviewCtrl.GroupTracksChanged fires
+    // (chain added/removed from the group) — never on every render or unrelated selection change.
+    private readonly ObservableCollection<ChainTimelineTrackVm> _groupTimelineTracks = new();
+    private bool _isGroupTimelineScrubbing;
+    private ChainTimelineTrackVm? _groupScrubTrack;
+    private ItemsControl? _groupScrubFramesList;
+
     private void WireTreeView()
     {
         AnimTree.ItemsSource = _treeRoots;
@@ -1865,6 +1897,10 @@ public partial class MainWindow : Window
         AnimTree.AddHandler(
             InputElement.PointerMovedEvent,
             OnTreeChainDragPointerMoved,
+            RoutingStrategies.Bubble);
+        AnimTree.AddHandler(
+            InputElement.PointerReleasedEvent,
+            OnTreeChainDragPointerReleased,
             RoutingStrategies.Bubble);
 
         // "Add Animation" button under the tree
@@ -2059,9 +2095,9 @@ public partial class MainWindow : Window
         }
 
         // Internal chain reorder drag.
-        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
-            var target = ResolveChainDrop(e, draggedChain);
+            var target = ResolveChainDrop(e, chainDrag.Chains);
             if (target.IsValid)
             {
                 e.DragEffects = DragDropEffects.Move;
@@ -2076,15 +2112,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        string? firstFile = e.DataTransfer.TryGetFiles()?
-            .FirstOrDefault()?.Path.LocalPath;
-
-        if (firstFile is null)
-        {
-            firstFile = e.DataTransfer.Items?
-                .Select(i => i.TryGetFile())
-                .FirstOrDefault(f => f is not null)?.Path.LocalPath;
-        }
+        string? firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
 
         if (string.IsNullOrEmpty(firstFile) ||
             !string.Equals(Path.GetExtension(firstFile), ".png", StringComparison.OrdinalIgnoreCase))
@@ -2107,7 +2135,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OnTreeDrop(object? sender, DragEventArgs e)
+    private async void OnTreeDrop(object? sender, DragEventArgs e)
     {
         // Internal frame reorder drop — perform the move and let the external .png path below
         // stay untouched (external file drags never carry the frame marker format).
@@ -2122,17 +2150,17 @@ public partial class MainWindow : Window
         }
 
         // Internal chain reorder drop.
-        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
             RemoveFrameDropIndicators();
-            var target = ResolveChainDrop(e, draggedChain);
+            var target = ResolveChainDrop(e, chainDrag.Chains);
             if (target.IsValid)
-                _appCommands.MoveChainToIndex(draggedChain, target.InsertIndex);
+                _appCommands.MoveChainsToIndex(chainDrag.Chains, target.InsertIndex);
             e.Handled = true;
             return;
         }
 
-        var firstFile = GetFirstDroppedFilePath(e);
+        var firstFile = DragDropFileResolver.GetFirstDroppedFilePath(e);
         Trace.WriteLine($"[DragDrop] OnTreeDrop: firstFile={firstFile ?? "(null)"}, FileName={_projectManager.FileName ?? "(null)"}");
 
         if (string.IsNullOrEmpty(firstFile))
@@ -2141,91 +2169,74 @@ public partial class MainWindow : Window
             return;
         }
 
-        // If no ACHX is saved yet, allow the drop but use an absolute texture path.
-        // Relative-path conversion requires a base directory; without one we fall back to absolute.
-        if (string.IsNullOrEmpty(_projectManager.FileName))
-        {
-            Trace.WriteLine("[DragDrop] Warning: no ACHX file saved yet — texture path will be absolute");
-        }
-
         var (targetChain, targetFrame) = ResolveTreePngDropTarget(e);
 
         Trace.WriteLine($"[DragDrop] targetChain={targetChain?.Name ?? "(null)"}, targetFrame={targetFrame?.TextureName ?? "(null)"}, ctrl={e.KeyModifiers.HasFlag(KeyModifiers.Control)}");
 
+        bool applied = await HandlePngDropAsync(targetChain, targetFrame, firstFile, e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        if (applied)
+            e.Handled = true;
+    }
+
+    /// <summary>
+    /// Single apply path for every PNG-drop entry point (ANIMATIONS tree — including PNGs
+    /// dragged in from the Files panel, which already ride the same OS drag/drop payload —
+    /// and the wireframe canvas, see issue #560). Prompts to copy the file alongside the .achx
+    /// when it lives outside the achx/project folder (<see cref="TextureCopyDecider"/>), computes
+    /// the drop via <see cref="TextureDropProcessor.ComputePngDrop"/>, and applies + refreshes.
+    /// Returns <see langword="true"/> when the drop actually changed something.
+    /// </summary>
+    private async Task<bool> HandlePngDropAsync(
+        AnimationChainSave? targetChain, AnimationFrameSave? targetFrame,
+        string droppedFilePath, bool createFrameOnCtrl)
+    {
+        if (!string.Equals(Path.GetExtension(droppedFilePath).TrimStart('.'), "png", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string resolvedFilePath = droppedFilePath;
+        string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
+
+        if (!string.IsNullOrEmpty(achxFolder) &&
+            TextureCopyDecider.ShouldPromptToCopy(droppedFilePath, achxFolder, _appState.ProjectFolder))
+        {
+            var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
+            if (choice == TextureCopyChoice.Cancel) return false;
+
+            if (choice == TextureCopyChoice.Copy)
+            {
+                string destination = Path.Combine(achxFolder, Path.GetFileName(droppedFilePath));
+                try
+                {
+                    File.Copy(droppedFilePath, destination, overwrite: true);
+                    resolvedFilePath = destination;
+                }
+                catch (Exception ex)
+                {
+                    ShowToast($"Could not copy: {ex.Message}");
+                    return false;
+                }
+            }
+        }
+
         var (result, relPath) = TextureDropProcessor.ComputePngDrop(
-            targetChain,
-            targetFrame,
-            firstFile,
-            _projectManager.FileName,
-            e.KeyModifiers.HasFlag(KeyModifiers.Control));
+            targetChain, targetFrame, resolvedFilePath, _projectManager.FileName, createFrameOnCtrl);
 
         Trace.WriteLine($"[DragDrop] Result={result}");
 
-        if (result == TextureDropResult.NotApplied)
+        bool applied = TextureDropApplier.Apply(_appCommands, _selectedState, targetChain, targetFrame, result, relPath);
+        if (!applied)
         {
             Trace.WriteLine("[DragDrop] NotApplied — no chain or frame targeted, or non-PNG dropped");
-            return;
-        }
-
-        switch (result)
-        {
-            case TextureDropResult.UpdatedFrame:
-                _appCommands.SetFrameTextureName(targetFrame!, relPath);
-                _appCommands.RefreshTreeNode(targetFrame!);
-                _selectedState.SelectedFrame = targetFrame!;
-                break;
-
-            case TextureDropResult.CreatedFrame:
-                _appCommands.AddFrame(targetChain!, relPath);
-                var createdFrame = targetChain!.Frames.LastOrDefault();
-                if (createdFrame is not null)
-                    _selectedState.SelectedFrame = createdFrame;
-                break;
-
-            case TextureDropResult.UpdatedChainFrames:
-                _appCommands.SetAllFramesTextureName(targetChain!, relPath);
-                _appCommands.RefreshTreeNode(targetChain!);
-                _selectedState.SelectedChain = targetChain;
-                break;
+            return false;
         }
 
         RefreshTextureCombo();
         _appCommands.RefreshWireframe();
         _events.RaiseAnimationChainsChanged();
         _appCommands.SyncHotReloadWatcher();  // watch the newly-referenced PNG directory
-        e.Handled = true;
-    }
-
-    private static string? GetFirstDroppedFilePath(DragEventArgs e)
-    {
-        // Log item formats so we can see exactly what the OS provides
-        var itemFormats = e.DataTransfer.Items?
-            .Select(i => "[" + string.Join(",", i.Formats) + "]")
-            .ToList();
-        Trace.WriteLine($"[DragDrop] Items and their formats: {(itemFormats == null ? "(null)" : string.Join(" ", itemFormats))}");
-        Trace.WriteLine($"[DragDrop] Contains(DataFormat.File)={e.DataTransfer.Contains(DataFormat.File)}");
-
-        // Correct Avalonia 12 API for OS file drops
-        var files = e.DataTransfer.TryGetFiles()?.ToList();
-        Trace.WriteLine($"[DragDrop] TryGetFiles() count={files?.Count ?? -1}");
-        if (files?.Count > 0)
-        {
-            var path = files[0].Path.LocalPath;
-            Trace.WriteLine($"[DragDrop] resolved path={path}");
-            return path;
-        }
-
-        // Fallback: per-item TryGetFile()
-        var items = e.DataTransfer.Items?.ToList();
-        Trace.WriteLine($"[DragDrop] Items count={items?.Count ?? -1}");
-        foreach (var item in items ?? new())
-            Trace.WriteLine($"[DragDrop] Item: Formats=[{string.Join(",", item.Formats)}] TryGetFile={item.TryGetFile()?.Path?.LocalPath ?? "(null)"}");
-
-        var fallback = items?
-            .Select(item => item.TryGetFile())
-            .FirstOrDefault(f => f is not null);
-        Trace.WriteLine($"[DragDrop] Items fallback resolved={fallback?.Path.LocalPath ?? "(null)"}");
-        return fallback?.Path.LocalPath;
+        return true;
     }
 
     private TreeNodeVm? GetTreeNodeAtDropPosition(DragEventArgs e)
@@ -2516,6 +2527,20 @@ public partial class MainWindow : Window
         _chainDragCandidate = null;
         _chainDragPressPoint = null;
         _chainDragPressArgs = null;
+        _chainDragSelectionSnapshot = null;
+        _pendingSingleSelectChain = null;
+    }
+
+    private void SelectSingleChain(AnimationChainSave chain)
+    {
+        var vm = TreeBuilder.FindNodeForData(_treeRoots, chain);
+        if (vm is null) return;
+
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try { AnimTree.SelectedItems?.Clear(); }
+        finally { _suppressTreeSelectionHandling = prior; }
+        AnimTree.SelectedItem = vm;
     }
 
     private async void OnTreeChainDragPointerMoved(object? sender, PointerEventArgs e)
@@ -2535,9 +2560,16 @@ public partial class MainWindow : Window
             Math.Abs(pos.Y - _chainDragPressPoint.Value.Y) <= 4)
             return;
 
-        var chain = _chainDragCandidate;
+        if (!TryBuildChainDragSource(out var dragSource))
+        {
+            ClearChainDragCandidate();
+            return;
+        }
+
+        // A drag is happening, so the deferred single-select must not fire on release.
+        _pendingSingleSelectChain = null;
         e.Pointer.Capture(null); // release press-capture so the drag system can take over
-        _pendingChainDrag = chain;
+        _pendingChainDrag = dragSource;
         _chainDragInProgress = true;
 
         var data = new DataTransfer();
@@ -2555,13 +2587,64 @@ public partial class MainWindow : Window
         }
     }
 
-    private ChainDropTarget ResolveChainDrop(DragEventArgs e, AnimationChainSave draggedChain)
+    private void OnTreeChainDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_chainDragInProgress) return;
+
+        // A press on an already-multi-selected chain that did not turn into a drag collapses
+        // the selection to that single chain now (the select-on-press was suppressed so the
+        // multi-selection could survive a potential drag).
+        if (_pendingSingleSelectChain is { } chain)
+        {
+            e.Pointer.Capture(null);
+            SelectSingleChain(chain);
+        }
+        ClearChainDragCandidate();
+    }
+
+    /// <summary>
+    /// Decides which chains a drag moves. Dragging a chain that is part of a valid chain
+    /// multi-selection moves the whole set; a mixed selection that includes the dragged chain
+    /// is rejected with a toast; otherwise just the dragged chain moves. Mirrors
+    /// <see cref="TryBuildFrameDragSource"/>.
+    /// </summary>
+    private bool TryBuildChainDragSource(out ChainDragSource dragSource)
+    {
+        dragSource = default;
+        var candidate = _chainDragCandidate;
+        if (candidate is null) return false;
+
+        var snapshot = _chainDragSelectionSnapshot ?? new List<object>();
+        bool candidateInSnapshot = snapshot.Any(n => ReferenceEquals(n, candidate));
+        var classified = ChainDropResolver.ClassifySelection(snapshot);
+
+        if (candidateInSnapshot)
+        {
+            if (classified.IsValid)
+            {
+                dragSource = classified;
+                return true;
+            }
+            if (classified.Validity is ChainDragValidity.MixedTypes)
+            {
+                ShowStatusMessage(
+                    "Can't reorder a mixed selection — select only animations.", isError: true);
+                return false;
+            }
+        }
+
+        // Drag just the single pressed chain.
+        dragSource = new ChainDragSource(new[] { candidate }, ChainDragValidity.Valid);
+        return true;
+    }
+
+    private ChainDropTarget ResolveChainDrop(DragEventArgs e, IReadOnlyList<AnimationChainSave> draggedChains)
     {
         var chains = _projectManager.AnimationChainListSave?.AnimationChains;
         if (chains is null) return ChainDropTarget.None;
         var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
         return ChainDropResolver.Resolve(
-            nodeData, half, draggedChain, chains,
+            nodeData, half, draggedChains, chains,
             f => _objectFinder.GetAnimationChainContaining(f));
     }
 
@@ -2652,11 +2735,9 @@ public partial class MainWindow : Window
 
     private void RefreshFilesPanel()
     {
-        string? achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? null
-            : Path.GetDirectoryName(_projectManager.FileName);
-        FilesPanel.Refresh(achxFolder);
-        _pngFolderWatcher.Watch(achxFolder);
+        string? filesRoot = _projectManager.ResolveFilesPanelRoot();
+        FilesPanel.Refresh(filesRoot);
+        _pngFolderWatcher.Watch(filesRoot);
     }
 
     // ── Tree refresh ──────────────────────────────────────────────────────────
@@ -2936,8 +3017,29 @@ public partial class MainWindow : Window
         }
     }
 
+    // The single-row timeline's fixed height (14px ruler + one ~38px frame-cell row).
+    private const double SingleTimelineAreaHeight = 52;
+    // Group-preview timeline area (#576): tall enough for ~4 track rows at once; more chains
+    // scroll within GroupTimelineScrubHost's ScrollViewer rather than growing the row further.
+    private const double GroupTimelineAreaHeight = 160;
+
     private void RefreshTimelineStrip()
     {
+        // Multi-select group preview (#576): 2+ whole chains selected swaps the single-row strip
+        // for a per-chain track stack. TimelineScrubSurface/GroupTimelineScrubHost occupy the same
+        // grid cell, so only one is ever visible. The host row is also grown so the extra track
+        // rows aren't clipped to the single-row strip's original fixed height.
+        bool groupActive = _selectedState.SelectedChains.Count >= 2;
+        TimelineScrubSurface.IsVisible = !groupActive;
+        GroupTimelineScrubHost.IsVisible = groupActive;
+        PreviewBlockGrid.RowDefinitions[2].Height =
+            new GridLength(groupActive ? GroupTimelineAreaHeight : SingleTimelineAreaHeight);
+        if (groupActive)
+        {
+            RefreshGroupTimelineTracks();
+            return;
+        }
+
         var chain = GetTimelineChain();
 
         // Only clear-and-rebuild the cells when the frame structure (chain identity, count,
@@ -2990,6 +3092,110 @@ public partial class MainWindow : Window
         double elapsed = PreviewCtrl.Playback.FrameElapsed;
         double travelWidth = Math.Max(0, _timelineFrames[frameIndex].Width - TimelineFrameVm.PlayheadWidth);
         _timelineFrames[frameIndex].ScrubberOffset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
+    }
+
+    // ── Multi-select group preview timeline (#576) ──────────────────────────────
+
+    /// <summary>
+    /// Rebuilds the per-chain track rows from <see cref="PreviewControl.GroupTracks"/>. Fired by
+    /// <see cref="PreviewControl.GroupTracksChanged"/> — only when the group's chain membership
+    /// actually changes, not on every render or unrelated selection change.
+    /// </summary>
+    private void RefreshGroupTimelineTracks()
+    {
+        _groupTimelineTracks.Clear();
+
+        foreach (var (chain, _) in PreviewCtrl.GroupTracks)
+        {
+            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain));
+            if (chain.Frames.Count > 0)
+            {
+                var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
+                for (int i = 0; i < chain.Frames.Count && i < track.Frames.Count; i++)
+                    track.Frames[i].Thumbnail = _thumbnailService.GetFrameThumbnail(chain.Frames[i], colors[i], 22, 18);
+            }
+            _groupTimelineTracks.Add(track);
+        }
+
+        RefreshGroupTimelineScrubbers();
+    }
+
+    /// <summary>
+    /// Updates every track's current-frame highlight and sub-frame playhead offset from its own
+    /// PlaybackController. Fired by <see cref="PreviewControl.GroupPlaybackTicked"/> on every
+    /// group-mode timer tick and after a per-track scrub.
+    /// </summary>
+    private void RefreshGroupTimelineScrubbers()
+    {
+        foreach (var (chain, playback) in PreviewCtrl.GroupTracks)
+        {
+            var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
+            if (track is null || track.Frames.Count == 0) continue;
+
+            int idx = Math.Clamp(playback.CurrentFrameIndex, 0, track.Frames.Count - 1);
+            for (int i = 0; i < track.Frames.Count; i++)
+                track.Frames[i].IsCurrent = i == idx;
+
+            double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
+            double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
+            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * pps, travelWidth);
+        }
+    }
+
+    private (ChainTimelineTrackVm Track, ItemsControl FramesList)? FindGroupTrackAndFramesList(PointerEventArgs e)
+    {
+        if (e.Source is not Avalonia.Visual source) return null;
+        var self = new[] { source }.Concat(source.GetVisualAncestors());
+        var framesList = self.OfType<ItemsControl>().FirstOrDefault(ic => ic.Name == "TrackFramesList");
+        return framesList?.DataContext is ChainTimelineTrackVm track ? (track, framesList) : null;
+    }
+
+    private void OnGroupTimelinePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(GroupTimelineTracks).Properties.IsLeftButtonPressed) return;
+        var hit = FindGroupTrackAndFramesList(e);
+        if (hit is null) return;
+
+        _isGroupTimelineScrubbing = true;
+        _groupScrubTrack = hit.Value.Track;
+        _groupScrubFramesList = hit.Value.FramesList;
+        e.Pointer.Capture(GroupTimelineTracks);
+        ScrubGroupTimelineToPointer(e);
+    }
+
+    private void OnGroupTimelinePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_isGroupTimelineScrubbing) ScrubGroupTimelineToPointer(e);
+    }
+
+    private void OnGroupTimelinePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isGroupTimelineScrubbing) return;
+        _isGroupTimelineScrubbing = false;
+        _groupScrubTrack = null;
+        _groupScrubFramesList = null;
+        e.Pointer.Capture(null);
+    }
+
+    /// <summary>
+    /// Scrubs the track captured at press time to the pointer's position within its own frames
+    /// list. Position is resolved against the captured <see cref="_groupScrubFramesList"/>, not
+    /// <c>e.Source</c>, since pointer capture keeps routing move/release events to
+    /// <c>GroupTimelineTracks</c> regardless of which row is physically under the cursor.
+    /// </summary>
+    private void ScrubGroupTimelineToPointer(PointerEventArgs e)
+    {
+        var track = _groupScrubTrack;
+        var framesList = _groupScrubFramesList;
+        if (track is null || framesList is null || track.Frames.Count == 0) return;
+
+        double contentX = e.GetPosition(framesList).X;
+        var widths = new double[track.Frames.Count];
+        for (int i = 0; i < widths.Length; i++) widths[i] = track.Frames[i].Width;
+
+        var result = TimelineScrubMapper.Resolve(contentX, widths);
+        // Fires GroupPlaybackTicked synchronously, which refreshes every track's playhead.
+        PreviewCtrl.ScrubGroupTrack(track.Chain, result.FrameIndex, result.Fraction);
     }
 
     private AnimationChainSave? GetTimelineChain()
@@ -3059,7 +3265,10 @@ public partial class MainWindow : Window
             // Walk up the visual tree to find the containing TreeViewItem.
             if (e.Source is not Control src) return;
             var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-            if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
+            // Right-clicking a node that's already part of the current multi-selection must
+            // leave the whole selection intact (Explorer-style) so the context menu acts on the
+            // whole group. Only collapse to just this node when it isn't already selected.
+            if (tvi?.DataContext is TreeNodeVm vm && !AnimTree.SelectedItems.Contains(vm))
                 AnimTree.SelectedItem = vm;
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 1)
@@ -3099,13 +3308,32 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
-                // Arm a chain-drag candidate. Do not handle/capture — normal selection and the
-                // context menu still run; the platform drag only begins once the pointer moves
-                // past the threshold, so a plain click never starts a drag.
+                // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
+                // it on press, so dragging a chain that is part of a multi-selection can move
+                // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
                 ClearFrameDragCandidate();
                 _chainDragCandidate = chain;
                 _chainDragPressPoint = e.GetPosition(AnimTree);
                 _chainDragPressArgs = e;
+                _chainDragSelectionSnapshot = new List<object>(_selectedState.SelectedNodes);
+
+                // Pressing a chain that's part of a chain multi-selection (no modifiers) must
+                // not collapse the selection — otherwise a drag would only move one chain. Mark
+                // the press handled to suppress the TreeView's select-on-press, capture so the
+                // move/release still arrive here, and defer the single-select to release if no
+                // drag happens. Ctrl/Shift presses fall through to normal selection editing.
+                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                if (noModifiers &&
+                    ChainDropResolver.IsChainMultiSelectionContaining(_chainDragSelectionSnapshot, chain))
+                {
+                    _pendingSingleSelectChain = chain;
+                    e.Pointer.Capture(AnimTree);
+                    e.Handled = true;
+                }
+                else
+                {
+                    _pendingSingleSelectChain = null;
+                }
             }
             else
             {
@@ -3153,16 +3381,11 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", () => _appCommands.DuplicateShape(rect));
+            AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, rect.Name));
             AddSeparator();
-            AddMenuItem("Delete Rectangle", () =>
-            {
-                var frame = _objectFinder.GetAnimationFrameContaining(rect);
-                if (frame is not null)
-                    _appCommands.DeleteShapes(frame, new() { rect }, new());
-            });
+            AddMenuItem("Delete Rectangle", HandleDelete);
         }
         else if (vm?.Data is CircleSave circle)
         {
@@ -3170,16 +3393,11 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", () => _appCommands.DuplicateShape(circle));
+            AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, circle.Name));
             AddSeparator();
-            AddMenuItem("Delete Circle", () =>
-            {
-                var frame = _objectFinder.GetAnimationFrameContaining(circle);
-                if (frame is not null)
-                    _appCommands.DeleteShapes(frame, new(), new() { circle });
-            });
+            AddMenuItem("Delete Circle", HandleDelete);
         }
         else if (vm?.Data is AnimationFrameSave frame2)
         {
@@ -3202,12 +3420,11 @@ public partial class MainWindow : Window
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             if (chain2 is not null)
-                AddMenuItem("Duplicate", () => _appCommands.DuplicateFrame(frame2, chain2));
+                AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
-            AddMenuItem("Delete Frame", () =>
-                _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
+            AddMenuItem("Delete Frame", HandleDelete);
         }
         else if (vm?.Data is AnimationChainSave chain)
         {
@@ -3236,15 +3453,14 @@ public partial class MainWindow : Window
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSubMenu("Duplicate",
-                ("Original",        () => _appCommands.DuplicateChain(chain)),
-                ("Flip Horizontal", () => _appCommands.DuplicateChain(chain, flipH: true)),
-                ("Flip Vertical",   () => _appCommands.DuplicateChain(chain, flipV: true)));
+                ("Original",        HandleDuplicate),
+                ("Flip Horizontal", () => HandleDuplicateChainsFlip(chain, flipH: true, flipV: false)),
+                ("Flip Vertical",   () => HandleDuplicateChainsFlip(chain, flipH: false, flipV: true)));
             AddSeparator();
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
-            AddMenuItem("Delete Animation", () =>
-                _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain }));
+            AddMenuItem("Delete Animation", HandleDelete);
         }
         else
         {
@@ -3502,11 +3718,7 @@ public partial class MainWindow : Window
 
         if (!string.IsNullOrEmpty(achxFolder))
         {
-            bool isInAchxFolder    = IsPathUnder(pickedPath, achxFolder);
-            bool isInProjectFolder = !string.IsNullOrEmpty(_appState.ProjectFolder)
-                                     && IsPathUnder(pickedPath, _appState.ProjectFolder);
-
-            if (!isInAchxFolder && !isInProjectFolder)
+            if (TextureCopyDecider.ShouldPromptToCopy(pickedPath, achxFolder, _appState.ProjectFolder))
             {
                 var choice = await ShowTextureCopyDialogAsync(pickedPath);
                 if (choice == TextureCopyChoice.Cancel) return;
@@ -3593,12 +3805,22 @@ public partial class MainWindow : Window
         return await tcs.Task;
     }
 
-    private static bool IsPathUnder(string path, string folder)
+    /// <summary>
+    /// Shows <paramref name="values"/>'s shared value in <paramref name="control"/>, or blanks it
+    /// with a "(mixed)" placeholder when the selected frames disagree on that property.
+    /// </summary>
+    private static void SetValueOrMixed(NumericUpDown control, IReadOnlyList<decimal> values)
     {
-        char sep = Path.DirectorySeparatorChar;
-        string normPath   = Path.GetFullPath(path).TrimEnd(sep);
-        string normFolder = Path.GetFullPath(folder).TrimEnd(sep) + sep;
-        return normPath.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase);
+        if (values.Distinct().Count() == 1)
+        {
+            control.Value = values[0];
+            control.PlaceholderText = string.Empty;
+        }
+        else
+        {
+            control.Value = null;
+            control.PlaceholderText = "(mixed)";
+        }
     }
 
     private void RefreshPropertyPanel()
@@ -3625,32 +3847,54 @@ public partial class MainWindow : Window
 
             if (frame is not null && !hasShapeSelection)
             {
-                PropFlipH.IsChecked  = frame.FlipHorizontal;
-                PropFlipV.IsChecked  = frame.FlipVertical;
-                PropFrameLen.Value   = (decimal)frame.FrameLength;
-                PropRelX.Value       = (decimal)frame.RelativeX;
-                PropRelY.Value       = (decimal)frame.RelativeY;
-                PropRed.Value        = frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null;
-                PropGreen.Value      = frame.Green.HasValue ? frame.Green.Value : (decimal?)null;
-                PropBlue.Value       = frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null;
-                PropAlpha.Value      = frame.Alpha.HasValue ? frame.Alpha.Value : (decimal?)null;
+                // When multiple frames are selected and disagree on a property, show that field
+                // blank with a "(mixed)" placeholder instead of one frame's value (issue #571) —
+                // editing it then applies the new value to every selected frame; leaving it blank
+                // applies nothing (see the `!PropXxx.Value.HasValue` guards in the Apply* methods).
+                var frames = _selectedState.SelectedFrames;
+
+                bool flipHMixed = frames.Select(f => f.FlipHorizontal).Distinct().Count() > 1;
+                bool flipVMixed = frames.Select(f => f.FlipVertical).Distinct().Count() > 1;
+                PropFlipH.IsChecked = flipHMixed ? null : frame.FlipHorizontal;
+                PropFlipV.IsChecked = flipVMixed ? null : frame.FlipVertical;
+
+                SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
+                SetValueOrMixed(PropRelX, frames.Select(f => (decimal)f.RelativeX).ToList());
+                SetValueOrMixed(PropRelY, frames.Select(f => (decimal)f.RelativeY).ToList());
+
+                bool redMixed   = frames.Select(f => f.Red).Distinct().Count() > 1;
+                bool greenMixed = frames.Select(f => f.Green).Distinct().Count() > 1;
+                bool blueMixed  = frames.Select(f => f.Blue).Distinct().Count() > 1;
+                bool alphaMixed = frames.Select(f => f.Alpha).Distinct().Count() > 1;
+                bool opMixed    = frames.Select(f => f.ColorOperation).Distinct().Count() > 1;
+
+                PropRed.Value   = redMixed   ? null : (frame.Red.HasValue   ? frame.Red.Value   : (decimal?)null);
+                PropGreen.Value = greenMixed ? null : (frame.Green.HasValue ? frame.Green.Value : (decimal?)null);
+                PropBlue.Value  = blueMixed  ? null : (frame.Blue.HasValue  ? frame.Blue.Value  : (decimal?)null);
+                PropAlpha.Value = alphaMixed ? null : (frame.Alpha.HasValue ? frame.Alpha.Value : (decimal?)null);
 
                 // Ghost the sticky effective value in each blank field: an omitted channel holds
                 // whatever an earlier frame last set (climbing back), or the operation's identity
                 // (Add → 0, else 255) when nothing ever set it. This makes a blank field read as the
-                // value a runtime actually applies, instead of implying "reset to default".
+                // value a runtime actually applies, instead of implying "reset to default". Mixed
+                // takes priority — it means the selection disagrees, not that a value is inherited.
                 var chain = _selectedState.SelectedChain;
                 int frameIndex = chain?.Frames.IndexOf(frame) ?? -1;
                 var effective = frameIndex >= 0
                     ? EffectiveFrameColor.Resolve(chain!.Frames, frameIndex)
                     : default;
                 int rgbDefault = EffectiveFrameColor.ChannelDefault(effective.Operation);
-                PropRed.PlaceholderText   = (effective.Red   ?? rgbDefault).ToString();
-                PropGreen.PlaceholderText = (effective.Green ?? rgbDefault).ToString();
-                PropBlue.PlaceholderText  = (effective.Blue  ?? rgbDefault).ToString();
-                PropAlpha.PlaceholderText = (effective.Alpha ?? 255).ToString();
+                PropRed.PlaceholderText   = redMixed   ? "(mixed)" : (effective.Red   ?? rgbDefault).ToString();
+                PropGreen.PlaceholderText = greenMixed ? "(mixed)" : (effective.Green ?? rgbDefault).ToString();
+                PropBlue.PlaceholderText  = blueMixed  ? "(mixed)" : (effective.Blue  ?? rgbDefault).ToString();
+                PropAlpha.PlaceholderText = alphaMixed ? "(mixed)" : (effective.Alpha ?? 255).ToString();
 
-                if (frame.ColorOperation is ColorOperation op)
+                if (opMixed)
+                {
+                    PropColorMode.SelectedIndex = -1;
+                    PropColorMode.PlaceholderText = "(mixed)";
+                }
+                else if (frame.ColorOperation is ColorOperation op)
                 {
                     PropColorMode.SelectedIndex = op == ColorOperation.Multiply ? 1 : 2;
                 }
@@ -3671,10 +3915,10 @@ public partial class MainWindow : Window
                 var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
                 if (bmpW > 0 && bmpH > 0)
                 {
-                    PropPixelX.Value = FrameDisplayValues.GetPixelX(frame, bmpW);
-                    PropPixelY.Value = FrameDisplayValues.GetPixelY(frame, bmpH);
-                    PropPixelW.Value = FrameDisplayValues.GetPixelWidth(frame, bmpW);
-                    PropPixelH.Value = FrameDisplayValues.GetPixelHeight(frame, bmpH);
+                    SetValueOrMixed(PropPixelX, frames.Select(f => (decimal)FrameDisplayValues.GetPixelX(f, bmpW)).ToList());
+                    SetValueOrMixed(PropPixelY, frames.Select(f => (decimal)FrameDisplayValues.GetPixelY(f, bmpH)).ToList());
+                    SetValueOrMixed(PropPixelW, frames.Select(f => (decimal)FrameDisplayValues.GetPixelWidth(f, bmpW)).ToList());
+                    SetValueOrMixed(PropPixelH, frames.Select(f => (decimal)FrameDisplayValues.GetPixelHeight(f, bmpH)).ToList());
                 }
             }
 
@@ -3706,40 +3950,49 @@ public partial class MainWindow : Window
     private void ApplyFrameFlip()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-        // Route through the undoable flip commands. FlipFrame* toggles, so only call
-        // it when the toggle button's state actually differs from the model.
-        if (frame.FlipHorizontal != (PropFlipH.IsChecked == true))
-            _appCommands.FlipFrameHorizontally(frame);
-        if (frame.FlipVertical != (PropFlipV.IsChecked == true))
-            _appCommands.FlipFrameVertically(frame);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
+        // ToggleButton.IsChecked is already nullable: null means the checkbox is showing the
+        // mixed/indeterminate state (the selection disagrees and the user didn't touch it), so
+        // it passes straight through as "leave this axis untouched".
+        _appCommands.SetFrameFlip(frames, PropFlipH.IsChecked, PropFlipV.IsChecked);
     }
 
     private void ApplyFrameLen()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null || !PropFrameLen.Value.HasValue) return;
-        _appCommands.SetFrameLength(frame, (float)PropFrameLen.Value.Value);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0 || !PropFrameLen.Value.HasValue) return;
+        _appCommands.SetFrameLength(frames, (float)PropFrameLen.Value.Value);
     }
 
     private void ApplyFrameRelative()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null || !PropRelX.Value.HasValue || !PropRelY.Value.HasValue) return;
-        _appCommands.SetFrameRelative(frame, (float)PropRelX.Value.Value, (float)PropRelY.Value.Value);
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
+        // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
+        // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
+        // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
+        float? relX = PropRelX.Value.HasValue ? (float)PropRelX.Value.Value : null;
+        float? relY = PropRelY.Value.HasValue ? (float)PropRelY.Value.Value : null;
+        if (relX is null && relY is null) return;
+        _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
     private void ApplyFrameColor()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // A blank NumericUpDown (null Value) means the channel is unset and is omitted from the .achx.
+        // Note: with a multi-selection, a channel that is still showing its "(mixed)" placeholder
+        // also reads as null here, so it gets applied (cleared) to every selected frame just like an
+        // explicit clear would — there's no way to tell "never touched" apart from "cleared on purpose"
+        // from the control's Value alone. Prefer not leaving a mixed color panel blank across an edit
+        // if that distinction matters; see PR notes for the known limitation.
         static int? ToChannel(decimal? v) => v.HasValue ? (int)v.Value : null;
-        _appCommands.SetFrameColor(frame, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
+        _appCommands.SetFrameColor(frames, ToChannel(PropRed.Value), ToChannel(PropGreen.Value), ToChannel(PropBlue.Value));
     }
 
     private void CommitColorChannelOnEnter(KeyEventArgs e)
@@ -3750,17 +4003,17 @@ public partial class MainWindow : Window
     private void ApplyFrameAlpha()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // A blank NumericUpDown (null Value) means alpha is unset and is omitted from the .achx.
-        _appCommands.SetFrameAlpha(frame, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
+        _appCommands.SetFrameAlpha(frames, PropAlpha.Value.HasValue ? (int)PropAlpha.Value.Value : null);
     }
 
     private void ApplyFrameColorOperation()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         // ComboBox order: 0 = None (null), 1 = Multiply, 2 = Add.
         ColorOperation? operation = PropColorMode.SelectedIndex switch
         {
@@ -3768,22 +4021,25 @@ public partial class MainWindow : Window
             2 => ColorOperation.Add,
             _ => null,
         };
-        _appCommands.SetFrameColorOperation(frame, operation);
+        _appCommands.SetFrameColorOperation(frames, operation);
     }
 
     private void ApplyFramePixelCoords()
     {
         if (_suppressPropRefresh) return;
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
         var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
         if (bmpW <= 0 || bmpH <= 0) return;
-        if (!PropPixelX.Value.HasValue || !PropPixelY.Value.HasValue ||
-            !PropPixelW.Value.HasValue || !PropPixelH.Value.HasValue) return;
-        _appCommands.SetFramePixelRegion(frame,
-            (int)PropPixelX.Value.Value, (int)PropPixelY.Value.Value,
-            (int)PropPixelW.Value.Value, (int)PropPixelH.Value.Value,
-            bmpW, bmpH);
+        // A null component here only ever means "still showing (mixed), not edited" — the pixel
+        // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
+        // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
+        int? x = PropPixelX.Value.HasValue ? (int)PropPixelX.Value.Value : null;
+        int? y = PropPixelY.Value.HasValue ? (int)PropPixelY.Value.Value : null;
+        int? w = PropPixelW.Value.HasValue ? (int)PropPixelW.Value.Value : null;
+        int? h = PropPixelH.Value.HasValue ? (int)PropPixelH.Value.Value : null;
+        if (x is null && y is null && w is null && h is null) return;
+        _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
     }
 
@@ -3850,6 +4106,15 @@ public partial class MainWindow : Window
         TimelineScrubSurface.AddHandler(InputElement.PointerMovedEvent, OnTimelinePointerMoved,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         TimelineScrubSurface.AddHandler(InputElement.PointerReleasedEvent, OnTimelinePointerReleased,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+
+        // Multi-select group preview timeline (#576) — same tunnel+bubble pattern, scoped to
+        // whichever track row's frames list is under the pointer at press time.
+        GroupTimelineTracks.AddHandler(InputElement.PointerPressedEvent, OnGroupTimelinePointerPressed,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        GroupTimelineTracks.AddHandler(InputElement.PointerMovedEvent, OnGroupTimelinePointerMoved,
+            RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        GroupTimelineTracks.AddHandler(InputElement.PointerReleasedEvent, OnGroupTimelinePointerReleased,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
@@ -4854,6 +5119,19 @@ public partial class MainWindow : Window
             RefreshFrameNode(shapeFrame);
             SyncTreeSelection();
         }
+    }
+
+    // Flip variants aren't part of the Ctrl+D path (HandleDuplicate has no flip concept),
+    // so this mirrors its multi-select dispatch for chains only: duplicate every selected
+    // chain (falling back to the right-clicked one when nothing is selected) with the flip
+    // flag applied, via the same AppCommands.DuplicateChains batch HandleDuplicate uses.
+    private void HandleDuplicateChainsFlip(AnimationChainSave rightClicked, bool flipH, bool flipV)
+    {
+        var selected = _selectedState.SelectedChains;
+        var sources = selected.Count > 0 ? selected : new List<AnimationChainSave> { rightClicked };
+        var copies = _appCommands.DuplicateChains(sources, flipH, flipV);
+        QueuePastedChainExpandFromSources(sources, copies);
+        RefreshTreeView();
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────

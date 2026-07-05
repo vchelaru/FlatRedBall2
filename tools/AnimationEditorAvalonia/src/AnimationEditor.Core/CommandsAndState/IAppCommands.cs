@@ -139,6 +139,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// an index landing on the chain's own slot is a no-op with no undo entry.
         /// </summary>
         void MoveChainToIndex(AnimationChainSave chain, int insertIndex);
+
+        /// <summary>
+        /// Moves <paramref name="chains"/> to an absolute slot in the chain list as one undo
+        /// step — the multi-selection drag-and-drop reorder entry point (parallel to
+        /// <see cref="MoveFrames"/> for frames). <paramref name="insertIndex"/> is interpreted
+        /// against the current list <em>before</em> the chains are removed, so it is adjusted
+        /// internally for the removal. The chains are sorted by their current index and become
+        /// a contiguous, gap-squashed block at the destination.
+        /// </summary>
+        void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex);
         void MoveChainToTop(AnimationChainSave chain);
         void MoveChainToBottom(AnimationChainSave chain);
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);
@@ -166,17 +176,45 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void MoveFramesRelative(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave chain, int delta);
+
+        /// <summary>
+        /// Shifts <paramref name="chains"/> within the chain list by <paramref name="delta"/>
+        /// slots (−1 = up, +1 = down) as one rigid group, preserving the gaps between
+        /// non-contiguous chains, as a single undo step. The whole group is clamped at the
+        /// list boundaries: if the shift would push any selected chain past an end, nothing
+        /// moves. Drives the Alt+Arrow keyboard reorder when multiple chains are selected —
+        /// mirrors <see cref="MoveFramesRelative"/> for frames.
+        /// </summary>
+        void MoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta);
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
         void HandleReorder(int delta);
-        void FlipFrameHorizontally(AnimationFrameSave frame);
-        void FlipFrameVertically(AnimationFrameSave frame);
+        /// <summary>
+        /// Sets the horizontal/vertical flip flags on every frame in <paramref name="frames"/> as one
+        /// undo step. Each axis is absolute (not a toggle): pass <c>null</c> for an axis to leave it
+        /// untouched (used when the inspector checkbox is showing a mixed/indeterminate multi-selection
+        /// state and the user didn't interact with it). Only frames whose flag actually changes are
+        /// mirrored (offset and attached shapes negated) — a frame already at the target state is a
+        /// no-op for that axis.
+        /// </summary>
+        void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical);
         void FlipChainHorizontally(AnimationChainSave chain);
         void FlipChainVertically(AnimationChainSave chain);
         void InvertFrameOrder(AnimationChainSave chain);
         void SetAllFrameLengths(AnimationChainSave chain, float frameLength);
         AnimationChainSave? DuplicateChain(AnimationChainSave source, bool flipH = false, bool flipV = false, string? newName = null);
+
+        /// <summary>
+        /// Deep-copies every chain in <paramref name="sources"/> and inserts the copies as one
+        /// contiguous block after the last source, in a single undo step. When <paramref name="flipH"/>
+        /// or <paramref name="flipV"/> is set, every copied frame and shape is mirrored along that axis.
+        /// Backs both <see cref="DuplicateSelection"/> (no flip) and the tree context menu's
+        /// Duplicate → Flip Horizontal/Vertical submenu items (which apply to the whole selection,
+        /// not just the right-clicked chain).
+        /// </summary>
+        IReadOnlyList<AnimationChainSave> DuplicateChains(
+            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false);
 
         /// <summary>
         /// Deep-copies <paramref name="source"/> and inserts the copy immediately after it
@@ -208,12 +246,27 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
 
-        void SetFrameLength(AnimationFrameSave frame, float newLength);
-        void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY);
-        void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue);
-        void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation);
-        void SetFrameAlpha(AnimationFrameSave frame, int? alpha);
-        void SetFramePixelRegion(AnimationFrameSave frame, int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH);
+        void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength);
+
+        /// <summary>
+        /// Sets RelativeX/Y on every frame in <paramref name="frames"/>. Either axis may be
+        /// <c>null</c> to leave it untouched per-frame (its own existing value survives) — used when
+        /// the inspector field is showing "(mixed)" and the user only edited the other axis. Unlike
+        /// color channels, there is no legitimate "clear to null" target for this field, so <c>null</c>
+        /// unambiguously means "don't touch".
+        /// </summary>
+        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY);
+        void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
+        void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
+        void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
+
+        /// <summary>
+        /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the
+        /// four may be <c>null</c> to leave that component untouched per-frame — used when the
+        /// inspector field is showing "(mixed)" and the user only edited one of the four. See
+        /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
+        /// </summary>
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 

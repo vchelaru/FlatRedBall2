@@ -73,6 +73,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AddFrame)]                     = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChain)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToIndex)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveChainsToIndex)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrame)]                    = Category.MutatingUndoable,
@@ -80,17 +81,18 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveFrameToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrames)]                   = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFramesRelative)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveChainsRelative)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
-        [nameof(IAppCommands.FlipFrameHorizontally)]        = Category.MutatingUndoable,
-        [nameof(IAppCommands.FlipFrameVertically)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameFlip)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainHorizontally)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainVertically)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.InvertFrameOrder)]             = Category.MutatingUndoable,
         [nameof(IAppCommands.SetAllFrameLengths)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateChain)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.DuplicateChains)]              = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateFrame)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.DuplicateShape)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.SortAnimationsAlphabetically)] = Category.MutatingUndoable,
@@ -225,6 +227,9 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.MoveChainToIndex),
             // Drag Alpha (index 1) to the front of the two-chain list.
             ctx => Sync(() => ctx.AppCommands.MoveChainToIndex(Alpha(ctx), 0)));
+        yield return Row(nameof(IAppCommands.MoveChainsToIndex),
+            // Multi-chain drag: drag Alpha (index 1) to the front of the two-chain list.
+            ctx => Sync(() => ctx.AppCommands.MoveChainsToIndex(new[] { Alpha(ctx) }, 0)));
         yield return Row(nameof(IAppCommands.MoveChainToTop),
             ctx => Sync(() => ctx.AppCommands.MoveChainToTop(Alpha(ctx))));
         yield return Row(nameof(IAppCommands.MoveChainToBottom),
@@ -243,6 +248,9 @@ public class UndoCoverageRosterTests
             // Rigid multi-frame shift: frames 0 and 1 of Zebra (3 frames) move down → 2,0,1.
             ctx => Sync(() => ctx.AppCommands.MoveFramesRelative(
                 new[] { Zebra(ctx).Frames[0], Zebra(ctx).Frames[1] }, Zebra(ctx), +1)));
+        yield return Row(nameof(IAppCommands.MoveChainsRelative),
+            // Rigid chain-group shift: Zebra (index 0) moves down past Alpha.
+            ctx => Sync(() => ctx.AppCommands.MoveChainsRelative(new[] { Zebra(ctx) }, +1)));
         yield return Row(nameof(IAppCommands.MoveShape),
             ctx => Sync(() => ctx.AppCommands.MoveShape(Rect(ctx), Zebra(ctx).Frames[0], +1)));
         yield return Row(nameof(IAppCommands.MoveShapeToTop),
@@ -255,10 +263,9 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveShapeToBottom(Rect(ctx), Zebra(ctx).Frames[0]))); // Rect is not already last
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
-        yield return Row(nameof(IAppCommands.FlipFrameHorizontally),
-            ctx => Sync(() => ctx.AppCommands.FlipFrameHorizontally(Zebra(ctx).Frames[0])));
-        yield return Row(nameof(IAppCommands.FlipFrameVertically),
-            ctx => Sync(() => ctx.AppCommands.FlipFrameVertically(Zebra(ctx).Frames[0])));
+        yield return Row(nameof(IAppCommands.SetFrameFlip),
+            ctx => Sync(() => ctx.AppCommands.SetFrameFlip(
+                new[] { Zebra(ctx).Frames[0] }, flipHorizontal: true, flipVertical: null)));
         yield return Row(nameof(IAppCommands.FlipChainHorizontally),
             ctx => Sync(() => ctx.AppCommands.FlipChainHorizontally(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.FlipChainVertically),
@@ -269,6 +276,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetAllFrameLengths(Zebra(ctx), 0.5f)));
         yield return Row(nameof(IAppCommands.DuplicateChain),
             ctx => Sync(() => ctx.AppCommands.DuplicateChain(Zebra(ctx))));
+        yield return Row(nameof(IAppCommands.DuplicateChains),
+            ctx => Sync(() => ctx.AppCommands.DuplicateChains(new[] { Zebra(ctx) })));
         yield return Row(nameof(IAppCommands.DuplicateFrame),
             ctx => Sync(() => ctx.AppCommands.DuplicateFrame(Zebra(ctx).Frames[0], Zebra(ctx))));
         yield return Row(nameof(IAppCommands.DuplicateShape),
@@ -294,17 +303,17 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.SetAllFramesTextureName),
             ctx => Sync(() => ctx.AppCommands.SetAllFramesTextureName(Zebra(ctx), "bulk.png")));
         yield return Row(nameof(IAppCommands.SetFrameLength),
-            ctx => Sync(() => ctx.AppCommands.SetFrameLength(Zebra(ctx).Frames[0], 0.99f)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameLength(new[] { Zebra(ctx).Frames[0] }, 0.99f)));
         yield return Row(nameof(IAppCommands.SetFrameRelative),
-            ctx => Sync(() => ctx.AppCommands.SetFrameRelative(Zebra(ctx).Frames[0], 99f, 88f)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameRelative(new[] { Zebra(ctx).Frames[0] }, 99f, 88f)));
         yield return Row(nameof(IAppCommands.SetFrameAlpha),
-            ctx => Sync(() => ctx.AppCommands.SetFrameAlpha(Zebra(ctx).Frames[0], 128)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameAlpha(new[] { Zebra(ctx).Frames[0] }, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColor),
-            ctx => Sync(() => ctx.AppCommands.SetFrameColor(Zebra(ctx).Frames[0], 255, 200, 128)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameColor(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColorOperation),
-            ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(Zebra(ctx).Frames[0], ColorOperation.Add)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(new[] { Zebra(ctx).Frames[0] }, ColorOperation.Add)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
-            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(Zebra(ctx).Frames[0], 4, 8, 12, 16, 64, 64)));
+            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16, 64, 64)));
         yield return Row(nameof(IAppCommands.SetRectProps),
             ctx => Sync(() => ctx.AppCommands.SetRectProps(Zebra(ctx).Frames[0], Rect(ctx), "Renamed", 5f, 6f, 7f, 8f)));
         yield return Row(nameof(IAppCommands.SetCircleProps),

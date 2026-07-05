@@ -56,6 +56,116 @@ public class AppCommandsReorderTests
         Assert.Equal(walk, acls.AnimationChains[0]);
     }
 
+    // ── HandleReorder — multiple chains selected (issue #566) ────────────────
+
+    [Fact]
+    public void HandleReorder_MultiChainContiguous_DeltaPos1_MovesBlockDown()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var c = ctx.Acls;
+        TestHelpers.MakeChain(c, "A");
+        TestHelpers.MakeChain(c, "B");
+        TestHelpers.MakeChain(c, "C");
+        TestHelpers.MakeChain(c, "D");
+        var chains = c.AnimationChains.ToArray();
+        ctx.SelectedState.SelectedChain = chains[0];
+        ctx.SelectedState.SelectedNodes = new List<object> { chains[0], chains[1] };
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        Assert.Equal(new[] { chains[2], chains[0], chains[1], chains[3] }, c.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void HandleReorder_MultiChainContiguous_DeltaNeg1_MovesBlockUp()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var c = ctx.Acls;
+        TestHelpers.MakeChain(c, "A");
+        TestHelpers.MakeChain(c, "B");
+        TestHelpers.MakeChain(c, "C");
+        TestHelpers.MakeChain(c, "D");
+        var chains = c.AnimationChains.ToArray();
+        ctx.SelectedState.SelectedChain = chains[2];
+        ctx.SelectedState.SelectedNodes = new List<object> { chains[2], chains[3] };
+
+        ctx.AppCommands.HandleReorder(-1);
+
+        Assert.Equal(new[] { chains[0], chains[2], chains[3], chains[1] }, c.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void HandleReorder_MultiChainNonContiguous_DeltaPos1_PreservesGaps()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var c = ctx.Acls;
+        for (int i = 0; i < 6; i++)
+            TestHelpers.MakeChain(c, $"Chain{i}");
+        var chains = c.AnimationChains.ToArray();
+        ctx.SelectedState.SelectedChain = chains[0];
+        ctx.SelectedState.SelectedNodes = new List<object> { chains[0], chains[2], chains[4] };
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        // 0,2,4 → 1,3,5; gaps preserved, non-selected fill remaining slots in order.
+        Assert.Equal(
+            new[] { chains[1], chains[0], chains[3], chains[2], chains[5], chains[4] },
+            c.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void HandleReorder_MultiChainAtBottom_DeltaPos1_IsNoOp()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var c = ctx.Acls;
+        TestHelpers.MakeChain(c, "A");
+        TestHelpers.MakeChain(c, "B");
+        TestHelpers.MakeChain(c, "C");
+        TestHelpers.MakeChain(c, "D");
+        var chains = c.AnimationChains.ToArray();
+        ctx.SelectedState.SelectedChain = chains[2];
+        ctx.SelectedState.SelectedNodes = new List<object> { chains[2], chains[3] };
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        // Bottommost selected chain is already at the end — whole group is clamped.
+        Assert.Equal(chains, c.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void HandleReorder_MultiChain_SingleUndo_RevertsWholeMove()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var c = ctx.Acls;
+        for (int i = 0; i < 6; i++)
+            TestHelpers.MakeChain(c, $"Chain{i}");
+        var chains = c.AnimationChains.ToArray();
+        ctx.SelectedState.SelectedChain = chains[0];
+        ctx.SelectedState.SelectedNodes = new List<object> { chains[0], chains[2], chains[4] };
+
+        ctx.AppCommands.HandleReorder(+1);
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(chains, c.AnimationChains.ToArray());
+    }
+
+    [Fact]
+    public void HandleReorder_SingleChainSelectedInNodesToo_UsesSingleChainMove()
+    {
+        // SelectedChains resolves to exactly one chain — must still go through the
+        // single-chain MoveChain path, not MoveChainsRelative.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var walk = TestHelpers.MakeChain(acls, "Walk");
+        var run = TestHelpers.MakeChain(acls, "Run");
+        ctx.SelectedState.SelectedChain = walk;
+        ctx.SelectedState.SelectedNodes = new List<object> { walk };
+
+        ctx.AppCommands.HandleReorder(+1);
+
+        Assert.Equal(new[] { run, walk }, acls.AnimationChains.ToArray());
+    }
+
     // ── MoveChainToIndex ─────────────────────────────────────────────────────
 
     [Fact]

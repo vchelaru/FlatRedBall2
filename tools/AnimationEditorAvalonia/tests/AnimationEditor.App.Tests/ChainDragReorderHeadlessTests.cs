@@ -80,4 +80,39 @@ public class ChainDragReorderHeadlessTests
         }
         finally { window.Close(); }
     }
+
+    /// <summary>
+    /// Multi-chain drag: dragging a selection of several chains moves the whole set together
+    /// as a contiguous block, preserving relative order (issue #566). Exercises the resolved
+    /// move via AppCommands.MoveChainsToIndex, which is what the drop handler calls for a
+    /// multi-chain drag source.
+    /// </summary>
+    [AvaloniaFact]
+    public void MoveChainsToIndex_MultiSelection_ReordersRootTreeNodesAsBlock_OneUndoReverts()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var acls = ctx.ProjectManager.AnimationChainListSave!;
+            var a = MakeChain(acls, "A");
+            var b = MakeChain(acls, "B");
+            var c = MakeChain(acls, "C");
+            var d = MakeChain(acls, "D");
+            RebuildTree(window);
+
+            // Drag {B, D} to the front — non-contiguous selection squashes to a block.
+            ctx.AppCommands.MoveChainsToIndex(new[] { b, d }, 0);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(new[] { b, d, a, c },
+                Roots(window).Select(n => n.Data).ToArray());
+
+            ctx.UndoManager.Undo();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(new[] { a, b, c, d },
+                Roots(window).Select(n => n.Data).ToArray());
+        }
+        finally { window.Close(); }
+    }
 }

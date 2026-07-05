@@ -654,6 +654,41 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Animation"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveChainsToIndex"/>
+        public void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex)
+        {
+            var list = _pm.AnimationChainListSave?.AnimationChains;
+            if (list is null || chains.Count == 0) return;
+
+            var indices = chains
+                .Select(c => list.IndexOf(c))
+                .Where(i => i >= 0)
+                .Distinct()
+                .OrderBy(i => i)
+                .ToList();
+            if (indices.Count == 0) return;
+
+            var moved = indices.Select(i => list[i]).ToArray();
+
+            // insertIndex is measured against the list before removal; removing the moved
+            // chains shifts the landing spot left by however many of them sat ahead of it
+            // (mirrors MoveFramesCommand).
+            int insertAt = insertIndex - indices.Count(i => i < insertIndex);
+
+            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+                list,
+                () =>
+                {
+                    foreach (var chain in moved)
+                        list.Remove(chain);
+                    int at = Math.Clamp(insertAt, 0, list.Count);
+                    for (int i = 0; i < moved.Length; i++)
+                        list.Insert(at + i, moved[i]);
+                },
+                this, _events, RefreshTreeView,
+                moved.Length == 1 ? "Move Animation" : $"Move {moved.Length} Animations"));
+        }
+
         public void MoveChainToTop(AnimationChainSave chain)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
@@ -759,6 +794,50 @@ namespace AnimationEditor.Core.CommandsAndState
                 delta > 0 ? "Move Frames Down" : "Move Frames Up"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveChainsRelative"/>
+        public void MoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta)
+        {
+            var list = _pm.AnimationChainListSave?.AnimationChains;
+            if (list is null || delta == 0 || chains.Count == 0) return;
+
+            var indices = chains
+                .Select(c => list.IndexOf(c))
+                .Where(i => i >= 0)
+                .Distinct()
+                .OrderBy(i => i)
+                .ToList();
+            if (indices.Count == 0) return;
+
+            // Rigid group: if shifting either edge by delta would cross a boundary, no-op.
+            if (indices[0] + delta < 0) return;
+            if (indices[^1] + delta > list.Count - 1) return;
+
+            var selected = new HashSet<int>(indices);
+
+            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+                list,
+                () =>
+                {
+                    var reordered = new AnimationChainSave[list.Count];
+                    // Selected chains land at their shifted slots (gaps preserved)...
+                    foreach (int i in indices)
+                        reordered[i + delta] = list[i];
+                    // ...and the rest slot into the remaining holes in original order.
+                    int cursor = 0;
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        if (selected.Contains(i)) continue;
+                        while (reordered[cursor] is not null) cursor++;
+                        reordered[cursor] = list[i];
+                    }
+                    list.Clear();
+                    foreach (var chain in reordered)
+                        list.Add(chain);
+                },
+                this, _events, RefreshTreeView,
+                delta > 0 ? "Move Animations Down" : "Move Animations Up"));
+        }
+
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             var shapes = frame.ShapesSave?.Shapes;
@@ -800,7 +879,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
         /// or down (<paramref name="delta"/> = +1) in the tree.
         /// Shape selection takes highest priority: if a shape is selected it is reordered within
-        /// its frame's shape list. Frame selection takes next priority; chain is last.
+        /// its frame's shape list. Frame selection takes next priority; chain is last. When more
+        /// than one frame or chain is selected, the whole group moves together as a rigid,
+        /// gap-preserving block (<see cref="MoveFramesRelative"/> / <see cref="MoveChainsRelative"/>).
         /// No-op when nothing is selected or when the item is already at the boundary.
         /// </summary>
         public void HandleReorder(int delta)
@@ -833,19 +914,40 @@ namespace AnimationEditor.Core.CommandsAndState
                     MoveFrame(frame, chain, delta);
             }
             else if (chain is not null)
-                MoveChain(chain, delta);
+            {
+                // Reorder the whole multi-selection together (gaps preserved); fall back to
+                // the single-chain move when only the primary chain is selected.
+                var chains = _selectedState.SelectedChains;
+                if (chains.Count > 1)
+                    MoveChainsRelative(chains, delta);
+                else
+                    MoveChain(chain, delta);
+            }
         }
 
-        public void FlipFrameHorizontally(AnimationFrameSave frame)
+        public void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical)
         {
-            _undoManager.Execute(new FlipCommand(
-                new[] { frame }, horizontal: true, this, _events, RefreshWireframe));
-        }
+            // Absolute set, not toggle: only the frames whose flag actually differs from the target
+            // get flipped (and their offset/shapes mirrored), so a frame already at the target state
+            // is untouched. Reuses FlipCommand's toggle for exactly those frames, grouped into one
+            // undo step via CompositeCommand.
+            var commands = new List<IUndoableCommand>();
 
-        public void FlipFrameVertically(AnimationFrameSave frame)
-        {
-            _undoManager.Execute(new FlipCommand(
-                new[] { frame }, horizontal: false, this, _events, RefreshWireframe));
+            if (flipHorizontal.HasValue)
+            {
+                var toFlip = frames.Where(f => f.FlipHorizontal != flipHorizontal.Value).ToArray();
+                if (toFlip.Length > 0)
+                    commands.Add(new FlipCommand(toFlip, horizontal: true, this, _events, RefreshWireframe));
+            }
+            if (flipVertical.HasValue)
+            {
+                var toFlip = frames.Where(f => f.FlipVertical != flipVertical.Value).ToArray();
+                if (toFlip.Length > 0)
+                    commands.Add(new FlipCommand(toFlip, horizontal: false, this, _events, RefreshWireframe));
+            }
+
+            if (commands.Count == 0) return;
+            _undoManager.Execute(new CompositeCommand(commands, "Set Flip"));
         }
 
         public void FlipChainHorizontally(AnimationChainSave chain)
@@ -886,49 +988,35 @@ namespace AnimationEditor.Core.CommandsAndState
             bool   flipV    = false,
             string? newName = null)
         {
-            var acls = _pm.AnimationChainListSave;
-            if (acls is null) return null;
+            var copies = DuplicateChains(new[] { source }, flipH, flipV);
+            if (copies.Count == 0) return null;
 
-            var copyName = newName ?? StringFunctions.MakeStringUnique(
-                source.Name + "Copy",
-                acls.AnimationChains.Select(c => c.Name).ToList());
+            var copy = copies[0];
+            if (newName is not null) copy.Name = newName;
+            return copy;
+        }
 
-            var copy = new AnimationChainSave { Name = copyName };
+        // Clones a chain and, when requested, mirrors every frame and shape horizontally
+        // and/or vertically. Shared by DuplicateChain (single) and DuplicateChains (batch)
+        // so right-click Duplicate's Original/Flip Horizontal/Flip Vertical submenu items
+        // behave identically whether one or many chains are selected.
+        private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, bool flipH, bool flipV)
+        {
+            var copy = new AnimationChainSave { Name = source.Name };
             foreach (var frame in source.Frames)
             {
-                var fCopy = new AnimationFrameSave
-                {
-                    TextureName      = frame.TextureName,
-                    LeftCoordinate   = frame.LeftCoordinate,
-                    RightCoordinate  = frame.RightCoordinate,
-                    TopCoordinate    = frame.TopCoordinate,
-                    BottomCoordinate = frame.BottomCoordinate,
-                    FrameLength      = frame.FrameLength,
-                    FlipHorizontal   = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal,
-                    FlipVertical     = flipV ? !frame.FlipVertical   : frame.FlipVertical,
-                    // Mirror the sprite offset about the entity origin so an off-center frame stays
-                    // aligned with its (also-mirrored) shapes after the flip.
-                    RelativeX        = flipH ? -frame.RelativeX : frame.RelativeX,
-                    RelativeY        = flipV ? -frame.RelativeY : frame.RelativeY,
-                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
-                };
-                if (frame.ShapesSave != null)
-                {
-                    foreach (var shape in frame.ShapesSave.Shapes)
-                        if (AnimationCloneHelper.CloneShape(shape) is { } shapeCopy)
-                        {
-                            // Mirror the copy's offsets so collision tracks the flipped sprite.
-                            ShapeFlip.Mirror(shapeCopy, flipH, flipV);
-                            fCopy.ShapesSave!.Shapes.Add(shapeCopy);
-                        }
-                }
+                var fCopy = AnimationCloneHelper.CloneFrame(frame);
+                fCopy.FlipHorizontal = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal;
+                fCopy.FlipVertical   = flipV ? !frame.FlipVertical   : frame.FlipVertical;
+                // Mirror the sprite offset about the entity origin so an off-center frame stays
+                // aligned with its (also-mirrored) shapes after the flip.
+                fCopy.RelativeX = flipH ? -frame.RelativeX : frame.RelativeX;
+                fCopy.RelativeY = flipV ? -frame.RelativeY : frame.RelativeY;
+                if (fCopy.ShapesSave is not null)
+                    foreach (var shape in fCopy.ShapesSave.Shapes)
+                        ShapeFlip.Mirror(shape, flipH, flipV);
                 copy.Frames.Add(fCopy);
             }
-
-            // Place the copy right after its source so it appears adjacent in the tree.
-            int sourceIndex = acls.AnimationChains.IndexOf(source);
-            int? insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : null;
-            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events, _selectedState, insertIndex));
             return copy;
         }
 
@@ -952,7 +1040,7 @@ namespace AnimationEditor.Core.CommandsAndState
             switch (payload.Kind)
             {
                 case CopySelectionKind.Chain:
-                    DuplicateChainsBatch(payload.Chains);
+                    DuplicateChains(payload.Chains);
                     break;
                 case CopySelectionKind.Frame:
                     DuplicateFramesBatch(payload.Frames);
@@ -963,7 +1051,9 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        private IReadOnlyList<AnimationChainSave> DuplicateChainsBatch(IReadOnlyList<AnimationChainSave> sources)
+        /// <inheritdoc cref="IAppCommands.DuplicateChains"/>
+        public IReadOnlyList<AnimationChainSave> DuplicateChains(
+            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null || sources.Count == 0) return Array.Empty<AnimationChainSave>();
@@ -975,7 +1065,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var items = new List<(AnimationChainSave Source, AnimationChainSave Copy)>();
             foreach (var source in ordered)
             {
-                var copy = AnimationCloneHelper.CloneChain(source);
+                var copy = CloneChainWithFlip(source, flipH, flipV);
                 copy.Name = StringFunctions.MakeStringUnique(source.Name + "Copy", existingNames, 2);
                 existingNames.Add(copy.Name);
                 items.Add((source, copy));
@@ -1311,62 +1401,73 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new CompositeCommand(cmds, "Set All Frame Textures"));
         }
 
-        public void SetFrameLength(AnimationFrameSave frame, float newLength)
+        public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength)
         {
-            var desc = $"Set Length: {frame.FrameLength:0.###}s → {newLength:0.###}s";
+            var desc = $"Set Length: {newLength:0.###}s";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.FrameLength = newLength,
+                frames, () => { foreach (var f in frames) f.FrameLength = newLength; },
                 this, _events, false, desc));
         }
 
-        public void SetFrameRelative(AnimationFrameSave frame, float newRelX, float newRelY)
+        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
         {
-            var desc = $"Set Offset: ({newRelX:0.##}, {newRelY:0.##})";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => { frame.RelativeX = newRelX; frame.RelativeY = newRelY; },
-                this, _events, true, desc));
+                frames, () =>
+                {
+                    foreach (var f in frames)
+                    {
+                        if (newRelX.HasValue) f.RelativeX = newRelX.Value;
+                        if (newRelY.HasValue) f.RelativeY = newRelY.Value;
+                    }
+                },
+                this, _events, true, "Set Offset"));
         }
 
-        public void SetFrameColor(AnimationFrameSave frame, int? red, int? green, int? blue)
+        public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
         {
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
             // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => { frame.Red = red; frame.Green = green; frame.Blue = blue; },
+                frames, () => { foreach (var f in frames) { f.Red = red; f.Green = green; f.Blue = blue; } },
                 this, _events, false, "Set Frame Color"));
         }
 
-        public void SetFrameColorOperation(AnimationFrameSave frame, ColorOperation? operation)
+        public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
         {
             // Mode drives how the preview + timeline/tree thumbnails tint; it doesn't touch the
             // wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.ColorOperation = operation,
+                frames, () => { foreach (var f in frames) f.ColorOperation = operation; },
                 this, _events, false, "Set Frame Color Mode"));
         }
 
-        public void SetFrameAlpha(AnimationFrameSave frame, int? alpha)
+        public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
         {
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
             // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () => frame.Alpha = alpha,
+                frames, () => { foreach (var f in frames) f.Alpha = alpha; },
                 this, _events, false, "Set Frame Alpha"));
         }
 
-        public void SetFramePixelRegion(AnimationFrameSave frame,
-            int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH)
+        public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
+            int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
         {
-            var desc = $"Set Region: ({pixelX}, {pixelY}) {pixelW}×{pixelH}";
             _undoManager.Execute(new BulkFrameEditCommand(
-                [frame], () =>
+                frames, () =>
                 {
-                    PixelFrameEditor.SetX(frame, pixelX, bmpW);
-                    PixelFrameEditor.SetY(frame, pixelY, bmpH);
-                    PixelFrameEditor.SetWidth(frame, pixelW, bmpW);
-                    PixelFrameEditor.SetHeight(frame, pixelH, bmpH);
+                    foreach (var f in frames)
+                    {
+                        // Order matters: SetX/SetY preserve each frame's own current width/height, so
+                        // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
+                        // (possibly just-moved) Left/Top.
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
+                    }
                 },
-                this, _events, true, desc));
+                this, _events, true, "Set Region"));
         }
 
         public void SetRectProps(AnimationFrameSave? frame, AARectSave rect,

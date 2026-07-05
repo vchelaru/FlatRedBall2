@@ -74,6 +74,8 @@ public class AppCommandsSaveFailTests
             AnimationChainListSave? preParsed = null,
             IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null) { }
 
+        public string? ResolveFilesPanelRoot() => null;
+
         public void SaveAnimationChainList(string targetPath)
             => throw new InvalidOperationException("Simulated save failure");
 

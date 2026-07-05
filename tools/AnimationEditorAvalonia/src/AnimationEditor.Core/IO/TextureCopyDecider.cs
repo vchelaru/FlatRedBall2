@@ -32,4 +32,11 @@ public static class TextureCopyDecider
 
         return !normTexture.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Overload for callers with two candidate "already inside" folders — e.g. the .achx
+    /// folder and the broader project folder. Prompts only when the texture is outside both.
+    /// </summary>
+    public static bool ShouldPromptToCopy(string? texturePath, string? primaryFolder, string? secondaryFolder)
+        => ShouldPromptToCopy(texturePath, primaryFolder) && ShouldPromptToCopy(texturePath, secondaryFolder);
 }

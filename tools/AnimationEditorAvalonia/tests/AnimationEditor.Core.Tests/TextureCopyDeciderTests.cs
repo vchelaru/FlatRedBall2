@@ -83,4 +83,33 @@ public class TextureCopyDeciderTests
         string fwdFolder = Folder.Replace('\\', '/');
         Assert.False(TextureCopyDecider.ShouldPromptToCopy(Inside, fwdFolder));
     }
+
+    // ── Two-folder overload (e.g. achx folder + broader project folder) ──────
+
+    [Fact]
+    public void ShouldPromptToCopy_TwoFolders_TextureOutsideBoth_ReturnsTrue()
+    {
+        string projectFolder = TestPaths.Abs("project");
+        Assert.True(TextureCopyDecider.ShouldPromptToCopy(Outside, Folder, projectFolder));
+    }
+
+    [Fact]
+    public void ShouldPromptToCopy_TwoFolders_TextureInsidePrimaryOnly_ReturnsFalse()
+    {
+        string projectFolder = TestPaths.Abs("project");
+        Assert.False(TextureCopyDecider.ShouldPromptToCopy(Inside, Folder, projectFolder));
+    }
+
+    [Fact]
+    public void ShouldPromptToCopy_TwoFolders_TextureInsideSecondaryOnly_ReturnsFalse()
+    {
+        // Outside "Folder" (project/Content) but inside the broader "project" root.
+        string projectFolder = TestPaths.Abs("project");
+        string textureInProjectRoot = TestPaths.Abs("project", "OtherAssets", "enemy.png");
+        Assert.False(TextureCopyDecider.ShouldPromptToCopy(textureInProjectRoot, Folder, projectFolder));
+    }
+
+    [Fact]
+    public void ShouldPromptToCopy_TwoFolders_TextureNullOrEmpty_ReturnsFalse()
+        => Assert.False(TextureCopyDecider.ShouldPromptToCopy(null, Folder, Folder));
 }
