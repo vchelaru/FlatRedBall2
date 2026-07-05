@@ -33,6 +33,13 @@ public class PreviewControl : Control
     private readonly DispatcherTimer _timer;
     private readonly AnimationEditor.Core.CommandsAndState.PlaybackController _playback = new();
 
+    // -- Group (multi-chain) preview playback (#576) ---------------------------
+    // One independent PlaybackController per selected chain, keyed by chain identity. Synced
+    // (added/removed) only when ISelectedState.SelectedChains membership changes — never
+    // recreated on unrelated selection changes (e.g. selecting a shape) — so drift and paused
+    // positions survive everything except the group itself changing.
+    private readonly Dictionary<AnimationChainSave, PlaybackController> _groupPlayback = new();
+
     // Measures real wall-clock time between timer ticks so playback advances by true
     // elapsed time, not the timer's nominal interval (a DispatcherTimer fires later than
     // its Interval, which otherwise makes the animation run slow — see #526).
@@ -190,12 +197,139 @@ public class PreviewControl : Control
     public double SpeedMultiplier
     {
         get => _playback.SpeedMultiplier;
-        set => _playback.SpeedMultiplier = value;
+        set
+        {
+            _playback.SpeedMultiplier = value;
+            foreach (var c in _groupPlayback.Values) c.SpeedMultiplier = value;
+        }
     }
 
-    public void Play()  => _playback.Play();
-    public void Pause() => _playback.Pause();
-    public void StopPlayback() { _playback.Reset(); InvalidateVisual(); }
+    public void Play()
+    {
+        _playback.Play();
+        foreach (var c in _groupPlayback.Values) c.Play();
+    }
+
+    public void Pause()
+    {
+        _playback.Pause();
+        foreach (var c in _groupPlayback.Values) c.Pause();
+    }
+
+    public void StopPlayback()
+    {
+        _playback.Reset();
+        foreach (var c in _groupPlayback.Values) c.Reset();
+        InvalidateVisual();
+    }
+
+    // -- Group (multi-chain) preview playback (#576) ---------------------------
+
+    /// <summary>True when 2+ whole AnimationChains are selected — the preview composites every
+    /// selected chain (see <see cref="GroupTracks"/>) instead of showing the single SelectedChain.</summary>
+    public bool IsGroupPreviewActive => _groupPlayback.Count >= 2;
+
+    /// <summary>
+    /// The active group's chains and their independent PlaybackControllers, back-to-front in
+    /// selection (click) order — see <see cref="ISelectedState.SelectedNodes"/>. Empty when
+    /// <see cref="IsGroupPreviewActive"/> is false.
+    /// </summary>
+    public IReadOnlyList<(AnimationChainSave Chain, PlaybackController Playback)> GroupTracks
+    {
+        get
+        {
+            if (_groupPlayback.Count == 0) return Array.Empty<(AnimationChainSave, PlaybackController)>();
+            var chains = _selectedState!.SelectedChains;
+            var result = new List<(AnimationChainSave, PlaybackController)>(chains.Count);
+            foreach (var chain in chains)
+                if (_groupPlayback.TryGetValue(chain, out var controller))
+                    result.Add((chain, controller));
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Fired when the set of group tracks changes (entering/leaving group mode, or a chain being
+    /// added to/removed from the group) — a structural change the host must rebuild its per-track
+    /// timeline rows for. Not fired for playback ticks; see <see cref="GroupPlaybackTicked"/>.
+    /// </summary>
+    public event Action? GroupTracksChanged;
+
+    /// <summary>
+    /// Fired after every group-mode timer tick and after <see cref="ScrubGroupTrack"/>, so the host
+    /// can refresh each track's playhead position without rebuilding the track list.
+    /// </summary>
+    public event Action? GroupPlaybackTicked;
+
+    /// <summary>
+    /// Scrubs <paramref name="chain"/>'s own track to (<paramref name="frameIndex"/>,
+    /// <paramref name="fraction"/>) while pausing every group track in place (#576 scope item 6).
+    /// Unlike <see cref="ScrubToFrame"/>, this never touches <see cref="ISelectedState.SelectedChain"/>
+    /// or <see cref="ISelectedState.SelectedFrame"/> — the singular selection stays exactly as it
+    /// was before the group was formed.
+    /// </summary>
+    public void ScrubGroupTrack(AnimationChainSave chain, int frameIndex, double fraction)
+    {
+        _playback.Pause();
+        foreach (var c in _groupPlayback.Values) c.Pause();
+        if (_groupPlayback.TryGetValue(chain, out var controller))
+            controller.SeekToFrame(frameIndex, fraction);
+        InvalidateVisual();
+        GroupPlaybackTicked?.Invoke();
+    }
+
+    /// <summary>
+    /// Adds/removes per-chain PlaybackControllers to match <see cref="ISelectedState.SelectedChains"/>.
+    /// A no-op (no event fired) when the group's membership hasn't actually changed, so unrelated
+    /// selection changes (e.g. selecting a shape while a group is active) never disturb playback.
+    /// </summary>
+    private void SyncGroupPlayback()
+    {
+        var chains = _selectedState!.SelectedChains;
+        if (chains.Count < 2)
+        {
+            bool hadAny = _groupPlayback.Count > 0;
+            _groupPlayback.Clear();
+            if (hadAny) GroupTracksChanged?.Invoke();
+            return;
+        }
+
+        var (toAdd, toRemove) = AnimationEditor.Core.CommandsAndState.GroupPlaybackSync.ComputeDiff(
+            _groupPlayback.Keys, chains);
+        foreach (var chain in toRemove) _groupPlayback.Remove(chain);
+        foreach (var chain in toAdd)
+        {
+            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier };
+            controller.SetChain(chain);
+            _groupPlayback[chain] = controller;
+        }
+
+        if (toAdd.Count > 0 || toRemove.Count > 0)
+            GroupTracksChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Builds the back-to-front layer list for the active group (#576 scope items 2–4): each
+    /// selected chain's current frame at its own RelativeX/Y offset. Warms the texture cache for
+    /// every layer, mirroring the single-selection render path.
+    /// </summary>
+    private PreviewLayer[] BuildGroupLayers()
+    {
+        var chains = _selectedState!.SelectedChains;
+        var layers = new List<PreviewLayer>(chains.Count);
+        foreach (var chain in chains)
+        {
+            if (!_groupPlayback.TryGetValue(chain, out var controller)) continue;
+            if (chain.Frames.Count == 0) continue;
+
+            int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+            var frame = chain.Frames[idx];
+            string? texPath = _thumbnailService!.ResolveTexturePath(frame);
+            _thumbnailService.GetImage(texPath);
+            layers.Add(new PreviewLayer(frame, texPath, frame.RelativeX, frame.RelativeY, ResolveColor(chain, frame)));
+        }
+        return layers.ToArray();
+    }
 
     /// <summary>Whether the animation is currently playing.</summary>
     public bool IsPlaying => _playback.IsPlaying;
@@ -222,27 +356,36 @@ public class PreviewControl : Control
     {
         // Clearing the pinned frame lets OnSelectionChanged keep the playback position (it only
         // re-seeks when the chain changes), so playback continues from where the playhead sits.
-        if (_selectedState!.SelectedFrame is not null)
+        // Skipped in group mode (#576): singular SelectedFrame must stay untouched by group code.
+        if (!IsGroupPreviewActive && _selectedState!.SelectedFrame is not null)
             _selectedState!.SelectedFrame = null;
         _playback.Play();
+        foreach (var c in _groupPlayback.Values) c.Play();
         StartAutoTimer();
         InvalidateVisual();
     }
 
     /// <summary>
     /// Pauses playback and pins the frame currently showing so the inspector/wireframe reflect it.
-    /// Keeps the sub-frame playhead position (does not snap to the frame's start).
+    /// Keeps the sub-frame playhead position (does not snap to the frame's start). In group mode
+    /// (#576) every group track is paused too, but the singular SelectedChain/SelectedFrame pinning
+    /// is skipped — group-preview code never touches the singular selection.
     /// </summary>
     public void PausePlayback()
     {
         _playback.Pause();
-        var chain = _selectedState!.SelectedChain;
-        if (chain is not null && chain.Frames.Count > 0)
+        foreach (var c in _groupPlayback.Values) c.Pause();
+
+        if (!IsGroupPreviewActive)
         {
-            int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
-            var frame = chain.Frames[idx];
-            if (!ReferenceEquals(_selectedState!.SelectedFrame, frame))
-                _selectedState!.SelectedFrame = frame;
+            var chain = _selectedState!.SelectedChain;
+            if (chain is not null && chain.Frames.Count > 0)
+            {
+                int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+                var frame = chain.Frames[idx];
+                if (!ReferenceEquals(_selectedState!.SelectedFrame, frame))
+                    _selectedState!.SelectedFrame = frame;
+            }
         }
         InvalidateVisual();
     }
@@ -322,6 +465,32 @@ public class PreviewControl : Control
     /// </summary>
     public SKBitmap RenderToBitmap(int width, int height)
     {
+        var snap = BuildRenderSnapshot(width, height);
+        UpdatePalette();
+        var bitmap = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(bitmap);
+        RenderSkCore(canvas, snap, _thumbnailService!.ImageCache, _palette);
+        return bitmap;
+    }
+
+    /// <summary>
+    /// Builds the snapshot both the live and off-screen render paths draw from. In group-preview
+    /// mode (#576, <see cref="IsGroupPreviewActive"/>) this returns <see cref="RenderSnapshot.GroupLayers"/>
+    /// populated and Frame/OnionFrame null; otherwise it mirrors the pre-#576 single-selection logic.
+    /// </summary>
+    private RenderSnapshot BuildRenderSnapshot(float width, float height)
+    {
+        if (IsGroupPreviewActive)
+        {
+            return new RenderSnapshot(
+                null, null, _zoom, _panX, _panY, _showGuides, null, null, width, height,
+                _appState!.OffsetMultiplier,
+                _hGuides.ToArray(), _vGuides.ToArray(),
+                _draggedGuideIdx, _draggingHGuide,
+                BuildShapeInfos(), 0f, 0f, default, default,
+                BuildGroupLayers());
+        }
+
         var chain         = _selectedState!.SelectedChain;
         var selectedFrame = _selectedState!.SelectedFrame;
 
@@ -353,18 +522,14 @@ public class PreviewControl : Control
 
         var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
 
-        var snap   = new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
-                                        _showGuides, texPath, onionPath, width, height,
-                                        _appState!.OffsetMultiplier,
-                                        _hGuides.ToArray(), _vGuides.ToArray(),
-                                        _draggedGuideIdx, _draggingHGuide,
-                                        BuildShapeInfos(), frameOffX, frameOffY,
-                                        ResolveColor(chain, displayFrame), ResolveColor(chain, onionFrame));
-        UpdatePalette();
-        var bitmap = new SKBitmap(width, height);
-        using var canvas = new SKCanvas(bitmap);
-        RenderSkCore(canvas, snap, _thumbnailService.ImageCache, _palette);
-        return bitmap;
+        return new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
+                                  _showGuides, texPath, onionPath, width, height,
+                                  _appState!.OffsetMultiplier,
+                                  _hGuides.ToArray(), _vGuides.ToArray(),
+                                  _draggedGuideIdx, _draggingHGuide,
+                                  BuildShapeInfos(), frameOffX, frameOffY,
+                                  ResolveColor(chain, displayFrame), ResolveColor(chain, onionFrame),
+                                  Array.Empty<PreviewLayer>());
     }
 
     // -- Injected services -----------------------------------------------------
@@ -449,16 +614,27 @@ public class PreviewControl : Control
         // Tick every time so the baseline stays current even while paused/pinned; this keeps
         // a resume from crediting the whole paused span as one huge delta.
         double delta = _clock.Tick();
+        double clamped = Math.Min(delta, MaxTickSeconds);
 
         // Only advance when the whole chain is playing (no specific frame pinned)
-        if (_selectedState!.SelectedFrame is not null) return;
-        _playback.Advance(Math.Min(delta, MaxTickSeconds));
+        if (_selectedState!.SelectedFrame is null)
+            _playback.Advance(clamped);
+
+        // Each group track loops on its own clock (#576 scope item 4) — paused tracks no-op.
+        if (_groupPlayback.Count > 0)
+        {
+            foreach (var c in _groupPlayback.Values) c.Advance(clamped);
+            InvalidateVisual();
+            GroupPlaybackTicked?.Invoke();
+        }
     }
 
     // -- State reset -----------------------------------------------------------
 
     private void OnSelectionChanged()
     {
+        SyncGroupPlayback();
+
         var chain = _selectedState!.SelectedChain;
         var frame = _selectedState!.SelectedFrame;
 
@@ -915,29 +1091,6 @@ public class PreviewControl : Control
 
     public override void Render(DrawingContext ctx)
     {
-        var chain         = _selectedState!.SelectedChain;
-        var selectedFrame = _selectedState!.SelectedFrame;
-
-        AnimationFrameSave? displayFrame = null;
-        AnimationFrameSave? onionFrame   = null;
-
-        if (selectedFrame is not null)
-        {
-            displayFrame = selectedFrame;
-            if (_showOnionSkin && chain is not null && chain.Frames.Count > 1)
-            {
-                int idx     = chain.Frames.IndexOf(selectedFrame);
-                int prevIdx = (idx - 1 + chain.Frames.Count) % chain.Frames.Count;
-                if (prevIdx != idx)
-                    onionFrame = chain.Frames[prevIdx];
-            }
-        }
-        else if (chain is not null && chain.Frames.Count > 0)
-        {
-            int idx  = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
-            displayFrame = chain.Frames[idx];
-        }
-
         double w = Bounds.Width;
         double h = Bounds.Height;
         if (w <= 0 || h <= 0) return;
@@ -945,24 +1098,11 @@ public class PreviewControl : Control
         // Pre-fill the image cache synchronously before handing off to the render thread.
         // GetImage warms both the image cache (drawn by the render op) and the bitmap cache it
         // decodes from — the cached SKImage is what avoids a per-frame full-atlas copy (#514).
-        string? texPath   = _thumbnailService!.ResolveTexturePath(displayFrame);
-        string? onionPath = _thumbnailService!.ResolveTexturePath(onionFrame);
-        _thumbnailService.GetImage(texPath);
-        _thumbnailService.GetImage(onionPath);
-
-        var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
+        var snap = BuildRenderSnapshot((float)w, (float)h);
 
         UpdatePalette();
         ctx.Custom(new DrawOp(
-            new RenderSnapshot(
-                displayFrame, onionFrame, _zoom, _panX, _panY, _showGuides,
-                texPath, onionPath, (float)w, (float)h,
-                _appState!.OffsetMultiplier,
-                _hGuides.ToArray(), _vGuides.ToArray(),
-                _draggedGuideIdx, _draggingHGuide,
-                BuildShapeInfos(), frameOffX, frameOffY,
-                ResolveColor(chain, displayFrame), ResolveColor(chain, onionFrame)),
-            _thumbnailService.ImageCache, _palette, _showDiagnostics ? _drawTimes : null));
+            snap, _thumbnailService!.ImageCache, _palette, _showDiagnostics ? _drawTimes : null));
     }
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
@@ -1758,7 +1898,15 @@ public class PreviewControl : Control
         float  FrameOffsetX, float FrameOffsetY,
         // Sticky per-channel color for the live frame and onion frame — an omitted channel holds
         // whatever an earlier frame last set, matching runtime, rather than resetting each frame.
-        ResolvedFrameColor FrameColor, ResolvedFrameColor OnionColor);
+        ResolvedFrameColor FrameColor, ResolvedFrameColor OnionColor,
+        // Multi-select group preview (#576): when non-empty, RenderSkCore draws these back-to-front
+        // INSTEAD of Frame/OnionFrame. Empty for the ordinary single-selection render path.
+        PreviewLayer[] GroupLayers);
+
+    /// <summary>One composited chain in a multi-select group preview (#576) — its current frame,
+    /// resolved texture path, and its own resting RelativeX/Y offset and effective color.</summary>
+    private record PreviewLayer(
+        AnimationFrameSave Frame, string? TexturePath, float OffsetX, float OffsetY, ResolvedFrameColor Color);
 
     /// <summary>
     /// Resolves a frame's sticky effective color within its chain. Returns an all-unset result
@@ -1786,22 +1934,40 @@ public class PreviewControl : Control
         canvas.Save();
         canvas.ClipRect(new SKRect(RulerSize, RulerSize, s.Width, s.Height));
 
-        if (s.OnionFrame is not null &&
-            s.OnionTexturePath is not null &&
-            cache.TryGetValue(s.OnionTexturePath, out var onionImg) && onionImg is not null)
+        if (s.GroupLayers.Length > 0)
         {
-            float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
-            float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
-            DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f);
-        }
+            // Multi-select group preview (#576): draw every selected chain's current frame
+            // back-to-front, each at its own resting offset — no onion skin in this mode.
+            foreach (var layer in s.GroupLayers)
+            {
+                if (layer.TexturePath is null ||
+                    !cache.TryGetValue(layer.TexturePath, out var limg) || limg is null)
+                    continue;
 
-        if (s.Frame is not null &&
-            s.TexturePath is not null &&
-            cache.TryGetValue(s.TexturePath, out var img) && img is not null)
+                float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
+                float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f);
+            }
+        }
+        else
         {
-            float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
-            float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-            DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f);
+            if (s.OnionFrame is not null &&
+                s.OnionTexturePath is not null &&
+                cache.TryGetValue(s.OnionTexturePath, out var onionImg) && onionImg is not null)
+            {
+                float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
+                float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
+                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f);
+            }
+
+            if (s.Frame is not null &&
+                s.TexturePath is not null &&
+                cache.TryGetValue(s.TexturePath, out var img) && img is not null)
+            {
+                float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
+                float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
+                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f);
+            }
         }
 
         // Origin crosshair (toggled by ShowGuides)

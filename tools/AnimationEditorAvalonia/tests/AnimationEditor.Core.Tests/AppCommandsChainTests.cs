@@ -627,63 +627,62 @@ public class AppCommandsChainTests
         }
     }
 
-    // ── FlipFrameHorizontally (F09) ──────────────────────────────────────────
+    // ── SetFrameFlip (F09/F10, absolute set — issue #571) ────────────────────
 
     [Fact]
-    public void FlipFrameHorizontally_TogglesFlipHorizontalOnFrame()
+    public void SetFrameFlip_HorizontalTrueOnUnflippedFrame_SetsFlipHorizontal()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { FlipHorizontal = false };
 
-        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
 
         Assert.True(frame.FlipHorizontal);
     }
 
     [Fact]
-    public void FlipFrameHorizontally_TogglesBackWhenCalledTwice()
+    public void SetFrameFlip_HorizontalFalseOnFlippedFrame_ClearsFlipHorizontal()
     {
         var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { FlipHorizontal = false };
+        var frame = new AnimationFrameSave { FlipHorizontal = true };
 
-        ctx.AppCommands.FlipFrameHorizontally(frame);
-        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: false, flipVertical: null);
 
         Assert.False(frame.FlipHorizontal);
     }
 
     [Fact]
-    public void FlipFrameHorizontally_NegatesFrameRelativeX()
+    public void SetFrameFlip_TargetAlreadyMatchesFrame_IsNoOpAndDoesNotCreateUndoEntry()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { FlipHorizontal = true };
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
+
+        Assert.True(frame.FlipHorizontal);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void SetFrameFlip_HorizontalTrue_NegatesFrameRelativeXOnly()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
 
-        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
 
         Assert.Equal(-20, frame.RelativeX);   // sprite offset mirrors about the origin
         Assert.Equal(7, frame.RelativeY);      // vertical offset untouched
     }
 
     [Fact]
-    public void FlipFrameHorizontally_TwiceRestoresFrameRelativeX()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { RelativeX = 20 };
-
-        ctx.AppCommands.FlipFrameHorizontally(frame);
-        ctx.AppCommands.FlipFrameHorizontally(frame);
-
-        Assert.Equal(20, frame.RelativeX);     // negation is its own inverse
-    }
-
-    [Fact]
-    public void FlipFrameHorizontally_MirrorsAttachedShapeOffsets()
+    public void SetFrameFlip_HorizontalTrue_MirrorsAttachedShapeOffsets()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
         frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
 
-        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
 
         var rect = frame.ShapesSave.AARectSaves.First();
         Assert.Equal(-12, rect.X);   // horizontal flip negates X
@@ -691,33 +690,40 @@ public class AppCommandsChainTests
     }
 
     [Fact]
-    public void FlipFrameHorizontally_TwiceRestoresShapeOffsets()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
-
-        ctx.AppCommands.FlipFrameHorizontally(frame);
-        ctx.AppCommands.FlipFrameHorizontally(frame);
-
-        var rect = frame.ShapesSave.AARectSaves.First();
-        Assert.Equal(12, rect.X);    // flip is its own inverse — exact restore
-        Assert.Equal(5, rect.Y);
-    }
-
-    [Fact]
-    public void FlipFrameHorizontally_DoesNotAffectFlipVertical()
+    public void SetFrameFlip_NullVertical_LeavesFlipVerticalUntouched()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave { FlipHorizontal = false, FlipVertical = true };
 
-        ctx.AppCommands.FlipFrameHorizontally(frame);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
 
         Assert.True(frame.FlipVertical);
     }
 
     [Fact]
-    public void FlipFrameHorizontally_RaisesAnimationChainsChanged()
+    public void SetFrameFlip_MultipleFrames_AppliesToAllAsOneUndoStep()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 3);
+        var frames = chain.Frames.ToList();
+        frames[0].FlipHorizontal = true;
+        frames[1].FlipHorizontal = false;
+        frames[2].FlipHorizontal = false;
+
+        ctx.AppCommands.SetFrameFlip(frames, flipHorizontal: true, flipVertical: null);
+
+        Assert.All(frames, f => Assert.True(f.FlipHorizontal));
+        Assert.Single(ctx.UndoManager.UndoHistory);
+
+        ctx.UndoManager.Undo();
+
+        Assert.True(frames[0].FlipHorizontal);
+        Assert.False(frames[1].FlipHorizontal);
+        Assert.False(frames[2].FlipHorizontal);
+    }
+
+    [Fact]
+    public void SetFrameFlip_RaisesAnimationChainsChanged()
     {
         var ctx = TestHelpers.SetupFreshAcls();
         var frame = new AnimationFrameSave();
@@ -726,88 +732,7 @@ public class AppCommandsChainTests
         ctx.ApplicationEvents.AnimationChainsChanged += Handler;
         try
         {
-            ctx.AppCommands.FlipFrameHorizontally(frame);
-            Assert.True(fired);
-        }
-        finally
-        {
-            ctx.ApplicationEvents.AnimationChainsChanged -= Handler;
-        }
-    }
-
-    // ── FlipFrameVertically (F10) ────────────────────────────────────────────
-
-    [Fact]
-    public void FlipFrameVertically_TogglesFlipVerticalOnFrame()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { FlipVertical = false };
-
-        ctx.AppCommands.FlipFrameVertically(frame);
-
-        Assert.True(frame.FlipVertical);
-    }
-
-    [Fact]
-    public void FlipFrameVertically_TogglesBackWhenCalledTwice()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { FlipVertical = false };
-
-        ctx.AppCommands.FlipFrameVertically(frame);
-        ctx.AppCommands.FlipFrameVertically(frame);
-
-        Assert.False(frame.FlipVertical);
-    }
-
-    [Fact]
-    public void FlipFrameVertically_MirrorsAttachedShapeOffsets()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
-        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
-
-        ctx.AppCommands.FlipFrameVertically(frame);
-
-        var rect = frame.ShapesSave.AARectSaves.First();
-        Assert.Equal(12, rect.X);    // horizontal offset untouched
-        Assert.Equal(-5, rect.Y);    // vertical flip negates Y
-    }
-
-    [Fact]
-    public void FlipFrameVertically_NegatesFrameRelativeY()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
-
-        ctx.AppCommands.FlipFrameVertically(frame);
-
-        Assert.Equal(20, frame.RelativeX);   // horizontal offset untouched
-        Assert.Equal(-7, frame.RelativeY);   // sprite offset mirrors about the origin
-    }
-
-    [Fact]
-    public void FlipFrameVertically_DoesNotAffectFlipHorizontal()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave { FlipVertical = false, FlipHorizontal = true };
-
-        ctx.AppCommands.FlipFrameVertically(frame);
-
-        Assert.True(frame.FlipHorizontal);
-    }
-
-    [Fact]
-    public void FlipFrameVertically_RaisesAnimationChainsChanged()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-        var frame = new AnimationFrameSave();
-        bool fired = false;
-        void Handler() => fired = true;
-        ctx.ApplicationEvents.AnimationChainsChanged += Handler;
-        try
-        {
-            ctx.AppCommands.FlipFrameVertically(frame);
+            ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null);
             Assert.True(fired);
         }
         finally

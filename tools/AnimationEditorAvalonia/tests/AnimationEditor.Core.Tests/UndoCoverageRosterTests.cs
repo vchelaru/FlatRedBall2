@@ -86,8 +86,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.HandleReorder)]                = Category.MutatingUndoable,
-        [nameof(IAppCommands.FlipFrameHorizontally)]        = Category.MutatingUndoable,
-        [nameof(IAppCommands.FlipFrameVertically)]          = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetFrameFlip)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainHorizontally)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.FlipChainVertically)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.InvertFrameOrder)]             = Category.MutatingUndoable,
@@ -264,10 +263,9 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MoveShapeToBottom(Rect(ctx), Zebra(ctx).Frames[0]))); // Rect is not already last
         yield return Row(nameof(IAppCommands.HandleReorder),
             ctx => Sync(() => ctx.AppCommands.HandleReorder(+1))); // selection is set up by Arrange
-        yield return Row(nameof(IAppCommands.FlipFrameHorizontally),
-            ctx => Sync(() => ctx.AppCommands.FlipFrameHorizontally(Zebra(ctx).Frames[0])));
-        yield return Row(nameof(IAppCommands.FlipFrameVertically),
-            ctx => Sync(() => ctx.AppCommands.FlipFrameVertically(Zebra(ctx).Frames[0])));
+        yield return Row(nameof(IAppCommands.SetFrameFlip),
+            ctx => Sync(() => ctx.AppCommands.SetFrameFlip(
+                new[] { Zebra(ctx).Frames[0] }, flipHorizontal: true, flipVertical: null)));
         yield return Row(nameof(IAppCommands.FlipChainHorizontally),
             ctx => Sync(() => ctx.AppCommands.FlipChainHorizontally(Zebra(ctx))));
         yield return Row(nameof(IAppCommands.FlipChainVertically),
@@ -305,17 +303,17 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.SetAllFramesTextureName),
             ctx => Sync(() => ctx.AppCommands.SetAllFramesTextureName(Zebra(ctx), "bulk.png")));
         yield return Row(nameof(IAppCommands.SetFrameLength),
-            ctx => Sync(() => ctx.AppCommands.SetFrameLength(Zebra(ctx).Frames[0], 0.99f)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameLength(new[] { Zebra(ctx).Frames[0] }, 0.99f)));
         yield return Row(nameof(IAppCommands.SetFrameRelative),
-            ctx => Sync(() => ctx.AppCommands.SetFrameRelative(Zebra(ctx).Frames[0], 99f, 88f)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameRelative(new[] { Zebra(ctx).Frames[0] }, 99f, 88f)));
         yield return Row(nameof(IAppCommands.SetFrameAlpha),
-            ctx => Sync(() => ctx.AppCommands.SetFrameAlpha(Zebra(ctx).Frames[0], 128)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameAlpha(new[] { Zebra(ctx).Frames[0] }, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColor),
-            ctx => Sync(() => ctx.AppCommands.SetFrameColor(Zebra(ctx).Frames[0], 255, 200, 128)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameColor(new[] { Zebra(ctx).Frames[0] }, 255, 200, 128)));
         yield return Row(nameof(IAppCommands.SetFrameColorOperation),
-            ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(Zebra(ctx).Frames[0], ColorOperation.Add)));
+            ctx => Sync(() => ctx.AppCommands.SetFrameColorOperation(new[] { Zebra(ctx).Frames[0] }, ColorOperation.Add)));
         yield return Row(nameof(IAppCommands.SetFramePixelRegion),
-            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(Zebra(ctx).Frames[0], 4, 8, 12, 16, 64, 64)));
+            ctx => Sync(() => ctx.AppCommands.SetFramePixelRegion(new[] { Zebra(ctx).Frames[0] }, 4, 8, 12, 16, 64, 64)));
         yield return Row(nameof(IAppCommands.SetRectProps),
             ctx => Sync(() => ctx.AppCommands.SetRectProps(Zebra(ctx).Frames[0], Rect(ctx), "Renamed", 5f, 6f, 7f, 8f)));
         yield return Row(nameof(IAppCommands.SetCircleProps),
