@@ -34,6 +34,11 @@
                     <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
                          distinct from passive BgRail chrome, without the loud Accent red. -->
                     <SolidColorBrush x:Key="InfoBannerBg" Color="#202d38" />
+                    <!-- Zebra band for odd animation groups in the ANIMATIONS tree — a barely-there
+                         lift off BgCanvas (#0e0f12). Low contrast on purpose: it must not fight the
+                         frame thumbnails, icons, or Meta text, and the selection/hover highlight sits
+                         on top of it. Even groups get no band (they show BgCanvas). -->
+                    <SolidColorBrush x:Key="TreeRowStripe" Color="#15171c" />
 
                     <!-- SVG icon CurrentColor tokens (Color, not Brush). -->
                     <Color x:Key="IconInk">#e6e8ec</Color>
@@ -71,6 +76,9 @@
                     <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
                          distinct from passive BgRail chrome, without the loud Accent red. -->
                     <SolidColorBrush x:Key="InfoBannerBg" Color="#dae5ee" />
+                    <!-- Zebra band for odd animation groups — a barely-there darkening of BgCanvas
+                         (#e8eaed). Same low-contrast contract as the dark variant. -->
+                    <SolidColorBrush x:Key="TreeRowStripe" Color="#dfe2e6" />
 
                     <Color x:Key="IconInk">#2a2e35</Color>
                     <Color x:Key="IconInkMuted">#5a626e</Color>

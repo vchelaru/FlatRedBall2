@@ -74,6 +74,18 @@ public partial class MainWindow : Window
     private bool _frameDragInProgress;
     private Border? _frameDropLine;
     private Border? _frameDropBox;
+
+    // ── Chain drag-and-drop reorder state ──────────────────────────────────────
+    // Mirrors the frame path above, but for top-level animation-chain nodes. Single-chain
+    // drag only; the dragged chain lives in _pendingChainDrag since the drag is same-process.
+    private static readonly DataFormat<string> ChainDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("animationeditor-chain-drag");
+    private const string ChainDragToken = "chain";
+    private AnimationChainSave? _pendingChainDrag;
+    private AnimationChainSave? _chainDragCandidate;
+    private Avalonia.Point? _chainDragPressPoint;
+    private PointerPressedEventArgs? _chainDragPressArgs;
+    private bool _chainDragInProgress;
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
@@ -1848,6 +1860,13 @@ public partial class MainWindow : Window
             OnTreeFrameDragPointerReleased,
             RoutingStrategies.Bubble);
 
+        // Chain drag-and-drop reorder: a press on a chain row arms a chain-drag candidate, a
+        // pointer move past the threshold starts the Avalonia drag (parallel to the frame path).
+        AnimTree.AddHandler(
+            InputElement.PointerMovedEvent,
+            OnTreeChainDragPointerMoved,
+            RoutingStrategies.Bubble);
+
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) =>
         {
@@ -2039,6 +2058,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Internal chain reorder drag.
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        {
+            var target = ResolveChainDrop(e, draggedChain);
+            if (target.IsValid)
+            {
+                e.DragEffects = DragDropEffects.Move;
+                ShowChainDropIndicator(e);
+            }
+            else
+            {
+                e.DragEffects = DragDropEffects.None;
+                RemoveFrameDropIndicators();
+            }
+            e.Handled = true;
+            return;
+        }
+
         string? firstFile = e.DataTransfer.TryGetFiles()?
             .FirstOrDefault()?.Path.LocalPath;
 
@@ -2080,6 +2117,17 @@ public partial class MainWindow : Window
             var target = ResolveFrameDrop(e, drag);
             if (target is { IsValid: true, Chain: not null } && drag.SourceChain is not null)
                 _appCommands.MoveFrames(drag.Frames, drag.SourceChain, target.Chain, target.InsertIndex);
+            e.Handled = true;
+            return;
+        }
+
+        // Internal chain reorder drop.
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        {
+            RemoveFrameDropIndicators();
+            var target = ResolveChainDrop(e, draggedChain);
+            if (target.IsValid)
+                _appCommands.MoveChainToIndex(draggedChain, target.InsertIndex);
             e.Handled = true;
             return;
         }
@@ -2461,6 +2509,90 @@ public partial class MainWindow : Window
         RemoveDropBox();
     }
 
+    // ── Internal chain drag-and-drop reorder ───────────────────────────────────
+
+    private void ClearChainDragCandidate()
+    {
+        _chainDragCandidate = null;
+        _chainDragPressPoint = null;
+        _chainDragPressArgs = null;
+    }
+
+    private async void OnTreeChainDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_chainDragInProgress || _chainDragCandidate is null ||
+            _chainDragPressPoint is null || _chainDragPressArgs is null)
+            return;
+
+        if (!e.GetCurrentPoint(AnimTree).Properties.IsLeftButtonPressed)
+        {
+            ClearChainDragCandidate();
+            return;
+        }
+
+        var pos = e.GetPosition(AnimTree);
+        if (Math.Abs(pos.X - _chainDragPressPoint.Value.X) <= 4 &&
+            Math.Abs(pos.Y - _chainDragPressPoint.Value.Y) <= 4)
+            return;
+
+        var chain = _chainDragCandidate;
+        e.Pointer.Capture(null); // release press-capture so the drag system can take over
+        _pendingChainDrag = chain;
+        _chainDragInProgress = true;
+
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ChainDragDataFormat, ChainDragToken));
+        try
+        {
+            await DragDrop.DoDragDropAsync(_chainDragPressArgs, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _pendingChainDrag = null;
+            _chainDragInProgress = false;
+            RemoveFrameDropIndicators();
+            ClearChainDragCandidate();
+        }
+    }
+
+    private ChainDropTarget ResolveChainDrop(DragEventArgs e, AnimationChainSave draggedChain)
+    {
+        var chains = _projectManager.AnimationChainListSave?.AnimationChains;
+        if (chains is null) return ChainDropTarget.None;
+        var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
+        return ChainDropResolver.Resolve(
+            nodeData, half, draggedChain, chains,
+            f => _objectFinder.GetAnimationChainContaining(f));
+    }
+
+    /// <summary>
+    /// Draws a thin insert line at the resolved chain boundary. Chains are root nodes, so the
+    /// line spans the full tree width (no box — a box reads as "drop inside", which is the
+    /// frame-into-chain affordance, not a sibling reorder).
+    /// </summary>
+    private void ShowChainDropIndicator(DragEventArgs e)
+    {
+        var (_, half, tvi) = HitTestFrameRow(e.GetPosition(AnimTree));
+        if (tvi is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        var topLeft = Avalonia.VisualExtensions.TranslatePoint(tvi, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        var treeOrigin = Avalonia.VisualExtensions.TranslatePoint(AnimTree, new Avalonia.Point(0, 0), DragOverlayCanvas);
+        if (topLeft is null || treeOrigin is null)
+        {
+            RemoveFrameDropIndicators();
+            return;
+        }
+
+        double treeRight = treeOrigin.Value.X + AnimTree.Bounds.Width;
+        double y = topLeft.Value.Y + (half == FrameRowHalf.Upper ? 0 : tvi.Bounds.Height);
+        RemoveDropBox();
+        ShowDropLine(treeOrigin.Value.X, treeRight, y);
+    }
+
     // ── Window-level OS file drop: open dropped .achx files as tabs ────────────
     //
     // Registered on the whole window (handledEventsToo) so an .achx dropped anywhere —
@@ -2638,6 +2770,8 @@ public partial class MainWindow : Window
                 node.PinnedVisible = node.PinnedVisible
                     || TreeBuilder.MatchesFilter(chain.Name, _treeFilterQuery);
             }
+            // Striping is positional and cascades — recompute after a chain add/frame sync.
+            TreeBuilder.RestripeRoots(_treeRoots);
             RefreshTreeThumbnails();
             SyncTreeSelection();
         }
@@ -2671,6 +2805,8 @@ public partial class MainWindow : Window
             frameNode.Meta       = rebuiltFrameNode.Meta;
             TreeBuilder.SyncShapesInto(frameNode, frame.ShapesSave);
         }
+        // A new frame/shape node must inherit its chain group's zebra parity.
+        TreeBuilder.RestripeRoots(_treeRoots);
         RefreshTreeThumbnails();
     }
 
@@ -2933,6 +3069,7 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
+                ClearChainDragCandidate();
                 _frameDragCandidate = frame;
                 _frameDragPressPoint = e.GetPosition(AnimTree);
                 _frameDragPressArgs = e;
@@ -2956,9 +3093,22 @@ public partial class MainWindow : Window
                     _pendingSingleSelectFrame = null;
                 }
             }
+            else if (e.Source is Control chainSrc &&
+                chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
+                    is TreeNodeVm { Data: AnimationChainSave chain })
+            {
+                // Arm a chain-drag candidate. Do not handle/capture — normal selection and the
+                // context menu still run; the platform drag only begins once the pointer moves
+                // past the threshold, so a plain click never starts a drag.
+                ClearFrameDragCandidate();
+                _chainDragCandidate = chain;
+                _chainDragPressPoint = e.GetPosition(AnimTree);
+                _chainDragPressArgs = e;
+            }
             else
             {
                 ClearFrameDragCandidate();
+                ClearChainDragCandidate();
             }
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 2)
