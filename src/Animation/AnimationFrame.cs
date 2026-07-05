@@ -33,6 +33,15 @@ public class AnimationFrame
     public bool FlipVertical;
 
     /// <summary>
+    /// Whether the source region should be transposed (swap X/Y), independent of
+    /// <see cref="FlipHorizontal"/>/<see cref="FlipVertical"/>. Authored and round-tripped by the
+    /// Animation Editor; the FRB2 <c>SpriteBatch</c> playback path does <b>not</b> apply it — MonoGame's
+    /// <c>SpriteEffects</c> has no diagonal option, so a runtime that wants this needs its own
+    /// UV-manipulation rendering.
+    /// </summary>
+    public bool FlipDiagonal;
+
+    /// <summary>
     /// Local X offset applied to the sprite while this frame is displayed.
     /// Replaces the sprite's X each frame switch, so the character can shift
     /// position per-frame (e.g. a kick frame that leans the character forward).

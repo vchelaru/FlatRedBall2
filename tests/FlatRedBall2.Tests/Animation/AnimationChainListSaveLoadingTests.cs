@@ -153,6 +153,7 @@ public class AnimationChainListSaveLoadingTests
             "      <BottomCoordinate>37</BottomCoordinate>" +
             "      <FlipHorizontal>true</FlipHorizontal>" +
             "      <FlipVertical>true</FlipVertical>" +
+            "      <FlipDiagonal>true</FlipDiagonal>" +
             "      <RelativeX>2.5</RelativeX>" +
             "      <RelativeY>-1.5</RelativeY>" +
             "    </Frame>" +
@@ -173,6 +174,7 @@ public class AnimationChainListSaveLoadingTests
         frame.BottomCoordinate.ShouldBe(37f);
         frame.FlipHorizontal.ShouldBeTrue();
         frame.FlipVertical.ShouldBeTrue();
+        frame.FlipDiagonal.ShouldBeTrue();
         frame.RelativeX.ShouldBe(2.5f);
         frame.RelativeY.ShouldBe(-1.5f);
     }

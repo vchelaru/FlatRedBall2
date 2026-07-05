@@ -925,7 +925,8 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        public void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical)
+        public void SetFrameFlip(
+            IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical, bool? flipDiagonal = null)
         {
             // Absolute set, not toggle: only the frames whose flag actually differs from the target
             // get flipped (and their offset/shapes mirrored), so a frame already at the target state
@@ -937,13 +938,19 @@ namespace AnimationEditor.Core.CommandsAndState
             {
                 var toFlip = frames.Where(f => f.FlipHorizontal != flipHorizontal.Value).ToArray();
                 if (toFlip.Length > 0)
-                    commands.Add(new FlipCommand(toFlip, horizontal: true, this, _events, RefreshWireframe));
+                    commands.Add(new FlipCommand(toFlip, FlipAxis.Horizontal, this, _events, RefreshWireframe));
             }
             if (flipVertical.HasValue)
             {
                 var toFlip = frames.Where(f => f.FlipVertical != flipVertical.Value).ToArray();
                 if (toFlip.Length > 0)
-                    commands.Add(new FlipCommand(toFlip, horizontal: false, this, _events, RefreshWireframe));
+                    commands.Add(new FlipCommand(toFlip, FlipAxis.Vertical, this, _events, RefreshWireframe));
+            }
+            if (flipDiagonal.HasValue)
+            {
+                var toFlip = frames.Where(f => f.FlipDiagonal != flipDiagonal.Value).ToArray();
+                if (toFlip.Length > 0)
+                    commands.Add(new FlipCommand(toFlip, FlipAxis.Diagonal, this, _events, RefreshWireframe));
             }
 
             if (commands.Count == 0) return;
@@ -953,14 +960,14 @@ namespace AnimationEditor.Core.CommandsAndState
         public void FlipChainHorizontally(AnimationChainSave chain)
         {
             _undoManager.Execute(new FlipCommand(
-                chain.Frames.ToArray(), horizontal: true, this, _events,
+                chain.Frames.ToArray(), FlipAxis.Horizontal, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
         }
 
         public void FlipChainVertically(AnimationChainSave chain)
         {
             _undoManager.Execute(new FlipCommand(
-                chain.Frames.ToArray(), horizontal: false, this, _events,
+                chain.Frames.ToArray(), FlipAxis.Vertical, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
         }
 

@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using FlatRedBall2.Animation.Content;
+using SkiaSharp;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -104,5 +105,56 @@ public class PreviewSourceRectTests
         Assert.Equal(48, sy);
         Assert.Equal(32, sw);
         Assert.Equal(32, sh);
+    }
+
+    // ── ComputeOutlineDst — diagonal flip swaps the on-screen footprint ──────
+
+    [Fact]
+    public void ComputeOutlineDst_NoDiagonalFlip_ReturnsDstUnchanged()
+    {
+        var dst = SKRect.Create(10, 20, 40, 60);
+        var outline = PreviewControl.ComputeOutlineDst(dst, flipDiagonal: false, cx: 30, cy: 50);
+        Assert.Equal(dst, outline);
+    }
+
+    [Fact]
+    public void ComputeOutlineDst_DiagonalFlip_SwapsWidthAndHeightAboutPivot()
+    {
+        var dst = SKRect.Create(10, 20, 40, 60); // cx=30, cy=50, width=40, height=60
+        var outline = PreviewControl.ComputeOutlineDst(dst, flipDiagonal: true, cx: 30, cy: 50);
+        Assert.Equal(60, outline.Width);
+        Assert.Equal(40, outline.Height);
+        Assert.Equal(30, outline.MidX);
+        Assert.Equal(50, outline.MidY);
+    }
+
+    // ── ComputeFlipMatrix — diagonal-only must reflect about the "up and to the right"
+    // (bottom-left/top-right) diagonal: top-left content swaps with bottom-right content,
+    // and top-right/bottom-left corners (on the axis) stay in place. ──────────────────────
+
+    [Fact]
+    public void ComputeFlipMatrix_DiagonalOnly_SwapsTopLeftAndBottomRight()
+    {
+        var matrix = PreviewControl.ComputeFlipMatrix(
+            flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
+
+        var topLeft = matrix.MapPoint(new SKPoint(5, 5));       // offset (-5,-5) from pivot
+        var bottomRight = matrix.MapPoint(new SKPoint(15, 15)); // offset (+5,+5) from pivot
+
+        Assert.Equal(new SKPoint(15, 15), topLeft);      // top-left corner moves to bottom-right
+        Assert.Equal(new SKPoint(5, 5), bottomRight);    // bottom-right corner moves to top-left
+    }
+
+    [Fact]
+    public void ComputeFlipMatrix_DiagonalOnly_LeavesTopRightAndBottomLeftInPlace()
+    {
+        var matrix = PreviewControl.ComputeFlipMatrix(
+            flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
+
+        var topRight = matrix.MapPoint(new SKPoint(15, 5));  // offset (+5,-5) from pivot
+        var bottomLeft = matrix.MapPoint(new SKPoint(5, 15)); // offset (-5,+5) from pivot
+
+        Assert.Equal(new SKPoint(15, 5), topRight);   // on the up-right axis — unchanged
+        Assert.Equal(new SKPoint(5, 15), bottomLeft);  // on the up-right axis — unchanged
     }
 }

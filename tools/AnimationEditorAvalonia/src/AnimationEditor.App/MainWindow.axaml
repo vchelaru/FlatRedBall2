@@ -1308,6 +1308,16 @@
                                                          CurrentColor="{DynamicResource IconInk}"
                                                          VerticalAlignment="Center" />
                                             </ToggleButton>
+                                            <ToggleButton x:Name="PropFlipD"
+                                                          ToolTip.Tip="Flip Diagonal"
+                                                          Width="32" Height="26"
+                                                          HorizontalContentAlignment="Center"
+                                                          VerticalContentAlignment="Center">
+                                                <svg:Svg Width="16" Height="16"
+                                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFlipD.svg"
+                                                         CurrentColor="{DynamicResource IconInk}"
+                                                         VerticalAlignment="Center" />
+                                            </ToggleButton>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

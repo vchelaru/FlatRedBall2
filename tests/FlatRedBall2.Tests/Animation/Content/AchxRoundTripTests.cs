@@ -66,6 +66,7 @@ public class AchxRoundTripTests
         actual.BottomCoordinate.ShouldBe(expected.BottomCoordinate);
         actual.FlipHorizontal.ShouldBe(expected.FlipHorizontal);
         actual.FlipVertical.ShouldBe(expected.FlipVertical);
+        actual.FlipDiagonal.ShouldBe(expected.FlipDiagonal);
         actual.RelativeX.ShouldBe(expected.RelativeX);
         actual.RelativeY.ShouldBe(expected.RelativeY);
 
