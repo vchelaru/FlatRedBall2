@@ -224,6 +224,35 @@ namespace AnimationEditor.Core
             }
         }
 
+        /// <summary>
+        /// Root folder the Files panel should browse: the linked project's Content folder
+        /// when <see cref="AnimationChainListSave.ProjectFile"/> resolves to an existing
+        /// file, otherwise the folder containing the loaded .achx. Only the project file's
+        /// *location* on disk is used here — never its internal format — so this keeps
+        /// working for project file formats other than the FRB1 .gluj this repo currently
+        /// supports. Returns <c>null</c> when no .achx is loaded/saved yet.
+        /// </summary>
+        public string? ResolveFilesPanelRoot()
+        {
+            if (string.IsNullOrEmpty(FileName)) return null;
+
+            var achxFolder = new FilePath(FileName).GetDirectoryContainingThis();
+
+            var projectFileRelative = AnimationChainListSave?.ProjectFile;
+            if (!string.IsNullOrEmpty(projectFileRelative))
+            {
+                var projectFile = new FilePath(achxFolder.FullPath + projectFileRelative);
+                if (projectFile.Exists())
+                {
+                    var projectDirectory = projectFile.GetDirectoryContainingThis();
+                    var contentDirectory = new FilePath(projectDirectory.FullPath + "Content/");
+                    return (contentDirectory.Exists() ? contentDirectory : projectDirectory).FullPath;
+                }
+            }
+
+            return achxFolder.FullPath;
+        }
+
         private void TryLoadProjectFile(FilePath projectFile)
         {
             if (projectFile?.Exists() != true)

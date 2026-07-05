@@ -71,6 +71,8 @@ public class AppCommandsSaveFailTests
 
         public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null) { }
 
+        public string? ResolveFilesPanelRoot() => null;
+
         public void SaveAnimationChainList(string targetPath)
             => throw new InvalidOperationException("Simulated save failure");
 
