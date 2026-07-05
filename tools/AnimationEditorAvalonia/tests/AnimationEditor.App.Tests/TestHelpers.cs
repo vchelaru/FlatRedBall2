@@ -55,17 +55,17 @@ internal sealed class TestServices
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
             ThumbnailService, FileAssociationService, SettingsRoot);
 
-    public WireframeControl CreateWireframeControl()
+    public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {
         var ctrl = new WireframeControl();
-        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, PendingCutState);
+        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, PendingCutState, showError);
         return ctrl;
     }
 
-    public PreviewControl CreatePreviewControl()
+    public PreviewControl CreatePreviewControl(System.Action<string>? showError = null)
     {
         var ctrl = new PreviewControl();
-        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, ThumbnailService, PendingCutState);
+        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, ThumbnailService, PendingCutState, showError);
         return ctrl;
     }
 }

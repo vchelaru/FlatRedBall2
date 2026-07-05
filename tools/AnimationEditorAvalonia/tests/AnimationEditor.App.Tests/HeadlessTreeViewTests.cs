@@ -880,6 +880,46 @@ public class HeadlessTreeViewTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// Issue #586: the expand/collapse indent column (PART_ExpandCollapseChevronContainer) was
+    /// narrowed to 10px to tighten row indentation, which also shrank the chevron ToggleButton's
+    /// click target to that same 10px width — too small to hit reliably. The fix must enlarge the
+    /// ToggleButton's hit-test area via a negative margin (so it overflows its 10px container)
+    /// without changing the container's own (visible) width.
+    /// </summary>
+    [AvaloniaFact]
+    public void ExpandCollapseChevron_HitTestAreaLargerThanVisibleColumn()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var chainNode = GetRoots(tree)[0];
+            var chainTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(tvi => ReferenceEquals(tvi.DataContext, chainNode));
+
+            var chevronContainer = chainTvi.GetVisualDescendants().OfType<Panel>()
+                .First(p => p.Name == "PART_ExpandCollapseChevronContainer");
+            var chevronButton = chainTvi.GetVisualDescendants().OfType<ToggleButton>()
+                .First(t => t.Name == "PART_ExpandCollapseChevron");
+
+            // Visible indent column stays exactly as authored...
+            Assert.Equal(10, chevronContainer.Bounds.Width);
+            // ...but the actual click target must extend well beyond it.
+            Assert.True(chevronButton.Bounds.Width > chevronContainer.Bounds.Width + 8,
+                $"Chevron click target width was {chevronButton.Bounds.Width}, expected it to overflow " +
+                $"the {chevronContainer.Bounds.Width}px visible column by more than 8px.");
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void ZebraBands_ConsecutiveRows_HaveNoVerticalSeam()
     {
