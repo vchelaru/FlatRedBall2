@@ -356,9 +356,8 @@ public class AnimationChainListSave
         // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
         // identity is its index, so the editor always shows a positional "Frame N" label.
 
-        // FRB1 dialect: shape wrapper is <ShapeCollectionSave>. FRB2's <ShapesSave> is not
-        // accepted — no .achx files exist in the wild using it (the FRB2 writer didn't exist
-        // before this branch), so the dialect is unified on FRB1's element names.
+        // Shape wrapper is always <ShapeCollectionSave>; ParseShapes accepts both this
+        // project's typed-list dialect and AnimationChain.MonoGame's nested <Shapes> dialect.
         var shapesEl = el.Element("ShapeCollectionSave");
         if (shapesEl != null)
             frame.ShapesSave = ParseShapes(shapesEl);
@@ -368,10 +367,18 @@ public class AnimationChainListSave
 
     private static ShapesSave ParseShapes(XElement el)
     {
-        // FRB1 dialect: separate typed containers. Read in write order (rects, polygons, circles)
-        // so the round-trip is stable; WriteShapes re-groups by type regardless of list order.
         var shapes = new ShapesSave();
 
+        // Some tooling (AnimationChain.MonoGame) nests shapes one level deeper, as untyped
+        // children of a <Shapes> wrapper, instead of this dialect's typed-list containers below.
+        // Accept both so a .achx saved by that tooling doesn't silently lose its shapes when
+        // read here (#535 follow-up). Never written by this project's own Save/WriteShapes.
+        var nestedShapesEl = el.Element("Shapes");
+        if (nestedShapesEl != null)
+            return ParseNestedShapesDialect(nestedShapesEl);
+
+        // FRB1 dialect: separate typed containers. Read in write order (rects, polygons, circles)
+        // so the round-trip is stable; WriteShapes re-groups by type regardless of list order.
         var rectsEl = el.Element("AxisAlignedRectangleSaves");
         if (rectsEl != null)
         {
@@ -426,6 +433,61 @@ public class AnimationChainListSave
                 };
                 ReadColor(c, circle);
                 shapes.Shapes.Add(circle);
+            }
+        }
+
+        return shapes;
+    }
+
+    // Nested dialect: untyped shape elements directly under a <Shapes> wrapper (as opposed to
+    // this dialect's typed-list containers), used by AnimationChain.MonoGame. Per-shape
+    // Z/Alpha/Red/Green/Blue are absent in that dialect's output; ReadColor falls back to FRB1
+    // defaults in that case, same as for any legacy file missing those elements.
+    private static ShapesSave ParseNestedShapesDialect(XElement nestedShapesEl)
+    {
+        var shapes = new ShapesSave();
+
+        foreach (var child in nestedShapesEl.Elements())
+        {
+            switch (child.Name.LocalName)
+            {
+                case "AxisAlignedRectangleSave":
+                    var rect = new AARectSave
+                    {
+                        Name = (string?)child.Element("Name") ?? string.Empty,
+                        X = FloatEl(child, "X"),
+                        Y = FloatEl(child, "Y"),
+                        ScaleX = FloatEl(child, "ScaleX", 16f),
+                        ScaleY = FloatEl(child, "ScaleY", 16f),
+                    };
+                    ReadColor(child, rect);
+                    shapes.Shapes.Add(rect);
+                    break;
+                case "CircleSave":
+                    var circle = new CircleSave
+                    {
+                        Name = (string?)child.Element("Name") ?? string.Empty,
+                        X = FloatEl(child, "X"),
+                        Y = FloatEl(child, "Y"),
+                        Radius = FloatEl(child, "Radius", 16f),
+                    };
+                    ReadColor(child, circle);
+                    shapes.Shapes.Add(circle);
+                    break;
+                case "PolygonSave":
+                    var poly = new PolygonSave
+                    {
+                        Name = (string?)child.Element("Name") ?? string.Empty,
+                        X = FloatEl(child, "X"),
+                        Y = FloatEl(child, "Y"),
+                    };
+                    var pointsEl = child.Element("Points");
+                    if (pointsEl != null)
+                        foreach (var v in pointsEl.Elements("Vector2Save"))
+                            poly.Points.Add(new Vector2Save { X = FloatEl(v, "X"), Y = FloatEl(v, "Y") });
+                    ReadColor(child, poly);
+                    shapes.Shapes.Add(poly);
+                    break;
             }
         }
 

@@ -64,6 +64,36 @@ public class AnimationChainListSaveLoadingTests
         save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe("Sword");
     }
 
+    // AnimationChain.MonoGame (see src/AnimationChain.MonoGame/Content/AnimationChainListSave.cs)
+    // has always written shapes nested one level deeper: <ShapeCollectionSave><Shapes>... rather
+    // than this project's typed-list dialect. Any future unification that points
+    // AnimationChain.MonoGame's parsing at this type must not silently lose shapes from files it
+    // already saved -- this is the read-side widening that makes that safe (#535 follow-up).
+    [Fact]
+    public void FromFile_FrameWithNestedShapesDialect_DeserializesRectangleEntry()
+    {
+        string xml =
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <AnimationChain><Name>Attack</Name>" +
+            "    <Frame><TextureName>a.png</TextureName><FrameLength>0.1</FrameLength>" +
+            "      <ShapeCollectionSave>" +
+            "        <Shapes>" +
+            "          <AxisAlignedRectangleSave><Name>Sword</Name><X>5</X><Y>0</Y><ScaleX>15</ScaleX><ScaleY>5</ScaleY></AxisAlignedRectangleSave>" +
+            "        </Shapes>" +
+            "      </ShapeCollectionSave>" +
+            "    </Frame>" +
+            "  </AnimationChain>" +
+            "</AnimationChainArraySave>";
+
+        var save = AnimationChainListSave.FromFile("any.achx",
+            _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
+
+        save.AnimationChains[0].Frames[0].ShapesSave.ShouldNotBeNull();
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.Count().ShouldBe(1);
+        save.AnimationChains[0].Frames[0].ShapesSave!.AARectSaves.First().Name.ShouldBe("Sword");
+    }
+
     // ToXmlString is the in-memory companion to Save(path): the Animation Editor clipboard
     // serializes copied frames/chains through it, so it must round-trip per-frame shapes.
     [Fact]
