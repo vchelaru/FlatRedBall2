@@ -1,4 +1,4 @@
-# #535 M1/M2 Spike Findings — Animation Editor on Avalonia.Browser (WASM)
+# #535 M1/M2/M3 Spike Findings — Animation Editor on Avalonia.Browser (WASM)
 
 Tracking issue: [vchelaru/FlatRedBall2#535](https://github.com/vchelaru/FlatRedBall2/issues/535).
 
@@ -192,3 +192,65 @@ consistently. Filed as an environment quirk of this sandbox's IPv6 loopback
 under load, not a bug in the app, the build, or Avalonia — but worth knowing
 if `dotnet run`'s browser dev server ever misbehaves only for the project's
 own (not a dependency's) assets.
+
+## M3 (file I/O) — Open Folder / Save As / drag-drop implemented; open questions on verification
+
+M3 asked: open/save via file picker + drag-drop, and evaluate the File System
+Access API for the folder panel. An audit before writing any code (see PR
+history) found the desktop app's file dialogs and drag-drop *already* go
+through Avalonia's own cross-platform `IStorageProvider`/`DragEventArgs`
+abstractions, not OS-native APIs — Avalonia.Browser backs both with the File
+System Access API. The actual gap was downstream: both paths reduce a picked/
+dropped item to a `string` filesystem path (`IStorageFile.Path.LocalPath`) and
+hand that to `AnimationChainListSave.FromFile(path)`/`.Save(path)`, and there
+was no stream-based `Save` to pair with the read side's existing
+`FromFile(path, streamProvider)` seam.
+
+**Landed:**
+- `AnimationChainListSave.Save(Stream)` — byte-identical output to
+  `Save(string)` (test: `Save_Stream_ProducesByteIdenticalOutputToSaveToPath`),
+  which now delegates to it.
+- `BrowserProjectLoader.TryLoadAsync(IReadOnlyList<IStorageFile>, ...)` — the
+  shared load path for both Open Folder and drag-drop. Per the user's choice
+  of "drag-drop the set together" + "open a folder" (not "open just the achx
+  and prompt for missing textures"): given a set of files, it finds the one
+  `.achx`, parses it via the existing `FromString`, and matches every other
+  `.png` in the set to frames by filename via `ThumbnailService.SeedTexture` —
+  no assumption of a shared folder on a real filesystem anywhere.
+- `AnimationEditor.Browser`'s view gained a toolbar (**Open Folder…**, **Save
+  As…**) and a window-wide drop target. Open Folder uses
+  `StorageProvider.OpenFolderPickerAsync` + `IStorageFolder.GetItemsAsync()` to
+  collect the folder's files, then calls the same loader. Save As uses
+  `StorageProvider.SaveFilePickerAsync` and writes via `IStorageFile.OpenWriteAsync()`
+  + the new `Save(Stream)`. "Save" (vs "Save As") has no distinct behavior in
+  this build — there's no stored file handle from the bundled sample to save
+  back to, so both go through the same picker; a real editor would need to
+  track the `IStorageFile` from whichever Open/Save As last succeeded.
+
+**Verified:** the toolbar renders and the app still loads/plays the bundled
+sample correctly with the new UI in place (confirmed in a real Chrome tab).
+
+**Not verified, and likely can't be from this harness:** clicking Open
+Folder/Save As opens a real native OS picker dialog, outside the page's DOM —
+no tool available in this session can drive that (same class of boundary as
+a native screenshot dialog). Drag-drop was tested by dispatching a synthetic
+`DragEvent` (with real `File` objects built from a canvas-generated PNG and an
+in-memory `.achx` string) at the canvas element — it never reached the
+registered `DragDrop.DragOverEvent`/`DropEvent` C# handlers at all (no trace
+of them running), meaning Avalonia's browser drag-drop plumbing requires a
+genuine trusted OS-driven drag gesture and silently ignores synthetic ones —
+consistent with browsers' security model around drag-and-drop file access
+generally. **This code is verified by construction** (compiles; follows the
+exact portable `IStorageProvider`/`DragEventArgs` pattern already proven
+working in the desktop app's own Open/Save/drag-drop, per the pre-change
+audit) and by the unit-tested `Save(Stream)`/`SeedTexture`/`BrowserProjectLoader`
+pieces, but a real end-to-end human/OS-driven test (actually dragging a file,
+actually clicking through a native folder picker) is the one remaining gap —
+same category as M1's real-browser rendering check earlier in this doc.
+
+**Explicitly out of scope:** the PNG folder-scan panel (`PngFolderScanner`/
+`PngFolderWatcher`) is pure `Directory.EnumerateFiles` + `FileSystemWatcher` —
+no browser equivalent exists for the live-watch behavior (File System Access
+API folder access is a one-time grant with no persistent watch primitive).
+Per the issue's own framing, this stays desktop-only rather than attempting a
+redesign as part of M3.

@@ -120,6 +120,35 @@ public class AnimationChainListSaveWriterTests
         doc.Root!.Name.LocalName.ShouldBe("AnimationChainArraySave");
     }
 
+    // #535 M3: browser Save/Save As writes to an IStorageFile's Stream, not a local path
+    // (WASM has no filesystem). Save(Stream) must produce byte-identical output to Save(path)
+    // so the two call sites never diverge.
+    [Fact]
+    public void Save_Stream_ProducesByteIdenticalOutputToSaveToPath()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, FlipHorizontal = true };
+        chain.Frames.Add(frame);
+        save.AnimationChains.Add(chain);
+
+        var tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".achx");
+        try
+        {
+            save.Save(tempPath);
+            var expectedBytes = File.ReadAllBytes(tempPath);
+
+            using var stream = new MemoryStream();
+            save.Save(stream);
+
+            stream.ToArray().ShouldBe(expectedBytes);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
     [Fact]
     public void Save_TopLevelFields_EmittedInFrb1Order()
     {

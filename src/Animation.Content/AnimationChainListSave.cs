@@ -171,6 +171,18 @@ public class AnimationChainListSave
     /// </remarks>
     public void Save(string path)
     {
+        using var stream = File.Create(path);
+        Save(stream);
+    }
+
+    /// <summary>
+    /// Writes this save using the same FRB1-faithful dialect as <see cref="Save(string)"/>, to an
+    /// already-open stream instead of a local path. For callers with no real filesystem to write
+    /// to (e.g. the browser build writing to an <c>IStorageFile</c>'s stream) -- the caller owns
+    /// <paramref name="stream"/> and is responsible for disposing it; this method does not close it.
+    /// </summary>
+    public void Save(Stream stream)
+    {
         // FRB1 writes UTF-8 without a BOM; XDocument.Save(stream) would emit one, diffing every
         // file. Use an explicit BOM-less encoding. Indent/newlines match FRB1 (2 spaces, CRLF).
         var settings = new XmlWriterSettings
@@ -182,13 +194,12 @@ public class AnimationChainListSave
             // Linux/CI), which would diff every line off-Windows — pin it so output is byte-stable.
             NewLineChars = "\r\n",
         };
-        using var stream = File.Create(path);
         using var writer = XmlWriter.Create(stream, settings);
         ToXDocument().Save(writer);
     }
 
     /// <summary>
-    /// Serializes this save to a .achx XML string using the same dialect as <see cref="Save"/>.
+    /// Serializes this save to a .achx XML string using the same dialect as <see cref="Save(string)"/>.
     /// Lets the Animation Editor clipboard share one serializer with file I/O, so copy/paste of
     /// frames and chains round-trips per-frame shapes exactly as the on-disk format does. Pair
     /// with <see cref="FromString"/> to read it back.
