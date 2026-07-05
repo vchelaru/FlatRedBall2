@@ -324,6 +324,28 @@ public class WireframeControl : Control
 
     private readonly List<FrameRect> _frameRects = new();
 
+    /// <summary>
+    /// The single "primary" selected frame's rect — used for resize handles and
+    /// handle-drag hit-testing. Resolved by reference to <see cref="ISelectedState.SelectedFrame"/>
+    /// rather than any <see cref="FrameRect.IsSelected"/> flag, because a tree multi-select
+    /// (issue #582) marks every selected frame's rect IsSelected for preview highlighting, but
+    /// resize handles/dragging still only ever target one frame at a time.
+    /// <para>
+    /// Returns null when more than one frame is multi-selected: handles on just one of several
+    /// equally-selected frames implies that frame is somehow special, so they are suppressed
+    /// entirely (same treatment as a whole-chain selection with no individual frame chosen).
+    /// </para>
+    /// </summary>
+    private FrameRect? PrimaryFrameRect()
+    {
+        if ((_selectedState?.SelectedFrames.Count ?? 0) > 1)
+            return null;
+
+        return _selectedState?.SelectedFrame is { } f
+            ? _frameRects.FirstOrDefault(fr => fr.Frame == f)
+            : null;
+    }
+
     // Set when LoadTexture/CenterTexture ran before the control had a real viewport
     // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
     private bool _needsInitialCenter;
@@ -951,7 +973,7 @@ public class WireframeControl : Control
         float startScreenX, float startScreenY,
         float endScreenX,   float endScreenY)
     {
-        var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
+        var sel = PrimaryFrameRect();
         if (sel is null || _bitmap is null) return;
 
         _draggingRect    = sel;
@@ -1306,7 +1328,7 @@ public class WireframeControl : Control
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
 
-        var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
+        var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
         {
             snap.SelectedHandleBounds = sel.Bounds;
@@ -1828,7 +1850,7 @@ public class WireframeControl : Control
 
     private (FrameRect? frame, HandleKind handle) HitTestHandle(Point pos)
     {
-        var sel = _frameRects.FirstOrDefault(f => f.IsSelected);
+        var sel = PrimaryFrameRect();
         if (sel != null)
         {
             var sr = ToScreen(sel.Bounds);
@@ -1961,6 +1983,7 @@ public class WireframeControl : Control
         if (_bitmap is null) { InvalidateVisual(); return; }
 
         var selectedFrame  = _selectedState!.SelectedFrame;
+        var selectedFrames = _selectedState!.SelectedFrames;
         var selectedChain  = _selectedState!.SelectedChain;
         var selectedChains = _selectedState!.SelectedChains;
 
@@ -1968,8 +1991,13 @@ public class WireframeControl : Control
             ? null
             : (Path.GetDirectoryName(_projectManager!.FileName) ?? string.Empty);
 
+        // A tree multi-select of individual frames (issue #582) must show every selected
+        // frame's region, not just the primary one — SelectedFrames already carries the full
+        // multi-select bag (falling back to just [SelectedFrame] when nothing is multi-selected).
         IEnumerable<AnimationFrameSave> framesToShow;
-        if (selectedFrame != null)
+        if (selectedFrames.Count > 1)
+            framesToShow = selectedFrames;
+        else if (selectedFrame != null)
             framesToShow = new[] { selectedFrame };
         else if (selectedChains?.Count > 0)
             framesToShow = selectedChains.SelectMany(c => c.Frames);
@@ -2004,7 +2032,7 @@ public class WireframeControl : Control
             {
                 Frame      = frame,
                 Bounds     = new SKRect(pixL, pixT, pixR, pixB),
-                IsSelected = frame == selectedFrame
+                IsSelected = selectedFrames.Contains(frame)
             });
         }
 
