@@ -11,6 +11,9 @@ CLAUDE.local.md
 # Visual Studio / Rider / IDE
 **/.vs/
 
+# C# Dev Kit language-service cache (safe to delete, auto-regenerated per its own header)
+**/*.lscache
+
 # Per-machine Claude settings
 **/settings.local.json
 
