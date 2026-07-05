@@ -149,6 +149,26 @@ public class AppSettingsModelTests
     }
 
     [Fact]
+    public void GuideLineArgb_DefaultsToNull()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.Null(model.GuideLineArgb);
+    }
+
+    [Fact]
+    public void GuideLineArgb_SurvivesJsonRoundTrip()
+    {
+        // Packed 0xAARRGGBB — opaque magenta.
+        var model = new AppSettingsModel { GuideLineArgb = 0xFFFF00FF };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.Equal(0xFFFF00FFu, restored!.GuideLineArgb);
+    }
+
+    [Fact]
     public void SuppressDefaultHandlerPrompt_DefaultsToFalse()
     {
         var model = new AppSettingsModel();

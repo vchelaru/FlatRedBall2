@@ -187,7 +187,7 @@ public partial class MainWindow : Window
         WireAppCommands();
         LoadSettingsFile();
         ApplyPersistedTheme();
-        ApplyPersistedCanvasBackground();
+        ApplyPersistedCanvasColors();
         WireMenuEvents();
         WireWireframeToolbar();
         WireWireframeControl();
@@ -1426,12 +1426,6 @@ public partial class MainWindow : Window
         MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
         MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
         MenuThemeSystem.Click += (_, _) => SetTheme(AppTheme.System);
-
-        MenuBgThemeDefault.Click += (_, _) => SetCanvasBackground(null);
-        MenuBgBlack.Click        += (_, _) => SetCanvasBackground(CanvasBgBlack);
-        MenuBgWhite.Click        += (_, _) => SetCanvasBackground(CanvasBgWhite);
-        MenuBgMidGray.Click      += (_, _) => SetCanvasBackground(CanvasBgMidGray);
-        MenuBgCustom.Click       += async (_, _) => await PickCustomCanvasBackgroundAsync();
         // C#-built surfaces (tab strip, history rows) hold static brush snapshots, so
         // rebuild them when the variant changes. XAML surfaces follow via DynamicResource.
         ActualThemeVariantChanged += (_, _) => { RebuildTabStrip(); RefreshHistoryPanel(); };
@@ -1549,12 +1543,17 @@ public partial class MainWindow : Window
 
     private void OnSettingsClick(object? sender, RoutedEventArgs e)
     {
+        var themedPalette = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light);
         var dialog = Settings.SettingsWindowBuilder.Build(
             new Settings.SettingsWindowModel
             {
                 FileAssociationSupported = _fileAssociation.IsSupported,
                 FileAssociationStatus = _fileAssociation.GetStatus(),
                 SuppressDefaultHandlerPrompt = _appSettings.SuppressDefaultHandlerPrompt,
+                CanvasBackgroundArgb = _appSettings.CanvasBackgroundArgb,
+                ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),
+                GuideLineArgb = _appSettings.GuideLineArgb,
+                ThemeDefaultGuideLineArgb = ToArgb(themedPalette.GuideLine),
             },
             new Settings.SettingsWindowCallbacks
             {
@@ -1565,6 +1564,10 @@ public partial class MainWindow : Window
                     SaveSettingsFile();
                     ShowDefaultHandlerBannerIfAppropriate();
                 },
+                OnCanvasBackgroundChanged = SetCanvasBackground,
+                OnPickCustomCanvasBackground = PickCustomCanvasBackgroundAsync,
+                OnGuideLineChanged = SetGuideLineColor,
+                OnPickCustomGuideLine = PickCustomGuideLineColorAsync,
             });
         _ = dialog.ShowDialog(this);
     }
@@ -4340,18 +4343,15 @@ public partial class MainWindow : Window
         MenuThemeSystem.IsChecked = _appSettings.Theme == AppTheme.System;
     }
 
-    // ── Canvas background ──────────────────────────────────────────────────────
-    // Preset backgrounds for the View → Canvas Background menu (packed 0xAARRGGBB, opaque).
-    private const uint CanvasBgBlack   = 0xFF000000;
-    private const uint CanvasBgWhite   = 0xFFFFFFFF;
-    private const uint CanvasBgMidGray = 0xFF808080;
+    // ── Canvas colors (background + guide line) ────────────────────────────────
+    // Both live in the Settings → Canvas Colors section; see SettingsWindowBuilder.
 
-    /// <summary>Pushes the persisted canvas-background override onto both canvases and syncs the menu.</summary>
-    private void ApplyPersistedCanvasBackground()
+    /// <summary>Pushes the persisted canvas-color overrides onto the canvases affected by each.</summary>
+    private void ApplyPersistedCanvasColors()
     {
         WireframeCtrl.CanvasBackgroundOverride = _appSettings.CanvasBackgroundArgb;
         PreviewCtrl.CanvasBackgroundOverride   = _appSettings.CanvasBackgroundArgb;
-        SyncCanvasBackgroundMenuChecks();
+        PreviewCtrl.GuideLineOverride          = _appSettings.GuideLineArgb;
     }
 
     private void SetCanvasBackground(uint? argb)
@@ -4359,33 +4359,25 @@ public partial class MainWindow : Window
         _appSettings.CanvasBackgroundArgb = argb;
         WireframeCtrl.CanvasBackgroundOverride = argb;
         PreviewCtrl.CanvasBackgroundOverride   = argb;
-        SyncCanvasBackgroundMenuChecks();
         SaveSettingsFile();
     }
 
-    private void SyncCanvasBackgroundMenuChecks()
+    private void SetGuideLineColor(uint? argb)
     {
-        var argb = _appSettings.CanvasBackgroundArgb;
-        MenuBgThemeDefault.IsChecked = argb is null;
-        MenuBgBlack.IsChecked        = argb == CanvasBgBlack;
-        MenuBgWhite.IsChecked        = argb == CanvasBgWhite;
-        MenuBgMidGray.IsChecked      = argb == CanvasBgMidGray;
-        // "Custom" covers any opaque color that isn't one of the named presets.
-        MenuBgCustom.IsChecked =
-            argb is uint v && v != CanvasBgBlack && v != CanvasBgWhite && v != CanvasBgMidGray;
+        _appSettings.GuideLineArgb = argb;
+        PreviewCtrl.GuideLineOverride = argb;
+        SaveSettingsFile();
     }
 
-    /// <summary>
-    /// Opens a color picker seeded with the current background, and on OK stores the chosen
-    /// color (forced opaque) as the custom canvas background.
-    /// </summary>
-    private async Task PickCustomCanvasBackgroundAsync()
-    {
-        var themed = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light).Background;
-        var seed = _appSettings.CanvasBackgroundArgb is uint v
-            ? Color.FromUInt32(v)
-            : Color.FromArgb(themed.Alpha, themed.Red, themed.Green, themed.Blue);
+    private static uint ToArgb(SKColor color) =>
+        (uint)((color.Alpha << 24) | (color.Red << 16) | (color.Green << 8) | color.Blue);
 
+    /// <summary>
+    /// Opens a color picker seeded with <paramref name="seed"/> and returns the chosen color
+    /// (forced opaque) as a packed <c>0xAARRGGBB</c> value, or <c>null</c> if cancelled.
+    /// </summary>
+    private async Task<uint?> PickCustomColorAsync(string title, Color seed)
+    {
         var colorView = new ColorView { Color = seed };
 
         var okBtn     = new Button { Content = "OK",     MinWidth = 80 };
@@ -4406,7 +4398,7 @@ public partial class MainWindow : Window
 
         var dialog = new Window
         {
-            Title = "Canvas Background",
+            Title = title,
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
@@ -4415,17 +4407,29 @@ public partial class MainWindow : Window
         okBtn.Click     += (_, _) => dialog.Close(true);
         cancelBtn.Click += (_, _) => dialog.Close(false);
 
-        if (await dialog.ShowDialog<bool>(this))
-        {
-            // Force opaque — a translucent canvas fill would composite unpredictably.
-            uint argb = 0xFF000000u | (colorView.Color.ToUInt32() & 0x00FFFFFFu);
-            SetCanvasBackground(argb);
-        }
-        else
-        {
-            // Re-sync so the "Custom…" radio doesn't stay selected after a cancel.
-            SyncCanvasBackgroundMenuChecks();
-        }
+        if (!await dialog.ShowDialog<bool>(this))
+            return null;
+
+        // Force opaque — a translucent canvas fill/guide would composite unpredictably.
+        return 0xFF000000u | (colorView.Color.ToUInt32() & 0x00FFFFFFu);
+    }
+
+    private Task<uint?> PickCustomCanvasBackgroundAsync()
+    {
+        var themed = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light).Background;
+        var seed = _appSettings.CanvasBackgroundArgb is uint v
+            ? Color.FromUInt32(v)
+            : Color.FromArgb(themed.Alpha, themed.Red, themed.Green, themed.Blue);
+        return PickCustomColorAsync("Canvas Background", seed);
+    }
+
+    private Task<uint?> PickCustomGuideLineColorAsync()
+    {
+        var themed = CanvasPalette.For(ActualThemeVariant != ThemeVariant.Light).GuideLine;
+        var seed = _appSettings.GuideLineArgb is uint v
+            ? Color.FromUInt32(v)
+            : Color.FromArgb(255, themed.Red, themed.Green, themed.Blue);
+        return PickCustomColorAsync("Guide Line Color", seed);
     }
 
     /// <summary>
