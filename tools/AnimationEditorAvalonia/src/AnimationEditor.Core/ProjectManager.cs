@@ -35,7 +35,18 @@ namespace AnimationEditor.Core
         /// </summary>
         public TextureCoordinateType OnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
-        public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null)
+        /// <param name="fileName">The .achx path. Only read from disk when <paramref name="preParsed"/> is null.</param>
+        /// <param name="preParsed">Already-parsed content (e.g. fetched over HTTP on the browser-wasm build), skipping the disk read.</param>
+        /// <param name="knownTextureSizes">
+        /// Pixel dimensions for textures the caller has already decoded (keyed by <see cref="AnimationFrameSave.TextureName"/>),
+        /// used instead of reading a PNG header from disk when converting Pixel coordinates to UV. Needed on the
+        /// browser-wasm build, which has no filesystem to read texture headers from but already decodes every
+        /// dropped/picked PNG into memory. Sizes not present here still fall back to a disk read.
+        /// </param>
+        public void LoadAnimationChain(
+            FilePath fileName,
+            AnimationChainListSave? preParsed = null,
+            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
         {
             AnimationChainListSave acls;
             if (preParsed != null)
@@ -61,7 +72,7 @@ namespace AnimationEditor.Core
             AddShapeCollectionsToFrames(acls);
 
             OnDiskCoordinateType = acls.CoordinateType;
-            NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath);
+            NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath, knownTextureSizes);
 
             AnimationChainListSave = acls;
             FileName = fileName.FullPath;
@@ -75,10 +86,24 @@ namespace AnimationEditor.Core
         /// throughout. .achx files saved with <c>CoordinateType=Pixel</c> store raw pixel
         /// coordinates instead, so we read the texture dimensions for each unique
         /// <see cref="AnimationFrameSave.TextureName"/> and divide. PNG headers are
-        /// parsed directly to avoid pulling an image-decode dependency into Core.
+        /// parsed directly to avoid pulling an image-decode dependency into Core, except
+        /// for sizes already supplied via <paramref name="knownTextureSizes"/>.
         /// </summary>
-        private static void NormalizeCoordinatesToUv(AnimationChainListSave acls, string achxDirectory)
-            => ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV);
+        private static void NormalizeCoordinatesToUv(
+            AnimationChainListSave acls,
+            string achxDirectory,
+            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
+        {
+            Dictionary<string, (int W, int H)>? seedCache = null;
+            if (knownTextureSizes != null)
+            {
+                seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in knownTextureSizes)
+                    seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
+            }
+
+            ConvertCoordinates(acls, achxDirectory, TextureCoordinateType.UV, seedCache);
+        }
 
         /// <summary>
         /// Save the current animation chain list to <paramref name="targetPath"/> in the

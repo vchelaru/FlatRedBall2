@@ -12,7 +12,10 @@ namespace AnimationEditor.Core
         string? FileName { get; set; }
         TextureCoordinateType OnDiskCoordinateType { get; set; }
 
-        void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null);
+        void LoadAnimationChain(
+            FilePath fileName,
+            AnimationChainListSave? preParsed = null,
+            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null);
         void SaveAnimationChainList(string targetPath);
 
         /// <summary>

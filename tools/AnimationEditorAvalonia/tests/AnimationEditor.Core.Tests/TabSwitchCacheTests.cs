@@ -122,10 +122,13 @@ public class TabSwitchCacheTests : IDisposable
             set => _inner.OnDiskCoordinateType = value;
         }
 
-        public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null)
+        public void LoadAnimationChain(
+            FilePath fileName,
+            AnimationChainListSave? preParsed = null,
+            IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null)
         {
             LoadCallCount++;
-            _inner.LoadAnimationChain(fileName, preParsed);
+            _inner.LoadAnimationChain(fileName, preParsed, knownTextureSizes);
         }
 
         public void SaveAnimationChainList(string targetPath) =>

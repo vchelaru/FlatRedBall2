@@ -267,6 +267,38 @@ the bundled sample still loads with the new UI. Not verified, same reason as
 Open Folder/Save As above: exercising a real folder pick + external file edit
 needs the native OS folder picker, which no tool in this environment can drive.
 
+### Bug found and fixed: `Pixel`-coordinate `.achx` files silently failed to load correctly
+
+Every existing `.achx` example elsewhere in the repo (`samples/*/Content/**/*.achx`,
+`.claude/templates/AnimationChains/*.achx`, test fixtures) uses `CoordinateType=Pixel` —
+only the hand-authored bundled `sample/player.achx` uses `UV`. `ProjectManager.LoadAnimationChain`
+always normalizes to UV via `ConvertCoordinates`, which read each texture's pixel size with
+`System.IO.File.OpenRead` (`TryReadPngSize`). In the browser there is no filesystem, so that
+read threw, was swallowed by a `try/catch`, and the frame's conversion was silently skipped —
+raw pixel values were then misinterpreted as UV (0–1) fractions at render time, producing
+garbled/wrong-region sprites with no error or crash.
+
+**Fixed:** `LoadAnimationChain` (and `IProjectManager`) gained an optional
+`knownTextureSizes` parameter; `BrowserProjectLoader.TryLoadAsync` already decodes every
+dropped/picked PNG into an `SKBitmap` (for `ThumbnailService.SeedTexture`) and now also
+records each one's pixel dimensions into that dictionary, so the Pixel→UV conversion never
+needs to touch disk in the browser. TDD'd: `ProjectManagerLoadTests.LoadAnimationChain_PixelCoordinatesWithKnownTextureSizes_*`
+construct a Pixel-coordinate chain whose texture is never written to disk and assert the
+conversion still happens correctly.
+
+### Known gap: no chain selector in this spike's UI
+
+`App.axaml.cs` and `BrowserProjectLoader.cs` both hardcode
+`selectedState.SelectedChain = acls.AnimationChains[0]` — whichever chain is first in the
+`.achx`'s XML document order is the only one this build can ever show; there is no
+ComboBox/tree/list to pick another. This was never in scope for M1–M4 (the ported UI is
+intentionally just Open Folder / Save As / Preview), but it means a manual test file whose
+first chain happens to be single-frame (e.g. `ShmupSpace.achx`'s `ShipTurnLeft`, a static
+ship-rotation pose — see `manual-test-content/shmup-space/`) will look like "nothing is
+animating" even though the file has real multi-frame chains (`Explosion`, `EnemyClam`,
+`ShipBoosterStrong/Weak`) later in the same document. Revisit if/when more of the desktop
+editor's UI gets ported to the browser build.
+
 ## M4 (deploy) — workflow + load indicator + bundle size measured; deploy not triggered
 
 M4 asked for a GitHub Actions → Pages workflow with the correct base-href

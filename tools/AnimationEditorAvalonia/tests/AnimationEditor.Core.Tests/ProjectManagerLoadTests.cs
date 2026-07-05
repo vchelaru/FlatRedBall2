@@ -127,4 +127,67 @@ public class ProjectManagerLoadTests : IDisposable
 
         Assert.Same(preParsed, pm.AnimationChainListSave);
     }
+
+    // ── Pre-parsed Pixel content with known texture sizes, no file on disk ─────────────────
+    // (#535 M3 follow-up: browser Open Folder/drag-drop has decoded textures in memory but no
+    // filesystem to read a PNG header from -- LoadAnimationChain must accept the already-known
+    // sizes instead of silently skipping the pixel-to-UV conversion.)
+
+    [Fact]
+    public void LoadAnimationChain_PixelCoordinatesWithKnownTextureSizes_ConvertsToUvWithoutReadingDisk()
+    {
+        var pm = new ProjectManager();
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "sprite.png",
+            LeftCoordinate = 0f,
+            RightCoordinate = 32f,
+            TopCoordinate = 0f,
+            BottomCoordinate = 64f,
+        };
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(frame);
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        preParsed.AnimationChains.Add(chain);
+
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>
+        {
+            ["sprite.png"] = (32, 64),
+        };
+
+        // "sprite.png" is never written to disk -- if this fell back to reading a PNG header
+        // from `TestPaths.Abs("browser", ...)` it would fail and skip the conversion.
+        pm.LoadAnimationChain(
+            new FilePath(TestPaths.Abs("browser", "does-not-exist.achx")),
+            preParsed,
+            knownTextureSizes);
+
+        Assert.Equal(0f, frame.LeftCoordinate);
+        Assert.Equal(1f, frame.RightCoordinate);
+        Assert.Equal(0f, frame.TopCoordinate);
+        Assert.Equal(1f, frame.BottomCoordinate);
+    }
+
+    [Fact]
+    public void LoadAnimationChain_PixelCoordinatesWithKnownTextureSizes_SetsOnDiskCoordinateTypeToPixel()
+    {
+        var pm = new ProjectManager();
+        var frame = new AnimationFrameSave { TextureName = "sprite.png" };
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(frame);
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        preParsed.AnimationChains.Add(chain);
+
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>
+        {
+            ["sprite.png"] = (32, 64),
+        };
+
+        pm.LoadAnimationChain(
+            new FilePath(TestPaths.Abs("browser", "does-not-exist2.achx")),
+            preParsed,
+            knownTextureSizes);
+
+        Assert.Equal(TextureCoordinateType.Pixel, pm.OnDiskCoordinateType);
+    }
 }

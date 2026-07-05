@@ -44,6 +44,12 @@ internal static class BrowserProjectLoader
 
         var acls = AnimationChainListSave.FromString(achxText);
 
+        // Pixel-coordinate .achx files need each texture's pixel size to convert to the UV
+        // coordinates ProjectManager works with internally (see ProjectManager.ConvertCoordinates).
+        // The browser has no filesystem for that conversion to fall back to, so capture the size
+        // of every texture we decode here anyway and hand it to LoadAnimationChain below.
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var file in files)
         {
             if (ReferenceEquals(file, achxFile)) continue;
@@ -55,13 +61,16 @@ internal static class BrowserProjectLoader
 
             var bitmap = SKBitmap.Decode(buffer.ToArray());
             if (bitmap != null)
+            {
                 thumbnailService.SeedTexture(file.Name, bitmap);
+                knownTextureSizes[file.Name] = (bitmap.Width, bitmap.Height);
+            }
         }
 
         // achxFile.Name has no real filesystem meaning here -- it's only the logical identity
         // ProjectManager.FileName exposes, and preParsed means it's never read from disk.
         selectedState.Reset();
-        projectManager.LoadAnimationChain(new FilePath(achxFile.Name), acls);
+        projectManager.LoadAnimationChain(new FilePath(achxFile.Name), acls, knownTextureSizes);
         if (acls.AnimationChains.Count > 0)
             selectedState.SelectedChain = acls.AnimationChains[0];
 
