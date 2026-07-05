@@ -6,11 +6,14 @@ using Xunit;
 namespace AnimationEditor.Core.Tests;
 
 /// <summary>
-/// Covers <see cref="ProjectManager.ResolveFilesPanelRoot"/>: the Files panel should
-/// browse the linked project's Content folder when one resolves, and fall back to the
-/// loaded .achx's own folder otherwise. Resolution only ever uses the project file's
-/// *location* on disk — never its internal format — so this keeps working even for
-/// project file formats other than the FRB1 .gluj this repo currently supports.
+/// Covers <see cref="ProjectManager.ResolveFilesPanelRoot"/>. Root resolution, in order:
+/// (1) if <see cref="AnimationChainListSave.ProjectFile"/> resolves to a directory that
+/// exists — the referenced project file itself need not exist, since a relative link
+/// authored against a source layout commonly goes stale once the .achx is copied to a
+/// build-output folder — use that directory (or its <c>Content</c> subfolder, if present);
+/// (2) otherwise walk up from the .achx's own folder to the nearest ancestor literally named
+/// <c>Content</c> — the convention every FlatRedBall content pipeline copies assets into;
+/// (3) otherwise the .achx's own folder.
 /// </summary>
 public class ProjectManagerFilesPanelRootTests
 {
@@ -23,14 +26,13 @@ public class ProjectManagerFilesPanelRootTests
     }
 
     [Fact]
-    public void ResolveFilesPanelRoot_WhenNoProjectFileSet_ReturnsAchxFolder()
+    public void ResolveFilesPanelRoot_WhenNoProjectFileAndNoContentAncestor_ReturnsAchxFolder()
     {
         using var temp = new TempDir();
 
         var sut = new ProjectManager
         {
-            FileName = Path.Combine(temp.Path, "Anim.achx"),
-            AnimationChainListSave = new AnimationChainListSave()
+            FileName = Path.Combine(temp.Path, "Anim.achx")
         };
 
         var root = sut.ResolveFilesPanelRoot();
@@ -39,7 +41,46 @@ public class ProjectManagerFilesPanelRootTests
     }
 
     [Fact]
-    public void ResolveFilesPanelRoot_WhenProjectFileResolvesWithContentFolder_ReturnsContentFolder()
+    public void ResolveFilesPanelRoot_WhenAchxIsNestedUnderContent_ReturnsContentFolder()
+    {
+        using var temp = new TempDir();
+
+        var contentDir = Path.Combine(temp.Path, "Content");
+        var achxDir = Path.Combine(contentDir, "Entities", "Enemy");
+        Directory.CreateDirectory(achxDir);
+        File.WriteAllText(Path.Combine(contentDir, "ChibiCthulhuTiles.png"), "");
+
+        var sut = new ProjectManager
+        {
+            FileName = Path.Combine(achxDir, "Byakhee.achx")
+        };
+
+        var root = sut.ResolveFilesPanelRoot();
+
+        Assert.Equal(new FilePath(contentDir + "/").Standardized, new FilePath(root!).Standardized);
+    }
+
+    [Fact]
+    public void ResolveFilesPanelRoot_MatchesContentFolderNameCaseInsensitively()
+    {
+        using var temp = new TempDir();
+
+        var contentDir = Path.Combine(temp.Path, "CONTENT");
+        var achxDir = Path.Combine(contentDir, "Sub");
+        Directory.CreateDirectory(achxDir);
+
+        var sut = new ProjectManager
+        {
+            FileName = Path.Combine(achxDir, "Anim.achx")
+        };
+
+        var root = sut.ResolveFilesPanelRoot();
+
+        Assert.Equal(new FilePath(contentDir + "/").Standardized, new FilePath(root!).Standardized);
+    }
+
+    [Fact]
+    public void ResolveFilesPanelRoot_WhenProjectFileExists_UsesItsContentFolder()
     {
         using var temp = new TempDir();
 
@@ -61,39 +102,49 @@ public class ProjectManagerFilesPanelRootTests
     }
 
     [Fact]
-    public void ResolveFilesPanelRoot_WhenProjectFileResolvesWithoutContentFolder_ReturnsProjectFolder()
+    public void ResolveFilesPanelRoot_WhenReferencedProjectFileIsMissingButItsFolderExists_StillUsesThatFolder()
     {
+        // Mirrors a real repro: a build-output .achx (under a non-"Content"-named path)
+        // whose ProjectFile points at a project file that was never copied alongside it,
+        // but the project's own folder (and its Content subfolder) still exists on disk.
         using var temp = new TempDir();
 
+        var achxDir = Path.Combine(temp.Path, "Build", "Nested");
+        Directory.CreateDirectory(achxDir);
         var projectDir = Path.Combine(temp.Path, "Project");
-        Directory.CreateDirectory(projectDir);
-        File.WriteAllText(Path.Combine(projectDir, "Game.gluj"), "<Project/>");
+        var contentDir = Path.Combine(projectDir, "Content");
+        Directory.CreateDirectory(contentDir);
+        // Note: no "Game.glux" file is written — only the folder exists.
 
         var sut = new ProjectManager
         {
-            FileName = Path.Combine(temp.Path, "Anim.achx"),
-            AnimationChainListSave = new AnimationChainListSave { ProjectFile = "Project/Game.gluj" }
+            FileName = Path.Combine(achxDir, "Anim.achx"),
+            AnimationChainListSave = new AnimationChainListSave { ProjectFile = "../../Project/Game.glux" }
         };
 
         var root = sut.ResolveFilesPanelRoot();
 
-        Assert.Equal(new FilePath(projectDir + "/").Standardized, new FilePath(root!).Standardized);
+        Assert.Equal(new FilePath(contentDir + "/").Standardized, new FilePath(root!).Standardized);
     }
 
     [Fact]
-    public void ResolveFilesPanelRoot_WhenProjectFileDoesNotResolve_FallsBackToAchxFolder()
+    public void ResolveFilesPanelRoot_WhenProjectFileFolderDoesNotExist_FallsBackToContentAncestor()
     {
         using var temp = new TempDir();
 
+        var contentDir = Path.Combine(temp.Path, "Content");
+        var achxDir = Path.Combine(contentDir, "Entities", "Enemy");
+        Directory.CreateDirectory(achxDir);
+
         var sut = new ProjectManager
         {
-            FileName = Path.Combine(temp.Path, "Anim.achx"),
-            AnimationChainListSave = new AnimationChainListSave { ProjectFile = "../NoSuchProject.gluj" }
+            FileName = Path.Combine(achxDir, "Byakhee.achx"),
+            AnimationChainListSave = new AnimationChainListSave { ProjectFile = "../../../../NoSuchFolder/game.glux" }
         };
 
         var root = sut.ResolveFilesPanelRoot();
 
-        Assert.Equal(new FilePath(temp.Path + "/").Standardized, new FilePath(root!).Standardized);
+        Assert.Equal(new FilePath(contentDir + "/").Standardized, new FilePath(root!).Standardized);
     }
 
     private sealed class TempDir : IDisposable

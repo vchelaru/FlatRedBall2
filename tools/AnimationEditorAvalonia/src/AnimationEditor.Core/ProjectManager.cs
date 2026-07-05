@@ -225,12 +225,16 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
-        /// Root folder the Files panel should browse: the linked project's Content folder
-        /// when <see cref="AnimationChainListSave.ProjectFile"/> resolves to an existing
-        /// file, otherwise the folder containing the loaded .achx. Only the project file's
-        /// *location* on disk is used here — never its internal format — so this keeps
-        /// working for project file formats other than the FRB1 .gluj this repo currently
-        /// supports. Returns <c>null</c> when no .achx is loaded/saved yet.
+        /// Root folder the Files panel should browse, in order: (1) if
+        /// <see cref="AnimationChainListSave.ProjectFile"/> resolves to a directory that
+        /// exists, that directory (or its <c>Content</c> subfolder, if present) — the
+        /// referenced project file itself need not exist, since a relative link authored
+        /// against a source layout commonly goes stale once the .achx is copied to a
+        /// build-output folder, so only the *directory* is required to resolve; (2)
+        /// otherwise the nearest ancestor folder literally named <c>Content</c>, walking up
+        /// from the loaded .achx's folder — the convention every FlatRedBall content
+        /// pipeline (FRB1 and FRB2) copies assets into; (3) otherwise the folder containing
+        /// the .achx itself. Returns <c>null</c> when no .achx is loaded/saved yet.
         /// </summary>
         public string? ResolveFilesPanelRoot()
         {
@@ -242,15 +246,28 @@ namespace AnimationEditor.Core
             if (!string.IsNullOrEmpty(projectFileRelative))
             {
                 var projectFile = new FilePath(achxFolder.FullPath + projectFileRelative);
-                if (projectFile.Exists())
+                var projectDirectory = projectFile.GetDirectoryContainingThis();
+                if (projectDirectory.Exists())
                 {
-                    var projectDirectory = projectFile.GetDirectoryContainingThis();
                     var contentDirectory = new FilePath(projectDirectory.FullPath + "Content/");
                     return (contentDirectory.Exists() ? contentDirectory : projectDirectory).FullPath;
                 }
             }
 
-            return achxFolder.FullPath;
+            return FindContentAncestor(achxFolder.FullPath) ?? achxFolder.FullPath;
+        }
+
+        private static string? FindContentAncestor(string folderFullPath)
+        {
+            var segments = folderFullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = segments.Length - 1; i >= 0; i--)
+            {
+                if (string.Equals(segments[i], "Content", StringComparison.OrdinalIgnoreCase))
+                    return string.Join("/", segments, 0, i + 1) + "/";
+            }
+
+            return null;
         }
 
         private void TryLoadProjectFile(FilePath projectFile)
