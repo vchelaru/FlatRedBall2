@@ -428,4 +428,86 @@ public class CanvasTransformTests
         Assert.Equal(startPanY, py, 2);
         Assert.Equal(startZoom, z, 4);
     }
+
+    // ── AutoPanVelocity (#540) ─────────────────────────────────────────────────
+
+    [Fact]
+    public void AutoPanVelocity_PointerWellInsideViewport_ReturnsZero()
+    {
+        var (vx, vy) = CanvasTransform.AutoPanVelocity(400f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(0f, vx);
+        Assert.Equal(0f, vy);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerExactlyAtMarginBoundary_ReturnsZero()
+    {
+        // The margin band starts just inside the boundary; at the boundary itself there is
+        // no overflow yet.
+        var (vx, vy) = CanvasTransform.AutoPanVelocity(32f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(0f, vx);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerAtLeftEdge_ReturnsMaxSpeedPositiveX()
+    {
+        // Left overflow reveals content further left, which means panX (the screen position
+        // of texture pixel 0,0) must increase.
+        var (vx, vy) = CanvasTransform.AutoPanVelocity(0f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(900f, vx, 3);
+        Assert.Equal(0f, vy);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerPastLeftEdge_ClampsToMaxSpeed()
+    {
+        // A captured pointer can report coordinates outside the control once it leaves the
+        // control's screen area; speed must not exceed the configured max.
+        var (vx, _) = CanvasTransform.AutoPanVelocity(-200f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(900f, vx, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerAtRightEdge_ReturnsMaxSpeedNegativeX()
+    {
+        var (vx, _) = CanvasTransform.AutoPanVelocity(800f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(-900f, vx, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerPastRightEdge_ClampsToMaxSpeed()
+    {
+        var (vx, _) = CanvasTransform.AutoPanVelocity(1000f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(-900f, vx, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerHalfwayIntoLeftMargin_ReturnsHalfMaxSpeed()
+    {
+        // 16px into a 32px margin → halfway through the ramp.
+        var (vx, _) = CanvasTransform.AutoPanVelocity(16f, 300f, 800f, 600f, 32f, 900f);
+        Assert.Equal(450f, vx, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerAtTopEdge_ReturnsMaxSpeedPositiveY()
+    {
+        var (_, vy) = CanvasTransform.AutoPanVelocity(400f, 0f, 800f, 600f, 32f, 900f);
+        Assert.Equal(900f, vy, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerAtBottomEdge_ReturnsMaxSpeedNegativeY()
+    {
+        var (_, vy) = CanvasTransform.AutoPanVelocity(400f, 600f, 800f, 600f, 32f, 900f);
+        Assert.Equal(-900f, vy, 3);
+    }
+
+    [Fact]
+    public void AutoPanVelocity_PointerInTopLeftCorner_ReturnsBothAxesPositive()
+    {
+        var (vx, vy) = CanvasTransform.AutoPanVelocity(0f, 0f, 800f, 600f, 32f, 900f);
+        Assert.Equal(900f, vx, 3);
+        Assert.Equal(900f, vy, 3);
+    }
 }
