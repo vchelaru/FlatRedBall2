@@ -148,6 +148,24 @@ public class PreviewControl : Control
             InvalidateVisual();
         }
     }
+
+    private uint? _guideLineOverride;
+
+    /// <summary>
+    /// Optional user-chosen guide-line color as a packed <c>0xAARRGGBB</c> value; <c>null</c>
+    /// follows the theme. Setting it re-resolves the palette and repaints.
+    /// </summary>
+    public uint? GuideLineOverride
+    {
+        get => _guideLineOverride;
+        set
+        {
+            if (_guideLineOverride == value) return;
+            _guideLineOverride = value;
+            UpdatePalette();
+            InvalidateVisual();
+        }
+    }
     private readonly List<float> _hGuides = new(); // world-Y values (positive = down on screen)
     private readonly List<float> _vGuides = new(); // world-X values (positive = right on screen)
     private int  _draggedGuideIdx = -1;
@@ -1123,7 +1141,7 @@ public class PreviewControl : Control
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
     // "is it Light?" check correctly handles the follow-system case.
     private void UpdatePalette() =>
-        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride);
+        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride, _guideLineOverride);
 
     // -- Guide helpers ---------------------------------------------------------
 

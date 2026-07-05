@@ -45,22 +45,56 @@ public class CanvasPaletteTests
     {
         var expected = CanvasPalette.For(isDark: true).Background;
 
-        Assert.Equal(expected, CanvasPalette.Resolve(isDark: true, overrideArgb: null).Background);
+        Assert.Equal(expected, CanvasPalette.Resolve(isDark: true, backgroundOverrideArgb: null).Background);
     }
 
     [Fact]
-    public void Resolve_WithOverride_UsesOverrideBackgroundAndKeepsChrome()
+    public void Resolve_WithBackgroundOverride_UsesOverrideBackgroundAndKeepsChrome()
     {
         // Opaque steel blue as a packed 0xAARRGGBB value.
         uint argb = 0xFF4080C0;
         var themed = CanvasPalette.For(isDark: true);
 
-        var result = CanvasPalette.Resolve(isDark: true, overrideArgb: argb);
+        var result = CanvasPalette.Resolve(isDark: true, backgroundOverrideArgb: argb);
 
         Assert.Equal(new SKColor(argb), result.Background);
         // Chrome stays theme-driven — only the background is overridden.
         Assert.Equal(themed.GridLine, result.GridLine);
         Assert.Equal(themed.GuideLine, result.GuideLine);
+    }
+
+    [Fact]
+    public void Resolve_NullGuideLineOverride_UsesThemeGuideLine()
+    {
+        var expected = CanvasPalette.For(isDark: true).GuideLine;
+
+        Assert.Equal(expected, CanvasPalette.Resolve(isDark: true, backgroundOverrideArgb: null, guideLineOverrideArgb: null).GuideLine);
+    }
+
+    [Fact]
+    public void Resolve_WithGuideLineOverride_UsesOverrideGuideLineAndKeepsBackground()
+    {
+        // Opaque magenta as a packed 0xAARRGGBB value.
+        uint argb = 0xFFFF00FF;
+        var themed = CanvasPalette.For(isDark: true);
+
+        var result = CanvasPalette.Resolve(isDark: true, backgroundOverrideArgb: null, guideLineOverrideArgb: argb);
+
+        Assert.Equal(new SKColor(argb), result.GuideLine);
+        // Background stays theme-driven — only the guide line is overridden.
+        Assert.Equal(themed.Background, result.Background);
+    }
+
+    [Fact]
+    public void Resolve_WithBothOverrides_AppliesBothIndependently()
+    {
+        uint bgArgb = 0xFF4080C0;
+        uint guideArgb = 0xFFFF00FF;
+
+        var result = CanvasPalette.Resolve(isDark: true, backgroundOverrideArgb: bgArgb, guideLineOverrideArgb: guideArgb);
+
+        Assert.Equal(new SKColor(bgArgb), result.Background);
+        Assert.Equal(new SKColor(guideArgb), result.GuideLine);
     }
 
     [Fact]
