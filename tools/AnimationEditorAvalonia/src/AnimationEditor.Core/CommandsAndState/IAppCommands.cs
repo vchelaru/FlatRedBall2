@@ -247,11 +247,26 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetAllFramesTextureName(AnimationChainSave chain, string? textureName);
 
         void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength);
-        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float newRelX, float newRelY);
+
+        /// <summary>
+        /// Sets RelativeX/Y on every frame in <paramref name="frames"/>. Either axis may be
+        /// <c>null</c> to leave it untouched per-frame (its own existing value survives) — used when
+        /// the inspector field is showing "(mixed)" and the user only edited the other axis. Unlike
+        /// color channels, there is no legitimate "clear to null" target for this field, so <c>null</c>
+        /// unambiguously means "don't touch".
+        /// </summary>
+        void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY);
         void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue);
         void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation);
         void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha);
-        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH);
+
+        /// <summary>
+        /// Sets the pixel region (X/Y/W/H) on every frame in <paramref name="frames"/>. Any of the
+        /// four may be <c>null</c> to leave that component untouched per-frame — used when the
+        /// inspector field is showing "(mixed)" and the user only edited one of the four. See
+        /// <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
+        /// </summary>
+        void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
 

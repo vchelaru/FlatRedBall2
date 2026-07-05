@@ -1409,12 +1409,18 @@ namespace AnimationEditor.Core.CommandsAndState
                 this, _events, false, desc));
         }
 
-        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float newRelX, float newRelY)
+        public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
         {
-            var desc = $"Set Offset: ({newRelX:0.##}, {newRelY:0.##})";
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () => { foreach (var f in frames) { f.RelativeX = newRelX; f.RelativeY = newRelY; } },
-                this, _events, true, desc));
+                frames, () =>
+                {
+                    foreach (var f in frames)
+                    {
+                        if (newRelX.HasValue) f.RelativeX = newRelX.Value;
+                        if (newRelY.HasValue) f.RelativeY = newRelY.Value;
+                    }
+                },
+                this, _events, true, "Set Offset"));
         }
 
         public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
@@ -1445,21 +1451,23 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
-            int pixelX, int pixelY, int pixelW, int pixelH, int bmpW, int bmpH)
+            int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
         {
-            var desc = $"Set Region: ({pixelX}, {pixelY}) {pixelW}×{pixelH}";
             _undoManager.Execute(new BulkFrameEditCommand(
                 frames, () =>
                 {
                     foreach (var f in frames)
                     {
-                        PixelFrameEditor.SetX(f, pixelX, bmpW);
-                        PixelFrameEditor.SetY(f, pixelY, bmpH);
-                        PixelFrameEditor.SetWidth(f, pixelW, bmpW);
-                        PixelFrameEditor.SetHeight(f, pixelH, bmpH);
+                        // Order matters: SetX/SetY preserve each frame's own current width/height, so
+                        // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
+                        // (possibly just-moved) Left/Top.
+                        if (pixelX.HasValue) PixelFrameEditor.SetX(f, pixelX.Value, bmpW);
+                        if (pixelY.HasValue) PixelFrameEditor.SetY(f, pixelY.Value, bmpH);
+                        if (pixelW.HasValue) PixelFrameEditor.SetWidth(f, pixelW.Value, bmpW);
+                        if (pixelH.HasValue) PixelFrameEditor.SetHeight(f, pixelH.Value, bmpH);
                     }
                 },
-                this, _events, true, desc));
+                this, _events, true, "Set Region"));
         }
 
         public void SetRectProps(AnimationFrameSave? frame, AARectSave rect,

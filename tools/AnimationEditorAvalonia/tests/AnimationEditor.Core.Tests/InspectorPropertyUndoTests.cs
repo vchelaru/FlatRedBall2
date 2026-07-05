@@ -252,6 +252,25 @@ public class InspectorPropertyUndoTests
         Assert.Single(ctx.UndoManager.UndoHistory);
     }
 
+    [Fact]
+    public void SetFrameRelative_NullY_LeavesEachFrameOwnRelativeYUntouched()
+    {
+        // Reproduces issue #571 follow-up: frames disagree on RelativeY (shown "(mixed)" in the
+        // inspector). The user only edits RelativeX; RelativeY must be left exactly as each frame
+        // already had it, not forced to a shared/null value.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 2);
+        var frames = chain.Frames.ToList();
+        frames[0].RelativeX = 1f; frames[0].RelativeY = 10f;
+        frames[1].RelativeX = 2f; frames[1].RelativeY = 20f;
+
+        ctx.AppCommands.SetFrameRelative(frames, newRelX: 5f, newRelY: null);
+
+        Assert.All(frames, f => Assert.Equal(5f, f.RelativeX));
+        Assert.Equal(10f, frames[0].RelativeY);
+        Assert.Equal(20f, frames[1].RelativeY);
+    }
+
     // ── SetFramePixelRegion ───────────────────────────────────────────────────
 
     [Fact]
@@ -296,6 +315,30 @@ public class InspectorPropertyUndoTests
         Assert.All(frames, f => Assert.Equal(4f / 64f, f.LeftCoordinate, precision: 5));
         Assert.All(frames, f => Assert.Equal(16f / 64f, f.RightCoordinate, precision: 5));
         Assert.Single(ctx.UndoManager.UndoHistory);
+    }
+
+    [Fact]
+    public void SetFramePixelRegion_OnlyXSpecified_LeavesEachFrameOwnYWidthHeightUntouched()
+    {
+        // Reproduces issue #571 follow-up: two frames at different positions/sizes on the sheet
+        // (so Y/W/H are all "(mixed)" in the inspector). The user types only a new X and presses
+        // Enter — that must move both frames' X without collapsing their own differing Y/W/H.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 2);
+        var frames = chain.Frames.ToList();
+        frames[0].LeftCoordinate = 0f / 64; frames[0].RightCoordinate = 8f / 64;
+        frames[0].TopCoordinate = 0f / 64; frames[0].BottomCoordinate = 8f / 64;
+        frames[1].LeftCoordinate = 32f / 64; frames[1].RightCoordinate = 40f / 64;
+        frames[1].TopCoordinate = 16f / 64; frames[1].BottomCoordinate = 32f / 64;
+
+        ctx.AppCommands.SetFramePixelRegion(frames, pixelX: 5, pixelY: null, pixelW: null, pixelH: null, bmpW: 64, bmpH: 64);
+
+        Assert.Equal(5f / 64f, frames[0].LeftCoordinate, precision: 5);
+        Assert.Equal(5f / 64f, frames[1].LeftCoordinate, precision: 5);
+        Assert.Equal(0f / 64f, frames[0].TopCoordinate, precision: 5);      // frame 0's own Y preserved
+        Assert.Equal(16f / 64f, frames[1].TopCoordinate, precision: 5);     // frame 1's own Y preserved
+        Assert.Equal(8f / 64f, frames[0].BottomCoordinate - frames[0].TopCoordinate, precision: 5); // width/height untouched
+        Assert.Equal(16f / 64f, frames[1].BottomCoordinate - frames[1].TopCoordinate, precision: 5);
     }
 
     // ── SetRectProps ──────────────────────────────────────────────────────────

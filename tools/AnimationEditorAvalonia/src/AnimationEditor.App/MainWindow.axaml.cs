@@ -3818,8 +3818,14 @@ public partial class MainWindow : Window
     {
         if (_suppressPropRefresh) return;
         var frames = _selectedState.SelectedFrames;
-        if (frames.Count == 0 || !PropRelX.Value.HasValue || !PropRelY.Value.HasValue) return;
-        _appCommands.SetFrameRelative(frames, (float)PropRelX.Value.Value, (float)PropRelY.Value.Value);
+        if (frames.Count == 0) return;
+        // A null axis here only ever means "still showing (mixed), not edited" — RelativeX/Y have no
+        // legitimate null/cleared state — so it's safe to apply just the axis the user touched and
+        // leave the other axis alone per-frame (see SetFrameRelative for why this is unambiguous).
+        float? relX = PropRelX.Value.HasValue ? (float)PropRelX.Value.Value : null;
+        float? relY = PropRelY.Value.HasValue ? (float)PropRelY.Value.Value : null;
+        if (relX is null && relY is null) return;
+        _appCommands.SetFrameRelative(frames, relX, relY);
     }
 
     private void ApplyFrameColor()
@@ -3873,12 +3879,15 @@ public partial class MainWindow : Window
         if (frames.Count == 0) return;
         var (bmpW, bmpH) = WireframeCtrl.BitmapSize;
         if (bmpW <= 0 || bmpH <= 0) return;
-        if (!PropPixelX.Value.HasValue || !PropPixelY.Value.HasValue ||
-            !PropPixelW.Value.HasValue || !PropPixelH.Value.HasValue) return;
-        _appCommands.SetFramePixelRegion(frames,
-            (int)PropPixelX.Value.Value, (int)PropPixelY.Value.Value,
-            (int)PropPixelW.Value.Value, (int)PropPixelH.Value.Value,
-            bmpW, bmpH);
+        // A null component here only ever means "still showing (mixed), not edited" — the pixel
+        // region has no legitimate null/cleared state — so it's safe to apply just the component(s)
+        // the user touched and leave the rest alone per-frame (see SetFramePixelRegion).
+        int? x = PropPixelX.Value.HasValue ? (int)PropPixelX.Value.Value : null;
+        int? y = PropPixelY.Value.HasValue ? (int)PropPixelY.Value.Value : null;
+        int? w = PropPixelW.Value.HasValue ? (int)PropPixelW.Value.Value : null;
+        int? h = PropPixelH.Value.HasValue ? (int)PropPixelH.Value.Value : null;
+        if (x is null && y is null && w is null && h is null) return;
+        _appCommands.SetFramePixelRegion(frames, x, y, w, h, bmpW, bmpH);
         WireframeCtrl.RefreshFrames();
     }
 
