@@ -681,8 +681,12 @@
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"
                                 Height="26" Margin="0,0,2,0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
+                                <!-- MinHeight 0 + Padding override (#501-style): Fluent forces a
+                                     ToggleButton min height of ~32 and a vertical Padding that, combined
+                                     with this Border's Height=26 + ClipToBounds, squeezed and clipped
+                                     text descenders (e.g. the "g" in "Magic"). -->
                                 <ToggleButton x:Name="MoveModeToggle"
-                                              Height="26"
+                                              Height="26" MinHeight="0" Padding="10,0"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="3,0,0,3"
                                               ToolTip.Tip="Move mode — drag handles to resize/move frames">
@@ -696,7 +700,7 @@
                                 </ToggleButton>
                                 <Border Width="1" Background="{DynamicResource LineBrush}" />
                                 <ToggleButton x:Name="MagicWandToggle"
-                                              Height="26"
+                                              Height="26" MinHeight="0" Padding="10,0"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="0,3,3,0"
                                               ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">

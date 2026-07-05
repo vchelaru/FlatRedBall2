@@ -757,7 +757,15 @@ public partial class MainWindow : Window
     private void OnMoveModeToggled(object? sender, RoutedEventArgs e)
     {
         if (_suppressModeToggle) return;
-        if (MoveModeToggle.IsChecked != true) return;
+
+        // Move can't be toggled off directly — clicking it again while it's already
+        // the active mode has no effect, matching a radio group's behavior.
+        if (MoveModeToggle.IsChecked != true)
+        {
+            MoveModeToggle.IsChecked = true;
+            return;
+        }
+
         _suppressModeToggle = true;
         MagicWandToggle.IsChecked = false;
         _suppressModeToggle = false;
@@ -767,7 +775,15 @@ public partial class MainWindow : Window
     private void OnMagicWandToggled(object? sender, RoutedEventArgs e)
     {
         if (_suppressModeToggle) return;
-        if (MagicWandToggle.IsChecked != true) return;
+
+        // Toggling Magic Wand off falls back to Move mode rather than leaving both
+        // toolbar toggles unchecked with IsMagicWandMode stuck on (issue #575).
+        if (MagicWandToggle.IsChecked != true)
+        {
+            MoveModeToggle.IsChecked = true;
+            return;
+        }
+
         _suppressModeToggle = true;
         MoveModeToggle.IsChecked = false;
         _suppressModeToggle = false;
