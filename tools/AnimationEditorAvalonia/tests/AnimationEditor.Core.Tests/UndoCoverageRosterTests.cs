@@ -73,6 +73,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AddFrame)]                     = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChain)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToIndex)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveChainsToIndex)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChainToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrame)]                    = Category.MutatingUndoable,
@@ -80,6 +81,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.MoveFrameToBottom)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFrames)]                   = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveFramesRelative)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.MoveChainsRelative)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShape)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToTop)]               = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveShapeToBottom)]            = Category.MutatingUndoable,
@@ -225,6 +227,9 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.MoveChainToIndex),
             // Drag Alpha (index 1) to the front of the two-chain list.
             ctx => Sync(() => ctx.AppCommands.MoveChainToIndex(Alpha(ctx), 0)));
+        yield return Row(nameof(IAppCommands.MoveChainsToIndex),
+            // Multi-chain drag: drag Alpha (index 1) to the front of the two-chain list.
+            ctx => Sync(() => ctx.AppCommands.MoveChainsToIndex(new[] { Alpha(ctx) }, 0)));
         yield return Row(nameof(IAppCommands.MoveChainToTop),
             ctx => Sync(() => ctx.AppCommands.MoveChainToTop(Alpha(ctx))));
         yield return Row(nameof(IAppCommands.MoveChainToBottom),
@@ -243,6 +248,9 @@ public class UndoCoverageRosterTests
             // Rigid multi-frame shift: frames 0 and 1 of Zebra (3 frames) move down → 2,0,1.
             ctx => Sync(() => ctx.AppCommands.MoveFramesRelative(
                 new[] { Zebra(ctx).Frames[0], Zebra(ctx).Frames[1] }, Zebra(ctx), +1)));
+        yield return Row(nameof(IAppCommands.MoveChainsRelative),
+            // Rigid chain-group shift: Zebra (index 0) moves down past Alpha.
+            ctx => Sync(() => ctx.AppCommands.MoveChainsRelative(new[] { Zebra(ctx) }, +1)));
         yield return Row(nameof(IAppCommands.MoveShape),
             ctx => Sync(() => ctx.AppCommands.MoveShape(Rect(ctx), Zebra(ctx).Frames[0], +1)));
         yield return Row(nameof(IAppCommands.MoveShapeToTop),

@@ -76,16 +76,18 @@ public partial class MainWindow : Window
     private Border? _frameDropLine;
     private Border? _frameDropBox;
 
-    // ── Chain drag-and-drop reorder state ──────────────────────────────────────
-    // Mirrors the frame path above, but for top-level animation-chain nodes. Single-chain
-    // drag only; the dragged chain lives in _pendingChainDrag since the drag is same-process.
+    // ── Chain drag-and-drop reorder state (issue #566) ──────────────────────────
+    // Mirrors the frame path above, but for top-level animation-chain nodes. The
+    // dragged chain(s) live in _pendingChainDrag since the drag is always same-process.
     private static readonly DataFormat<string> ChainDragDataFormat =
         DataFormat.CreateStringApplicationFormat("animationeditor-chain-drag");
     private const string ChainDragToken = "chain";
-    private AnimationChainSave? _pendingChainDrag;
+    private ChainDragSource? _pendingChainDrag;
     private AnimationChainSave? _chainDragCandidate;
     private Avalonia.Point? _chainDragPressPoint;
     private PointerPressedEventArgs? _chainDragPressArgs;
+    private List<object>? _chainDragSelectionSnapshot;
+    private AnimationChainSave? _pendingSingleSelectChain;
     private bool _chainDragInProgress;
     private int _untitledCounter;
     private bool _suppressPropRefresh;
@@ -1869,6 +1871,10 @@ public partial class MainWindow : Window
             InputElement.PointerMovedEvent,
             OnTreeChainDragPointerMoved,
             RoutingStrategies.Bubble);
+        AnimTree.AddHandler(
+            InputElement.PointerReleasedEvent,
+            OnTreeChainDragPointerReleased,
+            RoutingStrategies.Bubble);
 
         // "Add Animation" button under the tree
         AddChainBtn.Click += (_, _) =>
@@ -2062,9 +2068,9 @@ public partial class MainWindow : Window
         }
 
         // Internal chain reorder drag.
-        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
-            var target = ResolveChainDrop(e, draggedChain);
+            var target = ResolveChainDrop(e, chainDrag.Chains);
             if (target.IsValid)
             {
                 e.DragEffects = DragDropEffects.Move;
@@ -2117,12 +2123,12 @@ public partial class MainWindow : Window
         }
 
         // Internal chain reorder drop.
-        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { } draggedChain)
+        if (e.DataTransfer.Contains(ChainDragDataFormat) && _pendingChainDrag is { IsValid: true } chainDrag)
         {
             RemoveFrameDropIndicators();
-            var target = ResolveChainDrop(e, draggedChain);
+            var target = ResolveChainDrop(e, chainDrag.Chains);
             if (target.IsValid)
-                _appCommands.MoveChainToIndex(draggedChain, target.InsertIndex);
+                _appCommands.MoveChainsToIndex(chainDrag.Chains, target.InsertIndex);
             e.Handled = true;
             return;
         }
@@ -2494,6 +2500,20 @@ public partial class MainWindow : Window
         _chainDragCandidate = null;
         _chainDragPressPoint = null;
         _chainDragPressArgs = null;
+        _chainDragSelectionSnapshot = null;
+        _pendingSingleSelectChain = null;
+    }
+
+    private void SelectSingleChain(AnimationChainSave chain)
+    {
+        var vm = TreeBuilder.FindNodeForData(_treeRoots, chain);
+        if (vm is null) return;
+
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try { AnimTree.SelectedItems?.Clear(); }
+        finally { _suppressTreeSelectionHandling = prior; }
+        AnimTree.SelectedItem = vm;
     }
 
     private async void OnTreeChainDragPointerMoved(object? sender, PointerEventArgs e)
@@ -2513,9 +2533,16 @@ public partial class MainWindow : Window
             Math.Abs(pos.Y - _chainDragPressPoint.Value.Y) <= 4)
             return;
 
-        var chain = _chainDragCandidate;
+        if (!TryBuildChainDragSource(out var dragSource))
+        {
+            ClearChainDragCandidate();
+            return;
+        }
+
+        // A drag is happening, so the deferred single-select must not fire on release.
+        _pendingSingleSelectChain = null;
         e.Pointer.Capture(null); // release press-capture so the drag system can take over
-        _pendingChainDrag = chain;
+        _pendingChainDrag = dragSource;
         _chainDragInProgress = true;
 
         var data = new DataTransfer();
@@ -2533,13 +2560,64 @@ public partial class MainWindow : Window
         }
     }
 
-    private ChainDropTarget ResolveChainDrop(DragEventArgs e, AnimationChainSave draggedChain)
+    private void OnTreeChainDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_chainDragInProgress) return;
+
+        // A press on an already-multi-selected chain that did not turn into a drag collapses
+        // the selection to that single chain now (the select-on-press was suppressed so the
+        // multi-selection could survive a potential drag).
+        if (_pendingSingleSelectChain is { } chain)
+        {
+            e.Pointer.Capture(null);
+            SelectSingleChain(chain);
+        }
+        ClearChainDragCandidate();
+    }
+
+    /// <summary>
+    /// Decides which chains a drag moves. Dragging a chain that is part of a valid chain
+    /// multi-selection moves the whole set; a mixed selection that includes the dragged chain
+    /// is rejected with a toast; otherwise just the dragged chain moves. Mirrors
+    /// <see cref="TryBuildFrameDragSource"/>.
+    /// </summary>
+    private bool TryBuildChainDragSource(out ChainDragSource dragSource)
+    {
+        dragSource = default;
+        var candidate = _chainDragCandidate;
+        if (candidate is null) return false;
+
+        var snapshot = _chainDragSelectionSnapshot ?? new List<object>();
+        bool candidateInSnapshot = snapshot.Any(n => ReferenceEquals(n, candidate));
+        var classified = ChainDropResolver.ClassifySelection(snapshot);
+
+        if (candidateInSnapshot)
+        {
+            if (classified.IsValid)
+            {
+                dragSource = classified;
+                return true;
+            }
+            if (classified.Validity is ChainDragValidity.MixedTypes)
+            {
+                ShowStatusMessage(
+                    "Can't reorder a mixed selection — select only animations.", isError: true);
+                return false;
+            }
+        }
+
+        // Drag just the single pressed chain.
+        dragSource = new ChainDragSource(new[] { candidate }, ChainDragValidity.Valid);
+        return true;
+    }
+
+    private ChainDropTarget ResolveChainDrop(DragEventArgs e, IReadOnlyList<AnimationChainSave> draggedChains)
     {
         var chains = _projectManager.AnimationChainListSave?.AnimationChains;
         if (chains is null) return ChainDropTarget.None;
         var (nodeData, half, _) = HitTestFrameRow(e.GetPosition(AnimTree));
         return ChainDropResolver.Resolve(
-            nodeData, half, draggedChain, chains,
+            nodeData, half, draggedChains, chains,
             f => _objectFinder.GetAnimationChainContaining(f));
     }
 
@@ -3078,13 +3156,32 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
-                // Arm a chain-drag candidate. Do not handle/capture — normal selection and the
-                // context menu still run; the platform drag only begins once the pointer moves
-                // past the threshold, so a plain click never starts a drag.
+                // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
+                // it on press, so dragging a chain that is part of a multi-selection can move
+                // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
                 ClearFrameDragCandidate();
                 _chainDragCandidate = chain;
                 _chainDragPressPoint = e.GetPosition(AnimTree);
                 _chainDragPressArgs = e;
+                _chainDragSelectionSnapshot = new List<object>(_selectedState.SelectedNodes);
+
+                // Pressing a chain that's part of a chain multi-selection (no modifiers) must
+                // not collapse the selection — otherwise a drag would only move one chain. Mark
+                // the press handled to suppress the TreeView's select-on-press, capture so the
+                // move/release still arrive here, and defer the single-select to release if no
+                // drag happens. Ctrl/Shift presses fall through to normal selection editing.
+                bool noModifiers = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == 0;
+                if (noModifiers &&
+                    ChainDropResolver.IsChainMultiSelectionContaining(_chainDragSelectionSnapshot, chain))
+                {
+                    _pendingSingleSelectChain = chain;
+                    e.Pointer.Capture(AnimTree);
+                    e.Handled = true;
+                }
+                else
+                {
+                    _pendingSingleSelectChain = null;
+                }
             }
             else
             {

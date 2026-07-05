@@ -654,6 +654,41 @@ namespace AnimationEditor.Core.CommandsAndState
                 "Move Animation"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveChainsToIndex"/>
+        public void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex)
+        {
+            var list = _pm.AnimationChainListSave?.AnimationChains;
+            if (list is null || chains.Count == 0) return;
+
+            var indices = chains
+                .Select(c => list.IndexOf(c))
+                .Where(i => i >= 0)
+                .Distinct()
+                .OrderBy(i => i)
+                .ToList();
+            if (indices.Count == 0) return;
+
+            var moved = indices.Select(i => list[i]).ToArray();
+
+            // insertIndex is measured against the list before removal; removing the moved
+            // chains shifts the landing spot left by however many of them sat ahead of it
+            // (mirrors MoveFramesCommand).
+            int insertAt = insertIndex - indices.Count(i => i < insertIndex);
+
+            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+                list,
+                () =>
+                {
+                    foreach (var chain in moved)
+                        list.Remove(chain);
+                    int at = Math.Clamp(insertAt, 0, list.Count);
+                    for (int i = 0; i < moved.Length; i++)
+                        list.Insert(at + i, moved[i]);
+                },
+                this, _events, RefreshTreeView,
+                moved.Length == 1 ? "Move Animation" : $"Move {moved.Length} Animations"));
+        }
+
         public void MoveChainToTop(AnimationChainSave chain)
         {
             var chains = _pm.AnimationChainListSave?.AnimationChains;
@@ -759,6 +794,50 @@ namespace AnimationEditor.Core.CommandsAndState
                 delta > 0 ? "Move Frames Down" : "Move Frames Up"));
         }
 
+        /// <inheritdoc cref="IAppCommands.MoveChainsRelative"/>
+        public void MoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta)
+        {
+            var list = _pm.AnimationChainListSave?.AnimationChains;
+            if (list is null || delta == 0 || chains.Count == 0) return;
+
+            var indices = chains
+                .Select(c => list.IndexOf(c))
+                .Where(i => i >= 0)
+                .Distinct()
+                .OrderBy(i => i)
+                .ToList();
+            if (indices.Count == 0) return;
+
+            // Rigid group: if shifting either edge by delta would cross a boundary, no-op.
+            if (indices[0] + delta < 0) return;
+            if (indices[^1] + delta > list.Count - 1) return;
+
+            var selected = new HashSet<int>(indices);
+
+            _undoManager.Execute(new ReorderCommand<AnimationChainSave>(
+                list,
+                () =>
+                {
+                    var reordered = new AnimationChainSave[list.Count];
+                    // Selected chains land at their shifted slots (gaps preserved)...
+                    foreach (int i in indices)
+                        reordered[i + delta] = list[i];
+                    // ...and the rest slot into the remaining holes in original order.
+                    int cursor = 0;
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        if (selected.Contains(i)) continue;
+                        while (reordered[cursor] is not null) cursor++;
+                        reordered[cursor] = list[i];
+                    }
+                    list.Clear();
+                    foreach (var chain in reordered)
+                        list.Add(chain);
+                },
+                this, _events, RefreshTreeView,
+                delta > 0 ? "Move Animations Down" : "Move Animations Up"));
+        }
+
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             var shapes = frame.ShapesSave?.Shapes;
@@ -800,7 +879,9 @@ namespace AnimationEditor.Core.CommandsAndState
         /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
         /// or down (<paramref name="delta"/> = +1) in the tree.
         /// Shape selection takes highest priority: if a shape is selected it is reordered within
-        /// its frame's shape list. Frame selection takes next priority; chain is last.
+        /// its frame's shape list. Frame selection takes next priority; chain is last. When more
+        /// than one frame or chain is selected, the whole group moves together as a rigid,
+        /// gap-preserving block (<see cref="MoveFramesRelative"/> / <see cref="MoveChainsRelative"/>).
         /// No-op when nothing is selected or when the item is already at the boundary.
         /// </summary>
         public void HandleReorder(int delta)
@@ -833,7 +914,15 @@ namespace AnimationEditor.Core.CommandsAndState
                     MoveFrame(frame, chain, delta);
             }
             else if (chain is not null)
-                MoveChain(chain, delta);
+            {
+                // Reorder the whole multi-selection together (gaps preserved); fall back to
+                // the single-chain move when only the primary chain is selected.
+                var chains = _selectedState.SelectedChains;
+                if (chains.Count > 1)
+                    MoveChainsRelative(chains, delta);
+                else
+                    MoveChain(chain, delta);
+            }
         }
 
         public void FlipFrameHorizontally(AnimationFrameSave frame)
