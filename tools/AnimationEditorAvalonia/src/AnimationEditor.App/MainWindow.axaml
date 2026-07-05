@@ -137,7 +137,10 @@
             </DockPanel>
             <!-- Centered title overlay. Static parts use IsHitTestVisible="False" so clicks pass
                  through to the drag region underneath. TitleFileName is interactive (tooltip +
-                 right-click context menu), so it keeps the default IsHitTestVisible=True. -->
+                 right-click context menu), so it keeps the default IsHitTestVisible=True — but it
+                 sits on top of (not inside) the drag region, so it must wire the same drag/maximize
+                 handlers itself or clicks on the file name would swallow the event instead of
+                 moving the window (issue #583). -->
             <StackPanel Orientation="Horizontal" Spacing="6"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center">
@@ -161,7 +164,9 @@
                            FontSize="12"
                            LineHeight="16"
                            Foreground="{DynamicResource InkMid}"
-                           IsVisible="False">
+                           IsVisible="False"
+                           PointerPressed="OnTitleBarPointerPressed"
+                           DoubleTapped="OnTitleBarDoubleTapped">
                     <TextBlock.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Open Containing Folder"
