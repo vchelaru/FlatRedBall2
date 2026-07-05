@@ -3035,7 +3035,10 @@ public partial class MainWindow : Window
             // Walk up the visual tree to find the containing TreeViewItem.
             if (e.Source is not Control src) return;
             var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-            if (tvi?.DataContext is TreeNodeVm vm && !ReferenceEquals(AnimTree.SelectedItem, vm))
+            // Right-clicking a node that's already part of the current multi-selection must
+            // leave the whole selection intact (Explorer-style) so the context menu acts on the
+            // whole group. Only collapse to just this node when it isn't already selected.
+            if (tvi?.DataContext is TreeNodeVm vm && !AnimTree.SelectedItems.Contains(vm))
                 AnimTree.SelectedItem = vm;
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 1)
@@ -3133,12 +3136,7 @@ public partial class MainWindow : Window
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, rect.Name));
             AddSeparator();
-            AddMenuItem("Delete Rectangle", () =>
-            {
-                var frame = _objectFinder.GetAnimationFrameContaining(rect);
-                if (frame is not null)
-                    _appCommands.DeleteShapes(frame, new() { rect }, new());
-            });
+            AddMenuItem("Delete Rectangle", HandleDelete);
         }
         else if (vm?.Data is CircleSave circle)
         {
@@ -3150,12 +3148,7 @@ public partial class MainWindow : Window
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, circle.Name));
             AddSeparator();
-            AddMenuItem("Delete Circle", () =>
-            {
-                var frame = _objectFinder.GetAnimationFrameContaining(circle);
-                if (frame is not null)
-                    _appCommands.DeleteShapes(frame, new(), new() { circle });
-            });
+            AddMenuItem("Delete Circle", HandleDelete);
         }
         else if (vm?.Data is AnimationFrameSave frame2)
         {
@@ -3182,8 +3175,7 @@ public partial class MainWindow : Window
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
-            AddMenuItem("Delete Frame", () =>
-                _appCommands.DeleteFrames(new List<AnimationFrameSave> { frame2 }));
+            AddMenuItem("Delete Frame", HandleDelete);
         }
         else if (vm?.Data is AnimationChainSave chain)
         {
@@ -3219,8 +3211,7 @@ public partial class MainWindow : Window
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
             AddSeparator();
-            AddMenuItem("Delete Animation", () =>
-                _appCommands.DeleteAnimationChains(new List<AnimationChainSave> { chain }));
+            AddMenuItem("Delete Animation", HandleDelete);
         }
         else
         {
