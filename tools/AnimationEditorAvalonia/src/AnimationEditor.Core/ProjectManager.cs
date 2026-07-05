@@ -259,7 +259,11 @@ namespace AnimationEditor.Core
 
         private static string? FindContentAncestor(string folderFullPath)
         {
-            var segments = folderFullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            // Deliberately no StringSplitOptions.RemoveEmptyEntries: a Unix-style absolute
+            // path ("/tmp/...") splits with a leading empty entry, and dropping it would
+            // make the reconstructed join lose its leading '/' — turning an absolute path
+            // into a relative one that FilePath then resolves against the current directory.
+            var segments = folderFullPath.Split('/');
 
             for (int i = segments.Length - 1; i >= 0; i--)
             {

@@ -128,6 +128,26 @@ public class ProjectManagerFilesPanelRootTests
     }
 
     [Fact]
+    public void ResolveFilesPanelRoot_PreservesLeadingSlashOnUnixStyleAbsolutePaths()
+    {
+        // Regression: the Content-ancestor walk-up must not lose a Unix-style absolute
+        // path's leading '/' when reconstructing the truncated path — losing it turns
+        // the result into a relative path, which FilePath then resolves against
+        // Environment.CurrentDirectory instead of the real root. Constructed directly
+        // (no real filesystem paths) so this reproduces on any host OS: Path.IsPathRooted
+        // treats a leading '/' as rooted on both Windows and Linux, so FilePath won't
+        // rewrite it, letting this test exercise the Linux-only code path everywhere.
+        var sut = new ProjectManager
+        {
+            FileName = "/tmp/AnimationEditorCoreTests/proj/Content/Entities/Enemy/Byakhee.achx"
+        };
+
+        var root = sut.ResolveFilesPanelRoot();
+
+        Assert.Equal("/tmp/AnimationEditorCoreTests/proj/Content/", root);
+    }
+
+    [Fact]
     public void ResolveFilesPanelRoot_WhenProjectFileFolderDoesNotExist_FallsBackToContentAncestor()
     {
         using var temp = new TempDir();
