@@ -208,8 +208,14 @@ public class AnimationChainListSave
                     FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
+                    FlipDiagonal = frameSave.FlipDiagonal,
                     RelativeX = frameSave.RelativeX,
                     RelativeY = frameSave.RelativeY,
+                    Red = frameSave.Red,
+                    Green = frameSave.Green,
+                    Blue = frameSave.Blue,
+                    Alpha = frameSave.Alpha,
+                    ColorOperation = frameSave.ColorOperation,
                 };
 
                 frame.Texture = loadTexture(frameSave);
@@ -305,6 +311,7 @@ public class AnimationChainListSave
         {
             FlipHorizontal = BoolEl(el, "FlipHorizontal"),
             FlipVertical   = BoolEl(el, "FlipVertical"),
+            FlipDiagonal   = BoolEl(el, "FlipDiagonal"),
             TextureName    = (string?)el.Element("TextureName") ?? string.Empty,
             FrameLength    = FloatEl(el, "FrameLength"),
             LeftCoordinate = FloatEl(el, "LeftCoordinate"),
@@ -313,6 +320,11 @@ public class AnimationChainListSave
             BottomCoordinate = FloatEl(el, "BottomCoordinate", 1f),
             RelativeX = FloatEl(el, "RelativeX"),
             RelativeY = FloatEl(el, "RelativeY"),
+            Red   = IntElNullable(el, "Red"),
+            Green = IntElNullable(el, "Green"),
+            Blue  = IntElNullable(el, "Blue"),
+            Alpha = IntElNullable(el, "Alpha"),
+            ColorOperation = ColorOperationEl(el, "ColorOperation"),
         };
 
         // Frame <Name>/<HasCustomName> in legacy .achx are intentionally ignored: a frame's
@@ -421,6 +433,7 @@ public class AnimationChainListSave
         var el = new XElement("Frame");
         if (frame.FlipHorizontal) el.Add(new XElement("FlipHorizontal", "true"));
         if (frame.FlipVertical)   el.Add(new XElement("FlipVertical", "true"));
+        if (frame.FlipDiagonal)   el.Add(new XElement("FlipDiagonal", "true"));
         el.Add(new XElement("TextureName", frame.TextureName));
         el.Add(new XElement("FrameLength", FloatStr(frame.FrameLength)));
         el.Add(new XElement("LeftCoordinate",   FloatStr(frame.LeftCoordinate)));
@@ -429,6 +442,11 @@ public class AnimationChainListSave
         el.Add(new XElement("BottomCoordinate", FloatStr(frame.BottomCoordinate)));
         if (frame.RelativeX != 0f) el.Add(new XElement("RelativeX", FloatStr(frame.RelativeX)));
         if (frame.RelativeY != 0f) el.Add(new XElement("RelativeY", FloatStr(frame.RelativeY)));
+        if (frame.Red.HasValue)   el.Add(new XElement("Red", frame.Red.Value));
+        if (frame.Green.HasValue) el.Add(new XElement("Green", frame.Green.Value));
+        if (frame.Blue.HasValue)  el.Add(new XElement("Blue", frame.Blue.Value));
+        if (frame.Alpha.HasValue) el.Add(new XElement("Alpha", frame.Alpha.Value));
+        if (frame.ColorOperation.HasValue) el.Add(new XElement("ColorOperation", frame.ColorOperation.Value.ToString()));
         el.Add(WriteShapesElement(frame.ShapesSave));
         return el;
     }
@@ -477,6 +495,18 @@ public class AnimationChainListSave
     {
         var el = parent.Element(name);
         return el != null ? bool.Parse(el.Value) : defaultValue;
+    }
+
+    private static int? IntElNullable(XElement parent, string name)
+    {
+        var el = parent.Element(name);
+        return el != null ? int.Parse(el.Value, CultureInfo.InvariantCulture) : null;
+    }
+
+    private static ColorOperation? ColorOperationEl(XElement parent, string name)
+    {
+        var el = parent.Element(name);
+        return el != null ? Enum.Parse<ColorOperation>(el.Value) : null;
     }
 
     private static string FloatStr(float v) => v.ToString("G9", CultureInfo.InvariantCulture);

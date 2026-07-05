@@ -29,11 +29,29 @@ public class AnimationFrameSave
     /// <summary>Whether the texture should be flipped vertically.</summary>
     public bool FlipVertical;
 
+    /// <summary>Whether the texture should be flipped diagonally (transposed).</summary>
+    public bool FlipDiagonal;
+
     /// <summary>Per-frame X offset.</summary>
     public float RelativeX;
 
     /// <summary>Per-frame Y offset.</summary>
     public float RelativeY;
+
+    /// <summary>Per-frame red color channel (0-255). <c>null</c> means unset/not authored.</summary>
+    public int? Red;
+
+    /// <summary>Per-frame green color channel (0-255). <c>null</c> means unset/not authored.</summary>
+    public int? Green;
+
+    /// <summary>Per-frame blue color channel (0-255). <c>null</c> means unset/not authored.</summary>
+    public int? Blue;
+
+    /// <summary>Per-frame alpha/transparency channel (0-255). <c>null</c> means unset/not authored.</summary>
+    public int? Alpha;
+
+    /// <summary>How the color channels combine with the texture. <c>null</c> means none.</summary>
+    public ColorOperation? ColorOperation;
 
     /// <summary>Per-frame shape definitions. <c>null</c> when no shapes are defined.</summary>
     public ShapesSave? ShapesSave;

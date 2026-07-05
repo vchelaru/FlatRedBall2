@@ -28,5 +28,6 @@
   <ItemGroup>
     <Compile Include="..\AnimationChain.MonoGame.Tests\AchxLoaderTests.cs" Link="AchxLoaderTests.cs" />
     <Compile Include="..\AnimationChain.MonoGame.Tests\AnimationPlayerTests.cs" Link="AnimationPlayerTests.cs" />
+    <Compile Include="..\AnimationChain.MonoGame.Tests\AnimationChainListSaveRoundTripTests.cs" Link="AnimationChainListSaveRoundTripTests.cs" />
   </ItemGroup>
 </Project>

@@ -31,6 +31,9 @@ public class AnimationFrame
     /// <summary>When <c>true</c>, the source region is mirrored along the Y axis.</summary>
     public bool FlipVertical;
 
+    /// <summary>When <c>true</c>, the source region is transposed (flipped along the diagonal).</summary>
+    public bool FlipDiagonal;
+
     /// <summary>
     /// Per-frame X offset applied while this frame is displayed. In screen pixels; positive
     /// shifts right. Applied by <see cref="SpriteBatchExtensions.DrawAnimation"/>.
@@ -43,6 +46,41 @@ public class AnimationFrame
     /// Applied by <see cref="SpriteBatchExtensions.DrawAnimation"/>.
     /// </summary>
     public float RelativeY;
+
+    /// <summary>
+    /// Per-frame red color channel (0-255). <c>null</c> means unset/not authored. Not applied
+    /// automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/> — available for game
+    /// code to use.
+    /// </summary>
+    public int? Red;
+
+    /// <summary>
+    /// Per-frame green color channel (0-255). <c>null</c> means unset/not authored. Not applied
+    /// automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/> — available for game
+    /// code to use.
+    /// </summary>
+    public int? Green;
+
+    /// <summary>
+    /// Per-frame blue color channel (0-255). <c>null</c> means unset/not authored. Not applied
+    /// automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/> — available for game
+    /// code to use.
+    /// </summary>
+    public int? Blue;
+
+    /// <summary>
+    /// Per-frame alpha/transparency channel (0-255). <c>null</c> means unset/not authored. Not
+    /// applied automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/> — available for
+    /// game code to use.
+    /// </summary>
+    public int? Alpha;
+
+    /// <summary>
+    /// How the color channels combine with the texture. <c>null</c> means none. Not applied
+    /// automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/> — available for game
+    /// code to use.
+    /// </summary>
+    public ColorOperation? ColorOperation;
 
     /// <summary>
     /// Per-frame shape definitions. Present as data only — the caller is responsible for
