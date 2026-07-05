@@ -552,6 +552,7 @@ public class WireframeControl : Control
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
     private IUndoManager? _undoManager;
+    private Action<string>? _showError;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -564,7 +565,8 @@ public class WireframeControl : Control
         IApplicationEvents events,
         IProjectManager projectManager,
         IUndoManager undoManager,
-        IPendingCutState pendingCutState)
+        IPendingCutState pendingCutState,
+        Action<string>? showError = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -573,6 +575,7 @@ public class WireframeControl : Control
         _events          = events;
         _projectManager  = projectManager;
         _undoManager     = undoManager;
+        _showError       = showError;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -586,6 +589,12 @@ public class WireframeControl : Control
     {
         ClipToBounds = true;
         Focusable = true;
+
+        // Right-click opens this menu with a "View <filename> in Explorer" item for the
+        // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
+        var contextMenu = new ContextMenu();
+        contextMenu.Opening += OnContextMenuOpening;
+        ContextMenu = contextMenu;
 
         // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
@@ -2049,7 +2058,30 @@ public class WireframeControl : Control
         RaiseViewChanged();
     }
 
-    private string? DetermineTexturePath()
+    /// <summary>
+    /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
+    /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
+    /// </summary>
+    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var absPath = DetermineTexturePath();
+        if (ContextMenu is not { } menu || absPath is null)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        menu.Items.Clear();
+        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
+        item.Click += (_, _) =>
+        {
+            var error = ShellExplorer.RevealFile(absPath);
+            if (error is not null) _showError?.Invoke(error);
+        };
+        menu.Items.Add(item);
+    }
+
+    internal string? DetermineTexturePath()
     {
         string? textureName = _selectedState!.SelectedFrame?.TextureName
                            ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;

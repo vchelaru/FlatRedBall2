@@ -29,7 +29,7 @@ public static class ShellExplorer
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "explorer.exe",
-                    Arguments = $"/select,\"{absolutePath}\"",
+                    Arguments = $"/select,\"{ToWindowsSelectPath(absolutePath)}\"",
                     UseShellExecute = true,
                 });
             }
@@ -63,4 +63,13 @@ public static class ShellExplorer
             return $"Could not open file manager: {ex.Message}";
         }
     }
+
+    /// <summary>
+    /// explorer.exe's <c>/select,</c> switch mis-parses forward slashes as extra switch
+    /// separators, silently ignoring the target and opening a default folder instead of
+    /// selecting the file. Callers may pass either separator (e.g. a path built from
+    /// <c>AnimationEditor.Core.Paths.FilePath</c>, which always normalizes to forward slashes)
+    /// so this converts to backslashes right before building the Windows-only argument string.
+    /// </summary>
+    internal static string ToWindowsSelectPath(string absolutePath) => absolutePath.Replace('/', '\\');
 }
