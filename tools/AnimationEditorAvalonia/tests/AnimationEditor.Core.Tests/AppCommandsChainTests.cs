@@ -630,6 +630,85 @@ public class AppCommandsChainTests
     // ── SetFrameFlip (F09/F10, absolute set — issue #571) ────────────────────
 
     [Fact]
+    public void SetFrameFlip_DiagonalTrueOnUnflippedFrame_SetsFlipDiagonal()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { FlipDiagonal = false };
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        Assert.True(frame.FlipDiagonal);
+    }
+
+    [Fact]
+    public void SetFrameFlip_DiagonalTrue_TransposesAttachedShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(5, rect.X);    // (x,y) -> (y,x)
+        Assert.Equal(12, rect.Y);
+    }
+
+    [Fact]
+    public void SetFrameFlip_DiagonalTrue_TransposesFrameRelativeXY()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        Assert.Equal(7, frame.RelativeX);    // (x,y) -> (y,x)
+        Assert.Equal(20, frame.RelativeY);
+    }
+
+    // Combined flip order — toggling diagonal bakes a DELTA onto whatever is already stored, so the
+    // delta's sign must depend on the frame's CURRENT horizontal/vertical state, not be fixed. These
+    // reproduce the order-dependent bug reported after the initial diagonal-flip PR (#592 follow-up):
+    // flipping horizontal then diagonal put a shape/offset at the mirror-image spot instead of the
+    // correct one, because the diagonal delta ignored horizontal's already-applied sign.
+
+    [Fact]
+    public void SetFrameFlip_DiagonalThenHorizontal_MatchesHorizontalThenDiagonal()
+    {
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var frameA = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+        ctxA.AppCommands.SetFrameFlip(new[] { frameA }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+        ctxA.AppCommands.SetFrameFlip(new[] { frameA }, flipHorizontal: true, flipVertical: null, flipDiagonal: null);
+
+        var ctxB = TestHelpers.SetupFreshAcls();
+        var frameB = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+        ctxB.AppCommands.SetFrameFlip(new[] { frameB }, flipHorizontal: true, flipVertical: null, flipDiagonal: null);
+        ctxB.AppCommands.SetFrameFlip(new[] { frameB }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        // Both orders reach the same (Horizontal=true, Diagonal=true) state, so both must land on
+        // the same offset regardless of which flag was toggled first.
+        Assert.Equal(-7, frameA.RelativeX);
+        Assert.Equal(20, frameA.RelativeY);
+        Assert.Equal(frameA.RelativeX, frameB.RelativeX);
+        Assert.Equal(frameA.RelativeY, frameB.RelativeY);
+    }
+
+    [Fact]
+    public void SetFrameFlip_HorizontalThenDiagonal_TransposesShapeOffsetAboutCurrentHorizontalSign()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: true, flipVertical: null, flipDiagonal: null);
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(-5, rect.X);
+        Assert.Equal(12, rect.Y);
+    }
+
+    [Fact]
     public void SetFrameFlip_HorizontalTrueOnUnflippedFrame_SetsFlipHorizontal()
     {
         var ctx = TestHelpers.SetupFreshAcls();

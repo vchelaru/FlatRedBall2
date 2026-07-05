@@ -161,8 +161,8 @@ public class AnimationChainListSave
     /// round-trippable decimal (the "R" format, matching FRB1's XmlConvert output), shapes in
     /// FRB1's typed lists, and per-shape Z/Alpha/Red/Green/Blue preserved verbatim (see
     /// <see cref="Frb1ShapeData"/>). Opening and re-saving an unedited file is a no-op diff.
-    /// Frame defaults are omitted to keep diffs small: <c>FlipHorizontal</c>/<c>FlipVertical</c>
-    /// are written only when <c>true</c>; <c>RelativeX</c>/<c>RelativeY</c> only when non-zero.
+    /// Frame defaults are omitted to keep diffs small: <c>FlipHorizontal</c>/<c>FlipVertical</c>/
+    /// <c>FlipDiagonal</c> are written only when <c>true</c>; <c>RelativeX</c>/<c>RelativeY</c> only when non-zero.
     /// The <c>&lt;ShapeCollectionSave&gt;</c> wrapper is written only when a frame's
     /// <see cref="AnimationFrameSave.ShapesSave"/> is non-null, mirroring whether the source frame
     /// had one (some FRB1 files omit it for shapeless frames, others write an empty one).
@@ -234,8 +234,11 @@ public class AnimationChainListSave
     {
         var el = new XElement("Frame");
         // Match FRB1's element order — FlipHorizontal appears before TextureName when set.
+        // FlipDiagonal has no FRB1 precedent (new in FRB2); placed after FlipVertical since it's
+        // part of the same flip-flag group.
         if (frame.FlipHorizontal) el.Add(new XElement("FlipHorizontal", "true"));
         if (frame.FlipVertical) el.Add(new XElement("FlipVertical", "true"));
+        if (frame.FlipDiagonal) el.Add(new XElement("FlipDiagonal", "true"));
         el.Add(new XElement("TextureName", frame.TextureName));
         el.Add(new XElement("FrameLength", FloatStr(frame.FrameLength)));
         el.Add(new XElement("LeftCoordinate", FloatStr(frame.LeftCoordinate)));
@@ -342,6 +345,7 @@ public class AnimationChainListSave
         frame.BottomCoordinate = FloatEl(el, "BottomCoordinate", 1f);
         frame.FlipHorizontal = BoolEl(el, "FlipHorizontal");
         frame.FlipVertical = BoolEl(el, "FlipVertical");
+        frame.FlipDiagonal = BoolEl(el, "FlipDiagonal");
         frame.RelativeX = FloatEl(el, "RelativeX");
         frame.RelativeY = FloatEl(el, "RelativeY");
         frame.Red = IntElNullable(el, "Red");

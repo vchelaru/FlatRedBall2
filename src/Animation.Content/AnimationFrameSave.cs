@@ -29,6 +29,13 @@ public class AnimationFrameSave
     /// <summary>Whether the texture should be flipped vertically.</summary>
     public bool FlipVertical;
 
+    /// <summary>
+    /// Whether the texture region should be transposed (swap X/Y) — a third mirror axis independent
+    /// of <see cref="FlipHorizontal"/>/<see cref="FlipVertical"/>, matching Tiled's diagonal tile-flip
+    /// flag. Combining all three yields all 8 orientations of a source region.
+    /// </summary>
+    public bool FlipDiagonal;
+
     /// <summary>The frame's offset along the X axis.</summary>
     public float RelativeX;
 

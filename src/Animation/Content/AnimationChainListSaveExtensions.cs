@@ -60,6 +60,7 @@ public static class AnimationChainListSaveExtensions
                     FrameLength = TimeSpan.FromSeconds(frameSave.FrameLength / frameLengthDivisor),
                     FlipHorizontal = frameSave.FlipHorizontal,
                     FlipVertical = frameSave.FlipVertical,
+                    FlipDiagonal = frameSave.FlipDiagonal,
                     RelativeX = frameSave.RelativeX,
                     RelativeY = frameSave.RelativeY,
                     Red = frameSave.Red,

@@ -191,14 +191,15 @@ namespace AnimationEditor.Core.CommandsAndState
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
         void HandleReorder(int delta);
         /// <summary>
-        /// Sets the horizontal/vertical flip flags on every frame in <paramref name="frames"/> as one
-        /// undo step. Each axis is absolute (not a toggle): pass <c>null</c> for an axis to leave it
+        /// Sets the horizontal/vertical/diagonal flip flags on every frame in <paramref name="frames"/>
+        /// as one undo step. Each axis is absolute (not a toggle): pass <c>null</c> for an axis to leave it
         /// untouched (used when the inspector checkbox is showing a mixed/indeterminate multi-selection
         /// state and the user didn't interact with it). Only frames whose flag actually changes are
-        /// mirrored (offset and attached shapes negated) — a frame already at the target state is a
-        /// no-op for that axis.
+        /// mirrored/transposed (offset and attached shapes updated to match) — a frame already at the
+        /// target state is a no-op for that axis.
         /// </summary>
-        void SetFrameFlip(IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical);
+        void SetFrameFlip(
+            IReadOnlyList<AnimationFrameSave> frames, bool? flipHorizontal, bool? flipVertical, bool? flipDiagonal = null);
         void FlipChainHorizontally(AnimationChainSave chain);
         void FlipChainVertically(AnimationChainSave chain);
         void InvertFrameOrder(AnimationChainSave chain);

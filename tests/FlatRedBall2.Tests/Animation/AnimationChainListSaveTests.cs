@@ -62,4 +62,18 @@ public class AnimationChainListSaveTests
 
         result.TimeMeasurementUnit.ShouldBe(TimeMeasurementUnit.Millisecond);
     }
+
+    [Fact]
+    public void ToAnimationChainList_CopiesFlipDiagonalToRuntimeFrame()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Corner" };
+        // Empty TextureName so conversion skips texture loading and the null ContentLoader is never used.
+        chain.Frames.Add(new AnimationFrameSave { FlipDiagonal = true });
+        save.AnimationChains.Add(chain);
+
+        var frame = save.ToAnimationChainList(null!)[0][0];
+
+        frame.FlipDiagonal.ShouldBeTrue();
+    }
 }
