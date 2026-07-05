@@ -139,6 +139,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// an index landing on the chain's own slot is a no-op with no undo entry.
         /// </summary>
         void MoveChainToIndex(AnimationChainSave chain, int insertIndex);
+
+        /// <summary>
+        /// Moves <paramref name="chains"/> to an absolute slot in the chain list as one undo
+        /// step — the multi-selection drag-and-drop reorder entry point (parallel to
+        /// <see cref="MoveFrames"/> for frames). <paramref name="insertIndex"/> is interpreted
+        /// against the current list <em>before</em> the chains are removed, so it is adjusted
+        /// internally for the removal. The chains are sorted by their current index and become
+        /// a contiguous, gap-squashed block at the destination.
+        /// </summary>
+        void MoveChainsToIndex(IReadOnlyList<AnimationChainSave> chains, int insertIndex);
         void MoveChainToTop(AnimationChainSave chain);
         void MoveChainToBottom(AnimationChainSave chain);
         void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta);
@@ -166,6 +176,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         void MoveFramesRelative(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave chain, int delta);
+
+        /// <summary>
+        /// Shifts <paramref name="chains"/> within the chain list by <paramref name="delta"/>
+        /// slots (−1 = up, +1 = down) as one rigid group, preserving the gaps between
+        /// non-contiguous chains, as a single undo step. The whole group is clamped at the
+        /// list boundaries: if the shift would push any selected chain past an end, nothing
+        /// moves. Drives the Alt+Arrow keyboard reorder when multiple chains are selected —
+        /// mirrors <see cref="MoveFramesRelative"/> for frames.
+        /// </summary>
+        void MoveChainsRelative(IReadOnlyList<AnimationChainSave> chains, int delta);
         void MoveShape(object shape, AnimationFrameSave frame, int delta);
         void MoveShapeToTop(object shape, AnimationFrameSave frame);
         void MoveShapeToBottom(object shape, AnimationFrameSave frame);
