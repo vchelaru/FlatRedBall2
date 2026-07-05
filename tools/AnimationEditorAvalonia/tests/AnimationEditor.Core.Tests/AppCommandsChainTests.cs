@@ -630,6 +630,43 @@ public class AppCommandsChainTests
     // ── SetFrameFlip (F09/F10, absolute set — issue #571) ────────────────────
 
     [Fact]
+    public void SetFrameFlip_DiagonalTrueOnUnflippedFrame_SetsFlipDiagonal()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { FlipDiagonal = false };
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        Assert.True(frame.FlipDiagonal);
+    }
+
+    [Fact]
+    public void SetFrameFlip_DiagonalTrue_TransposesAttachedShapeOffsets()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Box", X = 12, Y = 5 });
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        var rect = frame.ShapesSave.AARectSaves.First();
+        Assert.Equal(-5, rect.X);    // (x,y) -> (-y,-x)
+        Assert.Equal(-12, rect.Y);
+    }
+
+    [Fact]
+    public void SetFrameFlip_DiagonalTrue_TransposesFrameRelativeXY()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame = new AnimationFrameSave { RelativeX = 20, RelativeY = 7 };
+
+        ctx.AppCommands.SetFrameFlip(new[] { frame }, flipHorizontal: null, flipVertical: null, flipDiagonal: true);
+
+        Assert.Equal(-7, frame.RelativeX);    // (x,y) -> (-y,-x)
+        Assert.Equal(-20, frame.RelativeY);
+    }
+
+    [Fact]
     public void SetFrameFlip_HorizontalTrueOnUnflippedFrame_SetsFlipHorizontal()
     {
         var ctx = TestHelpers.SetupFreshAcls();

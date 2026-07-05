@@ -63,6 +63,32 @@ public class AnimationChainListSaveWriterTests
     }
 
     [Fact]
+    public void Save_FlipDiagonalFalse_OmitsElement()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "X" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, FlipDiagonal = false });
+        save.AnimationChains.Add(chain);
+
+        var doc = SaveAndParse(save);
+
+        doc.Descendants("FlipDiagonal").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Save_FlipDiagonalTrue_EmitsElement()
+    {
+        var save = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "X" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, FlipDiagonal = true });
+        save.AnimationChains.Add(chain);
+
+        var doc = SaveAndParse(save);
+
+        doc.Descendants("FlipDiagonal").Single().Value.ShouldBe("true");
+    }
+
+    [Fact]
     public void Save_FlipHorizontalFalse_OmitsElement()
     {
         var save = new AnimationChainListSave();

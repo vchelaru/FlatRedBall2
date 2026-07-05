@@ -44,4 +44,31 @@ public static class ShapeFlip
                 break;
         }
     }
+
+    /// <summary>
+    /// Transposes the offsets of <paramref name="shape"/> in place to match a frame's diagonal
+    /// flip: (x, y) becomes (-y, -x), the same transpose <c>TileMapCollisions.ApplyFlips</c> uses
+    /// for Tiled's diagonal tile-flip flag. A rectangle's <c>ScaleX</c>/<c>ScaleY</c> (half-width/
+    /// half-height) swap too, since the transposed region's bounding box swaps width and height.
+    /// A circle's radius is orientation-independent and untouched. Self-inverse, like
+    /// <see cref="Mirror"/> — applying it twice restores the original values exactly.
+    /// </summary>
+    public static void Transpose(object shape)
+    {
+        switch (shape)
+        {
+            case AARectSave r:
+                (r.X, r.Y) = (-r.Y, -r.X);
+                (r.ScaleX, r.ScaleY) = (r.ScaleY, r.ScaleX);
+                break;
+            case CircleSave c:
+                (c.X, c.Y) = (-c.Y, -c.X);
+                break;
+            case PolygonSave p:
+                (p.X, p.Y) = (-p.Y, -p.X);
+                foreach (var pt in p.Points)
+                    (pt.X, pt.Y) = (-pt.Y, -pt.X);
+                break;
+        }
+    }
 }

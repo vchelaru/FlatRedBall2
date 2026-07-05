@@ -3615,6 +3615,7 @@ public partial class MainWindow : Window
     {
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
+        PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFrameLen.ValueChanged  += (_, _) => ApplyFrameLen();
         PropRelX.ValueChanged      += (_, _) => ApplyFrameRelative();
         PropRelY.ValueChanged      += (_, _) => ApplyFrameRelative();
@@ -3855,8 +3856,10 @@ public partial class MainWindow : Window
 
                 bool flipHMixed = frames.Select(f => f.FlipHorizontal).Distinct().Count() > 1;
                 bool flipVMixed = frames.Select(f => f.FlipVertical).Distinct().Count() > 1;
+                bool flipDMixed = frames.Select(f => f.FlipDiagonal).Distinct().Count() > 1;
                 PropFlipH.IsChecked = flipHMixed ? null : frame.FlipHorizontal;
                 PropFlipV.IsChecked = flipVMixed ? null : frame.FlipVertical;
+                PropFlipD.IsChecked = flipDMixed ? null : frame.FlipDiagonal;
 
                 SetValueOrMixed(PropFrameLen, frames.Select(f => (decimal)f.FrameLength).ToList());
                 SetValueOrMixed(PropRelX, frames.Select(f => (decimal)f.RelativeX).ToList());
@@ -3955,7 +3958,7 @@ public partial class MainWindow : Window
         // ToggleButton.IsChecked is already nullable: null means the checkbox is showing the
         // mixed/indeterminate state (the selection disagrees and the user didn't touch it), so
         // it passes straight through as "leave this axis untouched".
-        _appCommands.SetFrameFlip(frames, PropFlipH.IsChecked, PropFlipV.IsChecked);
+        _appCommands.SetFrameFlip(frames, PropFlipH.IsChecked, PropFlipV.IsChecked, PropFlipD.IsChecked);
     }
 
     private void ApplyFrameLen()

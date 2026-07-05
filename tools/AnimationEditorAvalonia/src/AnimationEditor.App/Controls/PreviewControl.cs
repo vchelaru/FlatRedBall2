@@ -2328,12 +2328,16 @@ public class PreviewControl : Control
             ? new SKSamplingOptions(SKFilterMode.Nearest)
             : new SKSamplingOptions(SKFilterMode.Linear);
 
-        bool flip = FlipScaleCalculator.IsFlipped(frame.FlipHorizontal, frame.FlipVertical);
+        bool flip = FlipScaleCalculator.IsFlipped(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
         if (flip)
         {
             canvas.Save();
-            var (scaleX, scaleY) = FlipScaleCalculator.Compute(frame.FlipHorizontal, frame.FlipVertical);
-            canvas.Scale(scaleX, scaleY, cx, cy);
+            // General 2x2 affine flip (diagonal transposes axes, H/V mirror) pivoted on (cx, cy):
+            // output = M*(point - pivot) + pivot. Plain Scale can't express the diagonal case
+            // (off-diagonal coefficients), so build the matrix directly instead.
+            var (a, b, c, d) = FlipScaleCalculator.ComputeMatrix(frame.FlipHorizontal, frame.FlipVertical, frame.FlipDiagonal);
+            var matrix = new SKMatrix(a, b, cx - a * cx - b * cy, c, d, cy - c * cx - d * cy, 0, 0, 1);
+            canvas.Concat(in matrix);
         }
 
         // img is a cached, immutable SKImage owned by ThumbnailService — drawn directly, NOT
@@ -2343,13 +2347,30 @@ public class PreviewControl : Control
 
         if (flip) canvas.Restore();
 
+        var outlineDst = ComputeOutlineDst(dst, frame.FlipDiagonal, cx, cy);
+
         using var op = new SKPaint
         {
             Color       = new SKColor(255, 255, 255, (byte)(200 * alpha)),
             StrokeWidth = 1f,
             IsStroke    = true
         };
-        canvas.DrawRect(dst, op);
+        canvas.DrawRect(outlineDst, op);
+    }
+
+    /// <summary>
+    /// Returns the outline rect to draw (in untransformed canvas space, after the flip
+    /// transform's Save/Restore) around a frame previously drawn into <paramref name="dst"/>.
+    /// Diagonal flip transposes the axes at draw time, so the transformed image's on-screen
+    /// footprint has its width/height swapped relative to <paramref name="dst"/> (which was
+    /// computed pre-transform) — this mirrors that swap around the same pivot so the outline
+    /// still traces the actual rendered bounds. Exposed (internal) for unit testing.
+    /// </summary>
+    internal static SKRect ComputeOutlineDst(SKRect dst, bool flipDiagonal, float cx, float cy)
+    {
+        if (!flipDiagonal) return dst;
+        float dw = dst.Width, dh = dst.Height;
+        return SKRect.Create(cx - dh / 2, cy - dw / 2, dh, dw);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using FlatRedBall2.Animation.Content;
+using SkiaSharp;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -104,5 +105,26 @@ public class PreviewSourceRectTests
         Assert.Equal(48, sy);
         Assert.Equal(32, sw);
         Assert.Equal(32, sh);
+    }
+
+    // ── ComputeOutlineDst — diagonal flip swaps the on-screen footprint ──────
+
+    [Fact]
+    public void ComputeOutlineDst_NoDiagonalFlip_ReturnsDstUnchanged()
+    {
+        var dst = SKRect.Create(10, 20, 40, 60);
+        var outline = PreviewControl.ComputeOutlineDst(dst, flipDiagonal: false, cx: 30, cy: 50);
+        Assert.Equal(dst, outline);
+    }
+
+    [Fact]
+    public void ComputeOutlineDst_DiagonalFlip_SwapsWidthAndHeightAboutPivot()
+    {
+        var dst = SKRect.Create(10, 20, 40, 60); // cx=30, cy=50, width=40, height=60
+        var outline = PreviewControl.ComputeOutlineDst(dst, flipDiagonal: true, cx: 30, cy: 50);
+        Assert.Equal(60, outline.Width);
+        Assert.Equal(40, outline.Height);
+        Assert.Equal(30, outline.MidX);
+        Assert.Equal(50, outline.MidY);
     }
 }
