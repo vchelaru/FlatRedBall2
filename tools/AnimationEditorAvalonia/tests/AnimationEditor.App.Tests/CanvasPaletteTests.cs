@@ -36,8 +36,34 @@ public class CanvasPaletteTests
         var dark = CanvasPalette.For(isDark: true);
         var light = CanvasPalette.For(isDark: false);
 
-        Assert.True(dark.GridLine.Red > 200, "dark-mode grid line should be near-white");
-        Assert.True(light.GridLine.Red < 80, "light-mode grid line should be near-black");
+        Assert.True(dark.GridLineMinor.Red > 200, "dark-mode grid line should be near-white");
+        Assert.True(light.GridLineMinor.Red < 80, "light-mode grid line should be near-black");
+    }
+
+    [Fact]
+    public void For_LightVsDark_GridLineMajorContrastsWithBackground()
+    {
+        // Major lines share the minor line's hue (near-white on dark, near-black on
+        // light) — only opacity/weight differs, per issue #539.
+        var dark = CanvasPalette.For(isDark: true);
+        var light = CanvasPalette.For(isDark: false);
+
+        Assert.True(dark.GridLineMajor.Red > 200, "dark-mode major grid line should be near-white");
+        Assert.True(light.GridLineMajor.Red < 80, "light-mode major grid line should be near-black");
+    }
+
+    [Fact]
+    public void For_GridLineMajor_IsMoreOpaqueThanMinorInBothThemes()
+    {
+        // Issue #539: major lines (every 4th) must stand out from minor lines so
+        // users can eyeball distances at a glance.
+        var dark = CanvasPalette.For(isDark: true);
+        var light = CanvasPalette.For(isDark: false);
+
+        Assert.True(dark.GridLineMajor.Alpha > dark.GridLineMinor.Alpha,
+            "dark-mode major grid line should be more opaque than the minor line");
+        Assert.True(light.GridLineMajor.Alpha > light.GridLineMinor.Alpha,
+            "light-mode major grid line should be more opaque than the minor line");
     }
 
     [Fact]
@@ -59,7 +85,7 @@ public class CanvasPaletteTests
 
         Assert.Equal(new SKColor(argb), result.Background);
         // Chrome stays theme-driven — only the background is overridden.
-        Assert.Equal(themed.GridLine, result.GridLine);
+        Assert.Equal(themed.GridLineMinor, result.GridLineMinor);
         Assert.Equal(themed.GuideLine, result.GuideLine);
     }
 
@@ -106,7 +132,7 @@ public class CanvasPaletteTests
         var result = basePalette.WithBackground(custom);
 
         Assert.Equal(custom, result.Background);
-        Assert.Equal(basePalette.GridLine, result.GridLine);
+        Assert.Equal(basePalette.GridLineMinor, result.GridLineMinor);
         Assert.Equal(basePalette.RulerBackground, result.RulerBackground);
     }
 

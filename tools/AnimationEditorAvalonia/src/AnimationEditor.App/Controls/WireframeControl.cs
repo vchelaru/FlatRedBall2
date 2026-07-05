@@ -162,7 +162,7 @@ public class WireframeControl : Control
 
                 // Grid overlay
                 if (s.ShowGrid && s.GridSize > 0)
-                    DrawGrid(canvas, s, dest, palette.GridLine);
+                    DrawGrid(canvas, s, dest, palette);
             }
 
             // Frame region rectangles
@@ -237,22 +237,37 @@ public class WireframeControl : Control
             }
         }
 
-        private static void DrawGrid(SKCanvas canvas, RenderSnapshot s, SKRect textureDest, SKColor gridColor)
+        // Every 4th line is drawn as a "major" line (brighter/thicker) so distances are
+        // easier to eyeball at a glance, like graph paper (#539).
+        private const int MajorGridLineInterval = 4;
+
+        private static void DrawGrid(SKCanvas canvas, RenderSnapshot s, SKRect textureDest, CanvasPalette palette)
         {
-            using var paint = new SKPaint
+            using var minorPaint = new SKPaint
             {
-                Color        = gridColor,
+                Color        = palette.GridLineMinor,
                 Style        = SKPaintStyle.Stroke,
                 StrokeWidth  = 0.5f,
                 IsAntialias  = true
             };
+            using var majorPaint = new SKPaint
+            {
+                Color        = palette.GridLineMajor,
+                Style        = SKPaintStyle.Stroke,
+                StrokeWidth  = 1f,
+                IsAntialias  = true
+            };
             float step = s.GridSize * s.Zoom;
 
-            for (float x = textureDest.Left + step; x < textureDest.Right; x += step)
-                canvas.DrawLine(x, textureDest.Top, x, textureDest.Bottom, paint);
+            int index = 1;
+            for (float x = textureDest.Left + step; x < textureDest.Right; x += step, index++)
+                canvas.DrawLine(x, textureDest.Top, x, textureDest.Bottom,
+                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
 
-            for (float y = textureDest.Top + step; y < textureDest.Bottom; y += step)
-                canvas.DrawLine(textureDest.Left, y, textureDest.Right, y, paint);
+            index = 1;
+            for (float y = textureDest.Top + step; y < textureDest.Bottom; y += step, index++)
+                canvas.DrawLine(textureDest.Left, y, textureDest.Right, y,
+                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
         }
 
         private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge

@@ -20,7 +20,8 @@ namespace AnimationEditor.App.Theming;
 internal readonly record struct CanvasPalette(
     SKColor Background,
     SKColor TextureOutline,
-    SKColor GridLine,
+    SKColor GridLineMinor,
+    SKColor GridLineMajor,
     SKColor RulerBackground,
     SKColor RulerTick,
     SKColor RulerLabel,
@@ -31,7 +32,8 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Dark = new(
         Background:      new SKColor(0x0e, 0x0f, 0x12),
         TextureOutline:  new SKColor(255, 255, 255, 160),
-        GridLine:        new SKColor(255, 255, 255, 35),
+        GridLineMinor:   new SKColor(255, 255, 255, 22),
+        GridLineMajor:   new SKColor(255, 255, 255, 80),
         RulerBackground: new SKColor(50, 50, 55),
         RulerTick:       new SKColor(160, 160, 165),
         RulerLabel:      new SKColor(190, 190, 195),
@@ -42,7 +44,8 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Light = new(
         Background:      new SKColor(0xe8, 0xea, 0xed),
         TextureOutline:  new SKColor(0, 0, 0, 140),
-        GridLine:        new SKColor(0, 0, 0, 30),
+        GridLineMinor:   new SKColor(0, 0, 0, 18),
+        GridLineMajor:   new SKColor(0, 0, 0, 70),
         RulerBackground: new SKColor(225, 227, 231),
         RulerTick:       new SKColor(110, 116, 124),
         RulerLabel:      new SKColor(80, 86, 94),

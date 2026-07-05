@@ -191,6 +191,33 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    // ── Visual: major vs. minor lines ──────────────────────────────────────────
+
+    /// <summary>
+    /// Issue #539: every 4th grid line ("major") must render more prominently than
+    /// the lines in between ("minor") so users can eyeball distances at a glance.
+    /// With cellSize=8 on a 64px texture, x=32 is the 4th line (major) and x=8 is
+    /// the 1st (minor). Sampling at y=4 avoids the horizontal lines (first at y=8).
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_EveryFourthLine_IsBrighterThanMinorLines()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            int minorBrightness = ScanMaxRed(bm, centerX: 8, y: 4);
+            int majorBrightness = ScanMaxRed(bm, centerX: 32, y: 4);
+
+            Assert.True(majorBrightness > minorBrightness,
+                $"4th grid line (x=32) should render brighter than the 1st (x=8): major={majorBrightness}, minor={minorBrightness}");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── Visual: guard cases ───────────────────────────────────────────────────
 
     /// <summary>
