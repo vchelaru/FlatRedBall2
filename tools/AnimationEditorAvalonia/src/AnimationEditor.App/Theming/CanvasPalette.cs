@@ -59,14 +59,20 @@ internal readonly record struct CanvasPalette(
     /// </summary>
     public CanvasPalette WithBackground(SKColor background) => this with { Background = background };
 
+    /// <summary>Returns a copy with <see cref="GuideLine"/> replaced by <paramref name="guideLine"/>.</summary>
+    public CanvasPalette WithGuideLine(SKColor guideLine) => this with { GuideLine = guideLine };
+
     /// <summary>
-    /// Resolves the palette for a theme variant, applying an optional user background override
-    /// (packed <c>0xAARRGGBB</c>). <c>null</c> keeps the theme background; a value replaces only
-    /// the background via <see cref="WithBackground"/>, leaving chrome theme-driven.
+    /// Resolves the palette for a theme variant, applying optional user overrides (packed
+    /// <c>0xAARRGGBB</c>) for the canvas background and guide-line color. <c>null</c> keeps that
+    /// color theme-driven; a value replaces only that color, leaving the rest of the palette
+    /// theme-driven.
     /// </summary>
-    public static CanvasPalette Resolve(bool isDark, uint? overrideArgb)
+    public static CanvasPalette Resolve(bool isDark, uint? backgroundOverrideArgb, uint? guideLineOverrideArgb = null)
     {
         var palette = For(isDark);
-        return overrideArgb is uint argb ? palette.WithBackground(new SKColor(argb)) : palette;
+        if (backgroundOverrideArgb is uint bg) palette = palette.WithBackground(new SKColor(bg));
+        if (guideLineOverrideArgb is uint gl) palette = palette.WithGuideLine(new SKColor(gl));
+        return palette;
     }
 }

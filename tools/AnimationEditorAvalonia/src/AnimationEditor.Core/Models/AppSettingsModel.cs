@@ -34,6 +34,13 @@ namespace AnimationEditor.Core.Models
         public uint? CanvasBackgroundArgb { get; set; }
 
         /// <summary>
+        /// Optional override for the guide-line color drawn in the preview panel, as a packed
+        /// <c>0xAARRGGBB</c> value. <c>null</c> follows the theme default. Like
+        /// <see cref="CanvasBackgroundArgb"/>, this is a per-user viewing preference only.
+        /// </summary>
+        public uint? GuideLineArgb { get; set; }
+
+        /// <summary>
         /// When <c>true</c>, the editor never offers to register itself as the default
         /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
         /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear

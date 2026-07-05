@@ -1344,4 +1344,149 @@ public class HeadlessTreeViewTests
             }
             finally { window.Close(); }
     }
+
+    [AvaloniaTheory]
+    [InlineData(Key.Return)]
+    [InlineData(Key.Escape)]
+    public void FinishRename_ReturnsFocusToTree_NotToWindowChrome(Key key)
+    {
+            // Regression (#591 follow-up): committing (Enter) or cancelling (Escape) an inline
+            // rename removes the TextBox from the visual tree. If nothing explicitly refocuses
+            // the tree, Avalonia's focus fallback picks an arbitrary next focusable control
+            // (e.g. the window's minimize button), so pressing Down right afterward moves
+            // window-chrome focus instead of navigating to the next tree row.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var (_, chainNode, tb) = BeginRenameOnExpandedChain(window, ctx);
+
+                RaiseKeyDown(tb, key);
+
+                Assert.False(chainNode.IsEditing);
+                var focused = window.FocusManager?.GetFocusedElement();
+                Assert.True(
+                    focused is TreeView or TreeViewItem,
+                    $"After {key} ends the rename, focus should stay on the tree, but was: {focused?.GetType().Name ?? "null"}");
+            }
+            finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Sets up an expanded chain node (so it's collapsible) with an active inline rename,
+    /// and returns the tree, the chain node, and its active rename TextBox.
+    /// Caller must close <paramref name="window"/> when done.
+    /// </summary>
+    private static (TreeView Tree, TreeNodeVm ChainNode, TextBox TextBox) BeginRenameOnExpandedChain(
+        MainWindow window, TestServices ctx)
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave { TextureName = "A.png", ShapesSave = new ShapesSave() };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+        TriggerRefreshTreeView(window);
+        Dispatcher.UIThread.RunJobs();
+
+        var tree = GetTree(window);
+        var chainNode = GetRoots(tree)[0];
+        chainNode.IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var beginMethod = typeof(MainWindow).GetMethod(
+            "BeginInlineRenameSelected",
+            BindingFlags.NonPublic | BindingFlags.Instance,
+            null,
+            [typeof(AnimationChainSave)],
+            null)
+            ?? throw new InvalidOperationException("BeginInlineRenameSelected not found");
+        beginMethod.Invoke(window, [chain]);
+        Dispatcher.UIThread.RunJobs(); // flushes the Post(DispatcherPriority.Render) callback, incl. SelectAll
+
+        var tb = tree.GetVisualDescendants()
+            .OfType<TextBox>()
+            .FirstOrDefault(t => t.DataContext == chainNode)
+            ?? throw new InvalidOperationException("Inline rename TextBox not found");
+        Assert.True(chainNode.IsEditing, "Precondition: F2 must start inline rename.");
+
+        return (tree, chainNode, tb);
+    }
+
+    private static void RaiseKeyDown(TextBox tb, Key key)
+    {
+        tb.RaiseEvent(new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Source = tb,
+            Key = key,
+        });
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void PressLeftArrowAtSelectionStartDuringRename_CollapsesSelectionInsteadOfExitingEditMode()
+    {
+            // Regression (#591): TreeViewItem.OnKeyDown treats Left as collapse, which steals
+            // keyboard focus off the inline TextBox. That focus loss fires
+            // OnInlineRenameLostFocus, which commits/exits the rename — so pressing Left right
+            // after the initial select-all (the exact repro in the issue) kicked the user out of
+            // edit mode instead of just collapsing the selection to the caret.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var (_, chainNode, tb) = BeginRenameOnExpandedChain(window, ctx);
+
+                // BeginInlineRename select-all's the text ("Walk"): SelectionStart=0, End=4.
+                Assert.Equal(0, tb.SelectionStart);
+                Assert.Equal(4, tb.SelectionEnd);
+
+                RaiseKeyDown(tb, Key.Left);
+
+                Assert.True(chainNode.IsEditing,
+                    "Pressing Left while renaming must move the caret, not exit edit mode.");
+                Assert.Equal(0, tb.CaretIndex);
+                Assert.Equal(tb.SelectionStart, tb.SelectionEnd);
+            }
+            finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void PressRightArrowMidTextDuringRename_MovesCaretInsteadOfExitingEditMode()
+    {
+            // Same regression as above, but for Right from a plain (non-boundary, non-selection)
+            // caret position — confirms normal caret movement isn't just being swallowed.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var (_, chainNode, tb) = BeginRenameOnExpandedChain(window, ctx);
+                tb.SelectionStart = 2;
+                tb.SelectionEnd = 2; // caret at index 2 within "Walk", no active selection
+
+                RaiseKeyDown(tb, Key.Right);
+
+                Assert.True(chainNode.IsEditing,
+                    "Pressing Right while renaming must move the caret, not exit edit mode.");
+                Assert.Equal(3, tb.CaretIndex);
+            }
+            finally { window.Close(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(Key.Up)]
+    [InlineData(Key.Down)]
+    public void PressUpOrDownArrowDuringRename_DoesNotExitEditMode(Key key)
+    {
+            // Same regression: TreeViewItem.OnKeyDown treats Up/Down as row navigation to a
+            // sibling, which likewise steals focus off the TextBox mid-rename.
+            var (window, ctx) = CreateWindow();
+            try
+            {
+                var (_, chainNode, tb) = BeginRenameOnExpandedChain(window, ctx);
+
+                RaiseKeyDown(tb, key);
+
+                Assert.True(chainNode.IsEditing,
+                    $"Pressing {key} while renaming must not exit edit mode.");
+            }
+            finally { window.Close(); }
+    }
 }
