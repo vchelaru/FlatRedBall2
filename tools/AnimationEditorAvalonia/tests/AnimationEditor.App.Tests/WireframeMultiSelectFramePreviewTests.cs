@@ -1,5 +1,6 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Rendering;
 using Avalonia.Headless.XUnit;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
@@ -143,6 +144,115 @@ public class WireframeMultiSelectFramePreviewTests
 
             Assert.Equal(1, ctrl.FrameRectCount);
             Assert.True(ctrl.GetFrameRects().Single().IsSelected);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    // ── Handles suppressed on multi-select (follow-up to #582) ────────────────
+
+    /// <summary>
+    /// Same inner-margin frame geometry as
+    /// WireframeHandlesAndBorderTests.WireframeHandles_SelectedFrame_TopLeftHandleIsOutsideFrame
+    /// (UV 0.125-&gt;0.875 on 64x64 → TopLeft handle centred at screen (3,3)), except a second
+    /// frame is multi-selected alongside it. With more than one frame selected, handles must
+    /// not render on any of them — showing handles on only one of several equally-selected
+    /// frames would wrongly imply that frame is special.
+    /// </summary>
+    [AvaloniaFact]
+    public void MultiSelectFrames_NoHandlesRendered()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteSolidPng(dir, SKColors.Black);
+
+            var f0 = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
+                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                ShapesSave = new ShapesSave()
+            };
+            // Far corner, well clear of f0's handle zone at screen (3,3) — this is a
+            // second selected frame, not a probe point, so it must not overlap the pixel
+            // under test.
+            var f1 = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.95f, TopCoordinate = 0.95f,
+                RightCoordinate = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chain = new AnimationChainSave { Name = "Test" };
+            chain.Frames.AddRange(new[] { f0, f1 });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            ctx.SelectedState.SelectedFrame = f0;                        // anchor
+            ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 }; // multi-select
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);
+
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            // With a single selection this pixel is white (see WireframeHandlesAndBorderTests);
+            // with two frames selected it must stay dark texture — no handle drawn.
+            var px = bm.GetPixel(3, 3);
+            Assert.True(px.Red < 200 && px.Green < 200 && px.Blue < 200,
+                $"Handles must not render during multi-select; R={px.Red} G={px.Green} B={px.Blue}");
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Same geometry as <see cref="MultiSelectFrames_NoHandlesRendered"/>. Hit-testing the
+    /// would-be TopLeft handle position must miss (HandleKind.None) during multi-select, even
+    /// though the same screen point resolves to a handle when only f0 is selected.
+    /// </summary>
+    [AvaloniaFact]
+    public void MultiSelectFrames_HandleHitTestReturnsNone()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteSolidPng(dir, SKColors.Black);
+
+            var f0 = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
+                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                ShapesSave = new ShapesSave()
+            };
+            // Far corner, well clear of f0's handle zone at screen (3,3) — this is a
+            // second selected frame, not a probe point, so it must not overlap the pixel
+            // under test.
+            var f1 = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.95f, TopCoordinate = 0.95f,
+                RightCoordinate = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chain = new AnimationChainSave { Name = "Test" };
+            chain.Frames.AddRange(new[] { f0, f1 });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            ctx.SelectedState.SelectedFrame = f0;
+            ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 };
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);
+
+            Assert.Equal(HandleKind.None, ctrl.HitTestHandleKindAt(3f, 3f));
         }
         finally { Directory.Delete(dir, true); }
     }

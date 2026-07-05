@@ -329,12 +329,22 @@ public class WireframeControl : Control
     /// handle-drag hit-testing. Resolved by reference to <see cref="ISelectedState.SelectedFrame"/>
     /// rather than any <see cref="FrameRect.IsSelected"/> flag, because a tree multi-select
     /// (issue #582) marks every selected frame's rect IsSelected for preview highlighting, but
-    /// resize handles/dragging still only ever target the one primary frame.
+    /// resize handles/dragging still only ever target one frame at a time.
+    /// <para>
+    /// Returns null when more than one frame is multi-selected: handles on just one of several
+    /// equally-selected frames implies that frame is somehow special, so they are suppressed
+    /// entirely (same treatment as a whole-chain selection with no individual frame chosen).
+    /// </para>
     /// </summary>
-    private FrameRect? PrimaryFrameRect() =>
-        _selectedState?.SelectedFrame is { } f
+    private FrameRect? PrimaryFrameRect()
+    {
+        if ((_selectedState?.SelectedFrames.Count ?? 0) > 1)
+            return null;
+
+        return _selectedState?.SelectedFrame is { } f
             ? _frameRects.FirstOrDefault(fr => fr.Frame == f)
             : null;
+    }
 
     // Set when LoadTexture/CenterTexture ran before the control had a real viewport
     // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
