@@ -11,7 +11,7 @@ namespace AnimationEditor.Core.CommandsAndState;
 /// same flip restores the original offsets with no rounding drift.
 /// <para>
 /// Shared by <see cref="Commands.FlipCommand"/> (in-place flip) and the duplicate-with-flip
-/// path in <c>AppCommands.DuplicateChain</c> so both use identical logic.
+/// path in <c>AppCommands.DuplicateChains</c> so both use identical logic.
 /// </para>
 /// </summary>
 public static class ShapeFlip

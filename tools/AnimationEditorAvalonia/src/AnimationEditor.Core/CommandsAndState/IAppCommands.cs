@@ -199,6 +199,17 @@ namespace AnimationEditor.Core.CommandsAndState
         AnimationChainSave? DuplicateChain(AnimationChainSave source, bool flipH = false, bool flipV = false, string? newName = null);
 
         /// <summary>
+        /// Deep-copies every chain in <paramref name="sources"/> and inserts the copies as one
+        /// contiguous block after the last source, in a single undo step. When <paramref name="flipH"/>
+        /// or <paramref name="flipV"/> is set, every copied frame and shape is mirrored along that axis.
+        /// Backs both <see cref="DuplicateSelection"/> (no flip) and the tree context menu's
+        /// Duplicate → Flip Horizontal/Vertical submenu items (which apply to the whole selection,
+        /// not just the right-clicked chain).
+        /// </summary>
+        IReadOnlyList<AnimationChainSave> DuplicateChains(
+            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false);
+
+        /// <summary>
         /// Deep-copies <paramref name="source"/> and inserts the copy immediately after it
         /// in <paramref name="chain"/>. All UV coordinates, timing, flip flags, relative offsets,
         /// and attached shapes are copied. Undoable.

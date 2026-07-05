@@ -975,49 +975,35 @@ namespace AnimationEditor.Core.CommandsAndState
             bool   flipV    = false,
             string? newName = null)
         {
-            var acls = _pm.AnimationChainListSave;
-            if (acls is null) return null;
+            var copies = DuplicateChains(new[] { source }, flipH, flipV);
+            if (copies.Count == 0) return null;
 
-            var copyName = newName ?? StringFunctions.MakeStringUnique(
-                source.Name + "Copy",
-                acls.AnimationChains.Select(c => c.Name).ToList());
+            var copy = copies[0];
+            if (newName is not null) copy.Name = newName;
+            return copy;
+        }
 
-            var copy = new AnimationChainSave { Name = copyName };
+        // Clones a chain and, when requested, mirrors every frame and shape horizontally
+        // and/or vertically. Shared by DuplicateChain (single) and DuplicateChains (batch)
+        // so right-click Duplicate's Original/Flip Horizontal/Flip Vertical submenu items
+        // behave identically whether one or many chains are selected.
+        private static AnimationChainSave CloneChainWithFlip(AnimationChainSave source, bool flipH, bool flipV)
+        {
+            var copy = new AnimationChainSave { Name = source.Name };
             foreach (var frame in source.Frames)
             {
-                var fCopy = new AnimationFrameSave
-                {
-                    TextureName      = frame.TextureName,
-                    LeftCoordinate   = frame.LeftCoordinate,
-                    RightCoordinate  = frame.RightCoordinate,
-                    TopCoordinate    = frame.TopCoordinate,
-                    BottomCoordinate = frame.BottomCoordinate,
-                    FrameLength      = frame.FrameLength,
-                    FlipHorizontal   = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal,
-                    FlipVertical     = flipV ? !frame.FlipVertical   : frame.FlipVertical,
-                    // Mirror the sprite offset about the entity origin so an off-center frame stays
-                    // aligned with its (also-mirrored) shapes after the flip.
-                    RelativeX        = flipH ? -frame.RelativeX : frame.RelativeX,
-                    RelativeY        = flipV ? -frame.RelativeY : frame.RelativeY,
-                    ShapesSave = new FlatRedBall2.Animation.Content.ShapesSave()
-                };
-                if (frame.ShapesSave != null)
-                {
-                    foreach (var shape in frame.ShapesSave.Shapes)
-                        if (AnimationCloneHelper.CloneShape(shape) is { } shapeCopy)
-                        {
-                            // Mirror the copy's offsets so collision tracks the flipped sprite.
-                            ShapeFlip.Mirror(shapeCopy, flipH, flipV);
-                            fCopy.ShapesSave!.Shapes.Add(shapeCopy);
-                        }
-                }
+                var fCopy = AnimationCloneHelper.CloneFrame(frame);
+                fCopy.FlipHorizontal = flipH ? !frame.FlipHorizontal : frame.FlipHorizontal;
+                fCopy.FlipVertical   = flipV ? !frame.FlipVertical   : frame.FlipVertical;
+                // Mirror the sprite offset about the entity origin so an off-center frame stays
+                // aligned with its (also-mirrored) shapes after the flip.
+                fCopy.RelativeX = flipH ? -frame.RelativeX : frame.RelativeX;
+                fCopy.RelativeY = flipV ? -frame.RelativeY : frame.RelativeY;
+                if (fCopy.ShapesSave is not null)
+                    foreach (var shape in fCopy.ShapesSave.Shapes)
+                        ShapeFlip.Mirror(shape, flipH, flipV);
                 copy.Frames.Add(fCopy);
             }
-
-            // Place the copy right after its source so it appears adjacent in the tree.
-            int sourceIndex = acls.AnimationChains.IndexOf(source);
-            int? insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : null;
-            _undoManager.Execute(new AddChainCommand(copy, acls, this, _events, _selectedState, insertIndex));
             return copy;
         }
 
@@ -1041,7 +1027,7 @@ namespace AnimationEditor.Core.CommandsAndState
             switch (payload.Kind)
             {
                 case CopySelectionKind.Chain:
-                    DuplicateChainsBatch(payload.Chains);
+                    DuplicateChains(payload.Chains);
                     break;
                 case CopySelectionKind.Frame:
                     DuplicateFramesBatch(payload.Frames);
@@ -1052,7 +1038,9 @@ namespace AnimationEditor.Core.CommandsAndState
             }
         }
 
-        private IReadOnlyList<AnimationChainSave> DuplicateChainsBatch(IReadOnlyList<AnimationChainSave> sources)
+        /// <inheritdoc cref="IAppCommands.DuplicateChains"/>
+        public IReadOnlyList<AnimationChainSave> DuplicateChains(
+            IReadOnlyList<AnimationChainSave> sources, bool flipH = false, bool flipV = false)
         {
             var acls = _pm.AnimationChainListSave;
             if (acls is null || sources.Count == 0) return Array.Empty<AnimationChainSave>();
@@ -1064,7 +1052,7 @@ namespace AnimationEditor.Core.CommandsAndState
             var items = new List<(AnimationChainSave Source, AnimationChainSave Copy)>();
             foreach (var source in ordered)
             {
-                var copy = AnimationCloneHelper.CloneChain(source);
+                var copy = CloneChainWithFlip(source, flipH, flipV);
                 copy.Name = StringFunctions.MakeStringUnique(source.Name + "Copy", existingNames, 2);
                 existingNames.Add(copy.Name);
                 items.Add((source, copy));

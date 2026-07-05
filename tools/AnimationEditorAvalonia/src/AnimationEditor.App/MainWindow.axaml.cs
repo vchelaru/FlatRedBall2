@@ -3229,7 +3229,7 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", () => _appCommands.DuplicateShape(rect));
+            AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, rect.Name));
             AddSeparator();
@@ -3241,7 +3241,7 @@ public partial class MainWindow : Window
             AddMenuItem("Copy",  () => _ = HandleCopyAsync());
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", () => _appCommands.DuplicateShape(circle));
+            AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("Rename…", () => BeginInlineRename(vm!, circle.Name));
             AddSeparator();
@@ -3268,7 +3268,7 @@ public partial class MainWindow : Window
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             if (chain2 is not null)
-                AddMenuItem("Duplicate", () => _appCommands.DuplicateFrame(frame2, chain2));
+                AddMenuItem("Duplicate", HandleDuplicate);
             AddSeparator();
             AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
             AddSeparator();
@@ -3301,9 +3301,9 @@ public partial class MainWindow : Window
             AddMenuItem("Cut",   () => _ = HandleCutAsync());
             AddMenuItem("Paste", () => _ = HandlePasteAsync());
             AddSubMenu("Duplicate",
-                ("Original",        () => _appCommands.DuplicateChain(chain)),
-                ("Flip Horizontal", () => _appCommands.DuplicateChain(chain, flipH: true)),
-                ("Flip Vertical",   () => _appCommands.DuplicateChain(chain, flipV: true)));
+                ("Original",        HandleDuplicate),
+                ("Flip Horizontal", () => HandleDuplicateChainsFlip(chain, flipH: true, flipV: false)),
+                ("Flip Vertical",   () => HandleDuplicateChainsFlip(chain, flipH: false, flipV: true)));
             AddSeparator();
             AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
             AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
@@ -4906,6 +4906,19 @@ public partial class MainWindow : Window
             RefreshFrameNode(shapeFrame);
             SyncTreeSelection();
         }
+    }
+
+    // Flip variants aren't part of the Ctrl+D path (HandleDuplicate has no flip concept),
+    // so this mirrors its multi-select dispatch for chains only: duplicate every selected
+    // chain (falling back to the right-clicked one when nothing is selected) with the flip
+    // flag applied, via the same AppCommands.DuplicateChains batch HandleDuplicate uses.
+    private void HandleDuplicateChainsFlip(AnimationChainSave rightClicked, bool flipH, bool flipV)
+    {
+        var selected = _selectedState.SelectedChains;
+        var sources = selected.Count > 0 ? selected : new List<AnimationChainSave> { rightClicked };
+        var copies = _appCommands.DuplicateChains(sources, flipH, flipV);
+        QueuePastedChainExpandFromSources(sources, copies);
+        RefreshTreeView();
     }
 
     // ── Delete ────────────────────────────────────────────────────────────────

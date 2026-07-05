@@ -538,6 +538,24 @@ public class AppCommandsChainTests
         Assert.Null(result);
     }
 
+    // ── DuplicateChains (batch, with flip) ───────────────────────────────────
+
+    [Fact]
+    public void DuplicateChains_WithFlipH_TogglesFlipHorizontalOnAllCopiedChains()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+        var walk = TestHelpers.MakeChain(acls, "Walk", 1);
+        var run  = TestHelpers.MakeChain(acls, "Run", 1);
+        walk.Frames[0].FlipHorizontal = false;
+        run.Frames[0].FlipHorizontal  = false;
+
+        var copies = ctx.AppCommands.DuplicateChains(new[] { walk, run }, flipH: true);
+
+        Assert.Equal(2, copies.Count);
+        Assert.All(copies, c => Assert.True(c.Frames[0].FlipHorizontal));
+    }
+
     // ── SortAnimationsAlphabetically ─────────────────────────────────────────
 
     [Fact]
