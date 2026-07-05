@@ -37,16 +37,19 @@ namespace AnimationEditor.Core
 
         public void LoadAnimationChain(FilePath fileName, AnimationChainListSave? preParsed = null)
         {
-            if (!fileName.Exists())
-                throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
-
             AnimationChainListSave acls;
             if (preParsed != null)
             {
+                // Caller already has the parsed content (e.g. fetched over HTTP with no local
+                // filesystem, as on the browser-wasm build) — nothing to read from disk, so the
+                // existence check below only applies to the "read fileName ourselves" path.
                 acls = preParsed;
             }
             else
             {
+                if (!fileName.Exists())
+                    throw new FileNotFoundException($"Animation chain file not found: {fileName.FullPath}", fileName.FullPath);
+
                 var rawContent = File.ReadAllText(fileName.FullPath);
                 if (IO.AchxConflictMarkerDetector.HasConflictMarkers(rawContent))
                     throw new System.IO.InvalidDataException(

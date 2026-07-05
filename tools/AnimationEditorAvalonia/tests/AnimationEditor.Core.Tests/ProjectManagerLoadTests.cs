@@ -105,4 +105,26 @@ public class ProjectManagerLoadTests : IDisposable
 
         Assert.Same(sentinel, pm.AnimationChainListSave);
     }
+
+    // ── Pre-parsed content, no file on disk (#535 M2: browser has no filesystem) ────────────
+
+    [Fact]
+    public void LoadAnimationChain_PreParsedGivenAndFileDoesNotExist_DoesNotThrow()
+    {
+        var pm = new ProjectManager();
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+
+        pm.LoadAnimationChain(new FilePath(TestPaths.Abs("bundled", "sample.achx")), preParsed);
+    }
+
+    [Fact]
+    public void LoadAnimationChain_PreParsedGivenAndFileDoesNotExist_SetsAnimationChainListSaveToPreParsed()
+    {
+        var pm = new ProjectManager();
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.UV };
+
+        pm.LoadAnimationChain(new FilePath(TestPaths.Abs("bundled", "sample.achx")), preParsed);
+
+        Assert.Same(preParsed, pm.AnimationChainListSave);
+    }
 }

@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
+        xmlns:views="clr-namespace:AnimationEditor.App.Controls;assembly=AnimationEditor.Views"
         xmlns:conv="clr-namespace:AnimationEditor.App.Converters"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
         xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
@@ -811,7 +812,7 @@
                      model as the Preview panel below. The bars overlay the canvas edges and
                      auto-hide so they behave like the old ScrollViewer's scrollbars. -->
                 <Grid Grid.Row="1" Background="{DynamicResource BgCanvas}">
-                    <controls:WireframeControl x:Name="WireframeCtrl" />
+                    <views:WireframeControl x:Name="WireframeCtrl" />
                     <ScrollBar x:Name="WireframeVScroll"
                                Orientation="Vertical"
                                HorizontalAlignment="Right" VerticalAlignment="Stretch"
@@ -925,7 +926,7 @@
                          as the Wireframe's ScrollViewer scrollbars; overlaying (not reserving a
                          cell) keeps the hover-expand from shifting the layout. -->
                     <Grid Grid.Row="1">
-                        <controls:PreviewControl x:Name="PreviewCtrl" />
+                        <views:PreviewControl x:Name="PreviewCtrl" />
                         <ScrollBar x:Name="PreviewVScroll"
                                    Orientation="Vertical"
                                    HorizontalAlignment="Right" VerticalAlignment="Stretch"

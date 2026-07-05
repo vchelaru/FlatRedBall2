@@ -51,8 +51,14 @@
     <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
   </ItemGroup>
 
+  <!--
+    WireframeControl/PreviewControl and their support types moved to AnimationEditor.Views
+    (Avalonia.Desktop-free) so AnimationEditor.Browser can reference the real controls. See
+    tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md (#535 M2).
+  -->
   <ItemGroup>
     <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
+    <ProjectReference Include="..\AnimationEditor.Views\AnimationEditor.Views.csproj" />
   </ItemGroup>
 
   <ItemGroup>

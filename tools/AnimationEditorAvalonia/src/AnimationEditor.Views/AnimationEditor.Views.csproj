@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    #535 M2: the portable UI surface (WireframeControl, PreviewControl, and their support
+    types) has zero dependency on Avalonia.Desktop, confirmed by grepping every using and
+    fully-qualified AnimationEditor.App.* reference in these files before moving them here.
+    Splitting them out of AnimationEditor.App lets AnimationEditor.Browser reference the real
+    controls instead of a stand-in, the same way AnimationEditor.Core already dropped its
+    MonoGame dependency (see src/Animation.Content and BROWSER_SPIKE_FINDINGS.md).
+
+    Namespaces are left unchanged (AnimationEditor.App.Controls/.Theming/.Services) so no
+    existing call site, XAML reference, or test needs to change, same approach as the
+    Animation.Content split.
+  -->
+  <PropertyGroup>
+    <AnimationEditorTargetFramework Condition="'$(AnimationEditorTargetFramework)' == ''">net10.0</AnimationEditorTargetFramework>
+    <TargetFramework>$(AnimationEditorTargetFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.0.1" />
+    <PackageReference Include="Avalonia.Skia" Version="12.0.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AnimationEditor.App itself needs this now too, not just its test project: several
+         members these controls expose to MainWindow (PreviewControl.HGuides/VGuides/SetGuides,
+         CanvasPalette, etc.) are internal, and internal access does not cross assembly
+         boundaries just because it used to be the same file/assembly before this split.
+         Target "AnimationEditor", not "AnimationEditor.App": AnimationEditor.App.csproj
+         overrides <AssemblyName> to "AnimationEditor" (for the macOS Dock label; see that
+         csproj), so that is the real assembly name InternalsVisibleTo must match. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AnimationEditor</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AnimationEditor.App.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AnimationEditor.Browser</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
