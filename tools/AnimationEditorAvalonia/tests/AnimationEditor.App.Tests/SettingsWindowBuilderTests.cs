@@ -9,22 +9,24 @@ namespace AnimationEditor.App.Tests;
 
 public class SettingsWindowBuilderTests
 {
+    private static StackPanel SectionOf(TabItem tab) => (StackPanel)((ScrollViewer)tab.Content!).Content!;
+
     [Fact]
-    public void BuildSections_AlwaysIncludesCanvasColorsHeader()
+    public void BuildTabs_AlwaysIncludesColorsTab()
     {
-        var sections = SettingsWindowBuilder.BuildSections(
+        var tabs = SettingsWindowBuilder.BuildTabs(
             new SettingsWindowModel { FileAssociationSupported = false },
             new SettingsWindowCallbacks());
 
-        var header = Assert.IsType<TextBlock>(((StackPanel)sections.Children[0]).Children[0]);
+        var colorsTab = Assert.IsType<TabItem>(tabs.Items[0]);
 
-        Assert.Equal("Canvas colors", header.Text);
+        Assert.Equal("Colors", colorsTab.Header);
     }
 
     [Fact]
-    public void BuildSections_WithFileAssociation_IncludesSectionHeader()
+    public void BuildTabs_WithFileAssociation_IncludesFileAssociationTab()
     {
-        var sections = SettingsWindowBuilder.BuildSections(
+        var tabs = SettingsWindowBuilder.BuildTabs(
             new SettingsWindowModel
             {
                 FileAssociationSupported = true,
@@ -33,32 +35,32 @@ public class SettingsWindowBuilderTests
             },
             new SettingsWindowCallbacks());
 
-        // Canvas colors is always first; file association follows when supported.
-        var header = Assert.IsType<TextBlock>(((StackPanel)sections.Children[1]).Children[0]);
+        // Colors is always first; File Association follows when supported.
+        var fileAssocTab = Assert.IsType<TabItem>(tabs.Items[1]);
 
-        Assert.Equal("File association", header.Text);
+        Assert.Equal("File Association", fileAssocTab.Header);
     }
 
     [Fact]
-    public void BuildSections_WithoutFileAssociation_OmitsFileAssociationSection()
+    public void BuildTabs_WithoutFileAssociation_OnlyHasColorsTab()
     {
-        var sections = SettingsWindowBuilder.BuildSections(
+        var tabs = SettingsWindowBuilder.BuildTabs(
             new SettingsWindowModel { FileAssociationSupported = false },
             new SettingsWindowCallbacks());
 
-        Assert.Single(sections.Children);
+        Assert.Single(tabs.Items);
     }
 
     [AvaloniaFact]
-    public void BuildSections_CanvasBackgroundRow_ThemeDefaultButton_InvokesCallbackWithNull()
+    public void BuildTabs_CanvasBackgroundRow_ThemeDefaultButton_InvokesCallbackWithNull()
     {
         uint? received = 0xFF123456;
-        var sections = SettingsWindowBuilder.BuildSections(
+        var tabs = SettingsWindowBuilder.BuildTabs(
             new SettingsWindowModel { CanvasBackgroundArgb = 0xFF123456, ThemeDefaultBackgroundArgb = 0xFF0E0F12 },
             new SettingsWindowCallbacks { OnCanvasBackgroundChanged = argb => received = argb });
 
-        var canvasColors = (StackPanel)sections.Children[0];
-        var backgroundRow = (StackPanel)canvasColors.Children[1];
+        var colorsSection = SectionOf((TabItem)tabs.Items[0]!);
+        var backgroundRow = (StackPanel)colorsSection.Children[0];
         var buttonsRow = (StackPanel)backgroundRow.Children[1];
         // buttonsRow.Children[0] is the swatch; [1] is "Theme Default".
         var themeDefaultButton = Assert.IsType<Button>(buttonsRow.Children[1]);
@@ -70,14 +72,14 @@ public class SettingsWindowBuilderTests
     }
 
     [Fact]
-    public void BuildSections_GuideLineRow_HasNoNamedPresets()
+    public void BuildTabs_GuideLineRow_HasNoNamedPresets()
     {
-        var sections = SettingsWindowBuilder.BuildSections(
+        var tabs = SettingsWindowBuilder.BuildTabs(
             new SettingsWindowModel(),
             new SettingsWindowCallbacks());
 
-        var canvasColors = (StackPanel)sections.Children[0];
-        var guideLineRow = (StackPanel)canvasColors.Children[2];
+        var colorsSection = SectionOf((TabItem)tabs.Items[0]!);
+        var guideLineRow = (StackPanel)colorsSection.Children[1];
         var buttonsRow = (StackPanel)guideLineRow.Children[1];
 
         // Swatch + "Theme Default" + "Custom…" only — no Black/White/Mid Gray presets.

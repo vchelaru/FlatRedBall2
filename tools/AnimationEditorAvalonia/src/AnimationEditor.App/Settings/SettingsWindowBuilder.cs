@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using AnimationEditor.Core.IO;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 
@@ -65,11 +66,7 @@ public static class SettingsWindowBuilder
         var root = new DockPanel { Margin = new Thickness(20) };
         DockPanel.SetDock(closeBtn, Dock.Bottom);
         root.Children.Add(closeBtn);
-        root.Children.Add(new ScrollViewer
-        {
-            Content = BuildSections(model, callbacks),
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-        });
+        root.Children.Add(BuildTabs(model, callbacks));
 
         var window = new Window
         {
@@ -86,18 +83,40 @@ public static class SettingsWindowBuilder
         return window;
     }
 
-    /// <summary>Section stack for the settings dialog. Extracted so layout can be unit-tested without a <see cref="Window"/>.</summary>
-    internal static StackPanel BuildSections(SettingsWindowModel model, SettingsWindowCallbacks callbacks)
+    /// <summary>
+    /// Tab strip for the settings dialog. Extracted so layout can be unit-tested without a
+    /// <see cref="Window"/>. Each category (colors, file association, ...) is its own tab rather
+    /// than a flat scrolling list of sections, so the dialog can keep growing (grid, rulers, etc.)
+    /// without becoming an ever-taller scroll.
+    /// </summary>
+    internal static TabControl BuildTabs(SettingsWindowModel model, SettingsWindowCallbacks callbacks)
     {
-        var sections = new StackPanel { Spacing = 20 };
-
-        sections.Children.Add(BuildCanvasColorsSection(model, callbacks));
+        var tabs = new TabControl
+        {
+            Items =
+            {
+                new TabItem { Header = "Colors", Content = InTab(BuildCanvasColorsSection(model, callbacks)) },
+            },
+        };
 
         if (model.FileAssociationSupported)
-            sections.Children.Add(BuildFileAssociationSection(model, callbacks));
+        {
+            tabs.Items.Add(new TabItem
+            {
+                Header = "File Association",
+                Content = InTab(BuildFileAssociationSection(model, callbacks)),
+            });
+        }
 
-        return sections;
+        return tabs;
     }
+
+    private static ScrollViewer InTab(Control content) => new()
+    {
+        Content = content,
+        Padding = new Thickness(0, 12, 0, 0),
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+    };
 
     // Named background presets (packed 0xAARRGGBB, opaque). Guide-line color has no named
     // presets — arbitrary named colors don't help there the way Black/White/Mid Gray do for a
@@ -113,15 +132,9 @@ public static class SettingsWindowBuilder
     {
         return new StackPanel
         {
-            Spacing = 10,
+            Spacing = 14,
             Children =
             {
-                new TextBlock
-                {
-                    Text = "Canvas colors",
-                    FontWeight = FontWeight.SemiBold,
-                    FontSize = 14,
-                },
                 BuildColorRow(
                     "Background",
                     model.CanvasBackgroundArgb,
@@ -229,18 +242,7 @@ public static class SettingsWindowBuilder
         return new StackPanel
         {
             Spacing = 10,
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = "File association",
-                    FontWeight = FontWeight.SemiBold,
-                    FontSize = 14,
-                },
-                statusText,
-                setDefaultBtn,
-                suppressCheck,
-            },
+            Children = { statusText, setDefaultBtn, suppressCheck },
         };
     }
 }
