@@ -16,6 +16,14 @@ namespace AnimationEditor.Core
         void SaveAnimationChainList(string targetPath);
 
         /// <summary>
+        /// Root folder the Files panel should browse: the linked project's folder (if the
+        /// <c>ProjectFile</c> reference resolves to an existing directory) or its <c>Content</c>
+        /// subfolder, then the nearest ancestor named <c>Content</c> walking up from the .achx's
+        /// folder, then the .achx's own folder.
+        /// </summary>
+        string? ResolveFilesPanelRoot();
+
+        /// <summary>
         /// Resolves a frame's texture name to its pixel size (PNG header read), relative to the
         /// loaded .achx directory. Returns <c>null</c> when the name is empty or unreadable.
         /// </summary>

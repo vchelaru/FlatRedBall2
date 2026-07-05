@@ -2652,11 +2652,9 @@ public partial class MainWindow : Window
 
     private void RefreshFilesPanel()
     {
-        string? achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
-            ? null
-            : Path.GetDirectoryName(_projectManager.FileName);
-        FilesPanel.Refresh(achxFolder);
-        _pngFolderWatcher.Watch(achxFolder);
+        string? filesRoot = _projectManager.ResolveFilesPanelRoot();
+        FilesPanel.Refresh(filesRoot);
+        _pngFolderWatcher.Watch(filesRoot);
     }
 
     // ── Tree refresh ──────────────────────────────────────────────────────────
