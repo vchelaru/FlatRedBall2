@@ -201,7 +201,7 @@ public partial class MainWindow : Window
         WireTabBar();
         WireDefaultHandlerBanner();
 
-        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState);
+        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this, msg => ShowStatusMessage(msg, isError: true));
         _pngFolderWatcher.FolderContentsChanged += () =>
