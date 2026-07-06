@@ -187,4 +187,41 @@ public static class CanvasTransform
         var (cpx, cpy) = ClampWireframePan(npx, npy, viewW, viewH, bitmapW, bitmapH, nz);
         return (cpx, cpy, nz);
     }
+
+    // ── Drag auto-pan (#540) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Camera pan velocity (screen pixels/second) to auto-scroll a viewport while a drag holds
+    /// the pointer near or past its edge — the "drag past the edge and it scrolls" behaviour of
+    /// most canvas editors. Zero inside the viewport minus <paramref name="marginPx"/>; ramps
+    /// linearly from zero (at the margin boundary) to <paramref name="maxSpeed"/> (at the
+    /// viewport edge itself), then holds at <paramref name="maxSpeed"/> for a pointer captured
+    /// past the edge (a capturing drag can report coordinates outside the control's own bounds).
+    /// <para>
+    /// The sign follows the wireframe's pan convention (<c>screenX = panX + textureX × zoom</c>):
+    /// overflow on the min side (left/top) returns a positive velocity — panX/panY must increase
+    /// to reveal more content in that direction — and overflow on the max side (right/bottom)
+    /// returns negative.
+    /// </para>
+    /// </summary>
+    public static (float VelX, float VelY) AutoPanVelocity(
+        float pointerX, float pointerY,
+        float viewW, float viewH,
+        float marginPx, float maxSpeed)
+        => (AutoPanAxisVelocity(pointerX, viewW, marginPx, maxSpeed),
+            AutoPanAxisVelocity(pointerY, viewH, marginPx, maxSpeed));
+
+    private static float AutoPanAxisVelocity(float pointer, float viewExtent, float marginPx, float maxSpeed)
+    {
+        if (marginPx <= 0f) return 0f;
+
+        if (pointer < marginPx)
+            return Math.Clamp((marginPx - pointer) / marginPx, 0f, 1f) * maxSpeed;
+
+        float farBoundary = viewExtent - marginPx;
+        if (pointer > farBoundary)
+            return -Math.Clamp((pointer - farBoundary) / marginPx, 0f, 1f) * maxSpeed;
+
+        return 0f;
+    }
 }

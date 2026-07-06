@@ -334,6 +334,18 @@ public class WireframeControl : Control
     private float _zoomPivotVpY;
     private const float ZoomAnimIntervalSeconds = 1f / 60f;
 
+    // ── Drag auto-pan (#540) ───────────────────────────────────────────────────
+    // While a handle/chain drag is active, the timer nudges the camera each tick via
+    // StepAutoPan whenever the last-known pointer position sits within AutoPanMarginPx of the
+    // viewport edge, then re-applies the drag at that same screen position — ScreenToTexture
+    // depends on _panX/_panY, so re-running Apply*Drag after the pan shifts yields a new
+    // texture-space delta and the dragged frame keeps tracking the cursor.
+    private DispatcherTimer? _autoPanTimer;
+    private Point _lastPointerPos;
+    private const float AutoPanMarginPx = 32f;
+    private const float AutoPanMaxSpeedPxPerSec = 900f;
+    private const float AutoPanIntervalSeconds = 1f / 60f;
+
     private bool _showGrid;
     private int _gridSize = 16;
 
@@ -766,6 +778,52 @@ public class WireframeControl : Control
         RaiseViewChanged();
     }
 
+    private void StartAutoPanTimer()
+    {
+        _autoPanTimer ??= CreateAutoPanTimer();
+        _autoPanTimer.Start();
+    }
+
+    private void StopAutoPanTimer() => _autoPanTimer?.Stop();
+
+    private DispatcherTimer CreateAutoPanTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(AutoPanIntervalSeconds) };
+        timer.Tick += (_, _) => StepAutoPan(AutoPanIntervalSeconds);
+        return timer;
+    }
+
+    /// <summary>
+    /// Nudges the camera toward <see cref="_lastPointerPos"/> when it sits within
+    /// <see cref="AutoPanMarginPx"/> of the viewport edge during an active handle or chain drag
+    /// (<see cref="CanvasTransform.AutoPanVelocity"/>), then re-applies the drag at that same
+    /// screen position so the dragged frame keeps tracking the cursor. Live-driven by
+    /// <see cref="_autoPanTimer"/>; tests call this directly for determinism (see
+    /// <see cref="StepZoomAnimation"/> for the same pattern). No-op with no active drag, no
+    /// bitmap, or before layout has produced a real viewport.
+    /// </summary>
+    public void StepAutoPan(float dtSeconds)
+    {
+        if (_bitmap is null || Bounds.Width <= 1) return;
+        if (_draggingRect is null && !_draggingChain) return;
+
+        var (vx, vy) = CanvasTransform.AutoPanVelocity(
+            (float)_lastPointerPos.X, (float)_lastPointerPos.Y,
+            (float)Bounds.Width, (float)Bounds.Height,
+            AutoPanMarginPx, AutoPanMaxSpeedPxPerSec);
+        if (vx == 0f && vy == 0f) return;
+
+        _panX += vx * dtSeconds;
+        _panY += vy * dtSeconds;
+        ClampCamera();
+
+        if (_draggingRect != null) ApplyHandleDrag(_lastPointerPos);
+        else ApplyChainDrag(_lastPointerPos);
+
+        InvalidateVisual();
+        RaiseViewChanged();
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1112,6 +1170,78 @@ public class WireframeControl : Control
 
         ChainRegionChanged?.Invoke(chain);
         _draggingChain = false;
+        _chainDragStarts.Clear();
+    }
+
+    /// <summary>
+    /// Test-only: begins a handle-drag gesture without applying an end position, mirroring the
+    /// handle-hit branch of <see cref="OnPointerPressed"/>. Pairs with
+    /// <see cref="SimulateDragPointerMove"/> and <see cref="StepAutoPan"/> to observe auto-pan
+    /// (#540) mid-drag; use <see cref="SimulateHandleDrag"/> instead for a one-shot gesture that
+    /// doesn't need intermediate ticks. No-op when no frame is selected or no texture is loaded.
+    /// </summary>
+    public void SimulateHandleDragBegin(HandleKind handle, float startScreenX, float startScreenY)
+    {
+        var sel = PrimaryFrameRect();
+        if (sel is null || _bitmap is null) return;
+
+        _draggingRect    = sel;
+        _draggingHandle  = handle;
+        _dragStartWorld  = ScreenToTexture(startScreenX, startScreenY);
+        _dragStartBounds = sel.Bounds;
+        _dragBeforeL = sel.Frame.LeftCoordinate;
+        _dragBeforeT = sel.Frame.TopCoordinate;
+        _dragBeforeR = sel.Frame.RightCoordinate;
+        _dragBeforeB = sel.Frame.BottomCoordinate;
+        _bulkHandleDragStarts.Clear();
+        _lastPointerPos = new Point(startScreenX, startScreenY);
+    }
+
+    /// <summary>
+    /// Test-only: begins a chain-drag gesture without applying an end position — the
+    /// chain-drag counterpart of <see cref="SimulateHandleDragBegin"/>. No-op when no chain is
+    /// selected, no frames are visible, or no texture is loaded.
+    /// </summary>
+    public void SimulateChainDragBegin(float startScreenX, float startScreenY)
+    {
+        var chain = _selectedState?.SelectedChain;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+
+        _draggingChain = true;
+        _chainDragStarts.Clear();
+        foreach (var fr in _frameRects)
+            _chainDragStarts.Add((fr, fr.Bounds,
+                fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
+                fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
+        _lastPointerPos = new Point(startScreenX, startScreenY);
+    }
+
+    /// <summary>
+    /// Test-only: continues the handle/chain drag started by <see cref="SimulateHandleDragBegin"/>
+    /// or <see cref="SimulateChainDragBegin"/> to the given <b>viewport-space</b> pointer
+    /// position, mirroring the dragging branch of <see cref="OnPointerMoved"/>. No-op when no
+    /// drag is active.
+    /// </summary>
+    public void SimulateDragPointerMove(float vpX, float vpY)
+    {
+        _lastPointerPos = new Point(vpX, vpY);
+        if (_draggingRect != null) ApplyHandleDrag(_lastPointerPos);
+        else if (_draggingChain) ApplyChainDrag(_lastPointerPos);
+    }
+
+    /// <summary>
+    /// Test-only: ends the drag started by <see cref="SimulateHandleDragBegin"/> or
+    /// <see cref="SimulateChainDragBegin"/>, without recording undo or firing region-changed
+    /// events — tests that need those should use the one-shot <see cref="SimulateHandleDrag"/>/
+    /// <see cref="SimulateChainDrag"/> instead.
+    /// </summary>
+    public void SimulateDragEnd()
+    {
+        _draggingRect    = null;
+        _draggingHandle  = HandleKind.None;
+        _bulkHandleDragStarts.Clear();
+        _draggingChain   = false;
         _chainDragStarts.Clear();
     }
 
@@ -1500,6 +1630,8 @@ public class WireframeControl : Control
                             fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
+                _lastPointerPos = pos;
+                StartAutoPanTimer();
                 e.Pointer.Capture(this);
                 return;
             }
@@ -1576,12 +1708,14 @@ public class WireframeControl : Control
 
         if (_draggingRect != null)
         {
+            _lastPointerPos = pos;
             ApplyHandleDrag(pos);
             return;
         }
 
         if (_draggingChain)
         {
+            _lastPointerPos = pos;
             ApplyChainDrag(pos);
             return;
         }
@@ -1658,6 +1792,7 @@ public class WireframeControl : Control
             }
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
+            StopAutoPanTimer();
             e.Pointer.Capture(null);
         }
 
@@ -1682,6 +1817,7 @@ public class WireframeControl : Control
             }
             _draggingChain = false;
             _chainDragStarts.Clear();
+            StopAutoPanTimer();
             e.Pointer.Capture(null);
         }
     }
