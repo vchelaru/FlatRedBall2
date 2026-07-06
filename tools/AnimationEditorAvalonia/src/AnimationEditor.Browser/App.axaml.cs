@@ -56,12 +56,20 @@ public partial class App : Application
         var thumbnailService  = new ThumbnailService(projectManager);
 
         var acls = AnimationChainListSave.FromString(SampleContent.AchxText);
-        // "sample/player.achx" doesn't exist on disk (no filesystem in the browser); preParsed
-        // means LoadAnimationChain never tries to read it, only uses it as a logical identity.
-        projectManager.LoadAnimationChain(new FilePath("sample/player.achx"), acls);
-
         var bitmap = SKBitmap.Decode(SampleContent.PngBytes);
         thumbnailService.SeedTexture("player.png", bitmap);
+
+        // "sample/player.achx" doesn't exist on disk (no filesystem in the browser); preParsed
+        // means LoadAnimationChain never tries to read it, only uses it as a logical identity.
+        // knownTextureSizes mirrors BrowserProjectLoader's real load path -- the bundled sample
+        // happens to be UV-format today so this isn't load-bearing yet, but a Pixel-format
+        // sample would otherwise silently fail the same way BrowserProjectLoader's fix (#535)
+        // was needed for.
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["player.png"] = (bitmap.Width, bitmap.Height),
+        };
+        projectManager.LoadAnimationChain(new FilePath("sample/player.achx"), acls, knownTextureSizes);
 
         var preview = new PreviewControl();
         preview.InitializeServices(
@@ -210,7 +218,7 @@ public partial class App : Application
             if (file is null) return;
 
             await using var stream = await file.OpenWriteAsync();
-            acls.Save(stream);
+            projectManager.SaveAnimationChainList(stream);
             status.Text = $"Saved to {file.Name}.";
         };
 

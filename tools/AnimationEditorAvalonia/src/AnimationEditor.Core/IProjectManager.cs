@@ -1,5 +1,6 @@
 using AnimationEditor.Core.Data;
 using FlatRedBall2.Animation.Content;
+using System.IO;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core
@@ -17,6 +18,14 @@ namespace AnimationEditor.Core
             AnimationChainListSave? preParsed = null,
             IReadOnlyDictionary<string, (int Width, int Height)>? knownTextureSizes = null);
         void SaveAnimationChainList(string targetPath);
+
+        /// <summary>
+        /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
+        /// with no filesystem path to write (the browser-wasm build). Uses the
+        /// <c>knownTextureSizes</c> from the most recent <see cref="LoadAnimationChain"/> call
+        /// instead of a disk read when converting back to Pixel coordinates.
+        /// </summary>
+        void SaveAnimationChainList(Stream stream);
 
         /// <summary>
         /// Root folder the Files panel should browse: the linked project's folder (if the

@@ -35,6 +35,14 @@ namespace AnimationEditor.Core
         /// </summary>
         public TextureCoordinateType OnDiskCoordinateType { get; set; } = TextureCoordinateType.Pixel;
 
+        /// <summary>
+        /// Texture sizes supplied to the most recent <see cref="LoadAnimationChain"/> call, kept
+        /// around so <see cref="SaveAnimationChainList(Stream)"/> can convert back to Pixel
+        /// coordinates without a filesystem to re-read PNG headers from (the browser-wasm build
+        /// has no disk at all, unlike <see cref="SaveAnimationChainList(string)"/>'s directory).
+        /// </summary>
+        private IReadOnlyDictionary<string, (int Width, int Height)>? _knownTextureSizes;
+
         /// <param name="fileName">The .achx path. Only read from disk when <paramref name="preParsed"/> is null.</param>
         /// <param name="preParsed">Already-parsed content (e.g. fetched over HTTP on the browser-wasm build), skipping the disk read.</param>
         /// <param name="knownTextureSizes">
@@ -72,6 +80,7 @@ namespace AnimationEditor.Core
             AddShapeCollectionsToFrames(acls);
 
             OnDiskCoordinateType = acls.CoordinateType;
+            _knownTextureSizes = knownTextureSizes;
             NormalizeCoordinatesToUv(acls, fileName.GetDirectoryContainingThis().FullPath, knownTextureSizes);
 
             AnimationChainListSave = acls;
@@ -140,6 +149,48 @@ namespace AnimationEditor.Core
         }
 
         /// <summary>
+        /// Save the current animation chain list to <paramref name="stream"/> in the format
+        /// specified by <see cref="OnDiskCoordinateType"/> -- the seam the browser-wasm build
+        /// needs, since it has no filesystem to write a path to. When converting UV back to
+        /// Pixel, texture sizes come from the <c>knownTextureSizes</c> supplied to the most
+        /// recent <see cref="LoadAnimationChain"/> call rather than a disk read: there is no
+        /// directory to resolve a relative <see cref="AnimationFrameSave.TextureName"/> against
+        /// on this overload. A texture missing from that dictionary is left in UV coordinates,
+        /// same as the path-based overload's behavior when a PNG can't be read.
+        /// </summary>
+        public void SaveAnimationChainList(Stream stream)
+        {
+            var acls = AnimationChainListSave;
+            if (acls == null) return;
+
+            var diskFormat = OnDiskCoordinateType;
+
+            if (diskFormat == TextureCoordinateType.UV)
+            {
+                acls.Save(stream);
+                return;
+            }
+
+            Dictionary<string, (int W, int H)>? seedCache = null;
+            if (_knownTextureSizes != null)
+            {
+                seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in _knownTextureSizes)
+                    seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
+            }
+
+            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, seedCache);
+            try
+            {
+                acls.Save(stream);
+            }
+            finally
+            {
+                ConvertCoordinates(acls, achxDirectory: string.Empty, TextureCoordinateType.UV, sizes);
+            }
+        }
+
+        /// <summary>
         /// Convert <paramref name="acls"/> to <paramref name="target"/> coordinate space
         /// in place and return the per-texture size cache used (so a paired round-trip
         /// can reuse it). No-op if already in <paramref name="target"/> space.
@@ -164,14 +215,26 @@ namespace AnimationEditor.Core
 
                     if (!sizeCache.TryGetValue(frame.TextureName, out var size))
                     {
-                        var path = System.IO.Path.IsPathRooted(frame.TextureName)
-                            ? frame.TextureName
-                            : System.IO.Path.Combine(achxDirectory, frame.TextureName);
+                        // A caller-supplied sizeCache (knownTextureSizes) is keyed by bare
+                        // filename on the browser build, since folder enumeration there is
+                        // non-recursive and never learns a texture's subfolder. Fall back to a
+                        // bare-filename match before assuming a real disk read is possible.
+                        var bareName = System.IO.Path.GetFileName(frame.TextureName);
+                        if (bareName != frame.TextureName && sizeCache.TryGetValue(bareName, out size))
+                        {
+                            sizeCache[frame.TextureName] = size;
+                        }
+                        else
+                        {
+                            var path = System.IO.Path.IsPathRooted(frame.TextureName)
+                                ? frame.TextureName
+                                : System.IO.Path.Combine(achxDirectory, frame.TextureName);
 
-                        var read = TryReadPngSize(path);
-                        if (read == null) continue;
-                        size = read.Value;
-                        sizeCache[frame.TextureName] = size;
+                            var read = TryReadPngSize(path);
+                            if (read == null) continue;
+                            size = read.Value;
+                            sizeCache[frame.TextureName] = size;
+                        }
                     }
 
                     if (size.W <= 0 || size.H <= 0) continue;
