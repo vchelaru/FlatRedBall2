@@ -25,6 +25,7 @@ public partial class FilesPanelControl : UserControl
     private ThumbnailService? _thumbnailService;
     private Window? _ownerWindow;
     private Action<string>? _showError;
+    private Action<string>? _openPng;
     private PointerPressedEventArgs? _dragPressEvent;
     private string? _dragPath;
     private PngFilesTreeNodeVm? _dragSourceNode;
@@ -50,11 +51,13 @@ public partial class FilesPanelControl : UserControl
         FilesTree.ContextMenu = contextMenu;
     }
 
-    public void Initialize(ThumbnailService thumbnailService, Window ownerWindow, Action<string>? showError = null)
+    public void Initialize(ThumbnailService thumbnailService, Window ownerWindow,
+        Action<string>? showError = null, Action<string>? openPng = null)
     {
         _thumbnailService = thumbnailService;
         _ownerWindow = ownerWindow;
         _showError = showError;
+        _openPng = openPng;
     }
 
     public void Refresh(string? achxFolder)
@@ -141,6 +144,18 @@ public partial class FilesPanelControl : UserControl
 
         if (GetNodeVmFromSource(e.Source) is not { IsFile: true, AbsolutePath: { } path } sourceNode)
             return;
+
+        // Double-click opens the PNG in a tab. Detected here via ClickCount rather than the
+        // DoubleTapped event: the pointer capture below (for drag-to-assign) cancels Avalonia's
+        // tap-gesture recognizer, so DoubleTapped never fires on this tree.
+        if (e.ClickCount >= 2)
+        {
+            _dragSourceNode = null;
+            ClearPendingDrag();
+            _openPng?.Invoke(path);
+            e.Handled = true;
+            return;
+        }
 
         _dragSourceNode = sourceNode;
         _dragPressEvent = e;

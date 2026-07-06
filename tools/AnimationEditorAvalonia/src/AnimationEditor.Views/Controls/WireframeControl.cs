@@ -1,4 +1,3 @@
-using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
@@ -7,17 +6,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Media.Immutable;
-using Avalonia.Rendering.SceneGraph;
-using Avalonia.Skia;
-using Avalonia.Styling;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,16 +24,15 @@ namespace AnimationEditor.App.Controls;
 /// Avalonia + SkiaSharp wireframe editor.
 /// Replaces ImageRegionSelectionControl + WireframeManager from the WinForms port.
 /// <para>
-/// Coordinate systems:
-///   Texture-space — pixel coords (0,0)→(W,H) inside the loaded bitmap.
-///   Screen-space  — pixel coords within the control bounds (origin = top-left of control).
-///   Transform: screenX = panX + textureX * zoom
+/// Derives from <see cref="TextureViewport"/>, which owns all editing-agnostic viewport behavior
+/// (texture load, pan/zoom camera, grid, canvas palette, diagnostics, middle-mouse pan). This
+/// control adds the animation-frame editing layer on top: frame region rectangles, resize handles,
+/// chain/handle dragging, magic-wand and grid frame creation, and the origin crosshair.
 /// </para>
 /// </summary>
-public class WireframeControl : Control
+public class WireframeControl : TextureViewport
 {
     // ── Inner types ───────────────────────────────────────────────────────────
-
 
     private sealed class FrameRect
     {
@@ -50,23 +42,17 @@ public class WireframeControl : Control
     }
 
     /// <summary>
-    /// Immutable snapshot of all rendering state, captured on the UI thread
-    /// so the render thread can read it safely.
+    /// Wireframe editing overlay drawn on top of the base texture/grid layers. Carries the frame
+    /// rectangles, resize-handle bounds, magic-wand/grid preview, pending-cut frames, and origin
+    /// crosshair — all captured on the UI thread so <see cref="DrawWireframeOverlay"/> can draw
+    /// them safely on the render thread.
     /// </summary>
-    private sealed class RenderSnapshot
+    private sealed class WireframeSnapshot : TextureViewportSnapshot
     {
-        // SKImage (not SKBitmap) — immutable and explicitly safe to read on the
-        // Avalonia render thread while the UI thread holds the source bitmap.
-        public SKImage? Image;
-        public int ImageWidth, ImageHeight;
-        public float PanX, PanY, Zoom;
-        public bool ShowGrid;
-        public int GridSize;
         public List<(SKRect Bounds, bool IsSelected)> Frames = new();
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
-        public double Width, Height;
         /// <summary>
         /// Texture-space position (pixels) of the entity origin for the selected frame.
         /// Null when no frame is selected or origin data is unavailable.
@@ -77,277 +63,139 @@ public class WireframeControl : Control
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
-    // Skia GPU resource-cache budget. The sheet's GPU texture (a 4096² sheet is ~64 MB) must fit
-    // in this budget to stay cached across frames; otherwise Skia evicts and re-uploads it every
-    // frame, which is what made zoomed-out drawing crawl (#514). Letting Skia own the cache (rather
-    // than hand-holding an SKImage.ToTextureImage) also means Skia re-uploads correctly after a
-    // context purge — e.g. when a menu popup opens — so the texture never goes dangling/blank.
-    private const long GpuResourceCacheBytes = 512L * 1024 * 1024;
+    // ── Overlay rendering ─────────────────────────────────────────────────────
 
-    private sealed class DrawOp : ICustomDrawOperation
+    // Draws the editing overlay (frames → pending-cut → handles → preview → origin) on top of the
+    // base texture/grid layers. Runs on the render thread from immutable snapshot data — reads only
+    // WireframeSnapshot fields (never live control state), so it can never race the UI thread.
+    private static void DrawWireframeOverlay(SKCanvas canvas, TextureViewportSnapshot snapshot)
     {
-        private readonly RenderSnapshot _s;
-        private readonly CanvasPalette _palette;
-        private readonly RollingAverage? _drawTimes;   // non-null only when diagnostics are on
+        var s = (WireframeSnapshot)snapshot;
 
-        public DrawOp(RenderSnapshot s, CanvasPalette palette, RollingAverage? drawTimes)
+        // Frame region rectangles
+        using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
+        using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+
+        foreach (var (bounds, isSelected) in s.Frames)
         {
-            _s = s; _palette = palette; _drawTimes = drawTimes;
-            Bounds = new Rect(0, 0, s.Width, s.Height);
+            var sr = SnapToScreen(bounds, s);
+            if (isSelected)
+            {
+                frameFill.Color = new SKColor(80, 160, 255, 45);
+                frameStroke.Color = new SKColor(80, 160, 255, 230);
+            }
+            else
+            {
+                frameFill.Color = new SKColor(80, 160, 255, 18);
+                frameStroke.Color = new SKColor(80, 160, 255, 120);
+            }
+            canvas.DrawRect(sr, frameFill);
+            canvas.DrawRect(sr, frameStroke);
         }
 
-        public Rect Bounds { get; }
-        public bool HitTest(Point p) => true;
-        public bool Equals(ICustomDrawOperation? other) => false;
-        // _s.Image is the control's shared, cached SKImage — owned by the control, NOT this op —
-        // so the op must not dispose it. Its lifetime is managed in LoadTexture via deferred drop.
-        public void Dispose() { }
-
-        public void Render(ImmediateDrawingContext ctx)
+        // Pending-cut frames: dashed orange overlay (distinct from selection blue).
+        if (s.PendingCutFrameBounds.Count > 0)
         {
-            var lease = ctx.TryGetFeature<ISkiaSharpApiLeaseFeature>()?.Lease();
-            if (lease is null) return;
-            using (lease)
+            using var cutPaint = new SKPaint
             {
-                // Raise the GPU cache budget so Skia retains the sheet's texture across frames
-                // instead of re-uploading it (#514). Idempotent — the setter just stores the cap.
-                if (lease.GrContext is { } gr && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
-                    gr.SetResourceCacheLimit(GpuResourceCacheBytes);
-
-                if (_drawTimes is not null)
-                {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    RenderSk(lease.SkCanvas, _s, _palette);
-                    sw.Stop();
-                    _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
-                    // GrContext is non-null only on the GPU (ANGLE) backend; null = software raster.
-                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average,
-                        lease.GrContext != null ? "GPU" : "CPU");
-                }
-                else
-                    RenderSk(lease.SkCanvas, _s, _palette);
-            }
-        }
-
-        // ── Static rendering logic ────────────────────────────────────────────
-
-        internal static void RenderSk(SKCanvas canvas, RenderSnapshot s, CanvasPalette palette)
-        {
-            canvas.Clear(palette.Background);
-
-            if (s.Image != null)
-            {
-                var dest = new SKRect(
-                    s.PanX, s.PanY,
-                    s.PanX + s.ImageWidth * s.Zoom,
-                    s.PanY + s.ImageHeight * s.Zoom);
-
-                // Texture image — point sampling when zoomed ≥ 1× for pixel-art fidelity.
-                // s.Image is a GPU-resident texture on the accelerated path (see DrawOp.Render),
-                // so sampling this 4096² sheet is constant-time instead of re-uploading the visible
-                // slice from CPU memory every frame — the #514 zoom-out cost.
-                var sampling = s.Zoom >= 1f
-                    ? new SKSamplingOptions(SKFilterMode.Nearest)
-                    : new SKSamplingOptions(SKFilterMode.Linear);
-                canvas.DrawImage(s.Image, dest, sampling);
-
-                // Outline around whole texture
-                using var outlinePaint = new SKPaint
-                {
-                    Color = palette.TextureOutline,
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 1f
-                };
-                canvas.DrawRect(dest, outlinePaint);
-
-                // Grid overlay
-                if (s.ShowGrid && s.GridSize > 0)
-                    DrawGrid(canvas, s, dest, palette);
-            }
-
-            // Frame region rectangles
-            using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
-            using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
-
-            foreach (var (bounds, isSelected) in s.Frames)
-            {
-                var sr = ToScreen(bounds, s);
-                if (isSelected)
-                {
-                    frameFill.Color = new SKColor(80, 160, 255, 45);
-                    frameStroke.Color = new SKColor(80, 160, 255, 230);
-                }
-                else
-                {
-                    frameFill.Color = new SKColor(80, 160, 255, 18);
-                    frameStroke.Color = new SKColor(80, 160, 255, 120);
-                }
-                canvas.DrawRect(sr, frameFill);
-                canvas.DrawRect(sr, frameStroke);
-            }
-
-            // Pending-cut frames: dashed orange overlay (distinct from selection blue).
-            if (s.PendingCutFrameBounds.Count > 0)
-            {
-                using var cutPaint = new SKPaint
-                {
-                    Color = CutOutlineColor,
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 2f,
-                    PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
-                };
-                foreach (var bounds in s.PendingCutFrameBounds)
-                    canvas.DrawRect(ToScreen(bounds, s), cutPaint);
-            }
-
-            // Resize handles on selected frame
-            if (s.SelectedHandleBounds.HasValue)
-                DrawHandles(canvas, ToScreen(s.SelectedHandleBounds.Value, s));
-
-            // Magic-wand / grid-snap preview rectangle
-            if (s.ShowPreview)
-            {
-                using var pvPaint = new SKPaint
-                {
-                    Color = new SKColor(255, 220, 0, 180),
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 1.5f,
-                    PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f)
-                };
-                canvas.DrawRect(ToScreen(s.PreviewRect, s), pvPaint);
-            }
-
-            // Origin crosshair — yellow cross at the entity (0,0) origin in texture space
-            if (s.OriginTexX.HasValue && s.OriginTexY.HasValue)
-            {
-                float ox = s.PanX + s.OriginTexX.Value * s.Zoom;
-                float oy = s.PanY + s.OriginTexY.Value * s.Zoom;
-                const float ArmLen = 8f;
-                using var crossPaint = new SKPaint
-                {
-                    Color       = new SKColor(255, 220, 0, 230),
-                    Style       = SKPaintStyle.Stroke,
-                    StrokeWidth = 1.5f,
-                    IsAntialias = true
-                };
-                canvas.DrawLine(ox - ArmLen, oy, ox + ArmLen, oy, crossPaint);
-                canvas.DrawLine(ox, oy - ArmLen, ox, oy + ArmLen, crossPaint);
-                using var dotPaint = new SKPaint { Color = new SKColor(255, 220, 0, 230) };
-                canvas.DrawCircle(ox, oy, 2f, dotPaint);
-            }
-        }
-
-        // Every 4th line is drawn as a "major" line (brighter/thicker) so distances are
-        // easier to eyeball at a glance, like graph paper (#539).
-        private const int MajorGridLineInterval = 4;
-
-        private static void DrawGrid(SKCanvas canvas, RenderSnapshot s, SKRect textureDest, CanvasPalette palette)
-        {
-            using var minorPaint = new SKPaint
-            {
-                Color        = palette.GridLineMinor,
-                Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 0.5f,
-                IsAntialias  = true
+                Color = CutOutlineColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 2f,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
             };
-            using var majorPaint = new SKPaint
+            foreach (var bounds in s.PendingCutFrameBounds)
+                canvas.DrawRect(SnapToScreen(bounds, s), cutPaint);
+        }
+
+        // Resize handles on selected frame
+        if (s.SelectedHandleBounds.HasValue)
+            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s));
+
+        // Magic-wand / grid-snap preview rectangle
+        if (s.ShowPreview)
+        {
+            using var pvPaint = new SKPaint
             {
-                Color        = palette.GridLineMajor,
-                Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 1f,
-                IsAntialias  = true
+                Color = new SKColor(255, 220, 0, 180),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f)
             };
-            float step = s.GridSize * s.Zoom;
-
-            int index = 1;
-            for (float x = textureDest.Left + step; x < textureDest.Right; x += step, index++)
-                canvas.DrawLine(x, textureDest.Top, x, textureDest.Bottom,
-                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
-
-            index = 1;
-            for (float y = textureDest.Top + step; y < textureDest.Bottom; y += step, index++)
-                canvas.DrawLine(textureDest.Left, y, textureDest.Right, y,
-                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
+            canvas.DrawRect(SnapToScreen(s.PreviewRect, s), pvPaint);
         }
 
-        private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
-
-        private static void DrawHandles(SKCanvas canvas, SKRect sr)
+        // Origin crosshair — yellow cross at the entity (0,0) origin in texture space
+        if (s.OriginTexX.HasValue && s.OriginTexY.HasValue)
         {
-            using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
-            using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
-
-            foreach (var pt in HandlePoints(sr))
+            float ox = s.PanX + s.OriginTexX.Value * s.Zoom;
+            float oy = s.PanY + s.OriginTexY.Value * s.Zoom;
+            const float ArmLen = 8f;
+            using var crossPaint = new SKPaint
             {
-                var hr = new SKRect(pt.X - Hs, pt.Y - Hs, pt.X + Hs, pt.Y + Hs);
-                canvas.DrawRect(hr, fill);
-                canvas.DrawRect(hr, stroke);
-            }
+                Color       = new SKColor(255, 220, 0, 230),
+                Style       = SKPaintStyle.Stroke,
+                StrokeWidth = 1.5f,
+                IsAntialias = true
+            };
+            canvas.DrawLine(ox - ArmLen, oy, ox + ArmLen, oy, crossPaint);
+            canvas.DrawLine(ox, oy - ArmLen, ox, oy + ArmLen, crossPaint);
+            using var dotPaint = new SKPaint { Color = new SKColor(255, 220, 0, 230) };
+            canvas.DrawCircle(ox, oy, 2f, dotPaint);
         }
+    }
 
-        private static IEnumerable<SKPoint> HandlePoints(SKRect r)
-        {
-            float cx = r.MidX, cy = r.MidY;
-            yield return new SKPoint(r.Left  - Hs, r.Top    - Hs);  // TopLeft
-            yield return new SKPoint(cx,           r.Top    - Hs);  // TopCenter
-            yield return new SKPoint(r.Right + Hs, r.Top    - Hs);  // TopRight
-            yield return new SKPoint(r.Left  - Hs, cy);             // MidLeft
-            yield return new SKPoint(r.Right + Hs, cy);             // MidRight
-            yield return new SKPoint(r.Left  - Hs, r.Bottom + Hs);  // BotLeft
-            yield return new SKPoint(cx,           r.Bottom + Hs);  // BotCenter
-            yield return new SKPoint(r.Right + Hs, r.Bottom + Hs);  // BotRight
-        }
+    private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
 
-        private static SKRect ToScreen(SKRect r, RenderSnapshot s)
+    private static void DrawHandles(SKCanvas canvas, SKRect sr)
+    {
+        using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+
+        foreach (var pt in HandlePoints(sr))
         {
-            var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
-                r.Left, r.Top, r.Right, r.Bottom, s.PanX, s.PanY, s.Zoom);
-            return new SKRect(l, t, rr, b);
+            var hr = new SKRect(pt.X - Hs, pt.Y - Hs, pt.X + Hs, pt.Y + Hs);
+            canvas.DrawRect(hr, fill);
+            canvas.DrawRect(hr, stroke);
         }
+    }
+
+    private static IEnumerable<SKPoint> HandlePoints(SKRect r)
+    {
+        float cx = r.MidX, cy = r.MidY;
+        yield return new SKPoint(r.Left  - Hs, r.Top    - Hs);  // TopLeft
+        yield return new SKPoint(cx,           r.Top    - Hs);  // TopCenter
+        yield return new SKPoint(r.Right + Hs, r.Top    - Hs);  // TopRight
+        yield return new SKPoint(r.Left  - Hs, cy);             // MidLeft
+        yield return new SKPoint(r.Right + Hs, cy);             // MidRight
+        yield return new SKPoint(r.Left  - Hs, r.Bottom + Hs);  // BotLeft
+        yield return new SKPoint(cx,           r.Bottom + Hs);  // BotCenter
+        yield return new SKPoint(r.Right + Hs, r.Bottom + Hs);  // BotRight
+    }
+
+    // Texture-space rect → screen-space, using the snapshot's captured camera (render-thread safe).
+    // Named distinctly from the inherited instance ToScreen(SKRect) so both can coexist.
+    private static SKRect SnapToScreen(SKRect r, TextureViewportSnapshot s)
+    {
+        var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
+            r.Left, r.Top, r.Right, r.Bottom, s.PanX, s.PanY, s.Zoom);
+        return new SKRect(l, t, rr, b);
     }
 
     // ── Fields ────────────────────────────────────────────────────────────────
 
-    private SKBitmap? _bitmap;
-    // Immutable GPU-uploadable copy of _bitmap, built on the UI thread and
-    // safe to draw from the Avalonia render thread.
-    private SKImage? _image;
-    private string? _loadedTexturePath;
     private InspectableImage? _inspectableImage;
-
-    private float _zoom = 1f;
-    // Camera pan: the screen position (within the control's viewport) of texture pixel (0,0).
-    // screenX = panX + textureX * zoom. Clamped analytically by ClampCamera — there is no
-    // ScrollViewer; the control IS the viewport and two ScrollBars are driven from this pan.
-    private float _panX, _panY;
-
-    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
-    // A wheel notch retargets _zoomTarget; the timer eases _zoom toward it via ZoomChase,
-    // applying each stepped value through the existing pivot-preserving ZoomToward. The pivot
-    // is stored in VIEWPORT space and re-used every tick, so the point under the cursor stays
-    // fixed for the whole animation — the per-tick factors compose to the same result as one
-    // instant notch. Rapid notches retarget the in-flight animation rather than stacking.
-    private DispatcherTimer? _zoomTimer;
-    private bool  _zoomAnimating;
-    private float _zoomTarget;      // destination zoom factor (1.0 = 100 %)
-    private float _zoomPivotVpX;    // cursor pivot, viewport space
-    private float _zoomPivotVpY;
-    private const float ZoomAnimIntervalSeconds = 1f / 60f;
 
     // ── Drag auto-pan (#540) ───────────────────────────────────────────────────
     // While a handle/chain drag is active, the timer nudges the camera each tick via
     // StepAutoPan whenever the last-known pointer position sits within AutoPanMarginPx of the
     // viewport edge, then re-applies the drag at that same screen position — ScreenToTexture
-    // depends on _panX/_panY, so re-running Apply*Drag after the pan shifts yields a new
+    // depends on the camera pan, so re-running Apply*Drag after the pan shifts yields a new
     // texture-space delta and the dragged frame keeps tracking the cursor.
     private DispatcherTimer? _autoPanTimer;
     private Point _lastPointerPos;
     private const float AutoPanMarginPx = 32f;
     private const float AutoPanMaxSpeedPxPerSec = 900f;
     private const float AutoPanIntervalSeconds = 1f / 60f;
-
-    private bool _showGrid;
-    private int _gridSize = 16;
 
     private readonly List<FrameRect> _frameRects = new();
 
@@ -372,118 +220,6 @@ public class WireframeControl : Control
             ? _frameRects.FirstOrDefault(fr => fr.Frame == f)
             : null;
     }
-
-    // Set when LoadTexture/CenterTexture ran before the control had a real viewport
-    // (Bounds not yet laid out); the first SizeChanged with valid Bounds re-centers.
-    private bool _needsInitialCenter;
-
-    // ── Render diagnostics (#514): one overlay, toggled at runtime by F3 / Help menu ──
-    // When enabled the panel shows the rolling-average Skia render time (ms/frame + fps, drawn
-    // top-left inside the custom draw op) AND a camera-stats panel stacked below it. This is THE
-    // panel to watch for the #514 slowdown — panning/zooming a large sheet redraws it (60fps during
-    // smooth-zoom). Toggle via DiagnosticsEnabled; MainWindow wires F3 and the Help menu item.
-    private bool _showDiagnostics;
-    private readonly RollingAverage _drawTimes = new(10);
-    private DispatcherTimer? _diagnosticsTimer;
-    private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
-    // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
-    private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
-    private static readonly IImmutableBrush _dbgFg = new ImmutableSolidColorBrush(Color.FromRgb(0, 255, 80));
-
-    // Neutral canvas/grid/outline colors for the active theme variant. Refreshed from
-    // ActualThemeVariant on every render and whenever the variant changes.
-    private CanvasPalette _palette = CanvasPalette.Dark;
-
-    private uint? _canvasBackgroundOverride;
-
-    /// <summary>
-    /// Optional user-chosen canvas background as a packed <c>0xAARRGGBB</c> value; <c>null</c>
-    /// follows the theme. Setting it re-resolves the palette and repaints. Chrome (grid, rulers,
-    /// outline) stays theme-driven.
-    /// </summary>
-    public uint? CanvasBackgroundOverride
-    {
-        get => _canvasBackgroundOverride;
-        set
-        {
-            if (_canvasBackgroundOverride == value) return;
-            _canvasBackgroundOverride = value;
-            UpdatePalette();
-            InvalidateVisual();
-        }
-    }
-
-    /// <summary>
-    /// Shows/hides the render-diagnostics overlay (draw-time readout + camera stats). Toggled at
-    /// runtime from MainWindow (F3 and the Help ▸ Show Render Diagnostics menu item).
-    /// </summary>
-    public bool DiagnosticsEnabled
-    {
-        get => _showDiagnostics;
-        set
-        {
-            if (_showDiagnostics == value) return;
-            _showDiagnostics = value;
-            // The panel only repaints on demand (pan/zoom/selection), so an idle overlay would show
-            // a frozen ms/frame. While diagnostics are on, tick a 1 fps repaint so the readout stays
-            // live even when nothing else changes; stop it otherwise to keep the panel idle.
-            if (value)
-            {
-                _diagnosticsTimer ??= CreateDiagnosticsTimer();
-                _diagnosticsTimer.Start();
-            }
-            else
-                _diagnosticsTimer?.Stop();
-            InvalidateVisual();
-        }
-    }
-
-    private DispatcherTimer CreateDiagnosticsTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) => InvalidateVisual();
-        return timer;
-    }
-
-    // Camera-stats panel. Sits below the ms/frame box (drawn by the custom op via DrawTimeOverlay),
-    // so it starts at TopOffset to avoid overlapping it — both are left-aligned under one toggle.
-    private void DrawDebugOverlay(DrawingContext ctx)
-    {
-        if (!_showDiagnostics) return;
-        int bmpW = _bitmap?.Width  ?? 0;
-        int bmpH = _bitmap?.Height ?? 0;
-
-        var lines = new[]
-        {
-            "── WIREFRAME (F3 to hide) ──",
-            $"zoom          {_zoom * 100f,7:F1}%",
-            $"panXY         X={_panX,7:F1}  Y={_panY:F1}",
-            $"viewport      {Bounds.Width:F0} × {Bounds.Height:F0}",
-            $"content       {bmpW * _zoom:F0} × {bmpH * _zoom:F0}",
-            $"isPanning     {_isPanning}",
-        };
-
-        const double fsz  = 12;
-        const double lineH = 15;
-        const double padX  = 6;
-        const double padY  = 4;
-        const double topOffset = 28;   // clears the ms/frame box the draw op renders at the top
-        double panelW = 310;
-        double panelH = lines.Length * lineH + padY * 2;
-
-        ctx.FillRectangle(_dbgBg, new Rect(0, topOffset, panelW, panelH));
-        double y = topOffset + padY;
-        foreach (var line in lines)
-        {
-            ctx.DrawText(new FormattedText(
-                line, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                _dbgTypeface, fsz, _dbgFg), new Point(padX, y));
-            y += lineH;
-        }
-    }
-    private bool _isPanning;
-    private Point _panAnchor;
-    private float _panAnchorX, _panAnchorY;
 
     private FrameRect? _draggingRect;
     private HandleKind _draggingHandle;
@@ -510,21 +246,7 @@ public class WireframeControl : Control
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
     private static Cursor AddFrameCursor => _addFrameCursorLazy.Value;
 
-    // Per-texture saved camera (texture path → panX, panY, zoom). panX/panY are the screen
-    // position of texture pixel (0,0) — the full camera pan in the analytic model.
-    private readonly Dictionary<string, (float px, float py, float z)> _cameraByTexture = new();
-
     // ── Public properties ─────────────────────────────────────────────────────
-
-    /// <summary>Absolute path of the currently displayed texture, or null.</summary>
-    public string? LoadedTexturePath => _loadedTexturePath;
-
-    /// <summary>Pixel dimensions of the loaded bitmap (0×0 when nothing is loaded).</summary>
-    public (int Width, int Height) BitmapSize =>
-        _bitmap is null ? (0, 0) : (_bitmap.Width, _bitmap.Height);
-
-    /// <summary>Current zoom factor (1.0 = 100 %).</summary>
-    public float Zoom => _zoom;
 
     private bool _isMagicWandMode;
 
@@ -559,24 +281,6 @@ public class WireframeControl : Control
     /// Does NOT trigger save or tree refresh — use <see cref="FrameRegionChanged"/> for those.
     /// </summary>
     public event Action<AnimationFrameSave>? FrameLiveUpdated;
-
-    /// <summary>
-    /// Fired after every zoom change. Payload is the new zoom as a percentage (e.g. 100f = 100 %).
-    /// </summary>
-    public event Action<float>? ZoomChanged;
-
-    /// <summary>Fired when the user finishes a pan gesture (pointer released after drag).</summary>
-    public event Action<float, float>? PanChanged;
-
-    /// <summary>
-    /// When non-null, mouse-wheel zoom steps through these preset percentages instead of
-    /// applying a raw ×1.25 / ÷1.25 multiplier.  Set by <c>MainWindow</c> on startup.
-    /// <para>
-    /// Standalone controls (no <c>MainWindow</c>) leave this null and retain the legacy
-    /// multiplier behaviour, which is still useful in precision-zoom tests.
-    /// </para>
-    /// </summary>
-    public int[]? WheelZoomPresets { get; set; }
 
     /// <summary>
     /// Fired when the user ctrl+clicks to add a new frame
@@ -636,32 +340,11 @@ public class WireframeControl : Control
 
     public WireframeControl()
     {
-        ClipToBounds = true;
-        Focusable = true;
-
         // Right-click opens this menu with a "View <filename> in Explorer" item for the
         // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
         var contextMenu = new ContextMenu();
         contextMenu.Opening += OnContextMenuOpening;
         ContextMenu = contextMenu;
-
-        // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
-        ActualThemeVariantChanged += (_, _) => InvalidateVisual();
-
-        // A resize changes the viewport, hence the pan clamp and scrollbar range — re-clamp the
-        // camera and refresh the host's scrollbars. If centering was deferred because the control
-        // had no real viewport yet (Bounds not laid out), do it now.
-        SizeChanged += (_, _) =>
-        {
-            if (_needsInitialCenter && Bounds.Width > 1 && _bitmap != null)
-                CenterTexture();
-            else
-                ClampCamera();
-            RaiseViewChanged();
-        };
-
-        // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
-        DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
 
         // PNG drop (issue #560) — same DragOver/Drop plumbing as the ANIMATIONS tree
         // (OnTreeDragOver/OnTreeDrop in MainWindow), targeting the current selection instead
@@ -670,7 +353,8 @@ public class WireframeControl : Control
         AddHandler(DragDrop.DragOverEvent, OnPngDragOver);
         AddHandler(DragDrop.DropEvent, OnPngDrop);
 
-        // Subscriptions are deferred to InitializeServices (called from MainWindow)
+        // Base ctor sets up ClipToBounds/Focusable, theme repaint, SizeChanged re-clamp, and the
+        // timer teardown. Service subscriptions are deferred to InitializeServices (from MainWindow).
     }
 
     // ── PNG drop ──────────────────────────────────────────────────────────────
@@ -709,74 +393,7 @@ public class WireframeControl : Control
             e.Handled = true;
     }
 
-    // ── Camera clamping + scrollbar integration ───────────────────────────────
-
-    /// <summary>
-    /// Fired whenever the camera (pan, zoom) or the viewport size changes, so the host can
-    /// refresh the wireframe's two <c>ScrollBar</c>s from <see cref="GetScrollBarRanges"/>.
-    /// Distinct from <see cref="PanChanged"/>, which fires only on pan-gesture completion for
-    /// persistence.
-    /// </summary>
-    public event Action? ViewChanged;
-
-    private void RaiseViewChanged() => ViewChanged?.Invoke();
-
-    /// <summary>
-    /// Clamps the camera pan so the texture's far edge can reach the viewport centre but no
-    /// further — the texture is never scrolled fully out of view, yet any texture point can be
-    /// brought to the centre. Pure analytic clamp (<see cref="CanvasTransform.ClampWireframePan"/>)
-    /// — no ScrollViewer extent dependency, which is what makes a symmetric zoom in/out an exact
-    /// round-trip (#422). No-op until layout has produced a real viewport (<c>Bounds.Width &gt; 1</c>)
-    /// or with no texture.
-    /// </summary>
-    private void ClampCamera()
-    {
-        if (_bitmap == null || Bounds.Width <= 1) return;
-        (_panX, _panY) = CanvasTransform.ClampWireframePan(
-            _panX, _panY, (float)Bounds.Width, (float)Bounds.Height,
-            _bitmap.Width, _bitmap.Height, _zoom);
-    }
-
-    /// <summary>
-    /// Scrollbar (Minimum, Maximum, Value, ViewportSize) for each axis, derived from the
-    /// current pan, viewport, and texture size. <c>MainWindow</c> applies these to the two
-    /// wireframe <c>ScrollBar</c>s; the value axis is the negation of the pan axis (see
-    /// <see cref="PanScrollBar"/>). Returns a degenerate (zero) range before layout has run
-    /// or with no texture loaded.
-    /// </summary>
-    public (ScrollBarRange Horizontal, ScrollBarRange Vertical) GetScrollBarRanges()
-    {
-        float viewW = (float)Bounds.Width;
-        float viewH = (float)Bounds.Height;
-        if (_bitmap == null || viewW <= 1 || viewH <= 1)
-            return (new ScrollBarRange(0f, 0f, 0f, 1f), new ScrollBarRange(0f, 0f, 0f, 1f));
-
-        // Centre-relative pan: pan_c = panX − viewW/2; content extent (origin = texture
-        // top-left) is [0, bitmap × zoom]; padding −viewport/2 matches ClampWireframePan's band.
-        return (
-            PanScrollBar.FromPan(_panX - viewW / 2f, viewW, 0f, _bitmap.Width  * _zoom, -viewW / 2f),
-            PanScrollBar.FromPan(_panY - viewH / 2f, viewH, 0f, _bitmap.Height * _zoom, -viewH / 2f));
-    }
-
-    /// <summary>Sets the horizontal pan from a scrollbar value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.</summary>
-    public void SetPanX(float scrollValue)
-    {
-        _panX = PanScrollBar.PanFromValue(scrollValue) + (float)Bounds.Width / 2f;
-        ClampCamera();
-        InvalidateVisual();
-        RaiseViewChanged();
-    }
-
-    /// <summary>Sets the vertical pan from a scrollbar value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.</summary>
-    public void SetPanY(float scrollValue)
-    {
-        _panY = PanScrollBar.PanFromValue(scrollValue) + (float)Bounds.Height / 2f;
-        ClampCamera();
-        InvalidateVisual();
-        RaiseViewChanged();
-    }
+    // ── Drag auto-pan (#540) ────────────────────────────────────────────────────
 
     private void StartAutoPanTimer()
     {
@@ -799,8 +416,8 @@ public class WireframeControl : Control
     /// (<see cref="CanvasTransform.AutoPanVelocity"/>), then re-applies the drag at that same
     /// screen position so the dragged frame keeps tracking the cursor. Live-driven by
     /// <see cref="_autoPanTimer"/>; tests call this directly for determinism (see
-    /// <see cref="StepZoomAnimation"/> for the same pattern). No-op with no active drag, no
-    /// bitmap, or before layout has produced a real viewport.
+    /// <see cref="TextureViewport.StepZoomAnimation"/> for the same pattern). No-op with no active
+    /// drag, no bitmap, or before layout has produced a real viewport.
     /// </summary>
     public void StepAutoPan(float dtSeconds)
     {
@@ -824,97 +441,7 @@ public class WireframeControl : Control
         RaiseViewChanged();
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Load a PNG from disk and show it. Pass null to clear the view.
-    /// Saves the camera position for the old texture and restores it for the new one.
-    /// </summary>
-    /// <summary>
-    /// Loads <paramref name="filePath"/> as the displayed texture. Returns <c>true</c> when the
-    /// texture is shown (or when <paramref name="filePath"/> is empty, an intentional clear);
-    /// returns <c>false</c> when a non-empty path could not be displayed — the file is missing,
-    /// or it exists but cannot be decoded as an image (corrupt/truncated/mislabeled/locked).
-    /// On failure the control is left in a coherent unloaded state. Callers that persist the
-    /// texture name should commit it only when this returns <c>true</c>, so a file the editor
-    /// can't display never gets saved into the .achx (issue #479).
-    /// </summary>
-    public bool LoadTexture(string? filePath)
-    {
-        // Lowercased + slash-normalized form used only for cache-key comparison and the
-        // _loadedTexturePath identity that downstream filter code keys on. The case-preserving
-        // form is what actually goes to the filesystem (Linux is case-sensitive).
-        string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
-        string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
-
-        if (_loadedTexturePath == norm)
-        {
-            // Texture hasn't changed, but the selected frame may have, so update frame rects.
-            RefreshFramesInternal();
-            return true;
-        }
-
-        // Save camera for the texture we're leaving
-        if (_loadedTexturePath != null)
-            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
-
-        _loadedTexturePath = norm;
-        // Drop (don't Dispose) the previous image: a render op on the compositor thread may still be
-        // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
-        // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
-        // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
-        // copy from FromBitmap), so disposing it here stays safe.
-        _image = null;
-        _bitmap?.Dispose();
-        _bitmap = null;
-        _inspectableImage = null;
-
-        if (casePreserved != null && File.Exists(casePreserved))
-        {
-            _bitmap = SKBitmap.Decode(casePreserved);
-            if (_bitmap == null)
-            {
-                // SKBitmap.Decode returns null (it does NOT throw) when the file exists but
-                // can't be decoded — corrupt/truncated PNG, zero-byte file, mislabeled or
-                // unsupported format, or a file locked by another process. Handing that null
-                // to SKImage.FromBitmap throws ArgumentNullException on the dispatcher and
-                // terminates the app (issue #479). Leave the control unloaded and report failure.
-                _loadedTexturePath = null;
-                RefreshFramesInternal();
-                return false;
-            }
-
-            // Upload pixels into an immutable SKImage on the UI thread so the
-            // render thread never touches the SKBitmap directly. Without this,
-            // SKCanvas.DrawBitmap on the render thread crashes with AV.
-            _image = SKImage.FromBitmap(_bitmap);
-
-            if (_isMagicWandMode)
-                _inspectableImage = new InspectableImage(_bitmap);
-
-            if (_cameraByTexture.TryGetValue(norm!, out var cam))
-            {
-                // Restore the full camera and re-clamp against the current viewport (window may
-                // have been resized since this texture was last shown).
-                (_panX, _panY, _zoom) = (cam.px, cam.py, cam.z);
-                ClampCamera();
-                RaiseViewChanged();
-                InvalidateVisual();
-            }
-            else
-            {
-                CenterTexture();
-            }
-
-            RefreshFramesInternal();
-            return true;
-        }
-
-        // casePreserved == null means filePath was empty: an intentional clear (success).
-        // A non-empty path that isn't on disk is a load failure.
-        RefreshFramesInternal();
-        return casePreserved == null;
-    }
+    // ── Frame refresh ─────────────────────────────────────────────────────────
 
     /// <summary>
     /// Rebuild the displayed frame rectangles from SelectedState
@@ -932,66 +459,18 @@ public class WireframeControl : Control
         LoadTexture(path);
     }
 
-    /// <summary>
-    /// Force-reload the currently displayed texture from disk, bypassing the identity check.
-    /// Use for PNG hot-reload when the file content changed but the path did not.
-    /// Must be called on the UI thread.
-    /// </summary>
-    public void ForceReloadTexture()
+    /// <inheritdoc />
+    protected override void OnTextureLoaded(SKBitmap? bitmap)
     {
-        var path = _loadedTexturePath;
-        if (path == null) return;
-        // LoadTexture only restores a saved camera when _cameraByTexture has an entry for this
-        // path, which is populated on cross-texture switches, not on the very first load of a
-        // texture. Without saving/restoring here, a hot-reload of the only texture ever opened
-        // would find no entry and fall through to CenterTexture(), resetting pan/zoom (#584).
-        var savedCamera = (_panX, _panY, _zoom);
-        _loadedTexturePath = null;   // clear identity so LoadTexture doesn't short-circuit
-        LoadTexture(new FilePath(path).StandardizedCaseSensitive);
-        (_panX, _panY, _zoom) = savedCamera;
-        ClampCamera();
-        RaiseViewChanged();
-        InvalidateVisual();
-    }
-
-    /// <summary>Set zoom by whole-number percentage (e.g. 100 = 1× fit). Zooms toward the
-    /// centre of the viewport.</summary>
-    public void SetZoomPercent(int percent)
-    {
-        CancelZoomAnimation();   // an explicit zoom overrides any in-flight wheel ease
-        float newZoom = Math.Clamp(percent / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-        ZoomToward((float)Bounds.Width / 2f, (float)Bounds.Height / 2f, newZoom / _zoom);
-    }
-
-    /// <summary>Toggle the grid overlay and update the grid cell size.</summary>
-    public void SetGrid(bool show, int cellSize)
-    {
-        _showGrid = show;
-        _gridSize = cellSize;
+        // Magic-wand flood-fill needs an inspectable pixel copy; rebuild it for the new bitmap
+        // while the mode is active, else drop any stale one (it's only read in magic-wand mode).
+        _inspectableImage = _isMagicWandMode && bitmap != null
+            ? new InspectableImage(bitmap)
+            : null;
         RefreshFramesInternal();
     }
 
-    /// <summary>
-    /// Directly sets the camera state (pan and zoom) exactly, without clamping — for tests that
-    /// need a predictable, axis-aligned view and for restoring a persisted camera. A persisted
-    /// camera that lands out of band is re-clamped on the next layout pass (SizeChanged).
-    /// </summary>
-    public void SetCamera(float panX, float panY, float zoom)
-    {
-        CancelZoomAnimation();
-        _panX = panX;
-        _panY = panY;
-        _zoom = zoom;
-        InvalidateVisual();
-        RaiseViewChanged();
-    }
-
-    /// <summary>Current grid show/size state. For tests.</summary>
-    public (bool ShowGrid, int GridSize) GridState => (_showGrid, _gridSize);
-
-    /// <summary>Camera state (panX, panY, zoom). panX/panY are the screen position of texture
-    /// pixel (0,0): screenX = panX + textureX × zoom.</summary>
-    public (float PanX, float PanY, float Zoom) CameraState => (_panX, _panY, _zoom);
+    // ── Frame-region editing (test API) ───────────────────────────────────────
 
     /// <summary>
     /// Fires <see cref="FrameCreatedFromRegion"/> with the grid-snapped cell
@@ -1175,7 +654,7 @@ public class WireframeControl : Control
 
     /// <summary>
     /// Test-only: begins a handle-drag gesture without applying an end position, mirroring the
-    /// handle-hit branch of <see cref="OnPointerPressed"/>. Pairs with
+    /// handle-hit branch of <see cref="OnEditPointerPressed"/>. Pairs with
     /// <see cref="SimulateDragPointerMove"/> and <see cref="StepAutoPan"/> to observe auto-pan
     /// (#540) mid-drag; use <see cref="SimulateHandleDrag"/> instead for a one-shot gesture that
     /// doesn't need intermediate ticks. No-op when no frame is selected or no texture is loaded.
@@ -1220,7 +699,7 @@ public class WireframeControl : Control
     /// <summary>
     /// Test-only: continues the handle/chain drag started by <see cref="SimulateHandleDragBegin"/>
     /// or <see cref="SimulateChainDragBegin"/> to the given <b>viewport-space</b> pointer
-    /// position, mirroring the dragging branch of <see cref="OnPointerMoved"/>. No-op when no
+    /// position, mirroring the dragging branch of <see cref="OnEditPointerMoved"/>. No-op when no
     /// drag is active.
     /// </summary>
     public void SimulateDragPointerMove(float vpX, float vpY)
@@ -1245,160 +724,13 @@ public class WireframeControl : Control
         _chainDragStarts.Clear();
     }
 
-    /// <summary>
-    /// Test-only: starts a middle-mouse pan gesture with the anchor at the given
-    /// <b>viewport-space</b> position. Call <see cref="SimulatePanMove"/> one or more
-    /// times to continue the drag, then <see cref="SimulatePanEnd"/> when done.
-    /// No-op when no bitmap is loaded.
-    /// </summary>
-    public void SimulatePanStart(float vpX, float vpY)
-    {
-        if (_bitmap is null) return;
-        StartPan(new Point(vpX, vpY));
-    }
-
-    /// <summary>
-    /// Test-only: continues an active pan gesture by supplying the current
-    /// <b>viewport-space</b> mouse position. Drives the same pan-delta code path
-    /// as <see cref="OnPointerMoved"/>. No-op when no pan is in progress.
-    /// </summary>
-    public void SimulatePanMove(float vpX, float vpY)
-    {
-        if (!_isPanning || _bitmap is null) return;
-        UpdatePan(vpX, vpY);
-    }
-
-    /// <summary>Test-only: ends the pan gesture started by <see cref="SimulatePanStart"/>.</summary>
-    public void SimulatePanEnd() => _isPanning = false;
-
-    /// <summary>
-    /// Test-only: simulates a single mouse-wheel zoom event toward the given
-    /// <b>viewport-space</b> point. Mirrors <see cref="OnPointerWheelChanged"/>.
-    /// <para><paramref name="factor"/> is the zoom scale factor (e.g. 1.25 to zoom in by one
-    /// wheel notch, 1/1.25 to zoom out). This overload always applies the raw factor regardless
-    /// of <see cref="WheelZoomPresets"/> — use it in tests that need deterministic pivot math.</para>
-    /// </summary>
-    public void SimulateWheelZoom(float vpX, float vpY, float factor) => ZoomToward(vpX, vpY, factor);
-
-    /// <summary>
-    /// Test-only: simulates one mouse-wheel notch toward the given <b>viewport-space</b> point
-    /// using preset stepping (<see cref="WheelZoomPresets"/>) and runs the resulting smooth-zoom
-    /// animation to completion synchronously, so the camera lands on its settled state. Use
-    /// <see cref="SimulateWheelZoomBegin"/> instead to observe the animation mid-flight.
-    /// </summary>
-    public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn)
-    {
-        BeginAnimatedZoom(vpX, vpY, zoomIn);
-        SettleZoomAnimation();
-    }
-
-    /// <summary>
-    /// Test-only: begins a smooth wheel-zoom toward the <b>viewport-space</b> pivot WITHOUT
-    /// settling, so a test can drive <see cref="StepZoomAnimation"/> tick-by-tick and observe the
-    /// ease and retargeting. Mirrors the live <see cref="OnPointerWheelChanged"/> path.
-    /// </summary>
-    public void SimulateWheelZoomBegin(float vpX, float vpY, bool zoomIn) =>
-        BeginAnimatedZoom(vpX, vpY, zoomIn);
-
-    /// <summary>True while a smooth wheel-zoom (#425) is easing toward its target. The host gates
-    /// per-frame companion-file persistence on this so only the settled state is saved, not every
-    /// intermediate tick.</summary>
-    public bool IsZoomAnimating => _zoomAnimating;
-
-    /// <summary>Test-only: the zoom factor the in-flight animation is easing toward (1.0 = 100 %).</summary>
-    public float TargetZoom => _zoomTarget;
-
-    /// <summary>
-    /// Advances the in-flight smooth zoom by <paramref name="dtSeconds"/>, easing toward the
-    /// target via <see cref="ZoomChase"/> and applying each step through the pivot-preserving
-    /// <see cref="ZoomToward"/>. Returns <c>true</c> while still animating, <c>false</c> once
-    /// settled (at which point the timer is stopped). The live 60 fps timer calls this; tests
-    /// call it directly for deterministic stepping.
-    /// </summary>
-    public bool StepZoomAnimation(float dtSeconds)
-    {
-        if (!_zoomAnimating) return false;
-
-        float next = ZoomChase.Step(_zoom, _zoomTarget, dtSeconds);
-        bool settling = ZoomChase.IsSettled(next, _zoomTarget);
-
-        // Clear the flag BEFORE ZoomToward fires ZoomChanged on the settling tick, so the host
-        // sees IsZoomAnimating == false and persists the companion file exactly once (on settle).
-        if (settling) { _zoomAnimating = false; StopZoomTimer(); }
-
-        // factor is relative to the current zoom; the viewport pivot is constant across ticks, so
-        // the factors compose to the same result as a single notch (the pivot stays anchored).
-        ZoomToward(_zoomPivotVpX, _zoomPivotVpY, next / _zoom);
-        return !settling;
-    }
-
-    /// <summary>Runs <see cref="StepZoomAnimation"/> to completion synchronously. Used by the
-    /// instant test overloads and available to any caller that must force the settled state.</summary>
-    public void SettleZoomAnimation()
-    {
-        // The 1000-iteration cap is a non-convergence backstop; ZoomChase settles far sooner.
-        for (int i = 0; _zoomAnimating && i < 1000; i++)
-            StepZoomAnimation(ZoomAnimIntervalSeconds);
-    }
-
-    /// <summary>Test-only: current camera pan (screen position of texture pixel (0,0)).</summary>
-    public (float X, float Y) PanOffset => (_panX, _panY);
-
-    // ── Rendering ─────────────────────────────────────────────────────────────
-
-    public override void Render(DrawingContext ctx)
-    {
-        UpdatePalette();
-        var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette, _showDiagnostics ? _drawTimes : null));
-        DrawDebugOverlay(ctx);
-    }
-
-    // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
-    // "is it Light?" check correctly handles the follow-system case.
-    private void UpdatePalette() =>
-        _palette = CanvasPalette.Resolve(ActualThemeVariant != ThemeVariant.Light, _canvasBackgroundOverride);
-
-    /// <summary>
-    /// Renders the current wireframe state to an off-screen bitmap of the given size.
-    /// The current camera (pan/zoom) is used exactly as-is, so call
-    /// <see cref="LoadTexture"/> and optionally <see cref="CenterFitForSize"/> first.
-    /// <para>
-    /// Must be called on the UI thread (same thread that owns <see cref="LoadTexture"/>).
-    /// Caller is responsible for disposing the returned bitmap.
-    /// </para>
-    /// </summary>
-    public SKBitmap RenderToBitmap(int width, int height)
-    {
-        UpdatePalette();
-        var snap   = BuildSnapshot(width, height);
-        // snap.Image is the shared, control-owned _image (not a per-call clone) — must NOT be
-        // disposed here, or the next live render would draw a disposed image (#514).
-        var bitmap = new SKBitmap(width, height);
-        using var canvas = new SKCanvas(bitmap);
-        DrawOp.RenderSk(canvas, snap, _palette);
-        return bitmap;
-    }
-
-    /// <summary>
-    /// Sets the camera so the loaded texture is centered and 85 %-fitted inside
-    /// a virtual viewport of <paramref name="width"/> × <paramref name="height"/> pixels.
-    /// Use this before <see cref="RenderToBitmap"/> in tests that need a predictable view.
-    /// </summary>
-    public void CenterFitForSize(int width, int height)
-    {
-        if (_bitmap is null) return;
-        CancelZoomAnimation();
-        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(
-            _bitmap.Width, _bitmap.Height, width, height);
-        InvalidateVisual();
-    }
+    // ── Frame centering ───────────────────────────────────────────────────────
 
     /// <summary>
     /// Pans so <paramref name="frame"/>'s centre lands at the viewport centre, preserving the
-    /// current zoom level (the zoom is never changed, so <see cref="ZoomChanged"/> does not fire).
-    /// Clamped to the valid pan band, so a frame near the texture edge lands as close to centre as
-    /// the dead-space allows. Does nothing when no bitmap is loaded.
+    /// current zoom level (the zoom is never changed, so <see cref="TextureViewport.ZoomChanged"/>
+    /// does not fire). Clamped to the valid pan band, so a frame near the texture edge lands as
+    /// close to centre as the dead-space allows. Does nothing when no bitmap is loaded.
     /// </summary>
     public void CenterOnFrame(AnimationFrameSave frame)
     {
@@ -1445,28 +777,13 @@ public class WireframeControl : Control
     public HandleKind HitTestHandleKindAt(float screenX, float screenY) =>
         HitTestHandle(new Point(screenX, screenY)).handle;
 
-    private RenderSnapshot BuildSnapshot(double width, double height)
+    /// <inheritdoc />
+    protected override TextureViewportSnapshot BuildSnapshot(double width, double height)
     {
-        var snap = new RenderSnapshot
-        {
-            // Reuse the immutable image built once per load (issue #514). SKImage is safe to read on
-            // the render thread, so a single instance serves every frame — NO per-op atlas copy.
-            // 1665108 regressed this to a full bitmap.Copy() per op (67 MB/render on a 4096² sheet);
-            // LoadTexture now drops (never synchronously disposes) the old image, so sharing it here
-            // can't race a render op mid-draw.
-            Image        = _image,
-            ImageWidth   = _bitmap?.Width ?? 0,
-            ImageHeight  = _bitmap?.Height ?? 0,
-            PanX         = _panX,
-            PanY         = _panY,
-            Zoom         = _zoom,
-            ShowGrid     = _showGrid,
-            GridSize     = _gridSize,
-            Width        = width,
-            Height       = height,
-            ShowPreview  = _showPreview,
-            PreviewRect  = _previewRect,
-        };
+        var snap = new WireframeSnapshot { DrawOverlay = DrawWireframeOverlay };
+        PopulateBaseSnapshot(snap, width, height);
+        snap.ShowPreview = _showPreview;
+        snap.PreviewRect = _previewRect;
 
         foreach (var fr in _frameRects)
             snap.Frames.Add((fr.Bounds, fr.IsSelected));
@@ -1495,88 +812,12 @@ public class WireframeControl : Control
 
     // ── Mouse input ───────────────────────────────────────────────────────────
 
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    /// <inheritdoc />
+    protected override void OnEditPointerPressed(PointerPressedEventArgs e)
     {
-        base.OnPointerWheelChanged(e);
-        // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
-        // viewport-space pivot. Smooth-zoom retargets and eases toward the next preset (#425).
-        var pivot = e.GetPosition(this);
-        BeginAnimatedZoom((float)pivot.X, (float)pivot.Y, e.Delta.Y > 0);
-        StartZoomTimer();   // live driver; tests drive StepZoomAnimation directly instead
-        e.Handled = true;
-    }
-
-    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
-
-    /// <summary>
-    /// Retargets the smooth zoom toward the next/previous preset from the given viewport-space
-    /// pivot. A notch while already animating steps from the in-flight <see cref="_zoomTarget"/>,
-    /// so rapid spins accumulate through the presets rather than re-targeting the same one from the
-    /// mid-animation zoom. Does NOT start the driving timer — the live wheel handler starts it;
-    /// tests drive <see cref="StepZoomAnimation"/> directly for determinism.
-    /// </summary>
-    private void BeginAnimatedZoom(float pivotVpX, float pivotVpY, bool zoomIn)
-    {
-        float basis = _zoomAnimating ? _zoomTarget : _zoom;
-        _zoomTarget   = ComputeTargetZoom(basis, zoomIn);
-        _zoomPivotVpX = pivotVpX;
-        _zoomPivotVpY = pivotVpY;
-        _zoomAnimating = true;
-    }
-
-    /// <summary>Stops any in-flight wheel-zoom animation, holding the camera at its current value.
-    /// Competing camera actions (pan, combo zoom, centre-on-frame, load) call this so they don't
-    /// fight the easing timer.</summary>
-    private void CancelZoomAnimation()
-    {
-        if (!_zoomAnimating) return;
-        _zoomAnimating = false;
-        StopZoomTimer();
-    }
-
-    /// <summary>The zoom factor one wheel notch targets from <paramref name="basisZoom"/>, using
-    /// preset stepping when <see cref="WheelZoomPresets"/> is set, else a 1.25× multiplier. Clamped
-    /// to [<see cref="CanvasTransform.MinZoom"/>, <see cref="CanvasTransform.MaxZoom"/>].</summary>
-    private float ComputeTargetZoom(float basisZoom, bool zoomIn)
-    {
-        float targetPct = WheelZoomPresets is { Length: > 0 } presets
-            ? ZoomPresetStepper.StepToNextPreset(basisZoom * 100f, presets, zoomIn ? +1 : -1)
-            : basisZoom * 100f * (zoomIn ? 1.25f : 1f / 1.25f);
-        return Math.Clamp(targetPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-    }
-
-    private void StartZoomTimer()
-    {
-        _zoomTimer ??= CreateZoomTimer();
-        _zoomTimer.Start();
-    }
-
-    private void StopZoomTimer() => _zoomTimer?.Stop();
-
-    private DispatcherTimer CreateZoomTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ZoomAnimIntervalSeconds) };
-        timer.Tick += (_, _) => StepZoomAnimation(ZoomAnimIntervalSeconds);
-        return timer;
-    }
-
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
-    {
-        base.OnPointerPressed(e);
-        Focus();
-
         var props = e.GetCurrentPoint(this).Properties;
         var pos = e.GetPosition(this);
-        bool isAlt = (e.KeyModifiers & KeyModifiers.Alt) != 0;
         bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
-
-        // Middle-mouse or Alt+left → pan
-        if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && isAlt))
-        {
-            StartPan(pos);
-            e.Pointer.Capture(this);
-            return;
-        }
 
         if (!props.IsLeftButtonPressed) return;
 
@@ -1695,16 +936,10 @@ public class WireframeControl : Control
         TrySelectFrameAtPoint(world);
     }
 
-    protected override void OnPointerMoved(PointerEventArgs e)
+    /// <inheritdoc />
+    protected override void OnEditPointerMoved(PointerEventArgs e)
     {
-        base.OnPointerMoved(e);
         var pos = e.GetPosition(this);
-
-        if (_isPanning)
-        {
-            UpdatePan((float)pos.X, (float)pos.Y);
-            return;
-        }
 
         if (_draggingRect != null)
         {
@@ -1742,17 +977,9 @@ public class WireframeControl : Control
             : new Cursor(cursorType.Value);
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    /// <inheritdoc />
+    protected override void OnEditPointerReleased(PointerReleasedEventArgs e)
     {
-        base.OnPointerReleased(e);
-
-        if (_isPanning)
-        {
-            _isPanning = false;
-            PanChanged?.Invoke(_panX, _panY);
-            e.Pointer.Capture(null);
-        }
-
         if (_draggingRect != null)
         {
             if (_bulkHandleDragStarts.Count > 0)
@@ -1836,57 +1063,6 @@ public class WireframeControl : Control
         float aL, float aT, float aR, float aB)
         => Math.Abs(aL - bL) > 0.0001f || Math.Abs(aT - bT) > 0.0001f ||
            Math.Abs(aR - bR) > 0.0001f || Math.Abs(aB - bB) > 0.0001f;
-
-    private void StartPan(Point pos)
-    {
-        CancelZoomAnimation();   // panning takes over from any in-flight wheel ease
-        _isPanning = true;
-        _panAnchor = pos;
-        _panAnchorX = _panX;   // camera pan at drag start
-        _panAnchorY = _panY;
-    }
-
-    /// <summary>
-    /// Free-pan: shifts the camera by the pointer displacement since the drag started, then
-    /// clamps to the valid pan band. <paramref name="vpX"/>/<paramref name="vpY"/> are
-    /// viewport-space (the control IS the viewport — no ScrollViewer offset to compensate).
-    /// </summary>
-    private void UpdatePan(float vpX, float vpY)
-    {
-        _panX = _panAnchorX + (vpX - (float)_panAnchor.X);
-        _panY = _panAnchorY + (vpY - (float)_panAnchor.Y);
-        ClampCamera();
-        InvalidateVisual();
-        RaiseViewChanged();
-    }
-
-    /// <summary>
-    /// Zooms toward the viewport-space pivot (<paramref name="sx"/>, <paramref name="sy"/>) by
-    /// <paramref name="factor"/>, preserving the texture coordinate under the pivot, then clamps
-    /// the camera to the valid pan band. The clamp is the pure analytic
-    /// <see cref="CanvasTransform.ZoomWireframe"/> — no dependency on a layout-resolved extent,
-    /// so a symmetric zoom in/out round-trips and the reachable bounds at a given zoom are
-    /// identical regardless of zoom direction (#422). Subsumes the old #138/#319/#341 point
-    /// fixes: the texture is never pushed off-edge and is always pannable to the viewport centre.
-    /// </summary>
-    private void ZoomToward(float sx, float sy, float factor)
-    {
-        if (_bitmap == null || Bounds.Width <= 1)
-        {
-            (_panX, _panY, _zoom) = CanvasTransform.ZoomToward(sx, sy, factor, _panX, _panY, _zoom);
-        }
-        else
-        {
-            (_panX, _panY, _zoom) = CanvasTransform.ZoomWireframe(
-                sx, sy, factor, _panX, _panY, _zoom,
-                (float)Bounds.Width, (float)Bounds.Height,
-                _bitmap.Width, _bitmap.Height);
-        }
-
-        InvalidateVisual();
-        ZoomChanged?.Invoke(_zoom * 100f);
-        RaiseViewChanged();
-    }
 
     private void ApplyHandleDrag(Point pos)
     {
@@ -2110,21 +1286,6 @@ public class WireframeControl : Control
             (int)_previewRect.Right, (int)_previewRect.Bottom);
     }
 
-    // ── Coordinate transforms ─────────────────────────────────────────────────
-
-    private SKPoint ScreenToTexture(float sx, float sy)
-    {
-        var (tx, ty) = CanvasTransform.ScreenToTexture(sx, sy, _panX, _panY, _zoom);
-        return new SKPoint(tx, ty);
-    }
-
-    private SKRect ToScreen(SKRect r)
-    {
-        var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
-            r.Left, r.Top, r.Right, r.Bottom, _panX, _panY, _zoom);
-        return new SKRect(l, t, rr, b);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void RefreshFramesInternal()
@@ -2221,29 +1382,6 @@ public class WireframeControl : Control
         return result;
     }
 
-    private void CenterTexture()
-    {
-        if (_bitmap is null) return;
-        CancelZoomAnimation();   // a fresh texture/centre overrides any in-flight wheel ease
-
-        // Defer until layout has produced a real viewport; the first SizeChanged re-centers.
-        if (Bounds.Width <= 1)
-        {
-            _needsInitialCenter = true;
-            return;
-        }
-        _needsInitialCenter = false;
-
-        // CenterFit returns the top-left pan that centres the bitmap inside the viewport at
-        // 85 % fit — exactly the wireframe's pan convention, so it can be used directly.
-        (_panX, _panY, _zoom) = CanvasTransform.CenterFit(
-            _bitmap.Width, _bitmap.Height, (float)Bounds.Width, (float)Bounds.Height);
-        ClampCamera();
-
-        InvalidateVisual();
-        RaiseViewChanged();
-    }
-
     /// <summary>
     /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
     /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
@@ -2318,7 +1456,7 @@ public class WireframeControl : Control
     /// Test-only: simulates a Magic Wand double-click at the given screen position.
     /// Updates the hover preview from the pixel at <paramref name="screenX"/>,
     /// <paramref name="screenY"/> and then applies <see cref="ApplyPreviewToSelectedFrame"/>,
-    /// mirroring the double-click branch in <see cref="OnPointerPressed"/>.
+    /// mirroring the double-click branch in <see cref="OnEditPointerPressed"/>.
     /// No-op when magic-wand mode is off, the bitmap is null, or there is no preview.
     /// </summary>
     public void SimulateWandDoubleClick(float screenX, float screenY)
