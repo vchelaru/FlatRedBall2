@@ -1,5 +1,8 @@
 using AnimationEditor.Core;
+using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -11,8 +14,9 @@ using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Views.Tests;
 
-// Phase 1 (#603): read-only property display driven by ISelectedState.SelectionChanged. No
-// editable fields, no mutation -- see docs/BROWSER_TREE_INSPECTOR_DECISION.md.
+// Phase 1 (#603): property display driven by ISelectedState.SelectionChanged.
+// Phase 2 (#610): Rectangle/Circle panels became editable -- see
+// docs/BROWSER_TREE_INSPECTOR_DECISION.md.
 public class InspectorControlTests
 {
     private sealed class FakeProjectManager : IProjectManager
@@ -102,8 +106,11 @@ public class InspectorControlTests
         Assert.True(control.RectPanel.IsVisible);
         Assert.False(control.FramePanel.IsVisible);
         Assert.False(control.CirclePanel.IsVisible);
-        Assert.Contains("Hitbox", control.RectNameText.Text);
-        Assert.Contains("4", control.RectPositionText.Text);
+        Assert.Equal("Hitbox", control.RectNameBox.Text);
+        Assert.Equal(4m, control.RectXInput.Value);
+        Assert.Equal(-2m, control.RectYInput.Value);
+        Assert.Equal(8m, control.RectScaleXInput.Value);
+        Assert.Equal(16m, control.RectScaleYInput.Value);
     }
 
     [AvaloniaFact]
@@ -120,8 +127,10 @@ public class InspectorControlTests
         Assert.True(control.CirclePanel.IsVisible);
         Assert.False(control.FramePanel.IsVisible);
         Assert.False(control.RectPanel.IsVisible);
-        Assert.Contains("Hurtbox", control.CircleNameText.Text);
-        Assert.Contains("12", control.CircleRadiusText.Text);
+        Assert.Equal("Hurtbox", control.CircleNameBox.Text);
+        Assert.Equal(1m, control.CircleXInput.Value);
+        Assert.Equal(2m, control.CircleYInput.Value);
+        Assert.Equal(12m, control.CircleRadiusInput.Value);
     }
 
     [AvaloniaFact]
@@ -141,5 +150,91 @@ public class InspectorControlTests
 
         Assert.True(control.NoSelectionPanel.IsVisible);
         Assert.False(control.FramePanel.IsVisible);
+    }
+
+    // Phase 2 follow-up (#610): editable Rectangle/Circle panels, routed through
+    // AppCommands.SetRectProps/SetCircleProps. CommitRectProps/CommitCircleProps are the directly
+    // -testable seams (mirror MainWindow's own ApplyRectProps/ApplyCircleProps), exercised here
+    // without simulating an actual LostFocus/KeyDown.
+
+    private static (InspectorControl Control, IAppCommands Commands, AARectSave Rect, CircleSave Circle, SelectedState State)
+        BuildWithEditableShapes()
+    {
+        var frame = new AnimationFrameSave { TextureName = "a.png", ShapesSave = new ShapesSave() };
+        var rect = new AARectSave { Name = "Hitbox", X = 4f, Y = -2f, ScaleX = 8f, ScaleY = 16f };
+        var circle = new CircleSave { Name = "Hurtbox", X = 1f, Y = 2f, Radius = 12f };
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave!.Shapes.Add(circle);
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(frame);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(chain);
+
+        var pm = new FakeProjectManager { AnimationChainListSave = acls };
+        var state = new SelectedState(pm);
+        var events = new ApplicationEvents();
+        var appState = new AppState(events, state);
+        var ioManager = new IoManager(appState);
+        var objectFinder = new ObjectFinder(pm);
+        var undoManager = new UndoManager();
+        var appCommands = new AppCommands(pm, state, events, ioManager, objectFinder, undoManager);
+
+        var control = new InspectorControl();
+        control.InitializeServices(state);
+        control.EnableEditing(appCommands);
+
+        state.SelectedFrame = frame;
+        state.SelectedRectangle = rect;
+
+        return (control, appCommands, rect, circle, state);
+    }
+
+    [AvaloniaFact]
+    public void CommitRectProps_AppliesEditedFieldValues()
+    {
+        var (control, _, rect, _, _) = BuildWithEditableShapes();
+
+        control.RectNameBox.Text = "Hitbox2";
+        control.RectXInput.Value = 10m;
+        control.RectYInput.Value = 20m;
+        control.RectScaleXInput.Value = 5m;
+        control.RectScaleYInput.Value = 6m;
+        control.CommitRectProps();
+
+        Assert.Equal("Hitbox2", rect.Name);
+        Assert.Equal(10f, rect.X);
+        Assert.Equal(20f, rect.Y);
+        Assert.Equal(5f, rect.ScaleX);
+        Assert.Equal(6f, rect.ScaleY);
+    }
+
+    [AvaloniaFact]
+    public void CommitCircleProps_AppliesEditedFieldValues()
+    {
+        var (control, _, _, circle, state) = BuildWithEditableShapes();
+        // Switch selection to the circle (BuildWithEditableShapes leaves the rect selected).
+        state.SelectedCircle = circle;
+
+        control.CircleNameBox.Text = "Hurtbox2";
+        control.CircleXInput.Value = 30m;
+        control.CircleYInput.Value = 40m;
+        control.CircleRadiusInput.Value = 9m;
+        control.CommitCircleProps();
+
+        Assert.Equal("Hurtbox2", circle.Name);
+        Assert.Equal(30f, circle.X);
+        Assert.Equal(40f, circle.Y);
+        Assert.Equal(9f, circle.Radius);
+    }
+
+    [AvaloniaFact]
+    public void CommitRectProps_NoSelection_DoesNotThrow()
+    {
+        var control = new InspectorControl();
+        var pm = new FakeProjectManager();
+        var state = new SelectedState(pm);
+        control.InitializeServices(state);
+
+        control.CommitRectProps(); // no EnableEditing call, no selection -- should just no-op
     }
 }

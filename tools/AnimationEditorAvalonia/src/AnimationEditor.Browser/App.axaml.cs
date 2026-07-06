@@ -85,6 +85,7 @@ public partial class App : Application
         var animationTree = new AnimationTreeControl();
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
+        inspector.EnableEditing(appCommands);
         animationTree.InitializeServices(selectedState, acls);
         animationTree.EnableRename(appCommands);
 
