@@ -96,6 +96,7 @@ public partial class MainWindow : Window
     private bool _suppressPreviewZoomComboChanged;
     private bool _suppressPreviewScrollSync;
     private bool _suppressWireframeScrollSync;
+    private bool _suppressPngScrollSync;
     private List<AnimationChainSave>? _pendingPastedChains;
     private List<bool>? _pendingPastedChainExpand;
 
@@ -191,6 +192,7 @@ public partial class MainWindow : Window
         WireMenuEvents();
         WireWireframeToolbar();
         WireWireframeControl();
+        WirePngViewport();
         WirePreviewControls();
         WireTreeView();
         WireWindowFileDrop();
@@ -454,16 +456,18 @@ public partial class MainWindow : Window
     private void ShowPngPane(TabEntry tab)
     {
         AchxEditorPane.IsVisible = false;
+        PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
-        PngPane.LoadImage(tab.Path.FullPath);
+        PngPane.LoadTexture(tab.Path.FullPath);
     }
 
     /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
     private void ShowAchxPane()
     {
         if (!PngPane.IsVisible) return;
-        PngPane.Clear();
+        PngPane.LoadTexture(null);   // clear the previewed texture (Pass null to unload)
         PngPane.IsVisible = false;
+        PngPaneGrid.IsVisible = false;
         AchxEditorPane.IsVisible = true;
     }
 
@@ -1026,6 +1030,43 @@ public partial class MainWindow : Window
         ApplyScrollRange(WireframeHScroll, h);
         ApplyScrollRange(WireframeVScroll, v);
         _suppressWireframeScrollSync = false;
+    }
+
+    // ── PngPreviewControl scrollbar wiring (#604) ─────────────────────────────
+
+    private void WirePngViewport()
+    {
+        // Two-way sync between the PNG viewer's manual camera pan and its scrollbars, mirroring
+        // the wireframe (#422). No companion-file persistence — a PNG tab carries no editor state.
+        PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
+        PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
+        PngPane.ViewChanged += RefreshPngScrollBars;
+    }
+
+    private void OnPngScrollValueChanged(bool horizontal)
+    {
+        if (_suppressPngScrollSync) return;
+        _suppressPngScrollSync = true;
+        if (horizontal)
+            PngPane.SetPanX((float)PngHScroll.Value);
+        else
+            PngPane.SetPanY((float)PngVScroll.Value);
+        _suppressPngScrollSync = false;
+    }
+
+    /// <summary>
+    /// Pushes the PNG viewer's current pan/zoom/texture size into its two scrollbars. Fired by
+    /// <see cref="TextureViewport.ViewChanged"/>. The suppression flag stops the resulting
+    /// <c>ValueChanged</c> from looping back into the pan.
+    /// </summary>
+    private void RefreshPngScrollBars()
+    {
+        if (_suppressPngScrollSync) return;
+        _suppressPngScrollSync = true;
+        var (h, v) = PngPane.GetScrollBarRanges();
+        ApplyScrollRange(PngHScroll, h);
+        ApplyScrollRange(PngVScroll, v);
+        _suppressPngScrollSync = false;
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)

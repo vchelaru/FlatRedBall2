@@ -1547,8 +1547,20 @@
             </Grid>
 
             <!-- PNG viewer tab: overlays the same column as the achx editor and is shown in its
-                 place while a .png tab is active (#604). Hidden by default. -->
-            <views:PngPreviewControl x:Name="PngPane" Grid.Column="2" IsVisible="False" />
+                 place while a .png tab is active (#604). Hidden by default. The control draws its
+                 texture under the same pan/zoom camera as the wireframe, so its two ScrollBars drive
+                 the pan directly (overlaid + auto-hide), mirroring the wireframe panel. -->
+            <Grid x:Name="PngPaneGrid" Grid.Column="2" Background="{DynamicResource BgCanvas}" IsVisible="False">
+                <views:PngPreviewControl x:Name="PngPane" />
+                <ScrollBar x:Name="PngVScroll"
+                           Orientation="Vertical"
+                           HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                           AllowAutoHide="True" />
+                <ScrollBar x:Name="PngHScroll"
+                           Orientation="Horizontal"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
+                           AllowAutoHide="True" />
+            </Grid>
 
         </Grid>
     </DockPanel>
