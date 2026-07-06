@@ -17,7 +17,11 @@ internal sealed class Program
         using var http = new HttpClient { BaseAddress = new Uri(args[0]) };
         var achxTask = http.GetStringAsync("sample/player.achx");
         var pngTask = http.GetByteArrayAsync("sample/player.png");
-        await Task.WhenAll(achxTask, pngTask);
+        // #610: the localStorage JS module must be imported before any BrowserSettingsStore call
+        // (App.axaml.cs's BuildView reads the persisted theme synchronously on startup) --
+        // independent of the sample fetches above, so it rides along in the same WhenAll.
+        var storageInitTask = LocalStorageInterop.InitializeAsync();
+        await Task.WhenAll(achxTask, pngTask, storageInitTask);
         SampleContent.AchxText = achxTask.Result;
         SampleContent.PngBytes = pngTask.Result;
 

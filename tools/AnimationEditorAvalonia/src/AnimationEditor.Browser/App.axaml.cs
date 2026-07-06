@@ -6,7 +6,9 @@ using AnimationEditor.App.Services;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.App.Theming;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
@@ -57,6 +59,15 @@ public partial class App : Application
             projectManager, selectedState, applicationEvents, ioManager, objectFinder, undoManager);
         var thumbnailService  = new ThumbnailService(projectManager);
 
+        // #610: the first browser setting worth persisting -- theme has a real toggle button
+        // below, unlike zoom/grid/recent-files, which have no browser UI yet (see
+        // docs/BROWSER_SETTINGS_DECISION.md for why those aren't wired up until they do).
+        // LocalStorageInterop.InitializeAsync() (Program.cs) must have already completed by the
+        // time this runs -- BuildView is only reached after Program.Main's Task.WhenAll finishes.
+        var settingsStore = new BrowserSettingsStore(new JsLocalStorage());
+        var currentTheme = settingsStore.LoadTheme() ?? AppTheme.Dark; // matches AppSettingsModel's default
+        Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
+
         var acls = AnimationChainListSave.FromString(SampleContent.AchxText);
         var bitmap = SKBitmap.Decode(SampleContent.PngBytes);
         thumbnailService.SeedTexture("player.png", bitmap);
@@ -97,12 +108,21 @@ public partial class App : Application
         var openButton = new Button { Content = "Open Folder…" };
         var saveAsButton = new Button { Content = "Save As…" };
         var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
+        var themeButton = new Button { Content = $"Theme: {currentTheme}" };
         var toolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             Margin = new Thickness(8),
-            Children = { openButton, saveAsButton, reloadButton },
+            Children = { openButton, saveAsButton, reloadButton, themeButton },
+        };
+
+        themeButton.Click += (_, _) =>
+        {
+            currentTheme = currentTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark;
+            Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
+            settingsStore.SaveTheme(currentTheme);
+            themeButton.Content = $"Theme: {currentTheme}";
         };
 
         // Phase 2 (#610): mutation + Undo/Redo, routed entirely through the already-built,
