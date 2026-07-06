@@ -42,6 +42,11 @@ public sealed class PngBlameService
     private (int entryIndex, int tolerance)? _maskKey;
     private ChangeMask? _mask;
 
+    // Serializes the two entry points: ComputeRegions runs on a background thread (MainWindow uses
+    // Task.Run so a large sheet never freezes the UI), while Load runs on the UI thread on tab switch.
+    // Both mutate the same non-thread-safe caches, so they must not overlap.
+    private readonly object _computeLock = new();
+
     private const string WorkingTreeDecodeKey = "\0workingtree";
 
     public PngBlameService(GitCli? git = null) => _git = git ?? new GitCli();
@@ -52,6 +57,12 @@ public sealed class PngBlameService
     /// can inspect an as-yet-uncommitted re-export against HEAD. Resets all caches.
     /// </summary>
     public PngBlameResult Load(string absolutePath)
+    {
+        lock (_computeLock)
+            return LoadCore(absolutePath);
+    }
+
+    private PngBlameResult LoadCore(string absolutePath)
     {
         _absolutePath = absolutePath;
         _decodeCache.Clear();
@@ -85,6 +96,12 @@ public sealed class PngBlameService
     /// reads as new.
     /// </summary>
     public IReadOnlyList<PixelRegion> ComputeRegions(int entryIndex, int tolerance, int distanceThreshold)
+    {
+        lock (_computeLock)
+            return ComputeRegionsCore(entryIndex, tolerance, distanceThreshold);
+    }
+
+    private IReadOnlyList<PixelRegion> ComputeRegionsCore(int entryIndex, int tolerance, int distanceThreshold)
     {
         if (entryIndex < 0 || entryIndex >= _entries.Count)
             return Array.Empty<PixelRegion>();

@@ -29,15 +29,20 @@ public static class RegionMerger
     public static IReadOnlyList<PixelRegion> Merge(ChangeMask mask, int distanceThreshold)
     {
         int cellSize = Math.Max(1, distanceThreshold);
-        int cols = (mask.Width + cellSize - 1) / cellSize;
+        int width = mask.Width;
+        int cols = (width + cellSize - 1) / cellSize;
+        var changed = mask.Changed;
 
         // One accumulator per occupied grid cell (sparse — only cells with a changed pixel), keyed
         // by cell index cy*cols + cx. Each holds the tight pixel bounds and count within that cell.
+        // Scan the mask linearly and derive (x, y) only for pixels that actually changed, so a sheet
+        // with a few thousand changed pixels doesn't pay for a full W×H nested-loop scan (#606).
         var cells = new Dictionary<int, Accum>();
-        for (int y = 0; y < mask.Height; y++)
-        for (int x = 0; x < mask.Width; x++)
+        for (int idx = 0; idx < changed.Length; idx++)
         {
-            if (!mask.IsChanged(x, y)) continue;
+            if (!changed[idx]) continue;
+            int x = idx % width;
+            int y = idx / width;
             int key = (y / cellSize) * cols + (x / cellSize);
             if (cells.TryGetValue(key, out var acc))
                 cells[key] = acc.Add(x, y);

@@ -1205,10 +1205,14 @@ public partial class MainWindow : Window
         DiffBlameStatus.IsVisible = message is not null;
     }
 
+    // Bumped per diff request; a completed background compute only paints if it's still the latest,
+    // so rapid revision clicks / slider drags don't stack or paint stale boxes.
+    private int _diffRequestId;
+
     // Computes and shows the changed-region boxes for the selected revision at the current slider
-    // settings. Runs synchronously (issue #606, "diff on-demand per revision click"); the service
-    // caches decoded blobs and the change mask so slider drags only re-cluster.
-    private void UpdateDiffOverlay()
+    // settings. The compute runs off the UI thread (#606) — the service caches decoded blobs and the
+    // change mask, so an already-computed revision (or a slider drag) returns near-instantly.
+    private async void UpdateDiffOverlay()
     {
         if (RevisionList.SelectedItem is not Models.RevisionEntryVm vm)
         {
@@ -1218,7 +1222,22 @@ public partial class MainWindow : Window
 
         int tolerance = (int)DiffToleranceSlider.Value;
         int distance = (int)DiffMergeSlider.Value;
-        PngPane.SetDiffRegions(_blameService.ComputeRegions(vm.Index, tolerance, distance));
+        int requestId = ++_diffRequestId;
+
+        IReadOnlyList<PixelRegion> regions;
+        try
+        {
+            regions = await Task.Run(() => _blameService.ComputeRegions(vm.Index, tolerance, distance));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngBlame] compute failed: {ex}");
+            return;
+        }
+
+        // Resumes on the UI thread; ignore if a newer request has since been issued.
+        if (requestId == _diffRequestId)
+            PngPane.SetDiffRegions(regions);
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
