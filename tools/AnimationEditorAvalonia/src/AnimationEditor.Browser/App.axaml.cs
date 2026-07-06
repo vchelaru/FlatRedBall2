@@ -7,6 +7,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -102,6 +103,64 @@ public partial class App : Application
             Children = { openButton, saveAsButton, reloadButton },
         };
 
+        // Phase 2 (#610): mutation + Undo/Redo, routed entirely through the already-built,
+        // already-tested AppCommands/UndoManager -- no new mutation logic here, only wiring.
+        // Renaming, shape add/delete, editable inspector fields, and settings persistence are
+        // deferred to follow-up issues (see the PR description for the full list).
+        var addAnimationButton = new Button { Content = "Add Animation" };
+        var addFrameButton = new Button { Content = "Add Frame" };
+        var deleteSelectedButton = new Button { Content = "Delete Selected" };
+        var undoButton = new Button { Content = "Undo", IsEnabled = false };
+        var redoButton = new Button { Content = "Redo", IsEnabled = false };
+        var editToolbar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Margin = new Thickness(8, 0, 8, 8),
+            Children = { addAnimationButton, addFrameButton, deleteSelectedButton, undoButton, redoButton },
+        };
+
+        void UpdateUndoRedoButtons()
+        {
+            undoButton.IsEnabled = undoManager.CanUndo;
+            redoButton.IsEnabled = undoManager.CanRedo;
+        }
+        undoManager.StackChanged += UpdateUndoRedoButtons;
+
+        // Both Add/Delete commands raise AnimationChainsChanged -- refresh the tree once, here,
+        // rather than after every individual button handler.
+        applicationEvents.AnimationChainsChanged += animationTree.Refresh;
+
+        addAnimationButton.Click += (_, _) =>
+        {
+            var currentAcls = projectManager.AnimationChainListSave;
+            if (currentAcls is null) return;
+            var existingNames = currentAcls.AnimationChains.Select(c => c.Name).ToList();
+            var name = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
+            appCommands.AddAnimationChainWithName(name);
+        };
+
+        addFrameButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedChain is { } chain)
+                appCommands.AddFrame(chain);
+        };
+
+        deleteSelectedButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedRectangle is { } rect && selectedState.SelectedFrame is { } rectFrame)
+                appCommands.DeleteShapes(rectFrame, new List<AARectSave> { rect }, new List<CircleSave>());
+            else if (selectedState.SelectedCircle is { } circle && selectedState.SelectedFrame is { } circleFrame)
+                appCommands.DeleteShapes(circleFrame, new List<AARectSave>(), new List<CircleSave> { circle });
+            else if (selectedState.SelectedFrame is { } frame)
+                appCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
+            else if (selectedState.SelectedChain is { } selectedChain)
+                appCommands.DeleteAnimationChains(new List<AnimationChainSave> { selectedChain });
+        };
+
+        undoButton.Click += (_, _) => undoManager.Undo();
+        redoButton.Click += (_, _) => undoManager.Redo();
+
         // #535 M3 follow-up: no FileSystemWatcher in the browser, so texture edits made outside
         // the page (e.g. re-saving a PNG in an image editor) are only detected by polling
         // GetBasicPropertiesAsync (see BrowserFolderWatcher). Detected changes are queued here and
@@ -168,6 +227,8 @@ public partial class App : Application
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
         root.Children.Add(toolbar);
+        DockPanel.SetDock(editToolbar, Dock.Top);
+        root.Children.Add(editToolbar);
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
         root.Children.Add(mainArea);
