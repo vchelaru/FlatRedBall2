@@ -153,4 +153,57 @@ public class AnimationTreeControlTests
         Assert.Same(acls.AnimationChains[0].Frames[0], selectedState.SelectedFrame);
         Assert.Same(acls.AnimationChains[0].Frames[0].ShapesSave!.Shapes[1], selectedState.SelectedCircle);
     }
+
+    // Phase 2 (#610): mutation commands add/remove chains and frames; the tree must reflect
+    // those changes without losing existing nodes' expand state (a full rebuild would collapse
+    // everything). Refresh() uses TreeBuilder.SyncChainsInto -- the same diff-based sync
+    // MainWindow's RefreshTreeView already uses on desktop.
+
+    [AvaloniaFact]
+    public void Refresh_AddedChain_AppearsInTree_WithoutRebuildingExistingNodes()
+    {
+        var (control, _, acls) = Build();
+        var tree = control.TreeView;
+        var originalWalkNode = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().First();
+        originalWalkNode.IsExpanded = false; // simulate a user collapsing it before the mutation
+
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "NewAnim" });
+        control.Refresh();
+
+        var roots = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        Assert.Equal(3, roots.Count);
+        Assert.Equal("NewAnim", roots[2].Header);
+        Assert.Same(originalWalkNode, roots[0]); // same VM instance, not rebuilt
+        Assert.False(roots[0].IsExpanded); // collapse state survived the refresh
+    }
+
+    [AvaloniaFact]
+    public void Refresh_RemovedChain_DisappearsFromTree()
+    {
+        var (control, _, acls) = Build();
+        var tree = control.TreeView;
+
+        acls.AnimationChains.RemoveAt(1); // remove "Jump"
+        control.Refresh();
+
+        var roots = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        Assert.Single(roots);
+        Assert.Equal("Walk", roots[0].Header);
+    }
+
+    [AvaloniaFact]
+    public void Refresh_NoAclsLoaded_ClearsTree()
+    {
+        var control = new AnimationTreeControl();
+        var pm = new FakeProjectManager();
+        var selectedState = new SelectedState(pm);
+        control.InitializeServices(selectedState, null);
+
+        control.Refresh();
+
+        Assert.Null(control.TreeView.ItemsSource);
+    }
 }

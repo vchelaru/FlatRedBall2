@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using AnimationEditor.Core;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
@@ -11,12 +12,14 @@ namespace AnimationEditor.Views.Controls;
 /// already-tested <see cref="TreeBuilder.RouteNodeSelection"/>. Adds no new selection logic --
 /// only the Avalonia wiring MainWindow's desktop tree already has, minus editing/multi-select/
 /// drag-reorder (see docs/BROWSER_TREE_INSPECTOR_DECISION.md for why this is a new, smaller
-/// control rather than a port of MainWindow's).
+/// control rather than a port of MainWindow's). Phase 2 (#610) adds <see cref="Refresh"/> so
+/// mutation commands can keep the tree in sync.
 /// </summary>
 public partial class AnimationTreeControl : UserControl
 {
     private ISelectedState? _selectedState;
     private AnimationChainListSave? _acls;
+    private ObservableCollection<TreeNodeVm>? _roots;
 
     public AnimationTreeControl()
     {
@@ -37,7 +40,21 @@ public partial class AnimationTreeControl : UserControl
     {
         _selectedState = selectedState;
         _acls = acls;
-        Tree.ItemsSource = acls is null ? null : TreeBuilder.BuildTree(acls);
+        _roots = acls is null ? null : new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(acls));
+        Tree.ItemsSource = _roots;
+    }
+
+    /// <summary>
+    /// Diff-updates the tree to match the current <see cref="AnimationChainListSave"/> after a
+    /// mutation (add/delete/rename/reorder chain or frame), preserving existing nodes' expand
+    /// state and selection instead of rebuilding from scratch -- the same
+    /// <see cref="TreeBuilder.SyncChainsInto"/> desktop's <c>MainWindow.RefreshTreeView</c> uses.
+    /// No-op if no file is loaded ((<see cref="InitializeServices"/> was called with a null acls).
+    /// </summary>
+    public void Refresh()
+    {
+        if (_acls is null || _roots is null) return;
+        TreeBuilder.SyncChainsInto(_roots, _acls.AnimationChains);
     }
 
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
