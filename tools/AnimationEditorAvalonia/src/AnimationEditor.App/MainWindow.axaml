@@ -306,11 +306,13 @@
         <Grid x:Name="MainContentGrid" ColumnDefinitions="300,4,*">
 
             <!-- ── Left: ANIMATIONS tree (fixed, top) + tabbed Inspector/Files/History (bottom) ── -->
-            <Grid Grid.Column="0" RowDefinitions="2*,4,3*"
+            <Grid x:Name="LeftPanelGrid" Grid.Column="0" RowDefinitions="2*,4,3*"
                   Background="{DynamicResource BgCanvas}">
 
-                <!-- Animations block: header + tree + add button stay grouped -->
-                <Grid Grid.Row="0" RowDefinitions="Auto,*,Auto">
+                <!-- Animations block: header + tree + add button stay grouped.
+                     Collapsed for PNG-preview tabs (issue #604) — a read-only image has no
+                     animations to list; see SetSidebarForPng in the code-behind. -->
+                <Grid x:Name="AnimationsBlock" Grid.Row="0" RowDefinitions="Auto,*,Auto">
 
                 <!-- ── Tree pane header ── -->
                 <Border Grid.Row="0"
@@ -620,7 +622,7 @@
                 </Grid>
 
                 <!-- Splitter between the ANIMATIONS tree and the tabbed tool panel -->
-                <GridSplitter Grid.Row="1"
+                <GridSplitter x:Name="SidebarSplitter" Grid.Row="1"
                               ResizeDirection="Rows"
                               Background="{DynamicResource LineStrong}"
                               HorizontalAlignment="Stretch" />
@@ -651,7 +653,7 @@
                     </TabControl.Styles>
 
                     <!-- Inspector (default tab) -->
-                    <TabItem Header="Inspector">
+                    <TabItem x:Name="InspectorTab" Header="Inspector">
                         <Border x:Name="InspectorTabContent"
                                 Background="{DynamicResource BgPanel}">
                             <ScrollViewer HorizontalScrollBarVisibility="Disabled"
@@ -979,7 +981,7 @@
                     </TabItem>
 
                     <!-- Files -->
-                    <TabItem Header="Files">
+                    <TabItem x:Name="FilesTab" Header="Files">
                         <controls:FilesPanelControl x:Name="FilesPanel" />
                     </TabItem>
 

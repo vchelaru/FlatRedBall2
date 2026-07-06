@@ -458,17 +458,65 @@ public partial class MainWindow : Window
         AchxEditorPane.IsVisible = false;
         PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
+        SetSidebarForPng(true);
         PngPane.LoadTexture(tab.Path.FullPath);
     }
 
     /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
     private void ShowAchxPane()
     {
+        // Restore the editing sidebar unconditionally — it must come back whenever we intend to show
+        // the achx editor, including on the paths below that short-circuit before touching the panes.
+        SetSidebarForPng(false);
         if (!PngPane.IsVisible) return;
         PngPane.LoadTexture(null);   // clear the previewed texture (Pass null to unload)
         PngPane.IsVisible = false;
         PngPaneGrid.IsVisible = false;
         AchxEditorPane.IsVisible = true;
+    }
+
+    // Sidebar state saved when collapsing for a PNG tab, so restoring preserves the user's splitter
+    // position rather than snapping back to the XAML default ("2*,4,3*").
+    private bool _sidebarCollapsedForPng;
+    private GridLength _savedTreeRowHeight = new(2, GridUnitType.Star);
+    private GridLength _savedSplitterRowHeight = new(4, GridUnitType.Pixel);
+
+    /// <summary>
+    /// Collapses the animation-editing sidebar surfaces for a read-only PNG-preview tab (issue #604)
+    /// and restores them for the achx editor. A PNG has no animations, no editable frame/shape
+    /// properties, and no undo history, so the ANIMATIONS tree, the Inspector tab, and the History
+    /// tab are hidden; only the Files tab (navigation) remains, and it becomes the selected tab.
+    /// </summary>
+    private void SetSidebarForPng(bool png)
+    {
+        if (png == _sidebarCollapsedForPng) return;
+        var rows = LeftPanelGrid.RowDefinitions;
+        if (png)
+        {
+            _savedTreeRowHeight = rows[0].Height;
+            _savedSplitterRowHeight = rows[1].Height;
+            rows[0].Height = new GridLength(0);
+            rows[1].Height = new GridLength(0);
+            AnimationsBlock.IsVisible = false;
+            SidebarSplitter.IsVisible = false;
+            InspectorTab.IsVisible = false;
+            HistoryTab.IsVisible = false;
+            // A now-hidden tab can't stay selected or the strip would show blank content — fall back
+            // to Files, the only surface that still makes sense for an image.
+            if (ReferenceEquals(SidebarTabs.SelectedItem, InspectorTab) ||
+                ReferenceEquals(SidebarTabs.SelectedItem, HistoryTab))
+                SidebarTabs.SelectedItem = FilesTab;
+        }
+        else
+        {
+            rows[0].Height = _savedTreeRowHeight;
+            rows[1].Height = _savedSplitterRowHeight;
+            AnimationsBlock.IsVisible = true;
+            SidebarSplitter.IsVisible = true;
+            InspectorTab.IsVisible = true;
+            HistoryTab.IsVisible = true;
+        }
+        _sidebarCollapsedForPng = png;
     }
 
     private async Task ActivateTabAsync(TabEntry tab)

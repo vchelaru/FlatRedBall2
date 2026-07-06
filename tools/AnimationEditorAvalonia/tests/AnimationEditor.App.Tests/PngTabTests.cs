@@ -95,4 +95,68 @@ public class PngTabTests
             Directory.Delete(dir, true);
         }
     }
+
+    [AvaloniaFact]
+    public void OpenPngAsTab_HidesAnimationInspectorAndHistory_KeepsFiles()
+    {
+        // A read-only PNG has no animations, no editable properties, and no undo history, so the
+        // ANIMATIONS tree, Inspector tab, and History tab are meaningless — hide them and leave the
+        // Files tab (navigation) selected.
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            window.OpenPngAsTab(WritePng(dir, "sheet.png"));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
+            Assert.False(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
+            Assert.False(window.FindControl<TabItem>("HistoryTab")!.IsVisible);
+            Assert.True(window.FindControl<TabItem>("FilesTab")!.IsVisible);
+
+            var tabs = window.FindControl<TabControl>("SidebarTabs")!;
+            Assert.Same(window.FindControl<TabItem>("FilesTab"), tabs.SelectedItem);
+
+            // The Animations block's row must collapse to zero so the Files tab fills the column
+            // rather than floating below an empty gap.
+            Assert.Equal(0, window.FindControl<Grid>("LeftPanelGrid")!.RowDefinitions[0].Height.Value);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task OpenAchxAfterPng_RestoresAnimationInspectorAndHistory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            window.OpenPngAsTab(WritePng(dir, "sheet.png"));
+            Dispatcher.UIThread.RunJobs();
+            await window.OpenFileAsTab(WriteAchx(dir, "hero.achx"));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
+            Assert.True(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
+            Assert.True(window.FindControl<TabItem>("HistoryTab")!.IsVisible);
+            Assert.True(window.FindControl<Grid>("LeftPanelGrid")!.RowDefinitions[0].Height.Value > 0);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
 }
