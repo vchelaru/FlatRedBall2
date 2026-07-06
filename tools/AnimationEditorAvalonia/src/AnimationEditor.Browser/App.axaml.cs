@@ -86,6 +86,7 @@ public partial class App : Application
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
         animationTree.InitializeServices(selectedState, acls);
+        animationTree.EnableRename(appCommands);
 
         // Selecting a chain with no frame pinned auto-plays it (PreviewControl.OnSelectionChanged).
         selectedState.SelectedChain = acls.AnimationChains[0];

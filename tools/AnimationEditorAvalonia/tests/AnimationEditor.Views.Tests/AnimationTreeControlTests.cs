@@ -1,5 +1,8 @@
 using AnimationEditor.Core;
+using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -205,5 +208,74 @@ public class AnimationTreeControlTests
         control.Refresh();
 
         Assert.Null(control.TreeView.ItemsSource);
+    }
+
+    // Phase 2 follow-up (#610): inline rename, mirroring MainWindow's double-tap-to-rename for
+    // chain nodes. CommitRename is the directly-testable seam (matches MainWindow's own split of
+    // CommitInlineRename from the double-tap/keyboard gesture plumbing) -- it's exercised here
+    // without simulating an actual double-tap or KeyDown, the same way the gesture-independent
+    // logic is unit-tested on desktop.
+
+    private static (AnimationTreeControl Control, IAppCommands Commands, AnimationChainListSave Acls) BuildWithCommands()
+    {
+        var acls = TwoChainAcls();
+        var pm = new FakeProjectManager { AnimationChainListSave = acls };
+        var selectedState = new SelectedState(pm);
+        var events = new ApplicationEvents();
+        var appState = new AppState(events, selectedState);
+        var ioManager = new IoManager(appState);
+        var objectFinder = new ObjectFinder(pm);
+        var undoManager = new UndoManager();
+        var appCommands = new AppCommands(pm, selectedState, events, ioManager, objectFinder, undoManager);
+
+        var control = new AnimationTreeControl();
+        control.InitializeServices(selectedState, acls);
+        control.EnableRename(appCommands);
+
+        return (control, appCommands, acls);
+    }
+
+    [AvaloniaFact]
+    public void CommitRename_ChainNode_NonEmptyDifferentName_RenamesChain()
+    {
+        var (control, _, acls) = BuildWithCommands();
+        var roots = ((System.Collections.IEnumerable)control.TreeView.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        var walkNode = roots[0];
+        walkNode.BeginEdit();
+
+        control.CommitRename(walkNode, "Sprint");
+
+        Assert.Equal("Sprint", acls.AnimationChains[0].Name);
+        Assert.False(walkNode.IsEditing);
+    }
+
+    [AvaloniaFact]
+    public void CommitRename_ChainNode_EmptyName_DoesNotRename()
+    {
+        var (control, _, acls) = BuildWithCommands();
+        var roots = ((System.Collections.IEnumerable)control.TreeView.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        var walkNode = roots[0];
+        walkNode.BeginEdit();
+
+        control.CommitRename(walkNode, "   ");
+
+        Assert.Equal("Walk", acls.AnimationChains[0].Name);
+        Assert.False(walkNode.IsEditing);
+    }
+
+    [AvaloniaFact]
+    public void CommitRename_ChainNode_SameName_DoesNotThrowOrRecordUndoEntry()
+    {
+        var (control, commands, acls) = BuildWithCommands();
+        var roots = ((System.Collections.IEnumerable)control.TreeView.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        var walkNode = roots[0];
+        walkNode.BeginEdit();
+
+        control.CommitRename(walkNode, "Walk");
+
+        Assert.Equal("Walk", acls.AnimationChains[0].Name);
     }
 }
