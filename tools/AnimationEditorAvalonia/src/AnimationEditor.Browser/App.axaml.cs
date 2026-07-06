@@ -110,6 +110,8 @@ public partial class App : Application
         // deferred to follow-up issues (see the PR description for the full list).
         var addAnimationButton = new Button { Content = "Add Animation" };
         var addFrameButton = new Button { Content = "Add Frame" };
+        var addRectButton = new Button { Content = "Add Rectangle" };
+        var addCircleButton = new Button { Content = "Add Circle" };
         var deleteSelectedButton = new Button { Content = "Delete Selected" };
         var undoButton = new Button { Content = "Undo", IsEnabled = false };
         var redoButton = new Button { Content = "Redo", IsEnabled = false };
@@ -118,7 +120,11 @@ public partial class App : Application
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             Margin = new Thickness(8, 0, 8, 8),
-            Children = { addAnimationButton, addFrameButton, deleteSelectedButton, undoButton, redoButton },
+            Children =
+            {
+                addAnimationButton, addFrameButton, addRectButton, addCircleButton,
+                deleteSelectedButton, undoButton, redoButton,
+            },
         };
 
         void UpdateUndoRedoButtons()
@@ -145,6 +151,18 @@ public partial class App : Application
         {
             if (selectedState.SelectedChain is { } chain)
                 appCommands.AddFrame(chain);
+        };
+
+        addRectButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedFrame is { } frame)
+                appCommands.AddAxisAlignedRectangle(frame);
+        };
+
+        addCircleButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedFrame is { } frame)
+                appCommands.AddCircle(frame);
         };
 
         deleteSelectedButton.Click += (_, _) =>
