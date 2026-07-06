@@ -3,7 +3,6 @@ using AnimationEditor.Core.Git;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -108,50 +107,22 @@ public sealed class PngBlameService
         if (entryIndex < 0 || entryIndex >= _entries.Count)
             return Array.Empty<PixelRegion>();
 
-        // Per-stage timing (#606 slowness diagnosis) — Debug.WriteLine is stripped from Release builds.
-        // Watch the Visual Studio Output window (Debug pane) and click a revision to read the breakdown.
-        var total = Stopwatch.StartNew();
         var mask = GetOrBuildMask(entryIndex, tolerance);
-        if (mask is null)
-        {
-            Debug.WriteLine("[PngBlame] no mask (blobs undecodable)");
-            return Array.Empty<PixelRegion>();
-        }
-
-        var sw = Stopwatch.StartNew();
-        var regions = RegionMerger.Merge(mask, distanceThreshold);
-        long mergeMs = sw.ElapsedMilliseconds;
-
-        long changedPixels = 0;
-        foreach (var r in regions) changedPixels += r.ChangedPixelCount;
-
-        Debug.WriteLine($"[PngBlame]   region-merge: {mergeMs}ms " +
-            $"({changedPixels:N0} changed px → {regions.Count} regions, dist={distanceThreshold})");
-        Debug.WriteLine($"[PngBlame] ComputeRegions TOTAL: {total.ElapsedMilliseconds}ms " +
-            $"(entry={entryIndex}, tol={tolerance})");
-        return regions;
+        return mask is null ? Array.Empty<PixelRegion>() : RegionMerger.Merge(mask, distanceThreshold);
     }
 
     private ChangeMask? GetOrBuildMask(int entryIndex, int tolerance)
     {
         var key = (entryIndex, tolerance);
         if (_maskCache.TryGetValue(key, out var cachedMask))
-        {
-            Debug.WriteLine($"[PngBlame] mask entry={entryIndex} tol={tolerance}: CACHE HIT");
             return cachedMask;
-        }
 
         var after = DecodeAfter(entryIndex);
         var before = DecodeBefore(entryIndex);
         if (after is null && before is null)
             return null;
 
-        var sw = Stopwatch.StartNew();
         var mask = PixelDiff.Compute(before, after, tolerance);
-        long px = (long)mask.Width * mask.Height;
-        Debug.WriteLine($"[PngBlame]   pixel-diff: {sw.ElapsedMilliseconds}ms " +
-            $"({mask.Width}×{mask.Height} = {px:N0} px)");
-
         _maskCache[key] = mask;
         _maskOrder.Enqueue(key);
         if (_maskOrder.Count > MaskCacheCap)
@@ -184,23 +155,9 @@ public sealed class PngBlameService
     private ImageData? DecodeCached(string key, Func<byte[]?> fetchBytes)
     {
         if (_decodeCache.TryGetValue(key, out var cached))
-        {
-            Debug.WriteLine($"[PngBlame]   blob '{key}': CACHE HIT");
             return cached;
-        }
 
-        // Time git-fetch (subprocess + I/O) separately from SkiaSharp decode — they need different fixes.
-        var sw = Stopwatch.StartNew();
-        var bytes = fetchBytes();
-        long fetchMs = sw.ElapsedMilliseconds;
-
-        sw.Restart();
-        var image = Decode(bytes);
-        long decodeMs = sw.ElapsedMilliseconds;
-
-        Debug.WriteLine($"[PngBlame]   blob '{key}': git-fetch {fetchMs}ms ({(bytes?.Length ?? 0):N0} bytes), " +
-            $"decode {decodeMs}ms ({image?.Width ?? 0}×{image?.Height ?? 0})");
-
+        var image = Decode(fetchBytes());
         _decodeCache[key] = image;
         _decodeOrder.Enqueue(key);
         if (_decodeOrder.Count > DecodeCacheCap)
