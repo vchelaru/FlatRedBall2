@@ -25,6 +25,7 @@ public partial class FilesPanelControl : UserControl
     private ThumbnailService? _thumbnailService;
     private Window? _ownerWindow;
     private Action<string>? _showError;
+    private Action<string>? _openPng;
     private PointerPressedEventArgs? _dragPressEvent;
     private string? _dragPath;
     private PngFilesTreeNodeVm? _dragSourceNode;
@@ -43,6 +44,7 @@ public partial class FilesPanelControl : UserControl
             RoutingStrategies.Tunnel);
         FilesTree.AddHandler(InputElement.PointerReleasedEvent, OnTreePointerReleased,
             RoutingStrategies.Tunnel);
+        FilesTree.DoubleTapped += OnTreeDoubleTapped;
         FilesTree.SelectionChanged += (_, _) => ClearTreeSelection();
 
         var contextMenu = new ContextMenu();
@@ -50,11 +52,13 @@ public partial class FilesPanelControl : UserControl
         FilesTree.ContextMenu = contextMenu;
     }
 
-    public void Initialize(ThumbnailService thumbnailService, Window ownerWindow, Action<string>? showError = null)
+    public void Initialize(ThumbnailService thumbnailService, Window ownerWindow,
+        Action<string>? showError = null, Action<string>? openPng = null)
     {
         _thumbnailService = thumbnailService;
         _ownerWindow = ownerWindow;
         _showError = showError;
+        _openPng = openPng;
     }
 
     public void Refresh(string? achxFolder)
@@ -109,6 +113,19 @@ public partial class FilesPanelControl : UserControl
         node.IsExpanded = !node.IsExpanded;
         e.Handled = true;
         ClearTreeSelection();
+    }
+
+    private void OnTreeDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (GetNodeVmFromSource(e.Source) is not { IsFile: true, AbsolutePath: { } path })
+            return;
+
+        // A double-click's first press records a pending drag; clear it so the release
+        // that follows does not try to start a drag on the just-opened file.
+        _dragSourceNode = null;
+        ClearPendingDrag();
+        _openPng?.Invoke(path);
+        e.Handled = true;
     }
 
     private void OnTreeContextMenuOpening(object? sender, CancelEventArgs e)

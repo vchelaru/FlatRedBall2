@@ -21,12 +21,27 @@ namespace AnimationEditor.Core.Models
         {
             Path = path;
             _displayNameOverride = displayNameOverride;
+            Kind = ResolveKind(path);
         }
 
         private readonly string? _displayNameOverride;
 
-        /// <summary>The absolute path of the <c>.achx</c> file this tab represents.</summary>
+        /// <summary>The absolute path of the file this tab represents.</summary>
         public FilePath Path { get; }
+
+        /// <summary>
+        /// Which view this tab drives, derived from the file extension at construction.
+        /// See <see cref="TabKind"/>.
+        /// </summary>
+        public TabKind Kind { get; }
+
+        /// <summary>
+        /// Determines the <see cref="TabKind"/> for <paramref name="path"/> by extension.
+        /// A <c>.png</c> (any case) is <see cref="TabKind.Png"/>; everything else — including
+        /// untitled sentinels and empty paths — is <see cref="TabKind.Achx"/>.
+        /// </summary>
+        public static TabKind ResolveKind(FilePath path) =>
+            path.Extension == "png" ? TabKind.Png : TabKind.Achx;
 
         /// <summary>
         /// Undo/redo stack snapshot saved when this tab was last deactivated.

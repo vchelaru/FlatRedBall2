@@ -581,6 +581,52 @@ public class TabManagerTests
         Assert.Equal("My Custom Label", tm.Tabs[0].DisplayName);
     }
 
+    // ── TabEntry.Kind (issue #604) ────────────────────────────────────────────
+
+    [Fact]
+    public void TabEntry_Kind_AchxPath_IsAchx()
+    {
+        var entry = new TabEntry(P(@"C:\Games\hero.achx"));
+
+        Assert.Equal(TabKind.Achx, entry.Kind);
+    }
+
+    [Fact]
+    public void TabEntry_Kind_PngPath_IsPng()
+    {
+        var entry = new TabEntry(P(@"C:\Games\sheet.png"));
+
+        Assert.Equal(TabKind.Png, entry.Kind);
+    }
+
+    [Fact]
+    public void TabEntry_Kind_UppercasePngExtension_IsPng()
+    {
+        var entry = new TabEntry(P(@"C:\Games\SHEET.PNG"));
+
+        Assert.Equal(TabKind.Png, entry.Kind);
+    }
+
+    [Fact]
+    public void TabEntry_Kind_UntitledSentinel_IsAchx()
+    {
+        // Untitled sentinels ("__untitled__:1") have no .png extension, so a new unsaved
+        // file must never be mistaken for a PNG tab.
+        var entry = new TabEntry(P("__untitled__:1"), "Untitled");
+
+        Assert.Equal(TabKind.Achx, entry.Kind);
+    }
+
+    [Fact]
+    public void RestoreFrom_PngPath_DerivesPngKind()
+    {
+        var tm = new TabManager();
+
+        tm.RestoreFrom(new List<string> { @"C:\Games\sheet.png" }, activePath: null);
+
+        Assert.Equal(TabKind.Png, tm.Tabs[0].Kind);
+    }
+
     // ── TabEntry.DisplayName ──────────────────────────────────────────────────
 
     [Fact]

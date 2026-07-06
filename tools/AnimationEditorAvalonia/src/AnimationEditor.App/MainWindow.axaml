@@ -1044,7 +1044,7 @@
                           HorizontalAlignment="Stretch" />
 
             <!-- ── Right: Wireframe toolbar + Wireframe + Preview ── -->
-            <Grid Grid.Column="2" RowDefinitions="Auto,*,4,250">
+            <Grid x:Name="AchxEditorPane" Grid.Column="2" RowDefinitions="Auto,*,4,250">
 
                 <!-- ── Wireframe toolbar ── -->
                 <Border Grid.Row="0"
@@ -1545,6 +1545,10 @@
                     </Grid>
                 </Grid>
             </Grid>
+
+            <!-- PNG viewer tab: overlays the same column as the achx editor and is shown in its
+                 place while a .png tab is active (#604). Hidden by default. -->
+            <views:PngPreviewControl x:Name="PngPane" Grid.Column="2" IsVisible="False" />
 
         </Grid>
     </DockPanel>

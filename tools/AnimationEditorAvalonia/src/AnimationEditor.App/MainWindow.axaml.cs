@@ -203,7 +203,8 @@ public partial class MainWindow : Window
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
-        FilesPanel.Initialize(_thumbnailService, this, msg => ShowStatusMessage(msg, isError: true));
+        FilesPanel.Initialize(_thumbnailService, this,
+            msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
         _pngFolderWatcher.FolderContentsChanged += () =>
             Dispatcher.UIThread.InvokeAsync(RefreshFilesPanel);
 
@@ -298,22 +299,21 @@ public partial class MainWindow : Window
             // fresh ContextMenu on every right-click PointerPressed — is what prevents the menus from
             // stacking and failing to dismiss (issue #472): Avalonia reuses this one instance and
             // light-dismisses it on the next click.
-            tabBorder.ContextMenu = new ContextMenu
-            {
-                Items =
+            var tabMenu = new ContextMenu();
+            // Detaching re-opens the file in a fresh editor window; that path only knows how to
+            // load achx, so PNG viewer tabs omit it (issue #604).
+            if (captured.Kind == TabKind.Achx)
+                tabMenu.Items.Add(new MenuItem
                 {
-                    new MenuItem
-                    {
-                        Header = "Detach to New Window",
-                        Command = new RelayCommand(() => DetachTab(captured)),
-                    },
-                    new MenuItem
-                    {
-                        Header = "Close Tab",
-                        Command = new RelayCommand(() => CloseTab(captured)),
-                    },
-                },
-            };
+                    Header = "Detach to New Window",
+                    Command = new RelayCommand(() => DetachTab(captured)),
+                });
+            tabMenu.Items.Add(new MenuItem
+            {
+                Header = "Close Tab",
+                Command = new RelayCommand(() => CloseTab(captured)),
+            });
+            tabBorder.ContextMenu = tabMenu;
 
             // Pointer handling: immediate pointer-capture on press (so PointerMoved fires even
             // when the cursor moves over other tabs).  Activation is deferred to PointerReleased
@@ -422,6 +422,51 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── PNG viewer tabs (issue #604) ────────────────────────────────────────────
+
+    /// <summary>
+    /// Opens <paramref name="path"/> (a .png) as a viewer tab, or focuses it if already open.
+    /// Called from the Files panel on double-click. Mirrors the achx open flow's handling of the
+    /// leaving tab, but shows the PNG pane instead of loading an animation model.
+    /// </summary>
+    public void OpenPngAsTab(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+
+        // Preserve the leaving achx tab's edit state before the view swaps away from the editor.
+        var leavingTab = _tabManager.ActiveTab;
+        if (leavingTab is { Kind: TabKind.Achx })
+        {
+            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
+            _appCommands.CaptureTabEditorState(leavingTab);
+            SaveCompanionFile();
+        }
+
+        // Keep the currently-open achx editor content as a background tab, same as File > Open.
+        EnsureCurrentEditorContentHasTab();
+
+        _tabManager.OpenOrFocus(new FilePath(path));
+        ShowPngPane(_tabManager.ActiveTab!);
+        RebuildTabStrip();
+    }
+
+    /// <summary>Swaps the main pane to the PNG viewer and loads <paramref name="tab"/>'s image.</summary>
+    private void ShowPngPane(TabEntry tab)
+    {
+        AchxEditorPane.IsVisible = false;
+        PngPane.IsVisible = true;
+        PngPane.LoadImage(tab.Path.FullPath);
+    }
+
+    /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
+    private void ShowAchxPane()
+    {
+        if (!PngPane.IsVisible) return;
+        PngPane.Clear();
+        PngPane.IsVisible = false;
+        AchxEditorPane.IsVisible = true;
+    }
+
     private async Task ActivateTabAsync(TabEntry tab)
     {
         if (tab == _tabManager.ActiveTab) return;
@@ -429,13 +474,26 @@ public partial class MainWindow : Window
         ClearPendingCut();
 
         // Save the leaving tab's undo history and in-memory model before the editor switches.
+        // PNG tabs carry no model or undo stack, so only capture when leaving the achx editor.
         var leavingTab = _tabManager.ActiveTab;
-        if (leavingTab != null)
+        if (leavingTab is { Kind: TabKind.Achx })
         {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
             _appCommands.CaptureTabEditorState(leavingTab);
         }
 
+        // PNG tabs bypass the animation-editor machinery entirely.
+        if (tab.Kind == TabKind.Png)
+        {
+            if (leavingTab is { Kind: TabKind.Achx })
+                SaveCompanionFile();
+            _tabManager.Activate(tab.Path);
+            ShowPngPane(tab);
+            RebuildTabStrip();
+            return;
+        }
+
+        ShowAchxPane();
         SaveCompanionFile();
         _tabManager.Activate(tab.Path);
         // Bypass LoadAnimationFileAsync so we don't hit the short-circuit that skips
@@ -491,12 +549,21 @@ public partial class MainWindow : Window
         var next = _tabManager.ActiveTab;
         if (next != null)
         {
+            if (next.Kind == TabKind.Png)
+            {
+                ShowPngPane(next);
+                RebuildTabStrip();
+            }
             // Use OpenAchxWorkflowAsync directly — bypasses EnsureCurrentEditorContentHasTab
             // so the just-closed file is not accidentally re-registered as a background tab.
-            if (!IsUntitledTab(next))
+            else if (!IsUntitledTab(next))
+            {
+                ShowAchxPane();
                 _ = ActivateTabAfterCloseAsync(next);
+            }
             else
             {
+                ShowAchxPane();
                 ActivateUntitledTabContent(next);
                 RebuildTabStrip();
             }
@@ -504,6 +571,7 @@ public partial class MainWindow : Window
         else
         {
             // All tabs closed — start fresh
+            ShowAchxPane();
             _projectManager.AnimationChainListSave = new AnimationChainListSave();
             _projectManager.FileName = null;
             _selectedState.Reset();
@@ -554,7 +622,10 @@ public partial class MainWindow : Window
         var active = _tabManager.ActiveTab;
         if (active != null)
         {
-            await _appCommands.OpenAchxWorkflowAsync(active.Path.FullPath);
+            if (active.Kind == TabKind.Png)
+                ShowPngPane(active);
+            else
+                await _appCommands.OpenAchxWorkflowAsync(active.Path.FullPath);
             RebuildTabStrip();
         }
     }
@@ -4173,9 +4244,13 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(fileName)) return;
 
+        // Opening an achx always returns to the editor pane if a PNG tab was showing.
+        ShowAchxPane();
+
         // Save the leaving tab's undo history and in-memory model before a different file takes over.
+        // PNG tabs carry neither, so only capture when leaving the achx editor.
         var leavingTab = _tabManager.ActiveTab;
-        if (leavingTab != null)
+        if (leavingTab is { Kind: TabKind.Achx })
         {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
             _appCommands.CaptureTabEditorState(leavingTab);
