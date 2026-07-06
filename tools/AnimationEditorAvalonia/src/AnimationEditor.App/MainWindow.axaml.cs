@@ -103,8 +103,6 @@ public partial class MainWindow : Window
     private readonly Services.PngBlameService _blameService = new();
     // Debounces the two diff sliders so dragging re-merges once the user pauses, not per pixel-tick.
     private DispatcherTimer? _diffSliderDebounce;
-    // Cancels the background history warm-up when a different PNG is opened.
-    private System.Threading.CancellationTokenSource? _blamePrecomputeCts;
 
     private List<AnimationChainSave>? _pendingPastedChains;
     private List<bool>? _pendingPastedChainExpand;
@@ -1170,9 +1168,6 @@ public partial class MainWindow : Window
     /// </summary>
     private void LoadBlameForPng(string absolutePath)
     {
-        // Stop any warm-up still running for the previously-open PNG before Load resets the caches.
-        _blamePrecomputeCts?.Cancel();
-
         var result = _blameService.Load(absolutePath);
 
         var rows = new List<Models.RevisionEntryVm>(result.Entries.Count);
@@ -1187,21 +1182,6 @@ public partial class MainWindow : Window
         RevisionList.SelectedItem = null;
         PngPane.SetDiffRegions(Array.Empty<PixelRegion>());
         ShowDiffBlameStatus(result.Status, rows.Count);
-
-        // Warm every revision's change mask in the background so revision clicks are instant. The
-        // decode + diff is the cost; doing it up-front (newest-first) means the click just re-merges a
-        // cached mask. Cancelled if the user opens a different PNG.
-        if (result.Status == Core.Git.GitHistoryStatus.Ok && rows.Count > 0)
-        {
-            var cts = new System.Threading.CancellationTokenSource();
-            _blamePrecomputeCts = cts;
-            int tolerance = (int)DiffToleranceSlider.Value;
-            _ = Task.Run(() =>
-            {
-                try { _blameService.PrecomputeAll(tolerance, () => cts.IsCancellationRequested); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[PngBlame] precompute failed: {ex}"); }
-            });
-        }
     }
 
     private void ShowDiffBlameStatus(Core.Git.GitHistoryStatus status, int revisionCount)

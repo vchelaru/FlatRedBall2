@@ -159,28 +159,6 @@ public sealed class PngBlameService
         return mask;
     }
 
-    /// <summary>
-    /// Warms the mask cache for every revision at <paramref name="tolerance"/>, so subsequent revision
-    /// clicks and distance-slider drags are instant. Intended to run on a background thread right after
-    /// <see cref="Load"/>. Locks per revision (not for the whole run) so a user's on-demand click can
-    /// interleave, and bails early when <paramref name="isCancelled"/> returns true (e.g. the user
-    /// switched to a different PNG). Revisions are warmed newest-first to match the visible list order.
-    /// </summary>
-    public void PrecomputeAll(int tolerance, Func<bool> isCancelled)
-    {
-        for (int i = 0; ; i++)
-        {
-            if (isCancelled())
-                return;
-            lock (_computeLock)
-            {
-                if (i >= _entries.Count)
-                    return;
-                GetOrBuildMask(i, tolerance);
-            }
-        }
-    }
-
     // "After" is this entry's own content: the on-disk file for the working-tree entry, else the blob.
     private ImageData? DecodeAfter(int entryIndex)
     {
