@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
@@ -97,6 +98,12 @@ public partial class MainWindow : Window
     private bool _suppressPreviewScrollSync;
     private bool _suppressWireframeScrollSync;
     private bool _suppressPngScrollSync;
+
+    // ── PNG Diff/Blame (#606) ─────────────────────────────────────────────────
+    private readonly Services.PngBlameService _blameService = new();
+    // Debounces the two diff sliders so dragging re-merges once the user pauses, not per pixel-tick.
+    private DispatcherTimer? _diffSliderDebounce;
+
     private List<AnimationChainSave>? _pendingPastedChains;
     private List<bool>? _pendingPastedChainExpand;
 
@@ -193,6 +200,7 @@ public partial class MainWindow : Window
         WireWireframeToolbar();
         WireWireframeControl();
         WirePngViewport();
+        WirePngBlame();
         WirePreviewControls();
         WireTreeView();
         WireWindowFileDrop();
@@ -460,6 +468,7 @@ public partial class MainWindow : Window
         PngPane.IsVisible = true;
         SetSidebarForPng(true);
         PngPane.LoadTexture(tab.Path.FullPath);
+        LoadBlameForPng(tab.Path.FullPath);
     }
 
     /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
@@ -501,8 +510,9 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = false;
             InspectorTab.IsVisible = false;
             HistoryTab.IsVisible = false;
-            // A now-hidden tab can't stay selected or the strip would show blank content — fall back
-            // to Files, the only surface that still makes sense for an image.
+            // The PNG-only Diff/Blame surface (#606) becomes available; it isn't auto-selected, so a
+            // hidden editing tab still falls back to Files (the #605 navigation default).
+            DiffBlameTab.IsVisible = true;
             if (ReferenceEquals(SidebarTabs.SelectedItem, InspectorTab) ||
                 ReferenceEquals(SidebarTabs.SelectedItem, HistoryTab))
                 SidebarTabs.SelectedItem = FilesTab;
@@ -515,6 +525,11 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = true;
             InspectorTab.IsVisible = true;
             HistoryTab.IsVisible = true;
+            // A now-hidden PNG tab can't stay selected or the strip would show blank content — fall
+            // back to the Inspector, the achx editor's default surface.
+            if (ReferenceEquals(SidebarTabs.SelectedItem, DiffBlameTab))
+                SidebarTabs.SelectedItem = InspectorTab;
+            DiffBlameTab.IsVisible = false;
         }
         _sidebarCollapsedForPng = png;
     }
@@ -1115,6 +1130,95 @@ public partial class MainWindow : Window
         ApplyScrollRange(PngHScroll, h);
         ApplyScrollRange(PngVScroll, v);
         _suppressPngScrollSync = false;
+    }
+
+    // ── PNG Diff/Blame wiring (#606) ──────────────────────────────────────────
+
+    private void WirePngBlame()
+    {
+        RevisionList.SelectionChanged += (_, _) => UpdateDiffOverlay();
+        DiffToleranceSlider.PropertyChanged += OnDiffSliderPropertyChanged;
+        DiffMergeSlider.PropertyChanged += OnDiffSliderPropertyChanged;
+    }
+
+    private void OnDiffSliderPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != Avalonia.Controls.Primitives.RangeBase.ValueProperty) return;
+
+        // Reflect the value immediately; debounce the (potentially expensive) re-diff so a drag
+        // recomputes once the user settles rather than on every intermediate value.
+        DiffToleranceValue.Text = ((int)DiffToleranceSlider.Value).ToString();
+        DiffMergeValue.Text = ((int)DiffMergeSlider.Value).ToString();
+
+        _diffSliderDebounce ??= CreateDiffSliderDebounceTimer();
+        _diffSliderDebounce.Stop();
+        _diffSliderDebounce.Start();
+    }
+
+    private DispatcherTimer CreateDiffSliderDebounceTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        timer.Tick += (_, _) => { timer.Stop(); UpdateDiffOverlay(); };
+        return timer;
+    }
+
+    /// <summary>
+    /// Loads <paramref name="absolutePath"/>'s git history into the Diff/Blame revision list, or
+    /// shows a fallback message (not a repo / untracked / LFS / git missing). Clears any prior overlay.
+    /// </summary>
+    private void LoadBlameForPng(string absolutePath)
+    {
+        var result = _blameService.Load(absolutePath);
+
+        var rows = new List<Models.RevisionEntryVm>(result.Entries.Count);
+        for (int i = 0; i < result.Entries.Count; i++)
+        {
+            var rev = result.Entries[i];
+            string meta = rev.IsWorkingTree ? "uncommitted" : $"{rev.ShortHash} · {rev.Date:yyyy-MM-dd}";
+            rows.Add(new Models.RevisionEntryVm(i, rev.Subject, meta));
+        }
+
+        RevisionList.ItemsSource = rows;
+        RevisionList.SelectedItem = null;
+        PngPane.SetDiffRegions(Array.Empty<PixelRegion>());
+        ShowDiffBlameStatus(result.Status, rows.Count);
+    }
+
+    private void ShowDiffBlameStatus(Core.Git.GitHistoryStatus status, int revisionCount)
+    {
+        string? message = status switch
+        {
+            Core.Git.GitHistoryStatus.Ok when revisionCount == 0 => "No git history was found for this file.",
+            Core.Git.GitHistoryStatus.Ok => null,
+            Core.Git.GitHistoryStatus.NotARepository =>
+                "This file isn't inside a git repository, so there's no history to compare.",
+            Core.Git.GitHistoryStatus.Untracked =>
+                "This file isn't committed to git yet — commit it to compare revisions.",
+            Core.Git.GitHistoryStatus.LfsPointer =>
+                "This file is stored with Git LFS; committed versions are pointers, not images, so pixel diffing isn't available.",
+            Core.Git.GitHistoryStatus.GitUnavailable =>
+                "git isn't available on your PATH, so history can't be loaded.",
+            _ => null,
+        };
+
+        DiffBlameStatus.Text = message ?? "";
+        DiffBlameStatus.IsVisible = message is not null;
+    }
+
+    // Computes and shows the changed-region boxes for the selected revision at the current slider
+    // settings. Runs synchronously (issue #606, "diff on-demand per revision click"); the service
+    // caches decoded blobs and the change mask so slider drags only re-cluster.
+    private void UpdateDiffOverlay()
+    {
+        if (RevisionList.SelectedItem is not Models.RevisionEntryVm vm)
+        {
+            PngPane.SetDiffRegions(Array.Empty<PixelRegion>());
+            return;
+        }
+
+        int tolerance = (int)DiffToleranceSlider.Value;
+        int distance = (int)DiffMergeSlider.Value;
+        PngPane.SetDiffRegions(_blameService.ComputeRegions(vm.Index, tolerance, distance));
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
