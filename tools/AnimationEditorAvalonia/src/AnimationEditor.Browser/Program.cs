@@ -21,7 +21,9 @@ internal sealed class Program
         // (App.axaml.cs's BuildView reads the persisted theme synchronously on startup) --
         // independent of the sample fetches above, so it rides along in the same WhenAll.
         var storageInitTask = LocalStorageInterop.InitializeAsync();
-        await Task.WhenAll(achxTask, pngTask, storageInitTask);
+        // #622 (Phase 5): same requirement for the PixiJS export button's Blob-download path.
+        var downloadInitTask = DownloadInterop.InitializeAsync();
+        await Task.WhenAll(achxTask, pngTask, storageInitTask, downloadInitTask);
         SampleContent.AchxText = achxTask.Result;
         SampleContent.PngBytes = pngTask.Result;
 

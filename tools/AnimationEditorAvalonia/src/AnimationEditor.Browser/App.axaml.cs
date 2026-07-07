@@ -7,6 +7,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.App.Theming;
+using AnimationEditor.Core.Export;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Utilities;
@@ -374,6 +375,119 @@ public partial class App : Application
             preview.InvalidateVisual();
         };
 
+        // Phase 5 (#622): view/canvas polish. Every toggle here is already-built, already-tested
+        // control state (PreviewControl.ShowOnionSkin/InterpolateOffsets/ShowGuides,
+        // TextureViewport.DiagnosticsEnabled/SetZoomPercent/SetGrid) that MainWindow exposes via
+        // its own toolbar controls on desktop -- this is the same wiring, minus persistence
+        // (zoom%/grid-size/guide positions live in the desktop-only .aeproperties companion file,
+        // which the browser has no persistence path for yet -- same gap already flagged in
+        // docs/BROWSER_SETTINGS_DECISION.md for Phase 2's zoom/grid settings).
+        var zoomPresets = new[] { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
+
+        var onionSkinButton = new ToggleButton { Content = "Onion Skin" };
+        onionSkinButton.Click += (_, _) => preview.ShowOnionSkin = onionSkinButton.IsChecked == true;
+
+        var interpolateButton = new ToggleButton { Content = "Interpolate" };
+        interpolateButton.Click += (_, _) => preview.InterpolateOffsets = interpolateButton.IsChecked == true;
+
+        // Ruler-click-drag-to-create/move/right-click-to-remove guides is entirely self-contained
+        // inside PreviewControl's own pointer handlers (present since Phase 1's wiring) --
+        // ShowGuides only toggles the origin crosshair overlay; guides themselves always render
+        // once created, with or without this toggle.
+        var showGuidesButton = new ToggleButton { Content = "Guides" };
+        showGuidesButton.Click += (_, _) => preview.ShowGuides = showGuidesButton.IsChecked == true;
+
+        var diagnosticsButton = new ToggleButton { Content = "Diagnostics (F3)" };
+        void ApplyDiagnostics(bool on)
+        {
+            wireframe.DiagnosticsEnabled = on;
+            preview.DiagnosticsEnabled = on;
+            diagnosticsButton.IsChecked = on;
+        }
+        diagnosticsButton.Click += (_, _) => ApplyDiagnostics(diagnosticsButton.IsChecked == true);
+
+        var wireframeZoomOutButton = new Button { Content = "Wireframe Zoom −" };
+        var wireframeZoomInButton = new Button { Content = "Wireframe Zoom +" };
+        wireframeZoomInButton.Click += (_, _) =>
+            wireframe.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(wireframe.Zoom * 100f, zoomPresets, +1));
+        wireframeZoomOutButton.Click += (_, _) =>
+            wireframe.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(wireframe.Zoom * 100f, zoomPresets, -1));
+        wireframe.WheelZoomPresets = zoomPresets;
+
+        var previewZoomOutButton = new Button { Content = "Preview Zoom −" };
+        var previewZoomInButton = new Button { Content = "Preview Zoom +" };
+        previewZoomInButton.Click += (_, _) =>
+            preview.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(preview.Zoom * 100f, zoomPresets, +1));
+        previewZoomOutButton.Click += (_, _) =>
+            preview.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(preview.Zoom * 100f, zoomPresets, -1));
+        preview.WheelZoomPresets = zoomPresets;
+
+        var snapToGridCheck = new CheckBox { Content = "Snap to Grid" };
+        var gridSizeInput = new NumericUpDown { Value = 16, Minimum = 1, Maximum = 512, Width = 130 };
+        void ApplyGrid() => wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16));
+        snapToGridCheck.IsCheckedChanged += (_, _) => ApplyGrid();
+        gridSizeInput.ValueChanged += (_, _) => ApplyGrid();
+
+        // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
+        // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
+        // desktop writes the JSON + copies referenced PNGs to disk next to it; the browser has no
+        // disk to write to, so both the JSON and each referenced texture (re-encoded from
+        // ThumbnailService's already-decoded bitmap, never read from disk) are handed to the
+        // browser as Blob downloads instead (see DownloadInterop / wwwroot/download.js).
+        var exportPixiJsButton = new Button { Content = "Export to PixiJS" };
+        exportPixiJsButton.Click += (_, _) =>
+        {
+            var currentAcls = projectManager.AnimationChainListSave;
+            if (currentAcls is null) { status.Text = "Nothing to export."; return; }
+
+            (int Width, int Height)? ResolveTextureSize(string name)
+            {
+                var bmp = thumbnailService.GetBitmap(name);
+                return bmp is null ? null : (bmp.Width, bmp.Height);
+            }
+
+            var result = PixiJsSpriteSheetExporter.Export(currentAcls, ResolveTextureSize);
+            var baseName = string.IsNullOrEmpty(projectManager.FileName)
+                ? "spritesheet"
+                : System.IO.Path.GetFileNameWithoutExtension(projectManager.FileName);
+
+            DownloadInterop.DownloadText($"{baseName}.json", result.Json, "application/json");
+
+            var warnings = new List<string>(result.Warnings);
+            foreach (var textureName in result.ReferencedTextures)
+            {
+                var bitmap = thumbnailService.GetBitmap(textureName);
+                if (bitmap is null)
+                {
+                    warnings.Add($"Texture '{textureName}' was not found in memory, so it was not downloaded.");
+                    continue;
+                }
+
+                using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+                var base64 = System.Convert.ToBase64String(data.ToArray());
+                DownloadInterop.DownloadBase64(System.IO.Path.GetFileName(textureName), base64, "image/png");
+            }
+
+            status.Text = warnings.Count == 0
+                ? $"Exported {baseName}.json and {result.ReferencedTextures.Count} texture(s)."
+                : $"Exported {baseName}.json with {warnings.Count} warning(s): {string.Join(' ', warnings)}";
+        };
+
+        var viewToolbar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Margin = new Thickness(8, 0, 8, 8),
+            Children =
+            {
+                onionSkinButton, interpolateButton, showGuidesButton, diagnosticsButton,
+                wireframeZoomOutButton, wireframeZoomInButton,
+                previewZoomOutButton, previewZoomInButton,
+                snapToGridCheck, gridSizeInput,
+                exportPixiJsButton,
+            },
+        };
+
         // Left column: tree (fills available height) over inspector (sized to content).
         // Right: preview. Both new controls are pure UserControls with no dependency on this
         // layout shape -- MainWindow lays the equivalent panels out differently.
@@ -408,9 +522,26 @@ public partial class App : Application
         root.Children.Add(toolbar);
         DockPanel.SetDock(editToolbar, Dock.Top);
         root.Children.Add(editToolbar);
+        DockPanel.SetDock(viewToolbar, Dock.Top);
+        root.Children.Add(viewToolbar);
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
         root.Children.Add(mainArea);
+
+        // F3 is a best-effort accelerator only -- the diagnostics button above is the reliable
+        // path, since browsers may intercept F3 themselves (e.g. "Find next") before the page
+        // ever sees it.
+        root.AttachedToVisualTree += (_, _) =>
+        {
+            var topLevelForKeys = TopLevel.GetTopLevel(root);
+            if (topLevelForKeys is null) return;
+            topLevelForKeys.KeyDown += (_, e) =>
+            {
+                if (e.Key != Key.F3) return;
+                e.Handled = true;
+                ApplyDiagnostics(diagnosticsButton.IsChecked != true);
+            };
+        };
 
         DragDrop.SetAllowDrop(root, true);
         root.AddHandler(DragDrop.DragOverEvent, (_, e) =>
