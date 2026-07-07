@@ -465,4 +465,108 @@ public class WireframeTextureTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    // ── LoadTexture(path, knownBitmap) -- browser-wasm support (#614) ─────────
+    // The browser build has no filesystem to read a texture from; it already has every
+    // dropped/picked PNG decoded via ThumbnailService. Mirrors ProjectManager's earlier
+    // knownTextureSizes fix (#535) for the same "no disk in the browser" constraint.
+
+    private static SKBitmap MakeSolidBitmap(SKColor color, int size = 16)
+    {
+        var bm = new SKBitmap(size, size);
+        bm.Erase(color);
+        return bm;
+    }
+
+    [AvaloniaFact]
+    public void Wireframe_LoadTexture_WithKnownBitmap_DoesNotReadFromDisk()
+    {
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
+        using var knownBitmap = MakeSolidBitmap(SKColors.Red, size: 32);
+
+        // "sample/player.png" is never written to disk -- if this fell back to a disk read
+        // it would fail (File.Exists is false) and report load failure.
+        bool loaded = ctrl.LoadTexture("sample/player.png", knownBitmap);
+
+        Assert.True(loaded);
+        Assert.Equal((32, 32), ctrl.BitmapSize);
+    }
+
+    [AvaloniaFact]
+    public void Wireframe_LoadTexture_WithKnownBitmap_RendersCorrectColor()
+    {
+        var ctx = ResetSingletons();
+        var ctrl = ctx.CreateWireframeControl();
+        using var knownBitmap = MakeSolidBitmap(SKColors.Red, size: 32);
+
+        ctrl.LoadTexture("sample/player.png", knownBitmap);
+        ctrl.SetCamera(0f, 0f, 1f);
+
+        using var bm = ctrl.RenderToBitmap(64, 64);
+        var px = bm.GetPixel(16, 16);
+        Assert.True(px.Red > 150, $"Should render the known bitmap's red; R={px.Red}");
+    }
+
+    [AvaloniaFact]
+    public void Wireframe_LoadTexture_WithKnownBitmap_DoesNotDisposeCallerOwnedBitmap()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var otherPng = WriteSolidPng(dir, "other.png", SKColors.Blue, size: 16);
+            var ctrl = ctx.CreateWireframeControl();
+            var knownBitmap = MakeSolidBitmap(SKColors.Red, size: 32); // not disposed by this test
+
+            ctrl.LoadTexture("sample/player.png", knownBitmap);
+            // Switch to a real disk-backed texture -- must not dispose the caller-owned bitmap
+            // above, since ThumbnailService's cache (not this control) owns its lifetime.
+            ctrl.LoadTexture(otherPng);
+
+            var ex = Record.Exception(() => knownBitmap.GetPixel(0, 0));
+            Assert.Null(ex);
+            knownBitmap.Dispose(); // caller's responsibility, proving the control never touched it
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// End-to-end: RefreshAll() (the method SelectionChanged/AchxLoaded actually call) must
+    /// resolve a ThumbnailService-seeded texture and render it, with no file on disk at all --
+    /// the real shape of the browser-wasm case (#614), not just the LoadTexture unit-level check.
+    /// </summary>
+    [AvaloniaFact]
+    public void Wireframe_RefreshAll_UsesThumbnailServiceSeededTexture_WithNoFileOnDisk()
+    {
+        var ctx = ResetSingletons();
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "seeded.png", FrameLength = 0.1f,
+            LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+            ShapesSave = new ShapesSave(),
+        };
+        var chain = new AnimationChainSave { Name = "Test" };
+        chain.Frames.Add(frame);
+        ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+        ctx.SelectedState.SelectedChain = chain;
+        ctx.SelectedState.SelectedFrame = frame;
+
+        using var bitmap = MakeSolidBitmap(SKColors.Red, size: 32);
+        ctx.ThumbnailService.SeedTexture("seeded.png", bitmap);
+
+        var ctrl = new AnimationEditor.App.Controls.WireframeControl();
+        ctrl.InitializeServices(
+            ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents,
+            ctx.ProjectManager, ctx.UndoManager, ctx.PendingCutState,
+            thumbnailService: ctx.ThumbnailService);
+
+        ctrl.RefreshAll();
+        ctrl.SetCamera(0f, 0f, 1f);
+
+        using var bm = ctrl.RenderToBitmap(64, 64);
+        var px = bm.GetPixel(16, 16);
+        Assert.True(px.Red > 150, $"Should render the seeded texture; R={px.Red}");
+    }
 }

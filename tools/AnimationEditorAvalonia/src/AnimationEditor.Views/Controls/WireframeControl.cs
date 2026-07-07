@@ -307,11 +307,20 @@ public class WireframeControl : TextureViewport
     private IProjectManager? _projectManager;
     private IUndoManager? _undoManager;
     private Action<string>? _showError;
+    private ThumbnailService? _thumbnailService;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
+    /// <param name="thumbnailService">
+    /// Optional. When supplied, <see cref="RefreshAll"/> resolves the current texture through
+    /// it (bare-name lookup against its cache first, falling back to disk) instead of always
+    /// reading straight from disk -- the seam the browser-wasm build needs (#614), since it has
+    /// no filesystem but already has every dropped/picked texture decoded via
+    /// <see cref="ThumbnailService.SeedTexture"/>. Left <c>null</c> on desktop, where reading the
+    /// resolved path from disk (the pre-#614 behavior) is unchanged.
+    /// </param>
     public void InitializeServices(
         ISelectedState selectedState,
         IAppState appState,
@@ -320,7 +329,8 @@ public class WireframeControl : TextureViewport
         IProjectManager projectManager,
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
-        Action<string>? showError = null)
+        Action<string>? showError = null,
+        ThumbnailService? thumbnailService = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -330,6 +340,7 @@ public class WireframeControl : TextureViewport
         _projectManager  = projectManager;
         _undoManager     = undoManager;
         _showError       = showError;
+        _thumbnailService = thumbnailService;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
@@ -457,7 +468,17 @@ public class WireframeControl : TextureViewport
     public void RefreshAll()
     {
         var path = DetermineTexturePath();
-        LoadTexture(path);
+
+        SKBitmap? known = null;
+        if (_thumbnailService != null)
+        {
+            var frame = _selectedState?.SelectedFrame ?? _selectedState?.SelectedChain?.Frames?.FirstOrDefault();
+            var resolvedPath = _thumbnailService.ResolveTexturePath(frame);
+            if (resolvedPath != null)
+                known = _thumbnailService.GetBitmap(resolvedPath);
+        }
+
+        LoadTexture(path, known);
     }
 
     /// <inheritdoc />
