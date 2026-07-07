@@ -18,10 +18,17 @@ public class RevealAnimationTests
     }
 
     [Fact]
-    public void Scale_NearEnd_OvershootsBelowActualSize()
+    public void Scale_GrowsThenSettles_NeverBelowActualSize()
     {
-        // The back-ease overshoots: the box dips a hair under its real size before settling,
-        // which reads as a single clean bounce.
-        Assert.True(RevealAnimation.Scale(0.8f) < 1f);
+        // Grow-and-settle: the box starts large and eases monotonically down to its real size,
+        // never dipping under it (no undershoot that would make it smaller than the region).
+        float prev = RevealAnimation.Scale(0f);
+        for (int i = 1; i <= 100; i++)
+        {
+            float s = RevealAnimation.Scale(i / 100f);
+            Assert.True(s >= 1f - 1e-4f, $"scale dipped below final size at t={i / 100f}: {s}");
+            Assert.True(s <= prev + 1e-4f, $"scale grew instead of settling at t={i / 100f}");
+            prev = s;
+        }
     }
 }
