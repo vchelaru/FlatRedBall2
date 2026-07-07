@@ -15,18 +15,39 @@
             <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
         </StackPanel>
 
+        <!-- Editable (#610 follow-up): committed on LostFocus/Enter via CommitRectProps, routed
+             through AppCommands.SetRectProps, same commit-boundary pattern MainWindow uses
+             for its own PropRect* fields. -->
         <StackPanel x:Name="RectPanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
             <TextBlock Text="Rectangle" FontWeight="Bold" />
-            <TextBlock x:Name="RectNameText" x:FieldModifier="Public" />
-            <TextBlock x:Name="RectPositionText" x:FieldModifier="Public" />
-            <TextBlock x:Name="RectScaleText" x:FieldModifier="Public" />
+            <TextBox x:Name="RectNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                <TextBlock Text="Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Scale X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectScaleXInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+                <TextBlock Text="Scale Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectScaleYInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
         </StackPanel>
 
         <StackPanel x:Name="CirclePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
             <TextBlock Text="Circle" FontWeight="Bold" />
-            <TextBlock x:Name="CircleNameText" x:FieldModifier="Public" />
-            <TextBlock x:Name="CirclePositionText" x:FieldModifier="Public" />
-            <TextBlock x:Name="CircleRadiusText" x:FieldModifier="Public" />
+            <TextBox x:Name="CircleNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                <TextBlock Text="Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Radius:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleRadiusInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
         </StackPanel>
     </StackPanel>
 </UserControl>

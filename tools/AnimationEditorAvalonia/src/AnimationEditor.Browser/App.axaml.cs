@@ -6,7 +6,10 @@ using AnimationEditor.App.Services;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.App.Theming;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
@@ -56,6 +59,15 @@ public partial class App : Application
             projectManager, selectedState, applicationEvents, ioManager, objectFinder, undoManager);
         var thumbnailService  = new ThumbnailService(projectManager);
 
+        // #610: the first browser setting worth persisting -- theme has a real toggle button
+        // below, unlike zoom/grid/recent-files, which have no browser UI yet (see
+        // docs/BROWSER_SETTINGS_DECISION.md for why those aren't wired up until they do).
+        // LocalStorageInterop.InitializeAsync() (Program.cs) must have already completed by the
+        // time this runs -- BuildView is only reached after Program.Main's Task.WhenAll finishes.
+        var settingsStore = new BrowserSettingsStore(new JsLocalStorage());
+        var currentTheme = settingsStore.LoadTheme() ?? AppTheme.Dark; // matches AppSettingsModel's default
+        Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
+
         var acls = AnimationChainListSave.FromString(SampleContent.AchxText);
         var bitmap = SKBitmap.Decode(SampleContent.PngBytes);
         thumbnailService.SeedTexture("player.png", bitmap);
@@ -84,7 +96,9 @@ public partial class App : Application
         var animationTree = new AnimationTreeControl();
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
+        inspector.EnableEditing(appCommands);
         animationTree.InitializeServices(selectedState, acls);
+        animationTree.EnableRename(appCommands);
 
         // Selecting a chain with no frame pinned auto-plays it (PreviewControl.OnSelectionChanged).
         selectedState.SelectedChain = acls.AnimationChains[0];
@@ -94,13 +108,98 @@ public partial class App : Application
         var openButton = new Button { Content = "Open Folder…" };
         var saveAsButton = new Button { Content = "Save As…" };
         var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
+        var themeButton = new Button { Content = $"Theme: {currentTheme}" };
         var toolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             Margin = new Thickness(8),
-            Children = { openButton, saveAsButton, reloadButton },
+            Children = { openButton, saveAsButton, reloadButton, themeButton },
         };
+
+        themeButton.Click += (_, _) =>
+        {
+            currentTheme = currentTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark;
+            Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
+            settingsStore.SaveTheme(currentTheme);
+            themeButton.Content = $"Theme: {currentTheme}";
+        };
+
+        // Phase 2 (#610): mutation + Undo/Redo, routed entirely through the already-built,
+        // already-tested AppCommands/UndoManager -- no new mutation logic here, only wiring.
+        // Renaming, shape add/delete, editable inspector fields, and settings persistence are
+        // deferred to follow-up issues (see the PR description for the full list).
+        var addAnimationButton = new Button { Content = "Add Animation" };
+        var addFrameButton = new Button { Content = "Add Frame" };
+        var addRectButton = new Button { Content = "Add Rectangle" };
+        var addCircleButton = new Button { Content = "Add Circle" };
+        var deleteSelectedButton = new Button { Content = "Delete Selected" };
+        var undoButton = new Button { Content = "Undo", IsEnabled = false };
+        var redoButton = new Button { Content = "Redo", IsEnabled = false };
+        var editToolbar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Margin = new Thickness(8, 0, 8, 8),
+            Children =
+            {
+                addAnimationButton, addFrameButton, addRectButton, addCircleButton,
+                deleteSelectedButton, undoButton, redoButton,
+            },
+        };
+
+        void UpdateUndoRedoButtons()
+        {
+            undoButton.IsEnabled = undoManager.CanUndo;
+            redoButton.IsEnabled = undoManager.CanRedo;
+        }
+        undoManager.StackChanged += UpdateUndoRedoButtons;
+
+        // Both Add/Delete commands raise AnimationChainsChanged -- refresh the tree once, here,
+        // rather than after every individual button handler.
+        applicationEvents.AnimationChainsChanged += animationTree.Refresh;
+
+        addAnimationButton.Click += (_, _) =>
+        {
+            var currentAcls = projectManager.AnimationChainListSave;
+            if (currentAcls is null) return;
+            var existingNames = currentAcls.AnimationChains.Select(c => c.Name).ToList();
+            var name = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
+            appCommands.AddAnimationChainWithName(name);
+        };
+
+        addFrameButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedChain is { } chain)
+                appCommands.AddFrame(chain);
+        };
+
+        addRectButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedFrame is { } frame)
+                appCommands.AddAxisAlignedRectangle(frame);
+        };
+
+        addCircleButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedFrame is { } frame)
+                appCommands.AddCircle(frame);
+        };
+
+        deleteSelectedButton.Click += (_, _) =>
+        {
+            if (selectedState.SelectedRectangle is { } rect && selectedState.SelectedFrame is { } rectFrame)
+                appCommands.DeleteShapes(rectFrame, new List<AARectSave> { rect }, new List<CircleSave>());
+            else if (selectedState.SelectedCircle is { } circle && selectedState.SelectedFrame is { } circleFrame)
+                appCommands.DeleteShapes(circleFrame, new List<AARectSave>(), new List<CircleSave> { circle });
+            else if (selectedState.SelectedFrame is { } frame)
+                appCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
+            else if (selectedState.SelectedChain is { } selectedChain)
+                appCommands.DeleteAnimationChains(new List<AnimationChainSave> { selectedChain });
+        };
+
+        undoButton.Click += (_, _) => undoManager.Undo();
+        redoButton.Click += (_, _) => undoManager.Redo();
 
         // #535 M3 follow-up: no FileSystemWatcher in the browser, so texture edits made outside
         // the page (e.g. re-saving a PNG in an image editor) are only detected by polling
@@ -168,6 +267,8 @@ public partial class App : Application
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
         root.Children.Add(toolbar);
+        DockPanel.SetDock(editToolbar, Dock.Top);
+        root.Children.Add(editToolbar);
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
         root.Children.Add(mainArea);
