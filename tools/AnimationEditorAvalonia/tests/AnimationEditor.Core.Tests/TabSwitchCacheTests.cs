@@ -134,6 +134,9 @@ public class TabSwitchCacheTests : IDisposable
         public void SaveAnimationChainList(string targetPath) =>
             _inner.SaveAnimationChainList(targetPath);
 
+        public void SaveAnimationChainList(System.IO.Stream stream) =>
+            _inner.SaveAnimationChainList(stream);
+
         public string? ResolveFilesPanelRoot() => _inner.ResolveFilesPanelRoot();
 
         public (int Width, int Height)? GetTextureSizeInPixels(string textureName) =>

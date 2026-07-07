@@ -190,4 +190,45 @@ public class ProjectManagerLoadTests : IDisposable
 
         Assert.Equal(TextureCoordinateType.Pixel, pm.OnDiskCoordinateType);
     }
+
+    // ── TextureName with a subfolder prefix, known sizes keyed by bare filename ────────────
+    // (Browser folder enumeration is non-recursive, so BrowserProjectLoader/BrowserFolderWatcher
+    // key knownTextureSizes by bare file name. A .achx authored with FileRelativeTextures can
+    // still reference "Textures/sprite.png" -- the lookup must fall back to matching by bare
+    // filename instead of silently missing and falling through to a disk read that always fails
+    // in the browser.)
+
+    [Fact]
+    public void LoadAnimationChain_TextureNameHasSubfolderPrefix_StillResolvesFromBareFilenameKnownSizes()
+    {
+        var pm = new ProjectManager();
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "Textures/sprite.png",
+            LeftCoordinate = 0f,
+            RightCoordinate = 32f,
+            TopCoordinate = 0f,
+            BottomCoordinate = 64f,
+        };
+        var chain = new AnimationChainSave { Name = "Chain1" };
+        chain.Frames.Add(frame);
+        var preParsed = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        preParsed.AnimationChains.Add(chain);
+
+        // Keyed by bare filename, as the browser's non-recursive folder enumeration produces.
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>
+        {
+            ["sprite.png"] = (32, 64),
+        };
+
+        pm.LoadAnimationChain(
+            new FilePath(TestPaths.Abs("browser", "does-not-exist3.achx")),
+            preParsed,
+            knownTextureSizes);
+
+        Assert.Equal(0f, frame.LeftCoordinate);
+        Assert.Equal(1f, frame.RightCoordinate);
+        Assert.Equal(0f, frame.TopCoordinate);
+        Assert.Equal(1f, frame.BottomCoordinate);
+    }
 }

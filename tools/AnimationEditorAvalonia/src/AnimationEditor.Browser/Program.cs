@@ -15,8 +15,11 @@ internal sealed class Program
         // HttpClient needs an absolute BaseAddress to resolve relative request URIs; main.js
         // passes the page URL as args[0] (runMain(mainAssemblyName, [location.href])).
         using var http = new HttpClient { BaseAddress = new Uri(args[0]) };
-        SampleContent.AchxText = await http.GetStringAsync("sample/player.achx");
-        SampleContent.PngBytes = await http.GetByteArrayAsync("sample/player.png");
+        var achxTask = http.GetStringAsync("sample/player.achx");
+        var pngTask = http.GetByteArrayAsync("sample/player.png");
+        await Task.WhenAll(achxTask, pngTask);
+        SampleContent.AchxText = achxTask.Result;
+        SampleContent.PngBytes = pngTask.Result;
 
         await BuildAvaloniaApp()
             .WithInterFont()

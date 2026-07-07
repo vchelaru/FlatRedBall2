@@ -7,6 +7,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -56,17 +57,34 @@ public partial class App : Application
         var thumbnailService  = new ThumbnailService(projectManager);
 
         var acls = AnimationChainListSave.FromString(SampleContent.AchxText);
-        // "sample/player.achx" doesn't exist on disk (no filesystem in the browser); preParsed
-        // means LoadAnimationChain never tries to read it, only uses it as a logical identity.
-        projectManager.LoadAnimationChain(new FilePath("sample/player.achx"), acls);
-
         var bitmap = SKBitmap.Decode(SampleContent.PngBytes);
         thumbnailService.SeedTexture("player.png", bitmap);
+
+        // "sample/player.achx" doesn't exist on disk (no filesystem in the browser); preParsed
+        // means LoadAnimationChain never tries to read it, only uses it as a logical identity.
+        // knownTextureSizes mirrors BrowserProjectLoader's real load path -- the bundled sample
+        // happens to be UV-format today so this isn't load-bearing yet, but a Pixel-format
+        // sample would otherwise silently fail the same way BrowserProjectLoader's fix (#535)
+        // was needed for.
+        var knownTextureSizes = new Dictionary<string, (int Width, int Height)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["player.png"] = (bitmap.Width, bitmap.Height),
+        };
+        projectManager.LoadAnimationChain(new FilePath("sample/player.achx"), acls, knownTextureSizes);
 
         var preview = new PreviewControl();
         preview.InitializeServices(
             selectedState, appState, appCommands, applicationEvents,
             projectManager, undoManager, thumbnailService, pendingCutState);
+
+        // Phase 1 (#603): read-only browsing of every chain/frame/shape in the loaded file,
+        // replacing the previous hardcoded "always show AnimationChains[0]" behavior. Both
+        // controls are independent of each other and of PreviewControl -- any of the three can
+        // drive ISelectedState, and the others react via SelectionChanged.
+        var animationTree = new AnimationTreeControl();
+        var inspector = new InspectorControl();
+        inspector.InitializeServices(selectedState);
+        animationTree.InitializeServices(selectedState, acls);
 
         // Selecting a chain with no frame pinned auto-plays it (PreviewControl.OnSelectionChanged).
         selectedState.SelectedChain = acls.AnimationChains[0];
@@ -125,12 +143,34 @@ public partial class App : Application
             preview.InvalidateVisual();
         };
 
+        // Left column: tree (fills available height) over inspector (sized to content).
+        // Right: preview. Both new controls are pure UserControls with no dependency on this
+        // layout shape -- MainWindow lays the equivalent panels out differently.
+        var leftColumn = new Grid
+        {
+            Width = 260,
+            RowDefinitions = new RowDefinitions("*,Auto"),
+        };
+        Grid.SetRow(animationTree, 0);
+        Grid.SetRow(inspector, 1);
+        leftColumn.Children.Add(animationTree);
+        leftColumn.Children.Add(inspector);
+
+        var mainArea = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+        };
+        Grid.SetColumn(leftColumn, 0);
+        Grid.SetColumn(preview, 1);
+        mainArea.Children.Add(leftColumn);
+        mainArea.Children.Add(preview);
+
         var root = new DockPanel();
         DockPanel.SetDock(toolbar, Dock.Top);
         root.Children.Add(toolbar);
         DockPanel.SetDock(status, Dock.Bottom);
         root.Children.Add(status);
-        root.Children.Add(preview);
+        root.Children.Add(mainArea);
 
         DragDrop.SetAllowDrop(root, true);
         root.AddHandler(DragDrop.DragOverEvent, (_, e) =>
@@ -148,6 +188,9 @@ public partial class App : Application
             status.Text = loaded
                 ? $"Loaded from {files.Count} dropped file(s)."
                 : "Drop must include an .achx file (drop its texture PNG(s) alongside it).";
+
+            if (loaded)
+                animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
         });
 
         openButton.Click += async (_, _) =>
@@ -172,6 +215,9 @@ public partial class App : Application
             status.Text = loaded
                 ? $"Loaded from folder \"{folder.Name}\"."
                 : $"No .achx found in \"{folder.Name}\".";
+
+            if (loaded)
+                animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
 
             folderWatcher?.Dispose();
             pendingChangedPngs.Clear();
@@ -210,7 +256,7 @@ public partial class App : Application
             if (file is null) return;
 
             await using var stream = await file.OpenWriteAsync();
-            acls.Save(stream);
+            projectManager.SaveAnimationChainList(stream);
             status.Text = $"Saved to {file.Name}.";
         };
 

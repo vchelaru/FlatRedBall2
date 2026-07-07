@@ -24,6 +24,8 @@ internal sealed class BrowserFolderWatcher : IDisposable
     private readonly DispatcherTimer _timer;
     private Dictionary<string, FolderEntrySnapshot> _lastKnown = new();
     private bool _seeded;
+    private bool _pollInFlight;
+    private bool _disposed;
 
     /// <summary>Fires with the names of every .png whose size or last-modified time changed
     /// since the previous poll. Never fires on the very first poll (that just seeds the baseline).</summary>
@@ -43,28 +45,49 @@ internal sealed class BrowserFolderWatcher : IDisposable
         _timer.Start();
     }
 
+    // Enumerating a folder and fetching each file's properties is async and can plausibly
+    // outlast the poll interval (many files, a throttled background tab). DispatcherTimer
+    // re-arms on its own schedule regardless of whether the previous tick's task finished, so
+    // without this guard two overlapping polls would race on _lastKnown/_seeded.
     private async Task PollAsync()
     {
-        var current = new Dictionary<string, FolderEntrySnapshot>();
-        await foreach (var item in _folder.GetItemsAsync())
+        if (_pollInFlight || _disposed) return;
+        _pollInFlight = true;
+        try
         {
-            if (item is not IStorageFile file) continue;
-            if (!file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) continue;
+            var current = new Dictionary<string, FolderEntrySnapshot>();
+            await foreach (var item in _folder.GetItemsAsync())
+            {
+                if (item is not IStorageFile file) continue;
+                if (!file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var props = await file.GetBasicPropertiesAsync();
-            current[file.Name] = new FolderEntrySnapshot(props.Size, props.DateModified);
+                var props = await file.GetBasicPropertiesAsync();
+                current[file.Name] = new FolderEntrySnapshot(props.Size, props.DateModified);
+            }
+
+            // Dispose() may have been called while the enumeration above was in flight (e.g.
+            // the user opened a different folder mid-poll) -- don't publish a stale snapshot.
+            if (_disposed) return;
+
+            if (_seeded)
+            {
+                var changed = FolderSnapshotDiff.FindChanged(_lastKnown, current).ToList();
+                if (changed.Count > 0)
+                    ChangedPngsDetected?.Invoke(changed);
+            }
+
+            _seeded = true;
+            _lastKnown = current;
         }
-
-        if (_seeded)
+        finally
         {
-            var changed = FolderSnapshotDiff.FindChanged(_lastKnown, current).ToList();
-            if (changed.Count > 0)
-                ChangedPngsDetected?.Invoke(changed);
+            _pollInFlight = false;
         }
-
-        _seeded = true;
-        _lastKnown = current;
     }
 
-    public void Dispose() => _timer.Stop();
+    public void Dispose()
+    {
+        _disposed = true;
+        _timer.Stop();
+    }
 }
