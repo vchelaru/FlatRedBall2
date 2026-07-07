@@ -30,6 +30,8 @@
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="Scale X:" VerticalAlignment="Center" />
                 <NumericUpDown x:Name="RectScaleXInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
                 <TextBlock Text="Scale Y:" VerticalAlignment="Center" />
                 <NumericUpDown x:Name="RectScaleYInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
             </StackPanel>
