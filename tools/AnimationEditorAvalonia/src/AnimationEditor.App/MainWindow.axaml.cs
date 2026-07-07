@@ -101,7 +101,12 @@ public partial class MainWindow : Window
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
-    // Debounces the two diff sliders so dragging re-merges once the user pauses, not per pixel-tick.
+    // Fixed pixel-diff tolerance: max per-channel RGBA delta still counted as unchanged. Absorbs
+    // re-export / anti-alias noise; a solid default so the user never has to tune it. The one exposed
+    // control (the Grouping slider) tunes only region merge distance — which regroups boxes but never
+    // hides a real change.
+    private const int DiffTolerance = 12;
+    // Debounces the Grouping slider so dragging re-merges once the user pauses, not per pixel-tick.
     private DispatcherTimer? _diffSliderDebounce;
 
     private List<AnimationChainSave>? _pendingPastedChains;
@@ -1174,8 +1179,7 @@ public partial class MainWindow : Window
         // the latest-wins token, so this second call's compute is discarded before it paints — no
         // double reveal. handledEventsToo: selection marks the press handled, but the tap still routes.
         RevisionList.AddHandler(InputElement.TappedEvent, OnRevisionTapped, handledEventsToo: true);
-        DiffToleranceSlider.PropertyChanged += OnDiffSliderPropertyChanged;
-        DiffMergeSlider.PropertyChanged += OnDiffSliderPropertyChanged;
+        DiffGroupingSlider.PropertyChanged += OnDiffSliderPropertyChanged;
     }
 
     private void OnRevisionTapped(object? sender, TappedEventArgs e)
@@ -1195,8 +1199,7 @@ public partial class MainWindow : Window
 
         // Reflect the value immediately; debounce the (potentially expensive) re-diff so a drag
         // recomputes once the user settles rather than on every intermediate value.
-        DiffToleranceValue.Text = ((int)DiffToleranceSlider.Value).ToString();
-        DiffMergeValue.Text = ((int)DiffMergeSlider.Value).ToString();
+        DiffGroupingValue.Text = ((int)DiffGroupingSlider.Value).ToString();
 
         _diffSliderDebounce ??= CreateDiffSliderDebounceTimer();
         _diffSliderDebounce.Stop();
@@ -1336,8 +1339,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        int tolerance = (int)DiffToleranceSlider.Value;
-        int distance = (int)DiffMergeSlider.Value;
+        int tolerance = DiffTolerance;
+        int distance = (int)DiffGroupingSlider.Value;
         int requestId = ++_diffRequestId;
 
         IReadOnlyList<PixelRegion> regions;
