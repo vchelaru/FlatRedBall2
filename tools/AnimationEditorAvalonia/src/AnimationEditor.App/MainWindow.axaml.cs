@@ -1172,14 +1172,73 @@ public partial class MainWindow : Window
     // file, so a later deselect knows to restore the current image.
     private bool _pngShowingRevision;
 
-    private void LoadBlameForPng(string absolutePath)
+    // Latest-wins guard: only the newest requested history load populates the list, so a slow load
+    // for a tab the user already left never clobbers the current one. Read/written on the UI thread.
+    private int _blameLoadId;
+
+    // The most recent history load, awaited by the next one so the loads run in issue order — that
+    // keeps the service's state on the most-recently-requested file even under fast tab switches.
+    private Task _blameLoadInFlight = Task.CompletedTask;
+
+    // Lets tests await the fire-and-forget history load (it shells out to git in a temp dir; without
+    // awaiting it, a test's cleanup races the live git process for the directory handle).
+    internal Task PendingBlameLoad => _blameLoadInFlight;
+
+    /// <summary>
+    /// Starts loading <paramref name="absolutePath"/>'s git history into the revision list. The git
+    /// calls (dominated by <c>git log --follow</c>) run off the UI thread so switching to a PNG tab
+    /// doesn't freeze the app; the list fills in when the load completes. Fire-and-forget by design.
+    /// </summary>
+    private async void LoadBlameForPng(string absolutePath)
     {
         // The tab just (re)loaded the current on-disk image into PngPane, so we're no longer showing a
-        // historical revision — reset before the SelectedItem=null below re-enters UpdateDiffOverlay.
+        // historical revision.
         _pngShowingRevision = false;
 
-        var result = _blameService.Load(absolutePath);
+        int loadId = ++_blameLoadId;
 
+        // Clear the previous file's revisions immediately and show a transient loading state so the
+        // stale list never lingers while the (potentially slow) git log runs.
+        RevisionList.ItemsSource = null;
+        RevisionList.SelectedItem = null;
+        PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
+        DiffBlameStatus.Text = "Loading history…";
+        DiffBlameStatus.IsVisible = true;
+
+        var previous = _blameLoadInFlight;
+        _blameLoadInFlight = LoadBlameCoreAsync(absolutePath, loadId, previous);
+        await _blameLoadInFlight;
+    }
+
+    private async Task LoadBlameCoreAsync(string absolutePath, int loadId, Task previous)
+    {
+        // Serialize behind any in-flight load so the service's state ends on the most-recently-
+        // requested file; a prior load's failure must not block this one.
+        try { await previous; } catch { }
+
+        PngBlameResult result;
+        try
+        {
+            result = await Task.Run(() => _blameService.Load(absolutePath));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngBlame] history load failed: {ex}");
+            if (loadId == _blameLoadId)
+            {
+                DiffBlameStatus.Text = "History could not be loaded.";
+                DiffBlameStatus.IsVisible = true;
+            }
+            return;
+        }
+
+        // Only the newest requested load populates the list (latest-wins).
+        if (loadId == _blameLoadId)
+            PopulateRevisionList(result);
+    }
+
+    private void PopulateRevisionList(PngBlameResult result)
+    {
         var rows = new List<Models.RevisionEntryVm>(result.Entries.Count);
         for (int i = 0; i < result.Entries.Count; i++)
         {

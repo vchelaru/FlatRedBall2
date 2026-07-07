@@ -42,7 +42,7 @@ public class PngTabTests
     }
 
     [AvaloniaFact]
-    public void OpenPngAsTab_ShowsPngPane_HidesEditor()
+    public async Task OpenPngAsTab_ShowsPngPane_HidesEditor()
     {
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -55,6 +55,7 @@ public class PngTabTests
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
+            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
 
             Assert.True(window.FindControl<PngPreviewControl>("PngPane")!.IsVisible);
             Assert.False(window.FindControl<Grid>("AchxEditorPane")!.IsVisible);
@@ -83,6 +84,7 @@ public class PngTabTests
 
             window.OpenPngAsTab(pngPath);
             Dispatcher.UIThread.RunJobs();
+            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
             await window.OpenFileAsTab(achxPath);
             Dispatcher.UIThread.RunJobs();
 
@@ -97,7 +99,7 @@ public class PngTabTests
     }
 
     [AvaloniaFact]
-    public void OpenPngAsTab_HidesEditingTabsAndFiles_SelectsDiff()
+    public async Task OpenPngAsTab_HidesEditingTabsAndFiles_SelectsDiff()
     {
         // A read-only PNG has no animations, no editable properties, and no undo history — and for now
         // we don't offer file navigation from a PNG either. Hide the ANIMATIONS tree, Inspector,
@@ -111,6 +113,7 @@ public class PngTabTests
         {
             window.OpenPngAsTab(WritePng(dir, "sheet.png"));
             Dispatcher.UIThread.RunJobs();
+            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
 
             Assert.False(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
             Assert.False(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
@@ -133,6 +136,43 @@ public class PngTabTests
     }
 
     [AvaloniaFact]
+    public async Task OpenPngAsTab_LoadsHistoryOffUiThread_ResolvesLoadingState()
+    {
+        // The git history load runs off the UI thread (so a slow `git log --follow` doesn't freeze
+        // the app). Right after opening, the panel shows a transient "Loading…" status; after the
+        // background load marshals its result back, that status resolves to a terminal message.
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            window.OpenPngAsTab(WritePng(dir, "sheet.png"));
+
+            var status = window.FindControl<TextBlock>("DiffBlameStatus")!;
+            string loading = status.Text ?? "";   // set synchronously to the transient loading message
+
+            // Pump the dispatcher until the off-thread load posts its result back (bounded so a hang
+            // fails the test rather than spinning forever).
+            for (int i = 0; i < 200 && (status.Text ?? "") == loading; i++)
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(10);
+            }
+
+            // The temp dir isn't a git repo, so the load resolves to a terminal status — the point is
+            // that it changed off the loading state, proving the async load completed and marshaled back.
+            Assert.NotEqual(loading, status.Text);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task OpenAchxAfterPng_RestoresAnimationInspectorAndHistory()
     {
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -146,6 +186,7 @@ public class PngTabTests
         {
             window.OpenPngAsTab(WritePng(dir, "sheet.png"));
             Dispatcher.UIThread.RunJobs();
+            await window.PendingBlameLoad;   // let the off-thread git load finish before cleanup deletes dir
             await window.OpenFileAsTab(WriteAchx(dir, "hero.achx"));
             Dispatcher.UIThread.RunJobs();
 
