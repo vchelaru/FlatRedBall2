@@ -1527,32 +1527,39 @@
                  the pan directly (overlaid + auto-hide), mirroring the wireframe panel. -->
             <Grid x:Name="PngPaneGrid" Grid.Column="2" RowDefinitions="Auto,*"
                   Background="{DynamicResource BgCanvas}" IsVisible="False">
-                <!-- PNG toolbar (#606): a thin bar the same height as the editor's toolbar. Left: the
-                     lone "Grouping" knob (affects the change-box display, not the tree). Right: the
-                     current zoom, handy for taking 1:1 screenshots. Tolerance is fixed in code. -->
+                <!-- PNG toolbar (#606): a thin bar the same height as the editor's toolbar. Left-to-
+                     right, matching the wireframe/preview toolbars: the "Grouping" knob (affects the
+                     change-box display, not the tree), then the current zoom (handy for 1:1
+                     screenshots). Tolerance is fixed in code. -->
                 <Border Grid.Row="0" Background="{DynamicResource BgRail}"
                         BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
                         Padding="8,3">
-                    <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
-                                    VerticalAlignment="Center">
-                            <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource InkMid}" />
-                            <!-- MinHeight 0 overrides Fluent's tall default; Height 28 comfortably fits
-                                 the Fluent thumb (a shorter bar clipped the thumb top/bottom) while
-                                 keeping the bar close to the editor toolbar's height. -->
-                            <Slider x:Name="DiffGroupingSlider" Width="160" Height="28" MinHeight="0"
-                                    VerticalAlignment="Center"
-                                    Minimum="1" Maximum="128" Value="16"
-                                    SmallChange="1" LargeChange="8"
-                                    ToolTip.Tip="How close changed pixels must be to group into one highlighted box. Higher = fewer, larger boxes. Rarely needs changing." />
-                            <TextBlock x:Name="DiffGroupingValue" Text="16" FontSize="11"
-                                       MinWidth="20" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Ink}" />
-                        </StackPanel>
-                        <views:ZoomControl x:Name="PngZoom" Grid.Column="2"
-                                           VerticalAlignment="Center" Margin="8,0,0,0" />
-                    </Grid>
+                    <!-- Left-anchored WrapPanel mirrors the .achx toolbars: every control stacks from
+                         the left (and reflows when narrow, #510), so zoom lands in the same place as in
+                         the editor rather than pinned to the right. -->
+                    <WrapPanel VerticalAlignment="Center">
+                        <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
+                                   Margin="0,0,6,0" Foreground="{DynamicResource InkMid}" />
+                        <!-- No explicit Height: the Fluent thumb is sized for the theme's natural
+                             slider height, so forcing the bar shorter clips the thumb (it overflows and
+                             is covered by the canvas below). -->
+                        <Slider x:Name="DiffGroupingSlider" Width="160"
+                                VerticalAlignment="Center"
+                                Minimum="1" Maximum="128" Value="16"
+                                SmallChange="1" LargeChange="8"
+                                ToolTip.Tip="How close changed pixels must be to group into one highlighted box. Higher = fewer, larger boxes. Rarely needs changing." />
+                        <TextBlock x:Name="DiffGroupingValue" Text="16" FontSize="11"
+                                   MinWidth="20" Margin="6,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Ink}" />
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   Foreground="{DynamicResource InkMid}" FontSize="11" />
+                        <views:ZoomControl x:Name="PngZoom" VerticalAlignment="Center" />
+                    </WrapPanel>
                 </Border>
 
                 <views:PngPreviewControl x:Name="PngPane" Grid.Row="1" />
