@@ -221,8 +221,15 @@ public partial class MainWindow : Window
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
-        _pngFolderWatcher.FolderContentsChanged += () =>
-            Dispatcher.UIThread.InvokeAsync(RefreshFilesPanel);
+        _pngFolderWatcher.FolderContentsChanged += changed =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // Evict the changed PNGs so the rebuild re-decodes them (and re-renders their
+                // cached Files-panel thumbnails) instead of serving the stale pre-change image.
+                foreach (var path in changed)
+                    _thumbnailService.InvalidatePath(path);
+                RefreshFilesPanel();
+            });
 
         Opened += OnOpened;
         Closed += (_, _) =>

@@ -272,6 +272,43 @@ public class ThumbnailServiceTests
         Assert.Equal(56, thumb.PixelSize.Height);
     }
 
+    // -- Full-image thumbnail cache tests (Issue #615) ------------------------
+    //
+    // GetFullImageThumbnail (Files panel) downscales a whole PNG. It caches the finished
+    // Avalonia Bitmap keyed by (path + target size) so flipping the Files-panel scope toggle
+    // — which rebuilds the tree — re-uses icons instead of re-running SKImage.FromBitmap on
+    // every source atlas each time. InvalidatePath must drop it so a hot-reloaded PNG re-renders.
+
+    [AvaloniaFact]
+    public void GetFullImageThumbnail_CalledTwiceForSamePath_ReturnsSameCachedInstance()
+    {
+        var svc  = MakeSvc();
+        var path = WriteTempPng(64, 64);
+
+        var first  = svc.GetFullImageThumbnail(path, 28, 28);
+        var second = svc.GetFullImageThumbnail(path, 28, 28);
+
+        Assert.NotNull(first);
+        // Second call must hit the cache, not re-crop/re-wrap — the scope-toggle rebuild path.
+        Assert.Same(first, second);
+    }
+
+    [AvaloniaFact]
+    public void GetFullImageThumbnail_AfterInvalidatePath_ReturnsDifferentInstance()
+    {
+        var svc  = MakeSvc();
+        var path = WriteTempPng(64, 64);
+
+        var first = svc.GetFullImageThumbnail(path, 28, 28);
+        svc.InvalidatePath(path);
+        var afterInvalidate = svc.GetFullImageThumbnail(path, 28, 28);
+
+        Assert.NotNull(first);
+        Assert.NotNull(afterInvalidate);
+        // A hot-reloaded PNG must re-render its Files-panel thumbnail, not show the stale crop.
+        Assert.NotSame(first, afterInvalidate);
+    }
+
     // -- Immutable-image cache tests (Issue #514) -----------------------------
     //
     // The preview render path draws a cached SKImage per texture instead of rebuilding one
