@@ -14,6 +14,7 @@ using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
@@ -89,6 +90,18 @@ public partial class App : Application
             selectedState, appState, appCommands, applicationEvents,
             projectManager, undoManager, thumbnailService, pendingCutState);
 
+        // Phase 3 (#614): shape editing on the canvas. WireframeControl has zero
+        // Avalonia.Desktop dependency (confirmed during the #535/#588 M1 spike, same as
+        // PreviewControl) -- this is wiring an existing, tested control, not new interaction
+        // logic. The one real gap found while researching this (TextureViewport.LoadTexture
+        // reading straight from disk) was fixed separately; passing thumbnailService here is
+        // what makes RefreshAll() use that fix instead of always trying a disk read.
+        var wireframe = new WireframeControl();
+        wireframe.InitializeServices(
+            selectedState, appState, appCommands, applicationEvents,
+            projectManager, undoManager, pendingCutState,
+            thumbnailService: thumbnailService);
+
         // Phase 1 (#603): read-only browsing of every chain/frame/shape in the loaded file,
         // replacing the previous hardcoded "always show AnimationChains[0]" behavior. Both
         // controls are independent of each other and of PreviewControl -- any of the three can
@@ -136,6 +149,7 @@ public partial class App : Application
         var deleteSelectedButton = new Button { Content = "Delete Selected" };
         var undoButton = new Button { Content = "Undo", IsEnabled = false };
         var redoButton = new Button { Content = "Redo", IsEnabled = false };
+        var magicWandButton = new ToggleButton { Content = "Magic Wand" };
         var editToolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -144,8 +158,45 @@ public partial class App : Application
             Children =
             {
                 addAnimationButton, addFrameButton, addRectButton, addCircleButton,
-                deleteSelectedButton, undoButton, redoButton,
+                deleteSelectedButton, undoButton, redoButton, magicWandButton,
             },
+        };
+
+        // Phase 3 (#614): Move mode (drag existing handles/chains) is the wireframe's default
+        // and needs no toggle -- it's just pointer events already wired in WireframeControl's
+        // constructor. Magic Wand mode is the one the user must opt into.
+        magicWandButton.Click += (_, _) => wireframe.IsMagicWandMode = magicWandButton.IsChecked == true;
+
+        // FrameRegionChanged/ChainRegionChanged fire after a handle/chain drag commits;
+        // FrameLiveUpdated fires on every pointer-move frame during the drag (no save, just
+        // keep the inspector/preview in sync); FrameCreatedFromRegion fires from a magic-wand
+        // click or plain-mode ctrl+click. All four mirror MainWindow's own handlers.
+        wireframe.FrameRegionChanged += frame =>
+        {
+            appCommands.RefreshTreeNode(frame);
+            applicationEvents.RaiseAnimationChainsChanged();
+        };
+        wireframe.ChainRegionChanged += _ => applicationEvents.RaiseAnimationChainsChanged();
+        wireframe.FrameLiveUpdated += _ => appCommands.RefreshAnimationFrameDisplay();
+        wireframe.FrameCreatedFromRegion += (minX, minY, maxX, maxY) =>
+        {
+            var chain = selectedState.SelectedChain;
+            if (chain is null) return;
+
+            // wireframe.LoadedTexturePath is DetermineTexturePath()'s achx-relative disk path,
+            // which is synthetic here (the browser's ProjectManager.FileName is a logical
+            // identity, not a real folder) -- it won't match the bare/relative names
+            // ThumbnailService's cache and existing frames actually use. The texture being
+            // edited is always whichever one the selected chain's frames already reference, so
+            // reuse that name directly rather than deriving one from the fake path.
+            var textureName = selectedState.SelectedFrame?.TextureName
+                ?? chain.Frames.FirstOrDefault()?.TextureName;
+            if (string.IsNullOrEmpty(textureName)) return;
+
+            var (bitmapW, bitmapH) = wireframe.BitmapSize;
+            if (bitmapW == 0 || bitmapH == 0) return;
+
+            appCommands.AddFrameFromPixelBounds(chain, textureName, minX, minY, maxX, maxY, bitmapW, bitmapH);
         };
 
         void UpdateUndoRedoButtons()
@@ -255,13 +306,18 @@ public partial class App : Application
         leftColumn.Children.Add(animationTree);
         leftColumn.Children.Add(inspector);
 
+        // Middle: wireframe (shape editing canvas). Right: preview (playback). Both are
+        // independent TextureViewport-derived controls; neither depends on this layout shape --
+        // MainWindow arranges the equivalent panels differently (tabs, not a fixed 3-column split).
         var mainArea = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,*"),
         };
         Grid.SetColumn(leftColumn, 0);
-        Grid.SetColumn(preview, 1);
+        Grid.SetColumn(wireframe, 1);
+        Grid.SetColumn(preview, 2);
         mainArea.Children.Add(leftColumn);
+        mainArea.Children.Add(wireframe);
         mainArea.Children.Add(preview);
 
         var root = new DockPanel();
