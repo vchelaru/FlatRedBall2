@@ -1467,9 +1467,11 @@ public class WireframeControl : TextureViewport
         string? textureName = _selectedState!.SelectedFrame?.TextureName
                            ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
 
-        // Empty chain: borrow the first texture referenced anywhere in the project so the
-        // wireframe shows something to Ctrl+click on to seed the first frame (issue #618).
-        if (string.IsNullOrEmpty(textureName))
+        // When no *frame* is selected (an empty chain, or nothing selected), borrow the first texture
+        // referenced anywhere in the project so the wireframe shows something to Ctrl+click on to seed
+        // the first frame (issue #618). A selected frame with no texture is left blank instead of
+        // borrowing another frame's — the canvas must not imply a texture the frame doesn't have (#616).
+        if (string.IsNullOrEmpty(textureName) && _selectedState!.SelectedFrame is null)
             textureName = TextureListBuilder.GetFirstTextureName(_projectManager!.AnimationChainListSave);
 
         if (string.IsNullOrEmpty(textureName))

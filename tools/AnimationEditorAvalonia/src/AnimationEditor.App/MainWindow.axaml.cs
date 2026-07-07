@@ -1616,11 +1616,12 @@ public partial class MainWindow : Window
             ?? _selectedState.SelectedChains.SelectMany(c => c.Frames).FirstOrDefault()
             ?? _selectedState.SelectedChain?.Frames?.FirstOrDefault();
 
-        // When the selected chain is empty, borrow the first texture referenced anywhere in the
-        // project so the combo + wireframe show something Ctrl-clickable to seed the first frame
-        // (issue #618). Mirrors WireframeControl.DetermineTexturePath's fallback.
+        // Borrow the first texture referenced anywhere in the project ONLY when no frame is selected
+        // (an empty chain), so the combo + wireframe show something Ctrl-clickable to seed the first
+        // frame (issue #618). A selected frame with no texture is left un-assigned rather than
+        // borrowing another frame's. Mirrors WireframeControl.DetermineTexturePath's fallback (#616).
         string? textureName = frame?.TextureName;
-        if (string.IsNullOrEmpty(textureName))
+        if (string.IsNullOrEmpty(textureName) && _selectedState.SelectedFrame is null)
             textureName = TextureListBuilder.GetFirstTextureName(_projectManager.AnimationChainListSave);
 
         if (!string.IsNullOrEmpty(textureName) && !string.IsNullOrEmpty(_projectManager.FileName))
@@ -1645,6 +1646,15 @@ public partial class MainWindow : Window
         else if (texPath != null)
         {
             WireframeCtrl.LoadTexture(texPath);
+        }
+        else if (_selectedState.SelectedFrame is { } selectedFrame && string.IsNullOrEmpty(selectedFrame.TextureName))
+        {
+            // A frame is selected but has no texture: clear the combo so it doesn't imply one is
+            // assigned. Suppress so the clear doesn't fire OnTextureComboChanged. The wireframe is
+            // blanked separately by DetermineTexturePath's RefreshAll (#616).
+            _suppressTextureComboChanged = true;
+            try { TextureCombo.SelectedItem = null; }
+            finally { _suppressTextureComboChanged = false; }
         }
 
         RefreshTextureNameLabel();
