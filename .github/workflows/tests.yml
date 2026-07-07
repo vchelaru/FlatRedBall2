@@ -46,6 +46,9 @@ jobs:
       - name: Test AnimationEditor.App
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      - name: Test AnimationEditor.Views
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+
   animationchain-pack:
     name: Pack AnimationChain NuGet (ubuntu)
     runs-on: ubuntu-latest

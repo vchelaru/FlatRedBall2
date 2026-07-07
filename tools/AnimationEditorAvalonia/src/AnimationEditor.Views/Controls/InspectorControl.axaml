@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.InspectorControl">
+    <StackPanel Margin="8" Spacing="4">
+        <TextBlock x:Name="NoSelectionPanel" x:FieldModifier="Public"
+                   Text="No selection." IsVisible="False" />
+
+        <StackPanel x:Name="FramePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Frame" FontWeight="Bold" />
+            <TextBlock x:Name="FrameTextureText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
+        </StackPanel>
+
+        <StackPanel x:Name="RectPanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Rectangle" FontWeight="Bold" />
+            <TextBlock x:Name="RectNameText" x:FieldModifier="Public" />
+            <TextBlock x:Name="RectPositionText" x:FieldModifier="Public" />
+            <TextBlock x:Name="RectScaleText" x:FieldModifier="Public" />
+        </StackPanel>
+
+        <StackPanel x:Name="CirclePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Circle" FontWeight="Bold" />
+            <TextBlock x:Name="CircleNameText" x:FieldModifier="Public" />
+            <TextBlock x:Name="CirclePositionText" x:FieldModifier="Public" />
+            <TextBlock x:Name="CircleRadiusText" x:FieldModifier="Public" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>
