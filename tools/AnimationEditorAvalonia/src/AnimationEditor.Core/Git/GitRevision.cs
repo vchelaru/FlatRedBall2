@@ -3,7 +3,7 @@ using System;
 namespace AnimationEditor.Core.Git;
 
 /// <summary>
-/// One entry in a PNG's git history, as shown in the Diff/Blame revision list. Also used for the
+/// One entry in a PNG's git history, as shown in the Diff revision list. Also used for the
 /// synthetic "working tree" entry (uncommitted on-disk state) via <see cref="WorkingTree"/>.
 /// </summary>
 public sealed record GitRevision(

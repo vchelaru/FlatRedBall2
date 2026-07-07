@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace AnimationEditor.App.Controls;
 
@@ -41,6 +42,21 @@ public sealed class PngPreviewControl : TextureViewport
     public PngPreviewControl()
     {
         DetachedFromVisualTree += (_, _) => _revealTimer?.Stop();
+    }
+
+    /// <summary>
+    /// Shows a historical revision's decoded image (#606) so the diff boxes overlay the exact pixels
+    /// they were computed against, rather than the current on-disk texture. Call the base
+    /// <see cref="TextureViewport.ForceReloadTexture"/> to return to the current file.
+    /// </summary>
+    public void ShowRevisionImage(ImageData image)
+    {
+        var info = new SKImageInfo(image.Width, image.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        // SKBitmap(info) allocates a tightly-packed RGBA buffer (RowBytes == Width*4), matching
+        // ImageData's row-major layout, so the whole buffer copies in one shot.
+        var bitmap = new SKBitmap(info);
+        Marshal.Copy(image.Rgba, 0, bitmap.GetPixels(), image.Rgba.Length);
+        ShowDecodedTexture(bitmap);   // takes ownership of the bitmap
     }
 
     /// <summary>

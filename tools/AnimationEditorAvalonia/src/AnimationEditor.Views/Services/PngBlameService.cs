@@ -8,13 +8,14 @@ using System.Runtime.InteropServices;
 
 namespace AnimationEditor.App.Services;
 
-/// <summary>Status plus the ordered revision list for the Diff/Blame panel of one PNG.</summary>
+/// <summary>Status plus the ordered revision list for the PNG Diff panel of one file.</summary>
 public sealed record PngBlameResult(GitHistoryStatus Status, IReadOnlyList<GitRevision> Entries);
 
 /// <summary>
-/// Backs the PNG Diff/Blame view: loads a file's git history (via <see cref="GitCli"/>), then on
-/// demand computes the changed-region boxes for a chosen revision by decoding that revision's blob
-/// and its parent's, pixel-diffing (<see cref="PixelDiff"/>), and clustering (<see cref="RegionMerger"/>).
+/// Backs the PNG Diff view: loads a file's git history (via <see cref="GitCli"/>), then on demand
+/// serves the decoded image for a chosen revision (<see cref="GetRevisionImage"/>) and the
+/// changed-region boxes for it by decoding that revision's blob and its parent's, pixel-diffing
+/// (<see cref="PixelDiff"/>), and clustering (<see cref="RegionMerger"/>).
 /// <para>
 /// Decoding and the pixel diff are the expensive steps, so both are cached: decoded blobs by git
 /// object id, and the change mask by (revision, tolerance). Dragging the merge-distance slider only
@@ -109,6 +110,22 @@ public sealed class PngBlameService
 
         var mask = GetOrBuildMask(entryIndex, tolerance);
         return mask is null ? Array.Empty<PixelRegion>() : RegionMerger.Merge(mask, distanceThreshold);
+    }
+
+    /// <summary>
+    /// The decoded image for the revision at <paramref name="entryIndex"/> — the same pixels the
+    /// change boxes for that revision were computed against, so the Diff view shows the selected
+    /// revision's actual image (not always the current file) with its boxes aligned. Returns null
+    /// when the index is out of range or the blob can't be decoded. Reuses the decode cache.
+    /// </summary>
+    public ImageData? GetRevisionImage(int entryIndex)
+    {
+        lock (_computeLock)
+        {
+            if (entryIndex < 0 || entryIndex >= _entries.Count)
+                return null;
+            return DecodeAfter(entryIndex);
+        }
     }
 
     private ChangeMask? GetOrBuildMask(int entryIndex, int tolerance)

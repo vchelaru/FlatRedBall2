@@ -551,6 +551,26 @@ public class TextureViewport : Control
     }
 
     /// <summary>
+    /// Replaces the displayed texture with an already-decoded in-memory <paramref name="bitmap"/>,
+    /// taking ownership of it. Unlike <see cref="LoadTexture(string?)"/> this leaves the file-path
+    /// identity and the saved-camera cache untouched and does not move the camera — used to show a
+    /// historical git revision of the current PNG (#606) while the caller frames the change itself.
+    /// Call <see cref="ForceReloadTexture"/> to return to the current on-disk file.
+    /// </summary>
+    public void ShowDecodedTexture(SKBitmap bitmap)
+    {
+        // Deferred drop of the old image (a compositor draw may still hold it); the old bitmap is
+        // never handed to a render op, so disposing it here is safe — mirrors LoadTexture.
+        _image = null;
+        _bitmap?.Dispose();
+        _bitmap = bitmap;
+        _image = SKImage.FromBitmap(bitmap);
+        OnTextureLoaded(_bitmap);
+        InvalidateVisual();
+        RaiseViewChanged();
+    }
+
+    /// <summary>
     /// Called at the end of every <see cref="LoadTexture"/> path (success, unchanged, clear, or
     /// decode failure) with the newly-loaded bitmap (null when the view is cleared or the decode
     /// failed). The base implementation does nothing; editing subclasses rebuild their per-texture

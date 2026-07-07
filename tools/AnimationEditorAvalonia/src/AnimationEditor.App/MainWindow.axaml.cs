@@ -99,7 +99,7 @@ public partial class MainWindow : Window
     private bool _suppressWireframeScrollSync;
     private bool _suppressPngScrollSync;
 
-    // ── PNG Diff/Blame (#606) ─────────────────────────────────────────────────
+    // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
     // Debounces the two diff sliders so dragging re-merges once the user pauses, not per pixel-tick.
     private DispatcherTimer? _diffSliderDebounce;
@@ -510,7 +510,7 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = false;
             InspectorTab.IsVisible = false;
             HistoryTab.IsVisible = false;
-            // The PNG-only Diff/Blame surface (#606) becomes available; it isn't auto-selected, so a
+            // The PNG-only Diff surface (#606) becomes available; it isn't auto-selected, so a
             // hidden editing tab still falls back to Files (the #605 navigation default).
             DiffBlameTab.IsVisible = true;
             if (ReferenceEquals(SidebarTabs.SelectedItem, InspectorTab) ||
@@ -1132,7 +1132,7 @@ public partial class MainWindow : Window
         _suppressPngScrollSync = false;
     }
 
-    // ── PNG Diff/Blame wiring (#606) ──────────────────────────────────────────
+    // ── PNG Diff wiring (#606) ──────────────────────────────────────────
 
     private void WirePngBlame()
     {
@@ -1164,11 +1164,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Loads <paramref name="absolutePath"/>'s git history into the Diff/Blame revision list, or
+    /// Loads <paramref name="absolutePath"/>'s git history into the Diff revision list, or
     /// shows a fallback message (not a repo / untracked / LFS / git missing). Clears any prior overlay.
     /// </summary>
+    // True while PngPane is displaying a historical revision's image rather than the current on-disk
+    // file, so a later deselect knows to restore the current image.
+    private bool _pngShowingRevision;
+
     private void LoadBlameForPng(string absolutePath)
     {
+        // The tab just (re)loaded the current on-disk image into PngPane, so we're no longer showing a
+        // historical revision — reset before the SelectedItem=null below re-enters UpdateDiffOverlay.
+        _pngShowingRevision = false;
+
         var result = _blameService.Load(absolutePath);
 
         var rows = new List<Models.RevisionEntryVm>(result.Entries.Count);
@@ -1218,6 +1226,11 @@ public partial class MainWindow : Window
         if (RevisionList.SelectedItem is not Models.RevisionEntryVm vm)
         {
             PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
+            if (_pngShowingRevision)
+            {
+                _pngShowingRevision = false;
+                PngPane.ForceReloadTexture();   // back to the current on-disk image
+            }
             return;
         }
 
@@ -1226,9 +1239,17 @@ public partial class MainWindow : Window
         int requestId = ++_diffRequestId;
 
         IReadOnlyList<PixelRegion> regions;
+        ImageData? revisionImage;
         try
         {
-            regions = await Task.Run(() => _blameService.ComputeRegions(vm.Index, tolerance, distance));
+            (regions, revisionImage) = await Task.Run(() =>
+            {
+                var r = _blameService.ComputeRegions(vm.Index, tolerance, distance);
+                // Fetch the revision's image only when we're swapping it (a revision select, not a
+                // same-revision slider drag) — keeps the merge-distance drag from reloading the image.
+                var img = frame ? _blameService.GetRevisionImage(vm.Index) : null;
+                return (r, img);
+            });
         }
         catch (Exception ex)
         {
@@ -1237,8 +1258,17 @@ public partial class MainWindow : Window
         }
 
         // Resumes on the UI thread; ignore if a newer request has since been issued.
-        if (requestId == _diffRequestId)
-            PngPane.SetDiffRegions(regions, frame);
+        if (requestId != _diffRequestId)
+            return;
+
+        // Show the selected revision's actual pixels so the boxes overlay what changed then, not the
+        // current art (the boxes are framed against this image, so this must precede SetDiffRegions).
+        if (frame && revisionImage is not null)
+        {
+            PngPane.ShowRevisionImage(revisionImage);
+            _pngShowingRevision = true;
+        }
+        PngPane.SetDiffRegions(regions, frame);
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)

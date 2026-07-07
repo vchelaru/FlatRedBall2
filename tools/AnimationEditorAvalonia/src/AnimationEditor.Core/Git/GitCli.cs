@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace AnimationEditor.Core.Git;
 
 /// <summary>
-/// Thin wrapper over the <c>git</c> command line for the PNG Diff/Blame view: reads a file's revision
+/// Thin wrapper over the <c>git</c> command line for the PNG Diff view: reads a file's revision
 /// history, fetches a committed blob's raw bytes, and checks for uncommitted changes. All methods
 /// degrade gracefully — a missing <c>git</c> executable or a non-repo path returns a status/empty
 /// result rather than throwing. The pure log parsing lives in <see cref="GitLogParser"/>.

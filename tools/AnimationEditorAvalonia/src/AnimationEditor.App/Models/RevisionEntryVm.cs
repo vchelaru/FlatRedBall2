@@ -1,7 +1,7 @@
 namespace AnimationEditor.App.Models;
 
 /// <summary>
-/// View model for one row in the PNG Diff/Blame revision list (issue #606). <see cref="Index"/> maps
+/// View model for one row in the PNG Diff revision list (issue #606). <see cref="Index"/> maps
 /// the row back to its entry in the <c>PngBlameService</c> revision list so a selection can request
 /// that revision's changed-region overlay.
 /// </summary>

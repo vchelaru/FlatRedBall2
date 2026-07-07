@@ -1037,10 +1037,11 @@
                         </Grid>
                     </TabItem>
 
-                    <!-- Diff / Blame (PNG git history — shown only while a .png tab is active, #606).
-                         Vertical revision rail on top of the image; two live sliders tune the pixel
-                         diff (Tolerance) and how nearby changes group into one box (Merge distance). -->
-                    <TabItem x:Name="DiffBlameTab" Header="Diff / Blame" IsVisible="False">
+                    <!-- Diff (PNG git history — shown only while a .png tab is active, #606).
+                         Selecting a revision shows that revision's image with boxes outlining what
+                         changed vs. the previous one; two live sliders tune the pixel diff (Tolerance)
+                         and how nearby changes group into one box (Merge distance). -->
+                    <TabItem x:Name="DiffBlameTab" Header="Diff" IsVisible="False">
                         <Grid RowDefinitions="Auto,Auto,*" Background="{DynamicResource BgPanel}">
                             <!-- Sliders -->
                             <StackPanel Grid.Row="0" Margin="8,6,8,4" Spacing="4"
