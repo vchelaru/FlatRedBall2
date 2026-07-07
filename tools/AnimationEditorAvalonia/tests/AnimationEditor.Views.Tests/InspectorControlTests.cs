@@ -237,4 +237,59 @@ public class InspectorControlTests
 
         control.CommitRectProps(); // no EnableEditing call, no selection -- should just no-op
     }
+
+    // Live testing found a real bug: editing exactly one NumericUpDown field (e.g. via its spin
+    // buttons, which never trigger LostFocus) produced no visible change until a *second* field
+    // was also edited. EnableEditing wired the Rect/Circle numeric fields to LostFocus, but
+    // CommitRectProps/CommitCircleProps were always directly testable (bypassing the wiring), so
+    // no existing test exercised the actual event that fires when a field is edited. These tests
+    // drive the real wiring (setting .Value, matching desktop's own ValueChanged-based
+    // PropRectX/PropRectY/etc.) instead of calling CommitRectProps directly.
+
+    [AvaloniaFact]
+    public void EditingSingleRectField_ViaValueChanged_CommitsImmediately()
+    {
+        var (control, _, rect, _, _) = BuildWithEditableShapes();
+
+        control.RectXInput.Value = 99m;
+
+        Assert.Equal(99f, rect.X);
+    }
+
+    [AvaloniaFact]
+    public void EditingSingleCircleField_ViaValueChanged_CommitsImmediately()
+    {
+        var (control, _, _, circle, state) = BuildWithEditableShapes();
+        state.SelectedCircle = circle;
+
+        control.CircleRadiusInput.Value = 42m;
+
+        Assert.Equal(42f, circle.Radius);
+    }
+
+    [AvaloniaFact]
+    public void SwitchingSelectionBetweenRects_DoesNotLeakStaleFieldValues()
+    {
+        var (control, _, rectA, _, state) = BuildWithEditableShapes();
+        var frame = state.SelectedFrame!;
+        var rectB = new AARectSave { Name = "Other", X = 100f, Y = 200f, ScaleX = 30f, ScaleY = 40f };
+        frame.ShapesSave!.Shapes.Add(rectB);
+
+        // Edit rectA's fields (each ValueChanged commits immediately per the fix above), then
+        // switch selection to rectB. Populating the panel for rectB sets each field in turn
+        // (Name, X, Y, ScaleX, ScaleY) -- if ValueChanged commits fire during that populate, an
+        // early field set (rectB's new X) paired with a not-yet-updated later field (still
+        // rectA's old Y/ScaleX/ScaleY at that instant) would corrupt rectB with rectA's leftovers.
+        control.RectXInput.Value = 1m;
+        control.RectYInput.Value = 2m;
+        control.RectScaleXInput.Value = 3m;
+        control.RectScaleYInput.Value = 4m;
+
+        state.SelectedRectangle = rectB;
+
+        Assert.Equal(100f, rectB.X);
+        Assert.Equal(200f, rectB.Y);
+        Assert.Equal(30f, rectB.ScaleX);
+        Assert.Equal(40f, rectB.ScaleY);
+    }
 }

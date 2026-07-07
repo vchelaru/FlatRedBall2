@@ -2,7 +2,6 @@ using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace AnimationEditor.Core.Export;
 
@@ -45,12 +44,6 @@ public sealed class PixiJsExportResult
 /// </remarks>
 public static class PixiJsSpriteSheetExporter
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
     /// <summary>
     /// Converts <paramref name="acls"/> to a PixiJS spritesheet. <paramref name="textureSizeResolver"/>
     /// maps a frame's <see cref="AnimationFrameSave.TextureName"/> to its pixel size, or <c>null</c>
@@ -115,7 +108,8 @@ public static class PixiJsSpriteSheetExporter
         if (anyDurationDropped)
             warnings.Add("Per-frame durations are not part of the PixiJS spritesheet format and were dropped.");
 
-        return new PixiJsExportResult(JsonSerializer.Serialize(sheet, Options), warnings, orderedTextures);
+        return new PixiJsExportResult(
+            JsonSerializer.Serialize(sheet, PixiJsJsonContext.Default.PixiJsSpriteSheet), warnings, orderedTextures);
     }
 
     private static bool TryBuildRect(

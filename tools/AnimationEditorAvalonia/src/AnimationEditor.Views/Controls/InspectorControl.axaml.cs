@@ -27,6 +27,12 @@ public partial class InspectorControl : UserControl
     private ISelectedState? _selectedState;
     private IAppCommands? _appCommands;
 
+    // Guards CommitRectProps/CommitCircleProps against firing while Refresh() is populating the
+    // panel's own fields from a newly selected shape (see Refresh()'s doc comment). Mirrors
+    // MainWindow's _suppressPropRefresh guard around the identical ApplyRectProps/ApplyCircleProps
+    // wiring.
+    private bool _suppressCommit;
+
     public InspectorControl()
     {
         InitializeComponent();
@@ -39,22 +45,29 @@ public partial class InspectorControl : UserControl
         Refresh();
     }
 
-    /// <summary>Enables editing the Rectangle/Circle panels' fields.</summary>
+    /// <summary>
+    /// Enables editing the Rectangle/Circle panels' fields. Numeric fields commit on
+    /// <c>ValueChanged</c> (matching MainWindow's own PropRectX/PropRectY/etc. wiring) rather than
+    /// <c>LostFocus</c> -- a NumericUpDown's spin buttons never cause the control itself to lose
+    /// focus, so a LostFocus-only commit silently dropped single-field edits until a second field
+    /// happened to be edited afterward (confirmed live). The Name field stays LostFocus/Enter since
+    /// a plain TextBox has no ValueChanged equivalent.
+    /// </summary>
     public void EnableEditing(IAppCommands appCommands)
     {
         _appCommands = appCommands;
 
         RectNameBox.LostFocus += (_, _) => CommitRectProps();
-        RectXInput.LostFocus += (_, _) => CommitRectProps();
-        RectYInput.LostFocus += (_, _) => CommitRectProps();
-        RectScaleXInput.LostFocus += (_, _) => CommitRectProps();
-        RectScaleYInput.LostFocus += (_, _) => CommitRectProps();
+        RectXInput.ValueChanged += (_, _) => CommitRectProps();
+        RectYInput.ValueChanged += (_, _) => CommitRectProps();
+        RectScaleXInput.ValueChanged += (_, _) => CommitRectProps();
+        RectScaleYInput.ValueChanged += (_, _) => CommitRectProps();
         RectNameBox.KeyDown += CommitOnEnter(CommitRectProps);
 
         CircleNameBox.LostFocus += (_, _) => CommitCircleProps();
-        CircleXInput.LostFocus += (_, _) => CommitCircleProps();
-        CircleYInput.LostFocus += (_, _) => CommitCircleProps();
-        CircleRadiusInput.LostFocus += (_, _) => CommitCircleProps();
+        CircleXInput.ValueChanged += (_, _) => CommitCircleProps();
+        CircleYInput.ValueChanged += (_, _) => CommitCircleProps();
+        CircleRadiusInput.ValueChanged += (_, _) => CommitCircleProps();
         CircleNameBox.KeyDown += CommitOnEnter(CommitCircleProps);
     }
 
@@ -72,7 +85,7 @@ public partial class InspectorControl : UserControl
     /// </summary>
     public void CommitRectProps()
     {
-        if (_appCommands is null) return;
+        if (_suppressCommit || _appCommands is null) return;
         if (_selectedState?.SelectedRectangle is not { } rect) return;
         if (RectXInput.Value is not { } x || RectYInput.Value is not { } y ||
             RectScaleXInput.Value is not { } scaleX || RectScaleYInput.Value is not { } scaleY) return;
@@ -87,7 +100,7 @@ public partial class InspectorControl : UserControl
     /// </summary>
     public void CommitCircleProps()
     {
-        if (_appCommands is null) return;
+        if (_suppressCommit || _appCommands is null) return;
         if (_selectedState?.SelectedCircle is not { } circle) return;
         if (CircleXInput.Value is not { } x || CircleYInput.Value is not { } y ||
             CircleRadiusInput.Value is not { } radius) return;
@@ -97,21 +110,36 @@ public partial class InspectorControl : UserControl
             (float)x, (float)y, (float)radius);
     }
 
+    /// <summary>
+    /// Suppresses commits while populating the panel's fields from a newly selected shape: without
+    /// this, setting RectXInput.Value below would fire ValueChanged -> CommitRectProps immediately,
+    /// which reads the *other* Rect fields' still-stale values (the previous selection's) since
+    /// they haven't been set yet in this same pass -- corrupting the newly selected shape with a
+    /// mix of its own and the old selection's values.
+    /// </summary>
     private void Refresh()
     {
-        var s = _selectedState;
-        var rect = s?.SelectedRectangle;
-        var circle = s?.SelectedCircle;
-        var frame = s?.SelectedFrame;
+        _suppressCommit = true;
+        try
+        {
+            var s = _selectedState;
+            var rect = s?.SelectedRectangle;
+            var circle = s?.SelectedCircle;
+            var frame = s?.SelectedFrame;
 
-        FramePanel.IsVisible = frame is not null && rect is null && circle is null;
-        RectPanel.IsVisible = rect is not null;
-        CirclePanel.IsVisible = circle is not null;
-        NoSelectionPanel.IsVisible = frame is null && rect is null && circle is null;
+            FramePanel.IsVisible = frame is not null && rect is null && circle is null;
+            RectPanel.IsVisible = rect is not null;
+            CirclePanel.IsVisible = circle is not null;
+            NoSelectionPanel.IsVisible = frame is null && rect is null && circle is null;
 
-        if (rect is not null) ShowRect(rect);
-        if (circle is not null) ShowCircle(circle);
-        if (frame is not null && rect is null && circle is null) ShowFrame(frame);
+            if (rect is not null) ShowRect(rect);
+            if (circle is not null) ShowCircle(circle);
+            if (frame is not null && rect is null && circle is null) ShowFrame(frame);
+        }
+        finally
+        {
+            _suppressCommit = false;
+        }
     }
 
     private void ShowFrame(AnimationFrameSave frame)
