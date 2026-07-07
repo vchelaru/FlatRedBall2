@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
@@ -92,11 +93,20 @@ public partial class MainWindow : Window
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
-    private bool _suppressZoomComboChanged;
-    private bool _suppressPreviewZoomComboChanged;
     private bool _suppressPreviewScrollSync;
     private bool _suppressWireframeScrollSync;
     private bool _suppressPngScrollSync;
+
+    // ── PNG Diff (#606) ─────────────────────────────────────────────────
+    private readonly Services.PngBlameService _blameService = new();
+    // Pixel-diff tolerance = 0: any inequality is a change. PNG is lossless, so a differing pixel
+    // genuinely differs — there's no format noise to absorb, and a fuzz threshold would only hide real
+    // changes. The one exposed control (the Grouping slider) tunes region merge distance, which
+    // regroups boxes but never hides a change.
+    private const int DiffTolerance = 0;
+    // Debounces the Grouping slider so dragging re-merges once the user pauses, not per pixel-tick.
+    private DispatcherTimer? _diffSliderDebounce;
+
     private List<AnimationChainSave>? _pendingPastedChains;
     private List<bool>? _pendingPastedChainExpand;
 
@@ -193,6 +203,7 @@ public partial class MainWindow : Window
         WireWireframeToolbar();
         WireWireframeControl();
         WirePngViewport();
+        WirePngBlame();
         WirePreviewControls();
         WireTreeView();
         WireWindowFileDrop();
@@ -452,6 +463,14 @@ public partial class MainWindow : Window
         RebuildTabStrip();
     }
 
+    // Latest-wins guard + in-flight handle for the async PNG decode, mirroring the history load.
+    private int _pngTextureLoadId;
+    private Task _pngTextureLoadInFlight = Task.CompletedTask;
+
+    // Lets tests await both background operations a PNG tab kicks off (history load + texture decode)
+    // before deleting the temp dir they read from — otherwise cleanup races the live git/file handles.
+    internal Task WhenPngTabLoaded() => Task.WhenAll(_blameLoadInFlight, _pngTextureLoadInFlight);
+
     /// <summary>Swaps the main pane to the PNG viewer and loads <paramref name="tab"/>'s image.</summary>
     private void ShowPngPane(TabEntry tab)
     {
@@ -459,7 +478,30 @@ public partial class MainWindow : Window
         PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
         SetSidebarForPng(true);
-        PngPane.LoadTexture(tab.Path.FullPath);
+        // Decode the image off the UI thread so the tab appears immediately even for a large sheet;
+        // a "Loading…" overlay shows until it's ready. The history load is likewise async.
+        _pngTextureLoadInFlight = LoadPngTextureAsync(tab.Path.FullPath);
+        LoadBlameForPng(tab.Path.FullPath);
+    }
+
+    private async Task LoadPngTextureAsync(string absolutePath)
+    {
+        int id = ++_pngTextureLoadId;
+        PngLoadingText.IsVisible = true;
+        try
+        {
+            await PngPane.LoadTextureAsync(absolutePath);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngTab] texture load failed: {ex}");
+        }
+        finally
+        {
+            // Only the newest load clears the indicator, so a superseded load can't hide it early.
+            if (id == _pngTextureLoadId)
+                PngLoadingText.IsVisible = false;
+        }
     }
 
     /// <summary>Swaps back to the achx editor pane and releases any previewed image. No-op if already showing it.</summary>
@@ -484,8 +526,9 @@ public partial class MainWindow : Window
     /// <summary>
     /// Collapses the animation-editing sidebar surfaces for a read-only PNG-preview tab (issue #604)
     /// and restores them for the achx editor. A PNG has no animations, no editable frame/shape
-    /// properties, and no undo history, so the ANIMATIONS tree, the Inspector tab, and the History
-    /// tab are hidden; only the Files tab (navigation) remains, and it becomes the selected tab.
+    /// properties, and no undo history — and for now we don't offer file navigation from a PNG either
+    /// — so the ANIMATIONS tree and the Inspector, History, and Files tabs are all hidden; only the
+    /// Diff tab (#606) remains, and it becomes the selected tab.
     /// </summary>
     private void SetSidebarForPng(bool png)
     {
@@ -501,11 +544,11 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = false;
             InspectorTab.IsVisible = false;
             HistoryTab.IsVisible = false;
-            // A now-hidden tab can't stay selected or the strip would show blank content — fall back
-            // to Files, the only surface that still makes sense for an image.
-            if (ReferenceEquals(SidebarTabs.SelectedItem, InspectorTab) ||
-                ReferenceEquals(SidebarTabs.SelectedItem, HistoryTab))
-                SidebarTabs.SelectedItem = FilesTab;
+            FilesTab.IsVisible = false;
+            // Diff is the only PNG surface; select it before hiding Files so the strip never shows
+            // a hidden selected tab (blank content).
+            DiffBlameTab.IsVisible = true;
+            SidebarTabs.SelectedItem = DiffBlameTab;
         }
         else
         {
@@ -515,6 +558,12 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = true;
             InspectorTab.IsVisible = true;
             HistoryTab.IsVisible = true;
+            FilesTab.IsVisible = true;
+            // A now-hidden PNG tab can't stay selected or the strip would show blank content — fall
+            // back to the Inspector, the achx editor's default surface.
+            if (ReferenceEquals(SidebarTabs.SelectedItem, DiffBlameTab))
+                SidebarTabs.SelectedItem = InspectorTab;
+            DiffBlameTab.IsVisible = false;
         }
         _sidebarCollapsedForPng = png;
     }
@@ -843,13 +892,7 @@ public partial class MainWindow : Window
         GridSizeInput.LostFocus += OnGridSizeInputLostFocus;
         GridSizePlusBtn.Click  += OnGridSizePlusBtnClick;
         GridSizeMinusBtn.Click += OnGridSizeMinusBtnClick;
-        ZoomCombo.ItemsSource = _zoomPresetTexts;
-        ZoomCombo.KeyDown += OnZoomComboKeyDown;
-        ZoomCombo.LostFocus += OnZoomComboLostFocus;
-        ZoomCombo.SelectionChanged += OnZoomComboSelectionChanged;
-        ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
-        ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
-        WireframeCtrl.WheelZoomPresets = _zoomPresets;
+        WireframeZoom.Attach(WireframeCtrl);
 
         // Default to Move mode
         MoveModeToggle.IsChecked = true;
@@ -964,66 +1007,6 @@ public partial class MainWindow : Window
         SaveCompanionFile();
     }
 
-    // ── Editable zoom combo (top wireframe) ──────────────────────────────────
-    //
-    // AutoCompleteBox is used instead of ComboBox because it accepts arbitrary
-    // text. Wheel-zooming the wireframe can land on values that aren't in the
-    // preset list (e.g. 156%); the combo must display the live percent rather
-    // than snap to the nearest preset.
-    //
-    // Commit boundaries: Enter and LostFocus. SelectionChanged covers the case
-    // where the user picks a preset from the suggestion dropdown. The
-    // suppression flag breaks the feedback loop when ZoomChanged → SyncZoomCombo
-    // writes Text back into the control.
-
-    private static readonly int[] _zoomPresets =
-        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
-    private static readonly string[] _zoomPresetTexts =
-        _zoomPresets.Select(p => $"{p}%").ToArray();
-
-    private void OnZoomComboKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) { CommitZoomComboText(); e.Handled = true; }
-    }
-
-    private void OnZoomComboLostFocus(object? sender, RoutedEventArgs e) => CommitZoomComboText();
-
-    private void OnZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressZoomComboChanged) return;
-        if (ZoomCombo.SelectedItem is string s) ApplyZoomComboText(s);
-    }
-
-    private void CommitZoomComboText()
-    {
-        if (_suppressZoomComboChanged) return;
-        ApplyZoomComboText(ZoomCombo.Text ?? string.Empty);
-    }
-
-    private void ApplyZoomComboText(string text)
-    {
-        if (TryParsePercent(text, out int pct)) WireframeCtrl.SetZoomPercent(pct);
-    }
-
-    /// <summary>
-    /// Updates the ZoomCombo display to the live zoom percent (rounded). Called
-    /// from <see cref="WireframeControl.ZoomChanged"/>; the suppression flag
-    /// stops this write from triggering CommitZoomComboText via LostFocus or
-    /// SelectionChanged feedback.
-    /// </summary>
-    private void SyncZoomCombo(float zoomPercent)
-    {
-        _suppressZoomComboChanged = true;
-        ZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
-        _suppressZoomComboChanged = false;
-    }
-
-    private static bool TryParsePercent(string text, out int pct)
-    {
-        var trimmed = text.Trim().TrimEnd('%').Trim();
-        return int.TryParse(trimmed, out pct);
-    }
-
     // ── WireframeControl event wiring ─────────────────────────────────────────
 
     private void WireWireframeControl()
@@ -1034,11 +1017,11 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
-        // The combo follows every tick of a smooth wheel-zoom (#425); the companion file is only
-        // persisted once the animation settles (IsZoomAnimating == false), not on every frame.
-        WireframeCtrl.ZoomChanged            += zoomPct =>
+        // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
+        // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
+        // animating (IsZoomAnimating == false), not on every frame.
+        WireframeCtrl.ZoomChanged            += _ =>
         {
-            SyncZoomCombo(zoomPct);
             if (!WireframeCtrl.IsZoomAnimating) SaveCompanionFile();
         };
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
@@ -1089,6 +1072,9 @@ public partial class MainWindow : Window
         PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
         PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
         PngPane.ViewChanged += RefreshPngScrollBars;
+        // The PNG bar's zoom widget both shows the live zoom and drives it (type/step to 1:1 for
+        // screenshots), sharing the wireframe/preview implementation.
+        PngZoom.Attach(PngPane);
     }
 
     private void OnPngScrollValueChanged(bool horizontal)
@@ -1115,6 +1101,214 @@ public partial class MainWindow : Window
         ApplyScrollRange(PngHScroll, h);
         ApplyScrollRange(PngVScroll, v);
         _suppressPngScrollSync = false;
+    }
+
+    // ── PNG Diff wiring (#606) ──────────────────────────────────────────
+
+    private void WirePngBlame()
+    {
+        // A revision select frames + reveals the change; a slider drag just re-merges in place.
+        RevisionList.SelectionChanged += (_, _) => UpdateDiffOverlay(frame: true);
+        // Re-tapping the already-selected revision doesn't fire SelectionChanged, so replay the reveal
+        // here. A tap that *changes* selection also lands here, but its SelectionChanged already bumped
+        // the latest-wins token, so this second call's compute is discarded before it paints — no
+        // double reveal. handledEventsToo: selection marks the press handled, but the tap still routes.
+        RevisionList.AddHandler(InputElement.TappedEvent, OnRevisionTapped, handledEventsToo: true);
+        DiffGroupingSlider.PropertyChanged += OnDiffSliderPropertyChanged;
+    }
+
+    private void OnRevisionTapped(object? sender, TappedEventArgs e)
+    {
+        // Only when the tap landed on the currently-selected row (not empty list space).
+        if (e.Source is Avalonia.Visual v &&
+            v.FindAncestorOfType<ListBoxItem>() is { DataContext: Models.RevisionEntryVm vm } &&
+            ReferenceEquals(RevisionList.SelectedItem, vm))
+        {
+            UpdateDiffOverlay(frame: true);
+        }
+    }
+
+    private void OnDiffSliderPropertyChanged(object? sender, Avalonia.AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != Avalonia.Controls.Primitives.RangeBase.ValueProperty) return;
+
+        // Reflect the value immediately; debounce the (potentially expensive) re-diff so a drag
+        // recomputes once the user settles rather than on every intermediate value.
+        DiffGroupingValue.Text = ((int)DiffGroupingSlider.Value).ToString();
+
+        _diffSliderDebounce ??= CreateDiffSliderDebounceTimer();
+        _diffSliderDebounce.Stop();
+        _diffSliderDebounce.Start();
+    }
+
+    private DispatcherTimer CreateDiffSliderDebounceTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        timer.Tick += (_, _) => { timer.Stop(); UpdateDiffOverlay(frame: false); };
+        return timer;
+    }
+
+    /// <summary>
+    /// Loads <paramref name="absolutePath"/>'s git history into the Diff revision list, or
+    /// shows a fallback message (not a repo / untracked / LFS / git missing). Clears any prior overlay.
+    /// </summary>
+    // True while PngPane is displaying a historical revision's image rather than the current on-disk
+    // file, so a later deselect knows to restore the current image.
+    private bool _pngShowingRevision;
+
+    // Latest-wins guard: only the newest requested history load populates the list, so a slow load
+    // for a tab the user already left never clobbers the current one. Read/written on the UI thread.
+    private int _blameLoadId;
+
+    // The most recent history load, awaited by the next one so the loads run in issue order — that
+    // keeps the service's state on the most-recently-requested file even under fast tab switches.
+    private Task _blameLoadInFlight = Task.CompletedTask;
+
+    /// <summary>
+    /// Starts loading <paramref name="absolutePath"/>'s git history into the revision list. The git
+    /// calls (dominated by <c>git log --follow</c>) run off the UI thread so switching to a PNG tab
+    /// doesn't freeze the app; the list fills in when the load completes. Fire-and-forget by design.
+    /// </summary>
+    private async void LoadBlameForPng(string absolutePath)
+    {
+        // The tab just (re)loaded the current on-disk image into PngPane, so we're no longer showing a
+        // historical revision.
+        _pngShowingRevision = false;
+
+        int loadId = ++_blameLoadId;
+
+        // Clear the previous file's revisions immediately and show a transient loading state so the
+        // stale list never lingers while the (potentially slow) git log runs.
+        RevisionList.ItemsSource = null;
+        RevisionList.SelectedItem = null;
+        PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
+        DiffBlameStatus.Text = "Loading history…";
+        DiffBlameStatus.IsVisible = true;
+
+        var previous = _blameLoadInFlight;
+        _blameLoadInFlight = LoadBlameCoreAsync(absolutePath, loadId, previous);
+        await _blameLoadInFlight;
+    }
+
+    private async Task LoadBlameCoreAsync(string absolutePath, int loadId, Task previous)
+    {
+        // Serialize behind any in-flight load so the service's state ends on the most-recently-
+        // requested file; a prior load's failure must not block this one.
+        try { await previous; } catch { }
+
+        PngBlameResult result;
+        try
+        {
+            result = await Task.Run(() => _blameService.Load(absolutePath));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngBlame] history load failed: {ex}");
+            if (loadId == _blameLoadId)
+            {
+                DiffBlameStatus.Text = "History could not be loaded.";
+                DiffBlameStatus.IsVisible = true;
+            }
+            return;
+        }
+
+        // Only the newest requested load populates the list (latest-wins).
+        if (loadId == _blameLoadId)
+            PopulateRevisionList(result);
+    }
+
+    private void PopulateRevisionList(PngBlameResult result)
+    {
+        var rows = new List<Models.RevisionEntryVm>(result.Entries.Count);
+        for (int i = 0; i < result.Entries.Count; i++)
+        {
+            var rev = result.Entries[i];
+            string meta = rev.IsWorkingTree ? "uncommitted" : $"{rev.ShortHash} · {rev.Date:yyyy-MM-dd}";
+            rows.Add(new Models.RevisionEntryVm(i, rev.Subject, meta));
+        }
+
+        RevisionList.ItemsSource = rows;
+        RevisionList.SelectedItem = null;
+        PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
+        ShowDiffBlameStatus(result.Status, rows.Count);
+    }
+
+    private void ShowDiffBlameStatus(Core.Git.GitHistoryStatus status, int revisionCount)
+    {
+        string? message = status switch
+        {
+            Core.Git.GitHistoryStatus.Ok when revisionCount == 0 => "No git history was found for this file.",
+            Core.Git.GitHistoryStatus.Ok => null,
+            Core.Git.GitHistoryStatus.NotARepository =>
+                "This file isn't inside a git repository, so there's no history to compare.",
+            Core.Git.GitHistoryStatus.Untracked =>
+                "This file isn't committed to git yet — commit it to compare revisions.",
+            Core.Git.GitHistoryStatus.LfsPointer =>
+                "This file is stored with Git LFS; committed versions are pointers, not images, so pixel diffing isn't available.",
+            Core.Git.GitHistoryStatus.GitUnavailable =>
+                "git isn't available on your PATH, so history can't be loaded.",
+            _ => null,
+        };
+
+        DiffBlameStatus.Text = message ?? "";
+        DiffBlameStatus.IsVisible = message is not null;
+    }
+
+    // Bumped per diff request; a completed background compute only paints if it's still the latest,
+    // so rapid revision clicks / slider drags don't stack or paint stale boxes.
+    private int _diffRequestId;
+
+    // Computes and shows the changed-region boxes for the selected revision at the current slider
+    // settings. The compute runs off the UI thread (#606) — the service caches decoded blobs and the
+    // change mask, so an already-computed revision (or a slider drag) returns near-instantly.
+    private async void UpdateDiffOverlay(bool frame)
+    {
+        if (RevisionList.SelectedItem is not Models.RevisionEntryVm vm)
+        {
+            PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
+            if (_pngShowingRevision)
+            {
+                _pngShowingRevision = false;
+                PngPane.ForceReloadTexture();   // back to the current on-disk image
+            }
+            return;
+        }
+
+        int tolerance = DiffTolerance;
+        int distance = (int)DiffGroupingSlider.Value;
+        int requestId = ++_diffRequestId;
+
+        IReadOnlyList<PixelRegion> regions;
+        ImageData? revisionImage;
+        try
+        {
+            (regions, revisionImage) = await Task.Run(() =>
+            {
+                var r = _blameService.ComputeRegions(vm.Index, tolerance, distance);
+                // Fetch the revision's image only when we're swapping it (a revision select, not a
+                // same-revision slider drag) — keeps the merge-distance drag from reloading the image.
+                var img = frame ? _blameService.GetRevisionImage(vm.Index) : null;
+                return (r, img);
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PngBlame] compute failed: {ex}");
+            return;
+        }
+
+        // Resumes on the UI thread; ignore if a newer request has since been issued.
+        if (requestId != _diffRequestId)
+            return;
+
+        // Show the selected revision's actual pixels so the boxes overlay what changed then, not the
+        // current art (the boxes are framed against this image, so this must precede SetDiffRegions).
+        if (frame && revisionImage is not null)
+        {
+            PngPane.ShowRevisionImage(revisionImage);
+            _pngShowingRevision = true;
+        }
+        PngPane.SetDiffRegions(regions, frame);
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
@@ -1831,19 +2025,13 @@ public partial class MainWindow : Window
         TimelineStrip.ItemsSource = _timelineFrames;
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
-        PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
-        PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
-        PreviewZoomCombo.LostFocus += OnPreviewZoomComboLostFocus;
-        PreviewZoomCombo.SelectionChanged += OnPreviewZoomComboSelectionChanged;
-        PreviewZoomPlusBtn.Click  += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, +1, p => PreviewCtrl.SetZoomPercent(p));
-        PreviewZoomMinusBtn.Click += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, -1, p => PreviewCtrl.SetZoomPercent(p));
-        PreviewCtrl.WheelZoomPresets = _previewZoomPresets;
+        PreviewZoom.Attach(PreviewCtrl);
 
-        // The combo always tracks the live zoom; the companion file is persisted once the smooth
-        // zoom settles (IsZoomAnimating == false), not on every animation tick (#451).
-        PreviewCtrl.ZoomChanged += zoomPct =>
+        // PreviewZoom tracks the live zoom itself (ZoomControl.Attach subscribes ZoomChanged); this
+        // handler only persists the settled state — once the smooth zoom stops animating
+        // (IsZoomAnimating == false), not on every animation tick (#451).
+        PreviewCtrl.ZoomChanged += _ =>
         {
-            SyncPreviewZoomCombo(zoomPct);
             if (!PreviewCtrl.IsZoomAnimating) SaveCompanionFile();
         };
         PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
@@ -1853,8 +2041,8 @@ public partial class MainWindow : Window
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
-        // Two-way sync between the manual pan and the scrollbars, mirroring the
-        // PreviewZoomCombo ↔ PreviewCtrl suppression pattern above. The scroll axis runs
+        // Two-way sync between the manual pan and the scrollbars, using the same suppression-flag
+        // pattern that breaks feedback loops elsewhere. The scroll axis runs
         // opposite the pan axis (PanScrollBar handles the inversion).
         PreviewHScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: true);
         PreviewVScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: false);
@@ -1931,69 +2119,6 @@ public partial class MainWindow : Window
         // at the right edge until the frame advances rather than speeding up.
         double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
         _timelineFrames[idx].ScrubberOffset = offset;
-    }
-
-    // ── Editable preview-zoom combo (bottom preview) ─────────────────────────
-    //
-    // Same editable-AutoCompleteBox pattern as ZoomCombo above.
-
-    private static readonly int[] _previewZoomPresets =
-        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
-    private static readonly string[] _previewZoomPresetTexts =
-        _previewZoomPresets.Select(p => $"{p}%").ToArray();
-
-    /// <summary>
-    /// Steps to the next or previous preset relative to the current zoom percent.
-    /// + button: smallest preset strictly greater than current.
-    /// - button: largest preset strictly less than current.
-    /// If the current value is outside the preset range, clamps to the nearest end.
-    /// </summary>
-    private static void StepZoomPreset(float currentPct, int[] presets, int direction, Action<int> apply)
-    {
-        if (direction > 0)
-        {
-            for (int i = 0; i < presets.Length; i++)
-                if (presets[i] > currentPct) { apply(presets[i]); return; }
-            apply(presets[^1]);
-        }
-        else
-        {
-            for (int i = presets.Length - 1; i >= 0; i--)
-                if (presets[i] < currentPct) { apply(presets[i]); return; }
-            apply(presets[0]);
-        }
-    }
-
-    private void OnPreviewZoomComboKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) { CommitPreviewZoomComboText(); e.Handled = true; }
-    }
-
-    private void OnPreviewZoomComboLostFocus(object? sender, RoutedEventArgs e)
-        => CommitPreviewZoomComboText();
-
-    private void OnPreviewZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressPreviewZoomComboChanged) return;
-        if (PreviewZoomCombo.SelectedItem is string s) ApplyPreviewZoomComboText(s);
-    }
-
-    private void CommitPreviewZoomComboText()
-    {
-        if (_suppressPreviewZoomComboChanged) return;
-        ApplyPreviewZoomComboText(PreviewZoomCombo.Text ?? string.Empty);
-    }
-
-    private void ApplyPreviewZoomComboText(string text)
-    {
-        if (TryParsePercent(text, out int pct)) PreviewCtrl.SetZoomPercent(pct);
-    }
-
-    private void SyncPreviewZoomCombo(float zoomPercent)
-    {
-        _suppressPreviewZoomComboChanged = true;
-        PreviewZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
-        _suppressPreviewZoomComboChanged = false;
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────

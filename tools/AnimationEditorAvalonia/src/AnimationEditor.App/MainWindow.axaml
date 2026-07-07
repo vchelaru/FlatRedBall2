@@ -1051,6 +1051,38 @@
                             </ScrollViewer>
                         </Grid>
                     </TabItem>
+
+                    <!-- Diff (PNG git history — shown only while a .png tab is active, #606).
+                         Selecting a revision shows that revision's image with boxes outlining what
+                         changed vs. the previous one. The one tunable (region grouping) lives in a bar
+                         above the PNG, since it affects the image display, not this list. -->
+                    <TabItem x:Name="DiffBlameTab" Header="Diff" IsVisible="False">
+                        <Grid RowDefinitions="Auto,*" Background="{DynamicResource BgPanel}">
+                            <!-- Empty / fallback state (not a repo, untracked, LFS, git missing). -->
+                            <TextBlock x:Name="DiffBlameStatus" Grid.Row="0"
+                                       Margin="8,4" FontSize="11" TextWrapping="Wrap"
+                                       IsVisible="False"
+                                       Foreground="{DynamicResource InkMid}" />
+
+                            <!-- Revision rail: newest first; selecting a row overlays that revision's changes. -->
+                            <ListBox x:Name="RevisionList" Grid.Row="1"
+                                     Background="Transparent" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="appModels:RevisionEntryVm">
+                                        <StackPanel Margin="2,2">
+                                            <TextBlock Text="{Binding Subject}" FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource Ink}" />
+                                            <TextBlock Text="{Binding Meta}" FontSize="10"
+                                                       Foreground="{DynamicResource InkMid}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </TabItem>
                 </TabControl>
             </Grid>
 
@@ -1171,39 +1203,8 @@
 
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
-                        <Border BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                Height="26" Width="130" Margin="0,0,2,0" VerticalAlignment="Center">
-                            <DockPanel>
-                                <Button x:Name="ZoomMinusBtn" DockPanel.Dock="Left"
-                                        Classes="flanker" Content="−" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
-                                        ToolTip.Tip="Zoom out to previous preset" />
-                                <Button x:Name="ZoomPlusBtn" DockPanel.Dock="Right"
-                                        Classes="flanker" Content="+" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
-                                        ToolTip.Tip="Zoom in to next preset" />
-                                <AutoCompleteBox x:Name="ZoomCombo"
-                                                 Text="100%"
-                                                 MinimumPrefixLength="0" FilterMode="None"
-                                                 Background="Transparent" BorderThickness="0" Padding="0"
-                                                 Height="26" VerticalAlignment="Center" FontSize="11">
-                                    <AutoCompleteBox.Styles>
-                                        <Style Selector="TextBox">
-                                            <Setter Property="TextAlignment" Value="Center"/>
-                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                            <Setter Property="Padding" Value="4,0"/>
-                                            <!-- MinWidth/MinHeight 0 (#501): keep the field within its
-                                                 center slot so its focus highlight cannot overflow the
-                                                 −/+ buttons; Fluent forces a min ~64×32. -->
-                                            <Setter Property="MinWidth" Value="0"/>
-                                            <Setter Property="MinHeight" Value="0"/>
-                                            <Setter Property="FontSize" Value="11"/>
-                                        </Style>
-                                    </AutoCompleteBox.Styles>
-                                </AutoCompleteBox>
-                            </DockPanel>
-                        </Border>
+                        <views:ZoomControl x:Name="WireframeZoom"
+                                           VerticalAlignment="Center" Margin="0,0,2,0" />
 
                         <!-- Divider -->
                         <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
@@ -1306,35 +1307,7 @@
                             <TextBlock Text="Zoom:" VerticalAlignment="Center"
                                        Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
                                        FontSize="11" />
-                            <Border BorderBrush="{DynamicResource LineBrush}"
-                                    BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                    Height="26" Width="130" VerticalAlignment="Center">
-                                <DockPanel>
-                                    <Button x:Name="PreviewZoomMinusBtn" DockPanel.Dock="Left"
-                                            Classes="flanker" Content="−" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
-                                            ToolTip.Tip="Zoom out to previous preset" />
-                                    <Button x:Name="PreviewZoomPlusBtn" DockPanel.Dock="Right"
-                                            Classes="flanker" Content="+" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
-                                            ToolTip.Tip="Zoom in to next preset" />
-                                    <AutoCompleteBox x:Name="PreviewZoomCombo"
-                                                     Text="100%"
-                                                     MinimumPrefixLength="0" FilterMode="None"
-                                                     Background="Transparent" BorderThickness="0" Padding="0"
-                                                     Height="26" VerticalAlignment="Center" FontSize="11">
-                                        <AutoCompleteBox.Styles>
-                                            <Style Selector="TextBox">
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                                <Setter Property="Padding" Value="4,0"/>
-                                                <Setter Property="MinHeight" Value="0"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                            </Style>
-                                        </AutoCompleteBox.Styles>
-                                    </AutoCompleteBox>
-                                </DockPanel>
-                            </Border>
+                            <views:ZoomControl x:Name="PreviewZoom" VerticalAlignment="Center" />
                         </WrapPanel>
                     </Border>
 
@@ -1567,13 +1540,59 @@
                  place while a .png tab is active (#604). Hidden by default. The control draws its
                  texture under the same pan/zoom camera as the wireframe, so its two ScrollBars drive
                  the pan directly (overlaid + auto-hide), mirroring the wireframe panel. -->
-            <Grid x:Name="PngPaneGrid" Grid.Column="2" Background="{DynamicResource BgCanvas}" IsVisible="False">
-                <views:PngPreviewControl x:Name="PngPane" />
-                <ScrollBar x:Name="PngVScroll"
+            <Grid x:Name="PngPaneGrid" Grid.Column="2" RowDefinitions="Auto,*"
+                  Background="{DynamicResource BgCanvas}" IsVisible="False">
+                <!-- PNG toolbar (#606): a thin bar the same height as the editor's toolbar. Left-to-
+                     right, matching the wireframe/preview toolbars: the "Grouping" knob (affects the
+                     change-box display, not the tree), then the current zoom (handy for 1:1
+                     screenshots). Tolerance is fixed in code. -->
+                <Border Grid.Row="0" Background="{DynamicResource BgRail}"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
+                        Padding="8,3">
+                    <!-- Left-anchored WrapPanel mirrors the .achx toolbars: every control stacks from
+                         the left (and reflows when narrow, #510), so zoom lands in the same place as in
+                         the editor rather than pinned to the right. -->
+                    <WrapPanel VerticalAlignment="Center">
+                        <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
+                                   Margin="0,0,6,0" Foreground="{DynamicResource InkMid}" />
+                        <!-- The Fluent Slider reserves a 50px-tall layout box around a 20px thumb, and
+                             it does NOT re-center the thumb when forced to a shorter Height — the thumb
+                             stays anchored and its lower half spills out the bottom, where the canvas
+                             covers it (the "cut off" look). So don't constrain Height; keep the natural
+                             (thumb-centered) slider and trim its excess layout footprint with a negative
+                             vertical margin: 50px − 24 = a 26px footprint, matching the .achx toolbar's
+                             26px controls so this bar is exactly the same height. Only the empty tick
+                             padding is trimmed; the thumb stays fully visible. -->
+                        <Slider x:Name="DiffGroupingSlider" Width="160" Margin="0,-12"
+                                VerticalAlignment="Center"
+                                Minimum="1" Maximum="128" Value="16"
+                                SmallChange="1" LargeChange="8"
+                                ToolTip.Tip="How close changed pixels must be to group into one highlighted box. Higher = fewer, larger boxes. Rarely needs changing." />
+                        <TextBlock x:Name="DiffGroupingValue" Text="16" FontSize="11"
+                                   MinWidth="20" Margin="6,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Ink}" />
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
+                                   Foreground="{DynamicResource InkMid}" FontSize="11" />
+                        <views:ZoomControl x:Name="PngZoom" VerticalAlignment="Center" />
+                    </WrapPanel>
+                </Border>
+
+                <views:PngPreviewControl x:Name="PngPane" Grid.Row="1" />
+                <!-- Shown while the image decodes off the UI thread (#606); non-interactive overlay. -->
+                <TextBlock x:Name="PngLoadingText" Grid.Row="1" Text="Loading…" IsVisible="False"
+                           IsHitTestVisible="False" FontSize="14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource InkMid}" />
+                <ScrollBar x:Name="PngVScroll" Grid.Row="1"
                            Orientation="Vertical"
                            HorizontalAlignment="Right" VerticalAlignment="Stretch"
                            AllowAutoHide="True" />
-                <ScrollBar x:Name="PngHScroll"
+                <ScrollBar x:Name="PngHScroll" Grid.Row="1"
                            Orientation="Horizontal"
                            HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
                            AllowAutoHide="True" />

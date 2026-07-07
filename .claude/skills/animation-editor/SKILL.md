@@ -31,20 +31,23 @@ tools/AnimationEditorAvalonia/
 │   ├── DEVELOPMENT.md            ← read first when starting work
 │   └── FEATURE_COVERAGE_REPORT.md
 ├── src/
-│   ├── AnimationEditor.App/      ← Avalonia UI (windows, controls, axaml)
-│   │   ├── MainWindow.axaml(.cs)
-│   │   ├── Controls/
-│   │   │   ├── WireframeControl.cs   ← top panel (texture + frame regions)
-│   │   │   └── PreviewControl.cs     ← bottom panel (animation playback)
-│   │   ├── Models/, Services/, Assets/
-│   └── AnimationEditor.Core/     ← UI-independent logic
-│       ├── CommandsAndState/     ← AppState, AppCommands, ApplicationEvents
-│       ├── Data/, IO/, Rendering/, ViewModels/
-│       └── ProjectManager.cs, SelectedState.cs
+│   ├── AnimationEditor.App/      ← Avalonia host: MainWindow.axaml(.cs), Models/, Services/, Settings/, and App-only Controls/ (e.g. FilesPanelControl)
+│   ├── AnimationEditor.Views/    ← the SkiaSharp controls (App and Browser both consume it)
+│   │   └── Controls/
+│   │       ├── WireframeControl.cs, TextureViewport.cs    ← top panel (texture + frame regions)
+│   │       ├── PreviewControl.cs, PngPreviewControl.cs    ← bottom panel (playback) + PNG diff viewer
+│   │       └── ZoomControl.axaml(.cs), IZoomTarget.cs     ← reusable zoom widget (see "Two-panel mental model")
+│   ├── AnimationEditor.Core/     ← UI-independent logic (no SkiaSharp)
+│   │   ├── CommandsAndState/     ← AppState, AppCommands, ApplicationEvents
+│   │   ├── Data/, IO/, Rendering/, ViewModels/
+│   │   └── ProjectManager.cs, SelectedState.cs
+│   └── AnimationEditor.Browser/  ← WASM (BlazorGL/KNI) head
 └── tests/
-    ├── AnimationEditor.App.Tests/    ← headless Avalonia (Avalonia.Headless.XUnit)
+    ├── AnimationEditor.App.Tests/    ← headless Avalonia; covers App + Views
     └── AnimationEditor.Core.Tests/   ← pure logic
 ```
+
+> Controls that physically live in `AnimationEditor.Views` still use the namespace `AnimationEditor.App.Controls` (folder ≠ namespace) — locate them by type name, not by namespace path.
 
 ## Build
 
@@ -59,7 +62,11 @@ Test commands and headless-test discipline live in the `animation-editor-testing
 - **Wireframe (top)** — the texture editor. User loads a sprite sheet, draws/edits frame regions on it. State: pan, zoom, selected frame, snap-to-grid.
 - **Preview (bottom)** — the animation player. Plays the selected `AnimationChain` at runtime speed; supports onion skin and origin guides. State: pan, zoom, playback timer, speed multiplier.
 
-Both panels have their own zoom combo box wired in `MainWindow.axaml.cs` (`ZoomCombo` ↔ `WireframeCtrl`, `PreviewZoomCombo` ↔ `PreviewCtrl`). Each control raises a `ZoomChanged` event that `MainWindow` syncs back into the combo using a suppression flag to break the feedback loop. Mirror that pattern for any new bidirectional control ↔ combo wiring.
+All three zoom surfaces — wireframe toolbar, preview toolbar, and the PNG diff bar — mount the same reusable **`ZoomControl`** (`AnimationEditor.Views/Controls/`), the `[−][editable %][+]` widget. Wire it in code with `zoomControl.Attach(target)`, where `target` is an **`IZoomTarget`** (exposes live `Zoom`, `SetZoomPercent`, `ZoomChanged`, `WheelZoomPresets`); `Attach` installs the wheel presets, follows `ZoomChanged` to display the live percent, and routes edits/steps back into the target. The suppression flag that breaks the echo loop lives inside `ZoomControl` — callers don't manage it.
+
+**Landmine — the zoom hosts share no base class.** `IZoomTarget` exists only because `TextureViewport` (wireframe + PNG viewer) and `PreviewControl` are unrelated types. To share any *other* viewport behavior across both, extend `IZoomTarget` (or add a sibling interface); there is no common base to hang it on.
+
+**Scan for an existing control before adding one to a second surface; extract on the second copy.** `ZoomControl` exists because the widget was first duplicated as raw XAML plus per-host event wiring across three toolbars. When a control *and its wiring* would be copied a second time, factor it into a reusable `UserControl` — duplicated markup and its feedback-loop plumbing drift apart otherwise. (Testing an extracted `UserControl` has a namescope gotcha — see `animation-editor-testing`.)
 
 ## Rendering & performance
 

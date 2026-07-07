@@ -27,7 +27,7 @@ namespace AnimationEditor.App.Controls;
 /// (one frame = FrameLength seconds). When a single frame is selected, shows that
 /// frame statically with optional onion-skin overlay.
 /// </summary>
-public class PreviewControl : Control
+public class PreviewControl : Control, IZoomTarget
 {
     // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;

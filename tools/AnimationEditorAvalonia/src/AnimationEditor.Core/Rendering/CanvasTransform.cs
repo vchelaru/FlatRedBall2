@@ -88,6 +88,32 @@ public static class CanvasTransform
     }
 
     /// <summary>
+    /// Computes <c>(panX, panY, zoom)</c> to frame a texture-space rectangle
+    /// (<paramref name="rectL"/>..<paramref name="rectR"/>, <paramref name="rectT"/>..<paramref name="rectB"/>)
+    /// centered in a <paramref name="viewW"/>×<paramref name="viewH"/> viewport. The rect is fitted to
+    /// <paramref name="fitFraction"/> of the viewport (e.g. 0.7 leaves context around it); zoom is
+    /// clamped to [<see cref="MinZoom"/>, <paramref name="maxZoom"/>], so a 1-pixel region snaps to
+    /// <paramref name="maxZoom"/> and centers rather than magnifying absurdly. Pan uses the top-left
+    /// convention (<c>screenX = panX + textureX × zoom</c>); the caller should clamp it to the valid band.
+    /// </summary>
+    public static (float PanX, float PanY, float Zoom) FitRect(
+        float rectL, float rectT, float rectR, float rectB,
+        float viewW, float viewH,
+        float fitFraction, float maxZoom)
+    {
+        float rectW = Math.Max(1e-3f, rectR - rectL);
+        float rectH = Math.Max(1e-3f, rectB - rectT);
+
+        float zoom = Math.Clamp(
+            Math.Min(viewW / rectW, viewH / rectH) * fitFraction,
+            MinZoom, maxZoom);
+
+        float centerX = (rectL + rectR) / 2f;
+        float centerY = (rectT + rectB) / 2f;
+        return (viewW / 2f - centerX * zoom, viewH / 2f - centerY * zoom, zoom);
+    }
+
+    /// <summary>
     /// Returns the new (panX, panY) when the user drags the canvas.
     /// The pan anchor is the screen position captured when the drag started;
     /// the anchor camera position is the pan state at that moment.
