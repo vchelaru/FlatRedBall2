@@ -1396,7 +1396,7 @@
                                     Background="{DynamicResource BgRail}"
                                     BorderBrush="{DynamicResource LineBrush}"
                                     BorderThickness="0,1,0,1">
-                                <TextBlock Text="TIMELINE"
+                                <TextBlock x:Name="TimelineHeaderLabel" Text="TIMELINE"
                                            FontSize="9" FontWeight="SemiBold"
                                            Foreground="{DynamicResource InkDim}"
                                            VerticalAlignment="Center"

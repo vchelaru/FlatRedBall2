@@ -117,6 +117,20 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
+    public void BuildChainNode_Meta_IncludesFrameCountAndTotalDuration()
+    {
+        // The chain node's Meta shows both frame count and total play time (#623) so the
+        // user sees the animation's duration without adding up per-frame times by hand.
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
+
+        var node = TreeBuilder.BuildChainNode(chain);
+
+        Assert.Equal("2 fr · 0.50s", node.Meta);
+    }
+
+    [Fact]
     public void BuildFrameNode_HasIsChainNodeFalse()
     {
         var frame = new AnimationFrameSave { TextureName = "run1.png" };
@@ -388,7 +402,7 @@ public class TreeBuilderPureTests
         TreeBuilder.SyncChainsInto(roots, new[] { chain });
 
         Assert.Equal("Walk Renamed", roots[0].Header);
-        Assert.Equal("1 fr", roots[0].Meta);
+        Assert.Equal("1 fr · 0.00s", roots[0].Meta);
         Assert.Single(roots[0].Children);
         Assert.Equal("Frame 1", roots[0].Children[0].Header);
     }

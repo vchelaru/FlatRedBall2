@@ -63,6 +63,14 @@ public static class TreeBuilder
             SetStripeRecursive(child, isOdd);
     }
 
+    /// <summary>
+    /// The chain node's <see cref="TreeNodeVm.Meta"/> text: frame count plus total play time,
+    /// e.g. <c>"12 fr · 1.50s"</c> (#623). Single source of truth so every chain-meta refresh
+    /// path stays in sync.
+    /// </summary>
+    public static string BuildChainMeta(AnimationChainSave chain) =>
+        $"{chain.Frames.Count} fr · {TimelineBuilder.FormatSeconds(TimelineBuilder.TotalSeconds(chain))}";
+
     /// <summary>Builds a single chain node with all its frame children.</summary>
     public static TreeNodeVm BuildChainNode(AnimationChainSave chain)
     {
@@ -73,7 +81,7 @@ public static class TreeBuilder
             IsExpanded = true,
             IsChainNode = true,
             Kind = NodeKind.Chain,
-            Meta = $"{chain.Frames.Count} fr",
+            Meta = BuildChainMeta(chain),
         };
         for (int i = 0; i < chain.Frames.Count; i++)
             node.Children.Add(BuildFrameNode(chain.Frames[i], i));
@@ -314,7 +322,7 @@ public static class TreeBuilder
                     { roots.Move(j, i); break; }
             }
             roots[i].Header = target.Name;
-            roots[i].Meta   = $"{target.Frames.Count} fr";
+            roots[i].Meta   = BuildChainMeta(target);
             SyncFramesInto(roots[i], target.Frames);
         }
 
