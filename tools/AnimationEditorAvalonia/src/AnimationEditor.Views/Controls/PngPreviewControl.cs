@@ -35,7 +35,7 @@ public sealed class PngPreviewControl : TextureViewport
     // One-shot reveal bounce (#606). Progress runs 0→1; 1 means settled (no scaling).
     private DispatcherTimer? _revealTimer;
     private float _revealProgress = 1f;
-    private const float RevealDurationSeconds = 0.25f;
+    private const float RevealDurationSeconds = 0.4f;
     private const float RevealIntervalSeconds = 1f / 60f;
 
     public PngPreviewControl()

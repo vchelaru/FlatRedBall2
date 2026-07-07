@@ -4,27 +4,29 @@ namespace AnimationEditor.Core.Rendering;
 
 /// <summary>
 /// The one-shot "reveal" used to draw the eye to something that just appeared (the PNG diff region
-/// boxes, #606): the box starts enlarged and settles to its real size with a slight back-ease
-/// overshoot, so it reads as a quick bounce rather than a static pop-in.
+/// boxes, #606): the box pops in enlarged then bounces a couple of times as it settles to its real
+/// size, so a small or off-screen change is easy to spot. The double bounce reads as intentional
+/// "juice" and catches the eye better than a single settle, because each change of direction is a
+/// fresh motion cue.
 /// </summary>
 public static class RevealAnimation
 {
-    // Where the box starts, as a multiple of its final size.
-    private const float StartScale = 1.5f;
+    // Peak deviation from final size at progress 0: the box starts at 1 + Amplitude = 1.5×.
+    private const float Amplitude = 0.5f;
 
-    // easeOutBack overshoot constant (standard tuning).
-    private const float Overshoot = 1.70158f;
+    // Number of oscillations across the reveal — ~2 gives two visible bounces before settling.
+    private const float Bumps = 2f;
 
     /// <summary>
     /// Scale factor for a reveal at <paramref name="progress"/> (0 = just appeared, 1 = settled).
-    /// Returns <see cref="StartScale"/> at 0 and 1.0 at 1, overshooting slightly under 1.0 near the
-    /// end for the bounce. Apply it to a box's on-screen size around its center.
+    /// A damped cosine: starts at 1.5×, oscillates around 1.0 (over- and under-shooting) with the
+    /// amplitude decaying to 0 at progress 1, so it lands exactly on the real size. Apply it to a
+    /// box's on-screen size around its center.
     /// </summary>
     public static float Scale(float progress)
     {
         float t = Math.Clamp(progress, 0f, 1f);
-        float p = t - 1f;
-        float easeOutBack = 1f + (Overshoot + 1f) * p * p * p + Overshoot * p * p;
-        return StartScale - (StartScale - 1f) * easeOutBack;
+        float decay = (1f - t) * (1f - t);   // quadratic falloff → smaller, gentler later bounces
+        return 1f + Amplitude * decay * MathF.Cos(2f * MathF.PI * Bumps * t);
     }
 }
