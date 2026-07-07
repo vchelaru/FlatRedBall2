@@ -16,6 +16,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
@@ -28,6 +29,14 @@ namespace AnimationEditor.Browser;
 
 public partial class App : Application
 {
+    /// <summary>
+    /// One row in the history list: <see cref="IsCurrent"/> marks the most recently applied
+    /// command ("you are here"), <see cref="IsRedo"/> marks a command available to redo (rendered
+    /// muted). Mirrors desktop MainWindow's HistoryEntryVm at a fraction of the ceremony -- no
+    /// theme-token brush lookups, just FontWeight/Opacity.
+    /// </summary>
+    private sealed record HistoryRowVm(string Text, bool IsCurrent, bool IsRedo);
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -218,6 +227,42 @@ public partial class App : Application
             redoButton.IsEnabled = undoManager.CanRedo;
         }
         undoManager.StackChanged += UpdateUndoRedoButtons;
+
+        // History panel: a real gap against the original Phase 2 plan ("add an Undo/Redo toolbar
+        // + History panel") -- only the toolbar buttons were ever wired. Read-only by design, same
+        // as desktop's own HistoryList (confirmed by its dedicated "disable history listbox
+        // selection" fix): clicking a row doesn't jump there, so any stray selection is reset back
+        // to the current entry rather than left dangling on a row that does nothing.
+        var historyList = new ListBox { MaxHeight = 160, SelectionMode = SelectionMode.Single };
+        historyList.ItemTemplate = new FuncDataTemplate<HistoryRowVm>((row, _) => new TextBlock
+        {
+            Text = row!.Text,
+            FontWeight = row.IsCurrent ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
+            Opacity = row.IsRedo ? 0.55 : 1.0,
+            Margin = new Thickness(4, 2),
+        });
+
+        void RefreshHistoryList()
+        {
+            var undoHistory = undoManager.UndoHistory;
+            var redoHistory = undoManager.RedoHistory;
+            var rows = new List<HistoryRowVm>();
+            // Photoshop order: oldest applied at top, newest applied (current) at bottom, then
+            // redo entries (next-to-redo first).
+            for (int i = 0; i < undoHistory.Count; i++)
+                rows.Add(new HistoryRowVm(undoHistory[i].Description, IsCurrent: i == undoHistory.Count - 1, IsRedo: false));
+            foreach (var cmd in redoHistory)
+                rows.Add(new HistoryRowVm(cmd.Description, IsCurrent: false, IsRedo: true));
+            historyList.ItemsSource = rows;
+            historyList.SelectedIndex = undoHistory.Count - 1;
+        }
+        historyList.SelectionChanged += (_, _) =>
+        {
+            int expected = undoManager.UndoHistory.Count - 1;
+            if (historyList.SelectedIndex != expected) historyList.SelectedIndex = expected;
+        };
+        undoManager.StackChanged += RefreshHistoryList;
+        RefreshHistoryList();
 
         // Phase 4 (#620): multi-file tabs. TabManager/TabEditorCache are already fully built and
         // tested in Core (pure in-memory, zero disk dependency) -- this is wiring, not new logic.
@@ -488,18 +533,23 @@ public partial class App : Application
             },
         };
 
-        // Left column: tree (fills available height) over inspector (sized to content).
-        // Right: preview. Both new controls are pure UserControls with no dependency on this
-        // layout shape -- MainWindow lays the equivalent panels out differently.
+        // Left column: tree (fills available height) over inspector, then history (both sized to
+        // content). Right: preview. Both new controls are pure UserControls with no dependency on
+        // this layout shape -- MainWindow lays the equivalent panels out differently.
+        var historyLabel = new TextBlock { Text = "History", Margin = new Thickness(4, 4, 4, 0), FontWeight = Avalonia.Media.FontWeight.Bold };
         var leftColumn = new Grid
         {
             Width = 260,
-            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowDefinitions = new RowDefinitions("*,Auto,Auto,Auto"),
         };
         Grid.SetRow(animationTree, 0);
         Grid.SetRow(inspector, 1);
+        Grid.SetRow(historyLabel, 2);
+        Grid.SetRow(historyList, 3);
         leftColumn.Children.Add(animationTree);
         leftColumn.Children.Add(inspector);
+        leftColumn.Children.Add(historyLabel);
+        leftColumn.Children.Add(historyList);
 
         // Middle: wireframe (shape editing canvas). Right: preview (playback). Both are
         // independent TextureViewport-derived controls; neither depends on this layout shape --
