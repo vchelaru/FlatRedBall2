@@ -114,6 +114,17 @@ public static class CanvasTransform
     }
 
     /// <summary>
+    /// True when a texture-space rectangle of <paramref name="rectW"/>×<paramref name="rectH"/> pixels,
+    /// drawn at <paramref name="zoom"/>, is too large to fit inside a
+    /// <paramref name="viewW"/>×<paramref name="viewH"/> viewport — so at least one edge (and its
+    /// resize handle) is necessarily off-screen no matter how the camera is panned. Gates the #616
+    /// auto-fit of a freshly added or retextured frame: a frame that already fits is left untouched.
+    /// </summary>
+    public static bool RectExceedsViewport(
+        float rectW, float rectH, float zoom, float viewW, float viewH)
+        => rectW * zoom > viewW || rectH * zoom > viewH;
+
+    /// <summary>
     /// Returns the new (panX, panY) when the user drags the canvas.
     /// The pan anchor is the screen position captured when the drag started;
     /// the anchor camera position is the pan state at that moment.

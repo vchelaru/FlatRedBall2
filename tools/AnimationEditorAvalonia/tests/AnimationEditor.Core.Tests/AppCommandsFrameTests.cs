@@ -119,6 +119,27 @@ public class AppCommandsFrameTests
     }
 
     [Fact]
+    public void AddFrame_FiresFitFrameToViewRequested()
+    {
+        // The wireframe listens for this to zoom-to-fit a newly added frame that is larger than the
+        // viewport, so its edges/handles aren't stranded off-screen when zoomed in (#616).
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "X");
+        bool fired = false;
+        void Handler() => fired = true;
+        ctx.ApplicationEvents.FitFrameToViewRequested += Handler;
+        try
+        {
+            ctx.AppCommands.AddFrame(chain);
+            Assert.True(fired, "FitFrameToViewRequested not raised after AddFrame.");
+        }
+        finally
+        {
+            ctx.ApplicationEvents.FitFrameToViewRequested -= Handler;
+        }
+    }
+
+    [Fact]
     public void AddFrame_MultipleFrames_AllAppendedInOrder()
     {
         var ctx = TestHelpers.SetupFreshAcls();

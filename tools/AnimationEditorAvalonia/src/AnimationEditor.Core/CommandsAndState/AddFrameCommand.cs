@@ -32,6 +32,10 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events.RaiseAnimationChainsChanged();
             _commands.SaveCurrentAnimationChainList();
             _selectedState.SelectedFrame = _frame;
+            // Arm the wireframe to fit this frame into view on the reload the selection above triggers,
+            // in case it's larger than the viewport (e.g. a whole-sheet default) — #616. Undo does not
+            // re-arm: restoring the prior selection shouldn't surprise-zoom the user.
+            _events.RaiseFitFrameToViewRequested();
             return true;
         }
 

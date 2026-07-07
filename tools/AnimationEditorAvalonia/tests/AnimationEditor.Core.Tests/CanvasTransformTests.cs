@@ -544,4 +544,27 @@ public class CanvasTransformTests
 
         Assert.Equal(CanvasTransform.MinZoom, zoom, 3);
     }
+
+    // ── RectExceedsViewport ───────────────────────────────────────────────────
+
+    [Fact]
+    public void RectExceedsViewport_FitsAtCurrentZoom_ReturnsFalse()
+    {
+        // 2048×2048 frame at 0.2× → 409.6 px, comfortably inside an 800×600 viewport.
+        Assert.False(CanvasTransform.RectExceedsViewport(2048f, 2048f, 0.2f, 800f, 600f));
+    }
+
+    [Fact]
+    public void RectExceedsViewport_TallerThanViewport_ReturnsTrue()
+    {
+        // Wide-and-short: fits horizontally but the height overflows, so a handle is off-screen.
+        Assert.True(CanvasTransform.RectExceedsViewport(700f, 4000f, 1f, 800f, 600f));
+    }
+
+    [Fact]
+    public void RectExceedsViewport_WiderThanViewport_ReturnsTrue()
+    {
+        // 2048×2048 frame at 1× → 2048 px, far larger than an 800×600 viewport.
+        Assert.True(CanvasTransform.RectExceedsViewport(2048f, 2048f, 1f, 800f, 600f));
+    }
 }

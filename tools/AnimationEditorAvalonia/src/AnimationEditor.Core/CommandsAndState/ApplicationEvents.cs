@@ -17,6 +17,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public event Action<string>? PngChangedOnDisk;
         public event Action<string>? AchxDeletedOnDisk;
         public event Action<string>? AchxReloadedFromDisk;
+        public event Action? FitFrameToViewRequested;
 
         public void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle) =>
             AfterAxisAlignedRectangleChanged?.Invoke(rectangle);
@@ -53,5 +54,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void RaiseAchxReloadedFromDisk(string path) =>
             AchxReloadedFromDisk?.Invoke(path);
+
+        public void RaiseFitFrameToViewRequested() =>
+            FitFrameToViewRequested?.Invoke();
     }
 }

@@ -335,6 +335,11 @@ public class WireframeControl : TextureViewport
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _events.AchxLoaded                  += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        // Post at Background priority so this runs *after* the add/retexture's higher-priority
+        // SelectionChanged → RefreshAll (or a synchronous LoadTexture) has loaded the texture — only
+        // then can we measure the frame against the viewport and fit it if it's too big (#616). Mirrors
+        // the double-click CenterOnFrame post in MainWindow.
+        _events.FitFrameToViewRequested     += () => Dispatcher.UIThread.Post(FitSelectedFrameIfLargerThanViewport, DispatcherPriority.Background);
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -726,6 +731,57 @@ public class WireframeControl : TextureViewport
     }
 
     // ── Frame centering ───────────────────────────────────────────────────────
+
+    /// <summary>Fraction of the viewport a fitted frame fills, leaving a margin so its handles read
+    /// clearly (matches the 85 % of <see cref="CanvasTransform.CenterFit"/>).</summary>
+    private const float FrameFitFraction = 0.85f;
+
+    /// <summary>
+    /// Fits the currently selected frame into view via <see cref="FitFrameIfLargerThanViewport"/>.
+    /// This is what <see cref="ApplicationEvents.FitFrameToViewRequested"/> triggers (posted at
+    /// Background priority so the texture is loaded first). No-op when nothing is selected.
+    /// </summary>
+    private void FitSelectedFrameIfLargerThanViewport()
+    {
+        if (_selectedState?.SelectedFrame is { } frame)
+            FitFrameIfLargerThanViewport(frame);
+    }
+
+    /// <summary>
+    /// Zoom-to-fits <paramref name="frame"/> into view, but <em>only</em> when it is currently too
+    /// large to fit the viewport (<see cref="CanvasTransform.RectExceedsViewport"/>) — otherwise the
+    /// zoom is left untouched, so this never surprises a user whose frame already fits. The #616 fix:
+    /// a newly added or retextured frame covering a large sheet would otherwise be selected with all
+    /// of its edges and handles off-screen, leaving nothing on the canvas to show the selection.
+    /// Raises <see cref="TextureViewport.ZoomChanged"/> when it changes the zoom so the zoom combo
+    /// re-syncs. No-op when no bitmap is loaded or layout hasn't produced a viewport yet.
+    /// </summary>
+    public void FitFrameIfLargerThanViewport(AnimationFrameSave frame)
+    {
+        if (_bitmap is null) return;
+        float vpW = (float)Bounds.Width;
+        float vpH = (float)Bounds.Height;
+        if (vpW <= 1 || vpH <= 1) return;
+
+        float bmpW = _bitmap.Width;
+        float bmpH = _bitmap.Height;
+        float pixL = frame.LeftCoordinate  * bmpW;
+        float pixT = frame.TopCoordinate   * bmpH;
+        float pixR = frame.RightCoordinate * bmpW;
+        float pixB = frame.BottomCoordinate * bmpH;
+
+        if (!CanvasTransform.RectExceedsViewport(pixR - pixL, pixB - pixT, _zoom, vpW, vpH))
+            return;
+
+        CancelZoomAnimation();   // this fit overrides any in-flight wheel ease
+        // maxZoom 1: we only reach here when the frame exceeds the viewport, so fitting always zooms
+        // out — cap at 100 % so a degenerate thin frame can never be magnified past native.
+        (_panX, _panY, _zoom) = CanvasTransform.FitRect(pixL, pixT, pixR, pixB, vpW, vpH, FrameFitFraction, 1f);
+        ClampCamera();
+        InvalidateVisual();
+        RaiseZoomChanged();
+        RaiseViewChanged();
+    }
 
     /// <summary>
     /// Pans so <paramref name="frame"/>'s centre lands at the viewport centre, preserving the
