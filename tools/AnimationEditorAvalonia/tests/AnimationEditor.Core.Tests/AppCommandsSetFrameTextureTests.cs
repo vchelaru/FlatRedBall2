@@ -79,6 +79,21 @@ public class AppCommandsSetFrameTextureTests
     }
 
     [Fact]
+    public void SetFrameTextureName_FiresFitFrameToViewRequested()
+    {
+        // Retexturing a frame can make its region larger than the viewport; the wireframe listens for
+        // this to fit the frame into view on the next texture load (#616).
+        var ctx = TestHelpers.SetupFreshAcls();
+        var frame  = new AnimationFrameSave();
+        bool fired = false;
+        ctx.ApplicationEvents.FitFrameToViewRequested += () => fired = true;
+
+        ctx.AppCommands.SetFrameTextureName(frame, "run.png");
+
+        Assert.True(fired);
+    }
+
+    [Fact]
     public void SetFrameTextureName_FiresRefreshFrameNodeRequested_WithCorrectFrame()
     {
         var ctx = TestHelpers.SetupFreshAcls();

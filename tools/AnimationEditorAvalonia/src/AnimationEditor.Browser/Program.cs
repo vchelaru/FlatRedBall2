@@ -15,8 +15,17 @@ internal sealed class Program
         // HttpClient needs an absolute BaseAddress to resolve relative request URIs; main.js
         // passes the page URL as args[0] (runMain(mainAssemblyName, [location.href])).
         using var http = new HttpClient { BaseAddress = new Uri(args[0]) };
-        SampleContent.AchxText = await http.GetStringAsync("sample/player.achx");
-        SampleContent.PngBytes = await http.GetByteArrayAsync("sample/player.png");
+        var achxTask = http.GetStringAsync("sample/player.achx");
+        var pngTask = http.GetByteArrayAsync("sample/player.png");
+        // #610: the localStorage JS module must be imported before any BrowserSettingsStore call
+        // (App.axaml.cs's BuildView reads the persisted theme synchronously on startup) --
+        // independent of the sample fetches above, so it rides along in the same WhenAll.
+        var storageInitTask = LocalStorageInterop.InitializeAsync();
+        // #622 (Phase 5): same requirement for the PixiJS export button's Blob-download path.
+        var downloadInitTask = DownloadInterop.InitializeAsync();
+        await Task.WhenAll(achxTask, pngTask, storageInitTask, downloadInitTask);
+        SampleContent.AchxText = achxTask.Result;
+        SampleContent.PngBytes = pngTask.Result;
 
         await BuildAvaloniaApp()
             .WithInterFont()

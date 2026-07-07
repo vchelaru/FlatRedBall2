@@ -13,6 +13,7 @@ using SkiaSharp;
 using System;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.App.Controls;
@@ -57,7 +58,7 @@ public class TextureViewportSnapshot
 /// and the <c>OnEditPointer*</c> hooks — the base handles pan/zoom before any of those fire.
 /// </para>
 /// </summary>
-public class TextureViewport : Control
+public class TextureViewport : Control, IZoomTarget
 {
     // ── Inner types ───────────────────────────────────────────────────────────
 
@@ -191,10 +192,18 @@ public class TextureViewport : Control
     // ── Fields ────────────────────────────────────────────────────────────────
 
     protected SKBitmap? _bitmap;
+    // False when _bitmap came from LoadTexture's knownBitmap parameter (caller-owned, e.g.
+    // ThumbnailService's cache in the browser build) -- guards the Dispose call below so this
+    // control never frees a bitmap it doesn't own.
+    private bool _ownsBitmap = true;
     // Immutable GPU-uploadable copy of _bitmap, built on the UI thread and
     // safe to draw from the Avalonia render thread.
     private SKImage? _image;
     protected string? _loadedTexturePath;
+
+    // Bumped by every load/swap so an in-flight LoadTextureAsync decode that finishes after a newer
+    // load can detect it was superseded and discard its result instead of painting stale pixels.
+    private int _textureLoadId;
 
     protected float _zoom = 1f;
     // Camera pan: the screen position (within the control's viewport) of texture pixel (0,0).
@@ -366,6 +375,10 @@ public class TextureViewport : Control
 
     protected void RaiseViewChanged() => ViewChanged?.Invoke();
 
+    /// <summary>Raises <see cref="ZoomChanged"/> with the current zoom as a percentage, so a bound
+    /// zoom combo re-syncs. Subclasses call this after changing <see cref="_zoom"/> directly.</summary>
+    protected void RaiseZoomChanged() => ZoomChanged?.Invoke(_zoom * 100f);
+
     /// <summary>
     /// When non-null, mouse-wheel zoom steps through these preset percentages instead of
     /// applying a raw ×1.25 / ÷1.25 multiplier.  Set by <c>MainWindow</c> on startup.
@@ -476,14 +489,27 @@ public class TextureViewport : Control
     /// <see cref="OnTextureLoaded"/> at the end of every path so subclasses can rebuild their
     /// editing state.
     /// </para>
+    /// <para>
+    /// <paramref name="knownBitmap"/>, when supplied, is used directly instead of reading
+    /// <paramref name="filePath"/> from disk — the browser-wasm build has no filesystem, but
+    /// already has every dropped/picked texture decoded via ThumbnailService (mirrors
+    /// ProjectManager.LoadAnimationChain's knownTextureSizes fix for the same constraint, #535).
+    /// <paramref name="filePath"/> is still used as the logical identity (camera-per-texture
+    /// cache key, <see cref="LoadedTexturePath"/>) even though nothing is read from it. The
+    /// bitmap is treated as caller-owned (e.g. ThumbnailService's cache) and is never disposed
+    /// by this control, unlike a bitmap this method decodes itself from disk.
+    /// </para>
     /// </summary>
-    public bool LoadTexture(string? filePath)
+    public bool LoadTexture(string? filePath, SKBitmap? knownBitmap = null)
     {
         // Lowercased + slash-normalized form used only for cache-key comparison and the
         // _loadedTexturePath identity that downstream filter code keys on. The case-preserving
         // form is what actually goes to the filesystem (Linux is case-sensitive).
         string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
         string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
+
+        // Any load supersedes an in-flight async decode (LoadTextureAsync) so it can't paint late.
+        _textureLoadId++;
 
         if (_loadedTexturePath == norm)
         {
@@ -492,45 +518,17 @@ public class TextureViewport : Control
             return true;
         }
 
-        // Save camera for the texture we're leaving
-        if (_loadedTexturePath != null)
-            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
+        BeginTextureSwap(norm);
 
-        _loadedTexturePath = norm;
-        // Drop (don't Dispose) the previous image: a render op on the compositor thread may still be
-        // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
-        // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
-        // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
-        // copy from FromBitmap), so disposing it here stays safe.
-        _image = null;
-        _bitmap?.Dispose();
-        _bitmap = null;
-
-        if (casePreserved != null && File.Exists(casePreserved))
+        if (knownBitmap != null)
         {
-            _bitmap = SKBitmap.Decode(casePreserved);
-            if (_bitmap == null)
-            {
-                // SKBitmap.Decode returns null (it does NOT throw) when the file exists but
-                // can't be decoded — corrupt/truncated PNG, zero-byte file, mislabeled or
-                // unsupported format, or a file locked by another process. Handing that null
-                // to SKImage.FromBitmap throws ArgumentNullException on the dispatcher and
-                // terminates the app (issue #479). Leave the control unloaded and report failure.
-                _loadedTexturePath = null;
-                OnTextureLoaded(_bitmap);
-                return false;
-            }
-
-            // Upload pixels into an immutable SKImage on the UI thread so the
-            // render thread never touches the SKBitmap directly. Without this,
-            // SKCanvas.DrawBitmap on the render thread crashes with AV.
+            _bitmap = knownBitmap;
+            _ownsBitmap = false;
             _image = SKImage.FromBitmap(_bitmap);
 
-            if (_cameraByTexture.TryGetValue(norm!, out var cam))
+            if (norm != null && _cameraByTexture.TryGetValue(norm, out var knownCam))
             {
-                // Restore the full camera and re-clamp against the current viewport (window may
-                // have been resized since this texture was last shown).
-                (_panX, _panY, _zoom) = (cam.px, cam.py, cam.z);
+                (_panX, _panY, _zoom) = (knownCam.px, knownCam.py, knownCam.z);
                 ClampCamera();
                 RaiseViewChanged();
                 InvalidateVisual();
@@ -544,10 +542,141 @@ public class TextureViewport : Control
             return true;
         }
 
+        if (casePreserved != null && File.Exists(casePreserved))
+            return InstallDecodedTexture(SKBitmap.Decode(casePreserved), norm!);
+
         // casePreserved == null means filePath was empty: an intentional clear (success).
         // A non-empty path that isn't on disk is a load failure.
         OnTextureLoaded(_bitmap);
         return casePreserved == null;
+    }
+
+    /// <summary>
+    /// Like <see cref="LoadTexture(string?)"/>, but decodes the file off the UI thread so opening a
+    /// large image doesn't block. The view blanks immediately (fires <see cref="OnTextureLoaded"/>
+    /// with null so a subclass can show a loading state); the decoded image appears when ready. A
+    /// newer <see cref="LoadTexture(string?)"/> / <see cref="LoadTextureAsync"/> / <see cref="ShowDecodedTexture"/>
+    /// supersedes an in-flight decode so it never paints late. Returns true when the image is shown,
+    /// false on decode failure, supersession, or a clear-to-missing.
+    /// </summary>
+    public async Task<bool> LoadTextureAsync(string? filePath)
+    {
+        string? norm = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).Standardized;
+        string? casePreserved = string.IsNullOrEmpty(filePath) ? null : new FilePath(filePath).StandardizedCaseSensitive;
+
+        int loadId = ++_textureLoadId;
+
+        if (_loadedTexturePath == norm && _bitmap != null)
+        {
+            OnTextureLoaded(_bitmap);
+            return true;
+        }
+
+        BeginTextureSwap(norm);
+        OnTextureLoaded(null);   // blank now; a subclass can show "Loading…"
+        InvalidateVisual();
+
+        if (casePreserved == null || !File.Exists(casePreserved))
+            return casePreserved == null;   // empty path = intentional clear (success); missing = failure
+
+        // Read + decode off the UI thread. Byte-based decode (vs SKBitmap.Decode(path)) is what the
+        // rest of the app decodes with, and the file read for a large sheet is itself worth moving off
+        // the UI thread.
+        var decoded = await Task.Run(() => DecodeFileBytes(casePreserved));
+
+        if (loadId != _textureLoadId)
+        {
+            // Superseded by a newer load while we were decoding — drop this now-unwanted result.
+            decoded?.Dispose();
+            return false;
+        }
+
+        return InstallDecodedTexture(decoded, norm!);
+    }
+
+    private static SKBitmap? DecodeFileBytes(string path)
+    {
+        try { return SKBitmap.Decode(File.ReadAllBytes(path)); }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
+    // Saves the leaving texture's camera, sets the new identity, and blanks the current image so the
+    // view is empty until the (possibly async) decode installs the new one.
+    private void BeginTextureSwap(string? norm)
+    {
+        if (_loadedTexturePath != null)
+            _cameraByTexture[_loadedTexturePath] = (_panX, _panY, _zoom);
+
+        _loadedTexturePath = norm;
+        // Drop (don't Dispose) the previous image: a render op on the compositor thread may still be
+        // drawing it (BuildSnapshot shares _image directly). Releasing the reference lets GC reclaim
+        // it once no in-flight draw holds it — deferred drop, mirroring ThumbnailService (#514).
+        // The bitmap, by contrast, is never handed to a render op (the image carries its own pixel
+        // copy from FromBitmap), so disposing it here stays safe -- unless it's caller-owned.
+        _image = null;
+        if (_ownsBitmap) _bitmap?.Dispose();
+        _bitmap = null;
+        _ownsBitmap = true;
+    }
+
+    // Installs an already-decoded bitmap as the current texture and restores/centers the camera for
+    // `norm`. Assumes BeginTextureSwap already set the identity and blanked the old image. Returns
+    // false (clearing identity) when `decoded` is null — a decode failure (#479).
+    private bool InstallDecodedTexture(SKBitmap? decoded, string norm)
+    {
+        if (decoded == null)
+        {
+            // SKBitmap.Decode returns null (it does NOT throw) when the file exists but can't be
+            // decoded — corrupt/truncated/mislabeled PNG, zero-byte file, or a locked file. Handing
+            // null to SKImage.FromBitmap would crash the dispatcher (#479); stay unloaded instead.
+            _loadedTexturePath = null;
+            OnTextureLoaded(_bitmap);
+            return false;
+        }
+
+        _bitmap = decoded;
+        // Upload pixels into an immutable SKImage on the UI thread so the render thread never touches
+        // the SKBitmap directly (SKCanvas.DrawBitmap on the render thread would AV).
+        _image = SKImage.FromBitmap(decoded);
+
+        if (_cameraByTexture.TryGetValue(norm, out var cam))
+        {
+            // Restore the full camera and re-clamp against the current viewport (window may have been
+            // resized since this texture was last shown).
+            (_panX, _panY, _zoom) = (cam.px, cam.py, cam.z);
+            ClampCamera();
+            RaiseViewChanged();
+            InvalidateVisual();
+        }
+        else
+        {
+            CenterTexture();
+        }
+
+        OnTextureLoaded(_bitmap);
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces the displayed texture with an already-decoded in-memory <paramref name="bitmap"/>,
+    /// taking ownership of it. Unlike <see cref="LoadTexture(string?)"/> this leaves the file-path
+    /// identity and the saved-camera cache untouched and does not move the camera — used to show a
+    /// historical git revision of the current PNG (#606) while the caller frames the change itself.
+    /// Call <see cref="ForceReloadTexture"/> to return to the current on-disk file.
+    /// </summary>
+    public void ShowDecodedTexture(SKBitmap bitmap)
+    {
+        _textureLoadId++;   // supersede any in-flight async decode so it can't overwrite this
+        // Deferred drop of the old image (a compositor draw may still hold it); the old bitmap is
+        // never handed to a render op, so disposing it here is safe — mirrors LoadTexture.
+        _image = null;
+        _bitmap?.Dispose();
+        _bitmap = bitmap;
+        _image = SKImage.FromBitmap(bitmap);
+        OnTextureLoaded(_bitmap);
+        InvalidateVisual();
+        RaiseViewChanged();
     }
 
     /// <summary>
@@ -989,7 +1118,7 @@ public class TextureViewport : Control
         }
 
         InvalidateVisual();
-        ZoomChanged?.Invoke(_zoom * 100f);
+        RaiseZoomChanged();
         RaiseViewChanged();
     }
 

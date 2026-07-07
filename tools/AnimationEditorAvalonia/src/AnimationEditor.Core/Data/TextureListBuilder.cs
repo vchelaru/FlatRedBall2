@@ -35,4 +35,18 @@ public static class TextureListBuilder
             .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
             .ToList()!;
     }
+
+    /// <summary>
+    /// Returns the <c>TextureName</c> of the first frame — in chain-then-frame list order —
+    /// that references a non-empty texture, or <c>null</c> when nothing in
+    /// <paramref name="acls"/> does. Used to borrow a texture for a chain that has no frames
+    /// of its own, so the wireframe shows something the user can Ctrl+click to seed the first
+    /// frame, and so the +Add button can inherit a texture (issues #618 / #617).
+    /// </summary>
+    /// <param name="acls">The animation chain list; may be <c>null</c>.</param>
+    public static string? GetFirstTextureName(AnimationChainListSave? acls) =>
+        acls?.AnimationChains
+            .SelectMany(c => c.Frames)
+            .Select(f => f.TextureName)
+            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
 }

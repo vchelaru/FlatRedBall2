@@ -79,6 +79,9 @@ public class AppCommandsSaveFailTests
         public void SaveAnimationChainList(string targetPath)
             => throw new InvalidOperationException("Simulated save failure");
 
+        public void SaveAnimationChainList(System.IO.Stream stream)
+            => throw new InvalidOperationException("Simulated save failure");
+
         public IReadOnlyList<string> FindMissingTextures(AnimationChainListSave acls, string achxDirectory)
             => Array.Empty<string>();
 

@@ -26,7 +26,16 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 : "Set Texture";
         }
 
-        public bool Do()  => Apply(_newName);
+        public bool Do()
+        {
+            var result = Apply(_newName);
+            // Arm the wireframe to fit the frame into view on the next texture load in case the new
+            // texture makes its region larger than the viewport (#616). Undo does not re-arm — reverting
+            // a texture shouldn't surprise-zoom the user.
+            _events.RaiseFitFrameToViewRequested();
+            return result;
+        }
+
         public void Undo() => Apply(_oldName);
 
         // Assigns the name verbatim — null stays null, "" stays "" — so "clear the

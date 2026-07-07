@@ -510,4 +510,61 @@ public class CanvasTransformTests
         Assert.Equal(900f, vx, 3);
         Assert.Equal(900f, vy, 3);
     }
+
+    // ── FitRect ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FitRect_RectSmallerThanViewport_CentersAtFittingZoom()
+    {
+        // 200×200 rect (center 200,200) into 800×600 at full fit → zoom = min(4,3) = 3,
+        // panned so the rect center lands at the viewport center.
+        var (panX, panY, zoom) = CanvasTransform.FitRect(
+            100f, 100f, 300f, 300f, 800f, 600f, fitFraction: 1f, maxZoom: 32f);
+
+        Assert.Equal(3f, zoom, 3);
+        Assert.Equal(400f - 200f * 3f, panX, 3);   // viewW/2 − centerX·zoom
+        Assert.Equal(300f - 200f * 3f, panY, 3);
+    }
+
+    [Fact]
+    public void FitRect_TinyRect_ClampsToMaxZoom()
+    {
+        // A 1×1 changed pixel would otherwise fit at hundreds of ×; the cap keeps it readable.
+        var (_, _, zoom) = CanvasTransform.FitRect(
+            500f, 500f, 501f, 501f, 800f, 600f, fitFraction: 0.7f, maxZoom: 8f);
+
+        Assert.Equal(8f, zoom, 3);
+    }
+
+    [Fact]
+    public void FitRect_RectLargerThanViewport_ClampsToMinZoom()
+    {
+        var (_, _, zoom) = CanvasTransform.FitRect(
+            0f, 0f, 20000f, 20000f, 800f, 600f, fitFraction: 1f, maxZoom: 32f);
+
+        Assert.Equal(CanvasTransform.MinZoom, zoom, 3);
+    }
+
+    // ── RectExceedsViewport ───────────────────────────────────────────────────
+
+    [Fact]
+    public void RectExceedsViewport_FitsAtCurrentZoom_ReturnsFalse()
+    {
+        // 2048×2048 frame at 0.2× → 409.6 px, comfortably inside an 800×600 viewport.
+        Assert.False(CanvasTransform.RectExceedsViewport(2048f, 2048f, 0.2f, 800f, 600f));
+    }
+
+    [Fact]
+    public void RectExceedsViewport_TallerThanViewport_ReturnsTrue()
+    {
+        // Wide-and-short: fits horizontally but the height overflows, so a handle is off-screen.
+        Assert.True(CanvasTransform.RectExceedsViewport(700f, 4000f, 1f, 800f, 600f));
+    }
+
+    [Fact]
+    public void RectExceedsViewport_WiderThanViewport_ReturnsTrue()
+    {
+        // 2048×2048 frame at 1× → 2048 px, far larger than an 800×600 viewport.
+        Assert.True(CanvasTransform.RectExceedsViewport(2048f, 2048f, 1f, 800f, 600f));
+    }
 }

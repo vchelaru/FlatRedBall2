@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
@@ -306,11 +307,20 @@ public class WireframeControl : TextureViewport
     private IProjectManager? _projectManager;
     private IUndoManager? _undoManager;
     private Action<string>? _showError;
+    private ThumbnailService? _thumbnailService;
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
+    /// <param name="thumbnailService">
+    /// Optional. When supplied, <see cref="RefreshAll"/> resolves the current texture through
+    /// it (bare-name lookup against its cache first, falling back to disk) instead of always
+    /// reading straight from disk -- the seam the browser-wasm build needs (#614), since it has
+    /// no filesystem but already has every dropped/picked texture decoded via
+    /// <see cref="ThumbnailService.SeedTexture"/>. Left <c>null</c> on desktop, where reading the
+    /// resolved path from disk (the pre-#614 behavior) is unchanged.
+    /// </param>
     public void InitializeServices(
         ISelectedState selectedState,
         IAppState appState,
@@ -319,7 +329,8 @@ public class WireframeControl : TextureViewport
         IProjectManager projectManager,
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
-        Action<string>? showError = null)
+        Action<string>? showError = null,
+        ThumbnailService? thumbnailService = null)
     {
         _selectedState   = selectedState;
         _appState        = appState;
@@ -329,11 +340,17 @@ public class WireframeControl : TextureViewport
         _projectManager  = projectManager;
         _undoManager     = undoManager;
         _showError       = showError;
+        _thumbnailService = thumbnailService;
 
         _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _events.AchxLoaded                  += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        // Post at Background priority so this runs *after* the add/retexture's higher-priority
+        // SelectionChanged → RefreshAll (or a synchronous LoadTexture) has loaded the texture — only
+        // then can we measure the frame against the viewport and fit it if it's too big (#616). Mirrors
+        // the double-click CenterOnFrame post in MainWindow.
+        _events.FitFrameToViewRequested     += () => Dispatcher.UIThread.Post(FitSelectedFrameIfLargerThanViewport, DispatcherPriority.Background);
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -456,7 +473,17 @@ public class WireframeControl : TextureViewport
     public void RefreshAll()
     {
         var path = DetermineTexturePath();
-        LoadTexture(path);
+
+        SKBitmap? known = null;
+        if (_thumbnailService != null)
+        {
+            var frame = _selectedState?.SelectedFrame ?? _selectedState?.SelectedChain?.Frames?.FirstOrDefault();
+            var resolvedPath = _thumbnailService.ResolveTexturePath(frame);
+            if (resolvedPath != null)
+                known = _thumbnailService.GetBitmap(resolvedPath);
+        }
+
+        LoadTexture(path, known);
     }
 
     /// <inheritdoc />
@@ -725,6 +752,57 @@ public class WireframeControl : TextureViewport
     }
 
     // ── Frame centering ───────────────────────────────────────────────────────
+
+    /// <summary>Fraction of the viewport a fitted frame fills, leaving a margin so its handles read
+    /// clearly (matches the 85 % of <see cref="CanvasTransform.CenterFit"/>).</summary>
+    private const float FrameFitFraction = 0.85f;
+
+    /// <summary>
+    /// Fits the currently selected frame into view via <see cref="FitFrameIfLargerThanViewport"/>.
+    /// This is what <see cref="ApplicationEvents.FitFrameToViewRequested"/> triggers (posted at
+    /// Background priority so the texture is loaded first). No-op when nothing is selected.
+    /// </summary>
+    private void FitSelectedFrameIfLargerThanViewport()
+    {
+        if (_selectedState?.SelectedFrame is { } frame)
+            FitFrameIfLargerThanViewport(frame);
+    }
+
+    /// <summary>
+    /// Zoom-to-fits <paramref name="frame"/> into view, but <em>only</em> when it is currently too
+    /// large to fit the viewport (<see cref="CanvasTransform.RectExceedsViewport"/>) — otherwise the
+    /// zoom is left untouched, so this never surprises a user whose frame already fits. The #616 fix:
+    /// a newly added or retextured frame covering a large sheet would otherwise be selected with all
+    /// of its edges and handles off-screen, leaving nothing on the canvas to show the selection.
+    /// Raises <see cref="TextureViewport.ZoomChanged"/> when it changes the zoom so the zoom combo
+    /// re-syncs. No-op when no bitmap is loaded or layout hasn't produced a viewport yet.
+    /// </summary>
+    public void FitFrameIfLargerThanViewport(AnimationFrameSave frame)
+    {
+        if (_bitmap is null) return;
+        float vpW = (float)Bounds.Width;
+        float vpH = (float)Bounds.Height;
+        if (vpW <= 1 || vpH <= 1) return;
+
+        float bmpW = _bitmap.Width;
+        float bmpH = _bitmap.Height;
+        float pixL = frame.LeftCoordinate  * bmpW;
+        float pixT = frame.TopCoordinate   * bmpH;
+        float pixR = frame.RightCoordinate * bmpW;
+        float pixB = frame.BottomCoordinate * bmpH;
+
+        if (!CanvasTransform.RectExceedsViewport(pixR - pixL, pixB - pixT, _zoom, vpW, vpH))
+            return;
+
+        CancelZoomAnimation();   // this fit overrides any in-flight wheel ease
+        // maxZoom 1: we only reach here when the frame exceeds the viewport, so fitting always zooms
+        // out — cap at 100 % so a degenerate thin frame can never be magnified past native.
+        (_panX, _panY, _zoom) = CanvasTransform.FitRect(pixL, pixT, pixR, pixB, vpW, vpH, FrameFitFraction, 1f);
+        ClampCamera();
+        InvalidateVisual();
+        RaiseZoomChanged();
+        RaiseViewChanged();
+    }
 
     /// <summary>
     /// Pans so <paramref name="frame"/>'s centre lands at the viewport centre, preserving the
@@ -1409,6 +1487,13 @@ public class WireframeControl : TextureViewport
     {
         string? textureName = _selectedState!.SelectedFrame?.TextureName
                            ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
+
+        // When no *frame* is selected (an empty chain, or nothing selected), borrow the first texture
+        // referenced anywhere in the project so the wireframe shows something to Ctrl+click on to seed
+        // the first frame (issue #618). A selected frame with no texture is left blank instead of
+        // borrowing another frame's — the canvas must not imply a texture the frame doesn't have (#616).
+        if (string.IsNullOrEmpty(textureName) && _selectedState!.SelectedFrame is null)
+            textureName = TextureListBuilder.GetFirstTextureName(_projectManager!.AnimationChainListSave);
 
         if (string.IsNullOrEmpty(textureName))
             return null;

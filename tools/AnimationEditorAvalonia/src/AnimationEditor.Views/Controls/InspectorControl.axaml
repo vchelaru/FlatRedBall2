@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.InspectorControl">
+    <StackPanel Margin="8" Spacing="4">
+        <TextBlock x:Name="NoSelectionPanel" x:FieldModifier="Public"
+                   Text="No selection." IsVisible="False" />
+
+        <StackPanel x:Name="FramePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Frame" FontWeight="Bold" />
+            <TextBlock x:Name="FrameTextureText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" />
+            <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
+        </StackPanel>
+
+        <!-- Editable (#610 follow-up): committed on LostFocus/Enter via CommitRectProps, routed
+             through AppCommands.SetRectProps, same commit-boundary pattern MainWindow uses
+             for its own PropRect* fields. -->
+        <StackPanel x:Name="RectPanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Rectangle" FontWeight="Bold" />
+            <TextBox x:Name="RectNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                <TextBlock Text="Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Scale X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectScaleXInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Scale Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="RectScaleYInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel x:Name="CirclePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
+            <TextBlock Text="Circle" FontWeight="Bold" />
+            <TextBox x:Name="CircleNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="X:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                <TextBlock Text="Y:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="Radius:" VerticalAlignment="Center" />
+                <NumericUpDown x:Name="CircleRadiusInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

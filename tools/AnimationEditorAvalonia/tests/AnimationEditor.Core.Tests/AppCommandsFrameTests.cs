@@ -119,6 +119,27 @@ public class AppCommandsFrameTests
     }
 
     [Fact]
+    public void AddFrame_FiresFitFrameToViewRequested()
+    {
+        // The wireframe listens for this to zoom-to-fit a newly added frame that is larger than the
+        // viewport, so its edges/handles aren't stranded off-screen when zoomed in (#616).
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "X");
+        bool fired = false;
+        void Handler() => fired = true;
+        ctx.ApplicationEvents.FitFrameToViewRequested += Handler;
+        try
+        {
+            ctx.AppCommands.AddFrame(chain);
+            Assert.True(fired, "FitFrameToViewRequested not raised after AddFrame.");
+        }
+        finally
+        {
+            ctx.ApplicationEvents.FitFrameToViewRequested -= Handler;
+        }
+    }
+
+    [Fact]
     public void AddFrame_MultipleFrames_AllAppendedInOrder()
     {
         var ctx = TestHelpers.SetupFreshAcls();
@@ -133,6 +154,126 @@ public class AppCommandsFrameTests
         Assert.Equal("a.png", chain.Frames[0].TextureName);
         Assert.Equal("b.png", chain.Frames[1].TextureName);
         Assert.Equal("c.png", chain.Frames[2].TextureName);
+    }
+
+    // ── AddFrame texture inheritance (no explicit texture) ───────────────────
+
+    [Fact]
+    public void AddFrame_ChainHasFrames_InheritsLastFrameTexture()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "first.png");
+        ctx.AppCommands.AddFrame(chain, "second.png");
+
+        ctx.AppCommands.AddFrame(chain); // no texture → inherit previous frame
+
+        Assert.Equal("second.png", chain.Frames[^1].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_EmptyChain_BorrowsTextureFromOtherChain()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var withTexture = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        ctx.AppCommands.AddFrame(withTexture, "hero.png");
+        var empty = TestHelpers.MakeChain(ctx.Acls, "Idle"); // no frames
+
+        ctx.AppCommands.AddFrame(empty); // borrows from the only chain with a texture
+
+        Assert.Equal("hero.png", empty.Frames[0].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_EmptyFirstChain_BorrowsFromLaterChain()
+    {
+        // Proves the borrow scans ALL other chains in list order, not just preceding ones.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var target = TestHelpers.MakeChain(ctx.Acls, "First"); // index 0, empty
+        var later  = TestHelpers.MakeChain(ctx.Acls, "Second"); // index 1
+        ctx.AppCommands.AddFrame(later, "later.png");
+
+        ctx.AppCommands.AddFrame(target);
+
+        Assert.Equal("later.png", target.Frames[0].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_EmptyChain_SkipsFramesWithoutTexture()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var noTex = TestHelpers.MakeChain(ctx.Acls, "NoTex");
+        ctx.AppCommands.AddFrame(noTex, ""); // frame present but texture empty
+        var hasTex = TestHelpers.MakeChain(ctx.Acls, "HasTex");
+        ctx.AppCommands.AddFrame(hasTex, "real.png");
+        var target = TestHelpers.MakeChain(ctx.Acls, "Target"); // empty
+
+        ctx.AppCommands.AddFrame(target); // skips the empty-texture frame, borrows "real.png"
+
+        Assert.Equal("real.png", target.Frames[0].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_ChainHasFrames_InheritsLastFrameRegion()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "sheet.png");
+        var prev = chain.Frames[0];
+        prev.LeftCoordinate   = 0.25f;
+        prev.RightCoordinate  = 0.5f;
+        prev.TopCoordinate    = 0.1f;
+        prev.BottomCoordinate = 0.6f;
+
+        ctx.AppCommands.AddFrame(chain); // inherits the previous frame's sub-region, not the whole sheet
+
+        var added = chain.Frames[^1];
+        Assert.Equal(0.25f, added.LeftCoordinate);
+        Assert.Equal(0.5f,  added.RightCoordinate);
+        Assert.Equal(0.1f,  added.TopCoordinate);
+        Assert.Equal(0.6f,  added.BottomCoordinate);
+    }
+
+    [Fact]
+    public void AddFrame_EmptyChain_BorrowsRegionFromOtherChain()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var withTexture = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        ctx.AppCommands.AddFrame(withTexture, "sheet.png");
+        var src = withTexture.Frames[0];
+        src.LeftCoordinate   = 0.5f;
+        src.RightCoordinate  = 0.75f;
+        src.TopCoordinate    = 0f;
+        src.BottomCoordinate = 0.25f;
+        var empty = TestHelpers.MakeChain(ctx.Acls, "Idle");
+
+        ctx.AppCommands.AddFrame(empty); // borrows the source frame's region too, not just its texture
+
+        var added = empty.Frames[0];
+        Assert.Equal(0.5f,  added.LeftCoordinate);
+        Assert.Equal(0.75f, added.RightCoordinate);
+        Assert.Equal(0f,    added.TopCoordinate);
+        Assert.Equal(0.25f, added.BottomCoordinate);
+    }
+
+    [Fact]
+    public void AddFrame_WithExplicitTexture_DefaultsToFullRegion()
+    {
+        // Drag-drop passes an explicit texture; the new frame covers the whole sheet
+        // rather than inheriting a previous frame's sub-region.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "sheet.png");
+        chain.Frames[0].LeftCoordinate  = 0.25f;
+        chain.Frames[0].RightCoordinate = 0.5f;
+
+        ctx.AppCommands.AddFrame(chain, "other.png");
+
+        var added = chain.Frames[^1];
+        Assert.Equal(0f, added.LeftCoordinate);
+        Assert.Equal(1f, added.RightCoordinate);
+        Assert.Equal(0f, added.TopCoordinate);
+        Assert.Equal(1f, added.BottomCoordinate);
     }
 
     // ── MoveFrame ────────────────────────────────────────────────────────────

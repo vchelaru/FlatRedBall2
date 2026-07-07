@@ -27,6 +27,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <summary>Fired after a successful hot-reload of the .achx file. Arg: path.</summary>
         event Action<string> AchxReloadedFromDisk;
 
+        /// <summary>
+        /// Fired when a frame is added or retextured. The wireframe uses this to zoom-to-fit the frame
+        /// on its next texture load, but only if it's larger than the viewport — so a new/retextured
+        /// frame on a large sheet isn't left selected with its edges and handles off-screen (#616).
+        /// </summary>
+        event Action FitFrameToViewRequested;
+
         void RaiseAfterAxisAlignedRectangleChanged(AARectSave rectangle);
         void RaiseAfterCircleChanged(CircleSave circle);
         void RaiseAnimationChainsChanged();
@@ -39,5 +46,6 @@ namespace AnimationEditor.Core.CommandsAndState
         void RaisePngChangedOnDisk(string path);
         void RaiseAchxDeletedOnDisk(string path);
         void RaiseAchxReloadedFromDisk(string path);
+        void RaiseFitFrameToViewRequested();
     }
 }
