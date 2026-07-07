@@ -493,8 +493,9 @@ public partial class MainWindow : Window
     /// <summary>
     /// Collapses the animation-editing sidebar surfaces for a read-only PNG-preview tab (issue #604)
     /// and restores them for the achx editor. A PNG has no animations, no editable frame/shape
-    /// properties, and no undo history, so the ANIMATIONS tree, the Inspector tab, and the History
-    /// tab are hidden; only the Files tab (navigation) remains, and it becomes the selected tab.
+    /// properties, and no undo history — and for now we don't offer file navigation from a PNG either
+    /// — so the ANIMATIONS tree and the Inspector, History, and Files tabs are all hidden; only the
+    /// Diff tab (#606) remains, and it becomes the selected tab.
     /// </summary>
     private void SetSidebarForPng(bool png)
     {
@@ -510,12 +511,11 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = false;
             InspectorTab.IsVisible = false;
             HistoryTab.IsVisible = false;
-            // The PNG-only Diff surface (#606) becomes available; it isn't auto-selected, so a
-            // hidden editing tab still falls back to Files (the #605 navigation default).
+            FilesTab.IsVisible = false;
+            // Diff is the only PNG surface; select it before hiding Files so the strip never shows
+            // a hidden selected tab (blank content).
             DiffBlameTab.IsVisible = true;
-            if (ReferenceEquals(SidebarTabs.SelectedItem, InspectorTab) ||
-                ReferenceEquals(SidebarTabs.SelectedItem, HistoryTab))
-                SidebarTabs.SelectedItem = FilesTab;
+            SidebarTabs.SelectedItem = DiffBlameTab;
         }
         else
         {
@@ -525,6 +525,7 @@ public partial class MainWindow : Window
             SidebarSplitter.IsVisible = true;
             InspectorTab.IsVisible = true;
             HistoryTab.IsVisible = true;
+            FilesTab.IsVisible = true;
             // A now-hidden PNG tab can't stay selected or the strip would show blank content — fall
             // back to the Inspector, the achx editor's default surface.
             if (ReferenceEquals(SidebarTabs.SelectedItem, DiffBlameTab))

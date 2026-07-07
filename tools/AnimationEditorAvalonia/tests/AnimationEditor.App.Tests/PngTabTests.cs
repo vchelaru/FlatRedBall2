@@ -97,11 +97,11 @@ public class PngTabTests
     }
 
     [AvaloniaFact]
-    public void OpenPngAsTab_HidesAnimationInspectorAndHistory_KeepsFiles()
+    public void OpenPngAsTab_HidesEditingTabsAndFiles_SelectsDiff()
     {
-        // A read-only PNG has no animations, no editable properties, and no undo history, so the
-        // ANIMATIONS tree, Inspector tab, and History tab are meaningless — hide them and leave the
-        // Files tab (navigation) selected.
+        // A read-only PNG has no animations, no editable properties, and no undo history — and for now
+        // we don't offer file navigation from a PNG either. Hide the ANIMATIONS tree, Inspector,
+        // History, and Files tabs; show only the Diff tab and select it.
         var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         var ctx = TestHelpers.BuildServices();
@@ -115,12 +115,13 @@ public class PngTabTests
             Assert.False(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
             Assert.False(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
             Assert.False(window.FindControl<TabItem>("HistoryTab")!.IsVisible);
-            Assert.True(window.FindControl<TabItem>("FilesTab")!.IsVisible);
+            Assert.False(window.FindControl<TabItem>("FilesTab")!.IsVisible);
+            Assert.True(window.FindControl<TabItem>("DiffBlameTab")!.IsVisible);
 
             var tabs = window.FindControl<TabControl>("SidebarTabs")!;
-            Assert.Same(window.FindControl<TabItem>("FilesTab"), tabs.SelectedItem);
+            Assert.Same(window.FindControl<TabItem>("DiffBlameTab"), tabs.SelectedItem);
 
-            // The Animations block's row must collapse to zero so the Files tab fills the column
+            // The Animations block's row must collapse to zero so the Diff tab fills the column
             // rather than floating below an empty gap.
             Assert.Equal(0, window.FindControl<Grid>("LeftPanelGrid")!.RowDefinitions[0].Height.Value);
         }
@@ -151,6 +152,7 @@ public class PngTabTests
             Assert.True(window.FindControl<Grid>("AnimationsBlock")!.IsVisible);
             Assert.True(window.FindControl<TabItem>("InspectorTab")!.IsVisible);
             Assert.True(window.FindControl<TabItem>("HistoryTab")!.IsVisible);
+            Assert.True(window.FindControl<TabItem>("FilesTab")!.IsVisible);   // Files comes back for the achx editor
             Assert.True(window.FindControl<Grid>("LeftPanelGrid")!.RowDefinitions[0].Height.Value > 0);
         }
         finally
