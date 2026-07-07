@@ -90,17 +90,61 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # nuget.org indexing lags a push by a few seconds; a consumer restoring FlatRedBall2.MonoGame/Kni
+      # right after this job finishes needs FlatRedBall2.Animation.Content to already be resolvable at
+      # this exact version, not just pushed. `needs: publish-animation-content` only guarantees the push
+      # happened first, not that it's indexed yet.
+      - name: Wait for FlatRedBall2.Animation.Content to be resolvable on NuGet
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
+          URL="https://api.nuget.org/v3-flatcontainer/flatredball2.animation.content/$VERSION_LOWER/flatredball2.animation.content.$VERSION_LOWER.nupkg"
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "FlatRedBall2.Animation.Content $VERSION is resolvable on NuGet."
+              exit 0
+            fi
+            echo "Attempt $i/20: got HTTP $STATUS for $URL, waiting 15s..."
+            sleep 15
+          done
+          echo "::error::FlatRedBall2.Animation.Content $VERSION never became resolvable on NuGet after 5 minutes."
+          exit 1
+
       - name: Restore dependencies
         run: dotnet restore src/FlatRedBall2.csproj
 
+      # Use FlatRedBallDependencyPackageId, not the raw PackageId MSBuild property, to rename the
+      # output package. PackageId is a *global* property: passing -p:PackageId=X here would also
+      # override the PackageId of the Animation.Content ProjectReference (global properties
+      # propagate to every project pulled in via ProjectReference), making both projects resolve
+      # to the same PackageId and fail restore with "Ambiguous project name 'X'".
+      # FlatRedBallDependencyPackageId is a project-local indirection (see src/FlatRedBall2.csproj)
+      # that only FlatRedBall2.csproj itself reads, so it can't collide with a sibling project.
       - name: Build and Pack (${{ matrix.packageId }})
         run: >
           dotnet pack src/FlatRedBall2.csproj
           -c Release
-          -p:PackageId=${{ matrix.packageId }}
+          -p:FlatRedBallDependencyPackageId=${{ matrix.packageId }}
           -p:TargetFrameworks=${{ matrix.targetFrameworks }}
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
+
+      # Guards against a repeat of the exact bug this workflow already hit once: the ProjectReference
+      # to Animation.Content auto-generates a <dependency> in this nuspec, and nothing else here checks
+      # that its version actually matches what publish-animation-content pushed. A mismatch would only
+      # surface later as a broken `dotnet add package` for an end user, after --skip-duplicate makes it
+      # awkward to fix at the same version number.
+      - name: Verify Animation.Content dependency version
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          NUSPEC=$(unzip -p out/*.nupkg "*.nuspec")
+          if ! echo "$NUSPEC" | grep -qF "<dependency id=\"FlatRedBall2.Animation.Content\" version=\"$VERSION\""; then
+            echo "::error::Generated nuspec does not depend on FlatRedBall2.Animation.Content $VERSION. Aborting before publish."
+            echo "$NUSPEC" | grep -i "Animation.Content" || echo "(no Animation.Content dependency found at all)"
+            exit 1
+          fi
+          echo "Confirmed: nuspec depends on FlatRedBall2.Animation.Content $VERSION."
 
       - name: Publish to NuGet
         run: dotnet nuget push "out/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
