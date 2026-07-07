@@ -1136,7 +1136,8 @@ public partial class MainWindow : Window
 
     private void WirePngBlame()
     {
-        RevisionList.SelectionChanged += (_, _) => UpdateDiffOverlay();
+        // A revision select frames + reveals the change; a slider drag just re-merges in place.
+        RevisionList.SelectionChanged += (_, _) => UpdateDiffOverlay(frame: true);
         DiffToleranceSlider.PropertyChanged += OnDiffSliderPropertyChanged;
         DiffMergeSlider.PropertyChanged += OnDiffSliderPropertyChanged;
     }
@@ -1158,7 +1159,7 @@ public partial class MainWindow : Window
     private DispatcherTimer CreateDiffSliderDebounceTimer()
     {
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
-        timer.Tick += (_, _) => { timer.Stop(); UpdateDiffOverlay(); };
+        timer.Tick += (_, _) => { timer.Stop(); UpdateDiffOverlay(frame: false); };
         return timer;
     }
 
@@ -1180,7 +1181,7 @@ public partial class MainWindow : Window
 
         RevisionList.ItemsSource = rows;
         RevisionList.SelectedItem = null;
-        PngPane.SetDiffRegions(Array.Empty<PixelRegion>());
+        PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
         ShowDiffBlameStatus(result.Status, rows.Count);
     }
 
@@ -1212,11 +1213,11 @@ public partial class MainWindow : Window
     // Computes and shows the changed-region boxes for the selected revision at the current slider
     // settings. The compute runs off the UI thread (#606) — the service caches decoded blobs and the
     // change mask, so an already-computed revision (or a slider drag) returns near-instantly.
-    private async void UpdateDiffOverlay()
+    private async void UpdateDiffOverlay(bool frame)
     {
         if (RevisionList.SelectedItem is not Models.RevisionEntryVm vm)
         {
-            PngPane.SetDiffRegions(Array.Empty<PixelRegion>());
+            PngPane.SetDiffRegions(Array.Empty<PixelRegion>(), frame: false);
             return;
         }
 
@@ -1237,7 +1238,7 @@ public partial class MainWindow : Window
 
         // Resumes on the UI thread; ignore if a newer request has since been issued.
         if (requestId == _diffRequestId)
-            PngPane.SetDiffRegions(regions);
+            PngPane.SetDiffRegions(regions, frame);
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
