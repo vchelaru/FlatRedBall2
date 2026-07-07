@@ -93,8 +93,6 @@ public partial class MainWindow : Window
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
-    private bool _suppressZoomComboChanged;
-    private bool _suppressPreviewZoomComboChanged;
     private bool _suppressPreviewScrollSync;
     private bool _suppressWireframeScrollSync;
     private bool _suppressPngScrollSync;
@@ -894,13 +892,7 @@ public partial class MainWindow : Window
         GridSizeInput.LostFocus += OnGridSizeInputLostFocus;
         GridSizePlusBtn.Click  += OnGridSizePlusBtnClick;
         GridSizeMinusBtn.Click += OnGridSizeMinusBtnClick;
-        ZoomCombo.ItemsSource = _zoomPresetTexts;
-        ZoomCombo.KeyDown += OnZoomComboKeyDown;
-        ZoomCombo.LostFocus += OnZoomComboLostFocus;
-        ZoomCombo.SelectionChanged += OnZoomComboSelectionChanged;
-        ZoomPlusBtn.Click  += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, +1, p => WireframeCtrl.SetZoomPercent(p));
-        ZoomMinusBtn.Click += (_, _) => StepZoomPreset(WireframeCtrl.Zoom * 100f, _zoomPresets, -1, p => WireframeCtrl.SetZoomPercent(p));
-        WireframeCtrl.WheelZoomPresets = _zoomPresets;
+        WireframeZoom.Attach(WireframeCtrl);
 
         // Default to Move mode
         MoveModeToggle.IsChecked = true;
@@ -1015,66 +1007,6 @@ public partial class MainWindow : Window
         SaveCompanionFile();
     }
 
-    // ── Editable zoom combo (top wireframe) ──────────────────────────────────
-    //
-    // AutoCompleteBox is used instead of ComboBox because it accepts arbitrary
-    // text. Wheel-zooming the wireframe can land on values that aren't in the
-    // preset list (e.g. 156%); the combo must display the live percent rather
-    // than snap to the nearest preset.
-    //
-    // Commit boundaries: Enter and LostFocus. SelectionChanged covers the case
-    // where the user picks a preset from the suggestion dropdown. The
-    // suppression flag breaks the feedback loop when ZoomChanged → SyncZoomCombo
-    // writes Text back into the control.
-
-    private static readonly int[] _zoomPresets =
-        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
-    private static readonly string[] _zoomPresetTexts =
-        _zoomPresets.Select(p => $"{p}%").ToArray();
-
-    private void OnZoomComboKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) { CommitZoomComboText(); e.Handled = true; }
-    }
-
-    private void OnZoomComboLostFocus(object? sender, RoutedEventArgs e) => CommitZoomComboText();
-
-    private void OnZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressZoomComboChanged) return;
-        if (ZoomCombo.SelectedItem is string s) ApplyZoomComboText(s);
-    }
-
-    private void CommitZoomComboText()
-    {
-        if (_suppressZoomComboChanged) return;
-        ApplyZoomComboText(ZoomCombo.Text ?? string.Empty);
-    }
-
-    private void ApplyZoomComboText(string text)
-    {
-        if (TryParsePercent(text, out int pct)) WireframeCtrl.SetZoomPercent(pct);
-    }
-
-    /// <summary>
-    /// Updates the ZoomCombo display to the live zoom percent (rounded). Called
-    /// from <see cref="WireframeControl.ZoomChanged"/>; the suppression flag
-    /// stops this write from triggering CommitZoomComboText via LostFocus or
-    /// SelectionChanged feedback.
-    /// </summary>
-    private void SyncZoomCombo(float zoomPercent)
-    {
-        _suppressZoomComboChanged = true;
-        ZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
-        _suppressZoomComboChanged = false;
-    }
-
-    private static bool TryParsePercent(string text, out int pct)
-    {
-        var trimmed = text.Trim().TrimEnd('%').Trim();
-        return int.TryParse(trimmed, out pct);
-    }
-
     // ── WireframeControl event wiring ─────────────────────────────────────────
 
     private void WireWireframeControl()
@@ -1085,11 +1017,11 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
-        // The combo follows every tick of a smooth wheel-zoom (#425); the companion file is only
-        // persisted once the animation settles (IsZoomAnimating == false), not on every frame.
-        WireframeCtrl.ZoomChanged            += zoomPct =>
+        // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
+        // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
+        // animating (IsZoomAnimating == false), not on every frame.
+        WireframeCtrl.ZoomChanged            += _ =>
         {
-            SyncZoomCombo(zoomPct);
             if (!WireframeCtrl.IsZoomAnimating) SaveCompanionFile();
         };
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
@@ -1140,13 +1072,10 @@ public partial class MainWindow : Window
         PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
         PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
         PngPane.ViewChanged += RefreshPngScrollBars;
-        PngPane.ViewChanged += UpdatePngZoomLabel;
+        // The PNG bar's zoom widget both shows the live zoom and drives it (type/step to 1:1 for
+        // screenshots), sharing the wireframe/preview implementation.
+        PngZoom.Attach(PngPane);
     }
-
-    // Reflects the PNG viewer's zoom (1.0 = 100%) in the toolbar readout, so 1:1 is easy to hit for
-    // screenshots. Fires on every camera change (pan/zoom/load).
-    private void UpdatePngZoomLabel() =>
-        DiffZoomValue.Text = $"{PngPane.Zoom * 100f:F0}%";
 
     private void OnPngScrollValueChanged(bool horizontal)
     {
@@ -2085,19 +2014,13 @@ public partial class MainWindow : Window
         TimelineStrip.ItemsSource = _timelineFrames;
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
-        PreviewZoomCombo.ItemsSource = _previewZoomPresetTexts;
-        PreviewZoomCombo.KeyDown += OnPreviewZoomComboKeyDown;
-        PreviewZoomCombo.LostFocus += OnPreviewZoomComboLostFocus;
-        PreviewZoomCombo.SelectionChanged += OnPreviewZoomComboSelectionChanged;
-        PreviewZoomPlusBtn.Click  += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, +1, p => PreviewCtrl.SetZoomPercent(p));
-        PreviewZoomMinusBtn.Click += (_, _) => StepZoomPreset(PreviewCtrl.Zoom * 100f, _previewZoomPresets, -1, p => PreviewCtrl.SetZoomPercent(p));
-        PreviewCtrl.WheelZoomPresets = _previewZoomPresets;
+        PreviewZoom.Attach(PreviewCtrl);
 
-        // The combo always tracks the live zoom; the companion file is persisted once the smooth
-        // zoom settles (IsZoomAnimating == false), not on every animation tick (#451).
-        PreviewCtrl.ZoomChanged += zoomPct =>
+        // PreviewZoom tracks the live zoom itself (ZoomControl.Attach subscribes ZoomChanged); this
+        // handler only persists the settled state — once the smooth zoom stops animating
+        // (IsZoomAnimating == false), not on every animation tick (#451).
+        PreviewCtrl.ZoomChanged += _ =>
         {
-            SyncPreviewZoomCombo(zoomPct);
             if (!PreviewCtrl.IsZoomAnimating) SaveCompanionFile();
         };
         PreviewCtrl.PanChanged  += (_, _) => SaveCompanionFile();
@@ -2107,8 +2030,8 @@ public partial class MainWindow : Window
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
-        // Two-way sync between the manual pan and the scrollbars, mirroring the
-        // PreviewZoomCombo ↔ PreviewCtrl suppression pattern above. The scroll axis runs
+        // Two-way sync between the manual pan and the scrollbars, using the same suppression-flag
+        // pattern that breaks feedback loops elsewhere. The scroll axis runs
         // opposite the pan axis (PanScrollBar handles the inversion).
         PreviewHScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: true);
         PreviewVScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: false);
@@ -2185,69 +2108,6 @@ public partial class MainWindow : Window
         // at the right edge until the frame advances rather than speeding up.
         double offset = Math.Min(elapsed * _timelineEffectivePps, travelWidth);
         _timelineFrames[idx].ScrubberOffset = offset;
-    }
-
-    // ── Editable preview-zoom combo (bottom preview) ─────────────────────────
-    //
-    // Same editable-AutoCompleteBox pattern as ZoomCombo above.
-
-    private static readonly int[] _previewZoomPresets =
-        { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
-    private static readonly string[] _previewZoomPresetTexts =
-        _previewZoomPresets.Select(p => $"{p}%").ToArray();
-
-    /// <summary>
-    /// Steps to the next or previous preset relative to the current zoom percent.
-    /// + button: smallest preset strictly greater than current.
-    /// - button: largest preset strictly less than current.
-    /// If the current value is outside the preset range, clamps to the nearest end.
-    /// </summary>
-    private static void StepZoomPreset(float currentPct, int[] presets, int direction, Action<int> apply)
-    {
-        if (direction > 0)
-        {
-            for (int i = 0; i < presets.Length; i++)
-                if (presets[i] > currentPct) { apply(presets[i]); return; }
-            apply(presets[^1]);
-        }
-        else
-        {
-            for (int i = presets.Length - 1; i >= 0; i--)
-                if (presets[i] < currentPct) { apply(presets[i]); return; }
-            apply(presets[0]);
-        }
-    }
-
-    private void OnPreviewZoomComboKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter) { CommitPreviewZoomComboText(); e.Handled = true; }
-    }
-
-    private void OnPreviewZoomComboLostFocus(object? sender, RoutedEventArgs e)
-        => CommitPreviewZoomComboText();
-
-    private void OnPreviewZoomComboSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressPreviewZoomComboChanged) return;
-        if (PreviewZoomCombo.SelectedItem is string s) ApplyPreviewZoomComboText(s);
-    }
-
-    private void CommitPreviewZoomComboText()
-    {
-        if (_suppressPreviewZoomComboChanged) return;
-        ApplyPreviewZoomComboText(PreviewZoomCombo.Text ?? string.Empty);
-    }
-
-    private void ApplyPreviewZoomComboText(string text)
-    {
-        if (TryParsePercent(text, out int pct)) PreviewCtrl.SetZoomPercent(pct);
-    }
-
-    private void SyncPreviewZoomCombo(float zoomPercent)
-    {
-        _suppressPreviewZoomComboChanged = true;
-        PreviewZoomCombo.Text = $"{(int)MathF.Round(zoomPercent)}%";
-        _suppressPreviewZoomComboChanged = false;
     }
 
     // ── Tree view ─────────────────────────────────────────────────────────────

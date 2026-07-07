@@ -58,7 +58,7 @@ public class TextureViewportSnapshot
 /// and the <c>OnEditPointer*</c> hooks — the base handles pan/zoom before any of those fire.
 /// </para>
 /// </summary>
-public class TextureViewport : Control
+public class TextureViewport : Control, IZoomTarget
 {
     // ── Inner types ───────────────────────────────────────────────────────────
 

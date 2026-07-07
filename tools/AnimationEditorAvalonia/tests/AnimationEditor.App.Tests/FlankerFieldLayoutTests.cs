@@ -1,3 +1,4 @@
+using AnimationEditor.App.Controls;
 using System;
 using System.Linq;
 using Avalonia;
@@ -24,8 +25,6 @@ public class FlankerFieldLayoutTests
     [AvaloniaTheory]
     [InlineData("GridSizeInput", "GridSizeMinusBtn", "GridSizePlusBtn")]
     [InlineData("SpeedInput", "SpeedDownBtn", "SpeedUpBtn")]
-    [InlineData("ZoomCombo", "ZoomMinusBtn", "ZoomPlusBtn")]
-    [InlineData("PreviewZoomCombo", "PreviewZoomMinusBtn", "PreviewZoomPlusBtn")]
     public void FlankerField_StaysBetweenButtons(string fieldName, string minusName, string plusName)
     {
         var ctx = TestHelpers.BuildServices();
@@ -44,25 +43,61 @@ public class FlankerFieldLayoutTests
             var plus = window.FindControl<Button>(plusName)
                 ?? throw new InvalidOperationException($"{plusName} not found");
 
-            // The value field is either a TextBox directly (SpeedInput, GridSizeInput) or the inner
-            // TextBox of an AutoCompleteBox (ZoomCombo, PreviewZoomCombo). The inner TextBox is what
-            // carries the focus background/border, so measure its edges — not the outer control's.
-            var textBox = field as TextBox
-                ?? field.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()
-                ?? throw new InvalidOperationException($"{fieldName} has no TextBox");
-
-            // Project everything into the shared DockPanel space so the edges are comparable.
-            var dock = (Control?)minus.Parent
-                ?? throw new InvalidOperationException("flanker button has no parent");
-            double fieldLeft = textBox.TranslatePoint(new Point(0, 0), dock)!.Value.X;
-            double fieldRight = textBox.TranslatePoint(new Point(textBox.Bounds.Width, 0), dock)!.Value.X;
-
-            const double eps = 0.5;
-            Assert.True(fieldLeft >= minus.Bounds.Right - eps,
-                $"{fieldName}: field left {fieldLeft} overlaps − button (right edge {minus.Bounds.Right})");
-            Assert.True(fieldRight <= plus.Bounds.Left + eps,
-                $"{fieldName}: field right {fieldRight} overlaps + button (left edge {plus.Bounds.Left})");
+            AssertFieldBetweenButtons(fieldName, field, minus, plus);
         }
         finally { window.Close(); }
+    }
+
+    // The shared ZoomControl (wireframe + preview toolbars) has the same flanker layout, but its
+    // −/+ buttons and percent field live in the control's own namescope, so they're resolved by
+    // descending each ZoomControl's subtree rather than by window-level name lookup. PngZoom is
+    // excluded: its pane is collapsed by default so it isn't laid out.
+    [AvaloniaTheory]
+    [InlineData("WireframeZoom")]
+    [InlineData("PreviewZoom")]
+    public void ZoomControl_FieldStaysBetweenButtons(string zoomName)
+    {
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Width = 1400;
+        window.Height = 900;
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var zoom = window.FindControl<ZoomControl>(zoomName)
+                ?? throw new InvalidOperationException($"{zoomName} not found");
+
+            var buttons = zoom.GetVisualDescendants().OfType<Button>().ToList();
+            var minus = buttons.First(b => b.Name == "MinusBtn");
+            var plus = buttons.First(b => b.Name == "PlusBtn");
+            var field = zoom.GetVisualDescendants().OfType<AutoCompleteBox>().First();
+
+            AssertFieldBetweenButtons(zoomName, field, minus, plus);
+        }
+        finally { window.Close(); }
+    }
+
+    private static void AssertFieldBetweenButtons(string fieldName, Control field, Button minus, Button plus)
+    {
+        // The value field is either a TextBox directly (SpeedInput, GridSizeInput) or the inner
+        // TextBox of an AutoCompleteBox (the ZoomControl percent field). The inner TextBox is what
+        // carries the focus background/border, so measure its edges — not the outer control's.
+        var textBox = field as TextBox
+            ?? field.GetVisualDescendants().OfType<TextBox>().FirstOrDefault()
+            ?? throw new InvalidOperationException($"{fieldName} has no TextBox");
+
+        // Project everything into the shared DockPanel space so the edges are comparable.
+        var dock = (Control?)minus.Parent
+            ?? throw new InvalidOperationException("flanker button has no parent");
+        double fieldLeft = textBox.TranslatePoint(new Point(0, 0), dock)!.Value.X;
+        double fieldRight = textBox.TranslatePoint(new Point(textBox.Bounds.Width, 0), dock)!.Value.X;
+
+        const double eps = 0.5;
+        Assert.True(fieldLeft >= minus.Bounds.Right - eps,
+            $"{fieldName}: field left {fieldLeft} overlaps − button (right edge {minus.Bounds.Right})");
+        Assert.True(fieldRight <= plus.Bounds.Left + eps,
+            $"{fieldName}: field right {fieldRight} overlaps + button (left edge {plus.Bounds.Left})");
     }
 }

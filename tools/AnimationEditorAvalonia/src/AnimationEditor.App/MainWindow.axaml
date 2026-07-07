@@ -1188,39 +1188,8 @@
 
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
-                        <Border BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                Height="26" Width="130" Margin="0,0,2,0" VerticalAlignment="Center">
-                            <DockPanel>
-                                <Button x:Name="ZoomMinusBtn" DockPanel.Dock="Left"
-                                        Classes="flanker" Content="−" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
-                                        ToolTip.Tip="Zoom out to previous preset" />
-                                <Button x:Name="ZoomPlusBtn" DockPanel.Dock="Right"
-                                        Classes="flanker" Content="+" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
-                                        ToolTip.Tip="Zoom in to next preset" />
-                                <AutoCompleteBox x:Name="ZoomCombo"
-                                                 Text="100%"
-                                                 MinimumPrefixLength="0" FilterMode="None"
-                                                 Background="Transparent" BorderThickness="0" Padding="0"
-                                                 Height="26" VerticalAlignment="Center" FontSize="11">
-                                    <AutoCompleteBox.Styles>
-                                        <Style Selector="TextBox">
-                                            <Setter Property="TextAlignment" Value="Center"/>
-                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                            <Setter Property="Padding" Value="4,0"/>
-                                            <!-- MinWidth/MinHeight 0 (#501): keep the field within its
-                                                 center slot so its focus highlight cannot overflow the
-                                                 −/+ buttons; Fluent forces a min ~64×32. -->
-                                            <Setter Property="MinWidth" Value="0"/>
-                                            <Setter Property="MinHeight" Value="0"/>
-                                            <Setter Property="FontSize" Value="11"/>
-                                        </Style>
-                                    </AutoCompleteBox.Styles>
-                                </AutoCompleteBox>
-                            </DockPanel>
-                        </Border>
+                        <views:ZoomControl x:Name="WireframeZoom"
+                                           VerticalAlignment="Center" Margin="0,0,2,0" />
 
                         <!-- Divider -->
                         <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
@@ -1323,35 +1292,7 @@
                             <TextBlock Text="Zoom:" VerticalAlignment="Center"
                                        Margin="0,0,4,0" Foreground="{DynamicResource InkMid}"
                                        FontSize="11" />
-                            <Border BorderBrush="{DynamicResource LineBrush}"
-                                    BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                    Height="26" Width="130" VerticalAlignment="Center">
-                                <DockPanel>
-                                    <Button x:Name="PreviewZoomMinusBtn" DockPanel.Dock="Left"
-                                            Classes="flanker" Content="−" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
-                                            ToolTip.Tip="Zoom out to previous preset" />
-                                    <Button x:Name="PreviewZoomPlusBtn" DockPanel.Dock="Right"
-                                            Classes="flanker" Content="+" Width="22"
-                                            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
-                                            ToolTip.Tip="Zoom in to next preset" />
-                                    <AutoCompleteBox x:Name="PreviewZoomCombo"
-                                                     Text="100%"
-                                                     MinimumPrefixLength="0" FilterMode="None"
-                                                     Background="Transparent" BorderThickness="0" Padding="0"
-                                                     Height="26" VerticalAlignment="Center" FontSize="11">
-                                        <AutoCompleteBox.Styles>
-                                            <Style Selector="TextBox">
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                                <Setter Property="Padding" Value="4,0"/>
-                                                <Setter Property="MinHeight" Value="0"/>
-                                                <Setter Property="FontSize" Value="11"/>
-                                            </Style>
-                                        </AutoCompleteBox.Styles>
-                                    </AutoCompleteBox>
-                                </DockPanel>
-                            </Border>
+                            <views:ZoomControl x:Name="PreviewZoom" VerticalAlignment="Center" />
                         </WrapPanel>
                     </Border>
 
@@ -1597,9 +1538,10 @@
                                     VerticalAlignment="Center">
                             <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
                                        Foreground="{DynamicResource InkMid}" />
-                            <!-- Height + MinHeight 0 override Fluent's tall default so the bar matches
-                                 the editor toolbar's height (#501-style override). -->
-                            <Slider x:Name="DiffGroupingSlider" Width="160" Height="24" MinHeight="0"
+                            <!-- MinHeight 0 overrides Fluent's tall default; Height 28 comfortably fits
+                                 the Fluent thumb (a shorter bar clipped the thumb top/bottom) while
+                                 keeping the bar close to the editor toolbar's height. -->
+                            <Slider x:Name="DiffGroupingSlider" Width="160" Height="28" MinHeight="0"
                                     VerticalAlignment="Center"
                                     Minimum="1" Maximum="128" Value="16"
                                     SmallChange="1" LargeChange="8"
@@ -1608,10 +1550,8 @@
                                        MinWidth="20" VerticalAlignment="Center"
                                        Foreground="{DynamicResource Ink}" />
                         </StackPanel>
-                        <TextBlock x:Name="DiffZoomValue" Grid.Column="2" Text="100%" FontSize="11"
-                                   VerticalAlignment="Center" Margin="8,0,0,0"
-                                   Foreground="{DynamicResource InkMid}"
-                                   ToolTip.Tip="Current zoom. Scroll to zoom; 100% is 1:1 pixels (useful for screenshots)." />
+                        <views:ZoomControl x:Name="PngZoom" Grid.Column="2"
+                                           VerticalAlignment="Center" Margin="8,0,0,0" />
                     </Grid>
                 </Border>
 

@@ -128,7 +128,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         var ctrl  = FindCtrl<WireframeControl>(window, "WireframeCtrl");
-        var combo = FindCtrl<AutoCompleteBox>(window, "ZoomCombo");
+        var zoom  = FindCtrl<ZoomControl>(window, "WireframeZoom");
 
         ctrl.SetZoomPercent(100);
         Dispatcher.UIThread.RunJobs();
@@ -137,7 +137,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         // Next preset above 100 is 150.
-        Assert.Equal("150%", combo.Text);
+        Assert.Equal("150%", zoom.Text);
         window.Close();
     }
 
@@ -150,7 +150,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         var ctrl  = FindCtrl<WireframeControl>(window, "WireframeCtrl");
-        var combo = FindCtrl<AutoCompleteBox>(window, "ZoomCombo");
+        var zoom  = FindCtrl<ZoomControl>(window, "WireframeZoom");
 
         ctrl.SetZoomPercent(100);
         Dispatcher.UIThread.RunJobs();
@@ -159,7 +159,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         // Previous preset below 100 is 75.
-        Assert.Equal("75%", combo.Text);
+        Assert.Equal("75%", zoom.Text);
         window.Close();
     }
 
@@ -172,7 +172,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         var ctrl  = FindCtrl<WireframeControl>(window, "WireframeCtrl");
-        var combo = FindCtrl<AutoCompleteBox>(window, "ZoomCombo");
+        var zoom  = FindCtrl<ZoomControl>(window, "WireframeZoom");
 
         ctrl.SetZoomPercent(100);
         Dispatcher.UIThread.RunJobs();
@@ -180,11 +180,11 @@ public class WheelZoomPresetTests
         // 100 → 150 → 200 (two notches always land on presets).
         ctrl.SimulateWheelZoom(50f, 50f, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("150%", combo.Text);
+        Assert.Equal("150%", zoom.Text);
 
         ctrl.SimulateWheelZoom(50f, 50f, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("200%", combo.Text);
+        Assert.Equal("200%", zoom.Text);
 
         window.Close();
     }
@@ -198,7 +198,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         var preview = FindCtrl<PreviewControl>(window, "PreviewCtrl");
-        var combo   = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
+        var zoom    = FindCtrl<ZoomControl>(window, "PreviewZoom");
 
         preview.SetZoomPercent(100);
         Dispatcher.UIThread.RunJobs();
@@ -206,7 +206,7 @@ public class WheelZoomPresetTests
         preview.SimulateWheelZoom(100, 100, zoomIn: true);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("150%", combo.Text);
+        Assert.Equal("150%", zoom.Text);
         window.Close();
     }
 
@@ -219,7 +219,7 @@ public class WheelZoomPresetTests
         Dispatcher.UIThread.RunJobs();
 
         var preview = FindCtrl<PreviewControl>(window, "PreviewCtrl");
-        var combo   = FindCtrl<AutoCompleteBox>(window, "PreviewZoomCombo");
+        var zoom    = FindCtrl<ZoomControl>(window, "PreviewZoom");
 
         preview.SetZoomPercent(100);
         Dispatcher.UIThread.RunJobs();
@@ -227,7 +227,7 @@ public class WheelZoomPresetTests
         preview.SimulateWheelZoom(100, 100, zoomIn: false);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("75%", combo.Text);
+        Assert.Equal("75%", zoom.Text);
         window.Close();
     }
 
