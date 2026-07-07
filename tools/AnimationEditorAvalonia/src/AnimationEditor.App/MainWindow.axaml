@@ -1540,10 +1540,15 @@
                     <WrapPanel VerticalAlignment="Center">
                         <TextBlock Text="Grouping" FontSize="11" VerticalAlignment="Center"
                                    Margin="0,0,6,0" Foreground="{DynamicResource InkMid}" />
-                        <!-- No explicit Height: the Fluent thumb is sized for the theme's natural
-                             slider height, so forcing the bar shorter clips the thumb (it overflows and
-                             is covered by the canvas below). -->
-                        <Slider x:Name="DiffGroupingSlider" Width="160"
+                        <!-- The Fluent Slider reserves a 50px-tall layout box around a 20px thumb, and
+                             it does NOT re-center the thumb when forced to a shorter Height — the thumb
+                             stays anchored and its lower half spills out the bottom, where the canvas
+                             covers it (the "cut off" look). So don't constrain Height; keep the natural
+                             (thumb-centered) slider and trim its excess layout footprint with a negative
+                             vertical margin: 50px − 24 = a 26px footprint, matching the .achx toolbar's
+                             26px controls so this bar is exactly the same height. Only the empty tick
+                             padding is trimmed; the thumb stays fully visible. -->
+                        <Slider x:Name="DiffGroupingSlider" Width="160" Margin="0,-12"
                                 VerticalAlignment="Center"
                                 Minimum="1" Maximum="128" Value="16"
                                 SmallChange="1" LargeChange="8"
