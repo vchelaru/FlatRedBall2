@@ -1616,13 +1616,19 @@ public partial class MainWindow : Window
             ?? _selectedState.SelectedChains.SelectMany(c => c.Frames).FirstOrDefault()
             ?? _selectedState.SelectedChain?.Frames?.FirstOrDefault();
 
-        if (frame != null && !string.IsNullOrEmpty(frame.TextureName) &&
-            !string.IsNullOrEmpty(_projectManager.FileName))
+        // When the selected chain is empty, borrow the first texture referenced anywhere in the
+        // project so the combo + wireframe show something Ctrl-clickable to seed the first frame
+        // (issue #618). Mirrors WireframeControl.DetermineTexturePath's fallback.
+        string? textureName = frame?.TextureName;
+        if (string.IsNullOrEmpty(textureName))
+            textureName = TextureListBuilder.GetFirstTextureName(_projectManager.AnimationChainListSave);
+
+        if (!string.IsNullOrEmpty(textureName) && !string.IsNullOrEmpty(_projectManager.FileName))
         {
             string achxFolder = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
-            var abs = System.IO.Path.IsPathRooted(frame.TextureName)
-                ? frame.TextureName
-                : Path.Combine(achxFolder, frame.TextureName);
+            var abs = System.IO.Path.IsPathRooted(textureName)
+                ? textureName
+                : Path.Combine(achxFolder, textureName);
             texPath = new FilePath(abs).Standardized;
         }
 

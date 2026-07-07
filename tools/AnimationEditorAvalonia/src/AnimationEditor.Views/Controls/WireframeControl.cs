@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Rendering;
 using Avalonia;
 using Avalonia.Controls;
@@ -1409,6 +1410,11 @@ public class WireframeControl : TextureViewport
     {
         string? textureName = _selectedState!.SelectedFrame?.TextureName
                            ?? _selectedState!.SelectedChain?.Frames?.FirstOrDefault()?.TextureName;
+
+        // Empty chain: borrow the first texture referenced anywhere in the project so the
+        // wireframe shows something to Ctrl+click on to seed the first frame (issue #618).
+        if (string.IsNullOrEmpty(textureName))
+            textureName = TextureListBuilder.GetFirstTextureName(_projectManager!.AnimationChainListSave);
 
         if (string.IsNullOrEmpty(textureName))
             return null;
