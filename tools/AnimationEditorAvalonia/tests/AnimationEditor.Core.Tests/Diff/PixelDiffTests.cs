@@ -28,6 +28,17 @@ public class PixelDiffTests
     }
 
     [Fact]
+    public void Compute_SingleStepDelta_ChangedAtZeroTolerance()
+    {
+        // Tolerance 0 = "any inequality is a change": even a 1-step per-channel difference registers.
+        // This is what the PNG diff uses — PNG is lossless, so a differing pixel genuinely differs.
+        var before = Image(1, 1, (0, 0, 100, 100, 100, 255));
+        var after = Image(1, 1, (0, 0, 101, 100, 100, 255));
+
+        Assert.True(PixelDiff.Compute(before, after, tolerance: 0).IsChanged(0, 0));
+    }
+
+    [Fact]
     public void Compute_DeltaWithinTolerance_NotChanged()
     {
         // Per-channel delta of 5, tolerance 10 → absorbed as re-export noise.

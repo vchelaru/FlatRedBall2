@@ -4,8 +4,9 @@ namespace AnimationEditor.Core.Diff;
 
 /// <summary>
 /// Computes which pixels changed between two revisions of an image. A pixel counts as changed when the
-/// largest per-channel difference — max(|ΔR|, |ΔG|, |ΔB|, |ΔA|) — exceeds a tolerance, so small
-/// anti-aliasing / lossy re-export noise is absorbed. Alpha is compared like any other channel, so a
+/// largest per-channel difference — max(|ΔR|, |ΔG|, |ΔB|, |ΔA|) — exceeds a tolerance; tolerance 0 means
+/// any inequality is a change (the right choice for lossless formats like PNG), while a larger tolerance
+/// ignores small anti-aliasing / re-export differences. Alpha is compared like any other channel, so a
 /// new sprite frame drawn on a previously-transparent area (alpha 0 → 255) registers as changed.
 /// </summary>
 public static class PixelDiff

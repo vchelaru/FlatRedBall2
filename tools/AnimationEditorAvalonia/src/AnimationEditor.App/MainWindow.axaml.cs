@@ -101,11 +101,11 @@ public partial class MainWindow : Window
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
-    // Fixed pixel-diff tolerance: max per-channel RGBA delta still counted as unchanged. Absorbs
-    // re-export / anti-alias noise; a solid default so the user never has to tune it. The one exposed
-    // control (the Grouping slider) tunes only region merge distance — which regroups boxes but never
-    // hides a real change.
-    private const int DiffTolerance = 12;
+    // Pixel-diff tolerance = 0: any inequality is a change. PNG is lossless, so a differing pixel
+    // genuinely differs — there's no format noise to absorb, and a fuzz threshold would only hide real
+    // changes. The one exposed control (the Grouping slider) tunes region merge distance, which
+    // regroups boxes but never hides a change.
+    private const int DiffTolerance = 0;
     // Debounces the Grouping slider so dragging re-merges once the user pauses, not per pixel-tick.
     private DispatcherTimer? _diffSliderDebounce;
 
