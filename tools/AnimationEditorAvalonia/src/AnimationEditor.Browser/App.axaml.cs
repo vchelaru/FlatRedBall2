@@ -85,6 +85,16 @@ public partial class App : Application
         };
         projectManager.LoadAnimationChain(new FilePath("sample/player.achx"), acls, knownTextureSizes);
 
+        // Phase 4 (#620): multi-file tabs. TabManager/TabEditorCache are already fully built and
+        // tested in Core (pure in-memory, zero disk dependency) -- this is wiring, not new logic.
+        // One thing checked before wiring: TabEditorCache.HasFreshCache treats a tab as fresh
+        // whenever its cached disk-write-time is null, and TryReadDiskWriteTimeUtc naturally
+        // returns null for any path that doesn't exist on disk (every browser tab's path) --
+        // so cached tabs are already correctly "always trusted" here with no code changes needed.
+        var tabManager = new TabManager();
+        tabManager.OpenOrFocus(new FilePath("sample/player.achx"), "player.achx");
+        TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+
         var preview = new PreviewControl();
         preview.InitializeServices(
             selectedState, appState, appCommands, applicationEvents,
@@ -117,6 +127,8 @@ public partial class App : Application
         selectedState.SelectedChain = acls.AnimationChains[0];
 
         var status = new TextBlock { Margin = new Thickness(8), Text = "Loaded bundled sample." };
+
+        var tabStrip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(8, 0, 8, 0) };
 
         var openButton = new Button { Content = "Open Folder…" };
         var saveAsButton = new Button { Content = "Save As…" };
@@ -205,6 +217,75 @@ public partial class App : Application
             redoButton.IsEnabled = undoManager.CanRedo;
         }
         undoManager.StackChanged += UpdateUndoRedoButtons;
+
+        // Phase 4 (#620): multi-file tabs. TabManager/TabEditorCache are already fully built and
+        // tested in Core (pure in-memory, zero disk dependency) -- this is wiring, not new logic.
+        // One thing checked before wiring: TabEditorCache.HasFreshCache treats a tab as fresh
+        // whenever its cached disk-write-time is null, and TryReadDiskWriteTimeUtc naturally
+        // returns null for any path that doesn't exist on disk (every browser tab's path) --
+        // so cached tabs are already correctly "always trusted" here with no code changes needed.
+        void RebuildTabStrip()
+        {
+            tabStrip.Children.Clear();
+            foreach (var tab in tabManager.Tabs)
+            {
+                var isActive = tab == tabManager.ActiveTab;
+                var tabButton = new Button
+                {
+                    Content = tab.DisplayName,
+                    FontWeight = isActive ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
+                };
+                tabButton.Click += (_, _) => SwitchToTab(tab);
+                tabStrip.Children.Add(tabButton);
+            }
+        }
+
+        // Captures the leaving tab's project/undo state, activates the target tab from its
+        // cache (always fresh -- see the note above), and restores its undo history. Mirrors
+        // MainWindow's own tab-switch sequence (capture outgoing -> TryActivateTabFromCache ->
+        // RestoreSnapshot), minus the disk-reload fallback ActivateTabContentAsync has for a
+        // stale cache, which browser tabs never hit.
+        void SwitchToTab(TabEntry target)
+        {
+            if (target == tabManager.ActiveTab) return;
+
+            var leaving = tabManager.ActiveTab;
+            if (leaving != null)
+            {
+                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+            }
+
+            tabManager.Activate(target.Path);
+            appCommands.TryActivateTabFromCache(target);
+            undoManager.RestoreSnapshot(target.UndoSnapshot ?? new UndoSnapshot(new List<IUndoableCommand>(), new List<IUndoableCommand>()));
+            UpdateUndoRedoButtons();
+
+            animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            RebuildTabStrip();
+        }
+
+        // Opens a new tab for the file BrowserProjectLoader just finished loading into
+        // projectManager, capturing the tab that's being left first so switching back to it
+        // later restores its state. displayName is the .achx's own file name (BrowserProjectLoader
+        // uses achxFile.Name as ProjectManager.FileName's logical identity).
+        void OpenNewTabForLoadedProject(string displayName)
+        {
+            var leaving = tabManager.ActiveTab;
+            if (leaving != null)
+            {
+                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+            }
+
+            tabManager.OpenOrFocus(new FilePath(displayName), displayName);
+            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            undoManager.Clear();
+            UpdateUndoRedoButtons();
+            RebuildTabStrip();
+        }
+
+        RebuildTabStrip();
 
         // Both Add/Delete commands raise AnimationChainsChanged -- refresh the tree once, here,
         // rather than after every individual button handler.
@@ -321,6 +402,8 @@ public partial class App : Application
         mainArea.Children.Add(preview);
 
         var root = new DockPanel();
+        DockPanel.SetDock(tabStrip, Dock.Top);
+        root.Children.Add(tabStrip);
         DockPanel.SetDock(toolbar, Dock.Top);
         root.Children.Add(toolbar);
         DockPanel.SetDock(editToolbar, Dock.Top);
@@ -347,7 +430,10 @@ public partial class App : Application
                 : "Drop must include an .achx file (drop its texture PNG(s) alongside it).";
 
             if (loaded)
+            {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+                OpenNewTabForLoadedProject(projectManager.FileName ?? "Untitled");
+            }
         });
 
         openButton.Click += async (_, _) =>
@@ -374,7 +460,10 @@ public partial class App : Application
                 : $"No .achx found in \"{folder.Name}\".";
 
             if (loaded)
+            {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+                OpenNewTabForLoadedProject(projectManager.FileName ?? folder.Name);
+            }
 
             folderWatcher?.Dispose();
             pendingChangedPngs.Clear();
