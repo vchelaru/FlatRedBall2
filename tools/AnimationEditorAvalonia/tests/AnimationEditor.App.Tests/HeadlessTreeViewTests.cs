@@ -806,13 +806,14 @@ public class HeadlessTreeViewTests
             Dispatcher.UIThread.RunJobs();
 
             var roots = GetRoots(GetTree(window));
-            Assert.Equal("0 fr", roots[0].Meta);
+            Assert.Equal("0 fr · 0.00s", roots[0].Meta);
 
             chain.Frames.Add(new AnimationFrameSave { TextureName = "Tex.png", ShapesSave = new ShapesSave() });
             ctx.AppCommands.RefreshTreeNode(chain);
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Equal("1 fr", roots[0].Meta);
+            // Added frame has the default FrameLength (0), so total time stays 0.00s (#623).
+            Assert.Equal("1 fr · 0.00s", roots[0].Meta);
         }
         finally { window.Close(); }
     }

@@ -125,4 +125,38 @@ public class TextureListBuilderTests
         var result = TextureListBuilder.GetAvailableTextures(acls);
         Assert.Single(result);
     }
+
+    // ── GetFirstTextureName (borrow for empty chain — issue #618) ─────────
+
+    [Fact]
+    public void GetFirstTextureName_NullAcls_ReturnsNull()
+    {
+        Assert.Null(TextureListBuilder.GetFirstTextureName(null));
+    }
+
+    [Fact]
+    public void GetFirstTextureName_NoTexturedFrames_ReturnsNull()
+    {
+        // Empty/whitespace texture names and frameless chains contribute nothing.
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Empty" });
+        acls.AnimationChains.Add(AclsWithTextures("", " ").AnimationChains[0]);
+
+        Assert.Null(TextureListBuilder.GetFirstTextureName(acls));
+    }
+
+    [Fact]
+    public void GetFirstTextureName_EmptyChainThenTexturedChain_ReturnsFirstTextureInListOrder()
+    {
+        // The #618 scenario: the selected (first) chain has no frames, so the texture
+        // must be borrowed from a later chain — the first one referenced, in list order.
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Empty" });
+        var textured = new AnimationChainSave { Name = "Walk" };
+        textured.Frames.Add(new AnimationFrameSave { TextureName = "hero.png" });
+        textured.Frames.Add(new AnimationFrameSave { TextureName = "later.png" });
+        acls.AnimationChains.Add(textured);
+
+        Assert.Equal("hero.png", TextureListBuilder.GetFirstTextureName(acls));
+    }
 }

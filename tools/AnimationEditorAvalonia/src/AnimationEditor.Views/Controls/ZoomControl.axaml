@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.App.Controls.ZoomControl">
+    <!-- Reusable [−][editable %][+] zoom widget. Bound to a TextureViewport via ZoomControl.Attach.
+         The percent field is an AutoCompleteBox (not a ComboBox) so it accepts arbitrary text —
+         wheel-zoom can land on off-preset values (e.g. 156%) that must display verbatim. -->
+    <Border BorderBrush="{DynamicResource LineBrush}"
+            BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+            Height="26" Width="130">
+        <DockPanel>
+            <Button x:Name="MinusBtn" DockPanel.Dock="Left"
+                    Classes="flanker" Content="−" Width="22"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
+                    ToolTip.Tip="Zoom out to previous preset" />
+            <Button x:Name="PlusBtn" DockPanel.Dock="Right"
+                    Classes="flanker" Content="+" Width="22"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
+                    ToolTip.Tip="Zoom in to next preset" />
+            <AutoCompleteBox x:Name="Combo"
+                             Text="100%"
+                             MinimumPrefixLength="0" FilterMode="None"
+                             Background="Transparent" BorderThickness="0" Padding="0"
+                             Height="26" VerticalAlignment="Center" FontSize="11">
+                <AutoCompleteBox.Styles>
+                    <Style Selector="TextBox">
+                        <Setter Property="TextAlignment" Value="Center"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Padding" Value="4,0"/>
+                        <!-- MinWidth/MinHeight 0 (#501): keep the field within its center slot so its
+                             focus highlight cannot overflow the −/+ buttons; Fluent forces a min ~64×32. -->
+                        <Setter Property="MinWidth" Value="0"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="FontSize" Value="11"/>
+                    </Style>
+                </AutoCompleteBox.Styles>
+            </AutoCompleteBox>
+        </DockPanel>
+    </Border>
+</UserControl>

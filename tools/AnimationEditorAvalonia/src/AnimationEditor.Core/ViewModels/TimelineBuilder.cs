@@ -41,6 +41,38 @@ public static class TimelineBuilder
         return Math.Max(PixelsPerSecond, MinCellWidth / minDuration);
     }
 
+    /// <summary>
+    /// Total play duration of <paramref name="chain"/> in seconds — the sum of every frame's
+    /// <see cref="AnimationFrameSave.FrameLength"/>. FrameLength is treated as seconds (matching
+    /// the editor's per-frame display) regardless of the file's <c>TimeMeasurementUnit</c>.
+    /// Returns 0 for a null or empty chain.
+    /// </summary>
+    public static float TotalSeconds(AnimationChainSave? chain)
+    {
+        if (chain is null)
+            return 0f;
+
+        float total = 0f;
+        foreach (var frame in chain.Frames)
+            total += frame.FrameLength;
+        return total;
+    }
+
+    /// <summary>Sum of <see cref="TotalSeconds(AnimationChainSave?)"/> across every chain in the list.</summary>
+    public static float TotalSeconds(AnimationChainListSave? acls)
+    {
+        if (acls is null)
+            return 0f;
+
+        float total = 0f;
+        foreach (var chain in acls.AnimationChains)
+            total += TotalSeconds(chain);
+        return total;
+    }
+
+    /// <summary>Formats a duration in seconds for display, e.g. <c>1.5</c> → <c>"1.50s"</c>.</summary>
+    public static string FormatSeconds(float seconds) => $"{seconds:0.00}s";
+
     public static List<TimelineFrameVm> BuildFrameItems(AnimationChainSave? chain)
     {
         if (chain is null)

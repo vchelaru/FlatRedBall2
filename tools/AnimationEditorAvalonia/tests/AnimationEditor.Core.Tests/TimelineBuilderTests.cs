@@ -144,5 +144,45 @@ public class TimelineBuilderTests
         Assert.Equal(TimelineBuilder.MinCellWidth / 0.05, pps, precision: 3);
         Assert.True(pps > TimelineBuilder.PixelsPerSecond);
     }
+
+    // ── TotalSeconds & FormatSeconds ─────────────────────────────────────────
+
+    [Fact]
+    public void TotalSeconds_MultipleFrames_ReturnsSumOfFrameLengths()
+    {
+        var chain = new AnimationChainSave { Name = "Run" };
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
+        chain.Frames.Add(new AnimationFrameSave { FrameLength = 0.2f });
+
+        Assert.Equal(0.5, TimelineBuilder.TotalSeconds(chain), precision: 4);
+    }
+
+    [Fact]
+    public void TotalSeconds_NullChain_ReturnsZero()
+    {
+        Assert.Equal(0f, TimelineBuilder.TotalSeconds((AnimationChainSave?)null));
+    }
+
+    [Fact]
+    public void TotalSeconds_ChainList_SumsEveryChainsDuration()
+    {
+        var acls = new AnimationChainListSave();
+        var walk = new AnimationChainSave { Name = "Walk" };
+        walk.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
+        walk.Frames.Add(new AnimationFrameSave { FrameLength = 0.25f });
+        var run = new AnimationChainSave { Name = "Run" };
+        run.Frames.Add(new AnimationFrameSave { FrameLength = 0.5f });
+        acls.AnimationChains.Add(walk);
+        acls.AnimationChains.Add(run);
+
+        Assert.Equal(1.0, TimelineBuilder.TotalSeconds(acls), precision: 4);
+    }
+
+    [Fact]
+    public void FormatSeconds_Value_FormatsWithTwoDecimalsAndSuffix()
+    {
+        Assert.Equal("1.50s", TimelineBuilder.FormatSeconds(1.5f));
+    }
 }
 

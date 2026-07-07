@@ -169,8 +169,9 @@ public class StatusBarTests
             ctx.ApplicationEvents.RaiseAnimationChainsChanged();
             Dispatcher.UIThread.RunJobs();
 
+            // Both frames have the default FrameLength (0), so the total time is 0.00s (#623).
             var counts = window.FindControl<TextBlock>("StatusCounts")!;
-            Assert.Equal("1 chains · 2 frames", counts.Text);
+            Assert.Equal("1 chains · 2 frames · 0.00s", counts.Text);
         }
         finally { window.Close(); }
     }
@@ -211,19 +212,40 @@ public class StatusBarTests
         var (window, ctx) = CreateWindow();
         try
         {
-            // WriteAchx adds one frame per chain
+            // WriteAchx adds one 0.1s frame per chain — 3 frames total = 0.30s (#623).
             var path = WriteAchx(dir, "Walk", "Run", "Jump");
             ctx.AppCommands.LoadAnimationChain(path);
             Dispatcher.UIThread.RunJobs();
 
             var counts = window.FindControl<TextBlock>("StatusCounts")!;
-            Assert.Equal("3 chains · 3 frames", counts.Text);
+            Assert.Equal("3 chains · 3 frames · 0.30s", counts.Text);
         }
         finally
         {
             window.Close();
             Directory.Delete(dir, true);
         }
+    }
+
+    [AvaloniaFact]
+    public void StatusBar_ShowsSelectedCount_WhenMultipleChainsSelected()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var walk = new AnimationChainSave { Name = "Walk" };
+            var run  = new AnimationChainSave { Name = "Run" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(run);
+
+            // Selecting 2+ chains replaces the whole-file summary with just the count (#623).
+            ctx.SelectedState.SelectedNodes = new() { walk, run };
+            Dispatcher.UIThread.RunJobs();
+
+            var counts = window.FindControl<TextBlock>("StatusCounts")!;
+            Assert.Equal("2 chains selected", counts.Text);
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

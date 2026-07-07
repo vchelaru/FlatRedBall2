@@ -362,6 +362,55 @@ public class WireframeTextureTests
         }
     }
 
+    // ── Empty chain borrows a texture so Ctrl+click can add frames (issue #618) ─
+
+    /// <summary>
+    /// Issue #618: when the selected chain has no frames of its own, the wireframe must
+    /// borrow the first texture referenced by any other chain so the user has something to
+    /// Ctrl+click on to seed the first frame. Without this, an empty chain resolves to no
+    /// texture and <see cref="WireframeControl.RefreshAll"/> clears the wireframe, making
+    /// Ctrl+click-to-add a silent no-op.
+    /// </summary>
+    [AvaloniaFact]
+    public void Wireframe_RefreshAll_EmptySelectedChain_BorrowsTextureFromOtherChain()
+    {
+        var ctx = ResetSingletons();
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            WriteSolidPng(dir, "hero.png", SKColors.Magenta, size: 32);
+            ctx.ProjectManager.FileName = System.IO.Path.Combine(dir, "test.achx");
+
+            var textured = new AnimationChainSave { Name = "Walk" };
+            textured.Frames.Add(new AnimationFrameSave
+            {
+                TextureName = "hero.png", FrameLength = 0.1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave(),
+            });
+            var empty = new AnimationChainSave { Name = "NewChain" };   // no frames
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(textured);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(empty);
+
+            // Select the empty chain — nothing in it references a texture.
+            ctx.SelectedState.SelectedChain = empty;
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.RefreshAll();
+
+            Assert.NotNull(ctrl.LoadedTexturePath);
+            Assert.True(ctrl.LoadedTexturePath!.EndsWith("hero.png", System.StringComparison.OrdinalIgnoreCase),
+                $"Empty chain should borrow hero.png; got: {ctrl.LoadedTexturePath}");
+        }
+        finally
+        {
+            ctx.SelectedState.SelectedChain = null;
+            ctx.ProjectManager.FileName     = string.Empty;
+            System.IO.Directory.Delete(dir, true);
+        }
+    }
+
     // ── LoadedTexturePath reflects current texture ────────────────────────────
 
     /// <summary>
