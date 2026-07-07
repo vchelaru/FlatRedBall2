@@ -74,6 +74,16 @@ public sealed class ThumbnailService : IDisposable
     /// eviction loop tolerates that (the dictionary <c>Remove</c> simply reports it absent).</summary>
     private readonly Queue<ThumbnailKey> _thumbnailOrder = new();
 
+    /// <summary>Cache signature for a whole-PNG (Files-panel) thumbnail: the source path plus the
+    /// target box. Bounded by the number of distinct PNGs at a given icon size, so — unlike the
+    /// frame-thumbnail cache — it needs no churn cap; <see cref="InvalidatePath"/> drops entries
+    /// when a PNG reloads.</summary>
+    private readonly record struct FullImageKey(string Path, int MaxWidth, int MaxHeight);
+
+    /// <summary>Finished full-image thumbnails, owned by the service (do not dispose the returned
+    /// bitmap). Lets the Files-panel scope toggle rebuild the tree without re-downscaling every PNG.</summary>
+    private readonly Dictionary<FullImageKey, Avalonia.Media.Imaging.Bitmap> _fullImageCache = new();
+
     /// <summary>Caps finished-thumbnail memory so editing churn (e.g. dragging a UV slider, which
     /// mints a new key per tick) can't grow the cache without bound. Each entry is tiny
     /// (≤ 56×56×4 bytes), so this is a few MB worst case.</summary>
@@ -104,6 +114,16 @@ public sealed class ThumbnailService : IDisposable
         if (stale is not null)
             foreach (var k in stale)
                 _thumbnailCache.Remove(k);
+
+        // Same drop-don't-dispose treatment for the whole-PNG Files-panel thumbnails, so a
+        // hot-reloaded sheet re-renders its Files-panel icon instead of showing the stale crop.
+        List<FullImageKey>? staleFull = null;
+        foreach (var k in _fullImageCache.Keys)
+            if (string.Equals(k.Path, key, StringComparison.OrdinalIgnoreCase))
+                (staleFull ??= new()).Add(k);
+        if (staleFull is not null)
+            foreach (var k in staleFull)
+                _fullImageCache.Remove(k);
     }
 
     /// <summary>
@@ -195,11 +215,20 @@ public sealed class ThumbnailService : IDisposable
         BitmapCache[textureName.Replace('\\', '/')] = bitmap;
 
     /// <summary>
-    /// Returns a downscaled Avalonia bitmap of the full PNG at <paramref name="path"/>.
-    /// Used by the Files panel; the result is owned by the caller.
+    /// Returns a downscaled Avalonia bitmap of the full PNG at <paramref name="path"/>, for the
+    /// Files panel. The result is cached (keyed by path + target size) and <em>owned by this
+    /// service</em> — do not dispose it. Caching matters because the Files-panel scope toggle
+    /// rebuilds the whole tree; without it, every rebuild re-ran <see cref="SKImage.FromBitmap"/>
+    /// on each source atlas (a full-sheet copy — the #514 hot path) plus a fresh bitmap alloc per
+    /// PNG. <see cref="InvalidatePath"/> drops the entry so a hot-reloaded PNG re-renders.
     /// </summary>
     public Avalonia.Media.Imaging.Bitmap? GetFullImageThumbnail(string? path, int maxWidth, int maxHeight)
     {
+        if (string.IsNullOrEmpty(path)) return null;
+
+        var key = new FullImageKey(path.Replace('\\', '/'), maxWidth, maxHeight);
+        if (_fullImageCache.TryGetValue(key, out var cached)) return cached;
+
         var bm = GetBitmap(path);
         if (bm is null) return null;
 
@@ -214,7 +243,10 @@ public sealed class ThumbnailService : IDisposable
         using var img = SKImage.FromBitmap(bm);
         canvas.DrawImage(img, SKRect.Create(0, 0, finalW, finalH),
             new SKSamplingOptions(SKFilterMode.Linear));
-        return ToAvaloniaBitmap(thumb);
+
+        var bitmap = ToAvaloniaBitmap(thumb);
+        _fullImageCache[key] = bitmap;
+        return bitmap;
     }
 
     /// <summary>
@@ -303,6 +335,9 @@ public sealed class ThumbnailService : IDisposable
             bitmap.Dispose();
         _thumbnailCache.Clear();
         _thumbnailOrder.Clear();
+        foreach (var bitmap in _fullImageCache.Values)
+            bitmap.Dispose();
+        _fullImageCache.Clear();
     }
 
     /// <summary>

@@ -218,8 +218,18 @@ public partial class MainWindow : Window
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
-        _pngFolderWatcher.FolderContentsChanged += () =>
-            Dispatcher.UIThread.InvokeAsync(RefreshFilesPanel);
+        // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
+        // the live .achx instead of the snapshot cached at the last refresh.
+        FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
+        _pngFolderWatcher.FolderContentsChanged += changed =>
+            Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // Evict the changed PNGs so the rebuild re-decodes them (and re-renders their
+                // cached Files-panel thumbnails) instead of serving the stale pre-change image.
+                foreach (var path in changed)
+                    _thumbnailService.InvalidatePath(path);
+                RefreshFilesPanel();
+            });
 
         Opened += OnOpened;
         Closed += (_, _) =>
@@ -3032,7 +3042,11 @@ public partial class MainWindow : Window
     private void RefreshFilesPanel()
     {
         string? filesRoot = _projectManager.ResolveFilesPanelRoot();
-        FilesPanel.Refresh(filesRoot);
+        var referenced = TextureListBuilder.GetAvailableTextures(_projectManager.AnimationChainListSave);
+        string? achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
+            ? null
+            : new FilePath(_projectManager.FileName).GetDirectoryContainingThis().FullPath;
+        FilesPanel.Refresh(filesRoot, referenced, achxFolder);
         _pngFolderWatcher.Watch(filesRoot);
     }
 

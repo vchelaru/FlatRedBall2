@@ -8,11 +8,21 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace AnimationEditor.App.Controls;
+
+/// <summary>Which PNGs the Files panel lists (issue #615).</summary>
+public enum FilesPanelScope
+{
+    /// <summary>Every PNG under the browse root (the historical behavior).</summary>
+    Project,
+    /// <summary>Only the PNGs referenced by the open .achx.</summary>
+    ThisFile,
+}
 
 /// <summary>
 /// Tree of PNG thumbnails from the .achx folder for drag-to-assign and reveal-in-explorer.
@@ -31,7 +41,22 @@ public partial class FilesPanelControl : UserControl
     private PngFilesTreeNodeVm? _dragSourceNode;
     private PngFilesTreeNodeVm? _contextNode;
 
+    // Last inputs from Refresh, cached so the scope toggle can rebuild without a round-trip.
+    private string? _filesRoot;
+    private IReadOnlyList<string> _referencedTextureNames = Array.Empty<string>();
+    private string? _achxFolder;
+
     public ObservableCollection<PngFilesTreeNodeVm> TreeRoots { get; } = new();
+
+    /// <summary>The active scope. The owner refreshes referenced-texture data when this changes.</summary>
+    public FilesPanelScope Scope { get; private set; } = FilesPanelScope.Project;
+
+    /// <summary>
+    /// Raised when the user flips the scope toggle. The owner (MainWindow) handles this by
+    /// re-invoking <see cref="Refresh"/> with the current referenced textures, so "This File"
+    /// always reflects the live .achx rather than a stale snapshot.
+    /// </summary>
+    public event EventHandler? ScopeChanged;
 
     public FilesPanelControl()
     {
@@ -46,9 +71,26 @@ public partial class FilesPanelControl : UserControl
             RoutingStrategies.Tunnel);
         FilesTree.SelectionChanged += (_, _) => ClearTreeSelection();
 
+        ScopeProjectRadio.IsCheckedChanged += OnScopeRadioChanged;
+        ScopeThisFileRadio.IsCheckedChanged += OnScopeRadioChanged;
+
         var contextMenu = new ContextMenu();
         contextMenu.Opening += OnTreeContextMenuOpening;
         FilesTree.ContextMenu = contextMenu;
+    }
+
+    private void OnScopeRadioChanged(object? sender, RoutedEventArgs e)
+    {
+        var scope = ScopeThisFileRadio.IsChecked == true
+            ? FilesPanelScope.ThisFile
+            : FilesPanelScope.Project;
+        if (scope == Scope)
+            return;
+
+        Scope = scope;
+        // The owner (MainWindow) handles ScopeChanged synchronously by re-invoking Refresh with
+        // the current referenced textures, which rebuilds the tree — so no rebuild here.
+        ScopeChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Initialize(ThumbnailService thumbnailService, Window ownerWindow,
@@ -60,7 +102,22 @@ public partial class FilesPanelControl : UserControl
         _openPng = openPng;
     }
 
-    public void Refresh(string? achxFolder)
+    /// <param name="filesRoot">Root folder to browse (from <c>ProjectManager.ResolveFilesPanelRoot</c>).</param>
+    /// <param name="referencedTextureNames">
+    /// Texture names referenced by the open .achx (from <c>TextureListBuilder.GetAvailableTextures</c>),
+    /// used only in <see cref="FilesPanelScope.ThisFile"/> scope. Pass fresh values on every call so
+    /// the scoped list stays current.
+    /// </param>
+    /// <param name="achxFolder">The .achx's directory, used to resolve the relative texture names.</param>
+    public void Refresh(string? filesRoot, IReadOnlyList<string> referencedTextureNames, string? achxFolder)
+    {
+        _filesRoot = filesRoot;
+        _referencedTextureNames = referencedTextureNames;
+        _achxFolder = achxFolder;
+        Rebuild();
+    }
+
+    private void Rebuild()
     {
         TreeRoots.Clear();
 
@@ -70,14 +127,25 @@ public partial class FilesPanelControl : UserControl
             return;
         }
 
-        var files = PngFolderScanner.ListFiles(achxFolder);
-        if (files.Count == 0)
+        var allFiles = PngFolderScanner.ListFiles(_filesRoot);
+        if (allFiles.Count == 0)
         {
             SetEmptyMessage(
-                string.IsNullOrEmpty(achxFolder)
+                string.IsNullOrEmpty(_filesRoot)
                     ? "Save the .achx to browse folder PNGs."
                     : "No PNG files in this folder.",
                 visible: true);
+            return;
+        }
+
+        var files = Scope == FilesPanelScope.ThisFile
+            ? FilesPanelScopeFilter.FilterToReferenced(allFiles, _referencedTextureNames, _achxFolder)
+            : allFiles;
+
+        if (files.Count == 0)
+        {
+            // Only reachable in ThisFile scope — Project scope shows every scanned file.
+            SetEmptyMessage("This .achx references no PNGs in this folder.", visible: true);
             return;
         }
 

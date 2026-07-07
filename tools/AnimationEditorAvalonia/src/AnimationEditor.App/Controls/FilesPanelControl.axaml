@@ -7,9 +7,31 @@
     <UserControl.Resources>
         <x:Double x:Key="FilesTreeThumbSize">28</x:Double>
     </UserControl.Resources>
-    <Grid RowDefinitions="*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Scope toggle (issue #615): Project = all PNGs under the folder; This File =
+             only PNGs referenced by the open .achx, so the common case is a short list. -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource BgRail}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,5">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <RadioButton x:Name="ScopeProjectRadio"
+                             GroupName="FilesPanelScope"
+                             Content="Project"
+                             FontSize="11"
+                             IsChecked="True"
+                             ToolTip.Tip="Show every PNG in the project folder" />
+                <RadioButton x:Name="ScopeThisFileRadio"
+                             GroupName="FilesPanelScope"
+                             Content="This File"
+                             FontSize="11"
+                             ToolTip.Tip="Show only the PNGs referenced by the open .achx" />
+            </StackPanel>
+        </Border>
+
         <TreeView x:Name="FilesTree"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   ItemsSource="{Binding TreeRoots}"
                   Background="Transparent"
                   Focusable="False"
@@ -96,7 +118,7 @@
         </TreeView>
 
         <TextBlock x:Name="EmptyMessage"
-                   Grid.Row="1"
+                   Grid.Row="2"
                    Margin="8,4"
                    TextWrapping="Wrap"
                    FontSize="11"
