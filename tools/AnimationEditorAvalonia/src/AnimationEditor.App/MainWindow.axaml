@@ -94,13 +94,16 @@
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">
-                        <MenuItem Header="_Undo"            x:Name="MenuUndo"          InputGesture="Ctrl+Z" />
-                        <MenuItem Header="_Redo"            x:Name="MenuRedo"          InputGesture="Ctrl+Y" />
+                        <!-- InputGesture text for Undo/Redo/Copy/Cut/Paste/Duplicate is set in code from
+                             the hotkey registry (MainWindow.ApplyHotkeyMenuGestureText, issue #632) so
+                             it can never drift from what the KeyDown handler actually does. -->
+                        <MenuItem Header="_Undo"            x:Name="MenuUndo" />
+                        <MenuItem Header="_Redo"            x:Name="MenuRedo" />
                         <Separator />
-                        <MenuItem Header="_Copy"            x:Name="MenuCopy"          InputGesture="Ctrl+C" />
-                        <MenuItem Header="Cu_t"             x:Name="MenuCut"           InputGesture="Ctrl+X" />
-                        <MenuItem Header="_Paste"           x:Name="MenuPaste"         InputGesture="Ctrl+V" />
-                        <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate"     InputGesture="Ctrl+D" />
+                        <MenuItem Header="_Copy"            x:Name="MenuCopy" />
+                        <MenuItem Header="Cu_t"             x:Name="MenuCut" />
+                        <MenuItem Header="_Paste"           x:Name="MenuPaste" />
+                        <MenuItem Header="_Duplicate"       x:Name="MenuDuplicate" />
                         <Separator />
                         <MenuItem Header="Reload _from Disk"    x:Name="MenuReloadFromDisk" />
                         <MenuItem Header="Enable Hot _Reload"   x:Name="MenuEnableHotReload" IsChecked="True" />
@@ -125,8 +128,9 @@
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Help">
+                        <!-- InputGesture set in code from the hotkey registry — see note above. -->
                         <MenuItem Header="Show _Render Diagnostics" x:Name="MenuShowDiagnostics"
-                                  ToggleType="CheckBox" InputGesture="F3" />
+                                  ToggleType="CheckBox" />
                         <MenuItem Header="View _Log"      x:Name="MenuViewLog" />
                         <MenuItem Header="_About"         x:Name="MenuAbout" />
                     </MenuItem>

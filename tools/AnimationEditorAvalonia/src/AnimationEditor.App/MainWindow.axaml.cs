@@ -7,6 +7,7 @@ using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
+using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
@@ -1759,8 +1760,7 @@ public partial class MainWindow : Window
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
-        // F3 is handled separately in the global KeyDown handler (InputGesture on a MenuItem is
-        // display-only here — the same reason Ctrl+Z has its own KeyDown branch).
+        // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
         MenuSettings.Click += OnSettingsClick;
         MenuCopy.Click          += (_, _) => _ = HandleCopyAsync();
@@ -5057,15 +5057,180 @@ public partial class MainWindow : Window
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
-    // Returns true when the platform command modifier is active.
-    // On macOS the Command key (⌘) maps to KeyModifiers.Meta; on Windows/Linux it is Control.
-    // Accepting both lets Ctrl+C/V/Z keep working in tests and on Windows/Linux while also
-    // handling Cmd+C/V/Z on macOS.
-    private static bool HasCommandModifier(KeyModifiers m)
-        => m.HasFlag(KeyModifiers.Control) || m.HasFlag(KeyModifiers.Meta);
+    // Single source of truth for global keyboard shortcuts (issue #632). Built once in
+    // WireKeyboard and consulted both by the KeyDown dispatch below and by
+    // ApplyHotkeyMenuGestureText, so the menu's InputGesture text can never drift from what a
+    // keypress actually does.
+    private List<HotkeyDefinition> _hotkeys = new();
+
+    /// <summary>Exposes the built registry for tests (e.g. asserting no duplicate gestures).</summary>
+    internal IReadOnlyList<HotkeyDefinition> Hotkeys => _hotkeys;
+
+    // Translates Avalonia's native modifier flags into the UI-independent HotkeyModifiers used
+    // by AnimationEditor.Core.Hotkeys. Command unifies Control (Windows/Linux) and Meta (macOS).
+    private static HotkeyModifiers ToHotkeyModifiers(KeyModifiers modifiers)
+    {
+        var result = HotkeyModifiers.None;
+        if (modifiers.HasFlag(KeyModifiers.Shift)) result |= HotkeyModifiers.Shift;
+        if (modifiers.HasFlag(KeyModifiers.Alt)) result |= HotkeyModifiers.Alt;
+        if (modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Meta))
+            result |= HotkeyModifiers.Command;
+        return result;
+    }
+
+    private List<HotkeyDefinition> BuildHotkeyDefinitions()
+    {
+        const HotkeyModifiers Command = HotkeyModifiers.Command;
+        const HotkeyModifiers Shift   = HotkeyModifiers.Shift;
+        const HotkeyModifiers Alt     = HotkeyModifiers.Alt;
+
+        return new List<HotkeyDefinition>
+        {
+            new()
+            {
+                Id = "copy", Description = "Copy", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("C", Command) },
+                ShouldSkip = IsTextInputFocused,
+                Action = () => _ = HandleCopyAsync(),
+            },
+            new()
+            {
+                Id = "cut", Description = "Cut", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("X", Command) },
+                ShouldSkip = IsTextInputFocused,
+                Action = () => _ = HandleCutAsync(),
+            },
+            new()
+            {
+                Id = "paste", Description = "Paste", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("V", Command) },
+                ShouldSkip = IsTextInputFocused,
+                Action = () => _ = HandlePasteAsync(),
+            },
+            new()
+            {
+                Id = "duplicate", Description = "Duplicate", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("D", Command) },
+                ShouldSkip = IsTextInputFocused,
+                Action = HandleDuplicate,
+            },
+            new()
+            {
+                Id = "delete", Description = "Delete", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("Delete") },
+                ShouldSkip = IsTextInputFocused,
+                Action = HandleDelete,
+            },
+            new()
+            {
+                Id = "rename", Description = "Rename", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("F2") },
+                Action = HandleRenameHotkey,
+            },
+            new()
+            {
+                Id = "toggle-diagnostics", Description = "Toggle Render Diagnostics", Category = "View",
+                Gestures = new[] { new HotkeyGesture("F3") },
+                Action = ToggleDiagnostics,
+            },
+            new()
+            {
+                Id = "undo", Description = "Undo", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("Z", Command, Forbidden: Shift) },
+                Action = () => _undoManager.Undo(),
+            },
+            new()
+            {
+                Id = "redo", Description = "Redo", Category = "Edit",
+                Gestures = new[]
+                {
+                    new HotkeyGesture("Y", Command),
+                    new HotkeyGesture("Z", Command | Shift, Forbidden: Alt),
+                },
+                Action = () => _undoManager.Redo(),
+            },
+            new()
+            {
+                Id = "toggle-play-pause", Description = "Play / Pause Preview", Category = "Playback",
+                Gestures = new[] { new HotkeyGesture("Space") },
+                // Let a focused button receive Space to activate itself rather than hijacking it.
+                ShouldSkip = () => IsTextInputFocused() || FocusManager?.GetFocusedElement() is Button,
+                Action = () => PreviewCtrl.TogglePlayPause(),
+            },
+            new()
+            {
+                Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
+                Gestures = new[] { new HotkeyGesture("Up", Alt) },
+                Action = () => HandleReorderHotkey(-1),
+            },
+            new()
+            {
+                Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
+                Gestures = new[] { new HotkeyGesture("Down", Alt) },
+                Action = () => HandleReorderHotkey(+1),
+            },
+        };
+    }
+
+    // F2: prefer the tree's SelectedItem, fall back to _selectedState when the tree has
+    // temporarily lost focus (e.g. immediately after ALT+arrow reorder, where focus shifts
+    // before our Background-priority re-focus post runs).
+    private void HandleRenameHotkey()
+    {
+        var vm = AnimTree.SelectedItem as TreeNodeVm
+              ?? (_selectedState.SelectedShape is { } ss
+                      ? TreeBuilder.FindNodeForData(_treeRoots, ss) : null)
+              ?? (_selectedState.SelectedFrame is { } sf
+                      ? TreeBuilder.FindNodeForData(_treeRoots, sf) : null)
+              ?? (_selectedState.SelectedChain is { } sc
+                      ? TreeBuilder.FindNodeForData(_treeRoots, sc) : null);
+
+        if (vm is null) return;
+
+        // Frame nodes are intentionally not renameable: a frame's identity is its index, so its
+        // label is the computed positional "Frame N" (see TreeBuilder).
+        if (vm.Data is AnimationChainSave chain)
+            BeginInlineRename(vm, chain.Name);
+        else if (vm.Data is AARectSave rect)
+            BeginInlineRename(vm, rect.Name);
+        else if (vm.Data is CircleSave circle)
+            BeginInlineRename(vm, circle.Name);
+    }
+
+    private void HandleReorderHotkey(int delta)
+    {
+        _altMenuActivationSuppressor.ArmFromAltArrowReorder();
+        _appCommands.HandleReorder(delta);
+        // Restore focus to the tree — reorder can cause Avalonia to shift focus away, which
+        // would let F2 hit the wrong target for a subsequent rename.
+        Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
+        if (_selectedState.SelectedFrame is not null)
+            ShowStatusMessage("Frame labels updated to reflect new positions");
+    }
+
+    // Sets each menu item's InputGesture text from the matching registry entry's DisplayText,
+    // so the menu can never show a shortcut a keypress doesn't actually trigger (issue #632).
+    // MenuNew/MenuLoad/MenuSave and the zoom shortcuts keep their hand-authored XAML text — they
+    // have no KeyDown-driven implementation to derive from.
+    private void ApplyHotkeyMenuGestureText()
+    {
+        SetMenuGesture(MenuUndo, "undo");
+        SetMenuGesture(MenuRedo, "redo");
+        SetMenuGesture(MenuCopy, "copy");
+        SetMenuGesture(MenuCut, "cut");
+        SetMenuGesture(MenuPaste, "paste");
+        SetMenuGesture(MenuDuplicate, "duplicate");
+        SetMenuGesture(MenuShowDiagnostics, "toggle-diagnostics");
+    }
+
+    private void SetMenuGesture(MenuItem item, string hotkeyId) =>
+        item.InputGesture = KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
 
     private void WireKeyboard()
     {
+        _hotkeys = BuildHotkeyDefinitions();
+        ApplyHotkeyMenuGestureText();
+
         // Use Tunnel routing so we intercept keys before child controls (e.g. the TreeView,
         // which handles Up/Down for navigation and would mark the event Handled before the
         // default Bubble-phase KeyDown fires).
@@ -5073,103 +5238,12 @@ public partial class MainWindow : Window
         {
             if (e.Handled) return;
 
-            if (e.Key == Key.C && HasCommandModifier(e.KeyModifiers))
-            {
-                if (IsTextInputFocused()) return;
-                e.Handled = true;
-                _ = HandleCopyAsync();
-            }
-            else if (e.Key == Key.X && HasCommandModifier(e.KeyModifiers))
-            {
-                if (IsTextInputFocused()) return;
-                e.Handled = true;
-                _ = HandleCutAsync();
-            }
-            else if (e.Key == Key.V && HasCommandModifier(e.KeyModifiers))
-            {
-                if (IsTextInputFocused()) return;
-                e.Handled = true;
-                _ = HandlePasteAsync();
-            }
-            else if (e.Key == Key.D && HasCommandModifier(e.KeyModifiers))
-            {
-                if (IsTextInputFocused()) return;
-                e.Handled = true;
-                HandleDuplicate();
-            }
-            else if (e.Key == Key.Delete)
-            {
-                if (IsTextInputFocused()) return;
-                e.Handled = true;
-                HandleDelete();
-            }
-            else if (e.Key == Key.F2)
-            {
-                e.Handled = true;
-                // Prefer the tree's SelectedItem, fall back to _selectedState when the tree
-                // has temporarily lost focus (e.g. immediately after ALT+arrow reorder, where
-                // focus shifts before our Background-priority re-focus post runs).
-                var vm = AnimTree.SelectedItem as TreeNodeVm
-                      ?? (_selectedState.SelectedShape is { } ss
-                              ? TreeBuilder.FindNodeForData(_treeRoots, ss) : null)
-                      ?? (_selectedState.SelectedFrame is { } sf
-                              ? TreeBuilder.FindNodeForData(_treeRoots, sf) : null)
-                      ?? (_selectedState.SelectedChain is { } sc
-                              ? TreeBuilder.FindNodeForData(_treeRoots, sc) : null);
+            var match = HotkeyRegistry.FindMatch(_hotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
+            if (match is null) return;
+            if (match.ShouldSkip?.Invoke() == true) return;
 
-                if (vm is not null)
-                {
-                    // Frame nodes are intentionally not renameable: a frame's identity is its
-                    // index, so its label is the computed positional "Frame N" (see TreeBuilder).
-                    if (vm.Data is AnimationChainSave chain)
-                        BeginInlineRename(vm, chain.Name);
-                    else if (vm.Data is AARectSave rect)
-                        BeginInlineRename(vm, rect.Name);
-                    else if (vm.Data is CircleSave circle)
-                        BeginInlineRename(vm, circle.Name);
-                }
-                // F2 is rename-only. Render diagnostics moved to F3 / Help ▸ Show Render Diagnostics
-                // (the old F2 fallback was unreachable — a tree node is essentially always selected).
-            }
-            else if (e.Key == Key.F3)
-            {
-                e.Handled = true;
-                ToggleDiagnostics();
-            }
-            else if (e.Key == Key.Z && HasCommandModifier(e.KeyModifiers) &&
-                     !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                e.Handled = true;
-                _undoManager.Undo();
-            }
-            else if ((e.Key == Key.Y && HasCommandModifier(e.KeyModifiers)) ||
-                     (e.Key == Key.Z && (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) ||
-                                         e.KeyModifiers == (KeyModifiers.Meta    | KeyModifiers.Shift))))
-            {
-                e.Handled = true;
-                _undoManager.Redo();
-            }
-            else if (e.Key == Key.Space)
-            {
-                if (IsTextInputFocused()) return;
-                // Let a focused button receive Space to activate itself rather than hijacking it.
-                if (FocusManager?.GetFocusedElement() is Button) return;
-                e.Handled = true;
-                PreviewCtrl.TogglePlayPause();
-            }
-            else if ((e.Key == Key.Up || e.Key == Key.Down) &&
-                     e.KeyModifiers.HasFlag(KeyModifiers.Alt))
-            {
-                e.Handled = true;
-                _altMenuActivationSuppressor.ArmFromAltArrowReorder();
-                int delta = e.Key == Key.Up ? -1 : +1;
-                _appCommands.HandleReorder(delta);
-                // Restore focus to the tree — reorder can cause Avalonia to shift focus away, which
-                // would let F2 hit the wrong target for a subsequent rename.
-                Dispatcher.UIThread.Post(() => AnimTree.Focus(), DispatcherPriority.Background);
-                if (_selectedState.SelectedFrame is not null)
-                    ShowStatusMessage("Frame labels updated to reflect new positions");
-            }
+            e.Handled = true;
+            match.Action();
         }), RoutingStrategies.Tunnel);
 
         // Avalonia activates the title-bar menu on Alt KeyUp. Alt+Arrow reorder handles only
