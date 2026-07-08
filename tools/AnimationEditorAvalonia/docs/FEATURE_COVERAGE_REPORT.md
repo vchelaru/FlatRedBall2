@@ -111,7 +111,7 @@
 | IO10 | Invalid XML resilience | `LoadAndApplyCompanionFileFor` silently absorbs deserialization exceptions |
 | IO11 | New animation | File > New creates an empty `AnimationChainListSave`, clears `ProjectManager.FileName`, and immediately triggers the async Save-As flow so the user can choose a save path |
 | IO12 | Command-line file argument | On startup (`Window.Opened`), if `Environment.GetCommandLineArgs()[1]` is an existing `.achx` path it is loaded automatically, bypassing the file picker |
-| IO13 | Export current animation as GIF | File > "Save current animation as GIF"; renders each frame's texture region into a `Bitmap` and encodes as an animated GIF using `AnimatedGifEncoder`; user picks save path via `SaveFileDialog` |
+| IO13 | Export current animation as GIF | **Old WinForms app only — not ported to the Avalonia app.** File > "Save current animation as GIF"; renders each frame's texture region into a `Bitmap` and encodes as an animated GIF using `AnimatedGifEncoder`; user picks save path via `SaveFileDialog` |
 | IO14 | Copy / paste objects | Edit > Copy / Ctrl+C serializes the selected chain(s), frame(s), rectangle, or circle to the system clipboard as a typed XML string (`List<AnimationChainSave>:...`); Paste / Ctrl+V deserializes and appends into the current context; supports chain-to-chain, frame-to-chain, and shape-to-frame paste |
 | IO15 | Resize texture | Edit > "Resize texture"; pads the selected frame's texture PNG to power-of-two dimensions; user chooses to replace the original file or save a renamed copy (`*Resize.png`); adjusts `Left/Right/Top/BottomCoordinate` on every frame across all chains that references the same texture file |
 
@@ -278,7 +278,7 @@
 | Shape Management | 13 | 11 | 2 (S10–S11: property editor UI) |
 | Selection State | 8 | 8 | 0 |
 | Object Lookup | 3 | 3 | 0 |
-| File I/O | 15 | 14 | 1 (IO13: GIF export rendering — IO11 `NewFile()` + IO12 `CommandLineArgParser` + IO14 serialization + IO15 UV-adjust now all covered) |
+| File I/O | 15 | 14 | 1 (IO13: GIF export — **not implemented in the Avalonia app** (WinForms-only, never ported); would be untestable via unit tests regardless since it requires bitmap rendering. IO11 `NewFile()` + IO12 `CommandLineArgParser` + IO14 serialization + IO15 UV-adjust now all covered) |
 | Application State | 6 | 6 | 0 |
 | Application Events | 8 | 8 | 0 |
 | Serialization Details | 9 | 9 | 0 |
@@ -407,7 +407,7 @@ A top-down audit of the old WinForms app's `Controls/`, `Managers/`, `Plugins/`,
 | A16 | Adjust offsets dialog | `AdjustOffsetViewModel.ApplyOffsets()` — pure logic in UI ViewModel | Math fully extractable to Core — testable |
 | A17 | Scale frame times dialog | `AnimationChainTimeScaleWindow` + right-click `AdjustFrameTimeClick` — pure arithmetic | Math extractable to Core — testable |
 | F12 | Batch add frames | `TreeViewManager.AddFramesClick` + `AnimationAddFramesWPF` dialog | UV increment math extractable; dialog interaction UI-only |
-| IO13 | Export as GIF | `GifManager.SaveCurrentAnimationAsGif()` — requires bitmap rendering + file system | Bitmap rendering untestable without graphics context |
+| IO13 | Export as GIF | `GifManager.SaveCurrentAnimationAsGif()` (old WinForms app only) — requires bitmap rendering + file system | **Not ported to the Avalonia app** — no equivalent exists in `AnimationEditor.Core`/`AnimationEditor.App`. Would be untestable without a graphics context even if it were ported. |
 | IO14 | Copy / paste | `CopyManager.HandleCopy/HandlePaste` — XML serialization to system clipboard | Serialization logic testable; clipboard + paste-context wiring UI-only |
 | IO15 | Resize texture | `ResizeMethods.ResizeTextureClick` — requires `GraphicsDevice` + file I/O | UV-adjustment math (`AdjustFrameToResize`) extractable — testable; image resize requires graphics context |
 | PL11 | Preview sprite alignment | `PreviewControls.SpriteAlignmentComboBox` — rendering anchor change | Alignment enum + rendering UI-only |
@@ -416,7 +416,7 @@ A top-down audit of the old WinForms app's `Controls/`, `Managers/`, `Plugins/`,
 
 **Root cause of gap:** The prior audit read `src/AnimationEditor.Core` and inferred features from the data model API surface. It captured what data the model *can store* but was blind to any feature delivered through a dialog, property panel, toolbar widget, or OS integration that has no 1:1 backing method in Core. The fix is to always audit the old app's UI layer top-down as a first pass before reading Core bottom-up.
 
-**Status:** All extractable logic for A15–A17, F12, IO14, IO15, WF11, and F13 has been extracted into Core and is fully unit-tested. `AppCommands` wiring methods added for all applicable features. The remaining untestable portions are the dialog UI interactions (open dialog, read user input, close) and OS-level operations (GIF bitmap rendering, OS clipboard I/O, system process launch for TV09).
+**Status:** All extractable logic for A15–A17, F12, IO14, IO15, WF11, and F13 has been extracted into Core and is fully unit-tested. `AppCommands` wiring methods added for all applicable features. The remaining untestable portions are the dialog UI interactions (open dialog, read user input, close) and OS-level operations (OS clipboard I/O, system process launch for TV09). GIF export (IO13) is excluded from this — it was never ported to the Avalonia app in the first place, so it is N/A rather than merely untested.
 
 | WF11 | Sprite-sheet tile-index UV | `AnimationFrameDisplayer.SetTileX/SetTileY` — pure index math (`left = tileIndex * tileSize / textureSize`) | Extractable to Core math — ✅ Done (11 tests) |
 | F13  | Pixel-mode UV editing | `AnimationFrameDisplayer.CoordinateChange` X/Y/Width/Height cases — pure delta/rounding math | Extractable to Core math — ✅ Done (15 tests) |
