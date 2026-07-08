@@ -29,6 +29,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Only .axaml files with x:Class (UserControls) are picked up by the SDK's default
+         AvaloniaResource glob; a bare ResourceDictionary with no x:Class needs an explicit item
+         (confirmed by a failing AvaloniaXamlLoader.Load: "No precompiled XAML found... make sure
+         to specify x:Class and include your XAML file as AvaloniaResource"). -->
+    <AvaloniaResource Include="Theming\ThemeTokens.axaml" />
+    <AvaloniaResource Include="Theming\ThemeStyles.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- AnimationEditor.App itself needs this now too, not just its test project: several
          members these controls expose to MainWindow (PreviewControl.HGuides/VGuides/SetGuides,
          CanvasPalette, etc.) are internal, and internal access does not cross assembly

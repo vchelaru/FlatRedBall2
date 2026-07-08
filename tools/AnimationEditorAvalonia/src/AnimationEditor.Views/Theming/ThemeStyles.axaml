@@ -1,0 +1,55 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Phase 6 (#630): style classes shared by AnimationEditor.App and AnimationEditor.Browser, moved
+         out of AnimationEditor.App/App.axaml verbatim. Separate file from ThemeTokens.axaml because
+         Avalonia Style elements live under a Styles root, not a ResourceDictionary root; the two can't
+         be merged into one file. Included via StyleInclude inside Application.Styles, alongside
+         ThemeTokens.axaml's ResourceInclude inside Application.Resources.
+
+         Deliberately excluded: Button.plus/Button.minus (render an SVG icon; AnimationEditor.Views/
+         .Browser don't reference Avalonia.Svg.Skia yet, see Phase 7). -->
+
+    <!-- Compact buttons: override FluentTheme MinHeight so small +/- buttons aren't stretched -->
+    <Style Selector="Button.compact">
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <!-- Flanker buttons: sit inside a bordered field on left/right of a value (Grid, Zoom, Speed) -->
+    <Style Selector="Button.flanker">
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource InkMid}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.flanker /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.flanker:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BgHover}"/>
+    </Style>
+    <Style Selector="Button.flanker:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource BgActive}"/>
+    </Style>
+    <!-- NumericUpDown: compact, no spinners by default. Set ShowButtonSpinner="True" individually where needed. -->
+    <Style Selector="NumericUpDown">
+        <Setter Property="ShowButtonSpinner" Value="False"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+    <!-- Strip the Fluent TextBox inner border inside ButtonSpinner so only the outer border is visible. -->
+    <Style Selector="ButtonSpinner TextBox">
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <!-- Disabled buttons: dim so the user can tell they are unavailable -->
+    <Style Selector="Button:disabled">
+        <Setter Property="Opacity" Value="0.35" />
+    </Style>
+</Styles>
