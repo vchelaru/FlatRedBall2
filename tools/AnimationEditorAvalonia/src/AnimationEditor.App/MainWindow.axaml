@@ -84,10 +84,13 @@
                       VerticalAlignment="Center"
                       Margin="4,0">
                     <MenuItem Header="_File">
-                        <MenuItem Header="_New"          x:Name="MenuNew"    InputGesture="Ctrl+N" />
-                        <MenuItem Header="_Load..."       x:Name="MenuLoad"   InputGesture="Ctrl+L" />
+                        <!-- InputGesture text for New/Load/Save is set in code from the hotkey
+                             registry (MainWindow.ApplyHotkeyMenuGestureText, issue #638) so it
+                             can never drift from what the KeyDown handler actually does. -->
+                        <MenuItem Header="_New"          x:Name="MenuNew" />
+                        <MenuItem Header="_Load..."       x:Name="MenuLoad" />
                         <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
-                        <MenuItem Header="_Save"          x:Name="MenuSave"   InputGesture="Ctrl+S" />
+                        <MenuItem Header="_Save"          x:Name="MenuSave" />
                         <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
                             <MenuItem Header="_PixiJS..." x:Name="MenuExportPixiJs" />
@@ -113,11 +116,18 @@
                         <MenuItem Header="_Settings…" x:Name="MenuSettings" />
                     </MenuItem>
                     <MenuItem Header="_View">
-                        <MenuItem Header="Wireframe _Zoom In"   InputGesture="Ctrl+OemPlus" />
-                        <MenuItem Header="Wireframe Zoom _Out"  InputGesture="Ctrl+OemMinus" />
+                        <!-- InputGesture text for the four zoom items is set in code from the
+                             hotkey registry (see note above) — issue #638. Clicking a menu item
+                             always zooms that specific panel; Ctrl+Plus/Minus is one shared,
+                             focus-contextual gesture (whichever panel is focused), so both
+                             Wireframe/Preview Zoom In (and Out) truthfully show the same shortcut
+                             text — see MainWindow.FocusedPanelZoom. Ctrl+Shift+Plus/Minus is
+                             reserved, unclaimed, for a future app-wide zoom feature. -->
+                        <MenuItem Header="Wireframe _Zoom In"   x:Name="MenuWireframeZoomIn" />
+                        <MenuItem Header="Wireframe Zoom _Out"  x:Name="MenuWireframeZoomOut" />
                         <Separator />
-                        <MenuItem Header="Preview Zoom _In"     InputGesture="Ctrl+Shift+OemPlus" />
-                        <MenuItem Header="Preview Zoom O_ut"    InputGesture="Ctrl+Shift+OemMinus" />
+                        <MenuItem Header="Preview Zoom _In"     x:Name="MenuPreviewZoomIn" />
+                        <MenuItem Header="Preview Zoom O_ut"    x:Name="MenuPreviewZoomOut" />
                         <Separator />
                         <MenuItem Header="Show _History" x:Name="MenuShowHistory" />
                         <Separator />

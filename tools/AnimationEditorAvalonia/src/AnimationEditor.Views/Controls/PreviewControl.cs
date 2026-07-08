@@ -1726,13 +1726,13 @@ public class PreviewControl : Control, IZoomTarget
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        Focus();
         var props = e.GetCurrentPoint(this).Properties;
         var pos   = e.GetPosition(this);
         float px  = (float)pos.X;
         float py  = (float)pos.Y;
 
-        if (props.IsMiddleButtonPressed ||
-            (props.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt)))
+        if (PointerGestures.IsPanGesture(props.IsMiddleButtonPressed, props.IsLeftButtonPressed, e.KeyModifiers))
         {
             CancelZoomAnimation();   // a pan gesture overrides any in-flight wheel ease
             _isPanning    = true;

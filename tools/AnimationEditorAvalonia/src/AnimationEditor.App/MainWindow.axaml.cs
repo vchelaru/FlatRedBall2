@@ -1,4 +1,5 @@
-﻿using AnimationEditor.App.Services;
+﻿using AnimationEditor.App.Controls;
+using AnimationEditor.App.Services;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
@@ -1794,6 +1795,11 @@ public partial class MainWindow : Window
         HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
         HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
+
+        MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
+        MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();
+        MenuPreviewZoomIn.Click    += (_, _) => PreviewZoom.StepUp();
+        MenuPreviewZoomOut.Click   += (_, _) => PreviewZoom.StepDown();
 
         MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
         MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
@@ -5169,7 +5175,61 @@ public partial class MainWindow : Window
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
                 Action = () => HandleReorderHotkey(+1),
             },
+            new()
+            {
+                Id = "new", Description = "New", Category = "File",
+                Gestures = new[] { new HotkeyGesture("N", Command) },
+                Action = () => OnNewClick(null, null!),
+            },
+            new()
+            {
+                Id = "load", Description = "Load...", Category = "File",
+                Gestures = new[] { new HotkeyGesture("L", Command) },
+                Action = () => _ = LoadAsync(),
+            },
+            new()
+            {
+                Id = "save", Description = "Save", Category = "File",
+                Gestures = new[] { new HotkeyGesture("S", Command) },
+                Action = () => OnSaveClick(null, null!),
+            },
+            // Ctrl+Plus/Minus zooms whichever panel (wireframe, preview, or the PNG diff pane)
+            // currently has keyboard focus — not a fixed pane — because requiring the user to
+            // first click away from a panel to reach a different zoom gesture is its own source
+            // of confusion. Forbidden:
+            // Shift is reserved now, before anything claims it, so that a future app-wide zoom on
+            // Ctrl+Shift+Plus/Minus is a pure addition later rather than a retrofit that has to
+            // come back and defensively exclude Shift from these two entries after the fact. This
+            // is the shape of disambiguation the Gum tool's app-wide vs. per-pane zoom hotkeys
+            // never had — they shared one gesture and were split apart only after a double-zoom
+            // bug, via a hand-threaded suppression flag at every call site.
+            new()
+            {
+                Id = "panel-zoom-in", Description = "Zoom In (Focused Panel)", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemPlus", Command, Forbidden: Shift) },
+                ShouldSkip = () => FocusedPanelZoom() is null,
+                Action = () => FocusedPanelZoom()!.StepUp(),
+            },
+            new()
+            {
+                Id = "panel-zoom-out", Description = "Zoom Out (Focused Panel)", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemMinus", Command, Forbidden: Shift) },
+                ShouldSkip = () => FocusedPanelZoom() is null,
+                Action = () => FocusedPanelZoom()!.StepDown(),
+            },
         };
+    }
+
+    // Resolves which pane's ZoomControl the panel-zoom-in/out hotkeys should drive: whichever of
+    // WireframeCtrl/PreviewCtrl/PngPane currently owns keyboard focus (or is an ancestor of the
+    // focused element), else null when none does (e.g. the tree or a text field is focused instead).
+    private ZoomControl? FocusedPanelZoom()
+    {
+        if (FocusManager?.GetFocusedElement() is not Control focused) return null;
+        if (focused == WireframeCtrl || WireframeCtrl.IsVisualAncestorOf(focused)) return WireframeZoom;
+        if (focused == PreviewCtrl || PreviewCtrl.IsVisualAncestorOf(focused)) return PreviewZoom;
+        if (focused == PngPane || PngPane.IsVisualAncestorOf(focused)) return PngZoom;
+        return null;
     }
 
     // F2: prefer the tree's SelectedItem, fall back to _selectedState when the tree has
@@ -5209,9 +5269,7 @@ public partial class MainWindow : Window
     }
 
     // Sets each menu item's InputGesture text from the matching registry entry's DisplayText,
-    // so the menu can never show a shortcut a keypress doesn't actually trigger (issue #632).
-    // MenuNew/MenuLoad/MenuSave and the zoom shortcuts keep their hand-authored XAML text — they
-    // have no KeyDown-driven implementation to derive from.
+    // so the menu can never show a shortcut a keypress doesn't actually trigger (issue #632, #638).
     private void ApplyHotkeyMenuGestureText()
     {
         SetMenuGesture(MenuUndo, "undo");
@@ -5221,6 +5279,15 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuPaste, "paste");
         SetMenuGesture(MenuDuplicate, "duplicate");
         SetMenuGesture(MenuShowDiagnostics, "toggle-diagnostics");
+        SetMenuGesture(MenuNew, "new");
+        SetMenuGesture(MenuLoad, "load");
+        SetMenuGesture(MenuSave, "save");
+        // Wireframe/Preview Zoom In (and Out) share one gesture — it's contextual to whichever
+        // panel has focus — so both menu items truthfully show the same shortcut text.
+        SetMenuGesture(MenuWireframeZoomIn, "panel-zoom-in");
+        SetMenuGesture(MenuWireframeZoomOut, "panel-zoom-out");
+        SetMenuGesture(MenuPreviewZoomIn, "panel-zoom-in");
+        SetMenuGesture(MenuPreviewZoomOut, "panel-zoom-out");
     }
 
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
