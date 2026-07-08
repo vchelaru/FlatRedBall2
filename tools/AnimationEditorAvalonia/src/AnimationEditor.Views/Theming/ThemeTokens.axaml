@@ -1,0 +1,97 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Phase 6 (#630): design tokens shared by AnimationEditor.App and AnimationEditor.Browser, moved
+         out of AnimationEditor.App/App.axaml verbatim (values unchanged) so the browser build can
+         DynamicResource the same brushes/colors desktop does. Consumers MUST use DynamicResource, never
+         StaticResource; these live in ThemeDictionaries so they switch with the active ThemeVariant.
+
+         Deliberately excluded from this file: the ButtonSpinner ControlTheme override and the
+         Button.plus/Button.minus style classes. All three render an SVG icon via
+         Avalonia.Svg.Skia, which AnimationEditor.Views/.Browser don't reference yet; see Phase 7
+         (#631+) for the icon system spike/rollout. Until then NumericUpDown falls back to Fluent's
+         default spinner in the browser, an acceptable interim state. -->
+    <ResourceDictionary.ThemeDictionaries>
+
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="BgCanvas"    Color="#0e0f12" />
+            <SolidColorBrush x:Key="BgApp"       Color="#15171b" />
+            <SolidColorBrush x:Key="BgPanel"     Color="#1b1e23" />
+            <SolidColorBrush x:Key="BgRail"      Color="#1f232a" />
+            <SolidColorBrush x:Key="BgHover"     Color="#262b34" />
+            <SolidColorBrush x:Key="BgActive"    Color="#2f3641" />
+            <SolidColorBrush x:Key="LineBrush"   Color="#2a2e36" />
+            <SolidColorBrush x:Key="LineStrong"  Color="#383d47" />
+            <SolidColorBrush x:Key="Ink"         Color="#e6e8ec" />
+            <SolidColorBrush x:Key="InkMid"      Color="#9098a4" />
+            <SolidColorBrush x:Key="InkDim"      Color="#5d6573" />
+            <SolidColorBrush x:Key="Accent"      Color="#d83a3a" />
+            <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
+            <SolidColorBrush x:Key="AccentSoft"  Color="#f0c674" />
+            <SolidColorBrush x:Key="AccentCool"  Color="#5fb6e8" />
+            <SolidColorBrush x:Key="Ok"          Color="#6dd28d" />
+            <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
+                 distinct from passive BgRail chrome, without the loud Accent red. -->
+            <SolidColorBrush x:Key="InfoBannerBg" Color="#202d38" />
+            <!-- Zebra band for odd animation groups in the ANIMATIONS tree; a barely-there
+                 lift off BgCanvas (#0e0f12). Low contrast on purpose: it must not fight the
+                 frame thumbnails, icons, or Meta text, and the selection/hover highlight sits
+                 on top of it. Even groups get no band (they show BgCanvas). -->
+            <SolidColorBrush x:Key="TreeRowStripe" Color="#15171c" />
+
+            <!-- SVG icon CurrentColor tokens (Color, not Brush); values only, no icon rendered
+                 by this file (see the deferred-to-Phase-7 note above). -->
+            <Color x:Key="IconInk">#e6e8ec</Color>
+            <Color x:Key="IconInkMuted">#9098a4</Color>
+            <Color x:Key="IconInkDim">#5d6573</Color>
+
+            <!-- Fluent accent -> red -->
+            <Color x:Key="SystemAccentColor">#d83a3a</Color>
+            <Color x:Key="SystemAccentColorLight1">#e05050</Color>
+            <Color x:Key="SystemAccentColorLight2">#e86868</Color>
+            <Color x:Key="SystemAccentColorLight3">#f08080</Color>
+            <Color x:Key="SystemAccentColorDark1">#b52e2e</Color>
+            <Color x:Key="SystemAccentColorDark2">#922424</Color>
+            <Color x:Key="SystemAccentColorDark3">#6f1a1a</Color>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Light">
+            <!-- Light ramp inverts the value hierarchy while keeping the same hues. -->
+            <SolidColorBrush x:Key="BgCanvas"    Color="#e8eaed" />
+            <SolidColorBrush x:Key="BgApp"       Color="#f3f4f6" />
+            <SolidColorBrush x:Key="BgPanel"     Color="#fbfbfc" />
+            <SolidColorBrush x:Key="BgRail"      Color="#eef0f3" />
+            <SolidColorBrush x:Key="BgHover"     Color="#e2e5ea" />
+            <SolidColorBrush x:Key="BgActive"    Color="#d3d8e0" />
+            <SolidColorBrush x:Key="LineBrush"   Color="#d7dae0" />
+            <SolidColorBrush x:Key="LineStrong"  Color="#bcc2cc" />
+            <SolidColorBrush x:Key="Ink"         Color="#1a1d22" />
+            <SolidColorBrush x:Key="InkMid"      Color="#5a626e" />
+            <SolidColorBrush x:Key="InkDim"      Color="#8b93a0" />
+            <SolidColorBrush x:Key="Accent"      Color="#d83a3a" />
+            <SolidColorBrush x:Key="OnAccent"    Color="#ffffff" />
+            <SolidColorBrush x:Key="AccentSoft"  Color="#b8860b" />
+            <SolidColorBrush x:Key="AccentCool"  Color="#2b7fc0" />
+            <SolidColorBrush x:Key="Ok"          Color="#2f9e54" />
+            <!-- Subtle cool-tinted fill for tier-2 "actionable info" banners:
+                 distinct from passive BgRail chrome, without the loud Accent red. -->
+            <SolidColorBrush x:Key="InfoBannerBg" Color="#dae5ee" />
+            <!-- Zebra band for odd animation groups; a barely-there darkening of BgCanvas
+                 (#e8eaed). Same low-contrast contract as the dark variant. -->
+            <SolidColorBrush x:Key="TreeRowStripe" Color="#dfe2e6" />
+
+            <Color x:Key="IconInk">#2a2e35</Color>
+            <Color x:Key="IconInkMuted">#5a626e</Color>
+            <Color x:Key="IconInkDim">#8b93a0</Color>
+
+            <!-- Red base kept; shades deepened so hover/pressed read on a light background. -->
+            <Color x:Key="SystemAccentColor">#c62f2f</Color>
+            <Color x:Key="SystemAccentColorLight1">#d04545</Color>
+            <Color x:Key="SystemAccentColorLight2">#da5b5b</Color>
+            <Color x:Key="SystemAccentColorLight3">#e47272</Color>
+            <Color x:Key="SystemAccentColorDark1">#a82828</Color>
+            <Color x:Key="SystemAccentColorDark2">#882020</Color>
+            <Color x:Key="SystemAccentColorDark3">#671818</Color>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

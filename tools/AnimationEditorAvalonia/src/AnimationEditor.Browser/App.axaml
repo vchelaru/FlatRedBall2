@@ -1,7 +1,27 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="AnimationEditor.Browser.App">
+             x:Class="AnimationEditor.Browser.App"
+             RequestedThemeVariant="Dark">
+  <!-- "Dark" is only the bootstrap default for the first paint; App.axaml.cs's BuildView applies
+       the user's persisted theme choice (BrowserSettingsStore) right after this. -->
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <!-- Phase 6 (#630): the same design tokens AnimationEditor.App uses, shared via
+           AnimationEditor.Views/Theming/ThemeTokens.axaml so every DynamicResource key the
+           browser build's controls reference (and ZoomControl, reused starting Phase 8) resolves
+           to the same values/behavior as desktop. -->
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://AnimationEditor.Views/Theming/ThemeTokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
+    <!-- Shared style classes (.compact, .flanker, NumericUpDown/ButtonSpinner defaults, disabled
+         opacity); same file AnimationEditor.App includes. .plus/.minus (icon-dependent) and the
+         ButtonSpinner ControlTheme override are not in this file yet; see Phase 7. -->
+    <StyleInclude Source="avares://AnimationEditor.Views/Theming/ThemeStyles.axaml" />
   </Application.Styles>
 </Application>
