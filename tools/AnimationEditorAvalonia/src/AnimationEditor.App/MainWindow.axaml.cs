@@ -4467,8 +4467,8 @@ public partial class MainWindow : Window
     private void UpdatePlayPauseIcon(bool isPlaying)
     {
         PlayPauseIcon.Path = isPlaying
-            ? "avares://AnimationEditor/Assets/icons/svg/IconPause.svg"
-            : "avares://AnimationEditor/Assets/icons/svg/IconPlay.svg";
+            ? "avares://AnimationEditor.Views/Assets/icons/svg/IconPause.svg"
+            : "avares://AnimationEditor.Views/Assets/icons/svg/IconPlay.svg";
         ToolTip.SetTip(PlayPauseBtn, isPlaying ? "Pause (Space)" : "Play (Space)");
     }
 

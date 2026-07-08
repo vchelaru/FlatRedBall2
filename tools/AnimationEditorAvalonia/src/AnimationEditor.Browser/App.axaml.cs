@@ -144,6 +144,7 @@ public partial class App : Application
         var saveAsButton = new Button { Content = "Save As…" };
         var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
         var themeButton = new Button { Content = $"Theme: {currentTheme}" };
+
         var toolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,

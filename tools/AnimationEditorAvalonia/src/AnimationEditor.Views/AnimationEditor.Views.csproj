@@ -26,6 +26,8 @@
     <PackageReference Include="Avalonia" Version="12.0.1" />
     <PackageReference Include="Avalonia.Skia" Version="12.0.1" />
     <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+    <!-- Phase 7 (#644): shared SVG toolbar/spinner icons; see ThemeIconResources.axaml. -->
+    <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.7" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,6 +37,8 @@
          to specify x:Class and include your XAML file as AvaloniaResource"). -->
     <AvaloniaResource Include="Theming\ThemeTokens.axaml" />
     <AvaloniaResource Include="Theming\ThemeStyles.axaml" />
+    <AvaloniaResource Include="Theming\ThemeIconResources.axaml" />
+    <AvaloniaResource Include="Assets\icons\svg\**" />
   </ItemGroup>
 
   <ItemGroup>
