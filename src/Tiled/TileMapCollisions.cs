@@ -29,11 +29,16 @@ namespace FlatRedBall2.Tiled;
 /// <para>
 /// Object matching checks <see cref="TilemapRectangleObject"/> and <see cref="TilemapPolygonObject"/>
 /// entries directly — tile objects (Tiled's "Insert Tile" tool) are not matched; use
-/// <see cref="TileMap.CreateEntities"/> for those. Each matched object is positioned relative to
-/// whichever grid cell contains its center, the same convention used for per-tile
-/// <see cref="TilemapTileData.CollisionObjects"/> — an object must fit within roughly one cell to
-/// be found by broad-phase collision queries. Rotated objects (<c>Rotation != 0</c>) throw
-/// <see cref="InvalidOperationException"/> rather than silently producing wrong geometry.
+/// <see cref="TileMap.CreateEntities"/> for those.
+/// </para>
+/// <para>
+/// Rectangle objects support any position, size, and rotation that's an exact multiple of 90
+/// degrees — the rectangle stays axis-aligned (just reoriented) and is clipped against the grid,
+/// so it can span any number of cells and doesn't need to be grid-aligned. Rectangles at an
+/// arbitrary (non-90-degree-multiple) angle, and all polygon objects, are instead positioned
+/// relative to whichever grid cell contains their center (the same convention used for per-tile
+/// <see cref="TilemapTileData.CollisionObjects"/>) — these must fit within roughly one cell to be
+/// found by broad-phase collision queries.
 /// </para>
 /// </remarks>
 public static class TileMapCollisions
@@ -278,59 +283,155 @@ public static class TileMapCollisions
         }
     }
 
+    // Tiled rotates an object clockwise around its own (x,y) position (verified against
+    // MonoGame.Extended's OrientedBoundingBox2D.GetCorners() — NOT the object's bounding-box
+    // center). A rotation that's an exact multiple of 90 degrees keeps a rectangle axis-aligned
+    // (just reoriented/swapped), so it's still emitted as a plain rect — any other angle can't be
+    // an AARect and becomes a polygon instead.
     private static void AddRectangleObject(TilemapRectangleObject rectObj, float mapX, float mapY, TileShapes collection)
     {
-        ThrowIfRotated(rectObj);
-
         float w = rectObj.Size.X;
         float h = rectObj.Size.Y;
-        // Tiled rect: top-left (Position.X, Position.Y), Y-down from map top-left.
-        float worldCenterX = mapX + rectObj.Position.X + w / 2f;
-        float worldCenterY = mapY - (rectObj.Position.Y + h / 2f);
+        XnaVec2[] local = { new(0, 0), new(w, 0), new(w, h), new(0, h) };
+        var worldCorners = new Vector2[4];
+        for (int i = 0; i < 4; i++)
+        {
+            var (rx, ry) = RotateAroundOrigin(local[i].X, local[i].Y, rectObj.Rotation);
+            worldCorners[i] = new Vector2(
+                mapX + rectObj.Position.X + rx,
+                mapY - (rectObj.Position.Y + ry));
+        }
 
-        var (col, row) = collection.GetCellAt(new Vector2(worldCenterX, worldCenterY));
-        var cellCenter = collection.GetCellWorldPosition(col, row);
-
-        collection.AddRectangleTileAtCell(col, row,
-            worldCenterX - cellCenter.X, worldCenterY - cellCenter.Y, w, h);
+        if (TryGetAxisAlignedBounds(worldCorners, out float left, out float right, out float bottom, out float top))
+            AddClippedRectangleAcrossCells(left, right, bottom, top, collection);
+        else
+            AddPolygonFromWorldPoints(worldCorners, collection);
     }
 
     private static void AddPolygonObject(TilemapPolygonObject polyObj, float mapX, float mapY, TileShapes collection)
     {
         if (polyObj.Points == null || polyObj.Points.Length < 3) return;
-        ThrowIfRotated(polyObj);
 
-        var worldPoints = new List<Vector2>(polyObj.Points.Length);
-        float sumX = 0f, sumY = 0f;
-        foreach (var p in polyObj.Points)
+        var worldPoints = new Vector2[polyObj.Points.Length];
+        for (int i = 0; i < polyObj.Points.Length; i++)
         {
-            XnaVec2 tiled = polyObj.Position + p;
-            float wx = mapX + tiled.X;
-            float wy = mapY - tiled.Y;
-            worldPoints.Add(new Vector2(wx, wy));
-            sumX += wx;
-            sumY += wy;
+            var p = polyObj.Points[i];
+            var (rx, ry) = RotateAroundOrigin(p.X, p.Y, polyObj.Rotation);
+            worldPoints[i] = new Vector2(
+                mapX + polyObj.Position.X + rx,
+                mapY - (polyObj.Position.Y + ry));
         }
 
-        // Owning cell is the polygon's average-point centroid — there's no single "position"
-        // corner to key off, unlike a rectangle's top-left.
-        var centroid = new Vector2(sumX / worldPoints.Count, sumY / worldPoints.Count);
+        AddPolygonFromWorldPoints(worldPoints, collection);
+    }
+
+    // Rotates a Tiled-local point (Y-down) by 'rotationRadians' clockwise around the origin.
+    // Rotations within a small tolerance of an exact 90-degree multiple snap to integer
+    // transforms instead of using sin/cos — this keeps axis-alignment detection
+    // (TryGetAxisAlignedBounds) from being defeated by trig floating-point noise at exactly the
+    // angles (0/90/180/270) that matter most for staying a plain AARect.
+    private static (float x, float y) RotateAroundOrigin(float x, float y, float rotationRadians)
+    {
+        const float snapEps = 1e-4f;
+        float quarterTurns = rotationRadians / (MathF.PI / 2f);
+        int rounded = (int)MathF.Round(quarterTurns);
+        if (MathF.Abs(quarterTurns - rounded) < snapEps)
+        {
+            return ((rounded % 4 + 4) % 4) switch
+            {
+                1 => (-y, x),
+                2 => (-x, -y),
+                3 => (y, -x),
+                _ => (x, y),
+            };
+        }
+
+        float cos = MathF.Cos(rotationRadians);
+        float sin = MathF.Sin(rotationRadians);
+        return (x * cos - y * sin, x * sin + y * cos);
+    }
+
+    // True if the four corners form an axis-aligned rectangle — every corner's X matches either
+    // the min or max X (and likewise for Y). Any rotation that's a multiple of 90 degrees
+    // satisfies this; arbitrary angles don't.
+    private static bool TryGetAxisAlignedBounds(Vector2[] corners,
+        out float left, out float right, out float bottom, out float top)
+    {
+        const float eps = 1e-3f;
+        left = right = corners[0].X;
+        bottom = top = corners[0].Y;
+        foreach (var c in corners)
+        {
+            if (c.X < left) left = c.X;
+            if (c.X > right) right = c.X;
+            if (c.Y < bottom) bottom = c.Y;
+            if (c.Y > top) top = c.Y;
+        }
+
+        foreach (var c in corners)
+        {
+            bool xOk = MathF.Abs(c.X - left) < eps || MathF.Abs(c.X - right) < eps;
+            bool yOk = MathF.Abs(c.Y - bottom) < eps || MathF.Abs(c.Y - top) < eps;
+            if (!xOk || !yOk) return false;
+        }
+        return true;
+    }
+
+    // Clips an axis-aligned world-space rectangle against the grid, emitting one sub-cell rect
+    // per overlapped cell via the existing multi-rect-per-cell AddRectangleTileAtCell. Handles any
+    // size/position — including spanning many cells and not being grid-aligned — because existing
+    // SolidSides seam suppression already merges adjacent clipped pieces into one continuous
+    // surface.
+    private static void AddClippedRectangleAcrossCells(
+        float left, float right, float bottom, float top, TileShapes collection)
+    {
+        const float eps = 1e-4f;
+        int colMin = (int)MathF.Floor((left - collection.X) / collection.GridSize);
+        int colMax = (int)MathF.Floor((right - collection.X) / collection.GridSize - eps);
+        int rowMin = (int)MathF.Floor((bottom - collection.Y) / collection.GridSize);
+        int rowMax = (int)MathF.Floor((top - collection.Y) / collection.GridSize - eps);
+
+        for (int col = colMin; col <= colMax; col++)
+        {
+            for (int row = rowMin; row <= rowMax; row++)
+            {
+                float cellLeft = collection.X + col * collection.GridSize;
+                float cellBottom = collection.Y + row * collection.GridSize;
+                float clippedLeft = MathF.Max(left, cellLeft);
+                float clippedRight = MathF.Min(right, cellLeft + collection.GridSize);
+                float clippedBottom = MathF.Max(bottom, cellBottom);
+                float clippedTop = MathF.Min(top, cellBottom + collection.GridSize);
+
+                float w = clippedRight - clippedLeft;
+                float h = clippedTop - clippedBottom;
+                if (w <= 0f || h <= 0f) continue;
+
+                var cellCenter = collection.GetCellWorldPosition(col, row);
+                float worldCenterX = (clippedLeft + clippedRight) / 2f;
+                float worldCenterY = (clippedBottom + clippedTop) / 2f;
+                collection.AddRectangleTileAtCell(col, row,
+                    worldCenterX - cellCenter.X, worldCenterY - cellCenter.Y, w, h);
+            }
+        }
+    }
+
+    // Places a polygon at whichever single cell contains the average of its world points. Unlike
+    // AddClippedRectangleAcrossCells, this has no multi-cell splitting — the polygon must fit
+    // within roughly one cell to be found by broad-phase collision queries.
+    private static void AddPolygonFromWorldPoints(Vector2[] worldPoints, TileShapes collection)
+    {
+        float sumX = 0f, sumY = 0f;
+        foreach (var p in worldPoints) { sumX += p.X; sumY += p.Y; }
+        var centroid = new Vector2(sumX / worldPoints.Length, sumY / worldPoints.Length);
+
         var (col, row) = collection.GetCellAt(centroid);
         var cellCenter = collection.GetCellWorldPosition(col, row);
 
-        var localPoints = new List<Vector2>(worldPoints.Count);
+        var localPoints = new List<Vector2>(worldPoints.Length);
         foreach (var p in worldPoints)
             localPoints.Add(p - cellCenter);
 
         collection.AddPolygonTileAtCell(col, row, Polygon.FromPoints(localPoints));
-    }
-
-    private static void ThrowIfRotated(TilemapObject obj)
-    {
-        if (obj.Rotation != 0f)
-            throw new InvalidOperationException(
-                $"Tiled object '{obj.Name}' (Class '{obj.Class}') has Rotation={obj.Rotation}, " +
-                "which is not supported for collision generation. Remove rotation in Tiled.");
     }
 
     private static void AddMatchingTiles(

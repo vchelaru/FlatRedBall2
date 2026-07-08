@@ -148,7 +148,10 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 
 ### Collision from an object layer
 
-`GenerateCollisionFromClass`/`GenerateCollisionFromProperty` (the all-layers form, i.e. no `layerName` argument) also match `<object>` rectangles and polygons on any object layer whose own Class/property matches — not just tile objects. Each matched shape is positioned relative to whichever grid cell contains its center, same as a tileset tile's sub-cell `<object>`s, so **it must fit within roughly one cell** to be found by broad-phase collision queries; it does not need to be grid-aligned within that cell. Rotated objects (`rotation` attribute) throw `InvalidOperationException` at load time — remove rotation in Tiled. Passing an explicit `layerName` restricts the scan to a single **tile** layer and skips object layers entirely.
+`GenerateCollisionFromClass`/`GenerateCollisionFromProperty` (the all-layers form, i.e. no `layerName` argument) also match `<object>` rectangles and polygons on any object layer whose own Class/property matches — not just tile objects. Passing an explicit `layerName` restricts the scan to a single **tile** layer and skips object layers entirely.
+
+- **Rectangles** support any position, size, and `rotation` that's an exact multiple of 90 — the rect stays axis-aligned (just reoriented/swapped) and is clipped against the grid, so it can span any number of cells and doesn't need to be grid-aligned at all. This is the recommended way to author a hand-drawn collision boundary that doesn't match the tile grid (a wall, a boss-arena floor, an irregular pit).
+- **Rotated rectangles at other angles, and all polygons,** are positioned relative to whichever grid cell contains their center (same convention as a tileset tile's sub-cell `<object>`s) and **must fit within roughly one cell** to be found by broad-phase collision queries — Tiled rotates around the object's own `(x,y)`, not its bounding-box center, so don't assume a rotated shape's world position matches a naive center-based mental model.
 
 ### Add an object layer for entity spawns
 
