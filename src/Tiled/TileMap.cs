@@ -79,6 +79,7 @@ public class TileMap
 
     private readonly record struct TrackedCollection(
         Func<TilemapTileData, bool> Predicate,
+        Func<TilemapObject, bool>? ObjectPredicate,
         string? LayerName,
         TileShapes Collection);
 
@@ -271,17 +272,23 @@ public class TileMap
 
     /// <summary>
     /// Generates a <see cref="TileShapes"/> from tiles whose
-    /// <see cref="TilemapTileData.Class"/> matches <paramref name="className"/>.
+    /// <see cref="TilemapTileData.Class"/> matches <paramref name="className"/>. Also matches
+    /// rectangle and polygon objects on any object layer whose own <see cref="TilemapObject.Class"/>
+    /// matches — but only when <paramref name="layerName"/> is <c>null</c> (see below).
     /// </summary>
-    /// <param name="className">The tile class to match (case-insensitive).</param>
+    /// <param name="className">The tile/object class to match (case-insensitive).</param>
     /// <param name="layerName">
-    /// If specified, restricts the search to this layer. If <c>null</c> (default),
-    /// scans all tile layers.
+    /// If specified, restricts the search to a single <b>tile</b> layer by name — object layers
+    /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
+    /// object layers.
     /// </param>
     public TileShapes GenerateCollisionFromClass(string className, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
             string.Equals(td.Class, className, StringComparison.OrdinalIgnoreCase);
+        Func<TilemapObject, bool>? objectPredicate = layerName == null
+            ? obj => string.Equals(obj.Class, className, StringComparison.OrdinalIgnoreCase)
+            : null;
 
         TileShapes tsc = layerName != null
             ? TileMapCollisions.GenerateFromClass(_tilemap, GetInternalLayer(layerName), className, _x, _y)
@@ -289,29 +296,35 @@ public class TileMap
 
         tsc.Name = className;
 
-        _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
+        _trackedCollections.Add(new TrackedCollection(predicate, objectPredicate, layerName, tsc));
         return tsc;
     }
 
     /// <summary>
     /// Generates a <see cref="TileShapes"/> from tiles that have a custom
-    /// property named <paramref name="propertyName"/>.
+    /// property named <paramref name="propertyName"/>. Also matches rectangle and polygon
+    /// objects on any object layer with a matching property — but only when
+    /// <paramref name="layerName"/> is <c>null</c> (see below).
     /// </summary>
     /// <param name="propertyName">The custom property to match (presence only, value ignored).</param>
     /// <param name="layerName">
-    /// If specified, restricts the search to this layer. If <c>null</c> (default),
-    /// scans all tile layers.
+    /// If specified, restricts the search to a single <b>tile</b> layer by name — object layers
+    /// are not matched in this mode. If <c>null</c> (default), scans all tile layers plus all
+    /// object layers.
     /// </param>
     public TileShapes GenerateCollisionFromProperty(string propertyName, string? layerName = null)
     {
         Func<TilemapTileData, bool> predicate = td =>
             td.Properties.TryGetValue(propertyName, out _);
+        Func<TilemapObject, bool>? objectPredicate = layerName == null
+            ? obj => obj.Properties.TryGetValue(propertyName, out _)
+            : null;
 
         TileShapes tsc = layerName != null
             ? TileMapCollisions.GenerateFromProperty(_tilemap, GetInternalLayer(layerName), propertyName, _x, _y)
             : TileMapCollisions.GenerateFromProperty(_tilemap, propertyName, _x, _y);
 
-        _trackedCollections.Add(new TrackedCollection(predicate, layerName, tsc));
+        _trackedCollections.Add(new TrackedCollection(predicate, objectPredicate, layerName, tsc));
         return tsc;
     }
 
@@ -700,7 +713,7 @@ public class TileMap
                     _tilemap, GetInternalLayer(tracked.LayerName), tracked.Predicate, tracked.Collection);
             else
                 TileMapCollisions.RegenerateInto(
-                    _tilemap, tracked.Predicate, tracked.Collection);
+                    _tilemap, tracked.Predicate, tracked.ObjectPredicate!, tracked.Collection);
         }
 
         // Refresh the renderer's vertex cache so the visual update is visible next frame.
