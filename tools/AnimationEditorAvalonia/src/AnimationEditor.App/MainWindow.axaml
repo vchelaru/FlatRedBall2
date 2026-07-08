@@ -117,11 +117,12 @@
                     </MenuItem>
                     <MenuItem Header="_View">
                         <!-- InputGesture text for the four zoom items is set in code from the
-                             hotkey registry (see note above) — issue #638. Wireframe and preview
-                             zoom are deliberately on different gestures (plain Ctrl+Oem vs.
-                             Ctrl+Shift+Oem), each forbidding the other's modifier, so a future
-                             app-wide zoom feature can claim its own gesture (e.g. bare Ctrl+Plus/
-                             Minus or Ctrl+0) without colliding with either pane zoom. -->
+                             hotkey registry (see note above) — issue #638. Clicking a menu item
+                             always zooms that specific panel; Ctrl+Plus/Minus is one shared,
+                             focus-contextual gesture (whichever panel is focused), so both
+                             Wireframe/Preview Zoom In (and Out) truthfully show the same shortcut
+                             text — see MainWindow.FocusedPanelZoom. Ctrl+Shift+Plus/Minus is
+                             reserved, unclaimed, for a future app-wide zoom feature. -->
                         <MenuItem Header="Wireframe _Zoom In"   x:Name="MenuWireframeZoomIn" />
                         <MenuItem Header="Wireframe Zoom _Out"  x:Name="MenuWireframeZoomOut" />
                         <Separator />

@@ -2,11 +2,13 @@ using AnimationEditor.App.Controls;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.ObjectModel;
@@ -288,20 +290,52 @@ public class HotkeyDispatchTests
         finally { window.Close(); }
     }
 
+    // Clicks the centre of `control` via a real pointer press, so focus-on-click behavior
+    // (TextureViewport/PreviewControl.OnPointerPressed calling Focus()) is actually exercised
+    // rather than assumed.
+    private static void Click(MainWindow window, Control control)
+    {
+        var centre = new Point(control.Bounds.Width / 2, control.Bounds.Height / 2);
+        var pointInWindow = control.TranslatePoint(centre, window)!.Value;
+        window.MouseDown(pointInWindow, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     /// <summary>
-    /// Wireframe and preview zoom are deliberately on different gestures (Ctrl+Oem vs.
-    /// Ctrl+Shift+Oem), each forbidding the other's modifier — this is the regression guard for
-    /// the double-zoom bug the Gum tool hit from sharing one gesture between an app-wide and a
-    /// per-pane zoom (disambiguated there only by a hand-threaded suppression flag).
+    /// The focus-based panel-zoom hotkeys below depend on clicking a panel actually focusing it.
+    /// PreviewControl (unlike TextureViewport) has no explicit <c>Focus()</c> call in its
+    /// OnPointerPressed — this passes only because Avalonia auto-focuses a Focusable control on
+    /// pointer press by default. Keep this test as a guard against that default ever being
+    /// suppressed (e.g. a future PreviewControl change marking the press event Handled early).
     /// </summary>
     [AvaloniaFact]
-    public void CtrlOemPlus_StepsWireframeZoomUp_LeavesPreviewUnchanged()
+    public void ClickingPreviewPanel_GivesItFocus()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            Click(window, preview);
+
+            Assert.Same(preview, window.FocusManager?.GetFocusedElement());
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Ctrl+Plus/Minus targets whichever panel has focus rather than a fixed pane — clicking into
+    /// wireframe then pressing Ctrl+Plus must zoom only wireframe, never preview.
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlOemPlus_WireframeFocused_StepsWireframeZoomOnly()
     {
         var (window, _) = CreateWindow();
         try
         {
             var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
             var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            Click(window, wireframe);
 
             window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.None, null);
             Dispatcher.UIThread.RunJobs();
@@ -312,52 +346,18 @@ public class HotkeyDispatchTests
         finally { window.Close(); }
     }
 
+    /// <summary>The same gesture, but with focus on preview instead — zooms preview only.</summary>
     [AvaloniaFact]
-    public void CtrlOemMinus_StepsWireframeZoomDown_LeavesPreviewUnchanged()
+    public void CtrlOemMinus_PreviewFocused_StepsPreviewZoomOnly()
     {
         var (window, _) = CreateWindow();
         try
         {
             var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
             var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            Click(window, preview);
 
             window.KeyPress(Key.OemMinus, RawInputModifiers.Control, PhysicalKey.None, null);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Equal(0.75f, wireframe.Zoom);
-            Assert.Equal(1f, preview.Zoom);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void CtrlShiftOemPlus_StepsPreviewZoomUp_LeavesWireframeUnchanged()
-    {
-        var (window, _) = CreateWindow();
-        try
-        {
-            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
-            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
-
-            window.KeyPress(Key.OemPlus, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.None, null);
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.Equal(1.5f, preview.Zoom);
-            Assert.Equal(1f, wireframe.Zoom);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void CtrlShiftOemMinus_StepsPreviewZoomDown_LeavesWireframeUnchanged()
-    {
-        var (window, _) = CreateWindow();
-        try
-        {
-            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
-            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
-
-            window.KeyPress(Key.OemMinus, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.None, null);
             Dispatcher.UIThread.RunJobs();
 
             Assert.Equal(0.75f, preview.Zoom);
@@ -366,16 +366,63 @@ public class HotkeyDispatchTests
         finally { window.Close(); }
     }
 
-    /// <summary>Menu InputGesture text for the #638 items now derives from the registry too.</summary>
+    /// <summary>Neither panel focused (tree has it) — Ctrl+Plus is a no-op, not a guess.</summary>
     [AvaloniaFact]
-    public void MenuWireframeZoomIn_InputGesture_MatchesCtrlOemPlusDispatchedByKeyDown()
+    public void CtrlOemPlus_NeitherPanelFocused_DoesNothing()
     {
         var (window, _) = CreateWindow();
         try
         {
-            var item = window.FindControl<MenuItem>("MenuWireframeZoomIn")!;
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            window.FindControl<TreeView>("AnimTree")!.Focus();
 
-            Assert.Equal(new KeyGesture(Key.OemPlus, KeyModifiers.Control), item.InputGesture);
+            window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(1f, wireframe.Zoom);
+            Assert.Equal(1f, preview.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Ctrl+Shift+Plus/Minus is reserved, unclaimed, for a future app-wide zoom feature — it must
+    /// NOT also trigger the focused panel's zoom (Forbidden:Shift on panel-zoom-in/out). This is
+    /// the regression guard for the Gum tool's mistake: its app-wide and per-pane zoom hotkeys
+    /// shared one gesture and were split apart only after a reported double-zoom bug.
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlShiftOemPlus_WireframeFocused_DoesNotStepPanelZoom()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            Click(window, wireframe);
+
+            window.KeyPress(Key.OemPlus, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(1f, wireframe.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Menu InputGesture text for the #638 items now derives from the registry — Wireframe and
+    /// Preview Zoom In both show the same gesture text since it's genuinely contextual.
+    /// </summary>
+    [AvaloniaFact]
+    public void WireframeAndPreviewZoomInMenuItems_ShowTheSameSharedGesture()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var expected = new KeyGesture(Key.OemPlus, KeyModifiers.Control);
+
+            Assert.Equal(expected, window.FindControl<MenuItem>("MenuWireframeZoomIn")!.InputGesture);
+            Assert.Equal(expected, window.FindControl<MenuItem>("MenuPreviewZoomIn")!.InputGesture);
         }
         finally { window.Close(); }
     }

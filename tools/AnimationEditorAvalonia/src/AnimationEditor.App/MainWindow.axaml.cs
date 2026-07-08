@@ -1,4 +1,5 @@
-﻿using AnimationEditor.App.Services;
+﻿using AnimationEditor.App.Controls;
+using AnimationEditor.App.Services;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
@@ -5192,37 +5193,41 @@ public partial class MainWindow : Window
                 Gestures = new[] { new HotkeyGesture("S", Command) },
                 Action = () => OnSaveClick(null, null!),
             },
-            // Wireframe and preview zoom deliberately sit on different gestures (Forbidden:Shift
-            // keeps Ctrl+Shift+Oem from also matching the wireframe entry) rather than sharing one
-            // gesture disambiguated by a suppression flag — the Gum tool's app-wide vs. per-pane
-            // zoom hotkeys took that shared-gesture path and it required a bug fix (double-zoom)
-            // plus a hand-threaded bool at every call site. Keeping the two pane zooms on distinct
-            // gestures also leaves bare Ctrl+Plus/Minus free for a future app-wide zoom feature.
+            // Ctrl+Plus/Minus zooms whichever panel (wireframe or preview) currently has keyboard
+            // focus — not a fixed pane — because requiring the user to first click away from a
+            // panel to reach a different zoom gesture is its own source of confusion. Forbidden:
+            // Shift is reserved now, before anything claims it, so that a future app-wide zoom on
+            // Ctrl+Shift+Plus/Minus is a pure addition later rather than a retrofit that has to
+            // come back and defensively exclude Shift from these two entries after the fact. This
+            // is the shape of disambiguation the Gum tool's app-wide vs. per-pane zoom hotkeys
+            // never had — they shared one gesture and were split apart only after a double-zoom
+            // bug, via a hand-threaded suppression flag at every call site.
             new()
             {
-                Id = "wireframe-zoom-in", Description = "Wireframe Zoom In", Category = "View",
+                Id = "panel-zoom-in", Description = "Zoom In (Focused Panel)", Category = "View",
                 Gestures = new[] { new HotkeyGesture("OemPlus", Command, Forbidden: Shift) },
-                Action = () => WireframeZoom.StepUp(),
+                ShouldSkip = () => FocusedPanelZoom() is null,
+                Action = () => FocusedPanelZoom()!.StepUp(),
             },
             new()
             {
-                Id = "wireframe-zoom-out", Description = "Wireframe Zoom Out", Category = "View",
+                Id = "panel-zoom-out", Description = "Zoom Out (Focused Panel)", Category = "View",
                 Gestures = new[] { new HotkeyGesture("OemMinus", Command, Forbidden: Shift) },
-                Action = () => WireframeZoom.StepDown(),
-            },
-            new()
-            {
-                Id = "preview-zoom-in", Description = "Preview Zoom In", Category = "View",
-                Gestures = new[] { new HotkeyGesture("OemPlus", Command | Shift) },
-                Action = () => PreviewZoom.StepUp(),
-            },
-            new()
-            {
-                Id = "preview-zoom-out", Description = "Preview Zoom Out", Category = "View",
-                Gestures = new[] { new HotkeyGesture("OemMinus", Command | Shift) },
-                Action = () => PreviewZoom.StepDown(),
+                ShouldSkip = () => FocusedPanelZoom() is null,
+                Action = () => FocusedPanelZoom()!.StepDown(),
             },
         };
+    }
+
+    // Resolves which pane's ZoomControl the panel-zoom-in/out hotkeys should drive: whichever of
+    // WireframeCtrl/PreviewCtrl currently owns keyboard focus (or is an ancestor of the focused
+    // element), else null when neither does (e.g. the tree or a text field is focused instead).
+    private ZoomControl? FocusedPanelZoom()
+    {
+        if (FocusManager?.GetFocusedElement() is not Control focused) return null;
+        if (focused == WireframeCtrl || WireframeCtrl.IsVisualAncestorOf(focused)) return WireframeZoom;
+        if (focused == PreviewCtrl || PreviewCtrl.IsVisualAncestorOf(focused)) return PreviewZoom;
+        return null;
     }
 
     // F2: prefer the tree's SelectedItem, fall back to _selectedState when the tree has
@@ -5275,10 +5280,12 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuNew, "new");
         SetMenuGesture(MenuLoad, "load");
         SetMenuGesture(MenuSave, "save");
-        SetMenuGesture(MenuWireframeZoomIn, "wireframe-zoom-in");
-        SetMenuGesture(MenuWireframeZoomOut, "wireframe-zoom-out");
-        SetMenuGesture(MenuPreviewZoomIn, "preview-zoom-in");
-        SetMenuGesture(MenuPreviewZoomOut, "preview-zoom-out");
+        // Wireframe/Preview Zoom In (and Out) share one gesture — it's contextual to whichever
+        // panel has focus — so both menu items truthfully show the same shortcut text.
+        SetMenuGesture(MenuWireframeZoomIn, "panel-zoom-in");
+        SetMenuGesture(MenuWireframeZoomOut, "panel-zoom-out");
+        SetMenuGesture(MenuPreviewZoomIn, "panel-zoom-in");
+        SetMenuGesture(MenuPreviewZoomOut, "panel-zoom-out");
     }
 
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
