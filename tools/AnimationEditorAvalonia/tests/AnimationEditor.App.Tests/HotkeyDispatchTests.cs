@@ -8,7 +8,9 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
+using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -212,6 +214,168 @@ public class HotkeyDispatchTests
             var menuUndo = window.FindControl<MenuItem>("MenuUndo")!;
 
             Assert.Equal(new KeyGesture(Key.Z, KeyModifiers.Control), menuUndo.InputGesture);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── Issue #638: decorative File/View shortcuts wired to real actions ───────
+
+    [AvaloniaFact]
+    public void CtrlN_ClearsTree()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            var vm = SeedAndSelect(window, chain, "Walk");
+            var roots = (ObservableCollection<TreeNodeVm>)window.FindControl<TreeView>("AnimTree")!.ItemsSource!;
+            Assert.Contains(vm, roots);
+
+            window.KeyPress(Key.N, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.DoesNotContain(vm, roots);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CtrlS_WithFileName_WritesFileToDisk()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "out.achx");
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(
+                new AnimationChainSave { Name = "Idle" });
+            ctx.ProjectManager.FileName = path;
+
+            window.KeyPress(Key.S, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(File.Exists(path));
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    /// <summary>
+    /// The headless platform's StorageProvider returns no files for a file-open request, so this
+    /// only proves Ctrl+L dispatches to the same load path as clicking MenuLoad without throwing —
+    /// it does not exercise picking and loading a real file (no test in this suite does; loading a
+    /// specific file is covered via LoadAnimationFileAsync directly, see MainWindowMenuFlowTests).
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlL_DoesNotThrow()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            window.KeyPress(Key.L, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Single(ctx.ProjectManager.AnimationChainListSave!.AnimationChains);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Wireframe and preview zoom are deliberately on different gestures (Ctrl+Oem vs.
+    /// Ctrl+Shift+Oem), each forbidding the other's modifier — this is the regression guard for
+    /// the double-zoom bug the Gum tool hit from sharing one gesture between an app-wide and a
+    /// per-pane zoom (disambiguated there only by a hand-threaded suppression flag).
+    /// </summary>
+    [AvaloniaFact]
+    public void CtrlOemPlus_StepsWireframeZoomUp_LeavesPreviewUnchanged()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(1.5f, wireframe.Zoom);
+            Assert.Equal(1f, preview.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CtrlOemMinus_StepsWireframeZoomDown_LeavesPreviewUnchanged()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            window.KeyPress(Key.OemMinus, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(0.75f, wireframe.Zoom);
+            Assert.Equal(1f, preview.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CtrlShiftOemPlus_StepsPreviewZoomUp_LeavesWireframeUnchanged()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            window.KeyPress(Key.OemPlus, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(1.5f, preview.Zoom);
+            Assert.Equal(1f, wireframe.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CtrlShiftOemMinus_StepsPreviewZoomDown_LeavesWireframeUnchanged()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            window.KeyPress(Key.OemMinus, RawInputModifiers.Control | RawInputModifiers.Shift, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(0.75f, preview.Zoom);
+            Assert.Equal(1f, wireframe.Zoom);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>Menu InputGesture text for the #638 items now derives from the registry too.</summary>
+    [AvaloniaFact]
+    public void MenuWireframeZoomIn_InputGesture_MatchesCtrlOemPlusDispatchedByKeyDown()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var item = window.FindControl<MenuItem>("MenuWireframeZoomIn")!;
+
+            Assert.Equal(new KeyGesture(Key.OemPlus, KeyModifiers.Control), item.InputGesture);
         }
         finally { window.Close(); }
     }

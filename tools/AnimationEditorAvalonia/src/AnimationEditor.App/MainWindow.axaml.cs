@@ -1795,6 +1795,11 @@ public partial class MainWindow : Window
         HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
 
+        MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
+        MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();
+        MenuPreviewZoomIn.Click    += (_, _) => PreviewZoom.StepUp();
+        MenuPreviewZoomOut.Click   += (_, _) => PreviewZoom.StepDown();
+
         MenuThemeLight.Click  += (_, _) => SetTheme(AppTheme.Light);
         MenuThemeDark.Click   += (_, _) => SetTheme(AppTheme.Dark);
         MenuThemeSystem.Click += (_, _) => SetTheme(AppTheme.System);
@@ -5169,6 +5174,54 @@ public partial class MainWindow : Window
                 Gestures = new[] { new HotkeyGesture("Down", Alt) },
                 Action = () => HandleReorderHotkey(+1),
             },
+            new()
+            {
+                Id = "new", Description = "New", Category = "File",
+                Gestures = new[] { new HotkeyGesture("N", Command) },
+                Action = () => OnNewClick(null, null!),
+            },
+            new()
+            {
+                Id = "load", Description = "Load...", Category = "File",
+                Gestures = new[] { new HotkeyGesture("L", Command) },
+                Action = () => _ = LoadAsync(),
+            },
+            new()
+            {
+                Id = "save", Description = "Save", Category = "File",
+                Gestures = new[] { new HotkeyGesture("S", Command) },
+                Action = () => OnSaveClick(null, null!),
+            },
+            // Wireframe and preview zoom deliberately sit on different gestures (Forbidden:Shift
+            // keeps Ctrl+Shift+Oem from also matching the wireframe entry) rather than sharing one
+            // gesture disambiguated by a suppression flag — the Gum tool's app-wide vs. per-pane
+            // zoom hotkeys took that shared-gesture path and it required a bug fix (double-zoom)
+            // plus a hand-threaded bool at every call site. Keeping the two pane zooms on distinct
+            // gestures also leaves bare Ctrl+Plus/Minus free for a future app-wide zoom feature.
+            new()
+            {
+                Id = "wireframe-zoom-in", Description = "Wireframe Zoom In", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemPlus", Command, Forbidden: Shift) },
+                Action = () => WireframeZoom.StepUp(),
+            },
+            new()
+            {
+                Id = "wireframe-zoom-out", Description = "Wireframe Zoom Out", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemMinus", Command, Forbidden: Shift) },
+                Action = () => WireframeZoom.StepDown(),
+            },
+            new()
+            {
+                Id = "preview-zoom-in", Description = "Preview Zoom In", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemPlus", Command | Shift) },
+                Action = () => PreviewZoom.StepUp(),
+            },
+            new()
+            {
+                Id = "preview-zoom-out", Description = "Preview Zoom Out", Category = "View",
+                Gestures = new[] { new HotkeyGesture("OemMinus", Command | Shift) },
+                Action = () => PreviewZoom.StepDown(),
+            },
         };
     }
 
@@ -5209,9 +5262,7 @@ public partial class MainWindow : Window
     }
 
     // Sets each menu item's InputGesture text from the matching registry entry's DisplayText,
-    // so the menu can never show a shortcut a keypress doesn't actually trigger (issue #632).
-    // MenuNew/MenuLoad/MenuSave and the zoom shortcuts keep their hand-authored XAML text — they
-    // have no KeyDown-driven implementation to derive from.
+    // so the menu can never show a shortcut a keypress doesn't actually trigger (issue #632, #638).
     private void ApplyHotkeyMenuGestureText()
     {
         SetMenuGesture(MenuUndo, "undo");
@@ -5221,6 +5272,13 @@ public partial class MainWindow : Window
         SetMenuGesture(MenuPaste, "paste");
         SetMenuGesture(MenuDuplicate, "duplicate");
         SetMenuGesture(MenuShowDiagnostics, "toggle-diagnostics");
+        SetMenuGesture(MenuNew, "new");
+        SetMenuGesture(MenuLoad, "load");
+        SetMenuGesture(MenuSave, "save");
+        SetMenuGesture(MenuWireframeZoomIn, "wireframe-zoom-in");
+        SetMenuGesture(MenuWireframeZoomOut, "wireframe-zoom-out");
+        SetMenuGesture(MenuPreviewZoomIn, "preview-zoom-in");
+        SetMenuGesture(MenuPreviewZoomOut, "preview-zoom-out");
     }
 
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
