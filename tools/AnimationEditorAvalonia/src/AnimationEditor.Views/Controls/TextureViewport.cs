@@ -1009,10 +1009,8 @@ public class TextureViewport : Control, IZoomTarget
 
         var props = e.GetCurrentPoint(this).Properties;
         var pos = e.GetPosition(this);
-        bool isAlt = (e.KeyModifiers & KeyModifiers.Alt) != 0;
 
-        // Middle-mouse or Alt+left → pan
-        if (props.IsMiddleButtonPressed || (props.IsLeftButtonPressed && isAlt))
+        if (PointerGestures.IsPanGesture(props.IsMiddleButtonPressed, props.IsLeftButtonPressed, e.KeyModifiers))
         {
             StartPan(pos);
             e.Pointer.Capture(this);

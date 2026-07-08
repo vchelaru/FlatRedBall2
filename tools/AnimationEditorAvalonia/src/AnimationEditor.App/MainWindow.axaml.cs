@@ -5193,9 +5193,10 @@ public partial class MainWindow : Window
                 Gestures = new[] { new HotkeyGesture("S", Command) },
                 Action = () => OnSaveClick(null, null!),
             },
-            // Ctrl+Plus/Minus zooms whichever panel (wireframe or preview) currently has keyboard
-            // focus — not a fixed pane — because requiring the user to first click away from a
-            // panel to reach a different zoom gesture is its own source of confusion. Forbidden:
+            // Ctrl+Plus/Minus zooms whichever panel (wireframe, preview, or the PNG diff pane)
+            // currently has keyboard focus — not a fixed pane — because requiring the user to
+            // first click away from a panel to reach a different zoom gesture is its own source
+            // of confusion. Forbidden:
             // Shift is reserved now, before anything claims it, so that a future app-wide zoom on
             // Ctrl+Shift+Plus/Minus is a pure addition later rather than a retrofit that has to
             // come back and defensively exclude Shift from these two entries after the fact. This
@@ -5220,13 +5221,14 @@ public partial class MainWindow : Window
     }
 
     // Resolves which pane's ZoomControl the panel-zoom-in/out hotkeys should drive: whichever of
-    // WireframeCtrl/PreviewCtrl currently owns keyboard focus (or is an ancestor of the focused
-    // element), else null when neither does (e.g. the tree or a text field is focused instead).
+    // WireframeCtrl/PreviewCtrl/PngPane currently owns keyboard focus (or is an ancestor of the
+    // focused element), else null when none does (e.g. the tree or a text field is focused instead).
     private ZoomControl? FocusedPanelZoom()
     {
         if (FocusManager?.GetFocusedElement() is not Control focused) return null;
         if (focused == WireframeCtrl || WireframeCtrl.IsVisualAncestorOf(focused)) return WireframeZoom;
         if (focused == PreviewCtrl || PreviewCtrl.IsVisualAncestorOf(focused)) return PreviewZoom;
+        if (focused == PngPane || PngPane.IsVisualAncestorOf(focused)) return PngZoom;
         return null;
     }
 

@@ -293,20 +293,19 @@ public class HotkeyDispatchTests
     // Clicks the centre of `control` via a real pointer press, so focus-on-click behavior
     // (TextureViewport/PreviewControl.OnPointerPressed calling Focus()) is actually exercised
     // rather than assumed.
-    private static void Click(MainWindow window, Control control)
+    private static void Click(MainWindow window, Control control, MouseButton button = MouseButton.Left)
     {
         var centre = new Point(control.Bounds.Width / 2, control.Bounds.Height / 2);
         var pointInWindow = control.TranslatePoint(centre, window)!.Value;
-        window.MouseDown(pointInWindow, MouseButton.Left);
+        window.MouseDown(pointInWindow, button);
         Dispatcher.UIThread.RunJobs();
     }
 
     /// <summary>
     /// The focus-based panel-zoom hotkeys below depend on clicking a panel actually focusing it.
-    /// PreviewControl (unlike TextureViewport) has no explicit <c>Focus()</c> call in its
-    /// OnPointerPressed — this passes only because Avalonia auto-focuses a Focusable control on
-    /// pointer press by default. Keep this test as a guard against that default ever being
-    /// suppressed (e.g. a future PreviewControl change marking the press event Handled early).
+    /// Left-click specifically also works via Avalonia's default focus-on-primary-click, so this
+    /// alone wouldn't have caught the real gap here — see
+    /// <see cref="MiddleClickingPreviewPanel_GivesItFocus"/> for that regression.
     /// </summary>
     [AvaloniaFact]
     public void ClickingPreviewPanel_GivesItFocus()
@@ -321,6 +320,71 @@ public class HotkeyDispatchTests
             Assert.Same(preview, window.FocusManager?.GetFocusedElement());
         }
         finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Regression for a real gap found in manual testing (#638): Avalonia's default
+    /// focus-on-pointer-press only covers the primary (left) button, so middle-clicking
+    /// PreviewControl's pan gesture never focused it — unlike TextureViewport, which calls
+    /// Focus() unconditionally before branching on which button was pressed. Fixed by giving
+    /// PreviewControl.OnPointerPressed the same explicit, button-independent Focus() call.
+    /// </summary>
+    [AvaloniaFact]
+    public void MiddleClickingPreviewPanel_GivesItFocus()
+    {
+        var (window, _) = CreateWindow();
+        try
+        {
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+
+            Click(window, preview, MouseButton.Middle);
+
+            Assert.Same(preview, window.FocusManager?.GetFocusedElement());
+        }
+        finally { window.Close(); }
+    }
+
+    // A 1×1 transparent PNG — enough to make OpenPngAsTab show a visible, focusable PngPane;
+    // the pan/focus/zoom path under test doesn't depend on the decode succeeding (see PngTabTests).
+    private const string OnePixelPngBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+    /// <summary>
+    /// The PNG diff pane is a third focus-based zoom target alongside wireframe/preview (#638
+    /// follow-up) — it reuses TextureViewport (same base as wireframe), so it already had correct
+    /// multi-button focus-on-click; only FocusedPanelZoom needed to learn about it.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task CtrlOemPlus_PngPaneFocused_StepsPngZoomOnly()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var pngPath = Path.Combine(dir, "sheet.png");
+        File.WriteAllBytes(pngPath, Convert.FromBase64String(OnePixelPngBase64));
+        var (window, _) = CreateWindow();
+        try
+        {
+            window.OpenPngAsTab(pngPath);
+            Dispatcher.UIThread.RunJobs();
+            await window.WhenPngTabLoaded();
+
+            var pngPane = window.FindControl<PngPreviewControl>("PngPane")!;
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            Click(window, pngPane);
+
+            window.KeyPress(Key.OemPlus, RawInputModifiers.Control, PhysicalKey.None, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(1.5f, pngPane.Zoom);
+            Assert.Equal(1f, wireframe.Zoom);
+            Assert.Equal(1f, preview.Zoom);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
     }
 
     /// <summary>
