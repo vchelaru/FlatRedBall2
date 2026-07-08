@@ -384,6 +384,42 @@ public class TileMapReloadTests
     // Multiple tracked TSCs — both registered collections must update on a single reload.
     // ============================================================================================
 
+    // ============================================================================================
+    // Object-layer-sourced collision must survive a reload that only touches tile-layer data.
+    // The object layer itself is unchanged (same object count) in both maps — TryReload proceeds,
+    // and RegenerateInto must re-scan object layers, not just tile layers, or the object-sourced
+    // shape silently disappears from the tracked TileShapes.
+    // ============================================================================================
+
+    [Fact]
+    public void TryReload_ObjectLayerContributesToCollision_SurvivesTileOnlyReload()
+    {
+        Tilemap BuildWithObjectRect((int col, int row, int localId)[] placements)
+        {
+            var map = BuildTilemap(4, 4, 16, new[] { RectTile(0, "Solid") }, placements);
+            var objLayer = new TilemapObjectLayer("Objects");
+            objLayer.AddObject(new TilemapRectangleObject(
+                id: 1, position: new XnaVec2(0, 48), size: new XnaVec2(16, 16)) { Class = "Solid" });
+            map.Layers.Add(objLayer);
+            return map;
+        }
+
+        var oldMap = BuildWithObjectRect(new[] { (0, 0, 0) });
+        var newMap = BuildWithObjectRect(new[] { (0, 0, 0), (2, 2, 0) });
+
+        var tileMap = new TileMap(oldMap);
+        var solid = tileMap.GenerateCollisionFromClass("Solid");
+
+        // Object rect at Tiled (0,48,16,16) -> tmx row 3, col 0 -> tsc row 0.
+        solid.GetRectangleTilesAtCell(0, 0).Count.ShouldBe(1);
+
+        tileMap.TryReload(newMap).ShouldBeTrue();
+
+        solid.GetRectangleTilesAtCell(0, 0).Count.ShouldBe(1);
+        var (c, r) = Tsc(2, 2);
+        solid.GetTileAtCell(c, r).ShouldNotBeNull();
+    }
+
     [Fact]
     public void TryReload_TwoTrackedCollections_BothUpdate()
     {
