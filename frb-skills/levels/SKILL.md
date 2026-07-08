@@ -58,7 +58,7 @@ Add(solid);
 Add(jumpThrough);
 ```
 
-Each collection can have its own collision relationship. For jump-through platforms, set `OneWayDirection = OneWayDirection.Up` and `CanDropThrough = true` on the relationship — the player passes through from below, lands from above, and can drop down with Down+Jump. For hard one-way barriers (`OneWayCollision` tile class — Yoshi-style ratchet doors), set `OneWayDirection = OneWayDirection.Up` and leave `CanDropThrough = false`. See the `collision-relationships` skill for details. By default all tile layers are scanned; restrict to a specific layer with the optional `layerName` parameter:
+Each collection can have its own collision relationship. For jump-through platforms, set `OneWayDirection = OneWayDirection.Up` and `CanDropThrough = true` on the relationship — the player passes through from below, lands from above, and can drop down with Down+Jump. For hard one-way barriers (`OneWayCollision` tile class — Yoshi-style ratchet doors), set `OneWayDirection = OneWayDirection.Up` and leave `CanDropThrough = false`. See the `collision-relationships` skill for details. By default all tile layers *and* object layers are scanned — hand-drawn rectangle/polygon `<object>`s with a matching Class are collision sources too, not just painted tiles (see "Collision from hand-drawn object-layer shapes" below). Passing `layerName` restricts the scan to a single **tile** layer, skipping object layers entirely:
 
 ```csharp
 var solid = map.GenerateCollisionFromClass("SolidCollision", layerName: "GameplayLayer");
@@ -80,6 +80,10 @@ playerVsSolid.BounceFirstOnCollision(elasticity: 0f);
 `SlopeMode` is a per-relationship concern: the same `solid` collection can simultaneously back a player relationship (`PlatformerFloor`) and a ball relationship (default `Standard` SAT) without conflict.
 
 See the `tmx` skill for how to author the polygon on the tileset tile.
+
+## Collision from Hand-Drawn Object-Layer Shapes
+
+For a collision boundary that doesn't match the tile grid (an irregular wall, a boss-arena floor), draw a rectangle or polygon directly on an object layer with a matching Class instead of stamping tiles — `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` pick these up too. Rectangles support any position, size, and 90-degree-multiple rotation (clipped across however many cells they span); polygons and other-angle rotated rectangles must fit within roughly one cell. See the `tmx` skill's "Collision from an object layer" section for the full capability split and the rotation-pivot gotcha.
 
 ## Spawning Entities from Object Layers or Painted Tile Layers
 
