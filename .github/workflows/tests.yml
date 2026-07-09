@@ -49,6 +49,11 @@ jobs:
       - name: Test AnimationEditor.Views
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      # Separate assembly from AnimationEditor.App.Tests so it can run headless with real
+      # (non-no-op) Skia drawing — see AnimationEditor.DocScreenshots/TestAppBuilder.cs.
+      - name: Test AnimationEditor.DocScreenshots
+        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
+
   animationchain-pack:
     name: Pack AnimationChain NuGet (ubuntu)
     runs-on: ubuntu-latest
