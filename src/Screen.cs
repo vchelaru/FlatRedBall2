@@ -337,6 +337,28 @@ public class Screen : ILifecycleEvents
             Cameras[i].AttachManagers(managers);
     }
 
+    /// <summary>
+    /// Registers <paramref name="camera"/>'s <see cref="Camera.PopupRoot"/> and <see cref="Camera.ModalRoot"/>
+    /// as owning-camera renderables so Forms popups routed to them (via
+    /// <see cref="Gum.Wireframe.GraphicalUiElement.ResolvePopupRoots"/>) draw in that camera's pass —
+    /// inheriting its zoom/viewport. Modal is registered after popup so it draws on top (modal is
+    /// always topmost). Called by the engine after <see cref="CustomInitialize"/> so the roots draw
+    /// above any HUD the screen just added.
+    /// </summary>
+    internal void RegisterCameraPopupRoots(Camera camera)
+    {
+        RegisterOwningCameraRoot(camera.PopupRoot, camera);
+        RegisterOwningCameraRoot(camera.ModalRoot, camera);
+    }
+
+    private void RegisterOwningCameraRoot(GraphicalUiElement root, Camera camera)
+    {
+        var renderable = new GumRenderable(root) { OwningCamera = camera, Layer = Layer };
+        _gumRenderables.Add(renderable);
+        _gumByVisual[root] = renderable;
+        _renderList.Add(renderable);
+    }
+
     // ---------- Entity-attached visuals ----------
 
     private GraphicalUiElement? _entityVisualsRoot;

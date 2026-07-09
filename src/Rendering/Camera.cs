@@ -118,6 +118,24 @@ public class Camera
     // implementation detail; children opt into events normally.
     public GraphicalUiElement UiRoot => _uiRoot ??= new ContainerRuntime { Name = "Camera.UiRoot", HasEvents = false };
 
+    private InteractiveGue? _popupRoot;
+    private InteractiveGue? _modalRoot;
+
+    /// <summary>
+    /// This camera's Gum Forms popup root — where a ComboBox dropdown / MenuItem submenu opened by a
+    /// control on this camera is parented (via <see cref="GraphicalUiElement.ResolvePopupRoots"/>).
+    /// Drawn in this camera's own pass so popups inherit its <see cref="Zoom"/> and viewport, rather
+    /// than Gum's global full-window popup root. Input-transparent (<c>HasEvents=false</c>) like
+    /// <see cref="UiRoot"/> — the popup content parented under it receives cursor events, not the root.
+    /// </summary>
+    public InteractiveGue PopupRoot => _popupRoot ??= new ContainerRuntime { Name = "Camera.PopupRoot", HasEvents = false };
+
+    /// <summary>
+    /// This camera's Gum Forms modal root — the modal-dialog counterpart to <see cref="PopupRoot"/>,
+    /// drawn above it in this camera's pass. See <see cref="PopupRoot"/> for the per-camera rationale.
+    /// </summary>
+    public InteractiveGue ModalRoot => _modalRoot ??= new ContainerRuntime { Name = "Camera.ModalRoot", HasEvents = false };
+
     /// <summary>
     /// The screen this camera is associated with. Set by <see cref="Screen"/> when this camera is
     /// part of <see cref="Screen.Cameras"/>; required by <see cref="Add(GraphicalUiElement, FlatRedBall2.Rendering.Layer?)"/>
@@ -163,6 +181,8 @@ public class Camera
     internal void AttachManagers(RenderingLibrary.ISystemManagers managers)
     {
         UiRoot.AttachManagersOnly(managers);
+        PopupRoot.AttachManagersOnly(managers);
+        ModalRoot.AttachManagersOnly(managers);
     }
 
     /// <summary>
