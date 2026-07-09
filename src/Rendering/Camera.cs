@@ -154,6 +154,18 @@ public class Camera
     public void Remove(FrameworkElement element) => Remove(element.Visual);
 
     /// <summary>
+    /// Attaches <paramref name="managers"/> to this camera's Gum roots (<see cref="UiRoot"/>)
+    /// so that <c>EffectiveManagers</c> resolves for everything parented under them. Without this,
+    /// Gum silently no-ops features gated on <c>EffectiveManagers</c> (Forms <c>Loaded</c>,
+    /// TextBox hover state, ScreenPixel corner-radius zoom compensation, popup close-on-outside-
+    /// click). Called by the engine once <c>RenderingLibrary.SystemManagers.Default</c> exists.
+    /// </summary>
+    internal void AttachManagers(RenderingLibrary.ISystemManagers managers)
+    {
+        UiRoot.AttachManagersOnly(managers);
+    }
+
+    /// <summary>
     /// Resolves <see cref="NormalizedViewport"/> against <paramref name="hostRect"/> to produce
     /// this camera's pixel <see cref="Viewport"/>, then sets <see cref="OrthogonalHeight"/> from
     /// <paramref name="orthogonalHeight"/> and derives <see cref="OrthogonalWidth"/> from the

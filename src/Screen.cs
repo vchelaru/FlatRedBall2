@@ -322,6 +322,21 @@ public class Screen : ILifecycleEvents
         _renderList.Add(renderable);
     }
 
+    /// <summary>
+    /// Attaches <paramref name="managers"/> to every Gum root this screen owns — <see cref="OverlayRoot"/>,
+    /// <see cref="EntityVisualsRoot"/>, and each camera's <see cref="Camera.UiRoot"/> (via
+    /// <see cref="Camera.AttachManagers"/>) — so <c>EffectiveManagers</c> resolves for all UI parented
+    /// under them. Called by the engine during screen activation once the managers instance exists;
+    /// see <see cref="Camera.AttachManagers"/> for the list of features that silently break without it.
+    /// </summary>
+    internal void AttachManagers(RenderingLibrary.ISystemManagers managers)
+    {
+        OverlayRoot.AttachManagersOnly(managers);
+        EntityVisualsRoot.AttachManagersOnly(managers);
+        for (int i = 0; i < Cameras.Count; i++)
+            Cameras[i].AttachManagers(managers);
+    }
+
     // ---------- Entity-attached visuals ----------
 
     private GraphicalUiElement? _entityVisualsRoot;

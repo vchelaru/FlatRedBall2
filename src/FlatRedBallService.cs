@@ -516,6 +516,13 @@ public class FlatRedBallService
             var bounds = _game.Window.ClientBounds;
             for (int i = 0; i < screen.Cameras.Count; i++)
                 ApplyCameraSettings(screen.Cameras[i], bounds.Width, bounds.Height);
+
+            // Attach SystemManagers to the screen's Gum roots BEFORE CustomInitialize runs, so that
+            // controls parented during CustomInitialize see EffectiveManagers != null at parent-time.
+            // Gum's FrameworkElement.Loaded only fires when the parent chain already has managers when
+            // the control is added (HandleParentChanged) — attaching afterward would miss it. Default
+            // is set by _gum.Initialize, which has already run by the time any screen activates.
+            screen.AttachManagers(RenderingLibrary.SystemManagers.Default);
         }
         // See cast note in Initialize: Screen.Cameras' backing Collection<Camera> implements IReadOnlyList<T>.
         Input.SetCameras((IReadOnlyList<Rendering.Camera>)screen.Cameras);
