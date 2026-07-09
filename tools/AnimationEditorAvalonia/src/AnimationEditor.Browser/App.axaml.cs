@@ -19,6 +19,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.MarkupExtensions;
@@ -252,13 +253,16 @@ public partial class App : Application
             Children = { openButton, saveAsButton, reloadButton, themeButton },
         };
 
-        themeButton.Click += (_, _) =>
+        // Phase 13 (#662): extracted so the View > Theme menu items can set a specific theme
+        // directly, alongside the toolbar button's toggle-to-the-other-theme behavior.
+        void SetTheme(AppTheme theme)
         {
-            currentTheme = currentTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark;
+            currentTheme = theme;
             Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
             settingsStore.SaveTheme(currentTheme);
             themeButton.Content = $"Theme: {currentTheme}";
-        };
+        }
+        themeButton.Click += (_, _) => SetTheme(currentTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark);
 
         // Phase 2 (#610): mutation + Undo/Redo, routed entirely through the already-built,
         // already-tested AppCommands/UndoManager -- no new mutation logic here, only wiring.
@@ -895,9 +899,93 @@ public partial class App : Application
         statusBar.Children.Add(status);
         statusBar.Bind(Grid.BackgroundProperty, statusBar.GetResourceObservable("BgRail"));
 
+        // Phase 13 (#662): File/Edit/View/Help menu bar. Mostly wiring -- every item here
+        // delegates to a command already exposed via a toolbar button in Phases 2/5/8, either by
+        // re-raising that button's existing Click handler (RoutedEventArgs(Button.ClickEvent),
+        // zero logic duplication) or calling the same already-tested helper the button's handler
+        // calls. Items with no real browser-side implementation (Load Recent, Copy/Cut/Paste/
+        // Duplicate, Settings, View Log) are omitted rather than shown as disabled no-ops --
+        // see docs/BROWSER_MENU_BAR_DECISION.md. No window controls (minimize/maximize/close) --
+        // the browser tab already has real OS chrome for those.
+        int untitledCounter = 0;
+        var menuNew = new MenuItem { Header = "_New" };
+        menuNew.Click += (_, _) =>
+        {
+            var leaving = tabManager.ActiveTab;
+            if (leaving != null)
+            {
+                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+            }
+            appCommands.NewFile();
+            var displayName = TabManager.ComputeUntitledDisplayName(tabManager.Tabs.Select(t => t.DisplayName).ToList());
+            tabManager.OpenOrFocus(new FilePath($"untitled-{++untitledCounter}"), displayName);
+            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            undoManager.Clear();
+            UpdateUndoRedoButtons();
+            animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
+            RebuildTabStrip();
+        };
+        var menuLoad = new MenuItem { Header = "_Load Folder…" };
+        menuLoad.Click += (_, _) => openButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuSave = new MenuItem { Header = "_Save" };
+        menuSave.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuSaveAs = new MenuItem { Header = "Save _As…" };
+        menuSaveAs.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuExport = new MenuItem { Header = "_Export to PixiJS" };
+        menuExport.Click += (_, _) => exportPixiJsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var fileMenu = new MenuItem
+        {
+            Header = "_File",
+            Items = { menuNew, menuLoad, new Separator(), menuSave, menuSaveAs, new Separator(), menuExport },
+        };
+
+        var menuUndo = new MenuItem { Header = "_Undo" };
+        menuUndo.Click += (_, _) => undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuRedo = new MenuItem { Header = "_Redo" };
+        menuRedo.Click += (_, _) => redoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var editMenu = new MenuItem { Header = "_Edit", Items = { menuUndo, menuRedo } };
+
+        var menuWireframeZoomIn = new MenuItem { Header = "_Wireframe Zoom In" };
+        menuWireframeZoomIn.Click += (_, _) => wireframeZoom.StepUp();
+        var menuWireframeZoomOut = new MenuItem { Header = "Wireframe Zoom _Out" };
+        menuWireframeZoomOut.Click += (_, _) => wireframeZoom.StepDown();
+        var menuPreviewZoomIn = new MenuItem { Header = "_Preview Zoom In" };
+        menuPreviewZoomIn.Click += (_, _) => previewZoom.StepUp();
+        var menuPreviewZoomOut = new MenuItem { Header = "Preview Zoom O_ut" };
+        menuPreviewZoomOut.Click += (_, _) => previewZoom.StepDown();
+        var menuShowHistory = new MenuItem { Header = "Show _History" };
+        menuShowHistory.Click += (_, _) => sidebarTabs.SelectedItem = historyTab;
+        var menuThemeLight = new MenuItem { Header = "_Light" };
+        menuThemeLight.Click += (_, _) => SetTheme(AppTheme.Light);
+        var menuThemeDark = new MenuItem { Header = "_Dark" };
+        menuThemeDark.Click += (_, _) => SetTheme(AppTheme.Dark);
+        var menuTheme = new MenuItem { Header = "_Theme", Items = { menuThemeLight, menuThemeDark } };
+        var viewMenu = new MenuItem
+        {
+            Header = "_View",
+            Items =
+            {
+                menuWireframeZoomIn, menuWireframeZoomOut, menuPreviewZoomIn, menuPreviewZoomOut,
+                new Separator(), menuShowHistory, new Separator(), menuTheme,
+            },
+        };
+
+        var menuDiagnostics = new MenuItem { Header = "_Diagnostics (F3)" };
+        menuDiagnostics.Click += (_, _) => ApplyDiagnostics(diagnosticsButton.IsChecked != true);
+        var menuAbout = new MenuItem { Header = "_About" };
+        menuAbout.Click += (_, _) => status.Text = "Animation Editor (Avalonia Browser build).";
+        var helpMenu = new MenuItem { Header = "_Help", Items = { menuDiagnostics, new Separator(), menuAbout } };
+
+        var menuBar = new Menu { Items = { fileMenu, editMenu, viewMenu, helpMenu } };
+        menuBar.Bind(Menu.BackgroundProperty, menuBar.GetResourceObservable("BgRail"));
+
         var root = new DockPanel();
         DockPanel.SetDock(headerBar, Dock.Top);
         root.Children.Add(headerBar);
+        DockPanel.SetDock(menuBar, Dock.Top);
+        root.Children.Add(menuBar);
         DockPanel.SetDock(tabStrip, Dock.Top);
         root.Children.Add(tabStrip);
         DockPanel.SetDock(toolbar, Dock.Top);
@@ -919,9 +1007,36 @@ public partial class App : Application
             if (topLevelForKeys is null) return;
             topLevelForKeys.KeyDown += (_, e) =>
             {
-                if (e.Key != Key.F3) return;
-                e.Handled = true;
-                ApplyDiagnostics(diagnosticsButton.IsChecked != true);
+                if (e.Key == Key.F3)
+                {
+                    e.Handled = true;
+                    ApplyDiagnostics(diagnosticsButton.IsChecked != true);
+                    return;
+                }
+
+                // Phase 13 (#662): only the browser-safe subset from the roadmap's shortcut
+                // table -- Ctrl+S is interceptable via preventDefault; Ctrl+Z/Ctrl+Y aren't
+                // reserved. Ctrl+N/Ctrl+L/Ctrl+D/Ctrl+(+/-)/Ctrl+Shift+(+/-) are hard-reserved by
+                // Chrome (new window, address bar, bookmark, page zoom) and stay menu-only --
+                // no accelerator wired for those here, matching the roadmap's recommendation.
+                if (e.KeyModifiers == KeyModifiers.Control)
+                {
+                    if (e.Key == Key.S)
+                    {
+                        e.Handled = true;
+                        saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    else if (e.Key == Key.Z)
+                    {
+                        e.Handled = true;
+                        undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    else if (e.Key == Key.Y)
+                    {
+                        e.Handled = true;
+                        redoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                }
             };
         };
 

@@ -298,11 +298,13 @@ depends on it; it could move later without side effects.
 
 ---
 
-### Phase 13 — Menu bar (File/Edit/View/Help)
+### Phase 13 — Menu bar (File/Edit/View/Help) ✅
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-menu-bar`)* |
+| **Issue** | #662 |
+| **Status** | **Done** — merged into `644-ae-web-icons` (same branch/PR as Phases 7-12) |
+| **Doc** | `BROWSER_MENU_BAR_DECISION.md` |
 | **Depends on** | Independent of 12/14; reorderable |
 
 **Scope:** Recreate the four menus, delegating to commands already wired via toolbar buttons
