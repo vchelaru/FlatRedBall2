@@ -458,3 +458,48 @@ public class AutomationModeReflectionTests
         output.ToString().Trim().ShouldContain("\"custom\":\"view\"");
     }
 }
+
+// --- AutomationMode screenshot ---
+
+public class AutomationModeScreenshotTests
+{
+    [Fact]
+    public void ProcessLine_RecordNextScreenshotCommand_ArmsPendingRequestWithoutImmediateResponse()
+    {
+        var output = new StringWriter();
+        var mode = new AutomationMode(new FlatRedBallService(), output);
+
+        mode.ProcessLine("{\"cmd\":\"record_next_screenshot\",\"path\":\"out.png\"}");
+        mode.TryAdvanceFrame(0);
+
+        output.ToString().ShouldBeEmpty();
+        mode.TryConsumePendingScreenshot(out var path).ShouldBeTrue();
+        path.ShouldBe("out.png");
+    }
+
+    [Fact]
+    public void ProcessLine_RecordNextScreenshotCommand_MissingPath_WritesErrorAndDoesNotArm()
+    {
+        var output = new StringWriter();
+        var mode = new AutomationMode(new FlatRedBallService(), output);
+
+        mode.ProcessLine("{\"cmd\":\"record_next_screenshot\"}");
+        mode.TryAdvanceFrame(0);
+
+        output.ToString().ShouldContain("\"ok\":false");
+        mode.TryConsumePendingScreenshot(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryConsumePendingScreenshot_CalledTwice_OnlyFiresOnce()
+    {
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter());
+        mode.ProcessLine("{\"cmd\":\"record_next_screenshot\",\"path\":\"out.png\"}");
+        mode.TryAdvanceFrame(0);
+
+        mode.TryConsumePendingScreenshot(out _);
+        var second = mode.TryConsumePendingScreenshot(out _);
+
+        second.ShouldBeFalse();
+    }
+}

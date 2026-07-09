@@ -56,6 +56,7 @@ Each command is a JSON object terminated by `\n`. Each response is a JSON object
 | Query all entities | `{"cmd":"query","target":"entities"}` |
 | Query one entity type | `{"cmd":"query","target":"Player"}` |
 | Force a value | `{"cmd":"set","entity":"Player","prop":"X","value":100.0}` |
+| Arm a screenshot | `{"cmd":"record_next_screenshot","path":"out.png"}` |
 | Quit | `{"cmd":"quit"}` |
 
 ### Frame stepping
@@ -102,6 +103,10 @@ Engine.RegisterValueSetter("Player", "Health", v => player.Health = (int)v);
 A registered name takes precedence over reflection — handy when you want a concise view rather than the full property dump.
 
 Providers and setters live on the screen that registered them and disappear on screen exit. The agent can detect a screen change with `query target:"screen"`.
+
+## Capturing Screenshots
+
+`record_next_screenshot path:"out.png"` doesn't capture anything by itself — it arms a pending request. The back buffer for the frame you want isn't rendered until `Draw()` runs, which happens after the command is processed, so capture is deferred to the end of the *next* `Draw()` call. **You must follow it with a `step`** — that step is what actually triggers the `Draw()` that fulfills the request and writes the response (with the captured `frame` echoed back). Arming without a subsequent `step` leaves the request pending indefinitely.
 
 ## Gotchas
 

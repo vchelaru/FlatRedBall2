@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using FlatRedBall2.Input;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 
 namespace FlatRedBall2.Automation;
@@ -24,6 +25,10 @@ internal class AutomationMode
     // Game-thread only — no synchronization needed.
     private int _pendingStepCount;
     private bool _stepConsumedThisFrame;
+    // Armed by "record_next_screenshot", consumed by the first Draw() that follows. Screenshots
+    // can't be captured inline like query/set — the back buffer for the frame the caller cares
+    // about isn't rendered until Draw() runs, which happens after ProcessCommand returns.
+    private string? _pendingScreenshotPath;
 
     internal AutomationMode(FlatRedBallService engine, System.IO.TextWriter? output = null)
     {
@@ -128,9 +133,10 @@ internal class AutomationMode
         var command = cmdProp.GetString();
         switch (command)
         {
-            case "input":  ProcessInputCommand(cmd, frame);  break;
-            case "query":  ProcessQueryCommand(cmd, frame);  break;
-            case "set":    ProcessSetCommand(cmd, frame);    break;
+            case "input":                  ProcessInputCommand(cmd, frame);              break;
+            case "query":                  ProcessQueryCommand(cmd, frame);               break;
+            case "set":                    ProcessSetCommand(cmd, frame);                 break;
+            case "record_next_screenshot": ProcessRecordNextScreenshotCommand(cmd, frame); break;
             case "quit":
                 try { _engine.Game.Exit(); }
                 catch (InvalidOperationException) { }
@@ -342,6 +348,61 @@ internal class AutomationMode
         {
             error = $"failed to set {entityName}.{propName}: {ex.Message}";
             return false;
+        }
+    }
+
+    // --- Screenshot capture ---
+
+    private void ProcessRecordNextScreenshotCommand(JsonElement cmd, long frame)
+    {
+        var path = cmd.TryGetProperty("path", out var p) ? p.GetString() : null;
+        if (string.IsNullOrEmpty(path))
+        {
+            WriteResponse(new { ok = false, frame, error = "record_next_screenshot requires a non-empty 'path'" });
+            return;
+        }
+        _pendingScreenshotPath = path;
+    }
+
+    /// <summary>
+    /// Pops the armed screenshot request, if any. Pure state-machine logic — no
+    /// <see cref="GraphicsDevice"/> dependency — kept separate from <see cref="FulfillPendingScreenshot"/>
+    /// so it can be unit tested without a real graphics device.
+    /// </summary>
+    internal bool TryConsumePendingScreenshot(out string? path)
+    {
+        path = _pendingScreenshotPath;
+        _pendingScreenshotPath = null;
+        return path != null;
+    }
+
+    /// <summary>
+    /// Captures the just-rendered back buffer to disk as a PNG and responds, if a screenshot is
+    /// pending. Must be called from the end of <see cref="FlatRedBallService.Draw"/> — the back
+    /// buffer only reflects the current frame once Draw has finished writing to it.
+    /// </summary>
+    internal void FulfillPendingScreenshot(GraphicsDevice gd, long frame)
+    {
+        if (!TryConsumePendingScreenshot(out var path)) return;
+
+        try
+        {
+            var pp = gd.PresentationParameters;
+            int width = pp.BackBufferWidth;
+            int height = pp.BackBufferHeight;
+            var backBuffer = new Microsoft.Xna.Framework.Color[width * height];
+            gd.GetBackBufferData(backBuffer);
+
+            using var texture = new Texture2D(gd, width, height);
+            texture.SetData(backBuffer);
+            using var stream = System.IO.File.Create(path!);
+            texture.SaveAsPng(stream, width, height);
+
+            WriteResponse(new { ok = true, frame, result = new { path } });
+        }
+        catch (Exception ex)
+        {
+            WriteResponse(new { ok = false, frame, error = $"screenshot failed: {ex.Message}" });
         }
     }
 

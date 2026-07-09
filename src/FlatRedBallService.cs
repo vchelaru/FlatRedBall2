@@ -1106,6 +1106,7 @@ public class FlatRedBallService
 
 #if DEBUG
         _automationMode?.FlushStepResponse(Time.CurrentFrame);
+        _automationMode?.FulfillPendingScreenshot(gd, Time.CurrentFrame);
 #endif
 
         _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
