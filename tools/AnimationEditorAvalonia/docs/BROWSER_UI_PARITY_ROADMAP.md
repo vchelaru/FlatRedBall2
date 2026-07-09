@@ -26,8 +26,8 @@ exists and focus on *looking and feeling* like the desktop app.
 | Implementing a phase | The phase's GitHub issue body (if filed) **and** ship a `docs/BROWSER_*_DECISION.md` on merge |
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
-**Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9), #652 (Phase 10).
-Phases 11–15 issues are **not filed yet** — file
+**Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9), #652 (Phase 10),
+#654 (Phase 11). Phases 12–15 issues are **not filed yet** — file
 each from its own worktree when that phase starts, per the convention below.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
@@ -249,11 +249,13 @@ check, not just a container reflow. Browser-only wiring, no Core/Views changes e
 
 ---
 
-### Phase 11 — Tab-strip visual polish + context menus
+### Phase 11 — Tab-strip visual polish + context menus ✅
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-tabstrip-polish`)* |
+| **Issue** | #654 |
+| **Status** | **Done** — merged into `644-ae-web-icons` (same branch/PR as Phases 7-10) |
+| **Doc** | `BROWSER_TABSTRIP_CONTEXT_MENU_DECISION.md` |
 | **Depends on** | Independent of 12/14; reorderable |
 
 **Scope:** Restyle the multi-file tab strip to desktop's `Border`-based active/inactive look with a

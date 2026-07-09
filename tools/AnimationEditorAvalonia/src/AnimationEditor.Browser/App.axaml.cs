@@ -18,6 +18,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.MarkupExtensions;
@@ -198,6 +199,17 @@ public partial class App : Application
         // thing to an app mark already in the shared icon set (no dedicated logo asset exists).
         var headerFileNameText = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
         headerFileNameText.Bind(TextBlock.ForegroundProperty, headerFileNameText.GetResourceObservable("InkMid"));
+        // Phase 11 (#654): "Open Containing Folder" is dropped (no filesystem); "Copy Full Path"
+        // stays -- low-value against a synthetic path but harmless, per the roadmap.
+        var copyPathItem = new MenuItem { Header = "Copy Full Path" };
+        copyPathItem.Click += async (_, _) =>
+        {
+            var topLevel = TopLevel.GetTopLevel(headerFileNameText);
+            var path = tabManager.ActiveTab?.Path.FullPath;
+            if (topLevel?.Clipboard is { } clipboard && path is not null)
+                await clipboard.SetTextAsync(path);
+        };
+        headerFileNameText.ContextMenu = new ContextMenu { Items = { copyPathItem } };
         var headerBar = new Border
         {
             BorderThickness = new Thickness(0, 0, 0, 1),
@@ -379,21 +391,112 @@ public partial class App : Application
         // whenever its cached disk-write-time is null, and TryReadDiskWriteTimeUtc naturally
         // returns null for any path that doesn't exist on disk (every browser tab's path) --
         // so cached tabs are already correctly "always trusted" here with no code changes needed.
+        // Phase 11 (#654): Border-based active/inactive tab look matching desktop's TabStrip
+        // (BgActive/transparent background, Ink/InkMid label, 1px LineBrush divider) plus a close
+        // button and a context menu. No drag-to-reorder here -- that's desktop-only ceremony
+        // (pointer capture + ghost ItemsControl overlay) the roadmap's "visual polish + context
+        // menus" scope doesn't call for.
         void RebuildTabStrip()
         {
             tabStrip.Children.Clear();
-            foreach (var tab in tabManager.Tabs)
+            var tabs = tabManager.Tabs;
+            bool canClose = tabs.Count > 1;
+
+            foreach (var tab in tabs)
             {
                 var isActive = tab == tabManager.ActiveTab;
-                var tabButton = new Button
+                var captured = tab;
+
+                var tabBorder = new Border
                 {
-                    Content = tab.DisplayName,
-                    FontWeight = isActive ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
+                    BorderThickness = new Thickness(0, 0, 1, 0),
+                    Cursor = new Cursor(StandardCursorType.Hand),
                 };
-                tabButton.Click += (_, _) => SwitchToTab(tab);
-                tabStrip.Children.Add(tabButton);
+                if (isActive) tabBorder.Bind(Border.BackgroundProperty, tabBorder.GetResourceObservable("BgActive"));
+                else tabBorder.Background = Avalonia.Media.Brushes.Transparent;
+                tabBorder.Bind(Border.BorderBrushProperty, tabBorder.GetResourceObservable("LineBrush"));
+                ToolTip.SetTip(tabBorder, tab.Path.FullPath);
+
+                var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(8, 0, 0, 0) };
+                var label = new TextBlock { Text = tab.DisplayName, FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+                label.Bind(TextBlock.ForegroundProperty, label.GetResourceObservable(isActive ? "Ink" : "InkMid"));
+                Grid.SetColumn(label, 0);
+
+                var closeBtn = new Button
+                {
+                    Content = "✕",
+                    FontSize = 9, Width = 20, Height = 20, Padding = new Thickness(0),
+                    Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new Thickness(0),
+                    HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(2, 0, 2, 0),
+                    IsEnabled = canClose,
+                };
+                closeBtn.Bind(Button.ForegroundProperty, closeBtn.GetResourceObservable("InkMid"));
+                Grid.SetColumn(closeBtn, 1);
+                closeBtn.Click += (_, _) => CloseTab(captured);
+
+                row.Children.Add(label);
+                row.Children.Add(closeBtn);
+                tabBorder.Child = row;
+
+                // "Detach to New Window" has no browser equivalent -- remapped to "Open in New
+                // Browser Tab" (a fresh instance via window.open, not true state transfer; see
+                // docs/BROWSER_TABSTRIP_CONTEXT_MENU_DECISION.md).
+                var openNewTabItem = new MenuItem { Header = "Open in New Browser Tab" };
+                openNewTabItem.Click += async (_, _) =>
+                {
+                    var topLevel = TopLevel.GetTopLevel(tabBorder);
+                    if (topLevel?.Launcher is { } launcher)
+                        await launcher.LaunchUriAsync(new Uri(Program.PageUrl));
+                };
+                var closeTabItem = new MenuItem { Header = "Close Tab", IsEnabled = canClose };
+                closeTabItem.Click += (_, _) => CloseTab(captured);
+                tabBorder.ContextMenu = new ContextMenu { Items = { openNewTabItem, closeTabItem } };
+
+                // Left-click activates (skipping the close button, which handles its own click);
+                // middle-click closes, matching desktop.
+                tabBorder.PointerPressed += (_, args) =>
+                {
+                    if (args.Source is Button) return;
+                    if (args.GetCurrentPoint(tabBorder).Properties.IsLeftButtonPressed) SwitchToTab(captured);
+                };
+                tabBorder.PointerReleased += (_, args) =>
+                {
+                    if (args.GetCurrentPoint(tabBorder).Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonReleased)
+                    {
+                        CloseTab(captured);
+                        args.Handled = true;
+                    }
+                };
+
+                tabStrip.Children.Add(tabBorder);
             }
             RefreshHeaderAndStatusLeft();
+        }
+
+        // Mirrors desktop's CloseTab: close, then activate whatever TabManager.Close already
+        // picked as the next active tab (its own doc comment: next tab, else previous, else
+        // null). A null ActiveTab means the last tab was closed -- start fresh with a blank
+        // animation chain list, same fallback desktop uses.
+        void CloseTab(TabEntry tab)
+        {
+            tabManager.Close(tab.Path);
+            var next = tabManager.ActiveTab;
+            if (next != null)
+            {
+                appCommands.TryActivateTabFromCache(next);
+                undoManager.RestoreSnapshot(next.UndoSnapshot ?? new UndoSnapshot(new List<IUndoableCommand>(), new List<IUndoableCommand>()));
+            }
+            else
+            {
+                projectManager.AnimationChainListSave = new AnimationChainListSave();
+                projectManager.FileName = null;
+                selectedState.Reset();
+                undoManager.Clear();
+            }
+            UpdateUndoRedoButtons();
+            animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            RebuildTabStrip();
         }
 
         // Phase 8 (#648): feeds the branded header's filename and the status bar's left zone
