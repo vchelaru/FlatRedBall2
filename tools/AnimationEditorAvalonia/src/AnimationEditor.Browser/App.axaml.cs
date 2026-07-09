@@ -714,19 +714,46 @@ public partial class App : Application
         leftColumn.Children.Add(sidebarSplitter);
         leftColumn.Children.Add(sidebarTabs);
 
-        // Middle: wireframe (shape editing canvas). Right: preview (playback). Both are
-        // independent TextureViewport-derived controls; neither depends on this layout shape --
-        // MainWindow arranges the equivalent panels differently (tabs, not a fixed 3-column split).
+        // Phase 10 (#652): matches desktop's AchxEditorPane -- wireframe stacked over preview
+        // (with a draggable row splitter), replacing the previous fixed side-by-side two-column
+        // layout. Both are independent TextureViewport-derived controls; neither depends on this
+        // layout shape, so this is a pure container reflow -- their pan/zoom math is
+        // bounds-relative to their own control size, not the window/grid shape.
+        var canvasSplitter = new GridSplitter
+        {
+            ResizeDirection = GridResizeDirection.Rows,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        canvasSplitter.Bind(GridSplitter.BackgroundProperty, canvasSplitter.GetResourceObservable("LineStrong"));
+
+        var canvasColumn = new Grid
+        {
+            RowDefinitions = new RowDefinitions("*,4,*"),
+        };
+        Grid.SetRow(wireframe, 0);
+        Grid.SetRow(canvasSplitter, 1);
+        Grid.SetRow(preview, 2);
+        canvasColumn.Children.Add(wireframe);
+        canvasColumn.Children.Add(canvasSplitter);
+        canvasColumn.Children.Add(preview);
+
+        var sidebarColumnSplitter = new GridSplitter
+        {
+            ResizeDirection = GridResizeDirection.Columns,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        sidebarColumnSplitter.Bind(GridSplitter.BackgroundProperty, sidebarColumnSplitter.GetResourceObservable("LineStrong"));
+
         var mainArea = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*,*"),
+            ColumnDefinitions = new ColumnDefinitions("Auto,4,*"),
         };
         Grid.SetColumn(leftColumn, 0);
-        Grid.SetColumn(wireframe, 1);
-        Grid.SetColumn(preview, 2);
+        Grid.SetColumn(sidebarColumnSplitter, 1);
+        Grid.SetColumn(canvasColumn, 2);
         mainArea.Children.Add(leftColumn);
-        mainArea.Children.Add(wireframe);
-        mainArea.Children.Add(preview);
+        mainArea.Children.Add(sidebarColumnSplitter);
+        mainArea.Children.Add(canvasColumn);
 
         // Phase 8 (#648): desktop's status bar has 3 zones (save-state+filename+counts |
         // cursor+selection | transient toast); browser only has data for 2 -- there's no
