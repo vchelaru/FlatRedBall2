@@ -165,14 +165,14 @@ public class TextureViewport : Control, IZoomTarget
             {
                 Color        = palette.GridLineMinor,
                 Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 1f,
+                StrokeWidth  = 0.5f,
                 IsAntialias  = true
             };
             using var majorPaint = new SKPaint
             {
                 Color        = palette.GridLineMajor,
                 Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 1.5f,
+                StrokeWidth  = 1f,
                 IsAntialias  = true
             };
             float step = s.GridSize * s.Zoom;
