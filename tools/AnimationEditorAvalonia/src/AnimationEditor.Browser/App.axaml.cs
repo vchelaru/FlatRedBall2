@@ -653,23 +653,66 @@ public partial class App : Application
             },
         };
 
-        // Left column: tree (fills available height) over inspector, then history (both sized to
-        // content). Right: preview. Both new controls are pure UserControls with no dependency on
-        // this layout shape -- MainWindow lays the equivalent panels out differently.
-        var historyLabel = new TextBlock { Text = "History", Margin = new Thickness(4, 4, 4, 0), FontWeight = Avalonia.Media.FontWeight.Bold };
+        // Phase 9 (#649): matches desktop's sidebar shape -- ANIMATIONS tree always visible (top),
+        // GridSplitter, then a TabControl below with Inspector (default) and History tabs. Files
+        // tab is explicitly deferred to Phase 12 (needs a real folder scan; see the roadmap).
+        // RowDefinitions "2*,4,3*" mirrors desktop's LeftPanelGrid proportions exactly.
+        var inspectorTab = new TabItem
+        {
+            Header = "Inspector",
+            FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
+            Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = new Border { Child = inspector },
+        };
+        var historyTab = new TabItem
+        {
+            Header = "History",
+            FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
+            Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = new Border { Padding = new Thickness(4), Child = historyList },
+        };
+        ((Border)inspectorTab.Content!).Bind(Border.BackgroundProperty, inspectorTab.GetResourceObservable("BgPanel"));
+        ((Border)historyTab.Content!).Bind(Border.BackgroundProperty, historyTab.GetResourceObservable("BgPanel"));
+
+        var sidebarTabs = new TabControl
+        {
+            Padding = new Thickness(0),
+            Items = { inspectorTab, historyTab },
+        };
+        sidebarTabs.Bind(TabControl.BackgroundProperty, sidebarTabs.GetResourceObservable("BgRail"));
+
+        // Mirrors desktop's TabItem/TabItem:selected style pair (InkMid unselected, Ink selected)
+        // -- only two fixed tabs here, so plain instance-level rebinding is simpler than a Style.
+        void UpdateSidebarTabForegrounds()
+        {
+            inspectorTab.Bind(TabItem.ForegroundProperty,
+                inspectorTab.GetResourceObservable(sidebarTabs.SelectedItem == inspectorTab ? "Ink" : "InkMid"));
+            historyTab.Bind(TabItem.ForegroundProperty,
+                historyTab.GetResourceObservable(sidebarTabs.SelectedItem == historyTab ? "Ink" : "InkMid"));
+        }
+        sidebarTabs.SelectionChanged += (_, _) => UpdateSidebarTabForegrounds();
+        UpdateSidebarTabForegrounds();
+
+        var sidebarSplitter = new GridSplitter
+        {
+            ResizeDirection = GridResizeDirection.Rows,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        sidebarSplitter.Bind(GridSplitter.BackgroundProperty, sidebarSplitter.GetResourceObservable("LineStrong"));
+
         var leftColumn = new Grid
         {
             Width = 260,
-            RowDefinitions = new RowDefinitions("*,Auto,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("2*,4,3*"),
         };
         Grid.SetRow(animationTree, 0);
-        Grid.SetRow(inspector, 1);
-        Grid.SetRow(historyLabel, 2);
-        Grid.SetRow(historyList, 3);
+        Grid.SetRow(sidebarSplitter, 1);
+        Grid.SetRow(sidebarTabs, 2);
         leftColumn.Children.Add(animationTree);
-        leftColumn.Children.Add(inspector);
-        leftColumn.Children.Add(historyLabel);
-        leftColumn.Children.Add(historyList);
+        leftColumn.Children.Add(sidebarSplitter);
+        leftColumn.Children.Add(sidebarTabs);
 
         // Middle: wireframe (shape editing canvas). Right: preview (playback). Both are
         // independent TextureViewport-derived controls; neither depends on this layout shape --

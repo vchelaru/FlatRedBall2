@@ -26,8 +26,8 @@ exists and focus on *looking and feeling* like the desktop app.
 | Implementing a phase | The phase's GitHub issue body (if filed) **and** ship a `docs/BROWSER_*_DECISION.md` on merge |
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
-**Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8). Phases 9–15 issues are **not
-filed yet** — file
+**Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9). Phases 10–15
+issues are **not filed yet** — file
 each from its own worktree when that phase starts, per the convention below.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
@@ -210,12 +210,14 @@ scoped to data the browser build actually has (no fake dirty-tracking).
 
 ---
 
-### Phase 9 — Tabbed sidebar (Inspector/History) + sectioned Inspector
+### Phase 9 — Tabbed sidebar (Inspector/History) + sectioned Inspector ✅
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-sidebar-tabs`)* |
-| **Depends on** | Phase 8 (styled chrome for tab headers) |
+| **Issue** | #649 |
+| **Status** | **Done** — merged into `644-ae-web-icons` (same branch/PR as Phases 7-8) |
+| **Doc** | `BROWSER_SIDEBAR_TABS_DECISION.md` |
+| **Depends on** | Phase 8 ✅ (styled chrome for tab headers) |
 
 **Scope:** Replace the fixed tree+inspector `Grid` with desktop's shape: tree always visible (top)
 + `GridSplitter` + `TabControl` below with **Inspector** (default) and **History** tabs.

@@ -1,55 +1,111 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="AnimationEditor.Views.Controls.InspectorControl">
-    <StackPanel Margin="8" Spacing="4">
+    <!--
+        Phase 9 (#649): sectioned headers matching desktop MainWindow's inline inspector naming
+        (COORDINATES/TIMING/TRANSFORM/TEXTURE/COLOR), see docs/BROWSER_SIDEBAR_TABS_DECISION.md.
+        This control is NOT shared with desktop (MainWindow has its own separate, much richer
+        inline inspector directly in MainWindow.axaml; confirmed by grep, no source reference to
+        InspectorControl anywhere in AnimationEditor.App), so this is a visual-parity restyle of
+        the browser's own simpler control, matching desktop's section taxonomy rather than its
+        exact field set.
+    -->
+    <StackPanel Spacing="0">
         <TextBlock x:Name="NoSelectionPanel" x:FieldModifier="Public"
-                   Text="No selection." IsVisible="False" />
+                   Text="No selection." IsVisible="False"
+                   Foreground="{DynamicResource InkDim}"
+                   FontStyle="Italic" HorizontalAlignment="Center" Margin="0,12,0,0" />
 
-        <StackPanel x:Name="FramePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
-            <TextBlock Text="Frame" FontWeight="Bold" />
-            <TextBlock x:Name="FrameTextureText" x:FieldModifier="Public" />
-            <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" />
-            <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" />
-            <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" />
-            <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" />
-            <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
+        <StackPanel x:Name="FramePanel" x:FieldModifier="Public" IsVisible="False" Spacing="0">
+            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="CoordinatesHeader" x:FieldModifier="Public"
+                               Text="COORDINATES" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" />
+                </StackPanel>
+            </Border>
+            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="TimingHeader" x:FieldModifier="Public"
+                               Text="TIMING" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" />
+                </StackPanel>
+            </Border>
+            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="TransformHeader" x:FieldModifier="Public"
+                               Text="TRANSFORM" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" />
+                    <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" />
+                </StackPanel>
+            </Border>
+            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="TextureHeader" x:FieldModifier="Public"
+                               Text="TEXTURE" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBlock x:Name="FrameTextureText" x:FieldModifier="Public" />
+                </StackPanel>
+            </Border>
+            <Border Padding="12,8,12,10">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="ColorHeader" x:FieldModifier="Public"
+                               Text="COLOR" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Editable (#610 follow-up): committed on LostFocus/Enter via CommitRectProps, routed
              through AppCommands.SetRectProps, same commit-boundary pattern MainWindow uses
-             for its own PropRect* fields. -->
-        <StackPanel x:Name="RectPanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
-            <TextBlock Text="Rectangle" FontWeight="Bold" />
-            <TextBox x:Name="RectNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="X:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="RectXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
-                <TextBlock Text="Y:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="RectYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="Scale X:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="RectScaleXInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="Scale Y:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="RectScaleYInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
-            </StackPanel>
+             for its own PropRect* fields. One TRANSFORM section, matching desktop's flat
+             Name/X/Y/ScaleX/ScaleY field list (no further subdivision on desktop either). -->
+        <StackPanel x:Name="RectPanel" x:FieldModifier="Public" IsVisible="False" Spacing="0">
+            <Border Padding="12,8,12,10">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="TRANSFORM" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBox x:Name="RectNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="X:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="RectXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                        <TextBlock Text="Y:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="RectYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Scale X:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="RectScaleXInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Scale Y:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="RectScaleYInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
-        <StackPanel x:Name="CirclePanel" x:FieldModifier="Public" IsVisible="False" Spacing="2">
-            <TextBlock Text="Circle" FontWeight="Bold" />
-            <TextBox x:Name="CircleNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="X:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="CircleXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
-                <TextBlock Text="Y:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="CircleYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <TextBlock Text="Radius:" VerticalAlignment="Center" />
-                <NumericUpDown x:Name="CircleRadiusInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
-            </StackPanel>
+        <StackPanel x:Name="CirclePanel" x:FieldModifier="Public" IsVisible="False" Spacing="0">
+            <Border Padding="12,8,12,10">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="TRANSFORM" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkMid}" />
+                    <TextBox x:Name="CircleNameBox" x:FieldModifier="Public" PlaceholderText="Name" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="X:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="CircleXInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                        <TextBlock Text="Y:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="CircleYInput" x:FieldModifier="Public" Increment="1" FormatString="0.###" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Radius:" VerticalAlignment="Center" />
+                        <NumericUpDown x:Name="CircleRadiusInput" x:FieldModifier="Public" Increment="1" Minimum="0" FormatString="0.###" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </StackPanel>
 </UserControl>

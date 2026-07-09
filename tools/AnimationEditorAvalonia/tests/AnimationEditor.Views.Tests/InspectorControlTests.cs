@@ -133,6 +133,27 @@ public class InspectorControlTests
         Assert.Equal(12m, control.CircleRadiusInput.Value);
     }
 
+    // Phase 9 (#649): sectioned headers matching desktop's MainWindow inspector naming
+    // (COORDINATES/TIMING/TRANSFORM/TEXTURE/COLOR) -- InspectorControl itself isn't shared with
+    // desktop (MainWindow has its own separate, richer inline inspector; confirmed by grepping
+    // AnimationEditor.App for InspectorControl -- no source references, only compiled-binary
+    // matches), so this is a visual-parity restyle of the browser's simpler control, not a
+    // shared-file edit that could regress desktop.
+    [AvaloniaFact]
+    public void FrameSelected_ShowsSectionHeaders_MatchingDesktopNaming()
+    {
+        var (control, state) = Build();
+        var frame = new AnimationFrameSave { TextureName = "hero.png" };
+
+        state.SelectedFrame = frame;
+
+        Assert.Equal("COORDINATES", control.CoordinatesHeader.Text);
+        Assert.Equal("TIMING", control.TimingHeader.Text);
+        Assert.Equal("TRANSFORM", control.TransformHeader.Text);
+        Assert.Equal("TEXTURE", control.TextureHeader.Text);
+        Assert.Equal("COLOR", control.ColorHeader.Text);
+    }
+
     [AvaloniaFact]
     public void SelectionChangedDirectlyThroughSelectedState_UpdatesInspector_NotJustViaTreeClicks()
     {
