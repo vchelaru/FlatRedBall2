@@ -757,6 +757,10 @@ public class WireframeControl : TextureViewport
     /// clearly (matches the 85 % of <see cref="CanvasTransform.CenterFit"/>).</summary>
     private const float FrameFitFraction = 0.85f;
 
+    /// <summary>Max zoom for <see cref="FitChainToView"/> — matches <see cref="CanvasTransform.CenterFit"/>'s
+    /// cap so a chain made of tiny frames doesn't magnify into a blurry, unnaturally large zoom.</summary>
+    private const float ChainFitMaxZoom = 4f;
+
     /// <summary>
     /// Fits the currently selected frame into view via <see cref="FitFrameIfLargerThanViewport"/>.
     /// This is what <see cref="ApplicationEvents.FitFrameToViewRequested"/> triggers (posted at
@@ -836,6 +840,45 @@ public class WireframeControl : TextureViewport
         ClampCamera();
 
         InvalidateVisual();
+        RaiseViewChanged();
+    }
+
+    /// <summary>
+    /// Zoom-to-fits the union of every frame in <paramref name="chain"/> into view — computes the
+    /// smallest texture-space rectangle covering all of <see cref="AnimationChainSave.Frames"/> and
+    /// frames it via <see cref="CanvasTransform.FitRect"/>, the same math
+    /// <see cref="FitFrameIfLargerThanViewport"/> uses for a single frame. Unlike that method this
+    /// always applies the fit — there's no "only if it doesn't already fit" gate — since callers
+    /// (documentation screenshots) want a deterministic, chain-sized view rather than a pan/zoom
+    /// that only kicks in conditionally. Raises <see cref="TextureViewport.ZoomChanged"/> when the
+    /// zoom changes. No-op when no bitmap is loaded or the chain has no frames.
+    /// </summary>
+    public void FitChainToView(AnimationChainSave chain)
+    {
+        if (_bitmap is null || chain.Frames.Count == 0) return;
+        float vpW = (float)Bounds.Width;
+        float vpH = (float)Bounds.Height;
+        if (vpW <= 1 || vpH <= 1) return;
+
+        float bmpW = _bitmap.Width;
+        float bmpH = _bitmap.Height;
+
+        float unionL = float.MaxValue, unionT = float.MaxValue;
+        float unionR = float.MinValue, unionB = float.MinValue;
+        foreach (var frame in chain.Frames)
+        {
+            unionL = Math.Min(unionL, frame.LeftCoordinate   * bmpW);
+            unionT = Math.Min(unionT, frame.TopCoordinate    * bmpH);
+            unionR = Math.Max(unionR, frame.RightCoordinate  * bmpW);
+            unionB = Math.Max(unionB, frame.BottomCoordinate * bmpH);
+        }
+
+        CancelZoomAnimation();   // this fit overrides any in-flight wheel ease
+        (_panX, _panY, _zoom) = CanvasTransform.FitRect(
+            unionL, unionT, unionR, unionB, vpW, vpH, FrameFitFraction, ChainFitMaxZoom);
+        ClampCamera();
+        InvalidateVisual();
+        RaiseZoomChanged();
         RaiseViewChanged();
     }
 
