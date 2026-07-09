@@ -82,4 +82,37 @@ public class GumRootManagersTests
 
         control.EffectiveManagers.ShouldBe(managers);
     }
+
+    // Records what UiRoot.EffectiveManagers resolves to at CustomInitialize time — the moment
+    // game code parents its controls (and the moment Gum's FrameworkElement.Loaded can fire).
+    private sealed class ManagersProbeScreen : Screen
+    {
+        public ISystemManagers? UiRootManagersAtInit;
+        public override void CustomInitialize() =>
+            UiRootManagersAtInit = Cameras[0].UiRoot.EffectiveManagers;
+    }
+
+    [Fact]
+    public void EngineActivation_AttachesManagersToRoots_BeforeCustomInitialize()
+    {
+        // Regression guard for the ordering that makes FrameworkElement.Loaded fire: the engine must
+        // attach managers to the screen's roots BEFORE calling CustomInitialize, so controls parented
+        // there already have EffectiveManagers != null at parent-time. SystemManagers.Default is
+        // GraphicsDevice-bound (null in the headless host), so stand in a bare instance for the check.
+        var managers = new SystemManagers();
+        var previous = SystemManagers.Default;
+        SystemManagers.Default = managers;
+        try
+        {
+            var engine = new FlatRedBallService();
+            engine.Start<ManagersProbeScreen>();
+            var screen = (ManagersProbeScreen)engine.CurrentScreen;
+
+            screen.UiRootManagersAtInit.ShouldBe(managers);
+        }
+        finally
+        {
+            SystemManagers.Default = previous;
+        }
+    }
 }
