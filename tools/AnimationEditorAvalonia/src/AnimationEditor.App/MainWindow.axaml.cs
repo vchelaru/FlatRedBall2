@@ -264,7 +264,7 @@ public partial class MainWindow : Window
         TabStrip.Children.Clear();
 
         var tabs = _tabManager.Tabs;
-        TabBarBorder.IsVisible = tabs.Count > 1;
+        TabBarBorder.IsVisible = tabs.Count > 0;
 
         foreach (var tab in tabs)
         {
