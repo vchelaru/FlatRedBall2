@@ -27,8 +27,8 @@ exists and focus on *looking and feeling* like the desktop app.
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
 **Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9), #652 (Phase 10),
-#654 (Phase 11), #655 (Phase 12). Phases 13–15 issues are **not filed yet** — file
-each from its own worktree when that phase starts, per the convention below.
+#654 (Phase 11), #655 (Phase 12), #662 (Phase 13), #647 (Phase 14). Phase 15 issue is **not filed
+yet** — file from its own worktree when that phase starts, per the convention below.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
 `.claude/worktrees/<NNN-name>` branched from the previous phase's merged tip + a
@@ -327,12 +327,13 @@ handlers — Chrome-verified only, spot-check Firefox/Safari before calling it f
 
 ---
 
-### Phase 14 — Timeline/scrubber strip, full fidelity
+### Phase 14 — Timeline/scrubber strip, full fidelity ✅ (#647)
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-timeline)* |
+| **Issue** | #647 (stacked on same PR as Phases 7–13) |
 | **Depends on** | Phase 7 (icons), Phase 10 (soft — natural home is under a vertically-stacked preview panel) |
+| **Decision doc** | `BROWSER_TIMELINE_DECISION.md` |
 
 **Scope:** `TimelineBuilder`/`TimelineScrubMapper` (frame-width computation, scrub-position-to-frame
 hit-testing) are already portable and fully tested — build the real thing, not a simplified first
@@ -343,6 +344,9 @@ multi-chain `GroupTimelineTracks` view is a comparison workflow that may not be 
 browser-first session — defer unless it turns out cheap once the single-chain version exists.
 TDD-applicable (new Views control): test frame-count-matches-chain and
 scrub-position-selects-correct-frame before writing the control.
+
+**Shipped:** portable `TimelineStripControl` + browser transport row (Play/Pause, speed) in
+`previewBlock` below `PreviewControl`.
 
 ---
 

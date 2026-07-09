@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AnimationEditor.Core.ViewModels"
+             x:Class="AnimationEditor.Views.Controls.TimelineStripControl">
+    <!--
+        Phase 14: portable single-chain timeline/scrubber strip. Geometry from TimelineBuilder/
+        TimelineScrubMapper (Core, already tested); thumbnails from ThumbnailService. Desktop's
+        inline MainWindow.axaml ItemsControl template is lifted here so the browser build can
+        host it below PreviewControl without duplicating scrub math.
+    -->
+    <Grid RowDefinitions="14,*">
+        <Border Grid.Row="0"
+                Background="{DynamicResource BgRail}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,1,0,1">
+            <TextBlock x:Name="TimelineHeaderLabel" x:FieldModifier="Public"
+                       Text="TIMELINE"
+                       FontSize="9" FontWeight="SemiBold"
+                       Foreground="{DynamicResource InkDim}"
+                       VerticalAlignment="Center"
+                       Margin="6,0" />
+        </Border>
+        <Border x:Name="TimelineScrubSurface" x:FieldModifier="Public"
+                Grid.Row="1"
+                Background="{DynamicResource BgCanvas}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,0"
+                Cursor="Hand">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="TimelineStrip" x:FieldModifier="Public">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TimelineFrameVm">
+                            <Grid Width="{Binding Width}" Height="38">
+                                <Border BorderBrush="{DynamicResource LineBrush}"
+                                        BorderThickness="0,0,1,0"
+                                        Background="{DynamicResource BgPanel}">
+                                    <StackPanel VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                Spacing="2">
+                                        <Border Width="22" Height="18"
+                                                Background="{DynamicResource BgCanvas}"
+                                                BorderBrush="{DynamicResource LineStrong}"
+                                                BorderThickness="1"
+                                                CornerRadius="2">
+                                            <Image Source="{Binding Thumbnail}"
+                                                   Stretch="Uniform" />
+                                        </Border>
+                                        <TextBlock Text="{Binding IndexLabel}"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="9"
+                                                   Foreground="{DynamicResource InkDim}" />
+                                    </StackPanel>
+                                </Border>
+                                <Canvas ClipToBounds="True"
+                                        IsHitTestVisible="False"
+                                        IsVisible="{Binding IsCurrent}">
+                                    <Border Width="2"
+                                            Height="38"
+                                            Background="{DynamicResource Accent}"
+                                            Canvas.Left="{Binding ScrubberOffset}" />
+                                </Canvas>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

@@ -847,6 +847,196 @@ public partial class App : Application
         leftColumn.Children.Add(sidebarSplitter);
         leftColumn.Children.Add(sidebarTabs);
 
+        // Phase 14: portable timeline/scrubber strip + transport row below the preview canvas,
+        // matching desktop's PreviewBlockGrid row-2 layout (52px fixed). Geometry/thumbnails live
+        // in TimelineStripControl; this block is browser-only wiring glue.
+        var timelineStrip = new TimelineStripControl();
+        timelineStrip.InitializeServices(thumbnailService);
+
+        var playPauseIcon = Icon("IconPlay", 14);
+        var playPauseButton = new Button
+        {
+            Height = 26,
+            Width = 32,
+            VerticalAlignment = VerticalAlignment.Center,
+            Content = playPauseIcon,
+        };
+        void UpdatePlayPauseChrome(bool isPlaying)
+        {
+            playPauseIcon.Path = isPlaying
+                ? "avares://AnimationEditor.Views/Assets/icons/svg/IconPause.svg"
+                : "avares://AnimationEditor.Views/Assets/icons/svg/IconPlay.svg";
+            ToolTip.SetTip(playPauseButton, isPlaying ? "Pause" : "Play");
+        }
+        UpdatePlayPauseChrome(preview.Playback.IsPlaying);
+        playPauseButton.Click += (_, _) => preview.TogglePlayPause();
+        preview.IsPlayingChanged += UpdatePlayPauseChrome;
+
+        var speedInput = new TextBox
+        {
+            Text = "1.0",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Avalonia.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(4, 0),
+            FontSize = 11,
+            MinWidth = 0,
+            MinHeight = 0,
+            Height = 26,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        double GetSpeedFromInput() =>
+            double.TryParse(speedInput.Text, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out double v)
+                ? Math.Clamp(v, 0.1, 10.0)
+                : 1.0;
+        void ApplySpeedFromInput()
+        {
+            double s = GetSpeedFromInput();
+            speedInput.Text = s.ToString("0.0#");
+            preview.SpeedMultiplier = s;
+        }
+        speedInput.LostFocus += (_, _) => ApplySpeedFromInput();
+        var speedDownButton = new Button
+        {
+            Classes = { "flanker" },
+            Content = "−",
+            Width = 22,
+        };
+        speedDownButton.Bind(Button.BorderBrushProperty, speedDownButton.GetResourceObservable("LineBrush"));
+        speedDownButton.Click += (_, _) =>
+        {
+            double s = Math.Max(Math.Round(GetSpeedFromInput() - 0.1, 1), 0.1);
+            speedInput.Text = s.ToString("0.0#");
+            preview.SpeedMultiplier = s;
+        };
+        var speedUpButton = new Button
+        {
+            Classes = { "flanker" },
+            Content = "+",
+            Width = 22,
+        };
+        speedUpButton.Bind(Button.BorderBrushProperty, speedUpButton.GetResourceObservable("LineBrush"));
+        speedUpButton.Click += (_, _) =>
+        {
+            double s = Math.Min(Math.Round(GetSpeedFromInput() + 0.1, 1), 10.0);
+            speedInput.Text = s.ToString("0.0#");
+            preview.SpeedMultiplier = s;
+        };
+        var speedPill = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            ClipToBounds = true,
+            Height = 26,
+            Width = 92,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new DockPanel
+            {
+                Children =
+                {
+                    speedDownButton,
+                    speedUpButton,
+                    speedInput,
+                },
+            },
+        };
+        ToolTip.SetTip(speedPill, "Playback speed (1.0 = runtime speed)");
+        speedPill.Bind(Border.BorderBrushProperty, speedPill.GetResourceObservable("LineBrush"));
+        DockPanel.SetDock(speedDownButton, Dock.Left);
+        speedDownButton.BorderThickness = new Thickness(0, 0, 1, 0);
+        DockPanel.SetDock(speedUpButton, Dock.Right);
+        speedUpButton.BorderThickness = new Thickness(1, 0, 0, 0);
+
+        AnimationChainSave? GetTimelineChain()
+        {
+            var chain = selectedState.SelectedChain;
+            if (chain is null && selectedState.SelectedFrame is { } selectedFrame)
+                chain = objectFinder.GetAnimationChainContaining(selectedFrame);
+            return chain;
+        }
+
+        int GetPreferredTimelineFrameIndex(AnimationChainSave? chain)
+        {
+            if (chain is null || chain.Frames.Count == 0)
+                return -1;
+
+            if (selectedState.SelectedFrame is { } selectedFrame)
+            {
+                var selectedFrameChain = objectFinder.GetAnimationChainContaining(selectedFrame);
+                if (ReferenceEquals(selectedFrameChain, chain))
+                {
+                    int selectedFrameIndex = chain.Frames.IndexOf(selectedFrame);
+                    if (selectedFrameIndex >= 0)
+                        return selectedFrameIndex;
+                }
+            }
+
+            return preview.Playback.CurrentFrameIndex;
+        }
+
+        void RefreshTimelineStrip()
+        {
+            var chain = GetTimelineChain();
+            int preferred = GetPreferredTimelineFrameIndex(chain);
+            timelineStrip.SetChain(chain, preferred);
+            if (preferred >= 0)
+                timelineStrip.ApplyPlaybackPosition(preferred, preview.Playback.FrameElapsed);
+        }
+
+        timelineStrip.FrameScrubbed += (frameIndex, fraction) =>
+        {
+            preview.ScrubToFrame(frameIndex, fraction);
+            UpdatePlayPauseChrome(preview.Playback.IsPlaying);
+        };
+        selectedState.SelectionChanged += RefreshTimelineStrip;
+        applicationEvents.AnimationChainsChanged += RefreshTimelineStrip;
+        preview.Playback.FrameIndexChanged += index =>
+        {
+            if (selectedState.SelectedFrame is not null) return;
+            timelineStrip.SetChain(GetTimelineChain(), index);
+        };
+        preview.Playback.PlaybackTicked += () =>
+        {
+            if (selectedState.SelectedFrame is not null) return;
+            timelineStrip.ApplyPlaybackPosition(
+                preview.Playback.CurrentFrameIndex,
+                preview.Playback.FrameElapsed);
+        };
+
+        var transportColumn = new Border
+        {
+            BorderThickness = new Thickness(0, 1, 1, 0),
+            Padding = new Thickness(6, 0),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { playPauseButton, speedPill },
+            },
+        };
+        transportColumn.Bind(Border.BackgroundProperty, transportColumn.GetResourceObservable("BgRail"));
+        transportColumn.Bind(Border.BorderBrushProperty, transportColumn.GetResourceObservable("LineBrush"));
+
+        var timelineRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Grid.SetColumn(transportColumn, 0);
+        Grid.SetColumn(timelineStrip, 1);
+        timelineRow.Children.Add(transportColumn);
+        timelineRow.Children.Add(timelineStrip);
+
+        var previewBlock = new Grid
+        {
+            MinHeight = 80,
+            RowDefinitions = new RowDefinitions("*,52"),
+        };
+        Grid.SetRow(preview, 0);
+        Grid.SetRow(timelineRow, 1);
+        previewBlock.Children.Add(preview);
+        previewBlock.Children.Add(timelineRow);
+        RefreshTimelineStrip();
+
         // Phase 10 (#652): matches desktop's AchxEditorPane -- wireframe stacked over preview
         // (with a draggable row splitter), replacing the previous fixed side-by-side two-column
         // layout. Both are independent TextureViewport-derived controls; neither depends on this
@@ -865,10 +1055,10 @@ public partial class App : Application
         };
         Grid.SetRow(wireframe, 0);
         Grid.SetRow(canvasSplitter, 1);
-        Grid.SetRow(preview, 2);
+        Grid.SetRow(previewBlock, 2);
         canvasColumn.Children.Add(wireframe);
         canvasColumn.Children.Add(canvasSplitter);
-        canvasColumn.Children.Add(preview);
+        canvasColumn.Children.Add(previewBlock);
 
         var sidebarColumnSplitter = new GridSplitter
         {
