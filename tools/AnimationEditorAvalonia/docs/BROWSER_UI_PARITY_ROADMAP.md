@@ -27,7 +27,7 @@ exists and focus on *looking and feeling* like the desktop app.
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
 **Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9), #652 (Phase 10),
-#654 (Phase 11). Phases 12–15 issues are **not filed yet** — file
+#654 (Phase 11), #655 (Phase 12). Phases 13–15 issues are **not filed yet** — file
 each from its own worktree when that phase starts, per the convention below.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
@@ -270,12 +270,14 @@ but harmless to keep.
 
 ---
 
-### Phase 12 — Files panel (rebuild, not port; scoped to the active tab's referenced textures)
+### Phase 12 — Files panel (rebuild, not port; scoped to the active tab's referenced textures) ✅
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-files-panel`)* |
-| **Depends on** | Phase 9 (Files needs a tab slot to land in) |
+| **Issue** | #655 |
+| **Status** | **Done** — merged into `644-ae-web-icons` (same branch/PR as Phases 7-11) |
+| **Doc** | `BROWSER_FILES_PANEL_DECISION.md` |
+| **Depends on** | Phase 9 ✅ |
 
 **Scope:** `FilesPanelControl` needs a real `Window` and a real disk folder scan — neither survives
 the browser, so the port-vs-rebuild call goes to **rebuild** (same reasoning

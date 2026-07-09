@@ -187,6 +187,13 @@ public partial class App : Application
         animationTree.InitializeServices(selectedState, acls);
         animationTree.EnableRename(appCommands);
 
+        // Phase 12 (#655): declared here (rather than alongside the Files TabItem UI below) so
+        // CloseTab/SwitchToTab -- local functions defined earlier in this method that reference
+        // it -- see a definitely-assigned variable; C# local functions may capture a
+        // later-declared local, but only once it's assigned before any possible invocation.
+        var textureListPanel = new TextureListPanel();
+        textureListPanel.InitializeServices(acls, thumbnailService);
+
         // Selecting a chain with no frame pinned auto-plays it (PreviewControl.OnSelectionChanged).
         selectedState.SelectedChain = acls.AnimationChains[0];
 
@@ -496,6 +503,7 @@ public partial class App : Application
             }
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }
 
@@ -534,6 +542,7 @@ public partial class App : Application
             UpdateUndoRedoButtons();
 
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }
 
@@ -564,6 +573,9 @@ public partial class App : Application
         // animation count (Phase 8, #648) since that changes without a tab switch.
         applicationEvents.AnimationChainsChanged += animationTree.Refresh;
         applicationEvents.AnimationChainsChanged += RefreshHeaderAndStatusLeft;
+        // Phase 12 (#655): a new/deleted frame can add or remove a referenced texture without a
+        // tab switch (e.g. Add Frame on a chain that borrows a different texture).
+        applicationEvents.AnimationChainsChanged += () => textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
 
         addAnimationButton.Click += (_, _) =>
         {
@@ -757,8 +769,7 @@ public partial class App : Application
         };
 
         // Phase 9 (#649): matches desktop's sidebar shape -- ANIMATIONS tree always visible (top),
-        // GridSplitter, then a TabControl below with Inspector (default) and History tabs. Files
-        // tab is explicitly deferred to Phase 12 (needs a real folder scan; see the roadmap).
+        // GridSplitter, then a TabControl below with Inspector/History/Files tabs.
         // RowDefinitions "2*,4,3*" mirrors desktop's LeftPanelGrid proportions exactly.
         var inspectorTab = new TabItem
         {
@@ -776,24 +787,39 @@ public partial class App : Application
             VerticalContentAlignment = VerticalAlignment.Center,
             Content = new Border { Padding = new Thickness(4), Child = historyList },
         };
+        // Phase 12 (#655): "This File" scope only -- TextureListPanel.SetAnimationChainList is
+        // re-pushed at every point animationTree.InitializeServices already is (tab switch/close,
+        // Open Folder load, AnimationChainsChanged), since there's no single "the loaded file
+        // changed" event to subscribe to instead. See docs/BROWSER_FILES_PANEL_DECISION.md.
+        var filesTab = new TabItem
+        {
+            Header = "Files",
+            FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
+            Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = new Border { Padding = new Thickness(4), Child = textureListPanel },
+        };
         ((Border)inspectorTab.Content!).Bind(Border.BackgroundProperty, inspectorTab.GetResourceObservable("BgPanel"));
         ((Border)historyTab.Content!).Bind(Border.BackgroundProperty, historyTab.GetResourceObservable("BgPanel"));
+        ((Border)filesTab.Content!).Bind(Border.BackgroundProperty, filesTab.GetResourceObservable("BgPanel"));
 
         var sidebarTabs = new TabControl
         {
             Padding = new Thickness(0),
-            Items = { inspectorTab, historyTab },
+            Items = { inspectorTab, historyTab, filesTab },
         };
         sidebarTabs.Bind(TabControl.BackgroundProperty, sidebarTabs.GetResourceObservable("BgRail"));
 
         // Mirrors desktop's TabItem/TabItem:selected style pair (InkMid unselected, Ink selected)
-        // -- only two fixed tabs here, so plain instance-level rebinding is simpler than a Style.
+        // -- only three fixed tabs here, so plain instance-level rebinding is simpler than a Style.
         void UpdateSidebarTabForegrounds()
         {
             inspectorTab.Bind(TabItem.ForegroundProperty,
                 inspectorTab.GetResourceObservable(sidebarTabs.SelectedItem == inspectorTab ? "Ink" : "InkMid"));
             historyTab.Bind(TabItem.ForegroundProperty,
                 historyTab.GetResourceObservable(sidebarTabs.SelectedItem == historyTab ? "Ink" : "InkMid"));
+            filesTab.Bind(TabItem.ForegroundProperty,
+                filesTab.GetResourceObservable(sidebarTabs.SelectedItem == filesTab ? "Ink" : "InkMid"));
         }
         sidebarTabs.SelectionChanged += (_, _) => UpdateSidebarTabForegrounds();
         UpdateSidebarTabForegrounds();
@@ -919,6 +945,7 @@ public partial class App : Application
             if (loaded)
             {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
                 OpenNewTabForLoadedProject(projectManager.FileName ?? "Untitled");
             }
         });
@@ -949,6 +976,7 @@ public partial class App : Application
             if (loaded)
             {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
                 OpenNewTabForLoadedProject(projectManager.FileName ?? folder.Name);
             }
 
