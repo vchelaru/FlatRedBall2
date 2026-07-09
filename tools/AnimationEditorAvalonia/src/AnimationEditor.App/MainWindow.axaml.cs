@@ -1795,6 +1795,16 @@ public partial class MainWindow : Window
         HistoryUndoButton.Click += (_, _) => _undoManager.Undo();
         HistoryRedoButton.Click += (_, _) => _undoManager.Redo();
         MenuShowHistory.Click   += (_, _) => SelectHistoryTab();
+        var shortcutsTabToggle = new Helpers.ToggleableSidebarTab(SidebarTabs, ShortcutsTab, InspectorTab, MenuShowShortcuts);
+        ShortcutsTabCloseButton.Click += (_, _) => shortcutsTabToggle.Hide();
+        ShortcutsTabHeader.PointerReleased += (_, args) =>
+        {
+            if (args.GetCurrentPoint(ShortcutsTabHeader).Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonReleased)
+            {
+                shortcutsTabToggle.Hide();
+                args.Handled = true;
+            }
+        };
 
         MenuWireframeZoomIn.Click  += (_, _) => WireframeZoom.StepUp();
         MenuWireframeZoomOut.Click += (_, _) => WireframeZoom.StepDown();
@@ -5293,10 +5303,29 @@ public partial class MainWindow : Window
     private void SetMenuGesture(MenuItem item, string hotkeyId) =>
         item.InputGesture = KeyGesture.Parse(_hotkeys.First(h => h.Id == hotkeyId).DisplayText);
 
+    // Sourced from the same registry the KeyDown dispatch and menu gesture text use (#632), so
+    // this list can never drift from what a keypress actually does (#634).
+    private void RefreshShortcutsPanel()
+    {
+        ShortcutsList.ItemsSource = _hotkeys
+            .GroupBy(h => h.Category)
+            .Select(g => new Models.HotkeyCategoryVm(
+                g.Key,
+                g.Select(h => new Models.HotkeyEntryVm(h.Description, FormatGestureForDisplay(h))).ToList()))
+            .ToList();
+    }
+
+    // HotkeyDefinition.DisplayText must keep Avalonia's Key enum names verbatim (e.g. "OemPlus")
+    // since SetMenuGesture feeds it to KeyGesture.Parse, which only recognizes real Key names.
+    // This panel has no such constraint, so swap in words a user would actually recognize.
+    private static string FormatGestureForDisplay(HotkeyDefinition hotkey) =>
+        hotkey.DisplayText.Replace("OemPlus", "Plus").Replace("OemMinus", "Minus");
+
     private void WireKeyboard()
     {
         _hotkeys = BuildHotkeyDefinitions();
         ApplyHotkeyMenuGestureText();
+        RefreshShortcutsPanel();
 
         // Use Tunnel routing so we intercept keys before child controls (e.g. the TreeView,
         // which handles Up/Down for navigation and would mark the event Handled before the
