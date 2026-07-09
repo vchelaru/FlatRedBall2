@@ -1,0 +1,70 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia">
+    <!-- Phase 7 (#644): icon-dependent resources shared by AnimationEditor.App and
+         AnimationEditor.Browser. SVG assets live under AnimationEditor.Views/Assets/icons/svg/;
+         see docs/BROWSER_ICON_SYSTEM_DECISION.md. -->
+
+    <!-- Compact stacked chevron spinner — replaces Fluent default for all ButtonSpinner/NumericUpDown.
+         Safe because every NumericUpDown except PropFrameLen has ShowButtonSpinner="False". -->
+    <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
+        <Setter Property="Foreground"   Value="{DynamicResource TextControlForeground}" />
+        <Setter Property="Background"   Value="{DynamicResource TextControlBackground}" />
+        <Setter Property="BorderBrush"  Value="{DynamicResource TextControlBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="MinHeight"    Value="0" />
+        <Setter Property="Padding"      Value="8,0,4,0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment"   Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="ButtonSpinner">
+                <DataValidationErrors>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <DockPanel>
+                            <StackPanel Name="PART_SpinnerPanel"
+                                        DockPanel.Dock="Right"
+                                        Orientation="Vertical"
+                                        Width="18"
+                                        VerticalAlignment="Center"
+                                        Spacing="1"
+                                        IsVisible="{TemplateBinding ShowButtonSpinner}">
+                                <RepeatButton Name="PART_IncreaseButton"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              MinWidth="0" MinHeight="0" Padding="2">
+                                    <svg:Svg Width="7" Height="7"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChevronUp.svg"
+                                             CurrentColor="{DynamicResource IconInkMuted}" />
+                                </RepeatButton>
+                                <RepeatButton Name="PART_DecreaseButton"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              MinWidth="0" MinHeight="0" Padding="2">
+                                    <svg:Svg Width="7" Height="7"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChevronDown.svg"
+                                             CurrentColor="{DynamicResource IconInkMuted}" />
+                                </RepeatButton>
+                            </StackPanel>
+                            <ContentPresenter Name="PART_ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Padding="{TemplateBinding Padding}" />
+                        </DockPanel>
+                    </Border>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+</ResourceDictionary>

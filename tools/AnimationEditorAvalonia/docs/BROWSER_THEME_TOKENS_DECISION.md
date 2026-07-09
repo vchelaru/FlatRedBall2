@@ -6,7 +6,8 @@ worked, and what actually does.
 
 ## Problem
 
-This is Phase 6 of the UI/UX design-parity roadmap (Phases 6-15, see the plan). Every phase 1-5
+This is Phase 6 of the UI/UX design-parity roadmap (Phases 6-15, see
+`docs/BROWSER_UI_PARITY_ROADMAP.md`). Every phase 1-5
 built the browser's UI in raw C# (`AnimationEditor.Browser/App.axaml.cs`) using plain, unstyled
 Avalonia controls — `AnimationEditor.Browser/App.axaml` had no theme dictionary at all, just
 `<FluentTheme/>`. Desktop's actual look (dark/light brand colors, consistent spacing/pill styling)

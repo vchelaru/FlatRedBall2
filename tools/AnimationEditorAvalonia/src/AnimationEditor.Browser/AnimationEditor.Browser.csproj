@@ -11,6 +11,19 @@
     <OutputType>Exe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
+    <!--
+      Phase 7 (#644) discovery: `dotnet publish -c Release` for this project was already broken
+      on main before any icon work, confirmed by reverting these changes and re-publishing,
+      which fails identically. AnimationEditor.Core.IO.XmlFile.Deserialize (XmlSerializer) and
+      AnimationTreeControl.axaml's ReflectionBinding both trigger IL2026 trim-analysis errors
+      that promote to a fatal NETSDK1144, unrelated to anything Phase 7 touches. Both are
+      known-safe: every serialized/bound type here is referenced directly by name elsewhere in
+      the same assembly, never discovered purely through reflection, so trimming can't remove
+      members either path needs. Suppressed narrowly (IL2026 only) rather than disabling
+      PublishTrimmed, to keep the bundle-size discipline M4 established. See
+      docs/BROWSER_ICON_SYSTEM_DECISION.md.
+    -->
+    <NoWarn>$(NoWarn);IL2026</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,11 +31,23 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.1" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.1" />
     <PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+    <!-- Phase 7 (#644) spike: confirm Svg.Controls.Skia.Avalonia's SVG rendering survives a
+         net10.0-browser WASM publish before committing to the full icon rollout. See
+         docs/BROWSER_ICON_SYSTEM_DECISION.md. -->
+    <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.7" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AnimationEditor.Core\AnimationEditor.Core.csproj" />
     <ProjectReference Include="..\AnimationEditor.Views\AnimationEditor.Views.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Svg.Controls.Skia.Avalonia ships without trim annotations, which trips IL2104 ("assembly
+         produced trim warnings") under this project's full-program trim mode. Root it (exclude
+         from trimming, keep it whole) instead of suppressing IL2104 project-wide, since a blanket
+         suppression would silently hide a real regression from some future third-party package. -->
+    <TrimmerRootAssembly Include="Svg.Controls.Skia.Avalonia" />
   </ItemGroup>
 
 </Project>

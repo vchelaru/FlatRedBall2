@@ -88,11 +88,11 @@
                                    PointerPressed="OnFolderExpanderPressed">
                                 <svg:Svg IsVisible="{Binding IsFolderOpen}"
                                          Width="16" Height="16"
-                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFolderOpen.svg"
+                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolderOpen.svg"
                                          CurrentColor="{DynamicResource IconInkDim}" />
                                 <svg:Svg IsVisible="{Binding IsFolderClosed}"
                                          Width="16" Height="16"
-                                         Path="avares://AnimationEditor/Assets/icons/svg/IconFolder.svg"
+                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolder.svg"
                                          CurrentColor="{DynamicResource IconInkDim}" />
                             </Panel>
                             <Image IsVisible="{Binding IsFile}"

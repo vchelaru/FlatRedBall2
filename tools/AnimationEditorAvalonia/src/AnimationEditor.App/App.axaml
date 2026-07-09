@@ -1,6 +1,5 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.App.App"
              RequestedThemeVariant="Dark">
              <!-- "Dark" is only the bootstrap default for the first paint; MainWindow applies the
@@ -8,80 +7,11 @@
 
     <Application.Resources>
         <ResourceDictionary>
-            <!-- Design tokens (Dark/Light brushes/colors) moved to AnimationEditor.Views/Theming/
-                 ThemeTokens.axaml (#630) so AnimationEditor.Browser can share the exact same
-                 DynamicResource keys. This is a MergedDictionaries include, not nested inside
-                 ThemeDictionaries directly: ThemeTokens.axaml is itself a whole ResourceDictionary
-                 with its own ThemeDictionaries, and Avalonia's resource lookup already walks each
-                 merged dictionary's ThemeDictionaries recursively, so merging it here is sufficient
-                 for DynamicResource lookups here to follow the active ThemeVariant. -->
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://AnimationEditor.Views/Theming/ThemeTokens.axaml" />
+                <!-- Phase 7 (#644): ButtonSpinner ControlTheme with shared SVG chevrons. -->
+                <ResourceInclude Source="avares://AnimationEditor.Views/Theming/ThemeIconResources.axaml" />
             </ResourceDictionary.MergedDictionaries>
-
-            <!-- Compact stacked chevron spinner — replaces Fluent default for all ButtonSpinner/NumericUpDown.
-                 Safe because every NumericUpDown except PropFrameLen has ShowButtonSpinner="False". -->
-            <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
-                <Setter Property="Foreground"   Value="{DynamicResource TextControlForeground}" />
-                <Setter Property="Background"   Value="{DynamicResource TextControlBackground}" />
-                <Setter Property="BorderBrush"  Value="{DynamicResource TextControlBorderBrush}" />
-                <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
-                <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
-                <Setter Property="MinHeight"    Value="0" />
-                <Setter Property="Padding"      Value="8,0,4,0" />
-                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="VerticalContentAlignment"   Value="Center" />
-                <Setter Property="Template">
-                    <ControlTemplate TargetType="ButtonSpinner">
-                        <DataValidationErrors>
-                            <Border Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="{TemplateBinding CornerRadius}">
-                                <DockPanel>
-                                    <!-- Compact stacked ▲/▼ chevron panel on the right -->
-                                    <StackPanel Name="PART_SpinnerPanel"
-                                                DockPanel.Dock="Right"
-                                                Orientation="Vertical"
-                                                Width="18"
-                                                VerticalAlignment="Center"
-                                                Spacing="1"
-                                                IsVisible="{TemplateBinding ShowButtonSpinner}">
-                                        <RepeatButton Name="PART_IncreaseButton"
-                                                      HorizontalAlignment="Stretch"
-                                                      HorizontalContentAlignment="Center"
-                                                      VerticalContentAlignment="Center"
-                                                      Background="Transparent"
-                                                      BorderThickness="0"
-                                                      MinWidth="0" MinHeight="0" Padding="2">
-                                            <svg:Svg Width="7" Height="7"
-                                                     Path="avares://AnimationEditor/Assets/icons/svg/IconChevronUp.svg"
-                                                     CurrentColor="{DynamicResource IconInkMuted}" />
-                                        </RepeatButton>
-                                        <RepeatButton Name="PART_DecreaseButton"
-                                                      HorizontalAlignment="Stretch"
-                                                      HorizontalContentAlignment="Center"
-                                                      VerticalContentAlignment="Center"
-                                                      Background="Transparent"
-                                                      BorderThickness="0"
-                                                      MinWidth="0" MinHeight="0" Padding="2">
-                                            <svg:Svg Width="7" Height="7"
-                                                     Path="avares://AnimationEditor/Assets/icons/svg/IconChevronDown.svg"
-                                                     CurrentColor="{DynamicResource IconInkMuted}" />
-                                        </RepeatButton>
-                                    </StackPanel>
-                                    <ContentPresenter Name="PART_ContentPresenter"
-                                                      Content="{TemplateBinding Content}"
-                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                      Padding="{TemplateBinding Padding}" />
-                                </DockPanel>
-                            </Border>
-                        </DataValidationErrors>
-                    </ControlTemplate>
-                </Setter>
-            </ControlTheme>
         </ResourceDictionary>
     </Application.Resources>
 
@@ -91,29 +21,6 @@
              in a separate theme dictionary; without this include the controls have no template
              and render at zero size. Must match the FluentTheme above. -->
         <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
-        <!-- Shared style classes (.compact, .flanker, NumericUpDown/ButtonSpinner defaults,
-             disabled opacity) moved to AnimationEditor.Views/Theming/ThemeStyles.axaml (#630) so
-             AnimationEditor.Browser can share them too. .plus/.minus stay here; icon-dependent,
-             see Phase 7. -->
         <StyleInclude Source="avares://AnimationEditor.Views/Theming/ThemeStyles.axaml" />
-        <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
-        <Style Selector="Button.plus">
-            <Setter Property="ContentTemplate">
-                <DataTemplate>
-                    <svg:Svg Width="10" Height="10"
-                             Path="avares://AnimationEditor/Assets/icons/svg/IconPlus.svg"
-                             CurrentColor="{DynamicResource IconInk}" />
-                </DataTemplate>
-            </Setter>
-        </Style>
-        <Style Selector="Button.minus">
-            <Setter Property="ContentTemplate">
-                <DataTemplate>
-                    <svg:Svg Width="10" Height="10"
-                             Path="avares://AnimationEditor/Assets/icons/svg/IconMinus.svg"
-                             CurrentColor="{DynamicResource IconInk}" />
-                </DataTemplate>
-            </Setter>
-        </Style>
     </Application.Styles>
 </Application>

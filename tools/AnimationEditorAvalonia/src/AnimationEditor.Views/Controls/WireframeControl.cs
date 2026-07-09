@@ -227,6 +227,13 @@ public class WireframeControl : TextureViewport
     private SKPoint _dragStartWorld;
     private SKRect _dragStartBounds;
 
+    /// <summary>
+    /// True while a handle or chain drag is in progress. Exposed for tests and for
+    /// <see cref="OnPointerCaptureLost"/> cleanup — browser hosts often fire capture-lost
+    /// without a matching <c>PointerReleased</c>, which would otherwise leave the drag stuck.
+    /// </summary>
+    public bool IsDragging => _draggingRect is not null || _draggingChain;
+
     // Chain-drag state: set when the user drags the composite chain bounding rect
     private bool _draggingChain;
     private readonly List<(FrameRect Rect, SKRect StartBounds, float BL, float BT, float BR, float BB)> _chainDragStarts = new();
@@ -1101,6 +1108,32 @@ public class WireframeControl : TextureViewport
     /// <inheritdoc />
     protected override void OnEditPointerReleased(PointerReleasedEventArgs e)
     {
+        if (IsDragging)
+        {
+            CommitActiveDrag();
+            e.Pointer.Capture(null);
+        }
+    }
+
+    /// <summary>
+    /// Browser hosts (and any control that steals capture mid-drag) fire this without a
+    /// matching <c>PointerReleased</c>. Ending the drag here prevents the stuck-follow-cursor
+    /// bug where the chain/handle keeps tracking until a second click.
+    /// </summary>
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        if (IsDragging)
+            CommitActiveDrag();
+    }
+
+    /// <summary>
+    /// Commits the in-progress handle or chain drag (undo + region-changed events) and clears
+    /// drag state. Shared by <see cref="OnEditPointerReleased"/> and
+    /// <see cref="OnPointerCaptureLost"/> so both paths leave the control idle.
+    /// </summary>
+    private void CommitActiveDrag()
+    {
         if (_draggingRect != null)
         {
             if (_bulkHandleDragStarts.Count > 0)
@@ -1141,7 +1174,6 @@ public class WireframeControl : TextureViewport
             _draggingRect = null;
             _draggingHandle = HandleKind.None;
             StopAutoPanTimer();
-            e.Pointer.Capture(null);
         }
 
         if (_draggingChain)
@@ -1166,7 +1198,6 @@ public class WireframeControl : TextureViewport
             _draggingChain = false;
             _chainDragStarts.Clear();
             StopAutoPanTimer();
-            e.Pointer.Capture(null);
         }
     }
 

@@ -88,6 +88,24 @@ public partial class AnimationTreeControl : UserControl
         vm.BeginEdit();
     }
 
+    private void OnAddFrameBtnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        _appCommands?.AddFrame(chain);
+        e.Handled = true;
+    }
+
+    private void OnAddFrameBtnDoubleTapped(object? sender, TappedEventArgs e) => e.Handled = true;
+
+    /// <summary>Test seam for the inline add-frame button without simulating hover/pointer.</summary>
+    internal void RaiseAddFrameForTest(TreeNodeVm chainNode)
+    {
+        if (chainNode.Data is not AnimationChainSave chain) return;
+        _appCommands?.AddFrame(chain);
+    }
+
     private void OnRenameKeyDown(object? sender, KeyEventArgs e)
     {
         if (sender is not TextBox tb) return;
