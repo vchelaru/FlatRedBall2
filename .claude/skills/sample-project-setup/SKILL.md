@@ -17,11 +17,11 @@ How to create a new sample project (`.csproj`) under `samples/`. Follow this che
 
 ### 1. Create the directory and `.csproj`
 
-Copy the structure from an existing sample (e.g., `PlatformerSample`). The minimal `.csproj`:
+Copy the structure from an existing sample (e.g., `AnimationChainSample`). The minimal `.csproj`:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="..\..\..\src\PrecompiledShaders\AposShapesPrecompiled.props" />
+  <Import Project="..\..\src\PrecompiledShaders\AposShapesPrecompiled.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -63,7 +63,7 @@ Without this file, the first build fails with **"Cannot find a manifest file"** 
 
 Copy from any existing sample:
 ```
-samples/PlatformerSample/.config/dotnet-tools.json  →  samples/YourSample/.config/dotnet-tools.json
+samples/AnimationChainSample/.config/dotnet-tools.json  →  samples/YourSample/.config/dotnet-tools.json
 ```
 
 Content (do not modify versions):
