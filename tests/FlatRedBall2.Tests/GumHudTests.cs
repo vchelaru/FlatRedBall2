@@ -1,3 +1,4 @@
+using System.Linq;
 using FlatRedBall2.Rendering;
 using Gum.Wireframe;
 using Gum.GueDeriving;
@@ -73,6 +74,43 @@ public class GumHudTests
         var renderable = screen.GumRenderables[0];
         // Overlay renderables are drawn in a post-camera pass, never inside the per-camera loop.
         renderable.ShouldDrawForCamera(screen.Cameras[0]).ShouldBeFalse();
+    }
+
+    // AddOverlayRoot wires up Gum Forms' global PopupRoot/ModalRoot (ComboBox dropdowns, MenuItem
+    // submenus, ListBox popups) so they actually draw — see issue #656. Unlike AddOverlay, the
+    // passed-in root must NOT be reparented under Screen.OverlayRoot: PopupRoot/ModalRoot are
+    // independent top-level Gum roots that Gum's own Forms code expects to remain unparented.
+
+    [Fact]
+    public void AddOverlayRoot_RootRegisteredAsOverlay_NotParentedUnderOverlayRoot()
+    {
+        var screen = new TestScreen();
+        var popupRoot = new ContainerRuntime();
+
+        screen.AddOverlayRoot(popupRoot);
+
+        screen.GumRenderables.ShouldContain(r => r.Visual == popupRoot);
+        screen.OverlayRoot.Children.ShouldNotContain(popupRoot);
+        var renderable = screen.GumRenderables.First(r => r.Visual == popupRoot);
+        renderable.ShouldDrawForCamera(screen.Cameras[0]).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AddOverlayRoot_CalledAfterAddOverlay_DrawnAfterEarlierOverlayVisual()
+    {
+        // Draw order follows GumRenderables insertion order (see Screen.DrawOverlay) — popups
+        // must be wired in after a screen's own overlay visuals so they render on top.
+        var screen = new TestScreen();
+        var overlayVisual = new ContainerRuntime();
+        var popupRoot = new ContainerRuntime();
+        screen.AddOverlay(overlayVisual);
+
+        screen.AddOverlayRoot(popupRoot);
+
+        var renderables = screen.GumRenderables.ToList();
+        var overlayIndex = renderables.FindIndex(r => r.Visual == overlayVisual);
+        var popupIndex = renderables.FindIndex(r => r.Visual == popupRoot);
+        popupIndex.ShouldBeGreaterThan(overlayIndex);
     }
 
     // Engine-created Gum roots (Camera.UiRoot, Screen.OverlayRoot) are full-canvas-sized
