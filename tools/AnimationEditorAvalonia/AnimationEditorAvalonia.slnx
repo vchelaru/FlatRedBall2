@@ -11,6 +11,7 @@
     <Project Path="tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj" />
     <Project Path="tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj" />
     <Project Path="tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj" />
+    <Project Path="tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj" />
   </Folder>
   <Project Path="src/AnimationEditor.App/AnimationEditor.App.csproj" />
 </Solution>

@@ -63,6 +63,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="AnimationEditor.App.Tests" />
+    <InternalsVisibleTo Include="AnimationEditor.DocScreenshots" />
   </ItemGroup>
 
   <!--
