@@ -490,6 +490,12 @@ public class FlatRedBallService
         // This covers controls added via AddToRoot() as well as screen-specific GumRenderables,
         // which are abandoned with the old Screen object.
         _gum.Root.Children.Clear();
+        // PopupRoot/ModalRoot (ComboBox dropdowns, MenuItem submenus, ListBox popups) are global
+        // Gum Forms roots, not owned by any Screen — clear them too so a popup left open when the
+        // screen changed doesn't bleed into the new screen. Null before FormsUtilities.Initialize
+        // has run (see the _game != null wiring below).
+        _gum.PopupRoot?.Children.Clear();
+        _gum.ModalRoot?.Children.Clear();
 
         // Apply the screen's preferred display settings. Camera properties always apply;
         // window properties (size, resizing) only apply on Start to avoid mid-game window pops.
@@ -518,6 +524,16 @@ public class FlatRedBallService
         CurrentScreen = screen;
         screen.CustomInitialize();
         screen.InvokeInitialized();
+
+        if (_game != null)
+        {
+            // Wired in last so PopupRoot/ModalRoot draw on top of any overlay visuals
+            // CustomInitialize just added — draw order follows GumRenderables insertion order
+            // (see Screen.DrawOverlay). ModalRoot is added after PopupRoot so a modal blocks
+            // (draws over) an open popup, matching Gum's own "modal is always topmost" intent.
+            screen.AddOverlayRoot(_gum.PopupRoot!);
+            screen.AddOverlayRoot(_gum.ModalRoot!);
+        }
 
         // Snap every CameraControllingEntity to its target now that CustomInitialize has
         // wired up Targets. Without this, frame 1's lazy-spawn tick runs against the camera's
@@ -1076,6 +1092,15 @@ public class FlatRedBallService
             // in canvas pixels are not clipped/culled by the parent's bounds.
             CurrentScreen.EntityVisualsRoot.Width  = pp.BackBufferWidth;
             CurrentScreen.EntityVisualsRoot.Height = pp.BackBufferHeight;
+            // PopupRoot/ModalRoot are also sized here rather than left to Gum's own
+            // FormsUtilities.Update (which sizes them from the GraphicalUiElement.CanvasWidth/
+            // Height global): FRB2 never updates that global on resize under its own camera
+            // pipeline (see the _gum.CanvasWidth/Height comment above), so relying on it would
+            // leave popups stale-sized after a window resize.
+            _gum.PopupRoot.Width  = pp.BackBufferWidth;
+            _gum.PopupRoot.Height = pp.BackBufferHeight;
+            _gum.ModalRoot.Width  = pp.BackBufferWidth;
+            _gum.ModalRoot.Height = pp.BackBufferHeight;
             CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, _overlayCamera);
         }
 

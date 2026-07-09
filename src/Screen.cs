@@ -307,6 +307,21 @@ public class Screen : ILifecycleEvents
     /// <summary>Removes a Forms control previously added with <see cref="AddOverlay(FrameworkElement, Layer?)"/>.</summary>
     public void RemoveOverlay(FrameworkElement element) => RemoveOverlay(element.Visual);
 
+    /// <summary>
+    /// Registers an existing Gum root as a screen-level overlay without reparenting it. Unlike
+    /// <see cref="AddOverlay(GraphicalUiElement, Layer?)"/> (which parents a leaf visual under
+    /// <see cref="OverlayRoot"/>), <paramref name="root"/> is drawn as-is — used for Gum Forms'
+    /// global <c>PopupRoot</c>/<c>ModalRoot</c>, which must stay unparented for Gum's own Forms
+    /// code to treat them as top-level roots.
+    /// </summary>
+    internal void AddOverlayRoot(GraphicalUiElement root, Layer? layer = null)
+    {
+        var renderable = new GumRenderable(root) { Layer = layer ?? Layer, IsOverlay = true };
+        _gumRenderables.Add(renderable);
+        _gumByVisual[root] = renderable;
+        _renderList.Add(renderable);
+    }
+
     // ---------- Entity-attached visuals ----------
 
     private GraphicalUiElement? _entityVisualsRoot;
