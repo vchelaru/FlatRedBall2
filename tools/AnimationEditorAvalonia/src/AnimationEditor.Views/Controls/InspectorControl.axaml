@@ -18,28 +18,85 @@
 
         <StackPanel x:Name="FramePanel" x:FieldModifier="Public" IsVisible="False" Spacing="0">
             <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
-                <StackPanel Spacing="4">
+                <StackPanel Spacing="8">
                     <TextBlock x:Name="CoordinatesHeader" x:FieldModifier="Public"
                                Text="COORDINATES" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource InkMid}" />
-                    <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" />
+                    <!-- Kept for existing tests that assert on the summary string. -->
+                    <TextBlock x:Name="FrameCoordinatesText" x:FieldModifier="Public" IsVisible="False" />
+                    <WrapPanel>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="X" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FramePixelXInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="-16384" Maximum="16384" Increment="1" />
+                        </Grid>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="Y" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FramePixelYInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="-16384" Maximum="16384" Increment="1" />
+                        </Grid>
+                    </WrapPanel>
+                    <WrapPanel>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="W" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FramePixelWInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="1" Maximum="16384" Increment="1" />
+                        </Grid>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="H" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FramePixelHInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="1" Maximum="16384" Increment="1" />
+                        </Grid>
+                    </WrapPanel>
                 </StackPanel>
             </Border>
             <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
-                <StackPanel Spacing="4">
+                <StackPanel Spacing="8">
                     <TextBlock x:Name="TimingHeader" x:FieldModifier="Public"
                                Text="TIMING" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource InkMid}" />
-                    <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" />
+                    <TextBlock x:Name="FrameLengthText" x:FieldModifier="Public" IsVisible="False" />
+                    <Grid ColumnDefinitions="Auto,*" MinWidth="120">
+                        <TextBlock Text="Length (s)" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   Foreground="{DynamicResource InkMid}" FontSize="11" />
+                        <NumericUpDown x:Name="FrameLengthInput" x:FieldModifier="Public" Grid.Column="1"
+                                       Minimum="0.001" Maximum="60" Increment="0.01" FormatString="0.###" />
+                    </Grid>
                 </StackPanel>
             </Border>
             <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
-                <StackPanel Spacing="4">
+                <StackPanel Spacing="8">
                     <TextBlock x:Name="TransformHeader" x:FieldModifier="Public"
                                Text="TRANSFORM" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource InkMid}" />
-                    <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" />
-                    <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" />
+                    <TextBlock x:Name="FrameOffsetText" x:FieldModifier="Public" IsVisible="False" />
+                    <TextBlock x:Name="FrameFlipText" x:FieldModifier="Public" IsVisible="False" />
+                    <WrapPanel>
+                        <Grid ColumnDefinitions="Auto,*" MinWidth="100" Margin="0,0,8,4">
+                            <TextBlock Text="Rel X" VerticalAlignment="Center" Margin="0,0,6,0"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
+                            <NumericUpDown x:Name="FrameRelXInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Increment="1" FormatString="0.###" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*" MinWidth="100" Margin="0,0,8,4">
+                            <TextBlock Text="Rel Y" VerticalAlignment="Center" Margin="0,0,6,0"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" />
+                            <NumericUpDown x:Name="FrameRelYInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Increment="1" FormatString="0.###" />
+                        </Grid>
+                    </WrapPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <ToggleButton x:Name="FrameFlipHToggle" x:FieldModifier="Public"
+                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip H" />
+                        <ToggleButton x:Name="FrameFlipVToggle" x:FieldModifier="Public"
+                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip V" />
+                        <ToggleButton x:Name="FrameFlipDToggle" x:FieldModifier="Public"
+                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip D" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
             <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="12,8,12,10">
@@ -51,11 +108,48 @@
                 </StackPanel>
             </Border>
             <Border Padding="12,8,12,10">
-                <StackPanel Spacing="4">
+                <StackPanel Spacing="8">
                     <TextBlock x:Name="ColorHeader" x:FieldModifier="Public"
                                Text="COLOR" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource InkMid}" />
-                    <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" />
+                    <!-- Kept for existing tests that assert on the summary string. -->
+                    <TextBlock x:Name="FrameColorText" x:FieldModifier="Public" IsVisible="False" />
+                    <Grid ColumnDefinitions="44,*">
+                        <TextBlock Text="Mode" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource InkMid}" FontSize="11" />
+                        <ComboBox x:Name="FrameColorModeCombo" x:FieldModifier="Public" Grid.Column="1"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBoxItem>None</ComboBoxItem>
+                            <ComboBoxItem>Multiply</ComboBoxItem>
+                            <ComboBoxItem>Add</ComboBoxItem>
+                        </ComboBox>
+                    </Grid>
+                    <WrapPanel>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="R" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Accent}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FrameRedInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="G" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Ok}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FrameGreenInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="B" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentCool}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FrameBlueInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="14,*" MinWidth="86" Margin="0,0,8,4">
+                            <TextBlock Text="A" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource InkMid}" FontSize="11" FontWeight="SemiBold" />
+                            <NumericUpDown x:Name="FrameAlphaInput" x:FieldModifier="Public" Grid.Column="1"
+                                           MinWidth="66" Minimum="0" Maximum="255" Increment="1" FormatString="0" />
+                        </Grid>
+                    </WrapPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

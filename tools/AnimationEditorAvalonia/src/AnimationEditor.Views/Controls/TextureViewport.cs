@@ -165,27 +165,44 @@ public class TextureViewport : Control, IZoomTarget
             {
                 Color        = palette.GridLineMinor,
                 Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 0.5f,
+                StrokeWidth  = 1f,
                 IsAntialias  = true
             };
             using var majorPaint = new SKPaint
             {
                 Color        = palette.GridLineMajor,
                 Style        = SKPaintStyle.Stroke,
-                StrokeWidth  = 1f,
+                StrokeWidth  = 1.5f,
                 IsAntialias  = true
             };
             float step = s.GridSize * s.Zoom;
+            if (step < 1f) step = 1f;
 
-            int index = 1;
-            for (float x = textureDest.Left + step; x < textureDest.Right; x += step, index++)
-                canvas.DrawLine(x, textureDest.Top, x, textureDest.Bottom,
+            // Full viewport (not just textureDest) so empty canvas around the sheet still shows
+            // the grid — lines stay locked to the texture origin (PanX/PanY).
+            float viewL = 0f, viewT = 0f, viewR = (float)s.Width, viewB = (float)s.Height;
+            float originX = s.PanX;
+            float originY = s.PanY;
+
+            float FirstLine(float origin, float viewMin)
+            {
+                float n = MathF.Ceiling((viewMin - origin) / step);
+                return origin + n * step;
+            }
+
+            int index = 0;
+            for (float x = FirstLine(originX, viewL); x <= viewR; x += step, index++)
+                canvas.DrawLine(x, viewT, x, viewB,
                     index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
 
-            index = 1;
-            for (float y = textureDest.Top + step; y < textureDest.Bottom; y += step, index++)
-                canvas.DrawLine(textureDest.Left, y, textureDest.Right, y,
+            index = 0;
+            for (float y = FirstLine(originY, viewT); y <= viewB; y += step, index++)
+                canvas.DrawLine(viewL, y, viewR, y,
                     index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
+
+            // Keep textureDest referenced so callers/tests that pass it stay valid; the full-
+            // viewport pass supersedes the old texture-only clip.
+            _ = textureDest;
         }
     }
 
@@ -1059,6 +1076,21 @@ public class TextureViewport : Control, IZoomTarget
         }
 
         OnEditPointerReleased(e);
+    }
+
+    /// <summary>
+    /// Ends an in-progress pan when capture is stolen (browser hosts often fire this without a
+    /// matching <c>PointerReleased</c>). Subclasses that track their own drag state should
+    /// override and clear that state too — see <c>WireframeControl</c>.
+    /// </summary>
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        if (_isPanning)
+        {
+            _isPanning = false;
+            PanChanged?.Invoke(_panX, _panY);
+        }
     }
 
     /// <summary>

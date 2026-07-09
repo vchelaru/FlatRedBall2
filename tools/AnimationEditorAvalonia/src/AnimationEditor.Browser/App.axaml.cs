@@ -92,6 +92,34 @@ public partial class App : Application
         return border;
     }
 
+    /// <summary>Bottom-bordered rail matching desktop's wireframe/preview toolbar chrome.</summary>
+    private static Border ToolbarChrome(Control content)
+    {
+        var border = new Border
+        {
+            Padding = new Thickness(4, 3),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            ClipToBounds = true,
+            Child = content,
+        };
+        border.Bind(Border.BackgroundProperty, border.GetResourceObservable("BgRail"));
+        border.Bind(Border.BorderBrushProperty, border.GetResourceObservable("LineBrush"));
+        return border;
+    }
+
+    private static Border ToolbarDivider()
+    {
+        var divider = new Border
+        {
+            Width = 1,
+            Height = 18,
+            Margin = new Thickness(4, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        divider.Bind(Border.BackgroundProperty, divider.GetResourceObservable("LineBrush"));
+        return divider;
+    }
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -189,7 +217,11 @@ public partial class App : Application
         var animationTree = new AnimationTreeControl();
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
-        inspector.EnableEditing(appCommands);
+        inspector.EnableEditing(appCommands, textureName =>
+        {
+            var bmp = thumbnailService.GetBitmap(textureName);
+            return bmp is null ? null : (bmp.Width, bmp.Height);
+        });
         animationTree.InitializeServices(selectedState, acls);
         animationTree.EnableRename(appCommands);
 
@@ -243,43 +275,70 @@ public partial class App : Application
         headerBar.Bind(Border.BackgroundProperty, headerBar.GetResourceObservable("BgRail"));
         headerBar.Bind(Border.BorderBrushProperty, headerBar.GetResourceObservable("LineBrush"));
 
-        var tabStrip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(8, 0, 8, 0) };
-
-        var openButton = new Button { Content = "Open Folder…" };
-        var saveAsButton = new Button { Content = "Save As…" };
-        var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
-        var themeButton = new Button { Content = $"Theme: {currentTheme}" };
-
-        var toolbar = new StackPanel
+        // Desktop's TabBarBorder uses BgCanvas (not BgRail) so the strip reads as a distinct
+        // tab rail against the menu bar / header above it.
+        var tabStrip = new StackPanel { Orientation = Orientation.Horizontal };
+        var tabBarBorder = new Border
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Margin = new Thickness(8),
-            Children = { openButton, saveAsButton, reloadButton, themeButton },
+            Height = 30,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+                Content = tabStrip,
+            },
         };
+        tabBarBorder.Bind(Border.BackgroundProperty, tabBarBorder.GetResourceObservable("BgCanvas"));
+        tabBarBorder.Bind(Border.BorderBrushProperty, tabBarBorder.GetResourceObservable("LineBrush"));
 
-        // Phase 13 (#662): extracted so the View > Theme menu items can set a specific theme
-        // directly, alongside the toolbar button's toggle-to-the-other-theme behavior.
+        // Hidden command stubs — menu items raise Click on these rather than duplicating handlers.
+        var openButton = new Button { Content = "Open Folder…", IsVisible = false };
+        var saveAsButton = new Button { Content = "Save As…", IsVisible = false };
+        var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
+
         void SetTheme(AppTheme theme)
         {
             currentTheme = theme;
             Application.Current!.RequestedThemeVariant = ThemeManager.ToVariant(currentTheme);
             settingsStore.SaveTheme(currentTheme);
-            themeButton.Content = $"Theme: {currentTheme}";
         }
-        themeButton.Click += (_, _) => SetTheme(currentTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark);
 
-        // Phase 2 (#610): mutation + Undo/Redo, routed entirely through the already-built,
-        // already-tested AppCommands/UndoManager -- no new mutation logic here, only wiring.
-        // Renaming, shape add/delete, editable inspector fields, and settings persistence are
-        // deferred to follow-up issues (see the PR description for the full list).
-        var addAnimationButton = new Button { Content = IconLabel("IconChain", "Add Animation") };
-        var addFrameButton = new Button { Content = IconLabel("IconFrame", "Add Frame") };
-        var addRectButton = new Button { Content = IconLabel("IconShape", "Add Rectangle") };
-        var addCircleButton = new Button { Content = IconLabel("IconCircle", "Add Circle") };
-        var deleteSelectedButton = new Button { Content = IconLabel("IconClose", "Delete Selected") };
-        var undoButton = new Button { Content = IconLabel("IconUndo", "Undo"), IsEnabled = false };
-        var redoButton = new Button { Content = IconLabel("IconRedo", "Redo"), IsEnabled = false };
+        // Desktop parity: Add Animation lives at the bottom of the animations tree panel;
+        // shape/frame/delete commands are Edit-menu + tree context menus, not a global toolbar.
+        var addAnimationButton = new Button
+        {
+            Content = "+ Add Animation",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Height = 30,
+        };
+        var addFrameButton = new Button { IsVisible = false };
+        var addRectButton = new Button { IsVisible = false };
+        var addCircleButton = new Button { IsVisible = false };
+        var deleteSelectedButton = new Button { IsVisible = false };
+
+        var historyUndoButton = new Button
+        {
+            Width = 26,
+            Height = 26,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = Icon("IconUndo", 14),
+            IsEnabled = false,
+        };
+        ToolTip.SetTip(historyUndoButton, "Undo");
+        var historyRedoButton = new Button
+        {
+            Width = 26,
+            Height = 26,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = Icon("IconRedo", 14),
+            IsEnabled = false,
+        };
+        ToolTip.SetTip(historyRedoButton, "Redo");
 
         // Phase 8 (#648): mirrors desktop's Move/Magic-Wand edit-mode pill exactly -- two
         // mutually-exclusive ToggleButtons in one bordered group, split corner radii, no gap.
@@ -301,18 +360,6 @@ public partial class App : Application
         var editModeDivider = new Border { Width = 1 };
         editModeDivider.Bind(Border.BackgroundProperty, editModeDivider.GetResourceObservable("LineBrush"));
         var editModePill = Pill(moveModeButton, editModeDivider, magicWandButton);
-
-        var editToolbar = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Margin = new Thickness(8, 0, 8, 8),
-            Children =
-            {
-                addAnimationButton, addFrameButton, addRectButton, addCircleButton,
-                deleteSelectedButton, undoButton, redoButton, editModePill,
-            },
-        };
 
         moveModeButton.Click += (_, _) =>
         {
@@ -360,17 +407,23 @@ public partial class App : Application
 
         void UpdateUndoRedoButtons()
         {
-            undoButton.IsEnabled = undoManager.CanUndo;
-            redoButton.IsEnabled = undoManager.CanRedo;
+            historyUndoButton.IsEnabled = undoManager.CanUndo;
+            historyRedoButton.IsEnabled = undoManager.CanRedo;
         }
         undoManager.StackChanged += UpdateUndoRedoButtons;
 
-        // History panel: a real gap against the original Phase 2 plan ("add an Undo/Redo toolbar
-        // + History panel") -- only the toolbar buttons were ever wired. Read-only by design, same
-        // as desktop's own HistoryList (confirmed by its dedicated "disable history listbox
-        // selection" fix): clicking a row doesn't jump there, so any stray selection is reset back
-        // to the current entry rather than left dangling on a row that does nothing.
-        var historyList = new ListBox { MaxHeight = 160, SelectionMode = SelectionMode.Single };
+        // History panel: read-only ItemsControl matching desktop (not a focusable ListBox).
+        // A ListBox steals keyboard/pointer focus when the History tab is active, which on
+        // browser can interrupt wireframe pointer capture mid-drag and leave the chain stuck
+        // following the cursor until a second click. ScrollViewer owns overflow scrolling.
+        //
+        // Avalonia's TabControl only hosts the selected tab's content in the visual tree, so
+        // assigning ItemsSource while History is hidden can be lost when the tab is shown again.
+        // historyRows is the always-updated snapshot (UndoManager itself already persists
+        // regardless of which sidebar tab is open); we re-push it onto the ItemsControl whenever
+        // History becomes selected.
+        var historyList = new ItemsControl();
+        var historyRows = new List<HistoryRowVm>();
         historyList.ItemTemplate = new FuncDataTemplate<HistoryRowVm>((row, _) => new TextBlock
         {
             Text = row!.Text,
@@ -383,21 +436,17 @@ public partial class App : Application
         {
             var undoHistory = undoManager.UndoHistory;
             var redoHistory = undoManager.RedoHistory;
-            var rows = new List<HistoryRowVm>();
+            historyRows.Clear();
             // Photoshop order: oldest applied at top, newest applied (current) at bottom, then
             // redo entries (next-to-redo first).
             for (int i = 0; i < undoHistory.Count; i++)
-                rows.Add(new HistoryRowVm(undoHistory[i].Description, IsCurrent: i == undoHistory.Count - 1, IsRedo: false));
+                historyRows.Add(new HistoryRowVm(undoHistory[i].Description, IsCurrent: i == undoHistory.Count - 1, IsRedo: false));
             foreach (var cmd in redoHistory)
-                rows.Add(new HistoryRowVm(cmd.Description, IsCurrent: false, IsRedo: true));
-            historyList.ItemsSource = rows;
-            historyList.SelectedIndex = undoHistory.Count - 1;
+                historyRows.Add(new HistoryRowVm(cmd.Description, IsCurrent: false, IsRedo: true));
+            // New list instance so ItemsControl always sees a source change, even if it was
+            // detached from the visual tree while History was not the selected sidebar tab.
+            historyList.ItemsSource = historyRows.ToList();
         }
-        historyList.SelectionChanged += (_, _) =>
-        {
-            int expected = undoManager.UndoHistory.Count - 1;
-            if (historyList.SelectedIndex != expected) historyList.SelectedIndex = expected;
-        };
         undoManager.StackChanged += RefreshHistoryList;
         RefreshHistoryList();
 
@@ -416,7 +465,6 @@ public partial class App : Application
         {
             tabStrip.Children.Clear();
             var tabs = tabManager.Tabs;
-            bool canClose = tabs.Count > 1;
 
             foreach (var tab in tabs)
             {
@@ -425,6 +473,7 @@ public partial class App : Application
 
                 var tabBorder = new Border
                 {
+                    Height = 30,
                     BorderThickness = new Thickness(0, 0, 1, 0),
                     Cursor = new Cursor(StandardCursorType.Hand),
                 };
@@ -438,16 +487,18 @@ public partial class App : Application
                 label.Bind(TextBlock.ForegroundProperty, label.GetResourceObservable(isActive ? "Ink" : "InkMid"));
                 Grid.SetColumn(label, 0);
 
+                // Always closable, matching desktop — closing the last tab starts a blank project
+                // (see CloseTab below). SVG IconClose (not Unicode ✕) so the glyph renders in WASM
+                // where the ✕ codepoint often falls back to an empty/missing glyph.
                 var closeBtn = new Button
                 {
-                    Content = "✕",
-                    FontSize = 9, Width = 20, Height = 20, Padding = new Thickness(0),
+                    Content = Icon("IconClose", 12, "InkMid"),
+                    Width = 20, Height = 20, Padding = new Thickness(0),
                     Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new Thickness(0),
                     HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(2, 0, 2, 0),
-                    IsEnabled = canClose,
                 };
-                closeBtn.Bind(Button.ForegroundProperty, closeBtn.GetResourceObservable("InkMid"));
+                ToolTip.SetTip(closeBtn, "Close Tab");
                 Grid.SetColumn(closeBtn, 1);
                 closeBtn.Click += (_, _) => CloseTab(captured);
 
@@ -465,7 +516,7 @@ public partial class App : Application
                     if (topLevel?.Launcher is { } launcher)
                         await launcher.LaunchUriAsync(new Uri(Program.PageUrl));
                 };
-                var closeTabItem = new MenuItem { Header = "Close Tab", IsEnabled = canClose };
+                var closeTabItem = new MenuItem { Header = "Close Tab" };
                 closeTabItem.Click += (_, _) => CloseTab(captured);
                 tabBorder.ContextMenu = new ContextMenu { Items = { openNewTabItem, closeTabItem } };
 
@@ -625,8 +676,8 @@ public partial class App : Application
                 appCommands.DeleteAnimationChains(new List<AnimationChainSave> { selectedChain });
         };
 
-        undoButton.Click += (_, _) => undoManager.Undo();
-        redoButton.Click += (_, _) => undoManager.Redo();
+        historyUndoButton.Click += (_, _) => undoManager.Undo();
+        historyRedoButton.Click += (_, _) => undoManager.Redo();
 
         // #535 M3 follow-up: no FileSystemWatcher in the browser, so texture edits made outside
         // the page (e.g. re-saving a PNG in an image editor) are only detected by polling
@@ -636,11 +687,20 @@ public partial class App : Application
         BrowserFolderWatcher? folderWatcher = null;
         IStorageFolder? watchedFolder = null;
         var pendingChangedPngs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        MenuItem? menuReloadTextures = null;
 
         void UpdateReloadButton()
         {
-            reloadButton.IsVisible = pendingChangedPngs.Count > 0;
+            var hasPending = pendingChangedPngs.Count > 0;
+            reloadButton.IsVisible = hasPending;
             reloadButton.Content = $"Reload Changed Textures ({pendingChangedPngs.Count})";
+            if (menuReloadTextures is not null)
+            {
+                menuReloadTextures.IsEnabled = hasPending;
+                menuReloadTextures.Header = hasPending
+                    ? $"Reload Changed _Textures ({pendingChangedPngs.Count})"
+                    : "Reload Changed _Textures";
+            }
         }
 
         reloadButton.Click += async (_, _) =>
@@ -677,20 +737,48 @@ public partial class App : Application
         // (zoom%/grid-size/guide positions live in the desktop-only .aeproperties companion file,
         // which the browser has no persistence path for yet -- same gap already flagged in
         // docs/BROWSER_SETTINGS_DECISION.md for Phase 2's zoom/grid settings).
-        var onionSkinButton = new ToggleButton { Content = IconLabel("IconOnionSkin", "Onion Skin") };
+        // MinHeight 0 + Padding override (#501-style): Fluent forces ToggleButton min height ~32
+        // and vertical padding that, combined with Height=26, clips descenders (the "p" in
+        // "Interpolate") against the preview ruler below.
+        var onionSkinButton = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Content = IconLabel("IconOnionSkin", "Onion Skin"),
+        };
         onionSkinButton.Click += (_, _) => preview.ShowOnionSkin = onionSkinButton.IsChecked == true;
 
-        var interpolateButton = new ToggleButton { Content = "Interpolate" };
+        var interpolateButton = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            // TextBlock (not a bare string) so VerticalAlignment.Center actually applies —
+            // Fluent's string ContentPresenter top-aligns single-line text in a 26px button.
+            Content = new TextBlock
+            {
+                Text = "Interpolate",
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
         interpolateButton.Click += (_, _) => preview.InterpolateOffsets = interpolateButton.IsChecked == true;
 
         // Ruler-click-drag-to-create/move/right-click-to-remove guides is entirely self-contained
         // inside PreviewControl's own pointer handlers (present since Phase 1's wiring) --
         // ShowGuides only toggles the origin crosshair overlay; guides themselves always render
         // once created, with or without this toggle.
-        var showGuidesButton = new ToggleButton { Content = IconLabel("IconGuides", "Guides") };
+        var showGuidesButton = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 4, 0),
+            Content = IconLabel("IconGuides", "Guides"),
+        };
         showGuidesButton.Click += (_, _) => preview.ShowGuides = showGuidesButton.IsChecked == true;
 
-        var diagnosticsButton = new ToggleButton { Content = "Diagnostics (F3)" };
+        var diagnosticsButton = new ToggleButton { Content = "Diagnostics (F3)", IsVisible = false };
         void ApplyDiagnostics(bool on)
         {
             wireframe.DiagnosticsEnabled = on;
@@ -710,11 +798,111 @@ public partial class App : Application
         var previewZoom = new ZoomControl();
         previewZoom.Attach(preview);
 
-        var snapToGridCheck = new ToggleButton { Content = IconLabel("IconGrid", "Grid") };
-        var gridSizeInput = new NumericUpDown { Value = 16, Minimum = 1, Maximum = 512, Width = 130 };
-        void ApplyGrid() => wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16));
-        snapToGridCheck.IsCheckedChanged += (_, _) => ApplyGrid();
-        gridSizeInput.ValueChanged += (_, _) => ApplyGrid();
+        var snapToGridCheck = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            IsChecked = false,
+            IsThreeState = false,
+            Content = IconLabel("IconGrid", "Grid"),
+        };
+        ToolTip.SetTip(snapToGridCheck, "Snap to Grid");
+        // Ensure the wireframe starts with grid off (matches desktop's WireframeCtrl.SetGrid(false, 16)).
+        wireframe.SetGrid(false, 16);
+        var gridSizeInput = new TextBox
+        {
+            Text = "16",
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Avalonia.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(4, 0),
+            FontSize = 11,
+            MinWidth = 0,
+            MinHeight = 0,
+            Height = 26,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        // Classes="flanker" (ThemeStyles) zeros MinHeight/Padding and centers content — without
+        // it Fluent's default button chrome top-aligns "−"/"+" inside the 26px pill.
+        var gridSizeMinusBtn = new Button
+        {
+            Classes = { "flanker" },
+            Content = "−",
+            Width = 22,
+            Height = 26,
+            BorderThickness = new Thickness(0, 0, 1, 0),
+        };
+        gridSizeMinusBtn.Bind(Button.BorderBrushProperty, gridSizeMinusBtn.GetResourceObservable("LineBrush"));
+        var gridSizePlusBtn = new Button
+        {
+            Classes = { "flanker" },
+            Content = "+",
+            Width = 22,
+            Height = 26,
+            BorderThickness = new Thickness(1, 0, 0, 0),
+        };
+        gridSizePlusBtn.Bind(Button.BorderBrushProperty, gridSizePlusBtn.GetResourceObservable("LineBrush"));
+
+        int GetGridSizeFromInput() =>
+            int.TryParse(gridSizeInput.Text, out var v) && v >= 1 ? Math.Min(v, 512) : 16;
+
+        void ApplyGrid()
+        {
+            var size = GetGridSizeFromInput();
+            gridSizeInput.Text = size.ToString();
+            wireframe.SetGrid(snapToGridCheck.IsChecked == true, size);
+        }
+
+        var gridSizeDock = new DockPanel();
+        DockPanel.SetDock(gridSizeMinusBtn, Dock.Left);
+        DockPanel.SetDock(gridSizePlusBtn, Dock.Right);
+        gridSizeDock.Children.Add(gridSizeMinusBtn);
+        gridSizeDock.Children.Add(gridSizePlusBtn);
+        gridSizeDock.Children.Add(gridSizeInput);
+        var gridSizePill = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            ClipToBounds = true,
+            Height = 26,
+            Margin = new Thickness(0, 0, 2, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsEnabled = false,
+            Child = gridSizeDock,
+        };
+        gridSizePill.Bind(Border.BorderBrushProperty, gridSizePill.GetResourceObservable("LineBrush"));
+
+        // Click (same as Onion Skin / Guides) — IsCheckedChanged alone was unreliable in the
+        // browser Fluent ToggleButton path after the toolbar-placement pass; Click always fires
+        // after the toggle flips and is the path the other view toggles already use.
+        void OnGridToggle()
+        {
+            gridSizePill.IsEnabled = snapToGridCheck.IsChecked == true;
+            ApplyGrid();
+        }
+        snapToGridCheck.Click += (_, _) => OnGridToggle();
+        snapToGridCheck.IsCheckedChanged += (_, _) => OnGridToggle();
+        gridSizeInput.LostFocus += (_, _) => ApplyGrid();
+        gridSizeInput.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                ApplyGrid();
+                e.Handled = true;
+            }
+        };
+        gridSizeMinusBtn.Click += (_, _) =>
+        {
+            gridSizeInput.Text = Math.Max(GetGridSizeFromInput() - 1, 1).ToString();
+            ApplyGrid();
+        };
+        gridSizePlusBtn.Click += (_, _) =>
+        {
+            gridSizeInput.Text = Math.Min(GetGridSizeFromInput() + 1, 512).ToString();
+            ApplyGrid();
+        };
 
         // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
         // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
@@ -722,7 +910,7 @@ public partial class App : Application
         // disk to write to, so both the JSON and each referenced texture (re-encoded from
         // ThumbnailService's already-decoded bitmap, never read from disk) are handed to the
         // browser as Blob downloads instead (see DownloadInterop / wwwroot/download.js).
-        var exportPixiJsButton = new Button { Content = "Export to PixiJS" };
+        var exportPixiJsButton = new Button { Content = "Export to PixiJS", IsVisible = false };
         exportPixiJsButton.Click += (_, _) =>
         {
             var currentAcls = projectManager.AnimationChainListSave;
@@ -768,22 +956,52 @@ public partial class App : Application
                 : $"Exported {baseName}.json with {warnings.Count} warning(s).");
         };
 
-        var viewToolbar = new StackPanel
+        var wireframeZoomLabel = new TextBlock
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Margin = new Thickness(8, 0, 8, 8),
+            Text = "Zoom:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            FontSize = 11,
+        };
+        wireframeZoomLabel.Bind(TextBlock.ForegroundProperty, wireframeZoomLabel.GetResourceObservable("InkMid"));
+
+        var wireframeToolbar = ToolbarChrome(new WrapPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
             Children =
             {
-                onionSkinButton, interpolateButton, showGuidesButton, diagnosticsButton,
-                snapToGridCheck, gridSizeInput,
-                new TextBlock { Text = "Wireframe zoom:", VerticalAlignment = VerticalAlignment.Center },
+                editModePill,
+                ToolbarDivider(),
+                snapToGridCheck,
+                gridSizePill,
+                ToolbarDivider(),
+                wireframeZoomLabel,
                 wireframeZoom,
-                new TextBlock { Text = "Preview zoom:", VerticalAlignment = VerticalAlignment.Center },
-                previewZoom,
-                exportPixiJsButton,
             },
+        });
+
+        var previewZoomLabel = new TextBlock
+        {
+            Text = "Zoom:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            FontSize = 11,
         };
+        previewZoomLabel.Bind(TextBlock.ForegroundProperty, previewZoomLabel.GetResourceObservable("InkMid"));
+
+        var previewToolbar = ToolbarChrome(new WrapPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Children =
+            {
+                onionSkinButton,
+                showGuidesButton,
+                interpolateButton,
+                ToolbarDivider(),
+                previewZoomLabel,
+                previewZoom,
+            },
+        });
 
         // Phase 9 (#649): matches desktop's sidebar shape -- ANIMATIONS tree always visible (top),
         // GridSplitter, then a TabControl below with Inspector/History/Files tabs.
@@ -796,13 +1014,44 @@ public partial class App : Application
             VerticalContentAlignment = VerticalAlignment.Center,
             Content = new Border { Child = inspector },
         };
+        var historyTabHeader = new Border
+        {
+            Height = 30,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 2,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Children = { historyUndoButton, historyRedoButton },
+            },
+        };
+        historyTabHeader.Bind(Border.BackgroundProperty, historyTabHeader.GetResourceObservable("BgRail"));
+        historyTabHeader.Bind(Border.BorderBrushProperty, historyTabHeader.GetResourceObservable("LineBrush"));
+
+        var historyScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            Content = historyList,
+        };
+        historyScroll.Bind(ScrollViewer.BackgroundProperty, historyScroll.GetResourceObservable("BgPanel"));
+
+        var historyContent = new Grid { RowDefinitions = new RowDefinitions("Auto,*") };
+        Grid.SetRow(historyTabHeader, 0);
+        Grid.SetRow(historyScroll, 1);
+        historyContent.Children.Add(historyTabHeader);
+        historyContent.Children.Add(historyScroll);
+        historyContent.Bind(Grid.BackgroundProperty, historyContent.GetResourceObservable("BgPanel"));
+
         var historyTab = new TabItem
         {
             Header = "History",
             FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
             VerticalContentAlignment = VerticalAlignment.Center,
-            Content = new Border { Padding = new Thickness(4), Child = historyList },
+            Content = historyContent,
         };
         // Phase 12 (#655): "This File" scope only -- TextureListPanel.SetAnimationChainList is
         // re-pushed at every point animationTree.InitializeServices already is (tab switch/close,
@@ -817,7 +1066,6 @@ public partial class App : Application
             Content = new Border { Padding = new Thickness(4), Child = textureListPanel },
         };
         ((Border)inspectorTab.Content!).Bind(Border.BackgroundProperty, inspectorTab.GetResourceObservable("BgPanel"));
-        ((Border)historyTab.Content!).Bind(Border.BackgroundProperty, historyTab.GetResourceObservable("BgPanel"));
         ((Border)filesTab.Content!).Bind(Border.BackgroundProperty, filesTab.GetResourceObservable("BgPanel"));
 
         var sidebarTabs = new TabControl
@@ -838,25 +1086,52 @@ public partial class App : Application
             filesTab.Bind(TabItem.ForegroundProperty,
                 filesTab.GetResourceObservable(sidebarTabs.SelectedItem == filesTab ? "Ink" : "InkMid"));
         }
-        sidebarTabs.SelectionChanged += (_, _) => UpdateSidebarTabForegrounds();
+        sidebarTabs.SelectionChanged += (_, _) =>
+        {
+            UpdateSidebarTabForegrounds();
+            // Re-push history rows when History is shown — TabControl may have detached the
+            // ItemsControl while another sidebar tab was active, so edits made on Inspector
+            // still appear the moment the user opens History.
+            if (sidebarTabs.SelectedItem == historyTab)
+                RefreshHistoryList();
+        };
         UpdateSidebarTabForegrounds();
 
         var sidebarSplitter = new GridSplitter
         {
             ResizeDirection = GridResizeDirection.Rows,
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
         };
         sidebarSplitter.Bind(GridSplitter.BackgroundProperty, sidebarSplitter.GetResourceObservable("LineStrong"));
 
+        var addAnimationFooter = new Border
+        {
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(8, 6),
+            Child = addAnimationButton,
+        };
+        addAnimationFooter.Bind(Border.BackgroundProperty, addAnimationFooter.GetResourceObservable("BgCanvas"));
+        addAnimationFooter.Bind(Border.BorderBrushProperty, addAnimationFooter.GetResourceObservable("LineBrush"));
+        addAnimationButton.Bind(Button.ForegroundProperty, addAnimationButton.GetResourceObservable("Ink"));
+
+        var animationsBlock = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
+        Grid.SetRow(animationTree, 0);
+        Grid.SetRow(addAnimationFooter, 1);
+        animationsBlock.Children.Add(animationTree);
+        animationsBlock.Children.Add(addAnimationFooter);
+
+        // Pixel column width (not Auto+Width) so the adjacent GridSplitter can redistribute —
+        // Auto columns size to content and ignore drag. Matches desktop's "300,4,*".
         var leftColumn = new Grid
         {
-            Width = 260,
+            MinWidth = 180,
             RowDefinitions = new RowDefinitions("2*,4,3*"),
         };
-        Grid.SetRow(animationTree, 0);
+        Grid.SetRow(animationsBlock, 0);
         Grid.SetRow(sidebarSplitter, 1);
         Grid.SetRow(sidebarTabs, 2);
-        leftColumn.Children.Add(animationTree);
+        leftColumn.Children.Add(animationsBlock);
         leftColumn.Children.Add(sidebarSplitter);
         leftColumn.Children.Add(sidebarTabs);
 
@@ -889,7 +1164,9 @@ public partial class App : Application
         {
             Text = "1.0",
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center,
+            TextAlignment = Avalonia.Media.TextAlignment.Center,
             Background = Avalonia.Media.Brushes.Transparent,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(4, 0),
@@ -1042,10 +1319,12 @@ public partial class App : Application
         var previewBlock = new Grid
         {
             MinHeight = 80,
-            RowDefinitions = new RowDefinitions("*,52"),
+            RowDefinitions = new RowDefinitions("Auto,*,52"),
         };
-        Grid.SetRow(preview, 0);
-        Grid.SetRow(timelineRow, 1);
+        Grid.SetRow(previewToolbar, 0);
+        Grid.SetRow(preview, 1);
+        Grid.SetRow(timelineRow, 2);
+        previewBlock.Children.Add(previewToolbar);
         previewBlock.Children.Add(preview);
         previewBlock.Children.Add(timelineRow);
         RefreshTimelineStrip();
@@ -1059,16 +1338,19 @@ public partial class App : Application
         {
             ResizeDirection = GridResizeDirection.Rows,
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
         };
         canvasSplitter.Bind(GridSplitter.BackgroundProperty, canvasSplitter.GetResourceObservable("LineStrong"));
 
         var canvasColumn = new Grid
         {
-            RowDefinitions = new RowDefinitions("*,4,*"),
+            RowDefinitions = new RowDefinitions("Auto,*,4,*"),
         };
-        Grid.SetRow(wireframe, 0);
-        Grid.SetRow(canvasSplitter, 1);
-        Grid.SetRow(previewBlock, 2);
+        Grid.SetRow(wireframeToolbar, 0);
+        Grid.SetRow(wireframe, 1);
+        Grid.SetRow(canvasSplitter, 2);
+        Grid.SetRow(previewBlock, 3);
+        canvasColumn.Children.Add(wireframeToolbar);
         canvasColumn.Children.Add(wireframe);
         canvasColumn.Children.Add(canvasSplitter);
         canvasColumn.Children.Add(previewBlock);
@@ -1077,12 +1359,14 @@ public partial class App : Application
         {
             ResizeDirection = GridResizeDirection.Columns,
             HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
         };
         sidebarColumnSplitter.Bind(GridSplitter.BackgroundProperty, sidebarColumnSplitter.GetResourceObservable("LineStrong"));
 
+        // Fixed pixel + star (not Auto) so dragging the splitter actually changes column widths.
         var mainArea = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,4,*"),
+            ColumnDefinitions = new ColumnDefinitions("260,4,*"),
         };
         Grid.SetColumn(leftColumn, 0);
         Grid.SetColumn(sidebarColumnSplitter, 1);
@@ -1145,10 +1429,30 @@ public partial class App : Application
         };
 
         var menuUndo = new MenuItem { Header = "_Undo" };
-        menuUndo.Click += (_, _) => undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        menuUndo.Click += (_, _) => historyUndoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuRedo = new MenuItem { Header = "_Redo" };
-        menuRedo.Click += (_, _) => redoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        var editMenu = new MenuItem { Header = "_Edit", Items = { menuUndo, menuRedo } };
+        menuRedo.Click += (_, _) => historyRedoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuAddFrame = new MenuItem { Header = "Add _Frame" };
+        menuAddFrame.Click += (_, _) => addFrameButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuAddRect = new MenuItem { Header = "Add _Rectangle" };
+        menuAddRect.Click += (_, _) => addRectButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuAddCircle = new MenuItem { Header = "Add _Circle" };
+        menuAddCircle.Click += (_, _) => addCircleButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuDeleteSelected = new MenuItem { Header = "_Delete Selected" };
+        menuDeleteSelected.Click += (_, _) => deleteSelectedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuReload = new MenuItem { Header = "Reload Changed _Textures", IsEnabled = false };
+        menuReload.Click += (_, _) => reloadButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        menuReloadTextures = menuReload;
+        var editMenu = new MenuItem
+        {
+            Header = "_Edit",
+            Items =
+            {
+                menuUndo, menuRedo, new Separator(),
+                menuAddFrame, menuAddRect, menuAddCircle, menuDeleteSelected,
+                new Separator(), menuReload,
+            },
+        };
 
         var menuWireframeZoomIn = new MenuItem { Header = "_Wireframe Zoom In" };
         menuWireframeZoomIn.Click += (_, _) => wireframeZoom.StepUp();
@@ -1189,14 +1493,8 @@ public partial class App : Application
         root.Children.Add(headerBar);
         DockPanel.SetDock(menuBar, Dock.Top);
         root.Children.Add(menuBar);
-        DockPanel.SetDock(tabStrip, Dock.Top);
-        root.Children.Add(tabStrip);
-        DockPanel.SetDock(toolbar, Dock.Top);
-        root.Children.Add(toolbar);
-        DockPanel.SetDock(editToolbar, Dock.Top);
-        root.Children.Add(editToolbar);
-        DockPanel.SetDock(viewToolbar, Dock.Top);
-        root.Children.Add(viewToolbar);
+        DockPanel.SetDock(tabBarBorder, Dock.Top);
+        root.Children.Add(tabBarBorder);
         DockPanel.SetDock(statusBar, Dock.Bottom);
         root.Children.Add(statusBar);
         root.Children.Add(mainArea);
@@ -1232,12 +1530,12 @@ public partial class App : Application
                     else if (e.Key == Key.Z)
                     {
                         e.Handled = true;
-                        undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        historyUndoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
                     else if (e.Key == Key.Y)
                     {
                         e.Handled = true;
-                        redoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        historyRedoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
                 }
             };

@@ -2,7 +2,9 @@ using AnimationEditor.App.Controls;
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
+using Avalonia;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using System.Collections.Generic;
@@ -177,6 +179,34 @@ public class WireframeChainDragTests
             ctrl.SetCamera(0f, 0f, 1f);
             // No chain selected → must not throw
             ctrl.SimulateChainDrag(0f, 0f, 8f, 8f);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Browser (and any host that steals pointer capture mid-drag) fires
+    /// <see cref="InputElement.PointerCaptureLostEvent"/> without a matching
+    /// <c>PointerReleased</c>. Without ending the drag there, the chain keeps
+    /// tracking the cursor until a second click — the History-tab repro.
+    /// </summary>
+    [AvaloniaFact]
+    public void PointerCaptureLost_WhileChainDragging_EndsDrag()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, frameA, _, dir) = BuildCtrlWithChainSelected(ctx);
+        try
+        {
+            ctrl.SimulateChainDragBegin(startScreenX: 16f, startScreenY: 8f);
+            Assert.True(ctrl.IsDragging);
+
+            float before = frameA.LeftCoordinate;
+            var pointer = new Pointer(0, PointerType.Mouse, isPrimary: true);
+            ctrl.RaiseEvent(new PointerCaptureLostEventArgs(ctrl, pointer));
+
+            Assert.False(ctrl.IsDragging);
+            // Further move simulation must be a no-op once the drag ended.
+            ctrl.SimulateDragPointerMove(48f, 40f);
+            Assert.Equal(before, frameA.LeftCoordinate, precision: 4);
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
