@@ -1017,7 +1017,7 @@ public partial class App : Application
             if (file is null) return;
 
             await using var stream = await file.OpenWriteAsync();
-            projectManager.SaveAnimationChainList(stream);
+            await projectManager.SaveAnimationChainListAsync(stream);
             status.Text = $"Saved to {file.Name}.";
         };
 
