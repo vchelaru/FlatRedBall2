@@ -125,6 +125,11 @@ public partial class App : Application
             projectManager, selectedState, applicationEvents, ioManager, objectFinder, undoManager);
         var thumbnailService  = new ThumbnailService(projectManager);
 
+        // Phase 15: shared toast/banner overlays (item-deleted undo, generic toast, error banner).
+        var notifications = new EditorNotificationOverlay();
+        notifications.WireUndo(() => undoManager.Undo());
+        appCommands.ItemsDeleted += notifications.ShowItemDeleted;
+
         // #610: the first browser setting worth persisting -- theme has a real toggle button
         // below, unlike zoom/grid/recent-files, which have no browser UI yet (see
         // docs/BROWSER_SETTINGS_DECISION.md for why those aren't wired up until they do).
@@ -659,6 +664,7 @@ public partial class App : Application
             }
 
             status.Text = $"Reloaded {pendingChangedPngs.Count} texture(s).";
+            notifications.ShowToast($"Reloaded {pendingChangedPngs.Count} texture(s).");
             pendingChangedPngs.Clear();
             UpdateReloadButton();
             preview.InvalidateVisual();
@@ -720,7 +726,11 @@ public partial class App : Application
         exportPixiJsButton.Click += (_, _) =>
         {
             var currentAcls = projectManager.AnimationChainListSave;
-            if (currentAcls is null) { status.Text = "Nothing to export."; return; }
+            if (currentAcls is null)
+            {
+                notifications.ShowErrorBanner("Nothing to export.");
+                return;
+            }
 
             (int Width, int Height)? ResolveTextureSize(string name)
             {
@@ -753,6 +763,9 @@ public partial class App : Application
             status.Text = warnings.Count == 0
                 ? $"Exported {baseName}.json and {result.ReferencedTextures.Count} texture(s)."
                 : $"Exported {baseName}.json with {warnings.Count} warning(s): {string.Join(' ', warnings)}";
+            notifications.ShowToast(warnings.Count == 0
+                ? $"Exported {baseName}.json and {result.ReferencedTextures.Count} texture(s)."
+                : $"Exported {baseName}.json with {warnings.Count} warning(s).");
         };
 
         var viewToolbar = new StackPanel
@@ -1303,7 +1316,7 @@ public partial class App : Application
             var acls = projectManager.AnimationChainListSave;
             if (acls is null)
             {
-                status.Text = "Nothing to save.";
+                notifications.ShowErrorBanner("Nothing to save.");
                 return;
             }
 
@@ -1324,8 +1337,13 @@ public partial class App : Application
             await using var stream = await file.OpenWriteAsync();
             await projectManager.SaveAnimationChainListAsync(stream);
             status.Text = $"Saved to {file.Name}.";
+            notifications.ShowToast($"Saved to {file.Name}.");
         };
 
-        return root;
+        var shell = new Grid();
+        shell.Children.Add(root);
+        shell.Children.Add(notifications);
+
+        return shell;
     }
 }

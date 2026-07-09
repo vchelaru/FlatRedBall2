@@ -278,4 +278,16 @@ public class AnimationTreeControlTests
 
         Assert.Equal("Walk", acls.AnimationChains[0].Name);
     }
+
+    [AvaloniaFact]
+    public void AddFrameBtn_Click_AddsFrameToChain()
+    {
+        var (control, _, acls) = BuildWithCommands();
+        var walkNode = ((System.Collections.IEnumerable)control.TreeView.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().First();
+
+        control.RaiseAddFrameForTest(walkNode);
+
+        Assert.Equal(3, acls.AnimationChains[0].Frames.Count);
+    }
 }

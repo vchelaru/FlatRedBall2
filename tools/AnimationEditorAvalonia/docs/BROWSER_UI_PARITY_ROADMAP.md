@@ -27,8 +27,8 @@ exists and focus on *looking and feeling* like the desktop app.
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
 **Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8), #649 (Phase 9), #652 (Phase 10),
-#654 (Phase 11), #655 (Phase 12), #662 (Phase 13), #647 (Phase 14). Phase 15 issue is **not filed
-yet** — file from its own worktree when that phase starts, per the convention below.
+#654 (Phase 11), #655 (Phase 12), #662 (Phase 13), #647 (Phases 14–15). Phases 6–15 are complete
+on PR #647; merge when live-Chrome verification passes.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
 `.claude/worktrees/<NNN-name>` branched from the previous phase's merged tip + a
@@ -350,17 +350,21 @@ scrub-position-selects-correct-frame before writing the control.
 
 ---
 
-### Phase 15 — Toasts/banners/remaining affordances
+### Phase 15 — Toasts/banners/remaining affordances ✅ (#647)
 
 | | |
 |---|---|
-| **Issue** | *(not filed)* |
+| **Issue** | #647 (stacked on same PR as Phases 7–14) |
 | **Depends on** | All prior phases (sweep-up) |
+| **Decision doc** | `BROWSER_TOASTS_DECISION.md` |
 
 **Scope:** Smallest, most mechanical phase: undo "item deleted" toast, generic dismissible/
 retryable toast, error banner, hover-reveal add-frame tree button (check whether Phase 1/2's tree
 work already added this — it's tree-row-local, may already exist), any leftover `.compact`/
 disabled-opacity gaps from Phase 8. Sweep-up, not new architecture.
+
+**Shipped:** `EditorNotificationOverlay` + browser wiring; `AnimationTreeControl` hover add-frame
+button; theme style gaps confirmed already covered by shared `ThemeStyles.axaml`.
 
 ---
 
