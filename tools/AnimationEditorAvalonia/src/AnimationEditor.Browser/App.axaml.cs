@@ -20,10 +20,12 @@ using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Platform.Storage;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
+using SvgIcon = Avalonia.Svg.Skia.Svg;
 
 namespace AnimationEditor.Browser;
 
@@ -36,6 +38,57 @@ public partial class App : Application
     /// theme-token brush lookups, just FontWeight/Opacity.
     /// </summary>
     private sealed record HistoryRowVm(string Text, bool IsCurrent, bool IsRedo);
+
+    /// <summary>
+    /// Phase 8 (#648): one shared SVG icon, colored via a theme token by key (default
+    /// <c>IconInk</c>) instead of a hardcoded brush -- matches desktop's
+    /// <c>CurrentColor="{DynamicResource ...}"</c> pattern so icons still track the active theme.
+    /// </summary>
+    private static SvgIcon Icon(string name, double size = 16, string colorKey = "IconInk")
+    {
+        var svg = new SvgIcon(baseUri: null!)
+        {
+            Width = size,
+            Height = size,
+            Path = $"avares://AnimationEditor.Views/Assets/icons/svg/{name}.svg",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        svg.Bind(SvgIcon.CurrentColorProperty, svg.GetResourceObservable(colorKey));
+        return svg;
+    }
+
+    /// <summary>Icon + label content for a Button/ToggleButton -- desktop's toolbar pattern.</summary>
+    private static StackPanel IconLabel(string iconName, string text) => new()
+    {
+        Orientation = Orientation.Horizontal,
+        Spacing = 4,
+        Children =
+        {
+            Icon(iconName),
+            new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center },
+        },
+    };
+
+    /// <summary>
+    /// Groups controls into a bordered, clipped pill matching desktop's toolbar edit-mode-toggle
+    /// style (<c>CornerRadius="4"</c>, 1px <c>LineBrush</c> border, 26px height).
+    /// </summary>
+    private static Border Pill(params Control[] children)
+    {
+        var stack = new StackPanel { Orientation = Orientation.Horizontal };
+        stack.Children.AddRange(children);
+        var border = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            ClipToBounds = true,
+            Height = 26,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = stack,
+        };
+        border.Bind(Border.BorderBrushProperty, border.GetResourceObservable("LineBrush"));
+        return border;
+    }
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -137,6 +190,33 @@ public partial class App : Application
         selectedState.SelectedChain = acls.AnimationChains[0];
 
         var status = new TextBlock { Margin = new Thickness(8), Text = "Loaded bundled sample." };
+        var statusLeftText = new TextBlock { Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center };
+
+        // Phase 8 (#648): branded header bar -- visual only (icon, app name, active filename), per
+        // the roadmap's decision #1: no drag-to-move/custom resize/minimize-maximize-close, since
+        // the browser tab already has real OS chrome for those. IconChain doubles as the closest
+        // thing to an app mark already in the shared icon set (no dedicated logo asset exists).
+        var headerFileNameText = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+        headerFileNameText.Bind(TextBlock.ForegroundProperty, headerFileNameText.GetResourceObservable("InkMid"));
+        var headerBar = new Border
+        {
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(10, 6),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Children =
+                {
+                    Icon("IconChain", 18, "Accent"),
+                    new TextBlock { Text = "Animation Editor", FontWeight = Avalonia.Media.FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center },
+                    new TextBlock { Text = "—", Opacity = 0.5, VerticalAlignment = VerticalAlignment.Center },
+                    headerFileNameText,
+                },
+            },
+        };
+        headerBar.Bind(Border.BackgroundProperty, headerBar.GetResourceObservable("BgRail"));
+        headerBar.Bind(Border.BorderBrushProperty, headerBar.GetResourceObservable("LineBrush"));
 
         var tabStrip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(8, 0, 8, 0) };
 
@@ -165,14 +245,35 @@ public partial class App : Application
         // already-tested AppCommands/UndoManager -- no new mutation logic here, only wiring.
         // Renaming, shape add/delete, editable inspector fields, and settings persistence are
         // deferred to follow-up issues (see the PR description for the full list).
-        var addAnimationButton = new Button { Content = "Add Animation" };
-        var addFrameButton = new Button { Content = "Add Frame" };
-        var addRectButton = new Button { Content = "Add Rectangle" };
-        var addCircleButton = new Button { Content = "Add Circle" };
-        var deleteSelectedButton = new Button { Content = "Delete Selected" };
-        var undoButton = new Button { Content = "Undo", IsEnabled = false };
-        var redoButton = new Button { Content = "Redo", IsEnabled = false };
-        var magicWandButton = new ToggleButton { Content = "Magic Wand" };
+        var addAnimationButton = new Button { Content = IconLabel("IconChain", "Add Animation") };
+        var addFrameButton = new Button { Content = IconLabel("IconFrame", "Add Frame") };
+        var addRectButton = new Button { Content = IconLabel("IconShape", "Add Rectangle") };
+        var addCircleButton = new Button { Content = IconLabel("IconCircle", "Add Circle") };
+        var deleteSelectedButton = new Button { Content = IconLabel("IconClose", "Delete Selected") };
+        var undoButton = new Button { Content = IconLabel("IconUndo", "Undo"), IsEnabled = false };
+        var redoButton = new Button { Content = IconLabel("IconRedo", "Redo"), IsEnabled = false };
+
+        // Phase 8 (#648): mirrors desktop's Move/Magic-Wand edit-mode pill exactly -- two
+        // mutually-exclusive ToggleButtons in one bordered group, split corner radii, no gap.
+        // Move needs no new logic (drag events are already wired in WireframeControl's
+        // constructor); this only adds the visual toggle desktop has and browser never did.
+        var moveModeButton = new ToggleButton
+        {
+            IsChecked = true,
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            CornerRadius = new CornerRadius(3, 0, 0, 3),
+            Content = IconLabel("IconMove", "Move"),
+        };
+        var magicWandButton = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            CornerRadius = new CornerRadius(0, 3, 3, 0),
+            Content = IconLabel("IconMagicWand", "Magic Wand"),
+        };
+        var editModeDivider = new Border { Width = 1 };
+        editModeDivider.Bind(Border.BackgroundProperty, editModeDivider.GetResourceObservable("LineBrush"));
+        var editModePill = Pill(moveModeButton, editModeDivider, magicWandButton);
+
         var editToolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -181,14 +282,21 @@ public partial class App : Application
             Children =
             {
                 addAnimationButton, addFrameButton, addRectButton, addCircleButton,
-                deleteSelectedButton, undoButton, redoButton, magicWandButton,
+                deleteSelectedButton, undoButton, redoButton, editModePill,
             },
         };
 
-        // Phase 3 (#614): Move mode (drag existing handles/chains) is the wireframe's default
-        // and needs no toggle -- it's just pointer events already wired in WireframeControl's
-        // constructor. Magic Wand mode is the one the user must opt into.
-        magicWandButton.Click += (_, _) => wireframe.IsMagicWandMode = magicWandButton.IsChecked == true;
+        moveModeButton.Click += (_, _) =>
+        {
+            wireframe.IsMagicWandMode = false;
+            moveModeButton.IsChecked = true;
+            magicWandButton.IsChecked = false;
+        };
+        magicWandButton.Click += (_, _) =>
+        {
+            wireframe.IsMagicWandMode = magicWandButton.IsChecked == true;
+            moveModeButton.IsChecked = magicWandButton.IsChecked != true;
+        };
 
         // FrameRegionChanged/ChainRegionChanged fire after a handle/chain drag commits;
         // FrameLiveUpdated fires on every pointer-move frame during the drag (no save, just
@@ -285,6 +393,20 @@ public partial class App : Application
                 tabButton.Click += (_, _) => SwitchToTab(tab);
                 tabStrip.Children.Add(tabButton);
             }
+            RefreshHeaderAndStatusLeft();
+        }
+
+        // Phase 8 (#648): feeds the branded header's filename and the status bar's left zone
+        // (desktop's "filename + counts" zone, minus the save-state dot -- browser has no
+        // disk-backed dirty tracking to show honestly). Called whenever the active tab changes
+        // (via RebuildTabStrip) and whenever chains are added/removed (count changes without a
+        // tab switch).
+        void RefreshHeaderAndStatusLeft()
+        {
+            var displayName = tabManager.ActiveTab?.DisplayName ?? "Untitled";
+            headerFileNameText.Text = displayName;
+            var chainCount = projectManager.AnimationChainListSave?.AnimationChains.Count ?? 0;
+            statusLeftText.Text = $"{displayName} · {chainCount} animation{(chainCount == 1 ? "" : "s")}";
         }
 
         // Captures the leaving tab's project/undo state, activates the target tab from its
@@ -335,8 +457,10 @@ public partial class App : Application
         RebuildTabStrip();
 
         // Both Add/Delete commands raise AnimationChainsChanged -- refresh the tree once, here,
-        // rather than after every individual button handler.
+        // rather than after every individual button handler. Also refreshes the status bar's
+        // animation count (Phase 8, #648) since that changes without a tab switch.
         applicationEvents.AnimationChainsChanged += animationTree.Refresh;
+        applicationEvents.AnimationChainsChanged += RefreshHeaderAndStatusLeft;
 
         addAnimationButton.Click += (_, _) =>
         {
@@ -428,9 +552,7 @@ public partial class App : Application
         // (zoom%/grid-size/guide positions live in the desktop-only .aeproperties companion file,
         // which the browser has no persistence path for yet -- same gap already flagged in
         // docs/BROWSER_SETTINGS_DECISION.md for Phase 2's zoom/grid settings).
-        var zoomPresets = new[] { 5, 10, 16, 25, 33, 50, 66, 75, 100, 150, 200, 300, 400, 800, 1600, 3200 };
-
-        var onionSkinButton = new ToggleButton { Content = "Onion Skin" };
+        var onionSkinButton = new ToggleButton { Content = IconLabel("IconOnionSkin", "Onion Skin") };
         onionSkinButton.Click += (_, _) => preview.ShowOnionSkin = onionSkinButton.IsChecked == true;
 
         var interpolateButton = new ToggleButton { Content = "Interpolate" };
@@ -440,7 +562,7 @@ public partial class App : Application
         // inside PreviewControl's own pointer handlers (present since Phase 1's wiring) --
         // ShowGuides only toggles the origin crosshair overlay; guides themselves always render
         // once created, with or without this toggle.
-        var showGuidesButton = new ToggleButton { Content = "Guides" };
+        var showGuidesButton = new ToggleButton { Content = IconLabel("IconGuides", "Guides") };
         showGuidesButton.Click += (_, _) => preview.ShowGuides = showGuidesButton.IsChecked == true;
 
         var diagnosticsButton = new ToggleButton { Content = "Diagnostics (F3)" };
@@ -452,23 +574,18 @@ public partial class App : Application
         }
         diagnosticsButton.Click += (_, _) => ApplyDiagnostics(diagnosticsButton.IsChecked == true);
 
-        var wireframeZoomOutButton = new Button { Content = "Wireframe Zoom −" };
-        var wireframeZoomInButton = new Button { Content = "Wireframe Zoom +" };
-        wireframeZoomInButton.Click += (_, _) =>
-            wireframe.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(wireframe.Zoom * 100f, zoomPresets, +1));
-        wireframeZoomOutButton.Click += (_, _) =>
-            wireframe.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(wireframe.Zoom * 100f, zoomPresets, -1));
-        wireframe.WheelZoomPresets = zoomPresets;
+        // Phase 8 (#648): ZoomControl is the same reusable, already-tested, DynamicResource-styled
+        // [−][editable %][+] widget desktop's wireframe/preview toolbars and PNG diff bar all
+        // share (AnimationEditor.Views/Controls/ZoomControl.axaml). Attach() installs the preset
+        // list and follows/drives the target's zoom, replacing the four bespoke +/- buttons and
+        // their manual ZoomPresetStepper calls below with one shared control per viewport.
+        var wireframeZoom = new ZoomControl();
+        wireframeZoom.Attach(wireframe);
 
-        var previewZoomOutButton = new Button { Content = "Preview Zoom −" };
-        var previewZoomInButton = new Button { Content = "Preview Zoom +" };
-        previewZoomInButton.Click += (_, _) =>
-            preview.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(preview.Zoom * 100f, zoomPresets, +1));
-        previewZoomOutButton.Click += (_, _) =>
-            preview.SetZoomPercent(ZoomPresetStepper.StepToNextPreset(preview.Zoom * 100f, zoomPresets, -1));
-        preview.WheelZoomPresets = zoomPresets;
+        var previewZoom = new ZoomControl();
+        previewZoom.Attach(preview);
 
-        var snapToGridCheck = new CheckBox { Content = "Snap to Grid" };
+        var snapToGridCheck = new ToggleButton { Content = IconLabel("IconGrid", "Grid") };
         var gridSizeInput = new NumericUpDown { Value = 16, Minimum = 1, Maximum = 512, Width = 130 };
         void ApplyGrid() => wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16));
         snapToGridCheck.IsCheckedChanged += (_, _) => ApplyGrid();
@@ -527,9 +644,11 @@ public partial class App : Application
             Children =
             {
                 onionSkinButton, interpolateButton, showGuidesButton, diagnosticsButton,
-                wireframeZoomOutButton, wireframeZoomInButton,
-                previewZoomOutButton, previewZoomInButton,
                 snapToGridCheck, gridSizeInput,
+                new TextBlock { Text = "Wireframe zoom:", VerticalAlignment = VerticalAlignment.Center },
+                wireframeZoom,
+                new TextBlock { Text = "Preview zoom:", VerticalAlignment = VerticalAlignment.Center },
+                previewZoom,
                 exportPixiJsButton,
             },
         };
@@ -566,7 +685,20 @@ public partial class App : Application
         mainArea.Children.Add(wireframe);
         mainArea.Children.Add(preview);
 
+        // Phase 8 (#648): desktop's status bar has 3 zones (save-state+filename+counts |
+        // cursor+selection | transient toast); browser only has data for 2 -- there's no
+        // disk-backed dirty flag or cursor-position tracking to show honestly, so the middle
+        // zone is dropped rather than faked.
+        var statusBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Grid.SetColumn(statusLeftText, 0);
+        Grid.SetColumn(status, 1);
+        statusBar.Children.Add(statusLeftText);
+        statusBar.Children.Add(status);
+        statusBar.Bind(Grid.BackgroundProperty, statusBar.GetResourceObservable("BgRail"));
+
         var root = new DockPanel();
+        DockPanel.SetDock(headerBar, Dock.Top);
+        root.Children.Add(headerBar);
         DockPanel.SetDock(tabStrip, Dock.Top);
         root.Children.Add(tabStrip);
         DockPanel.SetDock(toolbar, Dock.Top);
@@ -575,8 +707,8 @@ public partial class App : Application
         root.Children.Add(editToolbar);
         DockPanel.SetDock(viewToolbar, Dock.Top);
         root.Children.Add(viewToolbar);
-        DockPanel.SetDock(status, Dock.Bottom);
-        root.Children.Add(status);
+        DockPanel.SetDock(statusBar, Dock.Bottom);
+        root.Children.Add(statusBar);
         root.Children.Add(mainArea);
 
         // F3 is a best-effort accelerator only -- the diagnostics button above is the reliable

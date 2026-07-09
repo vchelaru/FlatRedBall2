@@ -26,7 +26,8 @@ exists and focus on *looking and feeling* like the desktop app.
 | Implementing a phase | The phase's GitHub issue body (if filed) **and** ship a `docs/BROWSER_*_DECISION.md` on merge |
 | Picking up mid-roadmap | The latest merged decision doc + grep `Phase N` in `AnimationEditor.Browser/` |
 
-**Issue linkage:** #630 (Phase 6), #644 (Phase 7). Phases 8–15 issues are **not filed yet** — file
+**Issue linkage:** #630 (Phase 6), #644 (Phase 7), #648 (Phase 8). Phases 9–15 issues are **not
+filed yet** — file
 each from its own worktree when that phase starts, per the convention below.
 
 **Process, same convention as Phases 1–5:** each phase = its own GitHub issue + its own
@@ -188,11 +189,13 @@ was viable, so this wasn't used.
 
 ---
 
-### Phase 8 — Toolbar/pill restyling + branded header bar
+### Phase 8 — Toolbar/pill restyling + branded header bar ✅
 
 | | |
 |---|---|
-| **Issue** | *(not filed — create `<issue#>-ae-web-toolbar-restyle`)* |
+| **Issue** | #648 |
+| **Status** | **Done** — merged into `644-ae-web-icons` (same branch/PR as Phase 7, per no-stacked-PRs directive) |
+| **Doc** | `BROWSER_TOOLBAR_RESTYLE_DECISION.md` |
 | **Depends on** | Phase 6 ✅, Phase 7 ✅ |
 
 **Scope:** Restyle existing edit/view toolbars into `WrapPanel`s with pill borders using Phase 6's
