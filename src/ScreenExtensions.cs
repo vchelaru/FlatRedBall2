@@ -29,15 +29,15 @@ public static class ScreenExtensions
     /// Adds a Forms control to the screen overlay (`screen.AddOverlay(...)`), drawn once
     /// after all camera passes at full-window scale.
     /// </summary>
-    public static void AddScreenOverlay(this Screen screen, FrameworkElement element, Layer? layer = null)
-        => screen.AddOverlay(element, layer);
+    public static void AddScreenOverlay(this Screen screen, FrameworkElement element)
+        => screen.AddOverlay(element);
 
     /// <summary>
     /// Adds a Gum visual to the screen overlay (`screen.AddOverlay(...)`), drawn once
     /// after all camera passes at full-window scale.
     /// </summary>
-    public static void AddScreenOverlay(this Screen screen, GraphicalUiElement visual, Layer? layer = null)
-        => screen.AddOverlay(visual, layer);
+    public static void AddScreenOverlay(this Screen screen, GraphicalUiElement visual)
+        => screen.AddOverlay(visual);
 
     /// <summary>
     /// Restarts the current screen using <paramref name="newConfigure"/> instead of the previously

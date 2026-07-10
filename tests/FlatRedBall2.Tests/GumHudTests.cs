@@ -63,17 +63,31 @@ public class GumHudTests
     }
 
     [Fact]
-    public void AddOverlay_VisualParentedToOverlayRoot_AndSkippedDuringPerCameraDraw()
+    public void AddOverlay_ParentsVisualUnderOverlayRoot_WithoutPerVisualRenderable()
     {
+        // Blob model (#659): AddOverlay just parents under OverlayRoot; the OverlayRoot itself is
+        // registered once as a drawn overlay blob at activation, so no per-visual GumRenderable is
+        // created — the whole root (and everything AddOverlay/AddToRoot put under it) draws together.
         var screen = new TestScreen();
         var visual = new ContainerRuntime();
 
         screen.AddOverlay(visual);
 
         screen.OverlayRoot.Children.ShouldContain(visual);
-        var renderable = screen.GumRenderables[0];
-        // Overlay renderables are drawn in a post-camera pass, never inside the per-camera loop.
-        renderable.ShouldDrawForCamera(screen.Cameras[0]).ShouldBeFalse();
+        screen.GumRenderables.ShouldNotContain(r => r.Visual == visual);
+    }
+
+    [Fact]
+    public void Activation_UnifiesGumRootWithActiveScreenOverlayRoot()
+    {
+        // #659: element.AddToRoot() (-> GumService.Root) and screen.AddOverlay() (-> OverlayRoot)
+        // must target the same container so AddToRoot content actually draws. On activation the
+        // active screen's OverlayRoot becomes GumService.Root.
+        var engine = new FlatRedBallService();
+        engine.Start<TestScreen>();
+        var screen = (TestScreen)engine.CurrentScreen;
+
+        engine.Gum.Root.ShouldBeSameAs(screen.OverlayRoot);
     }
 
     // AddOverlayRoot wires up Gum Forms' global PopupRoot/ModalRoot (ComboBox dropdowns, MenuItem
@@ -96,19 +110,19 @@ public class GumHudTests
     }
 
     [Fact]
-    public void AddOverlayRoot_CalledAfterAddOverlay_DrawnAfterEarlierOverlayVisual()
+    public void AddOverlayRoot_RegisteredAfterOverlayRootBlob_DrawnOnTop()
     {
-        // Draw order follows GumRenderables insertion order (see Screen.DrawOverlay) — popups
-        // must be wired in after a screen's own overlay visuals so they render on top.
+        // Draw order follows GumRenderables insertion order (see Screen.DrawOverlay). Under the blob
+        // model the engine registers the OverlayRoot blob first, then popup roots, so popups draw
+        // over overlay content. Assert the AddOverlayRoot ordering primitive the engine relies on.
         var screen = new TestScreen();
-        var overlayVisual = new ContainerRuntime();
         var popupRoot = new ContainerRuntime();
-        screen.AddOverlay(overlayVisual);
+        screen.AddOverlayRoot(screen.OverlayRoot);
 
         screen.AddOverlayRoot(popupRoot);
 
         var renderables = screen.GumRenderables.ToList();
-        var overlayIndex = renderables.FindIndex(r => r.Visual == overlayVisual);
+        var overlayIndex = renderables.FindIndex(r => r.Visual == screen.OverlayRoot);
         var popupIndex = renderables.FindIndex(r => r.Visual == popupRoot);
         popupIndex.ShouldBeGreaterThan(overlayIndex);
     }

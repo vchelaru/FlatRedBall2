@@ -283,7 +283,55 @@ public class FlatRedBallService
             new KernSmithFontCreator(game.GraphicsDevice);
         GumRenderBatch.Instance.Initialize();
         ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
+
+        // Route Gum Forms popups (ComboBox dropdowns, MenuItem submenus) opened by a control on a
+        // camera to that camera's per-camera PopupRoot/ModalRoot, so they draw in that camera's pass
+        // at its zoom/viewport; controls under non-camera roots fall back to Gum's global pair. The
+        // lambda reads CurrentScreen / _gum.PopupRoot at invocation time (when a popup opens).
+        //
+        // Deliberate, documented exception to CLAUDE.md's "No static state" rule: Gum's static
+        // ShowPopupListBox consults this static delegate with no way to pass a Camera/Screen, so
+        // there is no instance-scoped seam. Kept narrow — it only reads the current screen's cameras
+        // and the engine's global popup roots.
+        GraphicalUiElement.ResolvePopupRoots = openingControl =>
+            ResolvePopupRootsFor(
+                openingControl,
+                (IReadOnlyList<Rendering.Camera>)CurrentScreen.Cameras,
+                _gum.PopupRoot,
+                _gum.ModalRoot);
+
         System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
+    }
+
+    /// <summary>
+    /// Resolves which popup/modal root pair a Forms popup opened by <paramref name="openingControl"/>
+    /// should use: the pair of the camera whose <see cref="Rendering.Camera.UiRoot"/>/<see cref="Rendering.Camera.PopupRoot"/>/<see cref="Rendering.Camera.ModalRoot"/>
+    /// is the control's topmost ancestor, else the (<paramref name="globalPopup"/>, <paramref name="globalModal"/>)
+    /// fallback when the control lives under a non-camera root (screen overlay, entity visuals). Wired into
+    /// <see cref="GraphicalUiElement.ResolvePopupRoots"/> at <see cref="Initialize"/> so Gum routes ComboBox/
+    /// MenuItem popups to the opening camera's per-camera roots — drawn in that camera's pass at its zoom.
+    /// </summary>
+    internal static (InteractiveGue popup, InteractiveGue modal) ResolvePopupRootsFor(
+        GraphicalUiElement openingControl,
+        IReadOnlyList<Rendering.Camera> cameras,
+        InteractiveGue globalPopup,
+        InteractiveGue globalModal)
+    {
+        var top = openingControl;
+        while (top.EffectiveParentGue != null)
+            top = top.EffectiveParentGue;
+
+        for (int i = 0; i < cameras.Count; i++)
+        {
+            var camera = cameras[i];
+            if (ReferenceEquals(top, camera.UiRoot) ||
+                ReferenceEquals(top, camera.PopupRoot) ||
+                ReferenceEquals(top, camera.ModalRoot))
+            {
+                return (camera.PopupRoot, camera.ModalRoot);
+            }
+        }
+        return (globalPopup, globalModal);
     }
 
     internal static IReadOnlyList<string> ResolveGumFontValidationPaths(EngineInitSettings settings)
@@ -497,6 +545,14 @@ public class FlatRedBallService
         _gum.PopupRoot?.Children.Clear();
         _gum.ModalRoot?.Children.Clear();
 
+        // Unify this screen's OverlayRoot with Gum's own Root so element.AddToRoot() and
+        // screen.AddOverlay() target the same container — and AddToRoot content actually draws (the
+        // OverlayRoot is registered as a drawn overlay blob after CustomInitialize below). Per-screen:
+        // each screen's OverlayRoot becomes the Root for its lifetime, reassigned on every transition
+        // (safe per Gum's reassignable Root, vchelaru/Gum#3584). The Clear above ran against the
+        // outgoing screen's root; from here on Root is the incoming screen's.
+        _gum.Root = (InteractiveGue)screen.OverlayRoot;
+
         // Apply the screen's preferred display settings. Camera properties always apply;
         // window properties (size, resizing) only apply on Start to avoid mid-game window pops.
         var pref = screen.PreferredDisplaySettings;
@@ -521,15 +577,37 @@ public class FlatRedBallService
         Input.SetCameras((IReadOnlyList<Rendering.Camera>)screen.Cameras);
         Time.ResetScreen();
 
+        // Attach SystemManagers to the screen's Gum roots BEFORE CustomInitialize runs, so controls
+        // parented there see EffectiveManagers != null at parent-time — Gum's FrameworkElement.Loaded
+        // only fires when the parent chain already has managers when the control is added
+        // (HandleParentChanged); attaching afterward would miss it. Gated on Default (rather than
+        // _game) because the attach is meaningful exactly when managers exist: Default is set by
+        // _gum.Initialize before any screen activates. This also keeps the ordering unit-testable
+        // without a GraphicsDevice (a test can stand in a bare SystemManagers.Default).
+        if (RenderingLibrary.SystemManagers.Default != null)
+            screen.AttachManagers(RenderingLibrary.SystemManagers.Default);
+
         CurrentScreen = screen;
         screen.CustomInitialize();
         screen.InvokeInitialized();
 
         if (_game != null)
         {
-            // Wired in last so PopupRoot/ModalRoot draw on top of any overlay visuals
-            // CustomInitialize just added — draw order follows GumRenderables insertion order
-            // (see Screen.DrawOverlay). ModalRoot is added after PopupRoot so a modal blocks
+            // Register the unified OverlayRoot (== _gum.Root) as one drawn overlay blob so everything
+            // added via AddOverlay OR element.AddToRoot() renders (AddToRoot content previously
+            // received input but never drew). Registered first so it draws under the popups below.
+            screen.AddOverlayRoot(screen.OverlayRoot);
+
+            // Register each camera's per-camera popup/modal roots so popups routed to them (via
+            // GraphicalUiElement.ResolvePopupRoots) draw in that camera's pass, on top of the HUD
+            // CustomInitialize just added.
+            for (int i = 0; i < screen.Cameras.Count; i++)
+                screen.RegisterCameraPopupRoots(screen.Cameras[i]);
+
+            // Global PopupRoot/ModalRoot cover controls under non-camera roots (overlay / entity
+            // visuals), which fall back to Gum's global pair. Wired in last so they draw on top of
+            // any overlay visuals CustomInitialize just added — draw order follows GumRenderables
+            // insertion order (see Screen.DrawOverlay). ModalRoot after PopupRoot so a modal blocks
             // (draws over) an open popup, matching Gum's own "modal is always topmost" intent.
             screen.AddOverlayRoot(_gum.PopupRoot!);
             screen.AddOverlayRoot(_gum.ModalRoot!);
@@ -982,15 +1060,22 @@ public class FlatRedBallService
             // Width/Height each frame; Gum gates internally on equality and triggers its own
             // UpdateLayout when dims change).
             _gumUpdateList.Clear();
-            _gumUpdateList.Add(_gum.Root);
-            // EntityVisualsRoot sits between _gum.Root and the per-camera UiRoots so that
-            // entity-attached visuals have lower cursor priority than HUD elements (which
-            // live on Camera.UiRoot) and far lower than modal overlays (OverlayRoot, last).
-            // This matches the visual stacking: world-projected entity Gum draws beneath HUD,
-            // so its input dispatch should also lose to HUD on overlap.
+            // EntityVisualsRoot has the lowest cursor priority (first): entity-attached visuals lose
+            // to HUD elements (per-camera UiRoots) and to the overlay (OverlayRoot, last) on overlap,
+            // matching the visual stacking. OverlayRoot is now the unified GumService.Root, so
+            // AddToRoot()/AddOverlay() content is covered by the single OverlayRoot add at the end —
+            // no separate _gum.Root entry (it would be a duplicate).
             _gumUpdateList.Add(CurrentScreen.EntityVisualsRoot);
             for (int i = 0; i < CurrentScreen.Cameras.Count; i++)
-                _gumUpdateList.Add(CurrentScreen.Cameras[i].UiRoot);
+            {
+                var camera = CurrentScreen.Cameras[i];
+                _gumUpdateList.Add(camera.UiRoot);
+                // Popup/modal roots after this camera's UiRoot so an open popup/modal gets cursor
+                // priority over the HUD beneath it (later in the list = higher priority), and modal
+                // after popup so it wins over an open popup.
+                _gumUpdateList.Add(camera.PopupRoot);
+                _gumUpdateList.Add(camera.ModalRoot);
+            }
             _gumUpdateList.Add(CurrentScreen.OverlayRoot);
 
             long tGum = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -1067,6 +1152,14 @@ public class FlatRedBallService
             // UpdateLayout when changed; no explicit gating needed here.
             camera.UiRoot.Width  = camera.OrthogonalWidth  / camera.Zoom;
             camera.UiRoot.Height = camera.OrthogonalHeight / camera.Zoom;
+            // Popup/modal roots share the camera's canvas so popups routed here (via
+            // GraphicalUiElement.ResolvePopupRoots) lay out and clip against the same extents as the
+            // HUD; their draw pass inherits this camera's zoom. (Edge-repositioning of the popup
+            // itself is Gum's job — see vchelaru/Gum#3591.)
+            camera.PopupRoot.Width  = camera.UiRoot.Width;
+            camera.PopupRoot.Height = camera.UiRoot.Height;
+            camera.ModalRoot.Width  = camera.UiRoot.Width;
+            camera.ModalRoot.Height = camera.UiRoot.Height;
 
             CurrentScreen.Draw(_spriteBatch, RenderDiagnostics, camera);
         }
