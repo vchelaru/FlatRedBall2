@@ -20,6 +20,26 @@
     are produced from a SPECIFIC Apos.Shapes version's shader source — bumping the
     package without rebuilding them ships a stale shader against a new runtime.
 
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │  ⚠  LOCAL PATCH: the shipped XNBs are NOT stock Apos.Shapes source.       │
+    └─────────────────────────────────────────────────────────────────────────┘
+
+    The precompiled apos-shapes.xnb carries a local fix to Apos.Shapes' Unpair()
+    shader function (issue #663). Its floor(sqrt(n)) decode mis-reads a packed
+    color byte of 0 on macOS's GL driver — sqrt of a perfect square rounds just
+    below the integer — forcing the blue channel of opaque filled shapes to 1.0.
+    The exact diff is in apos-shapes-663.patch (sibling file).
+
+    Consequence: rebuilding the XNBs from the stock package source (step 1 below)
+    REVERTS the fix. Until it ships in a released Apos.Shapes version, either
+      (a) re-apply apos-shapes-663.patch to the shader before recompiling, or
+      (b) bump $(AposShapesVersion) to the fixed release — which makes the local
+          patch unnecessary; delete apos-shapes-663.patch and this note then.
+
+    Scope: currently only the DesktopGL xnb is patched (that's where the bug was
+    observed). The BlazorGL (web) xnb is still stock — the same bug is latent
+    there but unconfirmed on WebGL. Option (b) fixes both at once.
+
     After changing $(AposShapesVersion):
       1. Rebuild a sample on each platform (DesktopGL, BlazorGL) so the content
          pipeline compiles fresh apos-shapes.xnb files. Use the PINNED MonoGame

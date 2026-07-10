@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
   <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
+  <Project Path="../../src/Animation.Content/FlatRedBall2.Animation.Content.csproj" />
   <Project Path="PlatformKing.Common/PlatformKing.Common.csproj" />
   <Project Path="PlatformKing.Desktop/PlatformKing.Desktop.csproj" />
   <Project Path="PlatformKing.BlazorGL/PlatformKing.BlazorGL.csproj" />

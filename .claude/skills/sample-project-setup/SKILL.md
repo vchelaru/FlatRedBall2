@@ -45,7 +45,7 @@ Do **not** pin `Apos.Shapes` — version flows transitively from the engine (`$(
 
 ### 1b. Add `YourSample.slnx` (REQUIRED — easy to forget)
 
-A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. Minimal content — the sample csproj plus the engine csproj:
+A sibling solution file lets the user open the sample in VS / Rider without loading every other sample in the repo. Minimal content — the sample csproj, the engine csproj, and the engine's `Animation.Content` dependency:
 
 > **Anti-precedent warning.** Roughly a third of the existing samples in `samples/auto/` are missing this file — that's drift, not the rule. If you scaffolded a new project by copying a sibling sample, the `.slnx` may not be there to copy. Add it from the template below; do not infer the pattern from the directory listing of one neighbor.
 
@@ -53,9 +53,12 @@ A sibling solution file lets the user open the sample in VS / Rider without load
 ```xml
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../src/Animation.Content/FlatRedBall2.Animation.Content.csproj" />
   <Project Path="YourSample.csproj" />
 </Solution>
 ```
+
+Include `Animation.Content` even though the sample never references it directly: `FlatRedBall2.csproj` project-references it, and IDE solution restore (Rider/VS) needs every project in the reference graph. Omit it and the solution fails to restore with `NU1105: Unable to find project information for ...FlatRedBall2.Animation.Content.csproj`. The `dotnet` CLI follows the `ProjectReference` transitively, so a `dotnet build`/`run` of the csproj hides the gap — the error only surfaces when someone opens the `.slnx`.
 
 ### 2. Add `.config/dotnet-tools.json` (REQUIRED — easy to forget)
 
