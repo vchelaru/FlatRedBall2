@@ -6,7 +6,8 @@
     On macOS and Linux, this requires Wine. To avoid that dependency, we ship precompiled XNBs
     for known platforms and skip Apos.Shapes' built-in shader compilation.
 
-    Unknown platforms fall back to normal compilation (Apos.Shapes' own MSBuild targets handle it).
+    Unknown platforms fall back to normal compilation (Apos.Shapes' own MSBuild targets handle
+    it): a non-DesktopGL MonoGame target (e.g. WindowsDX) matches neither platform section below.
 
     The Apos.Shapes PACKAGE version is centralized in AposShapes.props (sibling file) as
     $(AposShapesVersion) — see that file for the rule on rebuilding these XNBs after a bump.
@@ -15,33 +16,33 @@
     To add a new platform:
       1. Build a sample on that platform so the content pipeline compiles apos-shapes.xnb
       2. Copy the resulting .xnb into a new subfolder here (e.g. DirectX/)
-      3. Add the platform to the condition below
+      3. Add a platform section below, following the DesktopGL / BlazorGL pattern
       4. Update ShapesBatch.AposShapesVersion (C# const) to match $(AposShapesVersion)
+
+    NOTE: the two platforms are wired DIFFERENTLY on purpose — read each section's comment.
+    KNI's platform property is known during .props evaluation; MonoGame's is NOT.
   -->
 
   <PropertyGroup>
     <_FRB2PrecompiledShadersDir>$(MSBuildThisFileDirectory)</_FRB2PrecompiledShadersDir>
   </PropertyGroup>
 
-  <!-- MonoGame DesktopGL -->
-  <PropertyGroup Condition="'$(MonoGamePlatform)' == 'DesktopGL'">
-    <_FRB2HasPrecompiledAposShapes>true</_FRB2HasPrecompiledAposShapes>
-    <_FRB2AposShapesPlatformDir>DesktopGL</_FRB2AposShapesPlatformDir>
-  </PropertyGroup>
+  <!--
+    ===========================================================================
+    KNI BlazorGL
 
-  <!-- KNI BlazorGL -->
+    $(KniPlatform) is set in KNI's buildTransitive *.props, which import BEFORE
+    the project body. So it is already resolved when this .props evaluates, and
+    the KNI path can safely gate on it in a <PropertyGroup>.
+
+    KNI's props already added a KniContentReference (the compile trigger) before
+    we ran, so SkipAposShapeContent by itself is too late — we also remove that
+    reference explicitly.
+    ===========================================================================
+  -->
   <PropertyGroup Condition="'$(KniPlatform)' == 'BlazorGL'">
     <_FRB2HasPrecompiledAposShapes>true</_FRB2HasPrecompiledAposShapes>
     <_FRB2AposShapesPlatformDir>BlazorGL</_FRB2AposShapesPlatformDir>
-  </PropertyGroup>
-
-  <!--
-    When we have a precompiled XNB, skip Apos.Shapes' own shader compilation and copy ours.
-    SkipAposShapeContent works for MonoGame (its props are evaluated after the project body).
-    For KNI, the buildTransitive props run BEFORE the project body, so SkipAposShapeContent
-    is too late — we also remove the KniContentReference that was already added.
-  -->
-  <PropertyGroup Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true'">
     <SkipAposShapeContent>true</SkipAposShapeContent>
   </PropertyGroup>
 
@@ -49,17 +50,9 @@
     <KniContentReference Remove="$(AposShapesPath)" />
   </ItemGroup>
 
-  <!-- Desktop (MonoGame): copy precompiled XNB to Content/ in build output -->
-  <ItemGroup Condition="'$(_FRB2HasPrecompiledAposShapes)' == 'true' and '$(KniPlatform)' == ''">
-    <Content Include="$(_FRB2PrecompiledShadersDir)$(_FRB2AposShapesPlatformDir)\apos-shapes.xnb">
-      <Link>Content\apos-shapes.xnb</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
   <!--
-    BlazorGL (KNI): copy precompiled XNB to wwwroot/Content/ so Blazor's static asset
-    pipeline serves it. Uses a Copy target (not a Content item) to avoid conflicting with
+    Copy the precompiled XNB to wwwroot/Content/ so Blazor's static asset pipeline
+    serves it. Uses a Copy target (not a Content item) to avoid conflicting with
     Blazor's auto-discovered wwwroot assets.
   -->
   <Target Name="_FRB2CopyPrecompiledAposShapesToWwwroot"
@@ -68,6 +61,49 @@
     <Copy SourceFiles="$(_FRB2PrecompiledShadersDir)$(_FRB2AposShapesPlatformDir)\apos-shapes.xnb"
           DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\Content\"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    ===========================================================================
+    MonoGame DesktopGL  —  READ THIS BEFORE "SIMPLIFYING" IT TO A <PropertyGroup>
+
+    Do NOT gate this on <PropertyGroup Condition="'$(MonoGamePlatform)' == 'DesktopGL'">.
+    $(MonoGamePlatform) is set in MonoGame.Framework.DesktopGL's *.targets, which
+    import AFTER the project body. This .props is imported within the project body,
+    so during property evaluation $(MonoGamePlatform) is still EMPTY here, and a
+    property-group gate on it silently no-ops.
+
+    That was issue #666: with a dead gate the precompiled xnb never got copied,
+    Apos.Shapes fell back to compiling its .fx, and every desktop build broke on
+    macOS/Linux because that compile needs Wine. Windows hid it (it compiles the
+    shader natively, no Wine), and the templates only "worked" because each set
+    <MonoGamePlatform> manually before the import — a per-csproj line every new
+    project had to remember, and all the samples forgot.
+
+    Fix: read $(MonoGamePlatform) only where it resolves to its FINAL value — item
+    conditions and target conditions, both evaluated after all properties/imports.
+    This also frees consumer .csproj files from having to pre-set <MonoGamePlatform>.
+    ===========================================================================
+  -->
+
+  <!-- Copy the precompiled XNB into the build output's Content/ folder. -->
+  <ItemGroup Condition="'$(MonoGamePlatform)' == 'DesktopGL'">
+    <Content Include="$(_FRB2PrecompiledShadersDir)DesktopGL\apos-shapes.xnb">
+      <Link>Content\apos-shapes.xnb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Skip Apos.Shapes' own MGCB shader compile (the Wine trigger) by removing its
+       content reference right before MGCB collects references. A target is required
+       because the equivalent property (SkipAposShapeContent) can't be set from a
+       property-group gate here — see the note above. -->
+  <Target Name="_FRB2SkipAposShapesContentDesktopGL"
+          Condition="'$(MonoGamePlatform)' == 'DesktopGL'"
+          BeforeTargets="CollectContentReferences">
+    <ItemGroup>
+      <MonoGameContentReference Remove="$(AposShapesPath)" />
+    </ItemGroup>
   </Target>
 
 </Project>
