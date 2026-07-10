@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base href="/FlatRedBall2/AnimationEditor/" />
+    <title>AnimationEditor.Browser (#535 spike)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Avalonia's .avalonia-native-host div (hosts native text-input elements) sits on top of
+           the canvas in DOM/paint order. Without an explicit transparent background it inherits an
+           opaque dark fill (observed rgb(20,21,21), likely browser auto-dark-theme on unstyled
+           elements) that fully hides whatever the canvas drew underneath. */
+        .avalonia-native-host { background: transparent !important; }
+
+        /* #535 M4 load indicator. #out's children are replaced wholesale by Avalonia's own
+           canvas/native-host divs once the framework attaches (Avalonia.Browser has no built-in
+           splash-screen mechanism as of 12.0.1 -- checked the shipped avalonia.js directly), so
+           this markup just needs to live inside #out; it disappears on its own, no JS required. */
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: #181c24;
+            color: #e6e6e6;
+            font: 14px/1.4 -apple-system, Segoe UI, sans-serif;
+        }
+        #loading .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #3c4250;
+            border-top-color: #5aa0ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body style="margin: 0; overflow: hidden">
+<div id="out">
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Loading Animation Editor…</div>
+    </div>
+</div>
+<script type='module' src="./main.js"></script>
+</body>
+
+</html>
