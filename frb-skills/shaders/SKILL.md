@@ -16,6 +16,8 @@ FlatRedBall2 ships precompiled `.xnb` shaders for its built-in Apos.Shapes depen
 
 Projects import `AposShapesPrecompiled.props` to use these instead of compiling from source. Unknown platforms fall back to normal Apos.Shapes shader compilation.
 
+**These xnbs are duplicated in a second place: the dotnet templates' build folders** — `templates/frb2-desktop/build/` and `templates/frb2-multiplatform/build/` (each has a `DesktopGL/`; multiplatform also `BlazorGL/`), plus a copy of `AposShapesPrecompiled.props`. Any edit to a `src/PrecompiledShaders/<platform>/apos-shapes.xnb` must be copied byte-for-byte into the matching template folder(s). `TemplatePackageReferenceTests` fails CI on drift — run it after touching an xnb. This is invariant for *any* xnb change; the `AposShapes.props` rebuild checklist frames the sync under a version bump, but it isn't bump-specific.
+
 The package version is centralized in `$(AposShapesVersion)` (`src/PrecompiledShaders/AposShapes.props`), imported by the engine. Apos.Shapes ships only `buildTransitive` assets, so both the version and the `SkipAposShapeContent` precompiled-XNB skip flow identically whether the package is referenced directly or transitively — sample Desktop projects inherit it from the engine and don't pin it. Re-adding a per-sample pin only reintroduces the drift `NU1605` then fails the build on; bump the prop instead.
 
 ### Version Guard
