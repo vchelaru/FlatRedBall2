@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.EditorNotificationOverlay"
+             IsHitTestVisible="False">
+    <!--
+        Phase 15: item-deleted undo toast, generic status toast, and error banner lifted from
+        desktop MainWindow.axaml overlays so the browser build can host them without duplicating
+        timer/dismiss logic. IsHitTestVisible=False on the root so hidden overlays never block
+        the editor; each visible panel re-enables hit-testing on itself.
+    -->
+    <Panel>
+        <Border x:Name="ItemDeletedToastPanel" x:FieldModifier="Public"
+                IsVisible="False"
+                IsHitTestVisible="True"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,30"
+                Background="#333"
+                CornerRadius="4"
+                Padding="12,6"
+                ZIndex="50">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="ItemDeletedToastLabel" x:FieldModifier="Public"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           FontSize="12" />
+                <Button x:Name="ItemDeletedToastUndoBtn" x:FieldModifier="Public"
+                        Content="Undo"
+                        Padding="8,3"
+                        FontSize="12" />
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="ErrorBanner" x:FieldModifier="Public"
+                IsVisible="False"
+                IsHitTestVisible="True"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,16,0,0"
+                MaxWidth="640"
+                Background="#2D2122"
+                BorderBrush="#E0533F"
+                BorderThickness="1.5"
+                CornerRadius="6"
+                Padding="14,10"
+                ZIndex="60">
+            <DockPanel>
+                <Button x:Name="ErrorBannerDismissBtn" x:FieldModifier="Public"
+                        DockPanel.Dock="Right"
+                        Content="✕"
+                        Width="24" Height="22"
+                        Margin="10,0,0,0"
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        Foreground="#E8B0A8"
+                        VerticalAlignment="Top" />
+                <TextBlock DockPanel.Dock="Left"
+                           Text="⚠"
+                           FontSize="15"
+                           Foreground="#F2A03E"
+                           Margin="0,0,10,0"
+                           VerticalAlignment="Top" />
+                <TextBlock x:Name="ErrorBannerText" x:FieldModifier="Public"
+                           FontSize="12"
+                           Foreground="#F5E2DF"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <Border x:Name="ToastPanel" x:FieldModifier="Public"
+                IsVisible="False"
+                IsHitTestVisible="True"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Stretch"
+                Margin="0,0,0,22"
+                Background="{DynamicResource BgRail}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,1,0,0"
+                Height="36"
+                ZIndex="10">
+            <DockPanel Margin="16,0">
+                <Button x:Name="ToastDismissBtn" x:FieldModifier="Public"
+                        DockPanel.Dock="Right"
+                        Content="✕"
+                        Width="28" Height="22"
+                        Padding="0" BorderThickness="0"
+                        Background="Transparent"
+                        Foreground="{DynamicResource InkMid}"
+                        VerticalAlignment="Center" />
+                <Button x:Name="ToastRetryBtn" x:FieldModifier="Public"
+                        DockPanel.Dock="Right"
+                        Content="Retry"
+                        Height="22"
+                        Padding="8,0"
+                        Margin="0,0,4,0"
+                        VerticalAlignment="Center" />
+                <TextBlock x:Name="ToastMessage" x:FieldModifier="Public"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="{DynamicResource InkMid}"
+                           TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+    </Panel>
+</UserControl>

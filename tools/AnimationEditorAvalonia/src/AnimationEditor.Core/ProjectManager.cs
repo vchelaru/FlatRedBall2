@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
@@ -163,31 +164,80 @@ namespace AnimationEditor.Core
             var acls = AnimationChainListSave;
             if (acls == null) return;
 
-            var diskFormat = OnDiskCoordinateType;
+            RunWithDiskCoordinateConversion(acls, () => acls.Save(stream));
+        }
 
+        /// <summary>
+        /// Async counterpart to <see cref="SaveAnimationChainList(Stream)"/> for destination
+        /// streams that only support async writes -- the browser-wasm build's
+        /// <c>IStorageFile.OpenWriteAsync()</c> stream throws on a synchronous write, which
+        /// <see cref="AnimationChainListSave.Save(Stream)"/> would otherwise trigger from inside
+        /// <c>XmlWriter.Dispose()</c>. See <see cref="AnimationChainListSave.SaveAsync"/>.
+        /// </summary>
+        public async Task SaveAnimationChainListAsync(Stream stream)
+        {
+            var acls = AnimationChainListSave;
+            if (acls == null) return;
+
+            await RunWithDiskCoordinateConversionAsync(acls, () => acls.SaveAsync(stream));
+        }
+
+        /// <summary>
+        /// Converts <paramref name="acls"/> to <see cref="OnDiskCoordinateType"/> (using
+        /// <see cref="_knownTextureSizes"/> in place of a directory read), runs
+        /// <paramref name="save"/>, then converts back to UV so the in-memory model is
+        /// unaffected. Skips the conversion round-trip entirely when the disk format is already
+        /// UV. Shared by the sync and async stream-save overloads.
+        /// </summary>
+        private void RunWithDiskCoordinateConversion(AnimationChainListSave acls, Action save)
+        {
+            var diskFormat = OnDiskCoordinateType;
             if (diskFormat == TextureCoordinateType.UV)
             {
-                acls.Save(stream);
+                save();
                 return;
             }
 
-            Dictionary<string, (int W, int H)>? seedCache = null;
-            if (_knownTextureSizes != null)
-            {
-                seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
-                foreach (var entry in _knownTextureSizes)
-                    seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
-            }
-
-            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, seedCache);
+            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, BuildSeedCache());
             try
             {
-                acls.Save(stream);
+                save();
             }
             finally
             {
                 ConvertCoordinates(acls, achxDirectory: string.Empty, TextureCoordinateType.UV, sizes);
             }
+        }
+
+        /// <summary>Async twin of <see cref="RunWithDiskCoordinateConversion"/>.</summary>
+        private async Task RunWithDiskCoordinateConversionAsync(AnimationChainListSave acls, Func<Task> save)
+        {
+            var diskFormat = OnDiskCoordinateType;
+            if (diskFormat == TextureCoordinateType.UV)
+            {
+                await save();
+                return;
+            }
+
+            var sizes = ConvertCoordinates(acls, achxDirectory: string.Empty, diskFormat, BuildSeedCache());
+            try
+            {
+                await save();
+            }
+            finally
+            {
+                ConvertCoordinates(acls, achxDirectory: string.Empty, TextureCoordinateType.UV, sizes);
+            }
+        }
+
+        private Dictionary<string, (int W, int H)>? BuildSeedCache()
+        {
+            if (_knownTextureSizes == null) return null;
+
+            var seedCache = new Dictionary<string, (int W, int H)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in _knownTextureSizes)
+                seedCache[entry.Key] = (entry.Value.Width, entry.Value.Height);
+            return seedCache;
         }
 
         /// <summary>

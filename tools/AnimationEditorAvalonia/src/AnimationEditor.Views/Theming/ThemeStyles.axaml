@@ -1,13 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Phase 6 (#630): style classes shared by AnimationEditor.App and AnimationEditor.Browser, moved
-         out of AnimationEditor.App/App.axaml verbatim. Separate file from ThemeTokens.axaml because
-         Avalonia Style elements live under a Styles root, not a ResourceDictionary root; the two can't
-         be merged into one file. Included via StyleInclude inside Application.Styles, alongside
-         ThemeTokens.axaml's ResourceInclude inside Application.Resources.
-
-         Deliberately excluded: Button.plus/Button.minus (render an SVG icon; AnimationEditor.Views/
-         .Browser don't reference Avalonia.Svg.Skia yet, see Phase 7). -->
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia">
+    <!-- Phase 6 (#630) + Phase 7 (#644): style classes shared by AnimationEditor.App and
+         AnimationEditor.Browser. Icon-dependent .plus/.minus moved here in Phase 7; ButtonSpinner
+         ControlTheme lives in ThemeIconResources.axaml (ResourceDictionary, not Styles root). -->
 
     <!-- Compact buttons: override FluentTheme MinHeight so small +/- buttons aren't stretched -->
     <Style Selector="Button.compact">
@@ -51,5 +47,24 @@
     <!-- Disabled buttons: dim so the user can tell they are unavailable -->
     <Style Selector="Button:disabled">
         <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
+    <Style Selector="Button.plus">
+        <Setter Property="ContentTemplate">
+            <DataTemplate>
+                <svg:Svg Width="10" Height="10"
+                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconPlus.svg"
+                         CurrentColor="{DynamicResource IconInk}" />
+            </DataTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.minus">
+        <Setter Property="ContentTemplate">
+            <DataTemplate>
+                <svg:Svg Width="10" Height="10"
+                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconMinus.svg"
+                         CurrentColor="{DynamicResource IconInk}" />
+            </DataTemplate>
+        </Setter>
     </Style>
 </Styles>

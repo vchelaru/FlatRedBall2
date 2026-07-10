@@ -13,6 +13,8 @@
            to the same values/behavior as desktop. -->
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://AnimationEditor.Views/Theming/ThemeTokens.axaml" />
+        <!-- Phase 7 (#644): ButtonSpinner ControlTheme with shared SVG chevrons. -->
+        <ResourceInclude Source="avares://AnimationEditor.Views/Theming/ThemeIconResources.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
@@ -20,8 +22,7 @@
   <Application.Styles>
     <FluentTheme />
     <!-- Shared style classes (.compact, .flanker, NumericUpDown/ButtonSpinner defaults, disabled
-         opacity); same file AnimationEditor.App includes. .plus/.minus (icon-dependent) and the
-         ButtonSpinner ControlTheme override are not in this file yet; see Phase 7. -->
+         opacity, .plus/.minus icon buttons); same file AnimationEditor.App includes. -->
     <StyleInclude Source="avares://AnimationEditor.Views/Theming/ThemeStyles.axaml" />
   </Application.Styles>
 </Application>

@@ -4,27 +4,48 @@
              x:Class="AnimationEditor.Views.Controls.AnimationTreeControl">
     <TreeView x:Name="Tree" SelectionMode="Single">
         <TreeView.Styles>
-            <!-- Phase 1 is read-only browsing: no zebra striping, add-frame button, or
-                 drag-reorder yet. Chain rename (#610) is the one editing feature so far.
-                 See docs/BROWSER_TREE_INSPECTOR_DECISION.md. -->
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+            </Style>
+            <!-- Phase 15: hover-reveal add-frame button on chain rows, matching desktop. -->
+            <Style Selector="Button.add-frame-btn">
+                <Setter Property="Opacity" Value="0" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Focusable" Value="False" />
+            </Style>
+            <Style Selector="TreeViewItem:pointerover Button.add-frame-btn">
+                <Setter Property="Opacity" Value="1" />
+                <Setter Property="IsHitTestVisible" Value="True" />
+                <Setter Property="Focusable" Value="True" />
             </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="models:TreeNodeVm" ItemsSource="{Binding Children}">
-                <Panel>
-                    <TextBlock Text="{Binding Header}"
-                               Padding="4,2"
-                               IsVisible="{Binding !IsEditing}"
-                               DoubleTapped="OnHeaderDoubleTapped" />
-                    <!-- Matches TextBlock padding so it occupies the same spot while editing. -->
-                    <TextBox Text="{Binding EditingText, Mode=TwoWay}"
-                             IsVisible="{Binding IsEditing}"
-                             Padding="2,1"
-                             KeyDown="OnRenameKeyDown"
-                             LostFocus="OnRenameLostFocus" />
-                </Panel>
+                <Grid HorizontalAlignment="Stretch">
+                    <Panel>
+                        <TextBlock Text="{Binding Header}"
+                                   Padding="4,2"
+                                   Margin="0,0,28,0"
+                                   IsVisible="{Binding !IsEditing}"
+                                   DoubleTapped="OnHeaderDoubleTapped" />
+                        <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                 IsVisible="{Binding IsEditing}"
+                                 Padding="2,1"
+                                 KeyDown="OnRenameKeyDown"
+                                 LostFocus="OnRenameLostFocus" />
+                    </Panel>
+                    <Button Classes="add-frame-btn plus"
+                            IsVisible="{Binding IsChainNode}"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Width="22" Height="22"
+                            Padding="0"
+                            Margin="0,0,4,0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Click="OnAddFrameBtnClick"
+                            DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                </Grid>
             </TreeDataTemplate>
         </TreeView.ItemTemplate>
     </TreeView>

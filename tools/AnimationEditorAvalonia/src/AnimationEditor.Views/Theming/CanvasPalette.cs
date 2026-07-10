@@ -32,8 +32,10 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Dark = new(
         Background:      new SKColor(0x0e, 0x0f, 0x12),
         TextureOutline:  new SKColor(255, 255, 255, 160),
-        GridLineMinor:   new SKColor(255, 255, 255, 40),
-        GridLineMajor:   new SKColor(255, 255, 255, 80),
+        // Slightly above the historical 40/80 so empty canvas still reads, without the
+        // brief 120/200 pass that competed with frame overlays.
+        GridLineMinor:   new SKColor(255, 255, 255, 60),
+        GridLineMajor:   new SKColor(255, 255, 255, 100),
         RulerBackground: new SKColor(50, 50, 55),
         RulerTick:       new SKColor(160, 160, 165),
         RulerLabel:      new SKColor(190, 190, 195),
@@ -44,8 +46,8 @@ internal readonly record struct CanvasPalette(
     public static readonly CanvasPalette Light = new(
         Background:      new SKColor(0xe8, 0xea, 0xed),
         TextureOutline:  new SKColor(0, 0, 0, 140),
-        GridLineMinor:   new SKColor(0, 0, 0, 34),
-        GridLineMajor:   new SKColor(0, 0, 0, 70),
+        GridLineMinor:   new SKColor(0, 0, 0, 60),
+        GridLineMajor:   new SKColor(0, 0, 0, 110),
         RulerBackground: new SKColor(225, 227, 231),
         RulerTick:       new SKColor(110, 116, 124),
         RulerLabel:      new SKColor(80, 86, 94),

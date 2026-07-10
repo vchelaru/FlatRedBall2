@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:AnimationEditor.Views.Controls"
+             x:Class="AnimationEditor.Views.Controls.TextureListPanel">
+    <!--
+        Phase 12 (#655): "This File" scope only, lists exactly the active tab's referenced
+        texture names via AnimationEditor.Core.Data.TextureListBuilder.GetAvailableTextures, a
+        pure, disk-free function. Desktop's "Project" scope (whole-folder disk scan) has no
+        browser equivalent and isn't attempted here; see docs/BROWSER_FILES_PANEL_DECISION.md.
+    -->
+    <Grid>
+        <TextBlock x:Name="EmptyLabel" x:FieldModifier="Public"
+                   Text="No textures referenced." IsVisible="False"
+                   Foreground="{DynamicResource InkDim}"
+                   FontStyle="Italic" HorizontalAlignment="Center" Margin="0,12,0,0" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="TextureItems" x:FieldModifier="Public">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="controls:TextureRowVm">
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="8,4">
+                            <Image Source="{Binding Thumbnail}" Width="24" Height="24" Stretch="Uniform" />
+                            <TextBlock Text="{Binding Name}" FontSize="11" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

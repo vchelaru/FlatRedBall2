@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -196,6 +198,27 @@ public class AnimationChainListSave
         };
         using var writer = XmlWriter.Create(stream, settings);
         ToXDocument().Save(writer);
+    }
+
+    /// <summary>
+    /// Async-safe counterpart to <see cref="Save(Stream)"/> for destination streams that only
+    /// support async writes -- e.g. Avalonia's browser <c>IStorageFile.OpenWriteAsync()</c> stream,
+    /// backed by the File System Access API. <see cref="XmlWriter"/> writes synchronously, so
+    /// handing it such a stream directly throws from inside <c>XmlWriter.Dispose()</c>; on WASM
+    /// that takes down the whole runtime instead of raising a catchable exception. This method
+    /// serializes to an in-memory buffer first (where synchronous writes are always safe), then
+    /// copies the result to <paramref name="stream"/> asynchronously.
+    /// </summary>
+    public async Task SaveAsync(Stream stream, CancellationToken cancellationToken = default)
+    {
+        using var buffer = new MemoryStream();
+        Save(buffer);
+        // MemoryStream.CopyToAsync(stream) would defeat the point of this method: it has a
+        // synchronous fast path that calls stream.Write(...) directly since the source is
+        // already fully in memory. Call stream.WriteAsync explicitly so an async-only
+        // destination (e.g. the browser's WriteableStream) is never handed a sync write.
+        await stream.WriteAsync(buffer.GetBuffer().AsMemory(0, (int)buffer.Length), cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>

@@ -5,11 +5,8 @@
          DynamicResource the same brushes/colors desktop does. Consumers MUST use DynamicResource, never
          StaticResource; these live in ThemeDictionaries so they switch with the active ThemeVariant.
 
-         Deliberately excluded from this file: the ButtonSpinner ControlTheme override and the
-         Button.plus/Button.minus style classes. All three render an SVG icon via
-         Avalonia.Svg.Skia, which AnimationEditor.Views/.Browser don't reference yet; see Phase 7
-         (#631+) for the icon system spike/rollout. Until then NumericUpDown falls back to Fluent's
-         default spinner in the browser, an acceptable interim state. -->
+         Icon-dependent ButtonSpinner / .plus / .minus moved to ThemeIconResources.axaml and
+         ThemeStyles.axaml in Phase 7 (#644). -->
     <ResourceDictionary.ThemeDictionaries>
 
         <ResourceDictionary x:Key="Dark">

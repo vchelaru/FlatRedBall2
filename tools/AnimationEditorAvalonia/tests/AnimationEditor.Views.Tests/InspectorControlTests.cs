@@ -6,6 +6,7 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using FlatRedBall2.Animation;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.Collections.Generic;
@@ -90,6 +91,7 @@ public class InspectorControlTests
         Assert.False(control.NoSelectionPanel.IsVisible);
         Assert.Contains("hero.png", control.FrameTextureText.Text);
         Assert.Contains("0.125", control.FrameLengthText.Text);
+        Assert.Equal(0.125m, control.FrameLengthInput.Value);
     }
 
     [AvaloniaFact]
@@ -131,6 +133,27 @@ public class InspectorControlTests
         Assert.Equal(1m, control.CircleXInput.Value);
         Assert.Equal(2m, control.CircleYInput.Value);
         Assert.Equal(12m, control.CircleRadiusInput.Value);
+    }
+
+    // Phase 9 (#649): sectioned headers matching desktop's MainWindow inspector naming
+    // (COORDINATES/TIMING/TRANSFORM/TEXTURE/COLOR) -- InspectorControl itself isn't shared with
+    // desktop (MainWindow has its own separate, richer inline inspector; confirmed by grepping
+    // AnimationEditor.App for InspectorControl -- no source references, only compiled-binary
+    // matches), so this is a visual-parity restyle of the browser's simpler control, not a
+    // shared-file edit that could regress desktop.
+    [AvaloniaFact]
+    public void FrameSelected_ShowsSectionHeaders_MatchingDesktopNaming()
+    {
+        var (control, state) = Build();
+        var frame = new AnimationFrameSave { TextureName = "hero.png" };
+
+        state.SelectedFrame = frame;
+
+        Assert.Equal("COORDINATES", control.CoordinatesHeader.Text);
+        Assert.Equal("TIMING", control.TimingHeader.Text);
+        Assert.Equal("TRANSFORM", control.TransformHeader.Text);
+        Assert.Equal("TEXTURE", control.TextureHeader.Text);
+        Assert.Equal("COLOR", control.ColorHeader.Text);
     }
 
     [AvaloniaFact]
@@ -187,6 +210,121 @@ public class InspectorControlTests
         state.SelectedRectangle = rect;
 
         return (control, appCommands, rect, circle, state);
+    }
+
+    private static (InspectorControl Control, IAppCommands Commands, AnimationFrameSave Frame, SelectedState State)
+        BuildWithEditableFrame(int textureW = 64, int textureH = 64)
+    {
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "a.png",
+            FrameLength = 0.1f,
+            LeftCoordinate = 0f,
+            TopCoordinate = 0f,
+            RightCoordinate = 0.5f,
+            BottomCoordinate = 0.5f,
+            RelativeX = 0f,
+            RelativeY = 0f,
+            ShapesSave = new ShapesSave(),
+        };
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(frame);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(chain);
+
+        var pm = new FakeProjectManager { AnimationChainListSave = acls };
+        var state = new SelectedState(pm);
+        var events = new ApplicationEvents();
+        var appState = new AppState(events, state);
+        var ioManager = new IoManager(appState);
+        var objectFinder = new ObjectFinder(pm);
+        var undoManager = new UndoManager();
+        var appCommands = new AppCommands(pm, state, events, ioManager, objectFinder, undoManager);
+
+        var control = new InspectorControl();
+        control.InitializeServices(state);
+        control.EnableEditing(appCommands, _ => (textureW, textureH));
+        state.SelectedFrame = frame;
+
+        return (control, appCommands, frame, state);
+    }
+
+    [AvaloniaFact]
+    public void FrameSelected_WithTextureSize_ShowsEditablePixelFields()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        Assert.True(control.FramePanel.IsVisible);
+        Assert.Equal(0m, control.FramePixelXInput.Value);
+        Assert.Equal(0m, control.FramePixelYInput.Value);
+        Assert.Equal(32m, control.FramePixelWInput.Value);
+        Assert.Equal(32m, control.FramePixelHInput.Value);
+        Assert.Equal(0.1m, control.FrameLengthInput.Value);
+        Assert.Equal(frame.TextureName, control.FrameTextureText.Text);
+    }
+
+    [AvaloniaFact]
+    public void CommitFrameLength_AppliesEditedValue()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        control.FrameLengthInput.Value = 0.25m;
+        control.CommitFrameLength();
+
+        Assert.Equal(0.25f, frame.FrameLength);
+    }
+
+    [AvaloniaFact]
+    public void CommitFramePixelRegion_AppliesEditedValues()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        control.FramePixelXInput.Value = 8m;
+        control.FramePixelYInput.Value = 4m;
+        control.FramePixelWInput.Value = 16m;
+        control.FramePixelHInput.Value = 24m;
+        control.CommitFramePixelRegion();
+
+        Assert.Equal(8f / 64f, frame.LeftCoordinate, precision: 4);
+        Assert.Equal(4f / 64f, frame.TopCoordinate, precision: 4);
+        Assert.Equal(24f / 64f, frame.RightCoordinate, precision: 4);
+        Assert.Equal(28f / 64f, frame.BottomCoordinate, precision: 4);
+    }
+
+    [AvaloniaFact]
+    public void EditingSingleFrameLength_ViaValueChanged_CommitsImmediately()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        control.FrameLengthInput.Value = 0.5m;
+
+        Assert.Equal(0.5f, frame.FrameLength);
+    }
+
+    [AvaloniaFact]
+    public void CommitFrameColor_AppliesRgbChannels()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        control.FrameRedInput.Value = 200m;
+        control.FrameGreenInput.Value = 100m;
+        control.FrameBlueInput.Value = 50m;
+        control.CommitFrameColor();
+
+        Assert.Equal(200, frame.Red);
+        Assert.Equal(100, frame.Green);
+        Assert.Equal(50, frame.Blue);
+    }
+
+    [AvaloniaFact]
+    public void CommitFrameColorOperation_AppliesMultiplyMode()
+    {
+        var (control, _, frame, _) = BuildWithEditableFrame();
+
+        control.FrameColorModeCombo.SelectedIndex = 1;
+        control.CommitFrameColorOperation();
+
+        Assert.Equal(ColorOperation.Multiply, frame.ColorOperation);
     }
 
     [AvaloniaFact]
