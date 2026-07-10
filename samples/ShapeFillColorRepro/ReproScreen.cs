@@ -10,8 +10,8 @@ namespace ShapeFillColorRepro;
 //
 // The window shows a single centered rectangle — the only filled shape drawn, so it IS that first
 // shape. Just look at its color:
-//     black -> fixed
-//     blue  -> bug (run with FRB2_DISABLE_FILL_PRIME=1 to see it on an affected Mac)
+//     blue  -> bug   (this sample's default on an affected Mac)
+//     black -> fixed (run with FRB2_DISABLE_FILL_PRIME=0)
 public class ReproScreen : Screen
 {
     public override void CustomInitialize()

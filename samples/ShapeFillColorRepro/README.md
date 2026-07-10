@@ -11,17 +11,22 @@ shape. Just look at its color.
 
 ## Run it (flip the fix on/off)
 
+This sample **defaults to showing the bug**, so a fresh `dotnet run` reproduces it immediately:
+
 ```
-dotnet run                              # fix ON  -> BLACK rectangle
-FRB2_DISABLE_FILL_PRIME=1 dotnet run    # fix OFF -> BLUE rectangle on an affected Mac
+dotnet run                              # BLUE rectangle (bug) on an affected Mac — the default
+FRB2_DISABLE_FILL_PRIME=0 dotnet run    # BLACK rectangle (fix)
 ```
 
 | What you see | Meaning |
 |---|---|
-| Black rectangle on gray | Correct (fix working) |
-| Blue rectangle on gray  | Bug reproduced |
+| Blue rectangle on gray  | Bug reproduced (this sample's default) |
+| Black rectangle on gray | Fix working (`FRB2_DISABLE_FILL_PRIME=0`) |
 
 Press Escape to quit.
 
-If the rectangle is black even with `FRB2_DISABLE_FILL_PRIME=1`, the bug does not reproduce on your
-machine — reconcile that before trusting the fix.
+The default only affects this sample: `Program.cs` sets `FRB2_DISABLE_FILL_PRIME=1` when unset, while
+the engine's own default keeps the fix on for every other sample and game.
+
+If the rectangle is **black on the plain `dotnet run`**, the bug does not reproduce on your machine —
+reconcile that before trusting the fix.
