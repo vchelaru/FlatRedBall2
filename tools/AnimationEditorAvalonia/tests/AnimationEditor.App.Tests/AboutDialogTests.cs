@@ -8,7 +8,7 @@ namespace AnimationEditor.App.Tests;
 
 /// <summary>
 /// Regression tests for the About dialog (issue #194): centered on owner,
-/// non-resizable, correct title, version number from assembly, and GitHub link.
+/// non-resizable, correct title, version number from assembly, and Releases link.
 /// </summary>
 public class AboutDialogTests
 {
@@ -38,27 +38,27 @@ public class AboutDialogTests
     }
 
     [AvaloniaFact]
-    public void BuildAboutContent_ContainsGitHubLinkButton()
-    {
-        var panel = (StackPanel)MainWindow.BuildAboutContent();
-
-        var linkBtn = panel.Children
-            .OfType<Button>()
-            .FirstOrDefault(b => b.Content?.ToString()?.Contains("github.com/vchelaru/FlatRedBall2") == true);
-
-        Assert.NotNull(linkBtn);
-    }
-
-    [AvaloniaFact]
     public void BuildAboutContent_ContainsReleasesLinkButton()
     {
         var panel = (StackPanel)MainWindow.BuildAboutContent();
 
         var releasesBtn = panel.Children
             .OfType<Button>()
-            .FirstOrDefault(b => b.Content?.ToString()?.Contains("github.com/vchelaru/FlatRedBall2/releases") == true);
+            .FirstOrDefault(b => b.Tag?.ToString() == "https://github.com/vchelaru/FlatRedBall2/releases");
 
         Assert.NotNull(releasesBtn);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_ContainsUpdatesPrompt()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent();
+
+        var promptBlock = panel.Children
+            .OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("updates", System.StringComparison.OrdinalIgnoreCase) == true);
+
+        Assert.NotNull(promptBlock);
     }
 
     [AvaloniaFact]
