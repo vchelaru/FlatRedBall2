@@ -1627,6 +1627,23 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
+    /// Test-only: simulates a Magic Wand Ctrl+click at the given screen position,
+    /// mirroring the Ctrl+click branch in <see cref="OnEditPointerPressed"/>.
+    /// Fires <see cref="FrameCreatedFromRegion"/> with the flood-fill's pixel bounds.
+    /// No-op when magic-wand mode is off, the bitmap is null, or the clicked pixel is transparent.
+    /// </summary>
+    public void SimulateWandCtrlClick(float screenX, float screenY)
+    {
+        if (!_isMagicWandMode || _bitmap is null || _inspectableImage is null) return;
+        var world = ScreenToTexture(screenX, screenY);
+        _inspectableImage.GetOpaqueWandBounds(
+            (int)world.X, (int)world.Y,
+            out int minX, out int minY, out int maxX, out int maxY);
+        if (maxX >= minX && maxY >= minY)
+            FrameCreatedFromRegion?.Invoke(minX, minY, maxX, maxY);
+    }
+
+    /// <summary>
     /// Builds a cross-hair "+" cursor and returns a <see cref="Cursor"/>
     /// with its hot-spot at the centre pixel.  Called once by <see cref="_addFrameCursorLazy"/>.
     /// </summary>

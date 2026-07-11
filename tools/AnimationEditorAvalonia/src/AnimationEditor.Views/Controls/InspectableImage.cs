@@ -18,7 +18,10 @@ public sealed class InspectableImage
 
     /// <summary>
     /// BFS flood fill from (<paramref name="startX"/>, <paramref name="startY"/>)
-    /// across contiguous opaque pixels. Returns the bounding box in texture pixel coords.
+    /// across contiguous opaque pixels. Returns the bounding box in texture pixel coords,
+    /// with <paramref name="maxX"/>/<paramref name="maxY"/> exclusive (one past the last
+    /// opaque column/row), matching the min-inclusive/max-exclusive convention used
+    /// elsewhere in this codebase.
     /// If the start pixel is transparent (or out of bounds) all out params are
     /// <c>int.MinValue / int.MaxValue</c> sentinels — check <c>maxX >= minX</c>.
     /// </summary>

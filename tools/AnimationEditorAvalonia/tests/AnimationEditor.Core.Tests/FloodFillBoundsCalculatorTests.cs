@@ -23,7 +23,7 @@ public class FloodFillBoundsCalculatorTests
             1, 1, 3, 3, Pixels(px, 3), out int l, out int t, out int r, out int b);
         Assert.True(ok);
         Assert.Equal(1, l); Assert.Equal(1, t);
-        Assert.Equal(1, r); Assert.Equal(1, b);
+        Assert.Equal(2, r); Assert.Equal(2, b); // exclusive: one past the single opaque column/row
     }
 
     // ── Rectangular region ────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ public class FloodFillBoundsCalculatorTests
             2, 2, 5, 5, Pixels(px, 5), out int l, out int t, out int r, out int b);
         Assert.True(ok);
         Assert.Equal(1, l); Assert.Equal(1, t);
-        Assert.Equal(3, r); Assert.Equal(3, b);
+        Assert.Equal(4, r); Assert.Equal(4, b); // exclusive: one past the last opaque column/row (3)
     }
 
     // ── Transparent seed ─────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ public class FloodFillBoundsCalculatorTests
             0, 0, 5, 1, Pixels(px, 5), out int l, out _, out int r, out _);
         Assert.True(ok);
         Assert.Equal(0, l);
-        Assert.Equal(1, r); // must NOT reach x=3 or x=4
+        Assert.Equal(2, r); // exclusive: one past x=1; must NOT reach x=3 or x=4
     }
 
     // ── Entire bitmap opaque ──────────────────────────────────────────────────
@@ -109,7 +109,7 @@ public class FloodFillBoundsCalculatorTests
             0, 0, 4, 4, (x, y) => true, out int l, out int t, out int r, out int b);
         Assert.True(ok);
         Assert.Equal(0, l); Assert.Equal(0, t);
-        Assert.Equal(3, r); Assert.Equal(3, b);
+        Assert.Equal(4, r); Assert.Equal(4, b); // exclusive: one past the last column/row (3), i.e. the bitmap width/height
     }
 
     // ── L-shaped region ──────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ public class FloodFillBoundsCalculatorTests
             0, 0, 4, 4, Pixels(px, 4), out int l, out int t, out int r, out int b);
         Assert.True(ok);
         Assert.Equal(0, l); Assert.Equal(0, t);
-        Assert.Equal(3, r); Assert.Equal(3, b);
+        Assert.Equal(4, r); Assert.Equal(4, b); // exclusive: one past the last column/row (3)
     }
 
     // ── 1×1 bitmap ───────────────────────────────────────────────────────────
@@ -146,6 +146,6 @@ public class FloodFillBoundsCalculatorTests
             0, 0, 1, 1, (x, y) => true, out int l, out int t, out int r, out int b);
         Assert.True(ok);
         Assert.Equal(0, l); Assert.Equal(0, t);
-        Assert.Equal(0, r); Assert.Equal(0, b);
+        Assert.Equal(1, r); Assert.Equal(1, b); // exclusive: one past the single opaque pixel
     }
 }

@@ -22,6 +22,12 @@ namespace AnimationEditor.App.Tests;
 /// 2. A double-click via <see cref="WireframeControl.SimulateWandDoubleClick"/> while a
 ///    hover preview is active applies the preview rect to the selected frame and fires
 ///    <see cref="WireframeControl.FrameRegionChanged"/>.
+///
+/// 3. The hover-preview rect itself lands exactly on the flood-filled island's bounds
+///    (issue #577 — right/bottom must be exclusive, not one pixel short).
+///
+/// 4. Ctrl+click create-frame-from-wand-bounds also lands exactly on the island's bounds
+///    (same issue #577 fix, different call site).
 /// </summary>
 public class WireframeMagicWandModeTests
 {
@@ -174,7 +180,10 @@ public class WireframeMagicWandModeTests
             Assert.NotNull(changedFrame);
             Assert.Same(frame, changedFrame);
 
-            const float Eps = 1.5f / 64f;   // 1.5 pixel tolerance in UV space
+            // Sub-pixel tolerance only (float rounding), not a whole-pixel fudge factor —
+            // a 1-pixel tolerance here would mask the off-by-one bug from issue #577
+            // where RightCoordinate/BottomCoordinate landed one pixel short.
+            const float Eps = 0.25f / 64f;
             Assert.True(Math.Abs(frame.LeftCoordinate   - IslandMin / 64f) < Eps,
                 $"LeftCoordinate expected ≈{IslandMin}/64 but was {frame.LeftCoordinate}");
             Assert.True(Math.Abs(frame.TopCoordinate    - IslandMin / 64f) < Eps,
@@ -187,7 +196,84 @@ public class WireframeMagicWandModeTests
         finally { Directory.Delete(dir, recursive: true); }
     }
 
-    // ── Test 3: toolbar toggle-off falls back to Move mode ────────────────────
+    // ── Test 3: hover preview rect is pixel-exact ─────────────────────────────
+
+    /// <summary>
+    /// Regression test for issue #577: the hover-preview outline (what the user visually
+    /// sees while hovering in Magic Wand mode) must land exactly on the opaque island's
+    /// bounds, with <see cref="SKRect.Right"/>/<see cref="SKRect.Bottom"/> one pixel past
+    /// the last opaque column/row — not on the last opaque pixel itself.
+    /// </summary>
+    [AvaloniaFact]
+    public void WandMode_HoverPreview_RectIsExclusiveOnRightAndBottom()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            const int IslandMin = 20, IslandMax = 40;
+            var png = WriteRegionPng(dir, IslandMin, IslandMin, IslandMax, IslandMax);
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);
+            ctrl.IsMagicWandMode = true;
+
+            // Hover at screen (30,30) → texture pixel (30,30), inside the island.
+            var (showPreview, previewRect) = ctrl.GetPreviewStateForScreenPoint(30f, 30f);
+
+            Assert.True(showPreview);
+            Assert.Equal(new SKRect(IslandMin, IslandMin, IslandMax, IslandMax), previewRect);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    // ── Test 4: Ctrl+click create-frame-from-wand-bounds is pixel-exact ───────
+
+    /// <summary>
+    /// Regression test for issue #577: the wand's flood-fill bounds must be exclusive
+    /// on the right/bottom (one past the last opaque column/row), not inclusive.
+    /// Ctrl+click at a pixel inside a well-defined opaque island via
+    /// <see cref="WireframeControl.SimulateWandCtrlClick"/> must fire
+    /// <see cref="WireframeControl.FrameCreatedFromRegion"/> with bounds that land exactly
+    /// on the island edges — previously maxX/maxY were one pixel short.
+    /// </summary>
+    [AvaloniaFact]
+    public void WandMode_CtrlClick_FiresFrameCreatedFromRegion_WithExclusiveBounds()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            const int IslandMin = 20, IslandMax = 40;
+            var png = WriteRegionPng(dir, IslandMin, IslandMin, IslandMax, IslandMax);
+
+            var chain = new AnimationChainSave { Name = "Test" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);
+            ctrl.IsMagicWandMode = true;
+
+            (int minX, int minY, int maxX, int maxY)? received = null;
+            ctrl.FrameCreatedFromRegion += (x0, y0, x1, y1) => received = (x0, y0, x1, y1);
+
+            // Ctrl+click at screen (30,30) → texture pixel (30,30), inside the island.
+            ctrl.SimulateWandCtrlClick(30f, 30f);
+
+            Assert.NotNull(received);
+            Assert.Equal((IslandMin, IslandMin, IslandMax, IslandMax), received!.Value);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    // ── Test 5: toolbar toggle-off falls back to Move mode ────────────────────
 
     /// <summary>
     /// Regression test for issue #575: clicking the Magic Wand toolbar toggle a second
