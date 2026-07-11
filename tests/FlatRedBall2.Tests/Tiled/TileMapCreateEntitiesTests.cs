@@ -148,6 +148,56 @@ public class TileMapCreateEntitiesTests
     }
 
     // ============================================================================================
+    // Origin — every value maps to the correct corner/edge of the tile object's rect.
+    // Object at Tiled position (16, 48), size 16x16 → world bottom-left (16, -48).
+    // ============================================================================================
+
+    [Theory]
+    [InlineData(Origin.Center, 24f, -40f)]
+    [InlineData(Origin.BottomCenter, 24f, -48f)]
+    [InlineData(Origin.TopCenter, 24f, -32f)]
+    [InlineData(Origin.BottomLeft, 16f, -48f)]
+    [InlineData(Origin.TopLeft, 16f, -32f)]
+    [InlineData(Origin.BottomRight, 32f, -48f)]
+    [InlineData(Origin.TopRight, 32f, -32f)]
+    public void CreateEntities_ObjectLayer_OriginPlacesEntityAtExpectedCorner(Origin origin, float expectedX, float expectedY)
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            placements: System.Array.Empty<(int, int, int)>());
+        tilemap.Layers.Add(BuildObjectLayer("Entities", new[]
+        {
+            (id: 1, localId: 0, x: 16f, y: 48f, size: 16),
+        }));
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, origin);
+
+        created[0].X.ShouldBe(expectedX);
+        created[0].Y.ShouldBe(expectedY);
+    }
+
+    [Theory]
+    [InlineData(Origin.Center, 24f, -40f)]
+    [InlineData(Origin.BottomLeft, 16f, -48f)]
+    [InlineData(Origin.TopRight, 32f, -32f)]
+    public void CreateEntities_PaintedCell_OriginPlacesEntityAtExpectedCorner(Origin origin, float expectedX, float expectedY)
+    {
+        // Tile (1, 2) on a 4x4 16-px map: bottom-left at (16, -48) — same rect as the object-layer case above.
+        var tilemap = BuildTilemap(4, 4, 16,
+            new[] { new TilemapTileData(0) { Class = "Coin" } },
+            new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, origin);
+
+        created[0].X.ShouldBe(expectedX);
+        created[0].Y.ShouldBe(expectedY);
+    }
+
+    // ============================================================================================
     // Mixed sources — one painted + one object, default-on
     // ============================================================================================
 
