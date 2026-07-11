@@ -1925,6 +1925,7 @@ public partial class MainWindow : Window
         _ = _appCommands.ExportToPixiJsAsync();
 
     internal const string GitHubUrl = "https://github.com/vchelaru/FlatRedBall2";
+    internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 
     private void OnAboutClick(object? sender, RoutedEventArgs e)
         => _ = BuildAboutWindow().ShowDialog(this);
@@ -2002,7 +2003,7 @@ public partial class MainWindow : Window
         {
             Title = "About AnimationEditor",
             Width = 420,
-            Height = 220,
+            Height = 260,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
             Content = BuildAboutContent(),
@@ -2017,16 +2018,6 @@ public partial class MainWindow : Window
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
 
-        var linkButton = new Button { Content = GitHubUrl };
-        linkButton.Click += (_, _) =>
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(GitHubUrl) { UseShellExecute = true });
-            }
-            catch { }
-        };
-
         return new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
@@ -2036,9 +2027,27 @@ public partial class MainWindow : Window
                 new TextBlock { Text = "AnimationEditor", FontSize = 16 },
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
-                linkButton,
+                BuildOpenUrlButton(GitHubUrl),
+                BuildOpenUrlButton(ReleasesUrl),
             }
         };
+    }
+
+    /// <summary>
+    /// Builds a button that opens the given URL in the user's default browser when clicked.
+    /// </summary>
+    private static Button BuildOpenUrlButton(string url)
+    {
+        var button = new Button { Content = url };
+        button.Click += (_, _) =>
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch { }
+        };
+        return button;
     }
 
     // ── Preview controls wiring ───────────────────────────────────────────────

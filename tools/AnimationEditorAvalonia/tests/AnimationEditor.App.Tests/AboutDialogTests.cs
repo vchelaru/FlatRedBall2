@@ -50,6 +50,18 @@ public class AboutDialogTests
     }
 
     [AvaloniaFact]
+    public void BuildAboutContent_ContainsReleasesLinkButton()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent();
+
+        var releasesBtn = panel.Children
+            .OfType<Button>()
+            .FirstOrDefault(b => b.Content?.ToString()?.Contains("github.com/vchelaru/FlatRedBall2/releases") == true);
+
+        Assert.NotNull(releasesBtn);
+    }
+
+    [AvaloniaFact]
     public void BuildAboutWindow_HasCenterOwnerStartupLocation()
     {
         var window = MainWindow.BuildAboutWindow();
