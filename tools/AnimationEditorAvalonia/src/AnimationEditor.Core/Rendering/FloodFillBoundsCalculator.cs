@@ -25,8 +25,12 @@ public static class FloodFillBoundsCalculator
     /// </param>
     /// <param name="minX">Inclusive left edge of the bounding box.</param>
     /// <param name="minY">Inclusive top edge of the bounding box.</param>
-    /// <param name="maxX">Inclusive right edge of the bounding box.</param>
-    /// <param name="maxY">Inclusive bottom edge of the bounding box.</param>
+    /// <param name="maxX">
+    ///   Exclusive right edge of the bounding box (one past the last opaque column),
+    ///   matching the min-inclusive/max-exclusive convention used elsewhere in this
+    ///   codebase (e.g. grid snapping, <c>AppCommands.AddFrameFromPixelBounds</c>).
+    /// </param>
+    /// <param name="maxY">Exclusive bottom edge of the bounding box (one past the last opaque row).</param>
     /// <returns>
     ///   <c>true</c> if at least one pixel was flooded (i.e. the seed was opaque
     ///   and in-bounds); <c>false</c> otherwise.
@@ -71,6 +75,8 @@ public static class FloodFillBoundsCalculator
             stack.Push((x,     y + 1));
         }
 
-        return maxX >= minX;
+        bool found = maxX >= minX;
+        if (found) { maxX += 1; maxY += 1; }
+        return found;
     }
 }
