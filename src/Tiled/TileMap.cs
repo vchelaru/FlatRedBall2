@@ -344,11 +344,19 @@ public class TileMap
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Tiled custom properties on each object are automatically applied to matching public
-    /// instance properties on the entity via reflection (case-insensitive name match).
-    /// Supported property types: <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>.
-    /// Tile-layer cells have no per-cell custom properties; reflection mapping is a no-op
-    /// for that path.
+    /// Tiled custom properties are automatically applied to matching public instance properties
+    /// on the entity via reflection (case-insensitive name match). Supported property types:
+    /// <c>string</c>, <c>int</c>, <c>float</c>, <c>bool</c>. Two Tiled property sources are
+    /// merged: class-level properties (defined once on the tile's type in the tileset, apply to
+    /// every tile of that type) and instance-level properties (set on an individual object-layer
+    /// tile-object). When both set the same key, the instance-level value wins. Painted tile-layer
+    /// cells only have class-level properties — Tiled has no per-cell instance property mechanism
+    /// for painted tiles.
+    /// </para>
+    /// <para>
+    /// If the entity declares a public settable <c>int TiledGid</c> property, it is populated
+    /// with the spawning tile's Tiled global ID (GID). This is opt-in — entities that don't
+    /// declare the property are unaffected.
     /// </para>
     /// <para>
     /// If the factory has <see cref="Factory{T}.IsSolidGrid"/> set, the whole scan is wrapped
@@ -412,7 +420,7 @@ public class TileMap
                     ScanObjectLayer(objectLayer, className, origin, factory, entityProps, created, removeSourceTiles, configure);
                     break;
                 case TilemapTileLayer tileLayer:
-                    ScanTileLayer(tileLayer, className, origin, factory, created, removeSourceTiles, configure);
+                    ScanTileLayer(tileLayer, className, origin, factory, entityProps, created, removeSourceTiles, configure);
                     break;
             }
         }
@@ -445,15 +453,18 @@ public class TileMap
 
             var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
 
+            // Snapshot the merged property bag now — the live TilemapProperties on the tile
+            // object is about to be dropped by removeSourceTiles, so both the eager and lazy
+            // paths use the same self-contained merged dictionary.
+            var classProps = tileObj.Tile.GetTileData(_tilemap!.Tilesets)?.Properties;
+            var mergedProps = BuildMergedPropertySnapshot(classProps, tileObj.Properties);
+            int gid = tileObj.Tile.GlobalId;
+
             if (lazy)
             {
-                // Snapshot the property bag now — the live TilemapProperties is owned by the
-                // tile object, which removeSourceTiles is about to drop. The snapshot keeps the
-                // record self-contained for replay at spawn time.
-                var capturedProps = SnapshotProperties(tileObj.Properties);
                 LazySpawner.Add(factory, worldX, worldY, applyAfterInit: e =>
                 {
-                    ApplyCapturedProperties(e, capturedProps, entityProps);
+                    ApplyProperties(e, mergedProps, gid, entityProps);
                     configure?.Invoke(e);
                 });
             }
@@ -462,7 +473,7 @@ public class TileMap
                 var entity = factory.Create();
                 entity.X = worldX;
                 entity.Y = worldY;
-                ApplyCustomProperties(entity, tileObj.Properties, entityProps);
+                ApplyProperties(entity, mergedProps, gid, entityProps);
                 configure?.Invoke(entity);
                 created.Add(entity);
             }
@@ -481,6 +492,7 @@ public class TileMap
         string className,
         Origin origin,
         Factory<T> factory,
+        Dictionary<string, PropertyInfo> entityProps,
         List<T> created,
         bool removeSourceTiles,
         Action<T>? configure) where T : Entity, new()
@@ -510,16 +522,25 @@ public class TileMap
 
                 var (worldX, worldY) = OriginOffset(bottomLeftX, bottomLeftY, tw, th, origin);
 
+                // Painted cells have no per-instance property bag (Tiled doesn't support them),
+                // so only the tile's class-level properties are in play here.
+                var mergedProps = BuildMergedPropertySnapshot(tileData.Properties, instanceProps: null);
+                int gid = tileNullable.Value.GlobalId;
+
                 if (lazy)
                 {
-                    LazySpawner.Add(factory, worldX, worldY, applyAfterInit: configure);
+                    LazySpawner.Add(factory, worldX, worldY, applyAfterInit: e =>
+                    {
+                        ApplyProperties(e, mergedProps, gid, entityProps);
+                        configure?.Invoke(e);
+                    });
                 }
                 else
                 {
                     var entity = factory.Create();
                     entity.X = worldX;
                     entity.Y = worldY;
-                    // Tile layers have no per-cell custom properties — skip reflection mapping.
+                    ApplyProperties(entity, mergedProps, gid, entityProps);
                     configure?.Invoke(entity);
                     created.Add(entity);
                 }
@@ -530,24 +551,45 @@ public class TileMap
         }
     }
 
-    private static Dictionary<string, TilemapPropertyValue> SnapshotProperties(TilemapProperties src)
+    /// <summary>
+    /// Merges class-level tile properties (from the tile's type in the tileset) with
+    /// instance-level properties (set on an individual object-layer tile-object), instance
+    /// values winning on key collisions. Returns a plain snapshot dictionary — not a live view —
+    /// so it's safe to close over for lazy-spawn replay after the source objects are mutated.
+    /// </summary>
+    private static Dictionary<string, TilemapPropertyValue> BuildMergedPropertySnapshot(
+        TilemapProperties? classProps, TilemapProperties? instanceProps)
     {
-        var copy = new Dictionary<string, TilemapPropertyValue>(src.Count);
-        foreach (var kvp in src)
-            copy[kvp.Key] = kvp.Value;
-        return copy;
+        var merged = new Dictionary<string, TilemapPropertyValue>();
+        if (classProps != null)
+            foreach (var kvp in classProps)
+                merged[kvp.Key] = kvp.Value;
+        if (instanceProps != null)
+            foreach (var kvp in instanceProps)
+                merged[kvp.Key] = kvp.Value;
+        return merged;
     }
 
-    private static void ApplyCapturedProperties<T>(
+    private static void ApplyProperties<T>(
         T entity,
-        Dictionary<string, TilemapPropertyValue> captured,
+        Dictionary<string, TilemapPropertyValue> mergedProps,
+        int gid,
         Dictionary<string, PropertyInfo> entityProps) where T : Entity
     {
-        if (captured.Count == 0) return;
         foreach (var (name, propInfo) in entityProps)
         {
-            if (!captured.TryGetValue(name, out var tiledValue))
+            // TiledGid is a synthetic entry, not a real Tiled property — opt-in purely by
+            // declaring a public settable `int TiledGid` property on the entity.
+            if (propInfo.PropertyType == typeof(int) &&
+                string.Equals(name, "TiledGid", StringComparison.OrdinalIgnoreCase))
+            {
+                propInfo.SetValue(entity, gid);
                 continue;
+            }
+
+            if (!mergedProps.TryGetValue(name, out var tiledValue))
+                continue;
+
             object? converted = propInfo.PropertyType switch
             {
                 Type t when t == typeof(string) => tiledValue.AsString(),
@@ -619,34 +661,6 @@ public class TileMap
                 map[prop.Name] = prop;
         }
         return map;
-    }
-
-    private static void ApplyCustomProperties<T>(
-        T entity,
-        TilemapProperties? tiledProps,
-        Dictionary<string, PropertyInfo> entityProps)
-        where T : Entity
-    {
-        if (tiledProps == null || tiledProps.Count == 0)
-            return;
-
-        foreach (var (name, propInfo) in entityProps)
-        {
-            if (!tiledProps.TryGetValue(name, out var tiledValue))
-                continue;
-
-            object? converted = propInfo.PropertyType switch
-            {
-                Type t when t == typeof(string) => tiledValue.AsString(),
-                Type t when t == typeof(int) => tiledValue.AsInt(),
-                Type t when t == typeof(float) => tiledValue.AsFloat(),
-                Type t when t == typeof(bool) => tiledValue.AsBool(),
-                _ => null,
-            };
-
-            if (converted != null)
-                propInfo.SetValue(entity, converted);
-        }
     }
 
     /// <summary>

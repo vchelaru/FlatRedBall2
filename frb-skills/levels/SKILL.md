@@ -87,7 +87,7 @@ For a collision boundary that doesn't match the tile grid (an irregular wall, a 
 
 ## Spawning Entities from Object Layers or Painted Tile Layers
 
-`CreateEntities` scans both **object layers** (for precisely-placed tile objects) and **regular tile layers** (for tiles painted with Tiled's brush). Any tile whose Class matches the requested name becomes one entity — use whichever authoring path fits the designer's workflow. Painted tile layers have no per-cell custom properties; reflection-based property mapping is a no-op for that path.
+`CreateEntities` scans both **object layers** (for precisely-placed tile objects) and **regular tile layers** (for tiles painted with Tiled's brush). Any tile whose Class matches the requested name becomes one entity — use whichever authoring path fits the designer's workflow. Painted tile layers support class-level (tileset type) custom properties but not instance-level overrides — Tiled has no per-cell property mechanism for painted tiles.
 
 The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapes` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. The two methods never fight over the same tile — pick one per Class.
 
@@ -108,7 +108,7 @@ The engine converts Tiled's pixel coordinates (Y-down) to world space (Y-up) and
 
 **Source tiles are removed by default.** After spawning, `CreateEntities` clears the painted cell and removes the tile-object from its object layer so the source tile doesn't double-draw under the spawned entity. The mutation is in-memory only — the `.tmx` file is untouched, and a hot-reload repopulates the source tiles so the next spawn pass picks them up again. Pass `removeSourceTiles: false` to keep the source tile visible (e.g., the tile doubles as intentional background art). This is the opposite default from `GenerateCollisionFromClass`, which leaves source tiles visible because there the tile *is* the visual.
 
-**Custom properties** set on tile objects in Tiled are automatically applied to matching entity properties via reflection. If a Coin entity has `public int Worth { get; set; }` and the Tiled object has a custom property `Worth=50`, it's set automatically. Supported types: `string`, `int`, `float`, `bool`.
+**Custom properties** set on tile objects in Tiled are automatically applied to matching entity properties via reflection. If a Coin entity has `public int Worth { get; set; }` and the Tiled object has a custom property `Worth=50`, it's set automatically. Supported types: `string`, `int`, `float`, `bool`. Class-level properties (defined once on the tile's type in the tileset) are merged in the same way; an instance-level property on the same key overrides the class-level value. Declare `public int TiledGid { get; set; }` to have the spawning tile's Tiled GID populated automatically — opt-in only, not a member of the base `Entity` class.
 
 **Class matching** checks the object's Class first, then falls back to the tile definition's Class in the tileset. Case-insensitive.
 
