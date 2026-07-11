@@ -19,13 +19,15 @@ namespace FlatRedBall2.Tests.Rendering;
 public class SpriteDiagonalFlipTests
 {
     // Ground truth: FlipScaleCalculator.ComputeMatrix(h, v, flipDiagonal: true) is (0, b, c, 0)
-    // with b = h?1:-1, c = v?1:-1, mapping local offset (u,v) -> (b*v, c*u). Applied here to a
+    // with b = h?-1:1, c = v?-1:1 (diagonal-only is the plain swap (x,y)->(y,x) — it fixes the
+    // top-left/bottom-right corners and swaps top-right/bottom-left, matching Tiled's actual
+    // diagonal-flip semantics), mapping local offset (u,v) -> (b*v, c*u). Applied here to a
     // scaled offset and then the sprite's own base rotation, matching how Sprite composes flip
     // with an already-set Rotation.
     static (float x, float y) ExpectedOffset(bool flipHorizontal, bool effectiveFlipVertical, float baseRotationRadians, float u, float v, float scaleX, float scaleY)
     {
-        float b = flipHorizontal ? 1f : -1f;
-        float c = effectiveFlipVertical ? 1f : -1f;
+        float b = flipHorizontal ? -1f : 1f;
+        float c = effectiveFlipVertical ? -1f : 1f;
         float outX = b * (v * scaleY);
         float outY = c * (u * scaleX);
         float cr = MathF.Cos(baseRotationRadians), sr = MathF.Sin(baseRotationRadians);
@@ -103,15 +105,17 @@ public class SpriteDiagonalFlipTests
     }
 
     // The user-facing framing: a non-square sprite whose four source corners are known landmarks.
-    // After a pure diagonal flip (no H/V), the texture's top-left corner — which starts at local
-    // offset (-halfW, -halfH) — must land at the BOTTOM-RIGHT of the on-screen footprint, and the
-    // footprint itself swaps from wide (200x100) to tall (100x200). This mirrors
-    // AnimationEditorAvalonia's PreviewControl.ComputeOutlineDst, which the runtime must match.
+    // After a pure diagonal flip (no H/V), the texture's top-left corner — local offset
+    // (-halfW, -halfH) — must stay at the TOP-LEFT of the (now swapped) footprint, matching
+    // Tiled's actual diagonal-flip semantics (verified against TileMapCollisionsTests'
+    // GenerateFromClass_PolygonTileFlippedDiagonally_PointsReflectedAcrossDiagonal, where the
+    // (0,0)/(16,16) corners are provably unchanged by a diagonal-only flip) and
+    // AnimationEditorAvalonia's PreviewControl.ComputeFlipMatrix, which the runtime must match.
     // Uses ScreenSpaceBatch (FlipsY == false) so the camera's own Y-flip compensation — which
     // WorldSpaceBatch always folds in, even with no user-facing flip set — doesn't also apply
     // here; that compensation is exercised separately by the exhaustive tests above.
     [Fact]
-    public void DiagonalFlipOnly_NonSquareSprite_TopLeftTexelLandsAtBottomRight()
+    public void DiagonalFlipOnly_NonSquareSprite_TopLeftTexelStaysAtTopLeft()
     {
         var sprite = new Sprite { FlipDiagonal = true, Batch = ScreenSpaceBatch.Instance };
         const float halfW = 100f, halfH = 50f; // source 200x100
@@ -122,8 +126,25 @@ public class SpriteDiagonalFlipTests
         MathF.Abs(actual.x).ShouldBe(halfH, 1e-4);
         MathF.Abs(actual.y).ShouldBe(halfW, 1e-4);
 
-        // Bottom-right of the new (swapped) footprint means both offsets are positive.
-        actual.x.ShouldBeGreaterThan(0f);
+        // Top-left of the new (swapped) footprint means both offsets are negative.
+        actual.x.ShouldBeLessThan(0f);
+        actual.y.ShouldBeLessThan(0f);
+    }
+
+    // The corner NOT on the diagonal axis must move: top-right (u positive, v negative) ends up
+    // at bottom-left of the swapped footprint.
+    [Fact]
+    public void DiagonalFlipOnly_NonSquareSprite_TopRightTexelMovesToBottomLeft()
+    {
+        var sprite = new Sprite { FlipDiagonal = true, Batch = ScreenSpaceBatch.Instance };
+        const float halfW = 100f, halfH = 50f; // source 200x100
+        var actual = ActualOffset(sprite, u: halfW, v: -halfH, scaleX: 1f, scaleY: 1f);
+
+        MathF.Abs(actual.x).ShouldBe(halfH, 1e-4);
+        MathF.Abs(actual.y).ShouldBe(halfW, 1e-4);
+
+        // Bottom-left of the new footprint: negative x (left), positive y (down).
+        actual.x.ShouldBeLessThan(0f);
         actual.y.ShouldBeGreaterThan(0f);
     }
 }

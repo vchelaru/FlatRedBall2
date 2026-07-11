@@ -15,9 +15,14 @@ public static class FlipScaleCalculator
 
     /// <summary>
     /// Returns the 2x2 linear transform coefficients (a, b, c, d) such that a point offset
-    /// (x, y) from the frame's pivot maps to (a*x + b*y, c*x + d*y). Diagonal flip alone maps
-    /// (x, y) to (-y, -x) — the same transpose used by <c>TileMapCollisions.ApplyFlips</c> for
-    /// Tiled's diagonal tile-flip flag — and H/V then mirror on top of that.
+    /// (x, y) from the frame's pivot maps to (a*x + b*y, c*x + d*y). This matrix applies
+    /// directly to SkiaSharp canvas coordinates (Y-down, origin top-left) — unlike
+    /// <c>TileMapCollisions.ApplyFlips</c>, which converts Tiled's Y-down pixel data to FRB2's
+    /// Y-up local space before applying its own diagonal step. Diagonal flip alone is therefore
+    /// the plain swap (x, y) to (y, x) here, not the negated (-y, -x) form that's correct in
+    /// Y-up space — the plain swap is what fixes the top-left/bottom-right corners and swaps
+    /// top-right/bottom-left, matching Tiled's actual diagonal-flip semantics. H/V then mirror
+    /// on top of that.
     /// </summary>
     public static (float a, float b, float c, float d) ComputeMatrix(
         bool flipHorizontal, bool flipVertical, bool flipDiagonal)
@@ -25,6 +30,6 @@ public static class FlipScaleCalculator
         if (!flipDiagonal)
             return (flipHorizontal ? -1f : 1f, 0f, 0f, flipVertical ? -1f : 1f);
 
-        return (0f, flipHorizontal ? 1f : -1f, flipVertical ? 1f : -1f, 0f);
+        return (0f, flipHorizontal ? -1f : 1f, flipVertical ? -1f : 1f, 0f);
     }
 }

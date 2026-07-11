@@ -128,12 +128,13 @@ public class PreviewSourceRectTests
         Assert.Equal(50, outline.MidY);
     }
 
-    // ── ComputeFlipMatrix — diagonal-only must reflect about the "up and to the right"
-    // (bottom-left/top-right) diagonal: top-left content swaps with bottom-right content,
-    // and top-right/bottom-left corners (on the axis) stay in place. ──────────────────────
+    // ── ComputeFlipMatrix — diagonal-only must reflect about the top-left/bottom-right
+    // diagonal, matching Tiled's actual diagonal-flip semantics (verified against
+    // TileMapCollisionsTests.GenerateFromClass_PolygonTileFlippedDiagonally_...): top-left and
+    // bottom-right corners (on the axis) stay in place; top-right swaps with bottom-left. ──────
 
     [Fact]
-    public void ComputeFlipMatrix_DiagonalOnly_SwapsTopLeftAndBottomRight()
+    public void ComputeFlipMatrix_DiagonalOnly_LeavesTopLeftAndBottomRightInPlace()
     {
         var matrix = PreviewControl.ComputeFlipMatrix(
             flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
@@ -141,20 +142,20 @@ public class PreviewSourceRectTests
         var topLeft = matrix.MapPoint(new SKPoint(5, 5));       // offset (-5,-5) from pivot
         var bottomRight = matrix.MapPoint(new SKPoint(15, 15)); // offset (+5,+5) from pivot
 
-        Assert.Equal(new SKPoint(15, 15), topLeft);      // top-left corner moves to bottom-right
-        Assert.Equal(new SKPoint(5, 5), bottomRight);    // bottom-right corner moves to top-left
+        Assert.Equal(new SKPoint(5, 5), topLeft);        // on the diagonal axis — unchanged
+        Assert.Equal(new SKPoint(15, 15), bottomRight);  // on the diagonal axis — unchanged
     }
 
     [Fact]
-    public void ComputeFlipMatrix_DiagonalOnly_LeavesTopRightAndBottomLeftInPlace()
+    public void ComputeFlipMatrix_DiagonalOnly_SwapsTopRightAndBottomLeft()
     {
         var matrix = PreviewControl.ComputeFlipMatrix(
             flipHorizontal: false, flipVertical: false, flipDiagonal: true, cx: 10, cy: 10);
 
-        var topRight = matrix.MapPoint(new SKPoint(15, 5));  // offset (+5,-5) from pivot
+        var topRight = matrix.MapPoint(new SKPoint(15, 5));   // offset (+5,-5) from pivot
         var bottomLeft = matrix.MapPoint(new SKPoint(5, 15)); // offset (-5,+5) from pivot
 
-        Assert.Equal(new SKPoint(15, 5), topRight);   // on the up-right axis — unchanged
-        Assert.Equal(new SKPoint(5, 15), bottomLeft);  // on the up-right axis — unchanged
+        Assert.Equal(new SKPoint(5, 15), topRight);    // top-right corner moves to bottom-left
+        Assert.Equal(new SKPoint(15, 5), bottomLeft);  // bottom-left corner moves to top-right
     }
 }

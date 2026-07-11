@@ -596,9 +596,12 @@ public class Sprite : IRenderable, IAttachable
     // reflection can be written that way. Concretely: a +/-90 degree rotation offset plus (at
     // most) SpriteEffects.FlipVertically reproduces the exact diagonal-transpose matrix
     // (0, b, c, 0) that AnimationEditorAvalonia's FlipScaleCalculator.ComputeMatrix uses for the
-    // SkiaSharp preview (issue #593 requires editor/runtime parity). Width/Height, origin, and
-    // scale are untouched — the 90 degree rotation is what swaps the on-screen footprint, not a
-    // manual axis swap. See SpriteDiagonalFlipTests for the derivation check against that matrix.
+    // SkiaSharp preview (issue #593 requires editor/runtime parity) — diagonal-only there is the
+    // plain swap (x,y)->(y,x), which fixes the top-left/bottom-right corners and swaps
+    // top-right/bottom-left, matching Tiled's actual diagonal-flip semantics. Width/Height,
+    // origin, and scale are untouched — the 90 degree rotation is what swaps the on-screen
+    // footprint, not a manual axis swap. See SpriteDiagonalFlipTests for the derivation check
+    // against that matrix.
     //
     // Non-diagonal case unchanged: FlipVertically is the base effect that cancels the camera's
     // Y-flip (Batch.FlipsY); user-facing FlipVertical XORs it (net upside-down relative to
@@ -609,7 +612,7 @@ public class Sprite : IRenderable, IAttachable
 
         if (FlipDiagonal)
         {
-            float rotation = RenderRotationRadians + (effectiveFlipVertical ? MathHelper.PiOver2 : -MathHelper.PiOver2);
+            float rotation = RenderRotationRadians + (effectiveFlipVertical ? -MathHelper.PiOver2 : MathHelper.PiOver2);
             var effects = (FlipHorizontal == effectiveFlipVertical) ? SpriteEffects.FlipVertically : SpriteEffects.None;
             return (rotation, effects);
         }
