@@ -61,8 +61,8 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
                 }
             }
             return isChainDrag
-                ? $"Drag Chain ({snapshots.Count} frames)"
-                : $"Edit {snapshots.Count} Frame Regions";
+                ? $"Move {snapshots.Count} Frames"
+                : $"Edit {snapshots.Count} Frames";
         }
 
         public bool Do()

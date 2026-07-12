@@ -11,7 +11,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly ISelectedState _selectedState;
         private readonly AARectSave? _preAddRect;
 
-        public string Description => "Add Rectangle";
+        public string Description { get; }
 
         public AddAxisAlignedRectangleCommand(AARectSave rect, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
@@ -22,6 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             _selectedState = selectedState;
             _preAddRect = selectedState.SelectedRectangle;
+            Description = $"Add {ShapeUndoLabel.FormatForAddDelete(rect)}";
         }
 
         public bool Do()

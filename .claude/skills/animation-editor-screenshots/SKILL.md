@@ -39,4 +39,13 @@ For a one-off request (not a permanent doc-page scenario), hand-edit a scratch f
 
 Iterate fast: `dotnet build tests/AnimationEditor.DocScreenshots/...csproj`, then run the built `.exe -method "AnimationEditor.DocScreenshots._ScratchCapture.Capture"` directly — faster than `dotnet test` for one scenario, and its `Console.WriteLine` output is visible, unlike `dotnet test`'s VSTest adapter which swallows it on failure.
 
-Write output to a **persistent** path, not a temp dir you delete — then open it for the user (`Invoke-Item "<path>"` in PowerShell launches the OS default viewer). Also `Read` the PNG yourself before showing it — catches an empty tree or wrong selection before the user sees it.
+Write output via **`ScreenshotOutput.ResolveFeatureDir("<feature>")`** → `tools/AnimationEditorAvalonia/tests/_out/<feature>/` (not a temp dir you delete). Open with `Invoke-Item`, then `Read` the PNG yourself before showing the user.
+
+## Feature proof (History / undo labels / similar)
+
+When the ask is "prove the panel shows X" — not a unit assert:
+
+1. Put the drive script in **`AnimationEditor.Core.Demo.FeatureDemos`** (internal, test/DocScreenshots only). Call `FeatureDemos.TryRun(...)` from `_ScratchCapture` — do **not** hand-build history rows or fork a second script, and do **not** wire demos into shipping `App`/`MainWindow`.
+2. Drive real **`AppCommands` / `UndoManager.Execute`**. Never assign fake `HistoryEntryVm` text.
+3. Select **History** (`SidebarTabs` → `HistoryTab`), optionally enlarge `LeftPanelGrid` row 2 so more labels fit, capture `window` + `HistoryScrollViewer`, write `labels.txt` from `UndoManager.UndoHistory`.
+4. Optional browser PNG: **`animation-editor-browser-verify`** (temporary local hook only — revert before merge).

@@ -20,6 +20,12 @@ Default to a plain `[Fact]` against `AnimationEditor.Core` (`AppCommands`, comma
 
 Tests that do need it construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions — see `WireframePanZoomTests.cs` for the established pattern.
 
+## Undo labels vs screenshots
+
+- **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests`.
+- **"Show me the History panel":** DocScreenshots / browser verify — **`animation-editor-screenshots`** and **`animation-editor-browser-verify`**. Those drive the same `FeatureDemos` helpers; they do not replace unit asserts.
+
+Never seed History UI models with hand-written strings to "prove" a label.
 ## Service wiring in tests
 
 Services (`ProjectManager`, `SelectedState`, `AppCommands`, `AppState`, `ApplicationEvents`, `IoManager`, `ObjectFinder`, `UndoManager`) are constructor-injected — no static `Self` accessors, no global state. Production wires them through a `Microsoft.Extensions.DependencyInjection` container in `App.axaml.cs`.

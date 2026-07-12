@@ -11,7 +11,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
         private readonly ISelectedState _selectedState;
         private readonly CircleSave? _preAddCircle;
 
-        public string Description => "Add Circle";
+        public string Description { get; }
 
         public AddCircleCommand(CircleSave circle, AnimationFrameSave frame,
             IAppCommands commands, IApplicationEvents events, ISelectedState selectedState)
@@ -22,6 +22,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             _selectedState = selectedState;
             _preAddCircle = selectedState.SelectedCircle;
+            Description = $"Add {ShapeUndoLabel.FormatForAddDelete(circle)}";
         }
 
         public bool Do()

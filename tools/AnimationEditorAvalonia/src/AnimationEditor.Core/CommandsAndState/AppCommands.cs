@@ -662,7 +662,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 chains,
                 () => { chains.RemoveAt(idx); chains.Insert(newIdx, chain); },
                 this, _events, RefreshTreeView,
-                delta > 0 ? "Move Animation Down" : "Move Animation Up"));
+                delta > 0
+                    ? $"Move Animation '{chain.Name}' Down"
+                    : $"Move Animation '{chain.Name}' Up"));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveChainToIndex"/>
@@ -684,7 +686,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chains,
                 () => { chains.RemoveAt(currentIndex); chains.Insert(insertAt, chain); },
                 this, _events, RefreshTreeView,
-                "Move Animation"));
+                $"Move Animation '{chain.Name}'"));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveChainsToIndex"/>
@@ -719,7 +721,9 @@ namespace AnimationEditor.Core.CommandsAndState
                         list.Insert(at + i, moved[i]);
                 },
                 this, _events, RefreshTreeView,
-                moved.Length == 1 ? "Move Animation" : $"Move {moved.Length} Animations"));
+                moved.Length == 1
+                    ? $"Move Animation '{moved[0].Name}'"
+                    : $"Move {moved.Length} Animations"));
         }
 
         public void MoveChainToTop(AnimationChainSave chain)
@@ -730,7 +734,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chains,
                 () => { chains.Remove(chain); chains.Insert(0, chain); },
                 this, _events, RefreshTreeView,
-                "Move Animation to Top"));
+                $"Move Animation '{chain.Name}' to Top"));
         }
 
         public void MoveChainToBottom(AnimationChainSave chain)
@@ -741,7 +745,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chains,
                 () => { chains.Remove(chain); chains.Add(chain); },
                 this, _events, RefreshTreeView,
-                "Move Animation to Bottom"));
+                $"Move Animation '{chain.Name}' to Bottom"));
         }
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
@@ -753,7 +757,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => { chain.Frames.RemoveAt(idx); chain.Frames.Insert(newIdx, frame); },
                 this, _events, () => RefreshTreeNode(chain),
-                delta > 0 ? "Move Frame Down" : "Move Frame Up"));
+                delta > 0
+                    ? $"Move Frame in '{chain.Name}' Down"
+                    : $"Move Frame in '{chain.Name}' Up"));
         }
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
@@ -762,7 +768,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Insert(0, frame); },
                 this, _events, () => RefreshTreeNode(chain),
-                "Move Frame to Top"));
+                $"Move Frame in '{chain.Name}' to Top"));
         }
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
@@ -771,7 +777,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Add(frame); },
                 this, _events, () => RefreshTreeNode(chain),
-                "Move Frame to Bottom"));
+                $"Move Frame in '{chain.Name}' to Bottom"));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveFrames"/>
@@ -824,7 +830,8 @@ namespace AnimationEditor.Core.CommandsAndState
                         chain.Frames.Add(frame);
                 },
                 this, _events, () => RefreshTreeNode(chain),
-                delta > 0 ? "Move Frames Down" : "Move Frames Up"));
+                CountAwareMoveDescription(indices.Count, "Frame", "Frames",
+                    delta > 0 ? "Down" : "Up", frameContextName: chain.Name)));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveChainsRelative"/>
@@ -868,9 +875,31 @@ namespace AnimationEditor.Core.CommandsAndState
                         list.Add(chain);
                 },
                 this, _events, RefreshTreeView,
-                delta > 0 ? "Move Animations Down" : "Move Animations Up"));
+                CountAwareMoveDescription(indices.Count, "Animation", "Animations",
+                    delta > 0 ? "Down" : "Up",
+                    itemName: indices.Count == 1 ? list[indices[0]].Name : null)));
         }
 
+        /// <summary>
+        /// Undo label for a relative reorder. Plural includes the count
+        /// (<c>Move 3 Frames Down</c>). Singular names the target when known
+        /// (<c>Move Animation 'Walk' Down</c>, <c>Move Frame in 'Walk' Down</c>).
+        /// </summary>
+        private static string CountAwareMoveDescription(
+            int count, string singularNoun, string pluralNoun, string direction,
+            string? itemName = null, string? frameContextName = null)
+        {
+            if (count != 1)
+                return $"Move {count} {pluralNoun} {direction}";
+
+            if (frameContextName is not null)
+                return $"Move Frame in '{frameContextName}' {direction}";
+
+            if (itemName is not null)
+                return $"Move {singularNoun} '{itemName}' {direction}";
+
+            return $"Move {singularNoun} {direction}";
+        }
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
             var shapes = frame.ShapesSave?.Shapes;
@@ -883,7 +912,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 shapes,
                 () => { shapes.RemoveAt(idx); shapes.Insert(newIdx, shape); },
                 this, _events, () => RefreshTreeNode(frame),
-                delta > 0 ? "Move Shape Down" : "Move Shape Up"));
+                delta > 0
+                    ? $"Move {ShapeReorderLabel(shape)} Down"
+                    : $"Move {ShapeReorderLabel(shape)} Up"));
         }
 
         public void MoveShapeToTop(object shape, AnimationFrameSave frame)
@@ -894,7 +925,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 shapes,
                 () => { shapes.Remove(shape); shapes.Insert(0, shape); },
                 this, _events, () => RefreshTreeNode(frame),
-                "Move Shape to Top"));
+                $"Move {ShapeReorderLabel(shape)} to Top"));
         }
 
         public void MoveShapeToBottom(object shape, AnimationFrameSave frame)
@@ -905,8 +936,10 @@ namespace AnimationEditor.Core.CommandsAndState
                 shapes,
                 () => { shapes.Remove(shape); shapes.Add(shape); },
                 this, _events, () => RefreshTreeNode(frame),
-                "Move Shape to Bottom"));
+                $"Move {ShapeReorderLabel(shape)} to Bottom"));
         }
+
+        private static string ShapeReorderLabel(object shape) => ShapeUndoLabel.Format(shape);
 
         /// <summary>
         /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
@@ -1010,7 +1043,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => chain.Frames.Reverse(),
                 this, _events, () => RefreshTreeNode(chain),
-                "Invert Frame Order"));
+                $"Invert Frame Order in '{chain.Name}'"));
         }
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
@@ -1565,7 +1598,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 new PasteChainsCommand(acls, chains, this, _events, _selectedState),
                 new DeleteChainsCommand(sourcesToRemove, acls, this, _events, _selectedState),
             };
-            string desc = chains.Count == 1 ? "Cut Animation" : $"Cut {chains.Count} Animations";
+            string desc = chains.Count == 1
+                ? $"Cut Animation '{(sourcesToRemove.Count > 0 ? sourcesToRemove[0].Name : chains[0].Name)}'"
+                : $"Cut {chains.Count} Animations";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
@@ -1588,7 +1623,18 @@ namespace AnimationEditor.Core.CommandsAndState
                 cmds.Add(new DeleteFramesCommand(
                     group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
             }
-            string desc = frames.Count == 1 ? "Cut Frame" : $"Cut {frames.Count} Frames";
+            string desc;
+            if (frames.Count == 1)
+            {
+                var sourceChain = sourcesToRemove.Count > 0
+                    ? _objectFinder.GetAnimationChainContaining(sourcesToRemove[0])
+                    : null;
+                desc = $"Cut Frame in '{(sourceChain ?? targetChain).Name}'";
+            }
+            else
+            {
+                desc = $"Cut {frames.Count} Frames";
+            }
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
@@ -1622,7 +1668,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 new PasteShapesCommand(targetFrame, clones, this, _events, _selectedState),
             };
             cmds.AddRange(deleteCmds);
-            string desc = clones.Count == 1 ? "Cut Shape" : $"Cut {clones.Count} Shapes";
+            string desc = clones.Count == 1
+                ? $"Cut {ShapeUndoLabel.Format(sourcesToRemove.Count > 0 ? sourcesToRemove[0] : clones[0])}"
+                : $"Cut {clones.Count} Shapes";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
