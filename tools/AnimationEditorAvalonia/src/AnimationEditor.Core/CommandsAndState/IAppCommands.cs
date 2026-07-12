@@ -84,7 +84,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void LoadAnimationChain(string fileName);
 
         /// <summary>
-        /// Stores the current project model on <paramref name="tab"/> for later tab switches.
+        /// Stores the current project model and chain/frame selection on <paramref name="tab"/>
+        /// for later tab switches.
         /// </summary>
         void CaptureTabEditorState(TabEntry tab);
 
@@ -100,6 +101,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="OpenAchxWorkflowAsync"/>. Does not restore undo.
         /// </summary>
         Task ActivateTabContentAsync(TabEntry tab);
+
+        /// <summary>
+        /// Restores chain/frame selection from <paramref name="tab"/>'s cached selection fields
+        /// onto the current project model. Call after applying a cached or untitled model that
+        /// does not go through <see cref="TryActivateTabFromCache"/>.
+        /// </summary>
+        void RestoreTabSelection(TabEntry tab);
 
         /// <summary>
         /// Raised after the in-memory project model is loaded or saved from disk so the app

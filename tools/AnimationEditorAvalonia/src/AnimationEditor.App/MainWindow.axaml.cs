@@ -637,7 +637,7 @@ public partial class MainWindow : Window
         _projectManager.AnimationChainListSave =
             tab.CachedEditorModel ?? new AnimationChainListSave();
         _projectManager.FileName = null;
-        _selectedState.Reset();
+        _appCommands.RestoreTabSelection(tab);
         _undoManager.Clear();
         if (tab.UndoSnapshot != null)
             _undoManager.RestoreSnapshot(tab.UndoSnapshot);

@@ -43,6 +43,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.OpenAchxWorkflowAsync)]              = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.LoadAnimationChain)]                 = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.CaptureTabEditorState)]              = Category.NonMutating,
+        [nameof(IAppCommands.RestoreTabSelection)]                = Category.NonMutating,
         [nameof(IAppCommands.TryActivateTabFromCache)]            = Category.MutatingNotUndoable, // swaps project model; undo restored by app layer
         [nameof(IAppCommands.ActivateTabContentAsync)]            = Category.MutatingNotUndoable, // tab switch load or cache restore
         [nameof(IAppCommands.ReloadAchxFromDisk)]                 = Category.MutatingNotUndoable, // hot-reload; clears the undo stack on success

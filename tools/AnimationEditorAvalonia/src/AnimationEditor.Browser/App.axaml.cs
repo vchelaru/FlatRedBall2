@@ -191,7 +191,7 @@ public partial class App : Application
         // so cached tabs are already correctly "always trusted" here with no code changes needed.
         var tabManager = new TabManager();
         tabManager.OpenOrFocus(new FilePath("sample/player.achx"), "player.achx");
-        TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+        appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
 
         var preview = new PreviewControl();
         preview.InitializeServices(
@@ -592,7 +592,7 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                appCommands.CaptureTabEditorState(leaving);
                 leaving.UndoSnapshot = undoManager.TakeSnapshot();
             }
 
@@ -615,12 +615,12 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                appCommands.CaptureTabEditorState(leaving);
                 leaving.UndoSnapshot = undoManager.TakeSnapshot();
             }
 
             tabManager.OpenOrFocus(new FilePath(displayName), displayName);
-            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
             undoManager.Clear();
             UpdateUndoRedoButtons();
             RebuildTabStrip();
@@ -1427,13 +1427,13 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                appCommands.CaptureTabEditorState(leaving);
                 leaving.UndoSnapshot = undoManager.TakeSnapshot();
             }
             appCommands.NewFile();
             var displayName = TabManager.ComputeUntitledDisplayName(tabManager.Tabs.Select(t => t.DisplayName).ToList());
             tabManager.OpenOrFocus(new FilePath($"untitled-{++untitledCounter}"), displayName);
-            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
             undoManager.Clear();
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
