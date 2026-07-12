@@ -41,7 +41,7 @@ public class GuideRightClickRemoveTests
     private static PreviewControl MakeArrangedControl(TestServices ctx)
     {
         var ctrl = ctx.CreatePreviewControl();
-        ctrl.ShowGuides = true;
+        ctrl.ShowUserGuides = true;
         // Arrange to a known size so GetCenterX/Y match the 64×64 render size.
         ctrl.Measure(new Size(64, 64));
         ctrl.Arrange(new Rect(0, 0, 64, 64));
