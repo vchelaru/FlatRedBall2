@@ -147,6 +147,7 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
+    private bool _suppressGuideVisibilitySync;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
     private System.Threading.CancellationTokenSource? _toastCts;
 
@@ -2062,8 +2063,17 @@ public partial class MainWindow : Window
         OnionSkinToggle.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOnionSkin = OnionSkinToggle.IsChecked == true;
 
-        ShowGuidesCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowGuides = ShowGuidesCheck.IsChecked == true;
+        ShowOriginCheck.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
+
+        ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
+        {
+            if (_suppressGuideVisibilitySync) return;
+            PreviewCtrl.ShowUserGuides = ShowUserGuidesCheck.IsChecked == true;
+        };
+        // PreviewControl auto-reveals guides when a new one is added while hidden (#689);
+        // resync the toolbar toggle and its visibility (only shown once a guide exists).
+        PreviewCtrl.GuidesChanged += UpdateGuideToggleVisibility;
 
         InterpolateToggle.IsCheckedChanged += (_, _) =>
         {
@@ -2106,6 +2116,22 @@ public partial class MainWindow : Window
         PreviewHScroll.Scroll += OnPreviewScrollEnded;
         PreviewVScroll.Scroll += OnPreviewScrollEnded;
         PreviewCtrl.ViewChanged += RefreshPreviewScrollBars;
+
+        UpdateGuideToggleVisibility();
+    }
+
+    /// <summary>
+    /// Shows the "Guides" toggle only once at least one guide has been placed (#689), and
+    /// mirrors its checked state to <see cref="PreviewControl.ShowUserGuides"/> — including
+    /// after the control auto-reveals guides on creation, which happens without going through
+    /// this toggle's own click handler.
+    /// </summary>
+    private void UpdateGuideToggleVisibility()
+    {
+        ShowUserGuidesCheck.IsVisible = PreviewCtrl.HGuideCount > 0 || PreviewCtrl.VGuideCount > 0;
+        _suppressGuideVisibilitySync = true;
+        ShowUserGuidesCheck.IsChecked = PreviewCtrl.ShowUserGuides;
+        _suppressGuideVisibilitySync = false;
     }
 
     private void OnPreviewScrollValueChanged(bool horizontal)

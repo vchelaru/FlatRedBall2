@@ -191,7 +191,8 @@
 | PL05 | Loop animation | Wraps from last frame back to first |
 | PL06 | Preview flip H/V | Applies chain-level flip to preview |
 | PL07 | Onion skin | When a single frame is pinned, renders the previous frame at 50% alpha behind it; wraps index for the first frame; toggled by `OnionSkinToggle` |
-| PL08 | Preview guides overlay | Toggles rendering of horizontal/vertical guide lines (from `AESettingsSave`) over the preview canvas; controlled by `ShowGuidesCheck` |
+| PL08a | Origin crosshair overlay | Toggles a fixed crosshair through world origin (0,0) over the preview canvas; controlled by `ShowOriginCheck` |
+| PL08b | User-placed guides visibility (#689) | Toggles rendering/hit-testing of user-placed horizontal/vertical guide lines (persisted in `AESettingsSave`); controlled by `ShowUserGuidesCheck`, only shown once a guide exists; placing a new guide while hidden reveals them all again (matches Photoshop) |
 | PL09 | Preview zoom | Independent zoom combo (10%–400%) for the preview panel via `PreviewZoomCombo` and mouse wheel; `SetZoomPercent` clamps to 0.05×–32× |
 | PL10 | Preview pan | Middle-click or Alt+left-click drag pans the preview viewport; uses dedicated camera (`_panX`/`_panY`) shared with zoom-toward computation |
 | PL11 | Preview sprite alignment | Combo in preview toolbar: Center (FRB default), TopLeft, TopRight, BottomLeft, BottomRight, etc.; changes the anchor point used when positioning the animated sprite's `RelativeX/Y` offset in the preview panel |

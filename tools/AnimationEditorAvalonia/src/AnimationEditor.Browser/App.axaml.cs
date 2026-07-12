@@ -731,7 +731,7 @@ public partial class App : Application
         };
 
         // Phase 5 (#622): view/canvas polish. Every toggle here is already-built, already-tested
-        // control state (PreviewControl.ShowOnionSkin/InterpolateOffsets/ShowGuides,
+        // control state (PreviewControl.ShowOnionSkin/InterpolateOffsets/ShowOrigin/ShowUserGuides,
         // TextureViewport.DiagnosticsEnabled/SetZoomPercent/SetGrid) that MainWindow exposes via
         // its own toolbar controls on desktop -- this is the same wiring, minus persistence
         // (zoom%/grid-size/guide positions live in the desktop-only .aeproperties companion file,
@@ -766,17 +766,42 @@ public partial class App : Application
         interpolateButton.Click += (_, _) => preview.InterpolateOffsets = interpolateButton.IsChecked == true;
 
         // Ruler-click-drag-to-create/move/right-click-to-remove guides is entirely self-contained
-        // inside PreviewControl's own pointer handlers (present since Phase 1's wiring) --
-        // ShowGuides only toggles the origin crosshair overlay; guides themselves always render
-        // once created, with or without this toggle.
-        var showGuidesButton = new ToggleButton
+        // inside PreviewControl's own pointer handlers (present since Phase 1's wiring).
+        var showOriginButton = new ToggleButton
         {
             Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(4, 0, 4, 0),
+            Content = IconLabel("IconCrosshair", "Origin"),
+        };
+        showOriginButton.Click += (_, _) => preview.ShowOrigin = showOriginButton.IsChecked == true;
+
+        // Only shown once the user has placed at least one guide (#689); mirrors the checked
+        // state to PreviewControl.ShowUserGuides, including the auto-reveal-on-create case,
+        // which happens without going through this button's own click handler.
+        var showUserGuidesButton = new ToggleButton
+        {
+            Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            IsVisible = false,
+            IsChecked = true,
             Content = IconLabel("IconGuides", "Guides"),
         };
-        showGuidesButton.Click += (_, _) => preview.ShowGuides = showGuidesButton.IsChecked == true;
+        bool suppressGuideVisibilitySync = false;
+        showUserGuidesButton.Click += (_, _) =>
+        {
+            if (suppressGuideVisibilitySync) return;
+            preview.ShowUserGuides = showUserGuidesButton.IsChecked == true;
+        };
+        void UpdateGuideToggleVisibility()
+        {
+            showUserGuidesButton.IsVisible = preview.HGuideCount > 0 || preview.VGuideCount > 0;
+            suppressGuideVisibilitySync = true;
+            showUserGuidesButton.IsChecked = preview.ShowUserGuides;
+            suppressGuideVisibilitySync = false;
+        }
+        preview.GuidesChanged += UpdateGuideToggleVisibility;
 
         var diagnosticsButton = new ToggleButton { Content = "Diagnostics (F3)", IsVisible = false };
         void ApplyDiagnostics(bool on)
@@ -995,7 +1020,8 @@ public partial class App : Application
             Children =
             {
                 onionSkinButton,
-                showGuidesButton,
+                showOriginButton,
+                showUserGuidesButton,
                 interpolateButton,
                 ToolbarDivider(),
                 previewZoomLabel,

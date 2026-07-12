@@ -111,7 +111,8 @@ public class PreviewControl : Control, IZoomTarget
 
     // -- Settings --------------------------------------------------------------
     private bool _showOnionSkin;
-    private bool _showGuides;
+    private bool _showOrigin;
+    private bool _showUserGuides = true;
     private bool _interpolateOffsets;
 
     // -- Pan drag --------------------------------------------------------------
@@ -188,11 +189,27 @@ public class PreviewControl : Control, IZoomTarget
         set { _showOnionSkin = value; InvalidateVisual(); }
     }
 
-    public bool ShowGuides
+    /// <summary>Toggles the origin crosshair overlay — unrelated to user-placed guides, see <see cref="ShowUserGuides"/>.</summary>
+    public bool ShowOrigin
     {
-        get => _showGuides;
-        set { _showGuides = value; InvalidateVisual(); }
+        get => _showOrigin;
+        set { _showOrigin = value; InvalidateVisual(); }
     }
+
+    /// <summary>
+    /// Toggles visibility of user-placed ruler guides. Placing a new guide while this is
+    /// <c>false</c> sets it back to <c>true</c> (matches Photoshop) so guides never pile up
+    /// unseen. Does not affect guide hit-testing: a hidden guide cannot be dragged or
+    /// right-click-removed, since there's nothing on screen to target.
+    /// </summary>
+    public bool ShowUserGuides
+    {
+        get => _showUserGuides;
+        set { _showUserGuides = value; InvalidateVisual(); }
+    }
+
+    /// <summary>Fires whenever a guide is added, removed, or bulk-replaced via <see cref="SetGuides"/>.</summary>
+    public event Action? GuidesChanged;
 
     /// <summary>
     /// When <c>true</c>, the displayed sprite position eases between consecutive frames'
@@ -505,7 +522,7 @@ public class PreviewControl : Control, IZoomTarget
         if (IsGroupPreviewActive)
         {
             return new RenderSnapshot(
-                null, null, _zoom, _panX, _panY, _showGuides, null, null, width, height,
+                null, null, _zoom, _panX, _panY, _showOrigin, _showUserGuides, null, null, width, height,
                 _appState!.OffsetMultiplier,
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
@@ -545,7 +562,7 @@ public class PreviewControl : Control, IZoomTarget
         var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
 
         return new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
-                                  _showGuides, texPath, onionPath, width, height,
+                                  _showOrigin, _showUserGuides, texPath, onionPath, width, height,
                                   _appState!.OffsetMultiplier,
                                   _hGuides.ToArray(), _vGuides.ToArray(),
                                   _draggedGuideIdx, _draggingHGuide,
@@ -773,10 +790,22 @@ public class PreviewControl : Control, IZoomTarget
     }
 
     /// <summary>Test-only: adds a horizontal guide at the given world-Y coordinate.</summary>
-    public void AddHGuide(float worldY) { _hGuides.Add(worldY); InvalidateVisual(); }
+    public void AddHGuide(float worldY) { _hGuides.Add(worldY); OnGuideAdded(); }
 
     /// <summary>Test-only: adds a vertical guide at the given world-X coordinate.</summary>
-    public void AddVGuide(float worldX) { _vGuides.Add(worldX); InvalidateVisual(); }
+    public void AddVGuide(float worldX) { _vGuides.Add(worldX); OnGuideAdded(); }
+
+    /// <summary>
+    /// Common bookkeeping for every guide-creation path (ruler click, <see cref="AddHGuide"/>/
+    /// <see cref="AddVGuide"/>, <see cref="SimulateAddHGuide"/>/<see cref="SimulateAddVGuide"/>):
+    /// reveals guides if they were hidden and notifies listeners the guide set changed.
+    /// </summary>
+    private void OnGuideAdded()
+    {
+        _showUserGuides = true;
+        InvalidateVisual();
+        GuidesChanged?.Invoke();
+    }
 
     /// <summary>Test-only: returns the number of user-created horizontal guides.</summary>
     public int HGuideCount => _hGuides.Count;
@@ -1176,7 +1205,7 @@ public class PreviewControl : Control, IZoomTarget
     internal void SimulateAddHGuide(float screenY, float controlHeight)
     {
         _hGuides.Add(SnapToPixel(ScreenToWorldY(screenY, controlHeight)));
-        InvalidateVisual();
+        OnGuideAdded();
     }
 
     /// <summary>
@@ -1187,7 +1216,7 @@ public class PreviewControl : Control, IZoomTarget
     internal void SimulateAddVGuide(float screenX, float controlWidth)
     {
         _vGuides.Add(SnapToPixel(ScreenToWorldX(screenX, controlWidth)));
-        InvalidateVisual();
+        OnGuideAdded();
     }
 
     /// <summary>
@@ -1241,6 +1270,7 @@ public class PreviewControl : Control, IZoomTarget
         _vGuides.Clear();
         _vGuides.AddRange(vGuides);
         InvalidateVisual();
+        GuidesChanged?.Invoke();
     }
 
     /// <summary>
@@ -1258,7 +1288,7 @@ public class PreviewControl : Control, IZoomTarget
     /// user-placed guides. Returns <c>null</c> when no guide is nearby.
     /// </summary>
     public StandardCursorType? GetGuideCursorAt(float px, float py)
-        => GuideCursorResolver.CursorTypeAt(px, py,
+        => !_showUserGuides ? null : GuideCursorResolver.CursorTypeAt(px, py,
             _hGuides.ToArray(), _vGuides.ToArray(),
             _panX, _panY, _zoom,
             (float)Bounds.Width, (float)Bounds.Height);
@@ -1350,7 +1380,7 @@ public class PreviewControl : Control, IZoomTarget
     /// </summary>
     private bool TryRemoveGuideAt(float px, float py)
     {
-        if (px < RulerSize || py < RulerSize) return false;
+        if (!_showUserGuides || px < RulerSize || py < RulerSize) return false;
 
         const float hitPx = 4f;
         for (int i = 0; i < _hGuides.Count; i++)
@@ -1359,6 +1389,7 @@ public class PreviewControl : Control, IZoomTarget
             {
                 _hGuides.RemoveAt(i);
                 InvalidateVisual();
+                GuidesChanged?.Invoke();
                 return true;
             }
         }
@@ -1368,6 +1399,7 @@ public class PreviewControl : Control, IZoomTarget
             {
                 _vGuides.RemoveAt(i);
                 InvalidateVisual();
+                GuidesChanged?.Invoke();
                 return true;
             }
         }
@@ -1763,7 +1795,7 @@ public class PreviewControl : Control, IZoomTarget
             _draggedGuideIdx = _hGuides.Count - 1;
             _draggingHGuide  = true;
             e.Pointer.Capture(this);
-            InvalidateVisual();
+            OnGuideAdded();
             return;
         }
 
@@ -1775,30 +1807,34 @@ public class PreviewControl : Control, IZoomTarget
             _draggedGuideIdx = _vGuides.Count - 1;
             _draggingHGuide  = false;
             e.Pointer.Capture(this);
-            InvalidateVisual();
+            OnGuideAdded();
             return;
         }
 
-        // Click near existing guide ΓåÆ drag it
-        const float hitPx = 4f;
-        for (int i = 0; i < _hGuides.Count; i++)
+        // Click near existing guide ΓåÆ drag it. Skipped while guides are hidden — there's
+        // nothing on screen to target, so a click here falls through to shape drag/select.
+        if (_showUserGuides)
         {
-            if (MathF.Abs(py - WorldToScreenY(_hGuides[i])) < hitPx)
+            const float hitPx = 4f;
+            for (int i = 0; i < _hGuides.Count; i++)
             {
-                _draggedGuideIdx = i;
-                _draggingHGuide  = true;
-                e.Pointer.Capture(this);
-                return;
+                if (MathF.Abs(py - WorldToScreenY(_hGuides[i])) < hitPx)
+                {
+                    _draggedGuideIdx = i;
+                    _draggingHGuide  = true;
+                    e.Pointer.Capture(this);
+                    return;
+                }
             }
-        }
-        for (int i = 0; i < _vGuides.Count; i++)
-        {
-            if (MathF.Abs(px - WorldToScreenX(_vGuides[i])) < hitPx)
+            for (int i = 0; i < _vGuides.Count; i++)
             {
-                _draggedGuideIdx = i;
-                _draggingHGuide  = false;
-                e.Pointer.Capture(this);
-                return;
+                if (MathF.Abs(px - WorldToScreenX(_vGuides[i])) < hitPx)
+                {
+                    _draggedGuideIdx = i;
+                    _draggingHGuide  = false;
+                    e.Pointer.Capture(this);
+                    return;
+                }
             }
         }
 
@@ -1935,6 +1971,7 @@ public class PreviewControl : Control, IZoomTarget
                     _hGuides.RemoveAt(_draggedGuideIdx);
                 else
                     _vGuides.RemoveAt(_draggedGuideIdx);
+                GuidesChanged?.Invoke();
             }
             _draggedGuideIdx = -1;
             InvalidateVisual();
@@ -1973,7 +2010,8 @@ public class PreviewControl : Control, IZoomTarget
         AnimationFrameSave? OnionFrame,
         float  Zoom,
         float  PanX, float PanY,
-        bool   ShowGuides,
+        bool   ShowOrigin,
+        bool   ShowUserGuides,
         string? TexturePath,
         string? OnionTexturePath,
         float  Width, float Height,
@@ -2059,8 +2097,8 @@ public class PreviewControl : Control, IZoomTarget
             }
         }
 
-        // Origin crosshair (toggled by ShowGuides)
-        if (s.ShowGuides)
+        // Origin crosshair (toggled by ShowOrigin)
+        if (s.ShowOrigin)
         {
             using var gp = new SKPaint
             {
@@ -2073,7 +2111,7 @@ public class PreviewControl : Control, IZoomTarget
         }
 
         // User-created guide lines
-        if (s.HGuides.Length > 0 || s.VGuides.Length > 0)
+        if (s.ShowUserGuides && (s.HGuides.Length > 0 || s.VGuides.Length > 0))
         {
             using var guidePaint = new SKPaint
             {
@@ -2163,7 +2201,7 @@ public class PreviewControl : Control, IZoomTarget
         }
 
         // Dragged guide value label - drawn last so it stays on top of shapes.
-        if (s.DraggedGuideIdx >= 0)
+        if (s.ShowUserGuides && s.DraggedGuideIdx >= 0)
         {
             using var dragLabelFont = new SKFont { Size = 11f };
             using var dragLabelPaint = new SKPaint
@@ -2255,23 +2293,26 @@ public class PreviewControl : Control, IZoomTarget
         }
 
         // Draw guide value labels on the ruler edge
-        using var guideTickPaint = new SKPaint
+        if (s.ShowUserGuides)
         {
-            Color       = palette.GuideLine.WithAlpha(200),
-            StrokeWidth = 1f,
-            IsAntialias = false
-        };
-        foreach (float wy in s.HGuides)
-        {
-            float sy = cy + wy * s.Zoom;
-            if (sy >= RulerSize && sy <= s.Height)
-                canvas.DrawLine(0, sy, RulerSize, sy, guideTickPaint);
-        }
-        foreach (float wx in s.VGuides)
-        {
-            float sx = cx + wx * s.Zoom;
-            if (sx >= RulerSize && sx <= s.Width)
-                canvas.DrawLine(sx, 0, sx, RulerSize, guideTickPaint);
+            using var guideTickPaint = new SKPaint
+            {
+                Color       = palette.GuideLine.WithAlpha(200),
+                StrokeWidth = 1f,
+                IsAntialias = false
+            };
+            foreach (float wy in s.HGuides)
+            {
+                float sy = cy + wy * s.Zoom;
+                if (sy >= RulerSize && sy <= s.Height)
+                    canvas.DrawLine(0, sy, RulerSize, sy, guideTickPaint);
+            }
+            foreach (float wx in s.VGuides)
+            {
+                float sx = cx + wx * s.Zoom;
+                if (sx >= RulerSize && sx <= s.Width)
+                    canvas.DrawLine(sx, 0, sx, RulerSize, guideTickPaint);
+            }
         }
 
         // Ruler border lines
