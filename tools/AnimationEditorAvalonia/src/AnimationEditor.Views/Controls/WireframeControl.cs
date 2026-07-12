@@ -60,6 +60,10 @@ public class WireframeControl : TextureViewport
         /// </summary>
         public float? OriginTexX, OriginTexY;
         public List<SKRect> PendingCutFrameBounds = new();
+        /// <summary>Screen-space edge inflate for the selection-pop bump (#542). Zero at rest.</summary>
+        public float SelectionPopExpandPx;
+        /// <summary>Stroke width for selected frames during/after the selection-pop bump (#542).</summary>
+        public float SelectionPopStrokeWidth = SelectionPop.RestStrokeWidth;
     }
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
@@ -84,11 +88,16 @@ public class WireframeControl : TextureViewport
             {
                 frameFill.Color = new SKColor(80, 160, 255, 45);
                 frameStroke.Color = new SKColor(80, 160, 255, 230);
+                frameStroke.StrokeWidth = s.SelectionPopStrokeWidth;
+                // One-shot selection bump (#542): inflate then ease back to the rest outline.
+                if (s.SelectionPopExpandPx > 0f)
+                    sr.Inflate(s.SelectionPopExpandPx, s.SelectionPopExpandPx);
             }
             else
             {
                 frameFill.Color = new SKColor(80, 160, 255, 18);
                 frameStroke.Color = new SKColor(80, 160, 255, 120);
+                frameStroke.StrokeWidth = 1f;
             }
             canvas.DrawRect(sr, frameFill);
             canvas.DrawRect(sr, frameStroke);
@@ -250,6 +259,15 @@ public class WireframeControl : TextureViewport
     private bool _showPreview;
     private SKRect _previewRect;
 
+    // ── Selection-outline pop (#542) ───────────────────────────────────────────
+    // One-shot shrink-to-rest when the selected frame set changes. Live-driven by
+    // _selectionPopTimer; tests call StepSelectionPop / SettleSelectionPop directly.
+    private DispatcherTimer? _selectionPopTimer;
+    private bool _selectionPopAnimating;
+    private float _selectionPopAmount = SelectionPop.RestAmount;
+    private List<AnimationFrameSave>? _lastPoppedFrames;
+    private const float SelectionPopIntervalSeconds = 1f / 60f;
+
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
     private static Cursor AddFrameCursor => _addFrameCursorLazy.Value;
@@ -349,7 +367,7 @@ public class WireframeControl : TextureViewport
         _showError       = showError;
         _thumbnailService = thumbnailService;
 
-        _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _events.AchxLoaded                  += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
@@ -358,6 +376,95 @@ public class WireframeControl : TextureViewport
         // then can we measure the frame against the viewport and fit it if it's too big (#616). Mirrors
         // the double-click CenterOnFrame post in MainWindow.
         _events.FitFrameToViewRequested     += () => Dispatcher.UIThread.Post(FitSelectedFrameIfLargerThanViewport, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// SelectionChanged handler: starts the one-shot outline pop (#542) only when the
+    /// selected-frame identity actually changed, then refreshes the texture/frames.
+    /// Unrelated refreshes (grid toggle, refresh-wireframe requests) do not go through
+    /// here, so they cannot restart the pop.
+    /// </summary>
+    private void OnSelectionChanged()
+    {
+        if (SelectedFramesIdentityChanged())
+            BeginSelectionPop();
+        RefreshAll();
+    }
+
+    /// <summary>
+    /// True when <see cref="ISelectedState.SelectedFrames"/> differs by reference/identity
+    /// from the set that last started a pop. Updates the remembered set when it changed.
+    /// </summary>
+    private bool SelectedFramesIdentityChanged()
+    {
+        var current = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
+        if (_lastPoppedFrames is null
+            || _lastPoppedFrames.Count != current.Count
+            || !_lastPoppedFrames.SequenceEqual(current))
+        {
+            _lastPoppedFrames = current.ToList();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Resets the bump amount to <see cref="SelectionPop.StartAmount"/> and starts the timer.</summary>
+    private void BeginSelectionPop()
+    {
+        _selectionPopAmount = SelectionPop.StartAmount;
+        _selectionPopAnimating = true;
+        StartSelectionPopTimer();
+        InvalidateVisual();
+    }
+
+    /// <summary>True while the selection-outline pop (#542) is easing toward rest.</summary>
+    public bool IsSelectionPopAnimating => _selectionPopAnimating;
+
+    /// <summary>Test-only: current bump amount (1 = full pop, 0 = rest).</summary>
+    public float SelectionPopAmount => _selectionPopAmount;
+
+    /// <summary>
+    /// Advances the in-flight selection pop by <paramref name="dtSeconds"/>. Returns
+    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
+    /// both call this (tests skip the timer for determinism).
+    /// </summary>
+    public bool StepSelectionPop(float dtSeconds)
+    {
+        if (!_selectionPopAnimating) return false;
+
+        _selectionPopAmount = SelectionPop.Step(_selectionPopAmount, dtSeconds);
+        bool settling = SelectionPop.IsSettled(_selectionPopAmount);
+        if (settling)
+        {
+            _selectionPopAmount = SelectionPop.RestAmount;
+            _selectionPopAnimating = false;
+            StopSelectionPopTimer();
+        }
+
+        InvalidateVisual();
+        return !settling;
+    }
+
+    /// <summary>Runs <see cref="StepSelectionPop"/> to completion synchronously.</summary>
+    public void SettleSelectionPop()
+    {
+        for (int i = 0; _selectionPopAnimating && i < 1000; i++)
+            StepSelectionPop(SelectionPopIntervalSeconds);
+    }
+
+    private void StartSelectionPopTimer()
+    {
+        _selectionPopTimer ??= CreateSelectionPopTimer();
+        _selectionPopTimer.Start();
+    }
+
+    private void StopSelectionPopTimer() => _selectionPopTimer?.Stop();
+
+    private DispatcherTimer CreateSelectionPopTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(SelectionPopIntervalSeconds) };
+        timer.Tick += (_, _) => StepSelectionPop(SelectionPopIntervalSeconds);
+        return timer;
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -917,6 +1024,8 @@ public class WireframeControl : TextureViewport
             snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
+        snap.SelectionPopExpandPx = SelectionPop.OutlineExpandPx(_selectionPopAmount);
+        snap.SelectionPopStrokeWidth = SelectionPop.StrokeWidth(_selectionPopAmount);
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
