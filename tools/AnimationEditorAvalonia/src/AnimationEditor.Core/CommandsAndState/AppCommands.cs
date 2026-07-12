@@ -939,12 +939,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 $"Move {ShapeReorderLabel(shape)} to Bottom"));
         }
 
-        private static string ShapeReorderLabel(object shape) => shape switch
-        {
-            AARectSave r => string.IsNullOrEmpty(r.Name) ? "Rect" : $"Rect '{r.Name}'",
-            CircleSave c => string.IsNullOrEmpty(c.Name) ? "Circle" : $"Circle '{c.Name}'",
-            _ => "Shape",
-        };
+        private static string ShapeReorderLabel(object shape) => ShapeUndoLabel.Format(shape);
 
         /// <summary>
         /// Moves the currently-selected shape, frame, or chain up (<paramref name="delta"/> = -1)
@@ -1603,7 +1598,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 new PasteChainsCommand(acls, chains, this, _events, _selectedState),
                 new DeleteChainsCommand(sourcesToRemove, acls, this, _events, _selectedState),
             };
-            string desc = chains.Count == 1 ? "Cut Animation" : $"Cut {chains.Count} Animations";
+            string desc = chains.Count == 1
+                ? $"Cut Animation '{(sourcesToRemove.Count > 0 ? sourcesToRemove[0].Name : chains[0].Name)}'"
+                : $"Cut {chains.Count} Animations";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
@@ -1626,7 +1623,18 @@ namespace AnimationEditor.Core.CommandsAndState
                 cmds.Add(new DeleteFramesCommand(
                     group.Select(x => x.Frame).ToList(), group.Key, this, _events, _selectedState));
             }
-            string desc = frames.Count == 1 ? "Cut Frame" : $"Cut {frames.Count} Frames";
+            string desc;
+            if (frames.Count == 1)
+            {
+                var sourceChain = sourcesToRemove.Count > 0
+                    ? _objectFinder.GetAnimationChainContaining(sourcesToRemove[0])
+                    : null;
+                desc = $"Cut Frame in '{(sourceChain ?? targetChain).Name}'";
+            }
+            else
+            {
+                desc = $"Cut {frames.Count} Frames";
+            }
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
@@ -1660,7 +1668,9 @@ namespace AnimationEditor.Core.CommandsAndState
                 new PasteShapesCommand(targetFrame, clones, this, _events, _selectedState),
             };
             cmds.AddRange(deleteCmds);
-            string desc = clones.Count == 1 ? "Cut Shape" : $"Cut {clones.Count} Shapes";
+            string desc = clones.Count == 1
+                ? $"Cut {ShapeUndoLabel.Format(sourcesToRemove.Count > 0 ? sourcesToRemove[0] : clones[0])}"
+                : $"Cut {clones.Count} Shapes";
             _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 

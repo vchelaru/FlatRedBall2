@@ -32,7 +32,9 @@ internal sealed class PasteShapesCommand : IUndoableCommand
         _events = events;
         _selectedState = selectedState;
         _preSelection = new List<object>(_selectedState.SelectedNodes);
-        Description = _shapes.Length == 1 ? "Paste Shape" : $"Paste {_shapes.Length} Shapes";
+        Description = _shapes.Length == 1
+            ? $"Paste {ShapeUndoLabel.Format(_shapes[0])}"
+            : $"Paste {_shapes.Length} Shapes";
     }
 
     public bool Do()
