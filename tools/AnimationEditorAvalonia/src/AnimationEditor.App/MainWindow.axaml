@@ -1185,12 +1185,8 @@
                                 BorderThickness="1" CornerRadius="4" ClipToBounds="True"
                                 Height="26" Margin="0,0,2,0" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
-                                <!-- MinHeight 0 + Padding override (#501-style): Fluent forces a
-                                     ToggleButton min height of ~32 and a vertical Padding that, combined
-                                     with this Border's Height=26 + ClipToBounds, squeezed and clipped
-                                     text descenders (e.g. the "g" in "Magic"). -->
                                 <ToggleButton x:Name="MoveModeToggle"
-                                              Height="26" MinHeight="0" Padding="10,0"
+                                              Classes="toolbarToggle"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="3,0,0,3"
                                               ToolTip.Tip="Move mode — drag handles to resize/move frames">
@@ -1204,7 +1200,7 @@
                                 </ToggleButton>
                                 <Border Width="1" Background="{DynamicResource LineBrush}" />
                                 <ToggleButton x:Name="MagicWandToggle"
-                                              Height="26" MinHeight="0" Padding="10,0"
+                                              Classes="toolbarToggle"
                                               Foreground="{DynamicResource Ink}"
                                               CornerRadius="0,3,3,0"
                                               ToolTip.Tip="Magic Wand mode — hover to preview region; double-click to apply; Ctrl+click to add new frame">
@@ -1224,7 +1220,7 @@
                                 Margin="4,0" VerticalAlignment="Center" />
 
                         <ToggleButton x:Name="SnapToGridCheck"
-                                      Height="26"
+                                      Classes="toolbarToggle"
                                       Foreground="{DynamicResource Ink}"
                                       VerticalAlignment="Center"
                                       Margin="0,0,4,0"
@@ -1329,7 +1325,7 @@
                              convention already used for the property panel's coordinate fields. -->
                         <WrapPanel VerticalAlignment="Center">
                             <ToggleButton x:Name="OnionSkinToggle"
-                                          Height="26"
+                                          Classes="toolbarToggle"
                                           Foreground="{DynamicResource Ink}"
                                           ToolTip.Tip="Show previous frame at 50% alpha">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
@@ -1341,7 +1337,7 @@
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="ShowOriginCheck"
-                                          Height="26"
+                                          Classes="toolbarToggle"
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="4,0,4,0"
@@ -1354,10 +1350,25 @@
                                     <TextBlock Text="Origin" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
+                            <ToggleButton x:Name="ShowBoundingBoxCheck"
+                                          Classes="toolbarToggle"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          IsChecked="True"
+                                          ToolTip.Tip="Show sprite bounding box outline">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconBoundingBox.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Bounding Box" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
                             <!-- Only shown once the user has placed at least one guide (#689) —
                                  see UpdateGuideToggleVisibility in MainWindow.axaml.cs. -->
                             <ToggleButton x:Name="ShowUserGuidesCheck"
-                                          Height="26"
+                                          Classes="toolbarToggle"
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,4,0"
@@ -1373,7 +1384,7 @@
                                 </StackPanel>
                             </ToggleButton>
                             <ToggleButton x:Name="InterpolateToggle"
-                                          Height="26"
+                                          Classes="toolbarToggle"
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,4,0"

@@ -48,6 +48,18 @@
     <Style Selector="Button:disabled">
         <Setter Property="Opacity" Value="0.35" />
     </Style>
+    <!-- Toolbar/inspector text ToggleButtons (Move, Magic Wand, Grid, Onion Skin, Origin,
+         Bounding Box, Guides, Interpolate, Flip H/V/D, ...): FluentTheme's default ToggleButton
+         MinHeight (~32) and vertical Padding clip text descenders (e.g. the "g" in "Magic")
+         once a fixed Height="26" is applied, because the squeeze happens inside the button's
+         own rounded-corner clip. Originally patched per-button (#501/#697-style); centralized
+         here so new toolbar toggles pick it up via Classes="toolbarToggle" instead of repeating
+         the two-setter override. -->
+    <Style Selector="ToggleButton.toolbarToggle">
+        <Setter Property="Height" Value="26"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="10,0"/>
+    </Style>
     <!-- Icon-based +/- buttons: render SVG from file so path data lives in one place only -->
     <Style Selector="Button.plus">
         <Setter Property="ContentTemplate">

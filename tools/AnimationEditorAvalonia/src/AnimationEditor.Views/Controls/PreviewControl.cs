@@ -113,6 +113,7 @@ public class PreviewControl : Control, IZoomTarget
     private bool _showOnionSkin;
     private bool _showOrigin;
     private bool _showUserGuides = true;
+    private bool _showBoundingBox = true;
     private bool _interpolateOffsets;
 
     // -- Pan drag --------------------------------------------------------------
@@ -206,6 +207,14 @@ public class PreviewControl : Control, IZoomTarget
     {
         get => _showUserGuides;
         set { _showUserGuides = value; InvalidateVisual(); }
+    }
+
+    /// <summary>Toggles the 1-px outline drawn around the rendered sprite. When <c>false</c>,
+    /// only the sprite itself is drawn — no outline around it or the onion-skin frame.</summary>
+    public bool ShowBoundingBox
+    {
+        get => _showBoundingBox;
+        set { _showBoundingBox = value; InvalidateVisual(); }
     }
 
     /// <summary>Fires whenever a guide is added, removed, or bulk-replaced via <see cref="SetGuides"/>.</summary>
@@ -522,7 +531,7 @@ public class PreviewControl : Control, IZoomTarget
         if (IsGroupPreviewActive)
         {
             return new RenderSnapshot(
-                null, null, _zoom, _panX, _panY, _showOrigin, _showUserGuides, null, null, width, height,
+                null, null, _zoom, _panX, _panY, _showOrigin, _showUserGuides, _showBoundingBox, null, null, width, height,
                 _appState!.OffsetMultiplier,
                 _hGuides.ToArray(), _vGuides.ToArray(),
                 _draggedGuideIdx, _draggingHGuide,
@@ -562,7 +571,7 @@ public class PreviewControl : Control, IZoomTarget
         var (frameOffX, frameOffY) = ResolveFrameOffset(chain, displayFrame, selectedFrame is not null);
 
         return new RenderSnapshot(displayFrame, onionFrame, _zoom, _panX, _panY,
-                                  _showOrigin, _showUserGuides, texPath, onionPath, width, height,
+                                  _showOrigin, _showUserGuides, _showBoundingBox, texPath, onionPath, width, height,
                                   _appState!.OffsetMultiplier,
                                   _hGuides.ToArray(), _vGuides.ToArray(),
                                   _draggedGuideIdx, _draggingHGuide,
@@ -2012,6 +2021,7 @@ public class PreviewControl : Control, IZoomTarget
         float  PanX, float PanY,
         bool   ShowOrigin,
         bool   ShowUserGuides,
+        bool   ShowBoundingBox,
         string? TexturePath,
         string? OnionTexturePath,
         float  Width, float Height,
@@ -2073,7 +2083,7 @@ public class PreviewControl : Control, IZoomTarget
 
                 float lcx = cx + layer.OffsetX * s.OffsetMultiplier * s.Zoom;
                 float lcy = cy - layer.OffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f);
+                DrawFrameCore(canvas, layer.Frame, layer.Color, limg, lcx, lcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox);
             }
         }
         else
@@ -2084,7 +2094,7 @@ public class PreviewControl : Control, IZoomTarget
             {
                 float ocx = cx + s.OnionFrame.RelativeX * s.OffsetMultiplier * s.Zoom;
                 float ocy = cy - s.OnionFrame.RelativeY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f);
+                DrawFrameCore(canvas, s.OnionFrame, s.OnionColor, onionImg, ocx, ocy, s.Zoom, alpha: 0.4f, showOutline: s.ShowBoundingBox);
             }
 
             if (s.Frame is not null &&
@@ -2093,7 +2103,7 @@ public class PreviewControl : Control, IZoomTarget
             {
                 float fcx = cx + s.FrameOffsetX * s.OffsetMultiplier * s.Zoom;
                 float fcy = cy - s.FrameOffsetY * s.OffsetMultiplier * s.Zoom;
-                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f);
+                DrawFrameCore(canvas, s.Frame, s.FrameColor, img, fcx, fcy, s.Zoom, alpha: 1.0f, showOutline: s.ShowBoundingBox);
             }
         }
 
@@ -2362,7 +2372,7 @@ public class PreviewControl : Control, IZoomTarget
 
     private static void DrawFrameCore(
         SKCanvas canvas, AnimationFrameSave frame, ResolvedFrameColor color, SKImage img,
-        float cx, float cy, float zoom, float alpha)
+        float cx, float cy, float zoom, float alpha, bool showOutline = true)
     {
         var (sx, sy, sw, sh) = ComputeSourceRect(frame, img.Width, img.Height);
 
@@ -2401,6 +2411,8 @@ public class PreviewControl : Control, IZoomTarget
         canvas.DrawImage(img, src, dst, sampling, paint);
 
         if (flip) canvas.Restore();
+
+        if (!showOutline) return;
 
         var outlineDst = ComputeOutlineDst(dst, frame.FlipDiagonal, cx, cy);
 
