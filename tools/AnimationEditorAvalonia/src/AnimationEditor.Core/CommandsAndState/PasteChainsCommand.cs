@@ -41,7 +41,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _selectedState = selectedState;
             _preSelection = new List<object>(selectedState.SelectedNodes);
             _anchorChains = selectedState.SelectedChains;
-            Description = chains.Count == 1 ? "Paste Animation" : $"Paste {chains.Count} Animations";
+            Description = chains.Count == 1
+                ? $"Paste Animation '{chains[0].Name}'"
+                : $"Paste {chains.Count} Animations";
         }
 
         public bool Do()

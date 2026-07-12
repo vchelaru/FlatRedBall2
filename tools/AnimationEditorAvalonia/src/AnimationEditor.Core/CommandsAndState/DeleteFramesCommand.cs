@@ -30,7 +30,9 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands = commands;
             _events = events;
             _selectedState = selectedState;
-            Description = frames.Count == 1 ? "Delete Frame" : $"Delete {frames.Count} Frames";
+            Description = frames.Count == 1
+                ? $"Delete Frame in '{chain.Name}'"
+                : $"Delete {frames.Count} Frames";
         }
 
         public bool Do()

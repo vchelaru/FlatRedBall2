@@ -91,6 +91,62 @@ public class CommandDescriptionTests
         Assert.Equal(expected, cmd.Description);
     }
 
+    // ── DeleteChainsCommand / DeleteFramesCommand ─────────────────────────────
+
+    [Fact]
+    public void DeleteChainsCommand_Description_SingleChain_IncludesName()
+    {
+        var expected = "Delete Animation 'Walk'";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var cmd = new DeleteChainsCommand(
+            new[] { chain }, ctx.Acls, ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void DeleteFramesCommand_Description_SingleFrame_IncludesChainName()
+    {
+        var expected = "Delete Frame in 'Walk'";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var cmd = new DeleteFramesCommand(
+            new[] { chain.Frames[0] }, chain, ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    // ── DuplicateChainsCommand / PasteChainsCommand ───────────────────────────
+
+    [Fact]
+    public void DuplicateChainsCommand_Description_SingleChain_IncludesName()
+    {
+        var expected = "Duplicate Animation 'Walk'";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var source = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var copy = new AnimationChainSave { Name = "Walk Copy" };
+        var cmd = new DuplicateChainsCommand(
+            ctx.Acls,
+            new[] { (source, copy) },
+            ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void PasteChainsCommand_Description_SingleChain_IncludesName()
+    {
+        var expected = "Paste Animation 'Walk'";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var cmd = new PasteChainsCommand(
+            ctx.Acls, new[] { chain },
+            ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
     // ── FlipCommand ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -148,7 +204,45 @@ public class CommandDescriptionTests
         Assert.Equal(expected, cmd.Description);
     }
 
-    // ── MoveChainsRelative / MoveFramesRelative (AppCommands → ReorderCommand) ─
+    // ── InvertFrameOrder / MoveChain / MoveFrame / shape reorder ──────────────
+
+    [Fact]
+    public void InvertFrameOrder_Description_IncludesChainName()
+    {
+        var expected = "Invert Frame Order in 'Walk'";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+
+        ctx.AppCommands.InvertFrameOrder(chain);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveChain_Description_IncludesName()
+    {
+        var expected = "Move Animation 'A' Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var a = TestHelpers.MakeChain(ctx.Acls, "A");
+        TestHelpers.MakeChain(ctx.Acls, "B");
+
+        ctx.AppCommands.MoveChain(a, +1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveChainToTop_Description_IncludesName()
+    {
+        var expected = "Move Animation 'B' to Top";
+        var ctx = TestHelpers.SetupFreshAcls();
+        TestHelpers.MakeChain(ctx.Acls, "A");
+        var b = TestHelpers.MakeChain(ctx.Acls, "B");
+
+        ctx.AppCommands.MoveChainToTop(b);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
 
     [Fact]
     public void MoveChainsRelative_Description_MultipleChains_IncludesCount()
@@ -165,14 +259,26 @@ public class CommandDescriptionTests
     }
 
     [Fact]
-    public void MoveChainsRelative_Description_SingleChain_OmitsCount()
+    public void MoveChainsRelative_Description_SingleChain_IncludesName()
     {
-        var expected = "Move Animation Down";
+        var expected = "Move Animation 'A' Down";
         var ctx = TestHelpers.SetupFreshAcls();
         var a = TestHelpers.MakeChain(ctx.Acls, "A");
         TestHelpers.MakeChain(ctx.Acls, "B");
 
         ctx.AppCommands.MoveChainsRelative(new[] { a }, +1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveFrame_Description_IncludesChainName()
+    {
+        var expected = "Move Frame in 'Walk' Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+
+        ctx.AppCommands.MoveFrame(chain.Frames[0], chain, +1);
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }
@@ -192,9 +298,9 @@ public class CommandDescriptionTests
     }
 
     [Fact]
-    public void MoveFramesCommand_Description_SingleSameChain_OmitsCount()
+    public void MoveFramesCommand_Description_SingleSameChain_IncludesChainName()
     {
-        var expected = "Move Frame";
+        var expected = "Move Frame in 'Walk'";
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
         var cmd = new MoveFramesCommand(
@@ -218,14 +324,30 @@ public class CommandDescriptionTests
     }
 
     [Fact]
-    public void MoveFramesRelative_Description_SingleFrame_OmitsCount()
+    public void MoveFramesRelative_Description_SingleFrame_IncludesChainName()
     {
-        var expected = "Move Frame Up";
+        var expected = "Move Frame in 'Walk' Up";
         var ctx = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
         var frame = chain.Frames[1];
 
         ctx.AppCommands.MoveFramesRelative(new[] { frame }, chain, -1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveShape_Description_IncludesShapeName()
+    {
+        var expected = "Move Rect 'Hitbox' Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        var rect = new AARectSave { Name = "Hitbox" };
+        frame.ShapesSave!.Shapes.Add(rect);
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = "Other" });
+
+        ctx.AppCommands.MoveShape(rect, frame, +1);
 
         Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }
