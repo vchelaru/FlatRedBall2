@@ -32,7 +32,9 @@ internal sealed class DuplicateShapesCommand : IUndoableCommand
         _events = events;
         _selectedState = selectedState;
         _preSelection = new List<object>(_selectedState.SelectedNodes);
-        Description = _copies.Length == 1 ? "Duplicate Shape" : $"Duplicate {_copies.Length} Shapes";
+        Description = _copies.Length == 1
+            ? $"Duplicate {ShapeUndoLabel.Format(_copies[0])}"
+            : $"Duplicate {_copies.Length} Shapes";
     }
 
     public bool Do()

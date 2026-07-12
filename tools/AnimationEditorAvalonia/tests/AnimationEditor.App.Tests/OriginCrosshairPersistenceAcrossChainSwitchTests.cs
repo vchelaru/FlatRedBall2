@@ -11,19 +11,17 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Tests that verify the guide crosshair in <see cref="PreviewControl"/>
-/// persists when the user switches between animation chains.
+/// Tests that verify the origin crosshair in <see cref="PreviewControl"/>
+/// persists when the user switches between animation chains. Not to be confused
+/// with user-placed guides — this covers the fixed crosshair through world origin
+/// (0,0), toggled by <see cref="PreviewControl.ShowOrigin"/>.
 ///
-/// Tutorial doc step:
-///   "Now that we have a guide which represents the ground we can select the
-///    other animation to see how it lines up."
-///
-/// The guide position is stored in <c>_panX/_panY</c> on <c>PreviewControl</c>.
+/// The crosshair position is stored in <c>_panX/_panY</c> on <c>PreviewControl</c>.
 /// <c>OnSelectionChanged</c> only calls <c>_playback.SetChain</c> and
-/// <c>InvalidateVisual</c> — it does NOT reset pan — so the guide MUST
+/// <c>InvalidateVisual</c> — it does NOT reset pan — so the crosshair MUST
 /// remain at the same pixel position after a chain switch.
 /// </summary>
-public class GuidePersistenceAcrossChainSwitchTests
+public class OriginCrosshairPersistenceAcrossChainSwitchTests
 {
     private static TestServices ResetSingletons() {
         var ctx = TestHelpers.BuildServices();
@@ -48,17 +46,17 @@ public class GuidePersistenceAcrossChainSwitchTests
         return path;
     }
 
-    // ── Guide stays at same X after chain switch ──────────────────────────────
+    // ── Crosshair stays at same X after chain switch ──────────────────────────
 
     /// <summary>
-    /// After setting PanX=+8 (guide vertical line at x = 42+8 = 50), switching
-    /// from "Idle" to "Run" must NOT move the guide — it must still be at x=50.
+    /// After setting PanX=+8 (crosshair vertical line at x = 42+8 = 50), switching
+    /// from "Idle" to "Run" must NOT move the crosshair — it must still be at x=50.
     ///
     /// The test uses two empty chains so any pixel difference between the two
-    /// renders is only due to guide position or texture content, not frame drawing.
+    /// renders is only due to crosshair position or texture content, not frame drawing.
     /// </summary>
     [AvaloniaFact]
-    public void Guide_AfterChainSwitch_VerticalLineRemainsAtSameX()
+    public void Origin_AfterChainSwitch_VerticalLineRemainsAtSameX()
     {
         var ctx = ResetSingletons();
 
@@ -68,8 +66,8 @@ public class GuidePersistenceAcrossChainSwitchTests
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = ctx.CreatePreviewControl();
-        ctrl.ShowGuides = true;
-        ctrl.SetPan(8f, 0f); // vertical guide at x = (Width-20)/2+20+8 = 50
+        ctrl.ShowOrigin = true;
+        ctrl.SetPan(8f, 0f); // vertical line at x = (Width-20)/2+20+8 = 50
 
         ctx.SelectedState.SelectedChain = chainIdle;
         Dispatcher.UIThread.RunJobs();
@@ -79,24 +77,24 @@ public class GuidePersistenceAcrossChainSwitchTests
         Dispatcher.UIThread.RunJobs();
         using var bmRun = ctrl.RenderToBitmap(64, 64);
 
-        // Both renders must show the vertical guide at x=50 (green-dominant)
-        var idleGuidePixel = bmIdle.GetPixel(50, 25);
-        var runGuidePixel  = bmRun.GetPixel(50, 25);
-        var runOldPixel    = bmRun.GetPixel(42, 25);   // x=42 is old default centre
+        // Both renders must show the vertical line at x=50 (green-dominant)
+        var idlePixel   = bmIdle.GetPixel(50, 25);
+        var runPixel    = bmRun.GetPixel(50, 25);
+        var runOldPixel = bmRun.GetPixel(42, 25);   // x=42 is old default centre
 
-        Assert.True(idleGuidePixel.Green > idleGuidePixel.Red,
-            $"Idle: guide should be at x=50; G={idleGuidePixel.Green} R={idleGuidePixel.Red}");
-        Assert.True(runGuidePixel.Green > runGuidePixel.Red,
-            $"Run: guide must persist at x=50 after chain switch; G={runGuidePixel.Green} R={runGuidePixel.Red}");
+        Assert.True(idlePixel.Green > idlePixel.Red,
+            $"Idle: crosshair should be at x=50; G={idlePixel.Green} R={idlePixel.Red}");
+        Assert.True(runPixel.Green > runPixel.Red,
+            $"Run: crosshair must persist at x=50 after chain switch; G={runPixel.Green} R={runPixel.Red}");
         Assert.True(runOldPixel.Green <= runOldPixel.Red + 10,
-            $"Run: x=42 (old default) should NOT have guide; G={runOldPixel.Green} R={runOldPixel.Red}");
+            $"Run: x=42 (old default) should NOT have crosshair; G={runOldPixel.Green} R={runOldPixel.Red}");
     }
 
     /// <summary>
-    /// Same verification for the horizontal guide (PanY=+8 → guide at y=40).
+    /// Same verification for the horizontal line (PanY=+8 → line at y=40).
     /// </summary>
     [AvaloniaFact]
-    public void Guide_AfterChainSwitch_HorizontalLineRemainsAtSameY()
+    public void Origin_AfterChainSwitch_HorizontalLineRemainsAtSameY()
     {
         var ctx = ResetSingletons();
 
@@ -106,8 +104,8 @@ public class GuidePersistenceAcrossChainSwitchTests
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = ctx.CreatePreviewControl();
-        ctrl.ShowGuides = true;
-        ctrl.SetPan(0f, 8f); // horizontal guide at y = (Height-20)/2+20+8 = 50
+        ctrl.ShowOrigin = true;
+        ctrl.SetPan(0f, 8f); // horizontal line at y = (Height-20)/2+20+8 = 50
 
         ctx.SelectedState.SelectedChain = chainIdle;
         Dispatcher.UIThread.RunJobs();
@@ -120,19 +118,19 @@ public class GuidePersistenceAcrossChainSwitchTests
         var atOldY = bmRun.GetPixel(25, 42);
 
         Assert.True(atNewY.Green > atNewY.Red,
-            $"Horizontal guide should still be at y=50 after chain switch; G={atNewY.Green} R={atNewY.Red}");
+            $"Horizontal line should still be at y=50 after chain switch; G={atNewY.Green} R={atNewY.Red}");
         Assert.True(atOldY.Green <= atOldY.Red + 10,
-            $"y=42 (old default) should not have guide; G={atOldY.Green} R={atOldY.Red}");
+            $"y=42 (old default) should not have crosshair; G={atOldY.Green} R={atOldY.Red}");
     }
 
-    // ── Guide stays across multiple switches ──────────────────────────────────
+    // ── Crosshair stays across multiple switches ──────────────────────────────
 
     /// <summary>
     /// Switching chains multiple times (Idle→Run→Idle→Run) must not drift the
-    /// guide position. After four switches guide must be at the original offset.
+    /// crosshair position. After four switches it must be at the original offset.
     /// </summary>
     [AvaloniaFact]
-    public void Guide_MultipleChainSwitches_GuideDoesNotDrift()
+    public void Origin_MultipleChainSwitches_CrosshairDoesNotDrift()
     {
         var ctx = ResetSingletons();
 
@@ -142,8 +140,8 @@ public class GuidePersistenceAcrossChainSwitchTests
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
         var ctrl = ctx.CreatePreviewControl();
-        ctrl.ShowGuides = true;
-        ctrl.SetPan(8f, 8f); // guide at (50, 50)
+        ctrl.ShowOrigin = true;
+        ctrl.SetPan(8f, 8f); // crosshair at (50, 50)
 
         for (int i = 0; i < 4; i++)
         {
@@ -152,29 +150,29 @@ public class GuidePersistenceAcrossChainSwitchTests
         }
 
         using var bm = ctrl.RenderToBitmap(64, 64);
-        var vertGuide = bm.GetPixel(50, 25);  // vertical line at x=50
-        var horzGuide = bm.GetPixel(25, 50);  // horizontal line at y=50
+        var vertLine = bm.GetPixel(50, 25);  // vertical line at x=50
+        var horzLine = bm.GetPixel(25, 50);  // horizontal line at y=50
 
-        Assert.True(vertGuide.Green > vertGuide.Red,
-            $"After 4 switches vertical guide must still be at x=50; G={vertGuide.Green} R={vertGuide.Red}");
-        Assert.True(horzGuide.Green > horzGuide.Red,
-            $"After 4 switches horizontal guide must still be at y=50; G={horzGuide.Green} R={horzGuide.Red}");
+        Assert.True(vertLine.Green > vertLine.Red,
+            $"After 4 switches vertical line must still be at x=50; G={vertLine.Green} R={vertLine.Red}");
+        Assert.True(horzLine.Green > horzLine.Red,
+            $"After 4 switches horizontal line must still be at y=50; G={horzLine.Green} R={horzLine.Red}");
     }
 
-    // ── Guide persists with textured chains ───────────────────────────────────
+    // ── Crosshair persists with textured chains ────────────────────────────────
 
     /// <summary>
     /// Stronger test: both chains have textures. Even when the texture content
-    /// differs between chains, the guide must appear at the same pixel after the switch.
+    /// differs between chains, the crosshair must appear at the same pixel after the switch.
     ///
     /// Chain A (Idle): first chain.
     /// Chain B (Run):  second chain.
-    /// Guide: vertical at x=40 (PanX=+8 on 64×64 canvas).
+    /// Crosshair: vertical at x=40 (PanX=+8 on 64×64 canvas).
     /// After switching to Run, pixel at (40, 10) must still be green-dominant
-    /// (the guide rendered at that position).
+    /// (the crosshair rendered at that position).
     /// </summary>
     [AvaloniaFact]
-    public void Guide_WithTexturedChains_PersistsAfterSwitch()
+    public void Origin_WithTexturedChains_PersistsAfterSwitch()
     {
         var ctx = ResetSingletons();
         var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -187,8 +185,8 @@ public class GuidePersistenceAcrossChainSwitchTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainRun);
 
             var ctrl = ctx.CreatePreviewControl();
-            ctrl.ShowGuides = true;
-            ctrl.SetPan(8f, 0f); // vertical guide at x = 42+8 = 50
+            ctrl.ShowOrigin = true;
+            ctrl.SetPan(8f, 0f); // vertical line at x = 42+8 = 50
 
             // Select Idle chain
             ctx.SelectedState.SelectedChain = chainIdle;
@@ -200,14 +198,14 @@ public class GuidePersistenceAcrossChainSwitchTests
             Dispatcher.UIThread.RunJobs();
             using var bmRun = ctrl.RenderToBitmap(64, 64);
 
-            // Guide must appear at x=50 in BOTH renders (pan was not reset)
-            var idleGuide = bmIdle.GetPixel(50, 25);
-            var runGuide  = bmRun.GetPixel(50, 25);
+            // Crosshair must appear at x=50 in BOTH renders (pan was not reset)
+            var idlePixel = bmIdle.GetPixel(50, 25);
+            var runPixel  = bmRun.GetPixel(50, 25);
 
-            Assert.True(idleGuide.Green > idleGuide.Red,
-                $"Guide at x=50 must appear with Idle chain; G={idleGuide.Green} R={idleGuide.Red}");
-            Assert.True(runGuide.Green > runGuide.Red,
-                $"Guide at x=50 must persist after switching to Run; G={runGuide.Green} R={runGuide.Red}");
+            Assert.True(idlePixel.Green > idlePixel.Red,
+                $"Crosshair at x=50 must appear with Idle chain; G={idlePixel.Green} R={idlePixel.Red}");
+            Assert.True(runPixel.Green > runPixel.Red,
+                $"Crosshair at x=50 must persist after switching to Run; G={runPixel.Green} R={runPixel.Red}");
         }
         finally
         {

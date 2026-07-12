@@ -31,7 +31,7 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _events = events;
             _selectedState = selectedState;
             Description = chains.Count == 1
-                ? $"Delete '{chains[0].Name}'"
+                ? $"Delete Animation '{chains[0].Name}'"
                 : $"Delete {chains.Count} Animations";
         }
 

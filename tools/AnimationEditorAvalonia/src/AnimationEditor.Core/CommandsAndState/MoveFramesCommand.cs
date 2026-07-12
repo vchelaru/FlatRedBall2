@@ -53,7 +53,7 @@ internal sealed class MoveFramesCommand : IUndoableCommand
         bool sameChain = ReferenceEquals(sourceChain, targetChain);
         Description = (frames.Count, sameChain) switch
         {
-            (1, true) => "Move Frame",
+            (1, true) => $"Move Frame in '{sourceChain.Name}'",
             (_, true) => $"Move {frames.Count} Frames",
             (1, false) => $"Move Frame to '{targetChain.Name}'",
             _ => $"Move {frames.Count} Frames to '{targetChain.Name}'",

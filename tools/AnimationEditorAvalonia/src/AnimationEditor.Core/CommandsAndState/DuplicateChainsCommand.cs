@@ -38,7 +38,9 @@ internal sealed class DuplicateChainsCommand : IUndoableCommand
         _events = events;
         _selectedState = selectedState;
         _preSelection = new List<object>(_selectedState.SelectedNodes);
-        Description = _copies.Length == 1 ? "Duplicate Animation" : $"Duplicate {_copies.Length} Animations";
+            Description = _copies.Length == 1
+                ? $"Duplicate Animation '{_sources[0].Name}'"
+                : $"Duplicate {_copies.Length} Animations";
     }
 
     public bool Do()

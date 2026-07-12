@@ -62,6 +62,7 @@ public partial class MainWindow : Window
     private double _dragStartX;
     private bool _isDragging;
     private Border? _ghostBorder;
+    private Border? _tabDropLine;
 
     // ── Frame drag-and-drop reorder state (issue #500) ──────────────────────────
     // The DataTransfer only carries a marker token; the actual frames + source chain
@@ -146,6 +147,7 @@ public partial class MainWindow : Window
     private bool _suppressTreeSelectionHandling;
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
+    private bool _suppressGuideVisibilitySync;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
     private System.Threading.CancellationTokenSource? _toastCts;
 
@@ -401,6 +403,9 @@ public partial class MainWindow : Window
                     Canvas.SetLeft(_ghostBorder, pos.X + 10);
                     Canvas.SetTop(_ghostBorder, pos.Y - 18);
                 }
+
+                if (_isDragging)
+                    ShowTabDropLine(x);
             };
 
             tabBorder.PointerReleased += (_, args) =>
@@ -427,6 +432,7 @@ public partial class MainWindow : Window
                     DragOverlayCanvas.Children.Remove(_ghostBorder);
                     _ghostBorder = null;
                 }
+                RemoveTabDropLine();
 
                 if (_isDragging)
                 {
@@ -2057,8 +2063,17 @@ public partial class MainWindow : Window
         OnionSkinToggle.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOnionSkin = OnionSkinToggle.IsChecked == true;
 
-        ShowGuidesCheck.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.ShowGuides = ShowGuidesCheck.IsChecked == true;
+        ShowOriginCheck.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
+
+        ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
+        {
+            if (_suppressGuideVisibilitySync) return;
+            PreviewCtrl.ShowUserGuides = ShowUserGuidesCheck.IsChecked == true;
+        };
+        // PreviewControl auto-reveals guides when a new one is added while hidden (#689);
+        // resync the toolbar toggle and its visibility (only shown once a guide exists).
+        PreviewCtrl.GuidesChanged += UpdateGuideToggleVisibility;
 
         InterpolateToggle.IsCheckedChanged += (_, _) =>
         {
@@ -2101,6 +2116,22 @@ public partial class MainWindow : Window
         PreviewHScroll.Scroll += OnPreviewScrollEnded;
         PreviewVScroll.Scroll += OnPreviewScrollEnded;
         PreviewCtrl.ViewChanged += RefreshPreviewScrollBars;
+
+        UpdateGuideToggleVisibility();
+    }
+
+    /// <summary>
+    /// Shows the "Guides" toggle only once at least one guide has been placed (#689), and
+    /// mirrors its checked state to <see cref="PreviewControl.ShowUserGuides"/> — including
+    /// after the control auto-reveals guides on creation, which happens without going through
+    /// this toggle's own click handler.
+    /// </summary>
+    private void UpdateGuideToggleVisibility()
+    {
+        ShowUserGuidesCheck.IsVisible = PreviewCtrl.HGuideCount > 0 || PreviewCtrl.VGuideCount > 0;
+        _suppressGuideVisibilitySync = true;
+        ShowUserGuidesCheck.IsChecked = PreviewCtrl.ShowUserGuides;
+        _suppressGuideVisibilitySync = false;
     }
 
     private void OnPreviewScrollValueChanged(bool horizontal)
@@ -4620,6 +4651,57 @@ public partial class MainWindow : Window
                 _tabManager.Tabs.Select(t => t.DisplayName).ToList());
             _tabManager.RegisterBackground(new FilePath(NewUntitledSentinelPath()), displayName);
         }
+    }
+
+    /// <summary>
+    /// Shows (or moves) a thin vertical line in <see cref="DragOverlayCanvas"/> marking where
+    /// a dragged tab would land if dropped at <paramref name="xInTabStrip"/> (issue #545) —
+    /// otherwise reordering tabs is guesswork until release.
+    /// </summary>
+    private void ShowTabDropLine(double xInTabStrip)
+    {
+        double lineX = ComputeTabDropLineX(xInTabStrip);
+
+        _tabDropLine ??= new Border
+        {
+            Width = 2,
+            Background = new SolidColorBrush(Color.Parse("#4a90d9")),
+            IsHitTestVisible = false,
+        };
+        if (!DragOverlayCanvas.Children.Contains(_tabDropLine))
+            DragOverlayCanvas.Children.Add(_tabDropLine);
+
+        var origin = Avalonia.VisualExtensions.TranslatePoint(TabStrip, new Avalonia.Point(0, 0), DragOverlayCanvas) ?? default;
+        _tabDropLine.Height = TabStrip.Bounds.Height;
+        Canvas.SetLeft(_tabDropLine, origin.X + lineX - 1);
+        Canvas.SetTop(_tabDropLine, origin.Y);
+    }
+
+    private void RemoveTabDropLine()
+    {
+        if (_tabDropLine is not null)
+            DragOverlayCanvas.Children.Remove(_tabDropLine);
+    }
+
+    /// <summary>
+    /// Returns the TabStrip-local X coordinate of the drop boundary for <paramref name="xInTabStrip"/>:
+    /// the left edge of the first tab whose centre is to the right of it, or the right edge of the
+    /// last tab if the pointer is past every tab's centre. Mirrors <see cref="ComputeTabIndexAt"/>'s
+    /// traversal but keeps the "past the last tab" case visually distinct (line trails the last tab
+    /// instead of sitting on its left edge), which the index alone can't express since both cases
+    /// clamp to the same target index.
+    /// </summary>
+    internal double ComputeTabDropLineX(double xInTabStrip)
+    {
+        var children = TabStrip.Children;
+        if (children.Count == 0) return 0;
+        for (int i = 0; i < children.Count; i++)
+        {
+            var b = children[i].Bounds;
+            if (xInTabStrip < b.Left + b.Width / 2.0)
+                return b.Left;
+        }
+        return children[children.Count - 1].Bounds.Right;
     }
 
     /// <summary>
