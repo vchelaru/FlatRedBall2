@@ -1340,11 +1340,29 @@
                                     <TextBlock Text="Onion Skin" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ToggleButton>
-                            <ToggleButton x:Name="ShowGuidesCheck"
+                            <ToggleButton x:Name="ShowOriginCheck"
                                           Height="26"
                                           Foreground="{DynamicResource Ink}"
                                           VerticalAlignment="Center"
                                           Margin="4,0,4,0"
+                                          ToolTip.Tip="Show origin crosshair">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <svg:Svg Width="16" Height="16"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCrosshair.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="Origin" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ToggleButton>
+                            <!-- Only shown once the user has placed at least one guide (#689) —
+                                 see UpdateGuideToggleVisibility in MainWindow.axaml.cs. -->
+                            <ToggleButton x:Name="ShowUserGuidesCheck"
+                                          Height="26"
+                                          Foreground="{DynamicResource Ink}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,4,0"
+                                          IsVisible="False"
+                                          IsChecked="True"
                                           ToolTip.Tip="Show guides">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <svg:Svg Width="16" Height="16"

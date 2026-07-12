@@ -500,20 +500,20 @@ public class VisualRenderTests
     }
 
     /// <summary>
-    /// ShowGuides draws a 1 px green cross-hair through the canvas centre.
-    /// Sampling the intersection pixel proves the agent can detect guide lines
-    /// rendered over a plain background.
+    /// ShowOrigin draws a 1 px green cross-hair through the canvas centre.
+    /// Sampling the intersection pixel proves the agent can detect the origin
+    /// crosshair rendered over a plain background.
     ///
-    /// Math (guide = SKColor(100,200,100,160) over background SKColor(30,30,30)):
+    /// Math (crosshair = SKColor(100,200,100,160) over background SKColor(30,30,30)):
     ///   R≈74, G≈137, B≈74  →  green channel is clearly dominant.
     /// </summary>
     [AvaloniaFact]
-    public void PreviewGuides_DrawGreenCrossHairAtCenter()
+    public void ShowOrigin_DrawGreenCrossHairAtCenter()
     {
         var ctx = ResetSingletons();
         var ctrl = ctx.CreatePreviewControl();
         ctrl.PauseAutoPlayback();
-        ctrl.ShowGuides = true;   // no chain; guides are drawn over dark background
+        ctrl.ShowOrigin = true;   // no chain; crosshair is drawn over dark background
 
         using var bm = ctrl.RenderToBitmap(64, 64);
 
