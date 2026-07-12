@@ -60,6 +60,11 @@ public class WireframeControl : TextureViewport
         /// </summary>
         public float? OriginTexX, OriginTexY;
         public List<SKRect> PendingCutFrameBounds = new();
+        /// <summary>
+        /// Selection-outline reveal progress (#542): 0 = full bump, 1 = settled.
+        /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
+        /// </summary>
+        public float SelectionRevealProgress = 1f;
     }
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
@@ -77,6 +82,8 @@ public class WireframeControl : TextureViewport
         using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
+        float revealScale = RevealAnimation.Scale(s.SelectionRevealProgress);
+
         foreach (var (bounds, isSelected) in s.Frames)
         {
             var sr = SnapToScreen(bounds, s);
@@ -84,6 +91,9 @@ public class WireframeControl : TextureViewport
             {
                 frameFill.Color = new SKColor(80, 160, 255, 45);
                 frameStroke.Color = new SKColor(80, 160, 255, 230);
+                // One-shot reveal (#542): same shrink-to-rest as PNG diff boxes (#606).
+                if (revealScale != 1f)
+                    sr = ScaleAround(sr, revealScale);
             }
             else
             {
@@ -158,6 +168,15 @@ public class WireframeControl : TextureViewport
             canvas.DrawRect(hr, fill);
             canvas.DrawRect(hr, stroke);
         }
+    }
+
+    // Same screen-space center scale as PngPreviewControl's diff-box reveal (#606).
+    private static SKRect ScaleAround(SKRect r, float scale)
+    {
+        float cx = r.MidX, cy = r.MidY;
+        float halfW = r.Width * 0.5f * scale;
+        float halfH = r.Height * 0.5f * scale;
+        return new SKRect(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
     }
 
     private static IEnumerable<SKPoint> HandlePoints(SKRect r)
@@ -249,6 +268,13 @@ public class WireframeControl : TextureViewport
     // Preview rectangle (magic wand / grid snap hover)
     private bool _showPreview;
     private SKRect _previewRect;
+
+    // ── Selection-outline reveal (#542) ───────────────────────────────────────
+    // Same RevealAnimation shrink-to-rest as PNG diff boxes (#606). Progress 0→1;
+    // live-driven by _selectionRevealTimer; tests call StepSelectionReveal directly.
+    private DispatcherTimer? _selectionRevealTimer;
+    private float _selectionRevealProgress = 1f;
+    private List<AnimationFrameSave>? _lastRevealedFrames;
 
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
@@ -349,7 +375,7 @@ public class WireframeControl : TextureViewport
         _showError       = showError;
         _thumbnailService = thumbnailService;
 
-        _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
+        _selectedState.SelectionChanged     += () => Dispatcher.UIThread.InvokeAsync(OnSelectionChanged);
         _pendingCutState.Changed            += () => Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
         _appCommands.RefreshWireframeRequested += () => Dispatcher.UIThread.InvokeAsync(RefreshAll);
         _events.AchxLoaded                  += _ => Dispatcher.UIThread.InvokeAsync(RefreshAll);
@@ -358,6 +384,85 @@ public class WireframeControl : TextureViewport
         // then can we measure the frame against the viewport and fit it if it's too big (#616). Mirrors
         // the double-click CenterOnFrame post in MainWindow.
         _events.FitFrameToViewRequested     += () => Dispatcher.UIThread.Post(FitSelectedFrameIfLargerThanViewport, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// SelectionChanged handler: starts the one-shot outline reveal (#542) only when the
+    /// selected-frame identity actually changed, then refreshes the texture/frames.
+    /// Unrelated refreshes (grid toggle, refresh-wireframe requests) do not go through
+    /// here, so they cannot restart the reveal.
+    /// </summary>
+    private void OnSelectionChanged()
+    {
+        if (SelectedFramesIdentityChanged())
+            BeginSelectionReveal();
+        RefreshAll();
+    }
+
+    /// <summary>
+    /// True when <see cref="ISelectedState.SelectedFrames"/> differs by reference/identity
+    /// from the set that last started a reveal. Updates the remembered set when it changed.
+    /// </summary>
+    private bool SelectedFramesIdentityChanged()
+    {
+        var current = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
+        if (_lastRevealedFrames is null
+            || _lastRevealedFrames.Count != current.Count
+            || !_lastRevealedFrames.SequenceEqual(current))
+        {
+            _lastRevealedFrames = current.ToList();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Resets reveal progress to 0 and starts the timer (mirrors PngPreviewControl).</summary>
+    private void BeginSelectionReveal()
+    {
+        _selectionRevealProgress = 0f;
+        _selectionRevealTimer ??= CreateSelectionRevealTimer();
+        _selectionRevealTimer.Start();
+        InvalidateVisual();
+    }
+
+    /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
+    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
+
+    /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
+    public float SelectionRevealProgress => _selectionRevealProgress;
+
+    /// <summary>
+    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
+    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
+    /// both call this (tests skip the timer for determinism).
+    /// </summary>
+    public bool StepSelectionReveal(float dtSeconds)
+    {
+        if (_selectionRevealProgress >= 1f) return false;
+
+        _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
+        if (_selectionRevealProgress >= 1f)
+            _selectionRevealTimer?.Stop();
+
+        InvalidateVisual();
+        return _selectionRevealProgress < 1f;
+    }
+
+    /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
+    public void SettleSelectionReveal()
+    {
+        for (int i = 0; _selectionRevealProgress < 1f && i < 1000; i++)
+            StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
+    }
+
+    private DispatcherTimer CreateSelectionRevealTimer()
+    {
+        var timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(RevealAnimation.DefaultIntervalSeconds)
+        };
+        timer.Tick += (_, _) => StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
+        return timer;
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -917,6 +1022,7 @@ public class WireframeControl : TextureViewport
             snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
+        snap.SelectionRevealProgress = _selectionRevealProgress;
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
