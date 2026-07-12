@@ -824,7 +824,8 @@ namespace AnimationEditor.Core.CommandsAndState
                         chain.Frames.Add(frame);
                 },
                 this, _events, () => RefreshTreeNode(chain),
-                delta > 0 ? "Move Frames Down" : "Move Frames Up"));
+                CountAwareMoveDescription(indices.Count, "Frame", "Frames",
+                    delta > 0 ? "Down" : "Up")));
         }
 
         /// <inheritdoc cref="IAppCommands.MoveChainsRelative"/>
@@ -868,8 +869,19 @@ namespace AnimationEditor.Core.CommandsAndState
                         list.Add(chain);
                 },
                 this, _events, RefreshTreeView,
-                delta > 0 ? "Move Animations Down" : "Move Animations Up"));
+                CountAwareMoveDescription(indices.Count, "Animation", "Animations",
+                    delta > 0 ? "Down" : "Up")));
         }
+
+        /// <summary>
+        /// Undo label for a relative reorder: singular omits the count
+        /// (<c>Move Frame Down</c>), plural includes it (<c>Move 3 Frames Down</c>).
+        /// </summary>
+        private static string CountAwareMoveDescription(
+            int count, string singularNoun, string pluralNoun, string direction) =>
+            count == 1
+                ? $"Move {singularNoun} {direction}"
+                : $"Move {count} {pluralNoun} {direction}";
 
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {

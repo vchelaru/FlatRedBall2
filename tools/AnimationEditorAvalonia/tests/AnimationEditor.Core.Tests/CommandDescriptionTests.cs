@@ -1,95 +1,23 @@
 using AnimationEditor.Core.CommandsAndState.Commands;
 using FlatRedBall2.Animation.Content;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
 
+/// <summary>
+/// Undo/redo label conventions (issue #534): imperative tense, Title Case nouns,
+/// singular omits the count, plural includes it.
+/// </summary>
+[Collection("SequentialSingletons")]
 public class CommandDescriptionTests
 {
-    // ── FrameRegionChangedCommand ─────────────────────────────────────────────
-
-    [Fact]
-    public void FrameRegionChangedCommand_Description_PositionChangedSizeUnchanged_ReturnsMove()
-    {
-        var frame = new AnimationFrameSave();
-        // Move: same size (0.5x0.5), just shifted
-        var cmd = new FrameRegionChangedCommand(frame,
-            bL: 0f,   bT: 0f,   bR: 0.5f, bB: 0.5f,
-            aL: 0.1f, aT: 0.1f, aR: 0.6f, aB: 0.6f,
-            commands: null!, events: null!);
-
-        Assert.Equal("Move Frame", cmd.Description);
-    }
-
-    [Fact]
-    public void FrameRegionChangedCommand_Description_SizeChanged_ReturnsResize()
-    {
-        var frame = new AnimationFrameSave();
-        // Resize: width changed from 0.5 to 0.4
-        var cmd = new FrameRegionChangedCommand(frame,
-            bL: 0f,   bT: 0f,   bR: 0.5f, bB: 0.5f,
-            aL: 0f,   aT: 0f,   aR: 0.4f, aB: 0.5f,
-            commands: null!, events: null!);
-
-        Assert.Equal("Resize Frame", cmd.Description);
-    }
-
     // ── BulkFrameRegionChangedCommand ─────────────────────────────────────────
 
     [Fact]
-    public void BulkFrameRegionChangedCommand_Description_SingleFramePositionOnly_ReturnsMove()
+    public void BulkFrameRegionChangedCommand_Description_MultiFrameDifferentDeltas_ReturnsEditWithCount()
     {
-        var snapshots = new[]
-        {
-            new BulkFrameRegionChangedCommand.FrameSnapshot(
-                new AnimationFrameSave(),
-                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
-                AL: 0.1f, AT: 0.1f, AR: 0.6f, AB: 0.6f)
-        };
-        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
-
-        Assert.Equal("Move Frame", cmd.Description);
-    }
-
-    [Fact]
-    public void BulkFrameRegionChangedCommand_Description_SingleFrameSizeChanged_ReturnsResize()
-    {
-        var snapshots = new[]
-        {
-            new BulkFrameRegionChangedCommand.FrameSnapshot(
-                new AnimationFrameSave(),
-                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
-                AL: 0f, AT: 0f, AR: 0.4f, AB: 0.5f)
-        };
-        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
-
-        Assert.Equal("Resize Frame", cmd.Description);
-    }
-
-    [Fact]
-    public void BulkFrameRegionChangedCommand_Description_MultiFrameSameDelta_ReturnsDragChain()
-    {
-        // Both frames move by (+0.1, +0.1) with same size — chain drag
-        var snapshots = new[]
-        {
-            new BulkFrameRegionChangedCommand.FrameSnapshot(
-                new AnimationFrameSave(),
-                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
-                AL: 0.1f, AT: 0.1f, AR: 0.6f, AB: 0.6f),
-            new BulkFrameRegionChangedCommand.FrameSnapshot(
-                new AnimationFrameSave(),
-                BL: 0.5f, BT: 0f, BR: 1.0f, BB: 0.5f,
-                AL: 0.6f, AT: 0.1f, AR: 1.1f, AB: 0.6f)
-        };
-        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
-
-        Assert.Equal("Drag Chain (2 frames)", cmd.Description);
-    }
-
-    [Fact]
-    public void BulkFrameRegionChangedCommand_Description_MultiFrameDifferentDeltas_ReturnsEditRegions()
-    {
-        // Three frames with different translation deltas — handle drag
+        var expected = "Edit 3 Frames";
         var snapshots = new[]
         {
             new BulkFrameRegionChangedCommand.FrameSnapshot(
@@ -107,41 +35,236 @@ public class CommandDescriptionTests
         };
         var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
 
-        Assert.Equal("Edit 3 Frame Regions", cmd.Description);
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void BulkFrameRegionChangedCommand_Description_MultiFrameSameDelta_ReturnsMoveWithCount()
+    {
+        var expected = "Move 2 Frames";
+        // Both frames move by (+0.1, +0.1) with same size — uniform drag
+        var snapshots = new[]
+        {
+            new BulkFrameRegionChangedCommand.FrameSnapshot(
+                new AnimationFrameSave(),
+                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
+                AL: 0.1f, AT: 0.1f, AR: 0.6f, AB: 0.6f),
+            new BulkFrameRegionChangedCommand.FrameSnapshot(
+                new AnimationFrameSave(),
+                BL: 0.5f, BT: 0f, BR: 1.0f, BB: 0.5f,
+                AL: 0.6f, AT: 0.1f, AR: 1.1f, AB: 0.6f)
+        };
+        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void BulkFrameRegionChangedCommand_Description_SingleFramePositionOnly_ReturnsMove()
+    {
+        var expected = "Move Frame";
+        var snapshots = new[]
+        {
+            new BulkFrameRegionChangedCommand.FrameSnapshot(
+                new AnimationFrameSave(),
+                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
+                AL: 0.1f, AT: 0.1f, AR: 0.6f, AB: 0.6f)
+        };
+        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void BulkFrameRegionChangedCommand_Description_SingleFrameSizeChanged_ReturnsResize()
+    {
+        var expected = "Resize Frame";
+        var snapshots = new[]
+        {
+            new BulkFrameRegionChangedCommand.FrameSnapshot(
+                new AnimationFrameSave(),
+                BL: 0f, BT: 0f, BR: 0.5f, BB: 0.5f,
+                AL: 0f, AT: 0f, AR: 0.4f, AB: 0.5f)
+        };
+        var cmd = new BulkFrameRegionChangedCommand(snapshots, commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    // ── FlipCommand ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FlipCommand_Description_MultipleFrames_IncludesCount()
+    {
+        var expected = "Flip 3 Frames Horizontal";
+        var frames = new[]
+        {
+            new AnimationFrameSave(),
+            new AnimationFrameSave(),
+            new AnimationFrameSave(),
+        };
+        var cmd = new FlipCommand(frames, FlipAxis.Horizontal, commands: null!, events: null!, refresh: () => { });
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void FlipCommand_Description_SingleFrame_OmitsCount()
+    {
+        var expected = "Flip Vertical";
+        var frames = new[] { new AnimationFrameSave() };
+        var cmd = new FlipCommand(frames, FlipAxis.Vertical, commands: null!, events: null!, refresh: () => { });
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    // ── FrameRegionChangedCommand ─────────────────────────────────────────────
+
+    [Fact]
+    public void FrameRegionChangedCommand_Description_PositionChangedSizeUnchanged_ReturnsMove()
+    {
+        var expected = "Move Frame";
+        var frame = new AnimationFrameSave();
+        // Move: same size (0.5x0.5), just shifted
+        var cmd = new FrameRegionChangedCommand(frame,
+            bL: 0f,   bT: 0f,   bR: 0.5f, bB: 0.5f,
+            aL: 0.1f, aT: 0.1f, aR: 0.6f, aB: 0.6f,
+            commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void FrameRegionChangedCommand_Description_SizeChanged_ReturnsResize()
+    {
+        var expected = "Resize Frame";
+        var frame = new AnimationFrameSave();
+        // Resize: width changed from 0.5 to 0.4
+        var cmd = new FrameRegionChangedCommand(frame,
+            bL: 0f,   bT: 0f,   bR: 0.5f, bB: 0.5f,
+            aL: 0f,   aT: 0f,   aR: 0.4f, aB: 0.5f,
+            commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    // ── MoveChainsRelative / MoveFramesRelative (AppCommands → ReorderCommand) ─
+
+    [Fact]
+    public void MoveChainsRelative_Description_MultipleChains_IncludesCount()
+    {
+        var expected = "Move 2 Animations Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var a = TestHelpers.MakeChain(ctx.Acls, "A");
+        var b = TestHelpers.MakeChain(ctx.Acls, "B");
+        TestHelpers.MakeChain(ctx.Acls, "C");
+
+        ctx.AppCommands.MoveChainsRelative(new[] { a, b }, +1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveChainsRelative_Description_SingleChain_OmitsCount()
+    {
+        var expected = "Move Animation Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var a = TestHelpers.MakeChain(ctx.Acls, "A");
+        TestHelpers.MakeChain(ctx.Acls, "B");
+
+        ctx.AppCommands.MoveChainsRelative(new[] { a }, +1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveFramesCommand_Description_MultipleSameChain_IncludesCount()
+    {
+        var expected = "Move 3 Frames";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 4);
+        var frames = chain.Frames.Take(3).ToArray();
+        var cmd = new MoveFramesCommand(
+            frames, chain, chain, insertIndex: 3,
+            ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void MoveFramesCommand_Description_SingleSameChain_OmitsCount()
+    {
+        var expected = "Move Frame";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var cmd = new MoveFramesCommand(
+            new[] { chain.Frames[0] }, chain, chain, insertIndex: 1,
+            ctx.AppCommands, ctx.ApplicationEvents, ctx.SelectedState);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void MoveFramesRelative_Description_MultipleFrames_IncludesCount()
+    {
+        var expected = "Move 3 Frames Down";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 5);
+        var frames = chain.Frames.Take(3).ToArray();
+
+        ctx.AppCommands.MoveFramesRelative(frames, chain, +1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
+    }
+
+    [Fact]
+    public void MoveFramesRelative_Description_SingleFrame_OmitsCount()
+    {
+        var expected = "Move Frame Up";
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        var frame = chain.Frames[1];
+
+        ctx.AppCommands.MoveFramesRelative(new[] { frame }, chain, -1);
+
+        Assert.Equal(expected, ctx.UndoManager.UndoHistory[^1].Description);
     }
 
     // ── SetFrameTextureNameCommand ─────────────────────────────────────────────
 
     [Fact]
-    public void SetFrameTextureNameCommand_Description_NewNameSet_ShowsFilename()
-    {
-        var frame = new AnimationFrameSave();
-        var cmd = new SetFrameTextureNameCommand(frame,
-            oldName: null, newName: TestPaths.Abs("textures", "sprite.png"),
-            commands: null!, events: null!);
-
-        Assert.Equal("Set Texture: sprite.png", cmd.Description);
-    }
-
-    [Fact]
-    public void SetFrameTextureNameCommand_Description_NewNameNullOldNameSet_ShowsOldFilename()
-    {
-        var frame = new AnimationFrameSave();
-        var cmd = new SetFrameTextureNameCommand(frame,
-            oldName: TestPaths.Abs("textures", "old.png"), newName: null,
-            commands: null!, events: null!);
-
-        Assert.Equal("Set Texture: old.png", cmd.Description);
-    }
-
-    [Fact]
     public void SetFrameTextureNameCommand_Description_BothNull_ReturnsSetTexture()
     {
+        var expected = "Set Texture";
         var frame = new AnimationFrameSave();
         var cmd = new SetFrameTextureNameCommand(frame,
             oldName: null, newName: null,
             commands: null!, events: null!);
 
-        Assert.Equal("Set Texture", cmd.Description);
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void SetFrameTextureNameCommand_Description_NewNameNullOldNameSet_ShowsOldFilename()
+    {
+        var expected = "Set Texture: old.png";
+        var frame = new AnimationFrameSave();
+        var cmd = new SetFrameTextureNameCommand(frame,
+            oldName: TestPaths.Abs("textures", "old.png"), newName: null,
+            commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
+    }
+
+    [Fact]
+    public void SetFrameTextureNameCommand_Description_NewNameSet_ShowsFilename()
+    {
+        var expected = "Set Texture: sprite.png";
+        var frame = new AnimationFrameSave();
+        var cmd = new SetFrameTextureNameCommand(frame,
+            oldName: null, newName: TestPaths.Abs("textures", "sprite.png"),
+            commands: null!, events: null!);
+
+        Assert.Equal(expected, cmd.Description);
     }
 }

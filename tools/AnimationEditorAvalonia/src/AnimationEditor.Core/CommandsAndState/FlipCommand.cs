@@ -30,12 +30,15 @@ namespace AnimationEditor.Core.CommandsAndState.Commands
             _commands = commands;
             _events = events;
             _refresh = refresh;
-            Description = axis switch
+            string axisLabel = axis switch
             {
-                FlipAxis.Horizontal => "Flip Horizontal",
-                FlipAxis.Vertical => "Flip Vertical",
-                _ => "Flip Diagonal",
+                FlipAxis.Horizontal => "Horizontal",
+                FlipAxis.Vertical => "Vertical",
+                _ => "Diagonal",
             };
+            Description = frames.Count == 1
+                ? $"Flip {axisLabel}"
+                : $"Flip {frames.Count} Frames {axisLabel}";
         }
 
         public bool Do() { Toggle(); return true; }
