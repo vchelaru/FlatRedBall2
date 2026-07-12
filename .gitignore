@@ -63,3 +63,6 @@ CLAUDE.local.md
 /.claude/skills/tweening
 /.claude/worktrees
 **/TestResults/
+
+# Animation Editor ad-hoc visual proof screenshots (DocScreenshots / browser capture)
+tools/AnimationEditorAvalonia/tests/_out/
