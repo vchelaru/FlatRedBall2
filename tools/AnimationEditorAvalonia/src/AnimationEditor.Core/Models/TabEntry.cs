@@ -69,6 +69,19 @@ namespace AnimationEditor.Core.Models
         public DateTime? CachedDiskWriteTimeUtc { get; set; }
 
         /// <summary>
+        /// Name of the selected animation chain when this tab was last deactivated.
+        /// Session-only (not written to <c>.aeproperties</c>).
+        /// </summary>
+        public string? CachedSelectedChainName { get; set; }
+
+        /// <summary>
+        /// Index of the selected frame within <see cref="CachedSelectedChainName"/> when this
+        /// tab was last deactivated, or <c>null</c> when only the chain was selected.
+        /// Session-only (not written to <c>.aeproperties</c>).
+        /// </summary>
+        public int? CachedSelectedFrameIndex { get; set; }
+
+        /// <summary>
         /// The tab label. Returns <see cref="_displayNameOverride"/> when set;
         /// otherwise the filename without directory.
         /// </summary>
