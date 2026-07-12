@@ -6,18 +6,6 @@ namespace AnimationEditor.Core.Tests;
 public class RevealAnimationTests
 {
     [Fact]
-    public void Scale_ProgressZero_StartsLargerThanActualSize()
-    {
-        Assert.True(RevealAnimation.Scale(0f) > 1f);
-    }
-
-    [Fact]
-    public void Scale_ProgressOne_SettlesToActualSize()
-    {
-        Assert.Equal(1f, RevealAnimation.Scale(1f), 3);
-    }
-
-    [Fact]
     public void Scale_GrowsThenSettles_NeverBelowActualSize()
     {
         // Grow-and-settle: the box starts large and eases monotonically down to its real size,
@@ -30,5 +18,33 @@ public class RevealAnimationTests
             Assert.True(s <= prev + 1e-4f, $"scale grew instead of settling at t={i / 100f}");
             prev = s;
         }
+    }
+
+    [Fact]
+    public void Scale_ProgressOne_SettlesToActualSize()
+    {
+        Assert.Equal(1f, RevealAnimation.Scale(1f), 3);
+    }
+
+    [Fact]
+    public void Scale_ProgressZero_StartsLargerThanActualSize()
+    {
+        Assert.True(RevealAnimation.Scale(0f) > 1f);
+    }
+
+    [Fact]
+    public void StepProgress_OneTick_AdvancesTowardOneWithoutFinishing()
+    {
+        float next = RevealAnimation.StepProgress(0f, RevealAnimation.DefaultIntervalSeconds);
+        Assert.True(next > 0f && next < 1f, $"expected progress in (0, 1), got {next}");
+    }
+
+    [Fact]
+    public void StepProgress_Repeated_ReachesOne()
+    {
+        float p = 0f;
+        for (int i = 0; i < 1000 && p < 1f; i++)
+            p = RevealAnimation.StepProgress(p, RevealAnimation.DefaultIntervalSeconds);
+        Assert.Equal(1f, p);
     }
 }

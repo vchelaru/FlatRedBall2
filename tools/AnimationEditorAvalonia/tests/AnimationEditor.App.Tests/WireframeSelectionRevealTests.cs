@@ -12,12 +12,11 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// Selection-outline pop (#542): one-shot shrink-to-rest when the selected frame set
-/// changes. Pure easing is covered in <c>SelectionPopTests</c>; these cover the
-/// WireframeControl wiring — start on selection change, tick toward rest, settle, and
-/// no restart on a plain refresh.
+/// Selection-outline reveal (#542): one-shot <see cref="AnimationEditor.Core.Rendering.RevealAnimation"/>
+/// shrink-to-rest when the selected frame set changes — same curve as the PNG diff boxes (#606).
+/// Pure easing is covered in <c>RevealAnimationTests</c>; these cover the WireframeControl wiring.
 /// </summary>
-public class WireframeSelectionPopTests
+public class WireframeSelectionRevealTests
 {
     private static TestServices ResetSingletons()
     {
@@ -69,8 +68,6 @@ public class WireframeSelectionPopTests
         ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
         ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
 
-        // Select f0 before the control is created so InitializeServices' first
-        // SelectionChanged (if any) is not what we assert against below.
         ctx.SelectedState.SelectedFrame = f0;
 
         var ctrl = ctx.CreateWireframeControl();
@@ -79,70 +76,50 @@ public class WireframeSelectionPopTests
         ctrl.LoadTexture(png);
         ctrl.SetCamera(0f, 0f, 1f);
         ctrl.RefreshFrames();
-        // Drain any async SelectionChanged posted during setup, then force rest.
         Dispatcher.UIThread.RunJobs();
-        ctrl.SettleSelectionPop();
+        ctrl.SettleSelectionReveal();
 
         return (ctrl, f0, f1, dir);
     }
 
     [AvaloniaFact]
-    public void RefreshFrames_WithoutSelectionChange_DoesNotRestartPop()
+    public void RefreshFrames_WithoutSelectionChange_DoesNotRestartReveal()
     {
         var ctx = ResetSingletons();
         var (ctrl, _, _, dir) = BuildTwoFrameCtrl(ctx);
         try
         {
-            Assert.False(ctrl.IsSelectionPopAnimating);
-            Assert.Equal(0f, ctrl.SelectionPopAmount);
+            Assert.False(ctrl.IsSelectionRevealAnimating);
+            Assert.Equal(1f, ctrl.SelectionRevealProgress);
 
             ctrl.RefreshFrames();
 
-            Assert.False(ctrl.IsSelectionPopAnimating);
-            Assert.Equal(0f, ctrl.SelectionPopAmount);
+            Assert.False(ctrl.IsSelectionRevealAnimating);
+            Assert.Equal(1f, ctrl.SelectionRevealProgress);
         }
         finally { Directory.Delete(dir, true); }
     }
 
     [AvaloniaFact]
-    public void SelectedFrame_Change_StartsSelectionPop()
+    public void SelectedFrame_Change_StartsSelectionReveal()
     {
         var ctx = ResetSingletons();
         var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
         try
         {
-            Assert.False(ctrl.IsSelectionPopAnimating);
+            Assert.False(ctrl.IsSelectionRevealAnimating);
 
             ctx.SelectedState.SelectedFrame = f1;
             Dispatcher.UIThread.RunJobs();
 
-            Assert.True(ctrl.IsSelectionPopAnimating);
-            Assert.Equal(1f, ctrl.SelectionPopAmount);
+            Assert.True(ctrl.IsSelectionRevealAnimating);
+            Assert.Equal(0f, ctrl.SelectionRevealProgress);
         }
         finally { Directory.Delete(dir, true); }
     }
 
     [AvaloniaFact]
-    public void SettleSelectionPop_LandsAtRestAndStops()
-    {
-        var ctx = ResetSingletons();
-        var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
-        try
-        {
-            ctx.SelectedState.SelectedFrame = f1;
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(ctrl.IsSelectionPopAnimating);
-
-            ctrl.SettleSelectionPop();
-
-            Assert.False(ctrl.IsSelectionPopAnimating);
-            Assert.Equal(0f, ctrl.SelectionPopAmount);
-        }
-        finally { Directory.Delete(dir, true); }
-    }
-
-    [AvaloniaFact]
-    public void StepSelectionPop_OneTick_MovesTowardRestWithoutFinishing()
+    public void SettleSelectionReveal_LandsAtRestAndStops()
     {
         var ctx = ResetSingletons();
         var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
@@ -150,14 +127,33 @@ public class WireframeSelectionPopTests
         {
             ctx.SelectedState.SelectedFrame = f1;
             Dispatcher.UIThread.RunJobs();
+            Assert.True(ctrl.IsSelectionRevealAnimating);
 
-            float before = ctrl.SelectionPopAmount;
-            ctrl.StepSelectionPop(0.016f);
-            float after = ctrl.SelectionPopAmount;
+            ctrl.SettleSelectionReveal();
 
-            Assert.True(ctrl.IsSelectionPopAnimating);
-            Assert.True(after < before && after > 0f,
-                $"expected amount in (0, {before}) after one tick, got {after}");
+            Assert.False(ctrl.IsSelectionRevealAnimating);
+            Assert.Equal(1f, ctrl.SelectionRevealProgress);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [AvaloniaFact]
+    public void StepSelectionReveal_OneTick_MovesTowardRestWithoutFinishing()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, _, f1, dir) = BuildTwoFrameCtrl(ctx);
+        try
+        {
+            ctx.SelectedState.SelectedFrame = f1;
+            Dispatcher.UIThread.RunJobs();
+
+            float before = ctrl.SelectionRevealProgress;
+            ctrl.StepSelectionReveal(0.016f);
+            float after = ctrl.SelectionRevealProgress;
+
+            Assert.True(ctrl.IsSelectionRevealAnimating);
+            Assert.True(after > before && after < 1f,
+                $"expected progress in ({before}, 1) after one tick, got {after}");
         }
         finally { Directory.Delete(dir, true); }
     }

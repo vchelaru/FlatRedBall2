@@ -36,8 +36,6 @@ public sealed class PngPreviewControl : TextureViewport
     // One-shot reveal bounce (#606). Progress runs 0→1; 1 means settled (no scaling).
     private DispatcherTimer? _revealTimer;
     private float _revealProgress = 1f;
-    private const float RevealDurationSeconds = 0.5f;
-    private const float RevealIntervalSeconds = 1f / 60f;
 
     public PngPreviewControl()
     {
@@ -111,14 +109,15 @@ public sealed class PngPreviewControl : TextureViewport
 
     private DispatcherTimer CreateRevealTimer()
     {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(RevealIntervalSeconds) };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(RevealAnimation.DefaultIntervalSeconds) };
         timer.Tick += (_, _) => StepReveal();
         return timer;
     }
 
     private void StepReveal()
     {
-        _revealProgress = Math.Min(1f, _revealProgress + RevealIntervalSeconds / RevealDurationSeconds);
+        _revealProgress = RevealAnimation.StepProgress(
+            _revealProgress, RevealAnimation.DefaultIntervalSeconds);
         if (_revealProgress >= 1f)
             _revealTimer?.Stop();
         InvalidateVisual();
