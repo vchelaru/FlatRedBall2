@@ -823,6 +823,157 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    /// <summary>
+    /// Grid click-to-place (single click or double-click, both routed through
+    /// <c>SnapSelectedFrameToGridCell</c> / <c>ApplyRegionToSelectedFrame</c>) must
+    /// push an undo entry when it actually repositions the selected frame — just
+    /// like a handle drag does via <c>FrameRegionChangedCommand</c>. Silently
+    /// repositioning a frame with no way to undo it is the reported bug.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_RepositionsFrame_RecordsUndoEntry()
+    {
+        var ctx = ResetSingletons();
+        // 4×4 frame at pixel (5,5); snap-click at (20,20) with cellSize=16 moves it to (16,16).
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+
+            Assert.True(ctx.UndoManager.CanUndo,
+                "Repositioning the selected frame via grid click-to-place must record an undo entry.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Undoing after a grid click-to-place reposition must restore the frame's
+    /// exact pre-click UV coordinates.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_RepositionsFrame_UndoRestoresOriginalPosition()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            float origLeft = frame.LeftCoordinate, origTop = frame.TopCoordinate;
+            float origRight = frame.RightCoordinate, origBottom = frame.BottomCoordinate;
+
+            ctrl.SimulateGridSnapDoubleClick(20f, 20f);
+            Assert.NotEqual(origLeft, frame.LeftCoordinate);   // sanity: it did move
+
+            ctx.UndoManager.Undo();
+
+            Assert.Equal(origLeft,   frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(origTop,    frame.TopCoordinate,    precision: 5);
+            Assert.Equal(origRight,  frame.RightCoordinate,  precision: 5);
+            Assert.Equal(origBottom, frame.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Grid click-to-place at a position that does not actually move the frame
+    /// (already aligned) must not record a no-op undo entry.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridSnapDoubleClick_NoActualMovement_DoesNotRecordUndo()
+    {
+        var ctx = ResetSingletons();
+        // Frame already at the grid-aligned origin (0,0) with cellSize=16.
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 0, frameY: 0, frameW: 4, frameH: 4);
+        try
+        {
+            ctrl.SetGrid(true, 16);
+
+            ctrl.SimulateGridSnapDoubleClick(5f, 5f);   // snaps to (0,0) — same as current origin
+
+            Assert.False(ctx.UndoManager.CanUndo,
+                "Clicking a cell that doesn't change the frame's position must not record undo.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    // ── Plain single click in Grid mode: select, never silently reposition ────
+
+    /// <summary>
+    /// Was never requested by any issue (traced through #538 and #363, both of
+    /// which govern the explicit double-click placement gesture only) — a plain
+    /// single click in Grid mode must behave like plain mode: select the frame
+    /// under the cursor. It must NOT move the currently-selected frame.
+    ///
+    /// Selecting a whole chain (no single frame) is the reachable case where more
+    /// than one frame renders at once — <c>RefreshFramesInternal</c> only shows the
+    /// individually-selected frame's box when one frame is selected, so this test
+    /// starts from chain-selection to make frame B actually hit-testable.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridPlainClick_OnAnotherFrame_SelectsThatFrame_DoesNotMoveSelectedFrame()
+    {
+        var ctx = ResetSingletons();
+        // Frame A: 4x4 at (5,5). Frame B: 4x4 at (40,40). Whole chain selected (no single frame).
+        var (ctrl, frameA, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            var chain = ctx.SelectedState.SelectedChain!;
+            var frameB = new AnimationFrameSave
+            {
+                TextureName      = frameA.TextureName,
+                LeftCoordinate   = 40f / 64f, TopCoordinate    = 40f / 64f,
+                RightCoordinate  = 44f / 64f, BottomCoordinate = 44f / 64f,
+            };
+            chain.Frames.Add(frameB);
+            ctx.SelectedState.SelectedFrame = null;   // show the whole chain, not just one frame
+            ctrl.RefreshFrames();
+
+            float aL = frameA.LeftCoordinate, aT = frameA.TopCoordinate;
+            float aR = frameA.RightCoordinate, aB = frameA.BottomCoordinate;
+
+            ctrl.SetGrid(true, 16);
+            ctrl.SimulateGridPlainClick(42f, 42f);   // lands inside frame B
+
+            Assert.Same(frameB, ctx.SelectedState.SelectedFrame);
+            Assert.Equal(aL, frameA.LeftCoordinate,   precision: 5);
+            Assert.Equal(aT, frameA.TopCoordinate,    precision: 5);
+            Assert.Equal(aR, frameA.RightCoordinate,  precision: 5);
+            Assert.Equal(aB, frameA.BottomCoordinate, precision: 5);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// A plain click on empty canvas (no frame under the cursor) in Grid mode
+    /// must be a no-op — it must not reposition the currently-selected frame,
+    /// and must not record an undo entry.
+    /// </summary>
+    [AvaloniaFact]
+    public void GridPlainClick_OnEmptySpace_DoesNotMoveSelectedFrame_NoUndo()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, frame, dir) = BuildCtrlWithFrame(ctx, frameX: 5, frameY: 5, frameW: 4, frameH: 4);
+        try
+        {
+            float origLeft = frame.LeftCoordinate, origTop = frame.TopCoordinate;
+            float origRight = frame.RightCoordinate, origBottom = frame.BottomCoordinate;
+
+            ctrl.SetGrid(true, 16);
+            ctrl.SimulateGridPlainClick(45f, 45f);   // empty space, far from frame
+
+            Assert.Equal(origLeft,   frame.LeftCoordinate,   precision: 5);
+            Assert.Equal(origTop,    frame.TopCoordinate,    precision: 5);
+            Assert.Equal(origRight,  frame.RightCoordinate,  precision: 5);
+            Assert.Equal(origBottom, frame.BottomCoordinate, precision: 5);
+            Assert.False(ctx.UndoManager.CanUndo,
+                "A plain click on empty space in Grid mode must not record an undo entry.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── Resize: dragging a size handle must not snap position ──────────────────
 
     /// <summary>

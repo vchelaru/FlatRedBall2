@@ -640,6 +640,20 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
+    /// Test-only: simulates a plain (non-Ctrl, non-double) click at the given screen
+    /// position in Grid mode, mirroring the plain-click branch in
+    /// <see cref="OnEditPointerPressed"/>. Selects the frame under the cursor if any;
+    /// never repositions the currently-selected frame. No-op when bitmap is null,
+    /// grid is off, or cell size is ≤ 0.
+    /// </summary>
+    public void SimulateGridPlainClick(float screenX, float screenY)
+    {
+        if (_bitmap is null || !_showGrid || _gridSize <= 0) return;
+        var world = ScreenToTexture(screenX, screenY);
+        TrySelectFrameAtPoint(world);
+    }
+
+    /// <summary>
     /// Runs the hover-preview snap logic for the given screen point and returns
     /// the resulting preview state. Requires a loaded texture (returns ShowPreview=false otherwise).
     /// </summary>
@@ -1142,7 +1156,9 @@ public class WireframeControl : TextureViewport
         }
 
         // 3. Grid mode: Ctrl+click → create a new cell-sized frame; plain click →
-        //    reposition the selected frame's origin to the cell, preserving its size.
+        //    select the frame under the cursor, same as plain mode. Repositioning
+        //    the selected frame to a grid cell is an explicit gesture (double-click,
+        //    issue #363) — a plain click must never silently move it.
         if (_showGrid && _gridSize > 0)
         {
             if (isCtrl)
@@ -1152,7 +1168,7 @@ public class WireframeControl : TextureViewport
                 FrameCreatedFromRegion?.Invoke(gx, gy, gx + _gridSize, gy + _gridSize);
             }
             else
-                SnapSelectedFrameToGridCell(world.X, world.Y);
+                TrySelectFrameAtPoint(world);
             return;
         }
 
@@ -1505,12 +1521,23 @@ public class WireframeControl : TextureViewport
         if (_selectedState!.SelectedFrame is null || _bitmap is null) return;
         var frame = _selectedState!.SelectedFrame;
         float w = _bitmap.Width, h = _bitmap.Height;
-        frame.LeftCoordinate   = minX / w;
-        frame.RightCoordinate  = maxX / w;
-        frame.TopCoordinate    = minY / h;
-        frame.BottomCoordinate = maxY / h;
+
+        float bL = frame.LeftCoordinate, bT = frame.TopCoordinate;
+        float bR = frame.RightCoordinate, bB = frame.BottomCoordinate;
+        float aL = minX / w, aT = minY / h, aR = maxX / w, aB = maxY / h;
+
+        frame.LeftCoordinate   = aL;
+        frame.RightCoordinate  = aR;
+        frame.TopCoordinate    = aT;
+        frame.BottomCoordinate = aB;
         RefreshFramesInternal();
         FrameRegionChanged?.Invoke(frame);
+
+        if (RegionChanged(bL, bT, bR, bB, aL, aT, aR, aB))
+        {
+            _undoManager!.Record(new FrameRegionChangedCommand(
+                frame, bL, bT, bR, bB, aL, aT, aR, aB, _appCommands!, _events!));
+        }
     }
 
     /// <summary>
