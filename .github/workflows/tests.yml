@@ -27,27 +27,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # --verbosity minimal drops the MSBuild compile/copy spam; the console logger
-      # at verbosity=minimal prints only failed tests + the final summary (no per-test
-      # "Passed" lines), so a failure is not buried under hundreds of passes.
-      - name: Test engine
-        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      - name: Build dotnet new templates
-        run: |
-          dotnet build templates/frb2-desktop/MyGame.slnx --verbosity minimal
-          dotnet build templates/frb2-multiplatform/MyGame.slnx --verbosity minimal
-
-      - name: Test AnimationEditor.Core
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
-      # headless platform — no display server needed.
-      - name: Test AnimationEditor.App
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      - name: Test AnimationEditor.Views
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+      # TEMP diagnostic (throwaway branch, not for merge) — filtered to the suspect
+      # content/IO-heavy classes with a detailed logger so we get per-test durations,
+      # to find the real cost driver behind the 15-minute "Test engine" step.
+      - name: TEMP diagnostic timing (suspect classes)
+        run: >
+          dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj
+          --filter "FullyQualifiedName~ContentLoaderTextureTests|FullyQualifiedName~WatchContentIntegrationTests|FullyQualifiedName~LayerConsistencyTests|FullyQualifiedName~LazySpawnerTests|FullyQualifiedName~TileMapCreateEntitiesTests|FullyQualifiedName~AutomationModeScreenshotTests"
+          --verbosity minimal --logger "console;verbosity=detailed"
 
       # Separate assembly from AnimationEditor.App.Tests so it can run headless with real
       # (non-no-op) Skia drawing — see AnimationEditor.DocScreenshots/TestAppBuilder.cs.
