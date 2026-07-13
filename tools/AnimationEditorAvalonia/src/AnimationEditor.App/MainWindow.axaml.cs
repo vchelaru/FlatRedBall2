@@ -56,6 +56,7 @@ public partial class MainWindow : Window
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
+    private readonly TabController _tabController;
 
     // ── Tab drag state ────────────────────────────────────────────────────────
     private TabEntry? _dragTab;
@@ -189,6 +190,10 @@ public partial class MainWindow : Window
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
         _fileAssociation = fileAssociation;
+        // Desktop renders the tree with its own _treeRoots collection, so the controller
+        // reads expand state from there (browser reads its AnimationTreeControl instead).
+        _tabController = new TabController(_undoManager, _appCommands,
+            () => TreeBuilder.CaptureExpandState(_treeRoots));
 
         InitializeComponent();
 
@@ -468,9 +473,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
-            CaptureTreeExpandStateForLeavingTab(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
             SaveCompanionFile();
         }
 
@@ -598,9 +601,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
-            CaptureTreeExpandStateForLeavingTab(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
         }
 
         // PNG tabs bypass the animation-editor machinery entirely.
@@ -3171,15 +3172,6 @@ public partial class MainWindow : Window
     /// steps land in separate dispatcher jobs. Contrast with <see cref="RefreshTreeView"/>,
     /// which diff-updates and preserves each chain's collapse state across edits.
     /// </summary>
-    /// <summary>
-    /// Snapshots the tree's current expand state (including frame nodes with shape children,
-    /// which have no other persistence) onto <paramref name="leavingTab"/> so it survives the
-    /// full rebuild that reactivating a tab triggers (see <see cref="RebuildTreeView"/>). Call
-    /// immediately after <c>_appCommands.CaptureTabEditorState</c> at every "leaving tab" site (#687).
-    /// </summary>
-    private void CaptureTreeExpandStateForLeavingTab(TabEntry leavingTab) =>
-        leavingTab.CachedTreeExpandState = TreeBuilder.CaptureExpandState(_treeRoots);
-
     private void RebuildTreeView(IReadOnlyList<string> expandedChainNames)
     {
         _suppressTreeSelectionHandling = true;
@@ -4614,9 +4606,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
-            CaptureTreeExpandStateForLeavingTab(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
         }
 
         // If there is already a file open that hasn't been registered as a tab yet,

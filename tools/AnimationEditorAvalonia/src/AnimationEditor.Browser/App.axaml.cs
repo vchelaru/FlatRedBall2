@@ -215,6 +215,10 @@ public partial class App : Application
         // controls are independent of each other and of PreviewControl -- any of the three can
         // drive ISelectedState, and the others react via SelectionChanged.
         var animationTree = new AnimationTreeControl();
+        // Browser renders the tree with AnimationTreeControl, so the controller reads expand
+        // state from there (desktop reads its own _treeRoots collection instead).
+        var tabController = new TabController(undoManager, appCommands,
+            () => animationTree.CaptureExpandState());
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
         inspector.EnableEditing(appCommands, textureName =>
@@ -596,12 +600,7 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                appCommands.CaptureTabEditorState(leaving);
-                leaving.UndoSnapshot = undoManager.TakeSnapshot();
-                // #687: snapshot tree expand state (including frame nodes with shape children,
-                // which have no other persistence) so it survives the InitializeServices rebuild
-                // below when the user switches back to this tab.
-                leaving.CachedTreeExpandState = animationTree.CaptureExpandState();
+                tabController.CaptureLeavingTab(leaving);
             }
 
             tabManager.Activate(target.Path);
@@ -624,8 +623,7 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                appCommands.CaptureTabEditorState(leaving);
-                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+                tabController.CaptureLeavingTab(leaving);
             }
 
             tabManager.OpenOrFocus(new FilePath(displayName), displayName);
