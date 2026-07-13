@@ -30,8 +30,11 @@ jobs:
       # --verbosity minimal drops the MSBuild compile/copy spam; the console logger
       # at verbosity=minimal prints only failed tests + the final summary (no per-test
       # "Passed" lines), so a failure is not buried under hundreds of passes.
-      - name: Test engine
-        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+      # TEMP diagnostic (throwaway branch, not for merge) — replaces the normal full-suite run
+      # so we get a fast Linux-runner number for engine construction cost, instead of waiting
+      # through the full 15-minute suite.
+      - name: TEMP diagnostic timing
+        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --filter "FullyQualifiedName~_TempTimingDiagnosticTests" --verbosity minimal --logger "console;verbosity=detailed"
 
       - name: Build dotnet new templates
         run: |
