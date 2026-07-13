@@ -27,32 +27,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # --verbosity minimal drops the MSBuild compile/copy spam; the console logger
-      # at verbosity=minimal prints only failed tests + the final summary (no per-test
-      # "Passed" lines), so a failure is not buried under hundreds of passes.
-      - name: Test engine
-        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
+      # TEMP diagnostic (throwaway branch, not for merge) — full suite, but with a trx logger
+      # so we get every individual test's duration, to find the real cost driver behind the
+      # normal 15-minute wall time (two smaller targeted diagnostics both came back fast, so
+      # this checks whether it's a hidden long tail or full-scale parallel contention instead).
+      - name: TEMP diagnostic timing (full suite, trx)
+        run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "trx;LogFileName=results.trx" --logger "console;verbosity=minimal"
 
-      - name: Build dotnet new templates
-        run: |
-          dotnet build templates/frb2-desktop/MyGame.slnx --verbosity minimal
-          dotnet build templates/frb2-multiplatform/MyGame.slnx --verbosity minimal
-
-      - name: Test AnimationEditor.Core
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      # AnimationEditor.App.Tests references Avalonia.Headless.XUnit, which provides a
-      # headless platform — no display server needed.
-      - name: Test AnimationEditor.App
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/AnimationEditor.App.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      - name: Test AnimationEditor.Views
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Views.Tests/AnimationEditor.Views.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
-
-      # Separate assembly from AnimationEditor.App.Tests so it can run headless with real
-      # (non-no-op) Skia drawing — see AnimationEditor.DocScreenshots/TestAppBuilder.cs.
-      - name: Test AnimationEditor.DocScreenshots
-        run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.DocScreenshots/AnimationEditor.DocScreenshots.csproj --verbosity minimal --logger "console;verbosity=minimal"
+      - name: Upload trx results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-suite-trx
+          path: tests/FlatRedBall2.Tests/TestResults/results.trx
 
   animationchain-pack:
     name: Pack AnimationChain NuGet (ubuntu)
