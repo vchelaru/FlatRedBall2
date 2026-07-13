@@ -112,6 +112,8 @@ The engine converts Tiled's pixel coordinates (Y-down) to world space (Y-up) and
 
 **Class matching** checks the object's Class first, then falls back to the tile definition's Class in the tileset. Case-insensitive.
 
+**Sprite + collision on the spawned entity:** author it as an `.achx` chain (single-frame is fine) rather than hand-computing offsets in `CustomInitialize` — see `animation` skill's per-frame shapes.
+
 ## Camera Bounds
 
 `TileMap.Bounds` returns a `BoundsRectangle` for `CameraControllingEntity.Map`:

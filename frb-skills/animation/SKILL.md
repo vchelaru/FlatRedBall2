@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, .achx files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes)."
+description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, .achx files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -58,7 +58,7 @@ When you want an AI assistant to wire animation selection to gameplay state, des
 | Load Aseprite `.ase`/`.aseprite` files | `references/aseprite.md` |
 | Load `.achx` XML or author one by hand | `references/achx-authoring.md` |
 | Load Adobe Animate atlas XML | `references/adobe-animate.md` |
-| Add per-frame shapes (hitboxes, hurtboxes that come and go with frames) | `references/per-frame-shapes.md` |
+| Add per-frame shapes (hitboxes/hurtboxes, or a static object's fixed collision box) | `references/per-frame-shapes.md` |
 | Drop in the bundled platformer animation template | `references/platformer-template.md` |
 | Pick animation state in a platformer (state → chain mapping) | `platformer-movement` skill |
 
@@ -70,3 +70,4 @@ When you want an AI assistant to wire animation selection to gameplay state, des
 - **Animation is paused when the screen is paused** — `AnimateSelf` runs inside the `!IsPaused` block in `Screen.Update`.
 - **`Sprite.X` and `Sprite.Y` are overwritten on every frame switch.** Each `AnimationFrame` carries `RelativeX`/`RelativeY` (default `0`), and advancing assigns those unconditionally. Code like `_booster.Y = -10` in `CustomInitialize` works for exactly one frame, then snaps to `0`. To offset an animated sprite relative to its parent entity, bake the offset into each frame's `RelativeX`/`RelativeY` (in the `.achx` or in code), or attach the sprite to a child entity whose own `X`/`Y` carries the offset.
 - **`TextureScale` recalculates `Width`/`Height` per frame** — when `TextureScale` is non-null, frame switches recompute dimensions from the source rect. Don't manually assign `Width`/`Height` if `TextureScale` is in play.
+- **`.achx` isn't only for motion.** A chain can have a single frame and still be the right tool — it pairs a sprite's texture/offset with its collision box for a static object (a tree, a sign) that never animates. Going from that single frame to a real multi-frame animation later needs no code change; `PlayAnimation` and shape reconciliation behave the same either way.
