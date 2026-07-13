@@ -120,7 +120,7 @@ public class EntityColorTweenTests
         var entity = factory.Create();
 
         Should.Throw<ArgumentNullException>(() =>
-            entity.Tween((Action<Color>)null, Color.Black, Color.White, TimeSpan.FromSeconds(1)));
+            entity.Tween((Action<Color>)null!, Color.Black, Color.White, TimeSpan.FromSeconds(1)));
     }
 
     [Fact]
