@@ -218,6 +218,36 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    /// <summary>
+    /// Issue #701: the major-line pattern (every 4th line brighter) must stay anchored to the
+    /// texture origin (PanX/PanY), not to whichever line happens to be first visible. With
+    /// gridSize=8, majors sit at texture-space multiples of 32. Panning the camera by -16 (a
+    /// half-major, non-multiple-of-32 offset) moves the texture origin off past the left edge:
+    /// screen x=0 now maps to texture x=16 (minor) and screen x=16 maps to texture x=32 (major).
+    /// Before the fix, the emphasis index reset to 0 at the first visible line (screen x=0),
+    /// so x=0 was wrongly marked major and x=16 wrongly marked minor.
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_PannedCamera_MajorLinePatternStaysAnchoredToTextureOrigin()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            ctrl.SetCamera(-16, -16, 1);   // shift origin by half a major interval
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            int atZero = ScanMaxRed(bm, centerX: 0, y: 4);
+            int atSixteen = ScanMaxRed(bm, centerX: 16, y: 4);
+
+            Assert.True(atSixteen > atZero,
+                $"Major line should land at screen x=16 (texture x=32, a multiple of the major interval), " +
+                $"not x=0 (texture x=16): atSixteen={atSixteen}, atZero={atZero}");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── Visual: guard cases ───────────────────────────────────────────────────
 
     /// <summary>

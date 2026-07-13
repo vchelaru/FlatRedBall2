@@ -184,21 +184,25 @@ public class TextureViewport : Control, IZoomTarget
             float originX = s.PanX;
             float originY = s.PanY;
 
-            float FirstLine(float origin, float viewMin)
+            // n = how many grid steps this line sits from the texture origin (PanX/PanY). The
+            // major/minor pattern must key off n, not off "which line is first visible" — the
+            // latter shifts the pattern's phase every time the camera pans (#701).
+            (float pos, int n) FirstLine(float origin, float viewMin)
             {
-                float n = MathF.Ceiling((viewMin - origin) / step);
-                return origin + n * step;
+                int n = (int)MathF.Ceiling((viewMin - origin) / step);
+                return (origin + n * step, n);
             }
 
-            int index = 0;
-            for (float x = FirstLine(originX, viewL); x <= viewR; x += step, index++)
-                canvas.DrawLine(x, viewT, x, viewB,
-                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
+            // C#'s % can return negative for negative n; fold it into [0, interval).
+            bool IsMajor(int n) => ((n % MajorGridLineInterval) + MajorGridLineInterval) % MajorGridLineInterval == 0;
 
-            index = 0;
-            for (float y = FirstLine(originY, viewT); y <= viewB; y += step, index++)
-                canvas.DrawLine(viewL, y, viewR, y,
-                    index % MajorGridLineInterval == 0 ? majorPaint : minorPaint);
+            var (xStart, xIndex) = FirstLine(originX, viewL);
+            for (float x = xStart; x <= viewR; x += step, xIndex++)
+                canvas.DrawLine(x, viewT, x, viewB, IsMajor(xIndex) ? majorPaint : minorPaint);
+
+            var (yStart, yIndex) = FirstLine(originY, viewT);
+            for (float y = yStart; y <= viewB; y += step, yIndex++)
+                canvas.DrawLine(viewL, y, viewR, y, IsMajor(yIndex) ? majorPaint : minorPaint);
 
             // Keep textureDest referenced so callers/tests that pass it stay valid; the full-
             // viewport pass supersedes the old texture-only clip.
