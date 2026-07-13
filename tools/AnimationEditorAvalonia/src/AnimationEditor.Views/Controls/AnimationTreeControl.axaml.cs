@@ -71,6 +71,22 @@ public partial class AnimationTreeControl : UserControl
         TreeBuilder.SyncChainsInto(_roots, _acls.AnimationChains);
     }
 
+    /// <summary>
+    /// Snapshots every node's expand state (see <see cref="TreeBuilder.CaptureExpandState"/>) so it
+    /// can be restored after a tab switch calls <see cref="InitializeServices"/> again, which
+    /// otherwise rebuilds the tree from scratch and collapses everything (#687) — including frame
+    /// nodes with shape children, whose expand state has no other persistence.
+    /// </summary>
+    public Dictionary<object, bool> CaptureExpandState() =>
+        _roots is null ? new Dictionary<object, bool>() : TreeBuilder.CaptureExpandState(_roots);
+
+    /// <summary>Restores expand state captured by <see cref="CaptureExpandState"/> onto the current tree.</summary>
+    public void ApplyExpandState(IReadOnlyDictionary<object, bool>? state)
+    {
+        if (_roots is not null && state is not null)
+            TreeBuilder.ApplyExpandState(_roots, state);
+    }
+
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_selectedState is null) return;
