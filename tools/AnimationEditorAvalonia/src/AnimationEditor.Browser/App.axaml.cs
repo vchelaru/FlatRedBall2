@@ -563,6 +563,10 @@ public partial class App : Application
             }
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            // #687: InitializeServices always rebuilds fresh VMs (default-collapsed) -- restore
+            // whatever expand state (including frame nodes with shape children) was captured for
+            // `next` the last time it was the active tab (see SwitchToTab below).
+            if (next != null) animationTree.ApplyExpandState(next.CachedTreeExpandState);
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }
@@ -594,6 +598,10 @@ public partial class App : Application
             {
                 appCommands.CaptureTabEditorState(leaving);
                 leaving.UndoSnapshot = undoManager.TakeSnapshot();
+                // #687: snapshot tree expand state (including frame nodes with shape children,
+                // which have no other persistence) so it survives the InitializeServices rebuild
+                // below when the user switches back to this tab.
+                leaving.CachedTreeExpandState = animationTree.CaptureExpandState();
             }
 
             tabManager.Activate(target.Path);
@@ -602,6 +610,7 @@ public partial class App : Application
             UpdateUndoRedoButtons();
 
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            animationTree.ApplyExpandState(target.CachedTreeExpandState);
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }

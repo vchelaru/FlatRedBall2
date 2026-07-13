@@ -470,6 +470,7 @@ public partial class MainWindow : Window
         {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
             _appCommands.CaptureTabEditorState(leavingTab);
+            CaptureTreeExpandStateForLeavingTab(leavingTab);
             SaveCompanionFile();
         }
 
@@ -599,6 +600,7 @@ public partial class MainWindow : Window
         {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
             _appCommands.CaptureTabEditorState(leavingTab);
+            CaptureTreeExpandStateForLeavingTab(leavingTab);
         }
 
         // PNG tabs bypass the animation-editor machinery entirely.
@@ -3169,6 +3171,15 @@ public partial class MainWindow : Window
     /// steps land in separate dispatcher jobs. Contrast with <see cref="RefreshTreeView"/>,
     /// which diff-updates and preserves each chain's collapse state across edits.
     /// </summary>
+    /// <summary>
+    /// Snapshots the tree's current expand state (including frame nodes with shape children,
+    /// which have no other persistence) onto <paramref name="leavingTab"/> so it survives the
+    /// full rebuild that reactivating a tab triggers (see <see cref="RebuildTreeView"/>). Call
+    /// immediately after <c>_appCommands.CaptureTabEditorState</c> at every "leaving tab" site (#687).
+    /// </summary>
+    private void CaptureTreeExpandStateForLeavingTab(TabEntry leavingTab) =>
+        leavingTab.CachedTreeExpandState = TreeBuilder.CaptureExpandState(_treeRoots);
+
     private void RebuildTreeView(IReadOnlyList<string> expandedChainNames)
     {
         _suppressTreeSelectionHandling = true;
@@ -3191,6 +3202,16 @@ public partial class MainWindow : Window
                 node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
                 _treeRoots.Add(node);
             }
+
+            // #687: a full rebuild always creates fresh VMs, so expandedChainNames (the
+            // companion file's saved *chain*-level state) is all that survives by default --
+            // frame nodes with shape children collapse every time. Restore whatever richer,
+            // in-session expand state (including those frame nodes) was captured for the tab
+            // that is now active when it was last left (see the CaptureExpandState call sites
+            // alongside every CaptureTabEditorState call).
+            if (_tabManager.ActiveTab?.CachedTreeExpandState is { } expandState)
+                TreeBuilder.ApplyExpandState(_treeRoots, expandState);
+
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
@@ -4595,6 +4616,7 @@ public partial class MainWindow : Window
         {
             leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
             _appCommands.CaptureTabEditorState(leavingTab);
+            CaptureTreeExpandStateForLeavingTab(leavingTab);
         }
 
         // If there is already a file open that hasn't been registered as a tab yet,

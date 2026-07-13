@@ -331,6 +331,50 @@ public static class TreeBuilder
         RestripeRoots(roots);
     }
 
+    // ── Expand-state capture/restore across a full rebuild (#687) ────────────
+
+    /// <summary>
+    /// Walks <paramref name="roots"/> and every descendant, recording each node's
+    /// <see cref="TreeNodeVm.IsExpanded"/> keyed by <see cref="TreeNodeVm.Data"/> (by reference).
+    /// Pair with <see cref="ApplyExpandState"/> to survive a full tree rebuild (e.g. a tab
+    /// switch) that discards the old <see cref="TreeNodeVm"/> instances but keeps the same
+    /// underlying data objects — this covers frame nodes with shape children, which have no
+    /// other expand-state persistence (only chain-level expand state is saved to the companion
+    /// file). Nodes with a <c>null</c> Data are skipped since they can't be matched back up.
+    /// </summary>
+    public static Dictionary<object, bool> CaptureExpandState(IEnumerable<TreeNodeVm> roots)
+    {
+        var state = new Dictionary<object, bool>(ReferenceEqualityComparer.Instance);
+        CaptureExpandStateRecursive(roots, state);
+        return state;
+    }
+
+    private static void CaptureExpandStateRecursive(IEnumerable<TreeNodeVm> nodes, Dictionary<object, bool> state)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Data is not null)
+                state[node.Data] = node.IsExpanded;
+            CaptureExpandStateRecursive(node.Children, state);
+        }
+    }
+
+    /// <summary>
+    /// Applies previously-<see cref="CaptureExpandState"/>d expand flags onto <paramref name="roots"/>
+    /// by matching each node's <see cref="TreeNodeVm.Data"/> reference. Nodes whose data isn't in
+    /// <paramref name="state"/> (e.g. a node freshly created since capture) are left at whatever
+    /// default <see cref="BuildTree"/> gave them.
+    /// </summary>
+    public static void ApplyExpandState(IEnumerable<TreeNodeVm> roots, IReadOnlyDictionary<object, bool> state)
+    {
+        foreach (var node in roots)
+        {
+            if (node.Data is not null && state.TryGetValue(node.Data, out var expanded))
+                node.IsExpanded = expanded;
+            ApplyExpandState(node.Children, state);
+        }
+    }
+
     // ── Expand-state persistence ──────────────────────────────────────────────
 
     /// <summary>
