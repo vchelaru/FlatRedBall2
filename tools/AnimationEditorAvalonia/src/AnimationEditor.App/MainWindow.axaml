@@ -582,7 +582,8 @@
                                 <!-- Header lives in the star column so it ellipsizes when the panel is
                                      narrowed instead of forcing a horizontal scrollbar (#623). -->
                                 <Panel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Header}"
+                                        <TextBlock x:Name="RowHeaderLabel"
+                                                   Text="{Binding Header}"
                                                    Foreground="{DynamicResource Ink}"
                                                    Padding="2,1"
                                                    VerticalAlignment="Center"
