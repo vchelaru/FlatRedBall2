@@ -201,10 +201,15 @@ public class TextureViewport : Control, IZoomTarget
             // C#'s % can return negative for negative n; fold it into [0, interval).
             bool IsMajor(int n) => ((n % MajorGridLineInterval) + MajorGridLineInterval) % MajorGridLineInterval == 0;
 
+            // n is an exact multiple of MajorGridLineInterval whenever IsMajor(n) is true, so
+            // this division is exact regardless of sign.
+            bool IsMajorVisible(int n) => GridFadeCalculator.IsMajorLineVisible(n / MajorGridLineInterval, s.Zoom);
+
             var (xStart, xIndex) = FirstLine(originX, viewL);
             for (float x = xStart; x <= viewR; x += step, xIndex++)
             {
                 bool major = IsMajor(xIndex);
+                if (major && !IsMajorVisible(xIndex)) continue;
                 if (major || minorAlpha > 0)
                     canvas.DrawLine(x, viewT, x, viewB, major ? majorPaint : minorPaint);
             }
@@ -213,6 +218,7 @@ public class TextureViewport : Control, IZoomTarget
             for (float y = yStart; y <= viewB; y += step, yIndex++)
             {
                 bool major = IsMajor(yIndex);
+                if (major && !IsMajorVisible(yIndex)) continue;
                 if (major || minorAlpha > 0)
                     canvas.DrawLine(viewL, y, viewR, y, major ? majorPaint : minorPaint);
             }
