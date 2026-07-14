@@ -2286,7 +2286,10 @@ public partial class MainWindow : Window
         // Search box: icon toggles the inline box; typing filters the tree by chain name.
         WireTreeSearch();
 
-        // Blank-space double-tap: expand / collapse the node
+        // Double-tap on blank row space for non-chain nodes (frame/rect/circle centering).
+        // Chain focus (#716) is handled earlier, in OnTreePointerPressed's Tunnel-phase
+        // ClickCount==2 branch — see that method's comment for why DoubleTappedEvent alone
+        // is unreliable for chain rows (TreeViewItem's native expand toggle races it).
         AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
 
         // Tunnel-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel).
@@ -3673,6 +3676,18 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
+                // Re-clicking an already-selected frame must still replay the reveal (#716) —
+                // WireframeControl.OnSelectionChanged only restarts it when the highlighted
+                // frame *set* changes, and re-selecting the same frame reproduces the identical
+                // set, so it would otherwise silently no-op. Only fire this when the frame is
+                // *already* the selection: this call runs synchronously at Tunnel-phase, before
+                // AnimTree's own selection update and the async SelectionChanged→RefreshFrames
+                // catch-up, so calling it for a switch to a *different* frame would restart the
+                // reveal while WireframeControl still shows the previous frame's rects — a
+                // visible flash of the wrong frame growing before the highlight moves.
+                if (ReferenceEquals(_selectedState.SelectedFrame, frame))
+                    WireframeCtrl.ReplaySelectionReveal();
+
                 ClearChainDragCandidate();
                 _frameDragCandidate = frame;
                 _frameDragPressPoint = e.GetPosition(AnimTree);
@@ -3701,6 +3716,14 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
+                // Same reasoning as the frame branch above: only replay when this chain is
+                // *already* the whole-chain selection (SelectedFrame null too — otherwise a
+                // frame within this chain was selected and clicking the chain header is a real
+                // set change, from one frame to all of them, which the async catch-up handles
+                // correctly on its own).
+                if (ReferenceEquals(_selectedState.SelectedChain, chain) && _selectedState.SelectedFrame is null)
+                    WireframeCtrl.ReplaySelectionReveal();
+
                 // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
                 // it on press, so dragging a chain that is part of a multi-selection can move
                 // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -3746,6 +3769,20 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(
                     () => WireframeCtrl.CenterOnFrame(frame),
                     DispatcherPriority.Background);
+            }
+            else if (tvi?.DataContext is TreeNodeVm chainVm && chainVm.Data is AnimationChainSave chain
+                && src is not TextBlock { Name: "RowHeaderLabel" }
+                && src.FindAncestorOfType<Button>(includeSelf: true) is null)
+            {
+                // Double-click on blank chain-row space (not the label, not the Add-Frame
+                // button) → focus its frames (#716). Must intercept here, at Tunnel-phase
+                // PointerPressed — same reason the frame-centering branch above lives here
+                // rather than on DoubleTappedEvent: Avalonia's TreeViewItem toggles IsExpanded
+                // from its own ClickCount==2 pointer handling before a Bubble-registered
+                // DoubleTappedEvent handler on an ancestor like AnimTree ever sees the event,
+                // so OnAnimTreeDoubleTapped's chain case was effectively unreachable in practice.
+                HandleAnimTreeNodeDoubleTap(chainVm, isLabelDoubleTap: false);
+                e.Handled = true;
             }
         }
     }
@@ -6187,11 +6224,14 @@ public partial class MainWindow : Window
     /// center-on-frame gesture wins the text-label real estate over an inline rename.
     /// </summary>
     internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
-        => HandleAnimTreeNodeDoubleTap(vm);
+        => HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: true);
 
     /// <summary>
-    /// Double-tap on blank space in a tree row (not the text label, not a Button) →
-    /// toggle expand / collapse.
+    /// Double-tap on blank space in a tree row (not the text label, not a Button) → focus the
+    /// node instead of renaming it (#716). For a chain this selects all its frames (so they draw
+    /// with the shrink-to-rest reveal, #542) and fits them into the wireframe view via
+    /// <see cref="WireframeControl.FitChainToView"/>; frame/rect/circle already center themselves
+    /// via <see cref="HandleAnimTreeNodeDoubleTap"/>.
     /// </summary>
     private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -6199,7 +6239,10 @@ public partial class MainWindow : Window
         // or if the + button's DoubleTapped handler consumed it, skip.
         if (e.Handled) return;
         if (e.Source is not Control src) return;
-        if (src is TextBlock) return;
+        // Only the header/rename label is excluded (its own DoubleTapped handler already routes
+        // it to rename) — other TextBlocks in the row, like the frame-count "Meta" label, are
+        // genuine blank-row space and must still reach the focus gesture below (#716).
+        if (src is TextBlock { Name: "RowHeaderLabel" }) return;
         // Belt-and-suspenders: exclude clicks that originated from inside a Button even if
         // the Button's DoubleTapped handler didn't fire (e.g. focus or routing edge cases).
         // The event source is often a visual child (ContentPresenter, SVG icon, etc.),
@@ -6207,20 +6250,30 @@ public partial class MainWindow : Window
         if (src.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
-        if (!HandleAnimTreeNodeDoubleTap(vm)) return;
+        if (!HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: false)) return;
         e.Handled = true;
     }
 
     /// <summary>
     /// Routes a double-tap on a tree node to the appropriate action.
+    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain → inline
+    /// rename) from every other double-tap on the row (chain → focus/fit its frames, #716).
     /// Returns <c>true</c> when a recognised action was performed.
     /// </summary>
-    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm)
+    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm, bool isLabelDoubleTap = false)
     {
         switch (vm.Data)
         {
-            case AnimationChainSave chain:
+            case AnimationChainSave chain when isLabelDoubleTap:
                 BeginInlineRename(vm, chain.Name);
+                return true;
+            case AnimationChainSave chain:
+                // Selecting the chain (the click that preceded this double-click) already makes
+                // every one of its frames draw highlighted with the shrink-to-rest reveal (#542)
+                // — see WireframeControl.ComputeHighlightedFrames. Double-click's only remaining
+                // job is moving the camera onto them (#716). No-op for an empty chain:
+                // FitChainToView already no-ops with nothing to fit.
+                WireframeCtrl.FitChainToView(chain);
                 return true;
             case AnimationFrameSave frame:
                 WireframeCtrl.CenterOnFrame(frame);

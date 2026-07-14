@@ -65,6 +65,10 @@ public class WireframeControl : TextureViewport
         /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
         /// </summary>
         public float SelectionRevealProgress = 1f;
+        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Stays 0 until
+        /// <see cref="SelectionRevealProgress"/> reaches 1, so handles never overlap the
+        /// still-inflated frame outline.</summary>
+        public float HandleAlpha = 1f;
     }
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
@@ -82,7 +86,7 @@ public class WireframeControl : TextureViewport
         using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
-        float revealScale = RevealAnimation.Scale(s.SelectionRevealProgress);
+        float revealInflation = RevealAnimation.InflationPixels(s.SelectionRevealProgress);
 
         foreach (var (bounds, isSelected) in s.Frames)
         {
@@ -91,9 +95,10 @@ public class WireframeControl : TextureViewport
             {
                 frameFill.Color = new SKColor(80, 160, 255, 45);
                 frameStroke.Color = new SKColor(80, 160, 255, 230);
-                // One-shot reveal (#542): same shrink-to-rest as PNG diff boxes (#606).
-                if (revealScale != 1f)
-                    sr = ScaleAround(sr, revealScale);
+                // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the
+                // box's own size) so the pop stays visible at any zoom level.
+                if (revealInflation > 0f)
+                    sr = InflateBy(sr, revealInflation);
             }
             else
             {
@@ -118,9 +123,9 @@ public class WireframeControl : TextureViewport
                 canvas.DrawRect(SnapToScreen(bounds, s), cutPaint);
         }
 
-        // Resize handles on selected frame
-        if (s.SelectedHandleBounds.HasValue)
-            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s));
+        // Resize handles on selected frame — faded in (#716), not drawn at all once invisible.
+        if (s.SelectedHandleBounds.HasValue && s.HandleAlpha > 0f)
+            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s), s.HandleAlpha);
 
         // Magic-wand / grid-snap preview rectangle
         if (s.ShowPreview)
@@ -157,10 +162,11 @@ public class WireframeControl : TextureViewport
 
     private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
 
-    private static void DrawHandles(SKCanvas canvas, SKRect sr)
+    private static void DrawHandles(SKCanvas canvas, SKRect sr, float alpha = 1f)
     {
-        using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill };
-        using var stroke = new SKPaint { Color = SKColors.DodgerBlue, Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+        byte a = (byte)(Math.Clamp(alpha, 0f, 1f) * 255);
+        using var fill = new SKPaint { Color = SKColors.White.WithAlpha(a), Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint { Color = SKColors.DodgerBlue.WithAlpha(a), Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
 
         foreach (var pt in HandlePoints(sr))
         {
@@ -170,14 +176,10 @@ public class WireframeControl : TextureViewport
         }
     }
 
-    // Same screen-space center scale as PngPreviewControl's diff-box reveal (#606).
-    private static SKRect ScaleAround(SKRect r, float scale)
-    {
-        float cx = r.MidX, cy = r.MidY;
-        float halfW = r.Width * 0.5f * scale;
-        float halfH = r.Height * 0.5f * scale;
-        return new SKRect(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
-    }
+    // Expands an already screen-space rect by a fixed number of pixels on every side,
+    // preserving its center — the reveal's growth amount, independent of zoom (#716).
+    private static SKRect InflateBy(SKRect r, float pixels) =>
+        new(r.Left - pixels, r.Top - pixels, r.Right + pixels, r.Bottom + pixels);
 
     private static IEnumerable<SKPoint> HandlePoints(SKRect r)
     {
@@ -275,6 +277,7 @@ public class WireframeControl : TextureViewport
     private DispatcherTimer? _selectionRevealTimer;
     private float _selectionRevealProgress = 1f;
     private List<AnimationFrameSave>? _lastRevealedFrames;
+    private object? _lastRevealSelectionKey;
 
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
@@ -400,20 +403,50 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// True when <see cref="ISelectedState.SelectedFrames"/> differs by reference/identity
-    /// from the set that last started a reveal. Updates the remembered set when it changed.
+    /// True when either <see cref="ComputeHighlightedFrames"/>'s *content* differs from last time,
+    /// or the *click target* (the specific selected frame, or the selected chain when no frame is
+    /// selected) differs — checked separately because a chain with exactly one frame makes
+    /// selecting the whole chain and selecting that lone frame compute to the identical
+    /// one-frame highlighted set. A content-only diff would then see "no change" and skip the
+    /// reveal even though the user genuinely clicked a different tree node (#716). Updates both
+    /// remembered values when either changed.
     /// </summary>
     private bool SelectedFramesIdentityChanged()
     {
-        var current = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
-        if (_lastRevealedFrames is null
+        var current = ComputeHighlightedFrames();
+        bool contentChanged = _lastRevealedFrames is null
             || _lastRevealedFrames.Count != current.Count
-            || !_lastRevealedFrames.SequenceEqual(current))
-        {
-            _lastRevealedFrames = current.ToList();
-            return true;
-        }
-        return false;
+            || !_lastRevealedFrames.SequenceEqual(current);
+
+        object? selectionKey = (object?)_selectedState?.SelectedFrame ?? _selectedState?.SelectedChain;
+        bool targetChanged = !ReferenceEquals(_lastRevealSelectionKey, selectionKey);
+
+        _lastRevealedFrames = current;
+        _lastRevealSelectionKey = selectionKey;
+
+        return contentChanged || targetChanged;
+    }
+
+    /// <summary>
+    /// The frames that draw with the blue "selected" highlight and get the shrink-to-rest
+    /// reveal (#542): the multi-frame selection bag/single frame, or — when nothing more
+    /// specific is selected — every frame of the selected chain(s), whether that's one chain
+    /// (#716) or a Ctrl/Shift multi-chain selection, so selecting any chain(s) "plays" the same
+    /// pulse a frame selection gets. Matches <see cref="RefreshFramesInternal"/>'s framesToShow,
+    /// which already draws this same union for a multi-chain selection.
+    /// </summary>
+    private List<AnimationFrameSave> ComputeHighlightedFrames()
+    {
+        var selectedFrame  = _selectedState?.SelectedFrame;
+        var selectedFrames = _selectedState?.SelectedFrames ?? new List<AnimationFrameSave>();
+        var selectedChain  = _selectedState?.SelectedChain;
+        var selectedChains = _selectedState?.SelectedChains;
+
+        if (selectedFrames.Count > 1) return selectedFrames;
+        if (selectedFrame != null) return new List<AnimationFrameSave> { selectedFrame };
+        if (selectedChains?.Count > 1) return selectedChains.SelectMany(c => c.Frames).ToList();
+        if (selectedChain?.Frames != null) return new List<AnimationFrameSave>(selectedChain.Frames);
+        return new List<AnimationFrameSave>();
     }
 
     /// <summary>Resets reveal progress to 0 and starts the timer (mirrors PngPreviewControl).</summary>
@@ -425,11 +458,29 @@ public class WireframeControl : TextureViewport
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Explicitly restarts the shrink-to-rest reveal (#542), independent of whether the
+    /// highlighted frame set actually changed. <see cref="SelectedFramesIdentityChanged"/> only
+    /// fires <see cref="BeginSelectionReveal"/> when the *set* differs from last time, so
+    /// re-clicking an already-selected chain or frame — which reproduces the identical set —
+    /// would otherwise never replay (#716). Call this from the click site itself (a click always
+    /// means "play it again"), not from selection-change plumbing.
+    /// </summary>
+    public void ReplaySelectionReveal() => BeginSelectionReveal();
+
     /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
     public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
 
     /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
     public float SelectionRevealProgress => _selectionRevealProgress;
+
+    /// <summary>
+    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown), derived from
+    /// <see cref="SelectionRevealProgress"/> via <see cref="RevealAnimation.HandleAlpha"/> — a
+    /// linear ramp over the tail of the same progress timeline (not a separately-timed
+    /// animation), so the fade always finishes exactly when the shrink does.
+    /// </summary>
+    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionRevealProgress);
 
     /// <summary>
     /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
@@ -1037,6 +1088,7 @@ public class WireframeControl : TextureViewport
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
         snap.SelectionRevealProgress = _selectionRevealProgress;
+        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionRevealProgress);
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
@@ -1603,6 +1655,8 @@ public class WireframeControl : TextureViewport
         else
             framesToShow = Array.Empty<AnimationFrameSave>();
 
+        var highlightedFrames = ComputeHighlightedFrames();
+
         float w = _bitmap.Width;
         float h = _bitmap.Height;
 
@@ -1629,7 +1683,7 @@ public class WireframeControl : TextureViewport
             {
                 Frame      = frame,
                 Bounds     = new SKRect(pixL, pixT, pixR, pixB),
-                IsSelected = selectedFrames.Contains(frame)
+                IsSelected = highlightedFrames.Contains(frame)
             });
         }
 
