@@ -228,4 +228,73 @@ public class ChainSingleClickRevealTests
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Regression: switching from chain A to a *different* chain B must end with only chain B's
+    /// frames highlighted — not a mix, and not chain A's frames caught mid-reveal. The original
+    /// bug (<c>MainWindow.OnTreePointerPressed</c> calling <c>WireframeControl.ReplaySelectionReveal</c>
+    /// unconditionally on every click) restarted the reveal on chain A's still-rendered frames a
+    /// beat before the highlight moved to chain B — a visible flash of the wrong chain growing —
+    /// because that call runs synchronously at Tunnel-phase PointerPressed, before the actual
+    /// selection update and WireframeControl's SelectionChanged→RefreshFrames catch-up have run.
+    /// Headless's <c>window.MouseDown</c>/<c>MouseUp</c> fully pump that catch-up before
+    /// returning, so this test cannot freeze-frame the transient race the way a real 60fps render
+    /// loop can — it guards the fix's actual mechanism instead: <c>ReplaySelectionReveal</c> must
+    /// only fire when the clicked chain is *already* the selection (see the reference-equality
+    /// guard at the chain-click site), so a switch to a genuinely different chain never resets
+    /// the reveal until the new chain's frame set is the one being drawn.
+    /// </summary>
+    [AvaloniaFact]
+    public void SingleClick_DifferentChain_EndsWithOnlyNewChainHighlighted()
+    {
+        var (window, ctx) = CreateWindow();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var chainA = new AnimationChainSave { Name = "A" };
+            var af0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f };
+            chainA.Frames.Add(af0);
+            var chainB = new AnimationChainSave { Name = "B" };
+            var bf0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.4f, TopCoordinate = 0.1f, RightCoordinate = 0.6f, BottomCoordinate = 0.3f };
+            chainB.Frames.Add(bf0);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainA);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainB);
+            var texPath = WriteSolidPng(dir, "tex.png", 1000, 1000);
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            TriggerRefreshTreeView(window);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var nodes = tree.ItemsSource!.Cast<TreeNodeVm>().ToList();
+            var chainANode = nodes.First(n => ReferenceEquals(n.Data, chainA));
+            var chainBNode = nodes.First(n => ReferenceEquals(n.Data, chainB));
+
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            wireframe.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            Control HeaderLabelFor(TreeNodeVm node)
+            {
+                var tvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                    .First(t => ReferenceEquals(t.DataContext, node));
+                return tvi.GetVisualDescendants().OfType<TextBlock>()
+                    .First(tb => ReferenceEquals(tb.DataContext, node) && tb.Name == "RowHeaderLabel");
+            }
+
+            RealSingleClick(window, HeaderLabelFor(chainANode));
+            wireframe.SettleSelectionReveal();
+
+            System.Threading.Thread.Sleep(700); // avoid ClickCount==2, see other tests' comments.
+            RealSingleClick(window, HeaderLabelFor(chainBNode));
+
+            Assert.Same(chainB, ctx.SelectedState.SelectedChain);
+            var rects = wireframe.GetFrameRects();
+            Assert.Single(rects);
+            Assert.True(rects[0].IsSelected);
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Switching to a different chain must still start its reveal.");
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
 }
