@@ -448,6 +448,16 @@ public class WireframeControl : TextureViewport
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Explicitly restarts the shrink-to-rest reveal (#542), independent of whether the
+    /// highlighted frame set actually changed. <see cref="SelectedFramesIdentityChanged"/> only
+    /// fires <see cref="BeginSelectionReveal"/> when the *set* differs from last time, so
+    /// re-clicking an already-selected chain or frame — which reproduces the identical set —
+    /// would otherwise never replay (#716). Call this from the click site itself (a click always
+    /// means "play it again"), not from selection-change plumbing.
+    /// </summary>
+    public void ReplaySelectionReveal() => BeginSelectionReveal();
+
     /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
     public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
 

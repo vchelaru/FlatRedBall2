@@ -3676,6 +3676,12 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
+                // A click always replays the reveal (#716), even when re-clicking an
+                // already-selected frame — WireframeControl.OnSelectionChanged only restarts it
+                // when the highlighted frame *set* changes, and re-selecting the same frame
+                // reproduces the identical set, so it would otherwise silently no-op.
+                WireframeCtrl.ReplaySelectionReveal();
+
                 ClearChainDragCandidate();
                 _frameDragCandidate = frame;
                 _frameDragPressPoint = e.GetPosition(AnimTree);
@@ -3704,6 +3710,10 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
+                // Same reasoning as the frame branch above: replay unconditionally so re-clicking
+                // an already-selected chain still restarts the reveal (#716).
+                WireframeCtrl.ReplaySelectionReveal();
+
                 // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
                 // it on press, so dragging a chain that is part of a multi-selection can move
                 // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.

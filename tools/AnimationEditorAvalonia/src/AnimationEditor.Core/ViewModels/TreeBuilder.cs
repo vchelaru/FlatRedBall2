@@ -407,19 +407,20 @@ public static class TreeBuilder
             case AnimationChainSave chain:
                 if (acls is null || !acls.AnimationChains.Contains(chain))
                     return true; // stale — recognised type, but don't corrupt state
-                // Re-assign even if chain is the same object when a frame is selected,
-                // so that SelectedChain setter clears SelectedFrame and fires SelectionChanged.
-                if (selectedState.SelectedChain != chain || selectedState.SelectedFrame != null)
-                    selectedState.SelectedChain = chain;
+                // Always re-assign, even when this chain is already the selection: the setter
+                // clears SelectedFrame and fires SelectionChanged unconditionally, and clicking
+                // an already-selected chain must still replay the wireframe's reveal (#716),
+                // which is driven entirely off SelectionChanged.
+                selectedState.SelectedChain = chain;
                 return true;
             case AnimationFrameSave frame:
             {
                 if (acls is null || !acls.AnimationChains.Any(c => c.Frames.Contains(frame)))
                     return true; // stale — recognised type, but don't corrupt state
-                // Re-assign even when the same frame is already selected if a shape is
-                // selected, so that SelectedFrame.set clears SelectedCircle/SelectedRectangle.
-                if (selectedState.SelectedFrame != frame || selectedState.SelectedShape != null)
-                    selectedState.SelectedFrame = frame;
+                // Always re-assign, even when this frame is already the selection — same reason
+                // as the chain case above: re-clicking an already-selected frame must replay the
+                // reveal (#716), not just clear a stale shape selection.
+                selectedState.SelectedFrame = frame;
                 return true;
             }
             case AARectSave rect:

@@ -174,4 +174,58 @@ public class ChainSingleClickRevealTests
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Re-clicking the *same already-selected* chain must still replay the reveal, not just a
+    /// click that changes the selection. <c>WireframeControl.OnSelectionChanged</c> only restarts
+    /// the reveal when the highlighted frame *set* differs from last time (via
+    /// <c>SelectedFramesIdentityChanged</c>) — re-selecting the same chain reproduces the
+    /// identical set, so that content-diff alone silently swallowed the replay. The real click
+    /// site (<c>MainWindow.OnTreePointerPressed</c>) now calls
+    /// <c>WireframeControl.ReplaySelectionReveal()</c> unconditionally instead of relying solely
+    /// on the diff.
+    /// </summary>
+    [AvaloniaFact]
+    public void SingleClick_SameChainTwice_ReplaysRevealBothTimes()
+    {
+        var (window, ctx, chainNode, chainHeaderLabel, _, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, chainHeaderLabel);
+            Assert.True(wireframe.IsSelectionRevealAnimating, "First click must start the reveal.");
+            wireframe.SettleSelectionReveal();
+
+            // Sleep past Avalonia's double-click time window: two RealSingleClicks at the same
+            // point back-to-back would otherwise register as ClickCount==2 (a double-click,
+            // which does the focus gesture instead — see ChainRowDoubleTapFocusTests), not two
+            // independent single clicks. A real user re-selecting the same row after browsing
+            // elsewhere clicks well outside that window.
+            System.Threading.Thread.Sleep(700);
+            RealSingleClick(window, chainHeaderLabel);
+
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Re-clicking the same already-selected chain must replay the reveal.");
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
+
+    /// <summary>Same as above, for a frame — re-clicking the already-selected frame must replay too.</summary>
+    [AvaloniaFact]
+    public void SingleClick_SameFrameTwice_ReplaysRevealBothTimes()
+    {
+        var (window, ctx, chainNode, _, frameTvi, wireframe, dir) = BuildTwoFrameChainWindow();
+        try
+        {
+            RealSingleClick(window, frameTvi);
+            Assert.True(wireframe.IsSelectionRevealAnimating, "First click must start the reveal.");
+            wireframe.SettleSelectionReveal();
+
+            System.Threading.Thread.Sleep(700); // see comment in the chain test above.
+            RealSingleClick(window, frameTvi);
+
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Re-clicking the same already-selected frame must replay the reveal.");
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
 }
