@@ -430,10 +430,10 @@ public class WireframeControl : TextureViewport
     /// <summary>
     /// The frames that draw with the blue "selected" highlight and get the shrink-to-rest
     /// reveal (#542): the multi-frame selection bag/single frame, or — when nothing more
-    /// specific is selected — every frame of a single whole-chain selection, so selecting a
-    /// chain "plays" the same pulse a frame selection gets (#716). A multi-chain selection is
-    /// still drawn (see <see cref="RefreshFramesInternal"/>'s framesToShow) but not highlighted;
-    /// there's no single chain to attribute the pulse to.
+    /// specific is selected — every frame of the selected chain(s), whether that's one chain
+    /// (#716) or a Ctrl/Shift multi-chain selection, so selecting any chain(s) "plays" the same
+    /// pulse a frame selection gets. Matches <see cref="RefreshFramesInternal"/>'s framesToShow,
+    /// which already draws this same union for a multi-chain selection.
     /// </summary>
     private List<AnimationFrameSave> ComputeHighlightedFrames()
     {
@@ -444,11 +444,7 @@ public class WireframeControl : TextureViewport
 
         if (selectedFrames.Count > 1) return selectedFrames;
         if (selectedFrame != null) return new List<AnimationFrameSave> { selectedFrame };
-        // A plain single-click on a chain also puts that one chain into SelectedNodes (the tree's
-        // normal SelectedItems sync), so SelectedChains always has exactly 1 entry for an ordinary
-        // single selection — that must still highlight the chain's frames. Only 2+ chains (a real
-        // Ctrl/Shift multi-select) means "no single chain to attribute the pulse to."
-        if (selectedChains?.Count > 1) return new List<AnimationFrameSave>();
+        if (selectedChains?.Count > 1) return selectedChains.SelectMany(c => c.Frames).ToList();
         if (selectedChain?.Frames != null) return new List<AnimationFrameSave>(selectedChain.Frames);
         return new List<AnimationFrameSave>();
     }
