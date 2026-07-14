@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Rendering;
+using AnimationEditor.Core.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -61,6 +62,15 @@ public class WireframeControl : TextureViewport
         public float? OriginTexX, OriginTexY;
         public List<SKRect> PendingCutFrameBounds = new();
         /// <summary>
+        /// Texture-space bounds of the frame currently under the mouse (#718). Null when
+        /// nothing is hovered. Paired with <see cref="HoverLabel"/>, which is resolved on the
+        /// UI thread in <see cref="BuildSnapshot"/> so the render thread never touches
+        /// <see cref="AnimationFrameSave"/>/<see cref="AnimationChainSave"/> objects.
+        /// </summary>
+        public SKRect? HoverFrameBounds;
+        /// <summary>"Frame N" label for <see cref="HoverFrameBounds"/>; null when nothing is hovered.</summary>
+        public string? HoverLabel;
+        /// <summary>
         /// Selection-outline reveal progress (#542): 0 = full bump, 1 = settled.
         /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
         /// </summary>
@@ -108,6 +118,12 @@ public class WireframeControl : TextureViewport
             canvas.DrawRect(sr, frameFill);
             canvas.DrawRect(sr, frameStroke);
         }
+
+        // Hover label (#718): a small screen-space notch anchored at the top-left corner of
+        // the hovered frame. Fixed pixel font size (never multiplied by s.Zoom) so it reads the
+        // same size at any zoom level, unlike the frame rects it's attached to.
+        if (s.HoverFrameBounds.HasValue && s.HoverLabel != null)
+            DrawHoverLabel(canvas, SnapToScreen(s.HoverFrameBounds.Value, s), s.HoverLabel);
 
         // Pending-cut frames: dashed orange overlay (distinct from selection blue).
         if (s.PendingCutFrameBounds.Count > 0)
@@ -158,6 +174,44 @@ public class WireframeControl : TextureViewport
             using var dotPaint = new SKPaint { Color = new SKColor(255, 220, 0, 230) };
             canvas.DrawCircle(ox, oy, 2f, dotPaint);
         }
+    }
+
+    private static readonly SKColor HoverLabelBackground = new(80, 160, 255, 235);
+
+    /// <summary>
+    /// Draws the "Frame N" hover notch (#718) as a filled tag anchored at the top-left corner
+    /// of <paramref name="sr"/> (already screen-space), sized purely in fixed pixels so it never
+    /// scales with zoom the way the frame rect itself does.
+    /// </summary>
+    private static void DrawHoverLabel(SKCanvas canvas, SKRect sr, string label)
+    {
+        const float PadX = 5f;
+        const float PadY = 3f;
+
+        using var font = new SKFont { Size = 12f };
+        float textWidth = font.MeasureText(label);
+        float tagHeight = font.Size + PadY * 2f;
+        float tagWidth = textWidth + PadX * 2f;
+
+        var tagRect = ComputeHoverTagRect(sr, tagWidth, tagHeight);
+        using var bgPaint = new SKPaint { Color = HoverLabelBackground, IsAntialias = true };
+        canvas.DrawRoundRect(tagRect, 3f, 3f, bgPaint);
+
+        using var textPaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        canvas.DrawText(label, tagRect.Left + PadX, tagRect.Top + tagHeight - PadY, font, textPaint);
+    }
+
+    /// <summary>
+    /// Positions the hover-label tag above the frame's top-left corner, clamped so it never
+    /// draws off the top or left edge of the canvas (it can still run off the right/bottom,
+    /// which is acceptable since frame boxes near those edges have room to spare on the side
+    /// the tag grows toward).
+    /// </summary>
+    internal static SKRect ComputeHoverTagRect(SKRect frameScreenBounds, float tagWidth, float tagHeight)
+    {
+        float tagLeft = MathF.Max(0f, frameScreenBounds.Left);
+        float tagTop = MathF.Max(0f, frameScreenBounds.Top - tagHeight);
+        return new SKRect(tagLeft, tagTop, tagLeft + tagWidth, tagTop + tagHeight);
     }
 
     private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
@@ -242,6 +296,9 @@ public class WireframeControl : TextureViewport
             ? _frameRects.FirstOrDefault(fr => fr.Frame == f)
             : null;
     }
+
+    /// <summary>Frame currently under the mouse (#718), for the "Frame N" hover notch. Null when nothing is hovered.</summary>
+    private FrameRect? _hoverFrame;
 
     private FrameRect? _draggingRect;
     private HandleKind _draggingHandle;
@@ -342,6 +399,7 @@ public class WireframeControl : TextureViewport
     private IApplicationEvents? _events;
     private IProjectManager? _projectManager;
     private IUndoManager? _undoManager;
+    private IObjectFinder? _objectFinder;
     private Action<string>? _showError;
     private ThumbnailService? _thumbnailService;
 
@@ -365,6 +423,7 @@ public class WireframeControl : TextureViewport
         IProjectManager projectManager,
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
+        IObjectFinder objectFinder,
         Action<string>? showError = null,
         ThumbnailService? thumbnailService = null)
     {
@@ -375,6 +434,7 @@ public class WireframeControl : TextureViewport
         _events          = events;
         _projectManager  = projectManager;
         _undoManager     = undoManager;
+        _objectFinder    = objectFinder;
         _showError       = showError;
         _thumbnailService = thumbnailService;
 
@@ -1086,6 +1146,12 @@ public class WireframeControl : TextureViewport
         foreach (var fr in _frameRects)
             snap.Frames.Add((fr.Bounds, fr.IsSelected));
 
+        if (_hoverFrame != null)
+        {
+            snap.HoverFrameBounds = _hoverFrame.Bounds;
+            snap.HoverLabel = ResolveHoverLabel(_hoverFrame);
+        }
+
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
         snap.SelectionRevealProgress = _selectionRevealProgress;
         snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionRevealProgress);
@@ -1120,6 +1186,21 @@ public class WireframeControl : TextureViewport
         bool isCtrl = (e.KeyModifiers & KeyModifiers.Control) != 0;
 
         if (!props.IsLeftButtonPressed) return;
+
+        // Double-click a frame box: select that frame, same as clicking it in the tree view
+        // (issue #719). Bypasses handle hit-testing so it wins over the "drag the whole chain"
+        // fallback that HitTestHandle applies to any point inside any of a selected chain's frame
+        // boxes when no single frame is selected — otherwise TrySelectFrameAtPoint is never
+        // reached and the whole-chain view (every frame box overlaid) has no way to isolate one
+        // frame by clicking its box. No-ops (falls through to the frame's own double-click
+        // gesture below) when the hit box is already the selected frame, so double-clicking an
+        // already-selected frame's own box still drives grid-snap / wand-apply unchanged.
+        if (!isCtrl && e.ClickCount == 2 && _bitmap != null)
+        {
+            var dblSelectWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+            if (TrySelectDifferentFrameOnDoubleClick(dblSelectWorld))
+                return;
+        }
 
         // Grid mode double-click: bypass handle hit-testing so that a frame covering
         // the entire texture (which would otherwise always hit HandleKind.Move) can still
@@ -1261,6 +1342,62 @@ public class WireframeControl : TextureViewport
 
         // Update hover preview for magic-wand / grid-snap
         UpdatePreview(pos);
+
+        UpdateHoverFrame(pos);
+    }
+
+    /// <summary>
+    /// Hit-tests <paramref name="pos"/> against <see cref="_frameRects"/> (#718) and updates
+    /// <see cref="_hoverFrame"/> for the "Frame N" hover notch. Only invalidates when the hovered
+    /// frame identity actually changes, mirroring the reveal's identity-diffing (see
+    /// <see cref="SelectedFramesIdentityChanged"/>) so a move within the same frame's bounds
+    /// doesn't repaint every tick.
+    /// </summary>
+    private void UpdateHoverFrame(Point pos)
+    {
+        if (_bitmap is null) { ClearHoverFrame(); return; }
+
+        var world = ScreenToTexture((float)pos.X, (float)pos.Y);
+        var hit = _frameRects.FirstOrDefault(fr => fr.Bounds.Contains(world));
+
+        if (!ReferenceEquals(hit, _hoverFrame))
+        {
+            _hoverFrame = hit;
+            InvalidateVisual();
+        }
+    }
+
+    private void ClearHoverFrame()
+    {
+        if (_hoverFrame != null)
+        {
+            _hoverFrame = null;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>
+    /// Resolves the "Frame N" label (<see cref="TreeBuilder.BuildFrameHeader"/>) for
+    /// <paramref name="fr"/> via its owning chain's frame index. Null if the frame's chain can't
+    /// be found (e.g. it was removed mid-hover).
+    /// </summary>
+    private string? ResolveHoverLabel(FrameRect fr)
+    {
+        var chain = _objectFinder?.GetAnimationChainContaining(fr.Frame);
+        if (chain is null) return null;
+        int index = chain.Frames.IndexOf(fr.Frame);
+        return TreeBuilder.BuildFrameHeader(fr.Frame, index);
+    }
+
+    /// <summary>
+    /// Test-only: runs the same hover hit-test as <see cref="OnEditPointerMoved"/> for a given
+    /// screen point and returns the resolved label (mirrors <see cref="GetPreviewStateForScreenPoint"/>'s
+    /// test-only pattern for the magic-wand/grid preview). Null when nothing is hovered.
+    /// </summary>
+    public string? GetHoverLabelForScreenPoint(float screenX, float screenY)
+    {
+        UpdateHoverFrame(new Point(screenX, screenY));
+        return _hoverFrame is null ? null : ResolveHoverLabel(_hoverFrame);
     }
 
     private void UpdateHoverCursor(Point pos, bool isCtrl = false)
@@ -1380,6 +1517,7 @@ public class WireframeControl : TextureViewport
         base.OnPointerExited(e);
         Cursor = Cursor.Default;
         if (_showPreview) { _showPreview = false; InvalidateVisual(); }
+        ClearHoverFrame();
     }
 
     // ── Mouse helpers ─────────────────────────────────────────────────────────
@@ -1566,6 +1704,24 @@ public class WireframeControl : TextureViewport
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Selects the frame box under <paramref name="worldPt"/> if it differs from the currently
+    /// selected frame. Returns false — no selection change — when no box is hit or the hit box
+    /// is already the selected frame, so the caller can fall through to that frame's existing
+    /// double-click gesture (grid-snap / wand-apply) unchanged.
+    /// </summary>
+    private bool TrySelectDifferentFrameOnDoubleClick(SKPoint worldPt)
+    {
+        foreach (var fr in _frameRects)
+        {
+            if (!fr.Bounds.Contains(worldPt)) continue;
+            if (ReferenceEquals(fr.Frame, _selectedState?.SelectedFrame)) return false;
+            _selectedState!.SelectedFrame = fr.Frame;
+            return true;
+        }
+        return false;
     }
 
     private void ApplyRegionToSelectedFrame(int minX, int minY, int maxX, int maxY)

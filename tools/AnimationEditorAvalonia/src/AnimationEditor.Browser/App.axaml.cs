@@ -207,7 +207,7 @@ public partial class App : Application
         var wireframe = new WireframeControl();
         wireframe.InitializeServices(
             selectedState, appState, appCommands, applicationEvents,
-            projectManager, undoManager, pendingCutState,
+            projectManager, undoManager, pendingCutState, objectFinder,
             thumbnailService: thumbnailService);
 
         // Phase 1 (#603): read-only browsing of every chain/frame/shape in the loaded file,
