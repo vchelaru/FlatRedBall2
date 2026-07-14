@@ -108,4 +108,48 @@ public class WireframeHoverLabelTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Frame box sits with its left edge off-screen (negative X, e.g. panned so the box's
+    /// left edge is at -30) — the tag must clamp to the canvas's left edge (0), not draw
+    /// off-screen alongside it.
+    /// </summary>
+    [Fact]
+    public void ComputeHoverTagRect_FrameLeftEdgeOffScreen_ClampsTagToLeftEdge()
+    {
+        var frameBounds = new SKRect(-30f, 50f, 10f, 90f);
+
+        var tagRect = WireframeControl.ComputeHoverTagRect(frameBounds, tagWidth: 50f, tagHeight: 18f);
+
+        Assert.Equal(0f, tagRect.Left);
+    }
+
+    /// <summary>
+    /// Frame box sits with its top edge off-screen (negative Y) — same clamp, on the other axis,
+    /// already covered informally by manual testing; asserted here so both edges are locked in.
+    /// </summary>
+    [Fact]
+    public void ComputeHoverTagRect_FrameTopEdgeOffScreen_ClampsTagToTopEdge()
+    {
+        var frameBounds = new SKRect(50f, -30f, 90f, 10f);
+
+        var tagRect = WireframeControl.ComputeHoverTagRect(frameBounds, tagWidth: 50f, tagHeight: 18f);
+
+        Assert.Equal(0f, tagRect.Top);
+    }
+
+    /// <summary>
+    /// Frame box fully on-screen: the tag anchors at the frame's top-left corner, growing
+    /// upward, with no clamping applied.
+    /// </summary>
+    [Fact]
+    public void ComputeHoverTagRect_FrameFullyOnScreen_AnchorsAtFrameTopLeft()
+    {
+        var frameBounds = new SKRect(50f, 50f, 90f, 90f);
+
+        var tagRect = WireframeControl.ComputeHoverTagRect(frameBounds, tagWidth: 50f, tagHeight: 18f);
+
+        Assert.Equal(50f, tagRect.Left);
+        Assert.Equal(32f, tagRect.Top);
+    }
 }

@@ -193,16 +193,25 @@ public class WireframeControl : TextureViewport
         float tagHeight = font.Size + PadY * 2f;
         float tagWidth = textWidth + PadX * 2f;
 
-        // Anchored above the frame's top-left corner; clamp so it never draws off the top edge.
-        float tagLeft = sr.Left;
-        float tagTop = MathF.Max(0f, sr.Top - tagHeight);
-
-        var tagRect = new SKRect(tagLeft, tagTop, tagLeft + tagWidth, tagTop + tagHeight);
+        var tagRect = ComputeHoverTagRect(sr, tagWidth, tagHeight);
         using var bgPaint = new SKPaint { Color = HoverLabelBackground, IsAntialias = true };
         canvas.DrawRoundRect(tagRect, 3f, 3f, bgPaint);
 
         using var textPaint = new SKPaint { Color = SKColors.White, IsAntialias = true };
-        canvas.DrawText(label, tagLeft + PadX, tagTop + tagHeight - PadY, font, textPaint);
+        canvas.DrawText(label, tagRect.Left + PadX, tagRect.Top + tagHeight - PadY, font, textPaint);
+    }
+
+    /// <summary>
+    /// Positions the hover-label tag above the frame's top-left corner, clamped so it never
+    /// draws off the top or left edge of the canvas (it can still run off the right/bottom,
+    /// which is acceptable since frame boxes near those edges have room to spare on the side
+    /// the tag grows toward).
+    /// </summary>
+    internal static SKRect ComputeHoverTagRect(SKRect frameScreenBounds, float tagWidth, float tagHeight)
+    {
+        float tagLeft = MathF.Max(0f, frameScreenBounds.Left);
+        float tagTop = MathF.Max(0f, frameScreenBounds.Top - tagHeight);
+        return new SKRect(tagLeft, tagTop, tagLeft + tagWidth, tagTop + tagHeight);
     }
 
     private const float Hs = 5f;  // Handle half-size: handles are drawn this far outside the frame edge
