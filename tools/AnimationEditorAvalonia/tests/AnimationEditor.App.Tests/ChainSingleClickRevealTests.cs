@@ -297,4 +297,61 @@ public class ChainSingleClickRevealTests
         }
         finally { window.Close(); Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// The real-world repro reported live: a chain with exactly *one* frame. Selecting the whole
+    /// chain and selecting its lone frame both compute to the identical one-frame highlighted set
+    /// (<c>WireframeControl.ComputeHighlightedFrames</c>), so the content-based
+    /// <c>SelectedFramesIdentityChanged</c> check alone sees "no change" and skips the reveal —
+    /// even though the user genuinely clicked a different tree node (the chain, then its frame).
+    /// The reveal must restart on the click target changing, not only on the resulting frame set
+    /// changing.
+    /// </summary>
+    [AvaloniaFact]
+    public void SingleClick_ChainThenItsOnlyFrame_StillReplaysReveal()
+    {
+        var (window, ctx) = CreateWindow();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var f0 = new AnimationFrameSave { TextureName = "tex.png", LeftCoordinate = 0.1f, TopCoordinate = 0.1f, RightCoordinate = 0.3f, BottomCoordinate = 0.3f };
+            chain.Frames.Add(f0);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            var texPath = WriteSolidPng(dir, "tex.png", 1000, 1000);
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            TriggerRefreshTreeView(window);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var chainNode = (TreeNodeVm)tree.ItemsSource!.Cast<object>().First();
+            chainNode.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")!;
+            wireframe.LoadTexture(texPath);
+            Dispatcher.UIThread.RunJobs();
+
+            var chainTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(t => ReferenceEquals(t.DataContext, chainNode));
+            var chainHeaderLabel = chainTvi.GetVisualDescendants().OfType<TextBlock>()
+                .First(tb => ReferenceEquals(tb.DataContext, chainNode) && tb.Name == "RowHeaderLabel");
+            var frameTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(t => ReferenceEquals(t.DataContext, chainNode.Children[0]));
+
+            RealSingleClick(window, chainHeaderLabel);
+            wireframe.SettleSelectionReveal();
+
+            System.Threading.Thread.Sleep(700); // avoid ClickCount==2, see other tests' comments.
+            RealSingleClick(window, frameTvi);
+
+            Assert.Same(f0, ctx.SelectedState.SelectedFrame);
+            Assert.True(wireframe.IsSelectionRevealAnimating,
+                "Clicking the chain's only frame after the chain was selected must replay the " +
+                "reveal, even though the highlighted frame set (just that one frame either way) " +
+                "didn't change.");
+        }
+        finally { window.Close(); Directory.Delete(dir, true); }
+    }
 }

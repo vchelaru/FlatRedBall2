@@ -272,6 +272,7 @@ public class WireframeControl : TextureViewport
     private DispatcherTimer? _selectionRevealTimer;
     private float _selectionRevealProgress = 1f;
     private List<AnimationFrameSave>? _lastRevealedFrames;
+    private object? _lastRevealSelectionKey;
 
     // Lazily-created "+" cursor shown when Ctrl is held and a click would add a frame.
     private static readonly Lazy<Cursor> _addFrameCursorLazy = new(CreateAddFrameCursor);
@@ -397,20 +398,28 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// True when <see cref="ComputeHighlightedFrames"/> differs by reference/identity from the
-    /// set that last started a reveal. Updates the remembered set when it changed.
+    /// True when either <see cref="ComputeHighlightedFrames"/>'s *content* differs from last time,
+    /// or the *click target* (the specific selected frame, or the selected chain when no frame is
+    /// selected) differs — checked separately because a chain with exactly one frame makes
+    /// selecting the whole chain and selecting that lone frame compute to the identical
+    /// one-frame highlighted set. A content-only diff would then see "no change" and skip the
+    /// reveal even though the user genuinely clicked a different tree node (#716). Updates both
+    /// remembered values when either changed.
     /// </summary>
     private bool SelectedFramesIdentityChanged()
     {
         var current = ComputeHighlightedFrames();
-        if (_lastRevealedFrames is null
+        bool contentChanged = _lastRevealedFrames is null
             || _lastRevealedFrames.Count != current.Count
-            || !_lastRevealedFrames.SequenceEqual(current))
-        {
-            _lastRevealedFrames = current;
-            return true;
-        }
-        return false;
+            || !_lastRevealedFrames.SequenceEqual(current);
+
+        object? selectionKey = (object?)_selectedState?.SelectedFrame ?? _selectedState?.SelectedChain;
+        bool targetChanged = !ReferenceEquals(_lastRevealSelectionKey, selectionKey);
+
+        _lastRevealedFrames = current;
+        _lastRevealSelectionKey = selectionKey;
+
+        return contentChanged || targetChanged;
     }
 
     /// <summary>
