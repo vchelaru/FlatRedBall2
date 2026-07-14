@@ -298,6 +298,147 @@ public class GridRenderTests
         finally { System.IO.Directory.Delete(dir, true); }
     }
 
+    // ── Visual: fine grid fades out when zoomed out (#720) ────────────────────
+
+    /// <summary>
+    /// Issue #720: below the fade-out zoom threshold, minor (fine) grid lines must not
+    /// render at all, while major (coarse) lines keep rendering. With cellSize=40 and
+    /// zoom=0.3 (below FadeEndZoom=0.5 but above MajorThinZoom=0.25, so only the fine-grid
+    /// fade applies, not major thinning), grid step is 12px: a minor line lands at screen
+    /// x=24 (index 2) and a major line lands at screen x=48 (index 4, every 4th). Sampling
+    /// at y=4 avoids the horizontal lines and the texture-outline edges (drawn at x=0/y=0).
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_ZoomedOutBelowFadeThreshold_MinorLineNotDrawn_MajorLineStillDrawn()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 40);
+            ctrl.SetCamera(0, 0, 0.3f);
+            using var bmZoomedOut = ctrl.RenderToBitmap(64, 64);
+
+            ctrl.SetGrid(false, 40);
+            using var bmOff = ctrl.RenderToBitmap(64, 64);
+
+            int minorAtZoomedOut = ScanMaxRed(bmZoomedOut, centerX: 24, y: 4);
+            int minorOff         = ScanMaxRed(bmOff,         centerX: 24, y: 4);
+            int majorAtZoomedOut = ScanMaxRed(bmZoomedOut, centerX: 48, y: 4);
+
+            Assert.Equal(minorOff, minorAtZoomedOut);
+            Assert.True(majorAtZoomedOut > minorAtZoomedOut,
+                $"Major line should still render below the fade threshold: major={majorAtZoomedOut}, minor={minorAtZoomedOut}");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// The fine grid must be fully invisible AT 50% zoom (GridFadeCalculator.FadeEndZoom),
+    /// not just below it. Same layout as the test above but at zoom=0.5 exactly: step=20,
+    /// minor line at screen x=20 (index 1), major line at screen x=80 is off-canvas, so
+    /// compare a minor position instead — the major-line assertion isn't needed here since
+    /// major thinning doesn't apply at 0.5 (well above MajorThinZoom=0.25).
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_AtExactlyFadeEndZoom_MinorLineNotDrawn()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 40);
+            ctrl.SetCamera(0, 0, GridFadeCalculator.FadeEndZoom);
+            using var bmAtThreshold = ctrl.RenderToBitmap(64, 64);
+
+            ctrl.SetGrid(false, 40);
+            using var bmOff = ctrl.RenderToBitmap(64, 64);
+
+            int minorAtThreshold = ScanMaxRed(bmAtThreshold, centerX: 20, y: 4);
+            int minorOff         = ScanMaxRed(bmOff,          centerX: 20, y: 4);
+
+            Assert.Equal(minorOff, minorAtThreshold);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// At full zoom (1.0, at/above GridFadeCalculator.FadeStartZoom) the fine grid renders
+    /// at full opacity — unchanged from before #720.
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_FullZoom_MinorLinesStillRenderAtFullOpacity()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            ctrl.SetCamera(0, 0, 1f);
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            int minorBrightness = ScanMaxRed(bm, centerX: 8, y: 4);
+            Assert.True(minorBrightness > 0, "Minor grid line should render at full zoom.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    // ── Visual: every-other major line hidden well below zoom (#720 follow-up) ─
+
+    /// <summary>
+    /// At/below GridFadeCalculator.MajorThinZoom (0.25), every other major line hides —
+    /// the origin (major index 0) stays visible, the next major (index 1) does not, the
+    /// one after that (index 2) does. With cellSize=8 and zoom=0.25, step=2: majors land
+    /// at screen x=0 (index 0, visible), x=8 (index 1, hidden), x=16 (index 2, visible).
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_AtMajorThinZoom_EveryOtherMajorLineHidden()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            ctrl.SetCamera(0, 0, GridFadeCalculator.MajorThinZoom);
+            using var bmThinned = ctrl.RenderToBitmap(64, 64);
+
+            ctrl.SetGrid(false, 8);
+            using var bmOff = ctrl.RenderToBitmap(64, 64);
+
+            int hiddenMajorThinned = ScanMaxRed(bmThinned, centerX: 8, y: 4);
+            int hiddenMajorOff     = ScanMaxRed(bmOff,      centerX: 8, y: 4);
+            int visibleMajorThinned = ScanMaxRed(bmThinned, centerX: 16, y: 4);
+
+            Assert.Equal(hiddenMajorOff, hiddenMajorThinned);
+            Assert.True(visibleMajorThinned > hiddenMajorThinned,
+                $"Major index 2 should stay visible while index 1 is hidden: visible={visibleMajorThinned}, hidden={hiddenMajorThinned}");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Above MajorThinZoom, no major-line thinning applies — every major line renders,
+    /// matching pre-#720-follow-up behavior.
+    /// </summary>
+    [AvaloniaFact]
+    public void Grid_AboveMajorThinZoom_AllMajorLinesVisible()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, dir) = BuildCtrl(ctx);
+        try
+        {
+            ctrl.SetGrid(true, 8);
+            ctrl.SetCamera(0, 0, 1f);
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            // Every 4th line (x=8, x=24 relative pattern) is major; check the 2nd major
+            // (index 1) at x=32 still renders at full zoom.
+            int secondMajorBrightness = ScanMaxRed(bm, centerX: 32, y: 4);
+            Assert.True(secondMajorBrightness > 0, "Every major line should render above MajorThinZoom.");
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
+
     // ── State ─────────────────────────────────────────────────────────────────
 
     /// <summary>
