@@ -1187,6 +1187,21 @@ public class WireframeControl : TextureViewport
 
         if (!props.IsLeftButtonPressed) return;
 
+        // Double-click a frame box: select that frame, same as clicking it in the tree view
+        // (issue #719). Bypasses handle hit-testing so it wins over the "drag the whole chain"
+        // fallback that HitTestHandle applies to any point inside any of a selected chain's frame
+        // boxes when no single frame is selected — otherwise TrySelectFrameAtPoint is never
+        // reached and the whole-chain view (every frame box overlaid) has no way to isolate one
+        // frame by clicking its box. No-ops (falls through to the frame's own double-click
+        // gesture below) when the hit box is already the selected frame, so double-clicking an
+        // already-selected frame's own box still drives grid-snap / wand-apply unchanged.
+        if (!isCtrl && e.ClickCount == 2 && _bitmap != null)
+        {
+            var dblSelectWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
+            if (TrySelectDifferentFrameOnDoubleClick(dblSelectWorld))
+                return;
+        }
+
         // Grid mode double-click: bypass handle hit-testing so that a frame covering
         // the entire texture (which would otherwise always hit HandleKind.Move) can still
         // have a specific grid cell applied to it.
@@ -1689,6 +1704,24 @@ public class WireframeControl : TextureViewport
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Selects the frame box under <paramref name="worldPt"/> if it differs from the currently
+    /// selected frame. Returns false — no selection change — when no box is hit or the hit box
+    /// is already the selected frame, so the caller can fall through to that frame's existing
+    /// double-click gesture (grid-snap / wand-apply) unchanged.
+    /// </summary>
+    private bool TrySelectDifferentFrameOnDoubleClick(SKPoint worldPt)
+    {
+        foreach (var fr in _frameRects)
+        {
+            if (!fr.Bounds.Contains(worldPt)) continue;
+            if (ReferenceEquals(fr.Frame, _selectedState?.SelectedFrame)) return false;
+            _selectedState!.SelectedFrame = fr.Frame;
+            return true;
+        }
+        return false;
     }
 
     private void ApplyRegionToSelectedFrame(int minX, int minY, int maxX, int maxY)
