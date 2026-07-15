@@ -250,8 +250,14 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <inheritdoc cref="IAppCommands.CaptureTabEditorState"/>
-        public void CaptureTabEditorState(TabEntry tab) =>
+        public void CaptureTabEditorState(TabEntry tab)
+        {
             TabEditorCache.CaptureFromProject(tab, _pm);
+            tab.CachedSelectedChainName = _selectedState.SelectedChain?.Name;
+            tab.CachedSelectedFrameIndex = _selectedState.SelectedFrame != null
+                ? _selectedState.SelectedChain?.Frames.IndexOf(_selectedState.SelectedFrame)
+                : null;
+        }
 
         /// <inheritdoc cref="IAppCommands.TryActivateTabFromCache"/>
         public bool TryActivateTabFromCache(TabEntry tab)
@@ -263,9 +269,7 @@ namespace AnimationEditor.Core.CommandsAndState
             }
 
             TabEditorCache.ApplyToProject(tab, _pm);
-
-            _selectedState.Reset();
-            _selectedState.SelectedChain = tab.CachedEditorModel?.AnimationChains.FirstOrDefault();
+            RestoreTabSelection(tab);
             // See the comment in FinishLoadIntoEditor: build already-expanded from the
             // companion file so reactivating a tab doesn't flicker collapsed-then-expanded.
             RebuildTreeViewRequested?.Invoke((IReadOnlyList<string>?)_ioManager.TryLoadCompanionSettings(tab.Path.FullPath)?.ExpandedNodes ?? Array.Empty<string>());
@@ -286,8 +290,53 @@ namespace AnimationEditor.Core.CommandsAndState
             if (TryActivateTabFromCache(tab))
                 return;
 
+            // FinishLoadIntoEditor resets selection to the first chain; keep the prior
+            // per-tab selection so we can restore it after the disk load.
+            string? chainName = tab.CachedSelectedChainName;
+            int? frameIndex = tab.CachedSelectedFrameIndex;
+
             await OpenAchxWorkflowAsync(tab.Path.FullPath);
+
+            tab.CachedSelectedChainName = chainName;
+            tab.CachedSelectedFrameIndex = frameIndex;
+            RestoreTabSelection(tab);
             CaptureTabEditorState(tab);
+        }
+
+        /// <inheritdoc cref="IAppCommands.RestoreTabSelection"/>
+        public void RestoreTabSelection(TabEntry tab) =>
+            RestoreSelection(tab.CachedSelectedChainName, tab.CachedSelectedFrameIndex);
+
+        /// <summary>
+        /// Applies chain/frame selection by name and frame index. Sets chain before frame
+        /// because <see cref="ISelectedState.SelectedChain"/> clears the frame.
+        /// </summary>
+        private void RestoreSelection(string? selectedChainName, int? selectedFrameIndex)
+        {
+            _selectedState.Reset();
+            var acls = _pm.AnimationChainListSave;
+            if (acls == null || selectedChainName == null)
+            {
+                if (acls != null)
+                    _selectedState.SelectedChain = acls.AnimationChains.FirstOrDefault();
+                return;
+            }
+
+            var restoredChain = acls.AnimationChains
+                .FirstOrDefault(c => c.Name == selectedChainName);
+            if (restoredChain == null)
+            {
+                _selectedState.SelectedChain = acls.AnimationChains.FirstOrDefault();
+                return;
+            }
+
+            _selectedState.SelectedChain = restoredChain;
+            if (selectedFrameIndex.HasValue &&
+                selectedFrameIndex.Value >= 0 &&
+                selectedFrameIndex.Value < restoredChain.Frames.Count)
+            {
+                _selectedState.SelectedFrame = restoredChain.Frames[selectedFrameIndex.Value];
+            }
         }
 
         public void RefreshTreeNode(AnimationChainSave animationChain) =>
@@ -1551,6 +1600,45 @@ namespace AnimationEditor.Core.CommandsAndState
             string name, float x, float y, float radius) =>
             _undoManager.Execute(SetShapePropsCommand.ForCircle(frame, circ, name, x, y, radius, this, _events));
 
+        public void SetRectPropsBulk(IReadOnlyList<AARectSave> rects,
+            string? name, float? x, float? y, float? scaleX, float? scaleY)
+        {
+            if (rects.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                rects.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var r in rects)
+                    {
+                        if (name != null) r.Name = name;
+                        if (x.HasValue) r.X = x.Value;
+                        if (y.HasValue) r.Y = y.Value;
+                        if (scaleX.HasValue) r.ScaleX = scaleX.Value;
+                        if (scaleY.HasValue) r.ScaleY = scaleY.Value;
+                    }
+                },
+                this, _events, _objectFinder, "Edit Rectangles"));
+        }
+
+        public void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles,
+            string? name, float? x, float? y, float? radius)
+        {
+            if (circles.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                circles.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var c in circles)
+                    {
+                        if (name != null) c.Name = name;
+                        if (x.HasValue) c.X = x.Value;
+                        if (y.HasValue) c.Y = y.Value;
+                        if (radius.HasValue) c.Radius = radius.Value;
+                    }
+                },
+                this, _events, _objectFinder, "Edit Circles"));
+        }
+
         // ── Paste (clipboard → project) ───────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.PasteChains"/>
@@ -1734,28 +1822,7 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Clear();
             _undoManager.MarkSaved();
 
-            // Restore selection
-            _selectedState.Reset();
-            var acls = _pm.AnimationChainListSave;
-            if (acls != null && selectedChainName != null)
-            {
-                var restoredChain = acls.AnimationChains
-                    .FirstOrDefault(c => c.Name == selectedChainName);
-                if (restoredChain != null)
-                {
-                    _selectedState.SelectedChain = restoredChain;
-                    if (selectedFrameIndex.HasValue &&
-                        selectedFrameIndex.Value >= 0 &&
-                        selectedFrameIndex.Value < restoredChain.Frames.Count)
-                    {
-                        _selectedState.SelectedFrame = restoredChain.Frames[selectedFrameIndex.Value];
-                    }
-                }
-                else
-                {
-                    _selectedState.SelectedChain = acls.AnimationChains.FirstOrDefault();
-                }
-            }
+            RestoreSelection(selectedChainName, selectedFrameIndex);
 
             // Refresh tree without collapsing (preserves expanded nodes)
             RefreshTreeViewRequested?.Invoke();

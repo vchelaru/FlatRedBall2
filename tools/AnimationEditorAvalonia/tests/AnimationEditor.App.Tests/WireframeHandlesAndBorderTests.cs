@@ -442,6 +442,59 @@ public class WireframeHandlesAndBorderTests
         }
     }
 
+    /// <summary>
+    /// <see cref="PreviewControl.ShowBoundingBox"/> set to <c>false</c> suppresses the
+    /// frame outline entirely — the near-border pixel should read as plain background,
+    /// not the brightened outline stroke seen in <c>PreviewFrameBorder_LeftEdge_...</c>.
+    /// </summary>
+    [AvaloniaFact]
+    public void PreviewFrameBorder_ShowBoundingBoxFalse_LeftEdgeNotBrighterThanFarBackground()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = Path.Combine(dir, "dark.png");
+            using (var bmp = new SKBitmap(16, 16)) { bmp.Erase(new SKColor(0, 0, 60)); using var d = bmp.Encode(SKEncodedImageFormat.Png, 100); File.WriteAllBytes(texPath, d.ToArray()); }
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            var frame = new AnimationFrameSave
+            {
+                TextureName = "dark.png", FrameLength = 0.1f,
+                LeftCoordinate = 0f, TopCoordinate = 0f, RightCoordinate = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chain = new AnimationChainSave { Name = "Test" };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
+
+            var ctrl = ctx.CreatePreviewControl();
+            ctrl.ShowBoundingBox = false;
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            // Same sample points as PreviewFrameBorder_LeftEdge_BrighterThanFarBackground.
+            int maxRNearBorder = Enumerable.Range(33, 3)
+                .Where(x => x >= 0 && x < bm.Width)
+                .Select(x => (int)bm.GetPixel(x, 42).Red)
+                .Max();
+
+            var farBg = bm.GetPixel(22, 42);
+
+            Assert.True(maxRNearBorder <= farBg.Red + 60,
+                $"Frame border should be suppressed when ShowBoundingBox=false; nearMax R={maxRNearBorder} farBg R={farBg.Red}");
+        }
+        finally
+        {
+            ctx.ProjectManager.FileName = string.Empty;
+            ctx.SelectedState.SelectedFrame = null;
+            ctx.SelectedState.SelectedChain = null;
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     // ── Handles hidden when chain (not individual frame) is selected ──────────
 
     /// <summary>

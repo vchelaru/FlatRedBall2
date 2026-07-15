@@ -84,7 +84,8 @@ namespace AnimationEditor.Core.CommandsAndState
         void LoadAnimationChain(string fileName);
 
         /// <summary>
-        /// Stores the current project model on <paramref name="tab"/> for later tab switches.
+        /// Stores the current project model and chain/frame selection on <paramref name="tab"/>
+        /// for later tab switches.
         /// </summary>
         void CaptureTabEditorState(TabEntry tab);
 
@@ -100,6 +101,13 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <see cref="OpenAchxWorkflowAsync"/>. Does not restore undo.
         /// </summary>
         Task ActivateTabContentAsync(TabEntry tab);
+
+        /// <summary>
+        /// Restores chain/frame selection from <paramref name="tab"/>'s cached selection fields
+        /// onto the current project model. Call after applying a cached or untitled model that
+        /// does not go through <see cref="TryActivateTabFromCache"/>.
+        /// </summary>
+        void RestoreTabSelection(TabEntry tab);
 
         /// <summary>
         /// Raised after the in-memory project model is loaded or saved from disk so the app
@@ -270,6 +278,24 @@ namespace AnimationEditor.Core.CommandsAndState
         void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames, int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH);
         void SetRectProps(AnimationFrameSave? frame, AARectSave rect, string name, float x, float y, float scaleX, float scaleY);
         void SetCircleProps(AnimationFrameSave? frame, CircleSave circ, string name, float x, float y, float radius);
+
+        /// <summary>
+        /// Sets Name/X/Y/ScaleX/ScaleY on every rectangle in <paramref name="rects"/> as a single
+        /// undoable operation — the multi-select counterpart to <see cref="SetRectProps"/>. Rects may
+        /// belong to different frames. <paramref name="name"/> and each numeric parameter may be
+        /// <c>null</c> to leave that field untouched per-rect (its own existing value survives) —
+        /// used when the inspector field is showing "(mixed)", or (for name) when more than one
+        /// rect is selected and applying one literal name to every rect would clobber their
+        /// distinct names. See <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
+        /// </summary>
+        void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, float? x, float? y, float? scaleX, float? scaleY);
+
+        /// <summary>
+        /// Sets Name/X/Y/Radius on every circle in <paramref name="circles"/> as a single undoable
+        /// operation — the multi-select counterpart to <see cref="SetCircleProps"/>. See
+        /// <see cref="SetRectPropsBulk"/> for the null-means-"don't touch" semantics.
+        /// </summary>
+        void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, float? x, float? y, float? radius);
 
         // ── Hot Reload ────────────────────────────────────────────────────────────
 

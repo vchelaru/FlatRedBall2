@@ -559,7 +559,7 @@ public class WireframeTextureTests
         var ctrl = new AnimationEditor.App.Controls.WireframeControl();
         ctrl.InitializeServices(
             ctx.SelectedState, ctx.AppState, ctx.AppCommands, ctx.ApplicationEvents,
-            ctx.ProjectManager, ctx.UndoManager, ctx.PendingCutState,
+            ctx.ProjectManager, ctx.UndoManager, ctx.PendingCutState, ctx.ObjectFinder,
             thumbnailService: ctx.ThumbnailService);
 
         ctrl.RefreshAll();

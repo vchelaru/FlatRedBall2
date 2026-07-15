@@ -983,6 +983,76 @@ public class TreeBuilderStripeTests
     }
 }
 
+// ── Expand-state capture/apply tests (#687) ───────────────────────────────────
+
+public class TreeBuilderExpandStateTests
+{
+    private static AnimationChainSave ChainWithFrameAndShape(string chainName)
+    {
+        var chain = new AnimationChainSave { Name = chainName };
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave!.Shapes.Add(new AARectSave { Name = "HitBox" });
+        chain.Frames.Add(frame);
+        return chain;
+    }
+
+    [Fact]
+    public void CaptureExpandState_ThenApplyToFreshTree_RestoresFrameNodeExpansion()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(ChainWithFrameAndShape("Walk"));
+
+        var roots = TreeBuilder.BuildTree(acls);
+        var frameNode = roots[0].Children[0];
+        Assert.True(frameNode.IsLeafFrameNode is false); // has a shape child, so it's expandable
+        frameNode.IsExpanded = true;
+
+        var state = TreeBuilder.CaptureExpandState(roots);
+
+        // Simulate a tab-switch full rebuild: brand new VM instances, default (collapsed) state.
+        var rebuilt = TreeBuilder.BuildTree(acls);
+        var rebuiltFrameNode = rebuilt[0].Children[0];
+        Assert.False(rebuiltFrameNode.IsExpanded);
+
+        TreeBuilder.ApplyExpandState(rebuilt, state);
+
+        Assert.True(rebuiltFrameNode.IsExpanded);
+    }
+
+    [Fact]
+    public void CaptureExpandState_PreservesChainAndShapeExpansionToo()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(ChainWithFrameAndShape("Run"));
+
+        var roots = TreeBuilder.BuildTree(acls);
+        roots[0].IsExpanded = false; // chain collapsed
+        var shapeNode = roots[0].Children[0].Children[0];
+        shapeNode.IsExpanded = true; // arbitrary, but should round-trip regardless
+
+        var state = TreeBuilder.CaptureExpandState(roots);
+        var rebuilt = TreeBuilder.BuildTree(acls); // defaults: chain expanded, shape collapsed
+        TreeBuilder.ApplyExpandState(rebuilt, state);
+
+        Assert.False(rebuilt[0].IsExpanded);
+        Assert.True(rebuilt[0].Children[0].Children[0].IsExpanded);
+    }
+
+    [Fact]
+    public void ApplyExpandState_NodeNotInState_LeavesDefaultUntouched()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(ChainWithFrameAndShape("Idle"));
+
+        var roots = TreeBuilder.BuildTree(acls);
+        var emptyState = new Dictionary<object, bool>();
+
+        TreeBuilder.ApplyExpandState(roots, emptyState);
+
+        Assert.True(roots[0].IsExpanded); // untouched default from BuildTree
+    }
+}
+
 // ── Singleton-touching tests (RouteNodeSelection) ─────────────────────────────
 
 [Collection("SequentialSingletons")]

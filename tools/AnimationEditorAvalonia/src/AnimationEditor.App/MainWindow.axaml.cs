@@ -56,6 +56,7 @@ public partial class MainWindow : Window
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
+    private readonly TabController _tabController;
 
     // ── Tab drag state ────────────────────────────────────────────────────────
     private TabEntry? _dragTab;
@@ -189,6 +190,10 @@ public partial class MainWindow : Window
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
         _fileAssociation = fileAssociation;
+        // Desktop renders the tree with its own _treeRoots collection, so the controller
+        // reads expand state from there (browser reads its AnimationTreeControl instead).
+        _tabController = new TabController(_undoManager, _appCommands,
+            () => TreeBuilder.CaptureExpandState(_treeRoots));
 
         InitializeComponent();
 
@@ -218,7 +223,7 @@ public partial class MainWindow : Window
         WireTabBar();
         WireDefaultHandlerBanner();
 
-        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
+        WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
@@ -476,8 +481,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
             SaveCompanionFile();
         }
 
@@ -605,8 +609,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
         }
 
         // PNG tabs bypass the animation-editor machinery entirely.
@@ -645,7 +648,7 @@ public partial class MainWindow : Window
         _projectManager.AnimationChainListSave =
             tab.CachedEditorModel ?? new AnimationChainListSave();
         _projectManager.FileName = null;
-        _selectedState.Reset();
+        _appCommands.RestoreTabSelection(tab);
         _undoManager.Clear();
         if (tab.UndoSnapshot != null)
             _undoManager.RestoreSnapshot(tab.UndoSnapshot);
@@ -2074,6 +2077,9 @@ public partial class MainWindow : Window
         ShowOriginCheck.IsCheckedChanged += (_, _) =>
             PreviewCtrl.ShowOrigin = ShowOriginCheck.IsChecked == true;
 
+        ShowBoundingBoxCheck.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.ShowBoundingBox = ShowBoundingBoxCheck.IsChecked == true;
+
         ShowUserGuidesCheck.IsCheckedChanged += (_, _) =>
         {
             if (_suppressGuideVisibilitySync) return;
@@ -2288,7 +2294,10 @@ public partial class MainWindow : Window
         // Search box: icon toggles the inline box; typing filters the tree by chain name.
         WireTreeSearch();
 
-        // Blank-space double-tap: expand / collapse the node
+        // Double-tap on blank row space for non-chain nodes (frame/rect/circle centering).
+        // Chain focus (#716) is handled earlier, in OnTreePointerPressed's Tunnel-phase
+        // ClickCount==2 branch — see that method's comment for why DoubleTappedEvent alone
+        // is unreliable for chain rows (TreeViewItem's native expand toggle races it).
         AnimTree.DoubleTapped += OnAnimTreeDoubleTapped;
 
         // Tunnel-phase KeyDown from the inline TextBox (Enter=commit, Escape=cancel).
@@ -3196,6 +3205,16 @@ public partial class MainWindow : Window
                 node.PinnedVisible = TreeBuilder.MatchesFilter(node.Header, _treeFilterQuery);
                 _treeRoots.Add(node);
             }
+
+            // #687: a full rebuild always creates fresh VMs, so expandedChainNames (the
+            // companion file's saved *chain*-level state) is all that survives by default --
+            // frame nodes with shape children collapse every time. Restore whatever richer,
+            // in-session expand state (including those frame nodes) was captured for the tab
+            // that is now active when it was last left (see the CaptureExpandState call sites
+            // alongside every CaptureTabEditorState call).
+            if (_tabManager.ActiveTab?.CachedTreeExpandState is { } expandState)
+                TreeBuilder.ApplyExpandState(_treeRoots, expandState);
+
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
@@ -3665,6 +3684,18 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
+                // Re-clicking an already-selected frame must still replay the reveal (#716) —
+                // WireframeControl.OnSelectionChanged only restarts it when the highlighted
+                // frame *set* changes, and re-selecting the same frame reproduces the identical
+                // set, so it would otherwise silently no-op. Only fire this when the frame is
+                // *already* the selection: this call runs synchronously at Tunnel-phase, before
+                // AnimTree's own selection update and the async SelectionChanged→RefreshFrames
+                // catch-up, so calling it for a switch to a *different* frame would restart the
+                // reveal while WireframeControl still shows the previous frame's rects — a
+                // visible flash of the wrong frame growing before the highlight moves.
+                if (ReferenceEquals(_selectedState.SelectedFrame, frame))
+                    WireframeCtrl.ReplaySelectionReveal();
+
                 ClearChainDragCandidate();
                 _frameDragCandidate = frame;
                 _frameDragPressPoint = e.GetPosition(AnimTree);
@@ -3693,6 +3724,14 @@ public partial class MainWindow : Window
                 chainSrc.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationChainSave chain })
             {
+                // Same reasoning as the frame branch above: only replay when this chain is
+                // *already* the whole-chain selection (SelectedFrame null too — otherwise a
+                // frame within this chain was selected and clicking the chain header is a real
+                // set change, from one frame to all of them, which the async catch-up handles
+                // correctly on its own).
+                if (ReferenceEquals(_selectedState.SelectedChain, chain) && _selectedState.SelectedFrame is null)
+                    WireframeCtrl.ReplaySelectionReveal();
+
                 // Arm a chain-drag candidate. Snapshot the selection BEFORE the TreeView mutates
                 // it on press, so dragging a chain that is part of a multi-selection can move
                 // the whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -3738,6 +3777,20 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(
                     () => WireframeCtrl.CenterOnFrame(frame),
                     DispatcherPriority.Background);
+            }
+            else if (tvi?.DataContext is TreeNodeVm chainVm && chainVm.Data is AnimationChainSave chain
+                && src is not TextBlock { Name: "RowHeaderLabel" }
+                && src.FindAncestorOfType<Button>(includeSelf: true) is null)
+            {
+                // Double-click on blank chain-row space (not the label, not the Add-Frame
+                // button) → focus its frames (#716). Must intercept here, at Tunnel-phase
+                // PointerPressed — same reason the frame-centering branch above lives here
+                // rather than on DoubleTappedEvent: Avalonia's TreeViewItem toggles IsExpanded
+                // from its own ClickCount==2 pointer handling before a Bubble-registered
+                // DoubleTappedEvent handler on an ancestor like AnimTree ever sees the event,
+                // so OnAnimTreeDoubleTapped's chain case was effectively unreachable in practice.
+                HandleAnimTreeNodeDoubleTap(chainVm, isLabelDoubleTap: false);
+                e.Handled = true;
             }
         }
     }
@@ -4328,19 +4381,30 @@ public partial class MainWindow : Window
 
             if (rect is not null)
             {
-                PropRectName.Text    = rect.Name   ?? "";
-                PropRectX.Value      = (decimal)rect.X;
-                PropRectY.Value      = (decimal)rect.Y;
-                PropRectScaleX.Value = (decimal)rect.ScaleX;
-                PropRectScaleY.Value = (decimal)rect.ScaleY;
+                // Multi-selected rects can disagree on a property, same as multi-selected frames
+                // (#571) — show that field blank with a "(mixed)" placeholder instead of one rect's
+                // value; editing it then applies the new value to every selected rect. Name has no
+                // legitimate "mixed" display since it isn't numeric, so it's just disabled instead
+                // (see ApplyRectProps for why a shared literal name isn't applied across a batch).
+                var rects = _selectedState.SelectedRectangles;
+                bool rectsMulti = rects.Count > 1;
+                PropRectName.IsEnabled = !rectsMulti;
+                PropRectName.Text = rectsMulti ? "(multiple)" : (rect.Name ?? "");
+                SetValueOrMixed(PropRectX, rects.Select(r => (decimal)r.X).ToList());
+                SetValueOrMixed(PropRectY, rects.Select(r => (decimal)r.Y).ToList());
+                SetValueOrMixed(PropRectScaleX, rects.Select(r => (decimal)r.ScaleX).ToList());
+                SetValueOrMixed(PropRectScaleY, rects.Select(r => (decimal)r.ScaleY).ToList());
             }
 
             if (circ is not null)
             {
-                PropCircleName.Text    = circ.Name   ?? "";
-                PropCircleX.Value      = (decimal)circ.X;
-                PropCircleY.Value      = (decimal)circ.Y;
-                PropCircleRadius.Value = (decimal)circ.Radius;
+                var circles = _selectedState.SelectedCircles;
+                bool circlesMulti = circles.Count > 1;
+                PropCircleName.IsEnabled = !circlesMulti;
+                PropCircleName.Text = circlesMulti ? "(multiple)" : (circ.Name ?? "");
+                SetValueOrMixed(PropCircleX, circles.Select(c => (decimal)c.X).ToList());
+                SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
+                SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
             }
         }
         finally
@@ -4451,27 +4515,35 @@ public partial class MainWindow : Window
     private void ApplyRectProps()
     {
         if (_suppressPropRefresh) return;
-        var rect = _selectedState.SelectedRectangle;
-        if (rect is null || !PropRectX.Value.HasValue || !PropRectY.Value.HasValue ||
-            !PropRectScaleX.Value.HasValue || !PropRectScaleY.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetRectProps(frame, rect,
-            PropRectName.Text ?? "",
-            (float)PropRectX.Value.Value, (float)PropRectY.Value.Value,
-            (float)PropRectScaleX.Value.Value, (float)PropRectScaleY.Value.Value);
+        var rects = _selectedState.SelectedRectangles;
+        if (rects.Count == 0) return;
+
+        // A null component here means "still showing (mixed), not edited" — leave that axis alone
+        // per-rect. Name is only applied for a single selected rect: propagating one literal name
+        // to every rect in a multi-selection would clobber their distinct names (PropRectName is
+        // disabled in RefreshPropertyPanel whenever more than one rect is selected).
+        float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
+        float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
+        float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
+        float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
+        string? name = rects.Count == 1 ? (PropRectName.Text ?? "") : null;
+
+        _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
     }
 
     private void ApplyCircleProps()
     {
         if (_suppressPropRefresh) return;
-        var circ = _selectedState.SelectedCircle;
-        if (circ is null || !PropCircleX.Value.HasValue || !PropCircleY.Value.HasValue ||
-            !PropCircleRadius.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetCircleProps(frame, circ,
-            PropCircleName.Text ?? "",
-            (float)PropCircleX.Value.Value, (float)PropCircleY.Value.Value,
-            (float)PropCircleRadius.Value.Value);
+        var circles = _selectedState.SelectedCircles;
+        if (circles.Count == 0) return;
+
+        // See ApplyRectProps for the null-means-"don't touch" / single-selection-only-name semantics.
+        float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
+        float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
+        float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
+        string? name = circles.Count == 1 ? (PropCircleName.Text ?? "") : null;
+
+        _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
     }
 
     // ── Playback controls wiring ──────────────────────────────────────────────
@@ -4598,8 +4670,7 @@ public partial class MainWindow : Window
         var leavingTab = _tabManager.ActiveTab;
         if (leavingTab is { Kind: TabKind.Achx })
         {
-            leavingTab.UndoSnapshot = _undoManager.TakeSnapshot();
-            _appCommands.CaptureTabEditorState(leavingTab);
+            _tabController.CaptureLeavingTab(leavingTab);
         }
 
         // If there is already a file open that hasn't been registered as a tab yet,
@@ -6180,11 +6251,14 @@ public partial class MainWindow : Window
     /// center-on-frame gesture wins the text-label real estate over an inline rename.
     /// </summary>
     internal void HandleHeaderTextDoubleTap(TreeNodeVm vm)
-        => HandleAnimTreeNodeDoubleTap(vm);
+        => HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: true);
 
     /// <summary>
-    /// Double-tap on blank space in a tree row (not the text label, not a Button) →
-    /// toggle expand / collapse.
+    /// Double-tap on blank space in a tree row (not the text label, not a Button) → focus the
+    /// node instead of renaming it (#716). For a chain this selects all its frames (so they draw
+    /// with the shrink-to-rest reveal, #542) and fits them into the wireframe view via
+    /// <see cref="WireframeControl.FitChainToView"/>; frame/rect/circle already center themselves
+    /// via <see cref="HandleAnimTreeNodeDoubleTap"/>.
     /// </summary>
     private void OnAnimTreeDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -6192,7 +6266,10 @@ public partial class MainWindow : Window
         // or if the + button's DoubleTapped handler consumed it, skip.
         if (e.Handled) return;
         if (e.Source is not Control src) return;
-        if (src is TextBlock) return;
+        // Only the header/rename label is excluded (its own DoubleTapped handler already routes
+        // it to rename) — other TextBlocks in the row, like the frame-count "Meta" label, are
+        // genuine blank-row space and must still reach the focus gesture below (#716).
+        if (src is TextBlock { Name: "RowHeaderLabel" }) return;
         // Belt-and-suspenders: exclude clicks that originated from inside a Button even if
         // the Button's DoubleTapped handler didn't fire (e.g. focus or routing edge cases).
         // The event source is often a visual child (ContentPresenter, SVG icon, etc.),
@@ -6200,20 +6277,30 @@ public partial class MainWindow : Window
         if (src.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
         if (tvi?.DataContext is not TreeNodeVm vm) return;
-        if (!HandleAnimTreeNodeDoubleTap(vm)) return;
+        if (!HandleAnimTreeNodeDoubleTap(vm, isLabelDoubleTap: false)) return;
         e.Handled = true;
     }
 
     /// <summary>
     /// Routes a double-tap on a tree node to the appropriate action.
+    /// <paramref name="isLabelDoubleTap"/> distinguishes the text-label gesture (chain → inline
+    /// rename) from every other double-tap on the row (chain → focus/fit its frames, #716).
     /// Returns <c>true</c> when a recognised action was performed.
     /// </summary>
-    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm)
+    internal bool HandleAnimTreeNodeDoubleTap(TreeNodeVm vm, bool isLabelDoubleTap = false)
     {
         switch (vm.Data)
         {
-            case AnimationChainSave chain:
+            case AnimationChainSave chain when isLabelDoubleTap:
                 BeginInlineRename(vm, chain.Name);
+                return true;
+            case AnimationChainSave chain:
+                // Selecting the chain (the click that preceded this double-click) already makes
+                // every one of its frames draw highlighted with the shrink-to-rest reveal (#542)
+                // — see WireframeControl.ComputeHighlightedFrames. Double-click's only remaining
+                // job is moving the camera onto them (#716). No-op for an empty chain:
+                // FitChainToView already no-ops with nothing to fit.
+                WireframeCtrl.FitChainToView(chain);
                 return true;
             case AnimationFrameSave frame:
                 WireframeCtrl.CenterOnFrame(frame);

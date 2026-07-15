@@ -382,9 +382,11 @@ public class VisualRenderTests
     ///
     /// Behavioural note: when a single frame is selected the control shows only
     /// that frame (so the agent sees exactly 1 rect with IsSelected=true).
-    /// When no frame is selected the control shows all chain frames (so the
-    /// agent sees 2 rects all with IsSelected=false).  This two-phase assertion
-    /// verifies both sides of the selection contract.
+    /// When no frame is selected but a whole chain is (SelectedFrame is null,
+    /// SelectedChain is set), every one of the chain's frames is highlighted —
+    /// selecting a chain "plays" the same shrink-to-rest reveal a single frame
+    /// selection gets (#716). This two-phase assertion verifies both sides of
+    /// the selection contract.
     /// </summary>
     [AvaloniaFact]
     public void WireframeGetFrameRects_IsSelectedMatchesSelectedFrameState()
@@ -421,15 +423,15 @@ public class VisualRenderTests
             var ctrl = ctx.CreateWireframeControl();
             ctrl.LoadTexture(png);
 
-            // Phase 1: no selected frame → the control shows every chain frame,
-            // none of which should be marked as selected.
+            // Phase 1: no selected frame, whole chain selected → the control shows every
+            // chain frame, all of them highlighted (#716).
 #pragma warning disable CS8625
             ctx.SelectedState.SelectedFrame = null;
 #pragma warning restore CS8625
             ctrl.RefreshFrames();
             var allRects = ctrl.GetFrameRects();
             Assert.Equal(2, allRects.Count);
-            Assert.All(allRects, r => Assert.False(r.IsSelected, "no frame should be selected"));
+            Assert.All(allRects, r => Assert.True(r.IsSelected, "a whole-chain selection highlights every frame"));
 
             // Phase 2: select frame0 → the control shows only that frame and
             // reports IsSelected=true on it.

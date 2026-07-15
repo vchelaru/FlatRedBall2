@@ -33,6 +33,23 @@ jobs:
       - name: Test engine
         run: dotnet test tests/FlatRedBall2.Tests/FlatRedBall2.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 
+      # Issue #683: published NuGet packages are packed with `dotnet pack -c Release`, so a
+      # build-time `#if DEBUG` around AutomationMode would strip the real implementation out of
+      # every shipped assembly. The fix keeps the implementation compiled in under both
+      # configurations and gates the public entry point with [Conditional("DEBUG")] instead,
+      # evaluated against the *consumer's* DEBUG symbol. This step builds the real engine
+      # assembly in Release and greps its bytes for the internal StartAutomationMode symbol.
+      #
+      # This used to be an xUnit test (#708) that shelled out to `dotnet build` from inside the
+      # test process into a fresh temp dir every run — no incremental-build cache reuse, so it
+      # cost a full cold Release build (~15 minutes) on every `dotnet test` invocation, dwarfing
+      # the rest of the ~1170-test suite (which runs in a few seconds combined). Doing the same
+      # check as a plain CI step instead avoids paying that cost inside "unit test" overhead.
+      - name: Release build contains AutomationMode implementation
+        run: |
+          dotnet build src/FlatRedBall2.csproj -c Release -f net10.0 -o /tmp/frb2-release-check --verbosity minimal
+          grep -qa StartAutomationMode /tmp/frb2-release-check/FlatRedBall2.dll
+
       - name: Build dotnet new templates
         run: |
           dotnet build templates/frb2-desktop/MyGame.slnx --verbosity minimal

@@ -91,11 +91,11 @@
                     </WrapPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <ToggleButton x:Name="FrameFlipHToggle" x:FieldModifier="Public"
-                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip H" />
+                                      Classes="toolbarToggle" Content="Flip H" />
                         <ToggleButton x:Name="FrameFlipVToggle" x:FieldModifier="Public"
-                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip V" />
+                                      Classes="toolbarToggle" Content="Flip V" />
                         <ToggleButton x:Name="FrameFlipDToggle" x:FieldModifier="Public"
-                                      Height="26" MinHeight="0" Padding="10,0" Content="Flip D" />
+                                      Classes="toolbarToggle" Content="Flip D" />
                     </StackPanel>
                 </StackPanel>
             </Border>

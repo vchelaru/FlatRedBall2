@@ -1,6 +1,6 @@
 # Per-Frame Shapes (Hitboxes / Hurtboxes)
 
-Animation frames can carry shape definitions (`AARect`, `Circle`, `Polygon`) which the engine reconciles onto the parent entity as the animation plays. The intended use is hitboxes and hurtboxes that come and go with specific frames of an attack, parry, or i-frame window.
+Animation frames can carry shape definitions (`AARect`, `Circle`, `Polygon`) which the engine reconciles onto the parent entity as the animation plays. Intended uses span combat hitboxes/hurtboxes that come and go with specific frames of an attack, parry, or i-frame window, and static objects (a tree, a rock) that just need a sprite offset and collision box authored once, as a single-frame chain.
 
 ## The ownership rule (load-bearing — read this before authoring)
 

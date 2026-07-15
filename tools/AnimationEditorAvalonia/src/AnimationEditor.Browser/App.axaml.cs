@@ -191,7 +191,7 @@ public partial class App : Application
         // so cached tabs are already correctly "always trusted" here with no code changes needed.
         var tabManager = new TabManager();
         tabManager.OpenOrFocus(new FilePath("sample/player.achx"), "player.achx");
-        TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+        appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
 
         var preview = new PreviewControl();
         preview.InitializeServices(
@@ -207,7 +207,7 @@ public partial class App : Application
         var wireframe = new WireframeControl();
         wireframe.InitializeServices(
             selectedState, appState, appCommands, applicationEvents,
-            projectManager, undoManager, pendingCutState,
+            projectManager, undoManager, pendingCutState, objectFinder,
             thumbnailService: thumbnailService);
 
         // Phase 1 (#603): read-only browsing of every chain/frame/shape in the loaded file,
@@ -215,6 +215,10 @@ public partial class App : Application
         // controls are independent of each other and of PreviewControl -- any of the three can
         // drive ISelectedState, and the others react via SelectionChanged.
         var animationTree = new AnimationTreeControl();
+        // Browser renders the tree with AnimationTreeControl, so the controller reads expand
+        // state from there (desktop reads its own _treeRoots collection instead).
+        var tabController = new TabController(undoManager, appCommands,
+            () => animationTree.CaptureExpandState());
         var inspector = new InspectorControl();
         inspector.InitializeServices(selectedState);
         inspector.EnableEditing(appCommands, textureName =>
@@ -571,6 +575,10 @@ public partial class App : Application
             }
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            // #687: InitializeServices always rebuilds fresh VMs (default-collapsed) -- restore
+            // whatever expand state (including frame nodes with shape children) was captured for
+            // `next` the last time it was the active tab (see SwitchToTab below).
+            if (next != null) animationTree.ApplyExpandState(next.CachedTreeExpandState);
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }
@@ -600,8 +608,7 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
-                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+                tabController.CaptureLeavingTab(leaving);
             }
 
             tabManager.Activate(target.Path);
@@ -610,6 +617,7 @@ public partial class App : Application
             UpdateUndoRedoButtons();
 
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
+            animationTree.ApplyExpandState(target.CachedTreeExpandState);
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         }
@@ -623,12 +631,11 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
-                leaving.UndoSnapshot = undoManager.TakeSnapshot();
+                tabController.CaptureLeavingTab(leaving);
             }
 
             tabManager.OpenOrFocus(new FilePath(displayName), displayName);
-            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
             undoManager.Clear();
             UpdateUndoRedoButtons();
             RebuildTabStrip();
@@ -1435,13 +1442,13 @@ public partial class App : Application
             var leaving = tabManager.ActiveTab;
             if (leaving != null)
             {
-                TabEditorCache.CaptureFromProject(leaving, projectManager);
+                appCommands.CaptureTabEditorState(leaving);
                 leaving.UndoSnapshot = undoManager.TakeSnapshot();
             }
             appCommands.NewFile();
             var displayName = TabManager.ComputeUntitledDisplayName(tabManager.Tabs.Select(t => t.DisplayName).ToList());
             tabManager.OpenOrFocus(new FilePath($"untitled-{++untitledCounter}"), displayName);
-            TabEditorCache.CaptureFromProject(tabManager.ActiveTab!, projectManager);
+            appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
             undoManager.Clear();
             UpdateUndoRedoButtons();
             animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);

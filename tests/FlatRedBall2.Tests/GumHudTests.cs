@@ -169,8 +169,9 @@ public class GumHudTests
         entity.IsVisible = false;
 
         var renderable = (IAttachable)screen.GumRenderables[0];
-        renderable.Parent.ShouldBe(entity);
-        renderable.Parent.IsAbsoluteVisible.ShouldBeFalse();
+        var parent = renderable.Parent;
+        parent.ShouldBe(entity);
+        parent!.IsAbsoluteVisible.ShouldBeFalse();
     }
 
     // EntityVisualsRoot is the screen-level root that entity-attached Gum visuals are parented

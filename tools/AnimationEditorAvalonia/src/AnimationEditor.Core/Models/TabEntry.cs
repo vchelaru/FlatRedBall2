@@ -2,6 +2,7 @@ using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Paths;
 using FlatRedBall2.Animation.Content;
 using System;
+using System.Collections.Generic;
 
 namespace AnimationEditor.Core.Models
 {
@@ -67,6 +68,29 @@ namespace AnimationEditor.Core.Models
         /// captured. Used to detect external edits while the tab was in the background.
         /// </summary>
         public DateTime? CachedDiskWriteTimeUtc { get; set; }
+
+        /// <summary>
+        /// Name of the selected animation chain when this tab was last deactivated.
+        /// Session-only (not written to <c>.aeproperties</c>).
+        /// </summary>
+        public string? CachedSelectedChainName { get; set; }
+
+        /// <summary>
+        /// Index of the selected frame within <see cref="CachedSelectedChainName"/> when this
+        /// tab was last deactivated, or <c>null</c> when only the chain was selected.
+        /// Session-only (not written to <c>.aeproperties</c>).
+        /// </summary>
+        public int? CachedSelectedFrameIndex { get; set; }
+
+        /// <summary>
+        /// Per-node tree expand state (keyed by the chain/frame/shape data object, by reference)
+        /// captured via <c>TreeBuilder.CaptureExpandState</c> when this tab was last deactivated.
+        /// Restored via <c>TreeBuilder.ApplyExpandState</c> after the tree is rebuilt for this tab
+        /// (#687) — covers frame nodes with shape children, which have no other expand-state
+        /// persistence (only chain-level expand state is saved to the companion file).
+        /// Session-only (not written to <c>.aeproperties</c>).
+        /// </summary>
+        public Dictionary<object, bool>? CachedTreeExpandState { get; set; }
 
         /// <summary>
         /// The tab label. Returns <see cref="_displayNameOverride"/> when set;

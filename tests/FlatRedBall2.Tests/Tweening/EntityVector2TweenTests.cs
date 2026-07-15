@@ -66,6 +66,6 @@ public class EntityVector2TweenTests
         var entity = factory.Create();
 
         Should.Throw<ArgumentNullException>(() =>
-            entity.Tween((Action<Vector2>)null, Vector2.Zero, Vector2.One, TimeSpan.FromSeconds(1)));
+            entity.Tween((Action<Vector2>)null!, Vector2.Zero, Vector2.One, TimeSpan.FromSeconds(1)));
     }
 }

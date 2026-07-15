@@ -58,7 +58,7 @@ internal sealed class TestServices
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {
         var ctrl = new WireframeControl();
-        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, PendingCutState, showError);
+        ctrl.InitializeServices(SelectedState, AppState, AppCommands, ApplicationEvents, ProjectManager, UndoManager, PendingCutState, ObjectFinder, showError);
         return ctrl;
     }
 

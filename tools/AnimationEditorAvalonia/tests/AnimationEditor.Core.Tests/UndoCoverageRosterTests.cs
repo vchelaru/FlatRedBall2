@@ -43,6 +43,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.OpenAchxWorkflowAsync)]              = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.LoadAnimationChain)]                 = Category.MutatingNotUndoable, // loads a file; clears the undo stack
         [nameof(IAppCommands.CaptureTabEditorState)]              = Category.NonMutating,
+        [nameof(IAppCommands.RestoreTabSelection)]                = Category.NonMutating,
         [nameof(IAppCommands.TryActivateTabFromCache)]            = Category.MutatingNotUndoable, // swaps project model; undo restored by app layer
         [nameof(IAppCommands.ActivateTabContentAsync)]            = Category.MutatingNotUndoable, // tab switch load or cache restore
         [nameof(IAppCommands.ReloadAchxFromDisk)]                 = Category.MutatingNotUndoable, // hot-reload; clears the undo stack on success
@@ -113,6 +114,8 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.SetFramePixelRegion)]          = Category.MutatingUndoable,
         [nameof(IAppCommands.SetRectProps)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.SetCircleProps)]               = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetRectPropsBulk)]             = Category.MutatingUndoable,
+        [nameof(IAppCommands.SetCirclePropsBulk)]           = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteChains)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteFrames)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.PasteRectangle)]               = Category.MutatingUndoable,
@@ -318,6 +321,10 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.SetRectProps(Zebra(ctx).Frames[0], Rect(ctx), "Renamed", 5f, 6f, 7f, 8f)));
         yield return Row(nameof(IAppCommands.SetCircleProps),
             ctx => Sync(() => ctx.AppCommands.SetCircleProps(Zebra(ctx).Frames[0], Circle(ctx), "Renamed", 5f, 6f, 9f)));
+        yield return Row(nameof(IAppCommands.SetRectPropsBulk),
+            ctx => Sync(() => ctx.AppCommands.SetRectPropsBulk(new[] { Rect(ctx), SecondRect(ctx) }, null, null, null, 20f, 20f)));
+        yield return Row(nameof(IAppCommands.SetCirclePropsBulk),
+            ctx => Sync(() => ctx.AppCommands.SetCirclePropsBulk(new[] { Circle(ctx), SecondCircle(ctx) }, null, null, null, 20f)));
         yield return Row(nameof(IAppCommands.PasteChains),
             ctx => Sync(() => ctx.AppCommands.PasteChains(
                 new List<AnimationChainSave> { new() { Name = "Pasted" } })));
@@ -430,6 +437,7 @@ public class UndoCoverageRosterTests
     private static AnimationChainSave Zebra(TestServices ctx) => ctx.Acls.AnimationChains[0];
     private static AnimationChainSave Alpha(TestServices ctx) => ctx.Acls.AnimationChains[1];
     private static AARectSave Rect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.First();
+    private static AARectSave SecondRect(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.AARectSaves.ElementAt(1);
     private static CircleSave Circle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.First();
     private static CircleSave SecondCircle(TestServices ctx) => Zebra(ctx).Frames[0].ShapesSave!.CircleSaves.ElementAt(1);
 

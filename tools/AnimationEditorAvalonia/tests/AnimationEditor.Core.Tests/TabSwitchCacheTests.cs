@@ -28,13 +28,32 @@ public class TabSwitchCacheTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
-    private string WriteAchx(string fileName, string chainName)
+    private string WriteAchx(string fileName, string chainName, int frameCount = 0)
     {
         var path = Path.Combine(_dir.Path, fileName);
         var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
-        acls.AnimationChains.Add(new AnimationChainSave { Name = chainName });
+        var chain = new AnimationChainSave { Name = chainName };
+        for (int i = 0; i < frameCount; i++)
+            chain.Frames.Add(new AnimationFrameSave { TextureName = $"tex{i}.png", FrameLength = 0.1f });
+        acls.AnimationChains.Add(chain);
         acls.Save(path);
         return path;
+    }
+
+    [Fact]
+    public void CaptureTabEditorState_PreservesEditsAcrossCacheRoundTrip()
+    {
+        string path = WriteAchx("edited.achx", "Idle");
+        var tab = new TabEntry(new FilePath(path));
+
+        _pm.LoadAnimationChain(new FilePath(path));
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        _pm.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
+        _ctx.AppCommands.CaptureTabEditorState(tab);
+
+        TabEditorCache.ApplyToProject(tab, _pm);
+        Assert.Equal("Renamed", _pm.AnimationChainListSave!.AnimationChains[0].Name);
     }
 
     [Fact]
@@ -81,19 +100,32 @@ public class TabSwitchCacheTests : IDisposable
     }
 
     [Fact]
-    public void CaptureTabEditorState_PreservesEditsAcrossCacheRoundTrip()
+    public async Task TryActivateTabFromCache_WithSelectedFrame_RestoresFrameSelection()
     {
-        string path = WriteAchx("edited.achx", "Idle");
-        var tab = new TabEntry(new FilePath(path));
+        const string chainName = "Walk";
+        const int selectedFrameIndex = 1;
 
-        _pm.LoadAnimationChain(new FilePath(path));
-        _ctx.AppCommands.CaptureTabEditorState(tab);
+        string pathA = WriteAchx("a.achx", chainName, frameCount: 3);
+        string pathB = WriteAchx("b.achx", "Run");
+        var tabA = new TabEntry(new FilePath(pathA));
+        var tabB = new TabEntry(new FilePath(pathB));
 
-        _pm.AnimationChainListSave!.AnimationChains[0].Name = "Renamed";
-        _ctx.AppCommands.CaptureTabEditorState(tab);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(pathA);
+        var chain = _pm.AnimationChainListSave!.AnimationChains[0];
+        Assert.Equal(chainName, chain.Name);
+        _ctx.SelectedState.SelectedChain = chain;
+        _ctx.SelectedState.SelectedFrame = chain.Frames[selectedFrameIndex];
+        _ctx.AppCommands.CaptureTabEditorState(tabA);
 
-        TabEditorCache.ApplyToProject(tab, _pm);
-        Assert.Equal("Renamed", _pm.AnimationChainListSave!.AnimationChains[0].Name);
+        await _ctx.AppCommands.OpenAchxWorkflowAsync(pathB);
+        _ctx.AppCommands.CaptureTabEditorState(tabB);
+
+        Assert.True(_ctx.AppCommands.TryActivateTabFromCache(tabA));
+        Assert.Equal(chainName, _ctx.SelectedState.SelectedChain!.Name);
+        Assert.NotNull(_ctx.SelectedState.SelectedFrame);
+        Assert.Same(
+            _ctx.SelectedState.SelectedChain.Frames[selectedFrameIndex],
+            _ctx.SelectedState.SelectedFrame);
     }
 
     private sealed class CountingProjectManager : IProjectManager

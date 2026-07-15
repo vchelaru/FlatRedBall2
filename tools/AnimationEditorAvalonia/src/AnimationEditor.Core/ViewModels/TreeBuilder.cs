@@ -331,6 +331,50 @@ public static class TreeBuilder
         RestripeRoots(roots);
     }
 
+    // ── Expand-state capture/restore across a full rebuild (#687) ────────────
+
+    /// <summary>
+    /// Walks <paramref name="roots"/> and every descendant, recording each node's
+    /// <see cref="TreeNodeVm.IsExpanded"/> keyed by <see cref="TreeNodeVm.Data"/> (by reference).
+    /// Pair with <see cref="ApplyExpandState"/> to survive a full tree rebuild (e.g. a tab
+    /// switch) that discards the old <see cref="TreeNodeVm"/> instances but keeps the same
+    /// underlying data objects — this covers frame nodes with shape children, which have no
+    /// other expand-state persistence (only chain-level expand state is saved to the companion
+    /// file). Nodes with a <c>null</c> Data are skipped since they can't be matched back up.
+    /// </summary>
+    public static Dictionary<object, bool> CaptureExpandState(IEnumerable<TreeNodeVm> roots)
+    {
+        var state = new Dictionary<object, bool>(ReferenceEqualityComparer.Instance);
+        CaptureExpandStateRecursive(roots, state);
+        return state;
+    }
+
+    private static void CaptureExpandStateRecursive(IEnumerable<TreeNodeVm> nodes, Dictionary<object, bool> state)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Data is not null)
+                state[node.Data] = node.IsExpanded;
+            CaptureExpandStateRecursive(node.Children, state);
+        }
+    }
+
+    /// <summary>
+    /// Applies previously-<see cref="CaptureExpandState"/>d expand flags onto <paramref name="roots"/>
+    /// by matching each node's <see cref="TreeNodeVm.Data"/> reference. Nodes whose data isn't in
+    /// <paramref name="state"/> (e.g. a node freshly created since capture) are left at whatever
+    /// default <see cref="BuildTree"/> gave them.
+    /// </summary>
+    public static void ApplyExpandState(IEnumerable<TreeNodeVm> roots, IReadOnlyDictionary<object, bool> state)
+    {
+        foreach (var node in roots)
+        {
+            if (node.Data is not null && state.TryGetValue(node.Data, out var expanded))
+                node.IsExpanded = expanded;
+            ApplyExpandState(node.Children, state);
+        }
+    }
+
     // ── Expand-state persistence ──────────────────────────────────────────────
 
     /// <summary>
@@ -363,19 +407,20 @@ public static class TreeBuilder
             case AnimationChainSave chain:
                 if (acls is null || !acls.AnimationChains.Contains(chain))
                     return true; // stale — recognised type, but don't corrupt state
-                // Re-assign even if chain is the same object when a frame is selected,
-                // so that SelectedChain setter clears SelectedFrame and fires SelectionChanged.
-                if (selectedState.SelectedChain != chain || selectedState.SelectedFrame != null)
-                    selectedState.SelectedChain = chain;
+                // Always re-assign, even when this chain is already the selection: the setter
+                // clears SelectedFrame and fires SelectionChanged unconditionally, and clicking
+                // an already-selected chain must still replay the wireframe's reveal (#716),
+                // which is driven entirely off SelectionChanged.
+                selectedState.SelectedChain = chain;
                 return true;
             case AnimationFrameSave frame:
             {
                 if (acls is null || !acls.AnimationChains.Any(c => c.Frames.Contains(frame)))
                     return true; // stale — recognised type, but don't corrupt state
-                // Re-assign even when the same frame is already selected if a shape is
-                // selected, so that SelectedFrame.set clears SelectedCircle/SelectedRectangle.
-                if (selectedState.SelectedFrame != frame || selectedState.SelectedShape != null)
-                    selectedState.SelectedFrame = frame;
+                // Always re-assign, even when this frame is already the selection — same reason
+                // as the chain case above: re-clicking an already-selected frame must replay the
+                // reveal (#716), not just clear a stale shape selection.
+                selectedState.SelectedFrame = frame;
                 return true;
             }
             case AARectSave rect:
