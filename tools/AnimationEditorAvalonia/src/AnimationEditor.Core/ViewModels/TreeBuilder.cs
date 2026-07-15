@@ -480,10 +480,17 @@ public static class TreeBuilder
     /// <summary>
     /// Query-change path: sets each chain (root) node's
     /// <see cref="TreeNodeVm.PinnedVisible"/> to whether its header matches
-    /// <paramref name="query"/> under <see cref="MatchesFilter"/>. This is the <b>only</b>
-    /// filter path allowed to hide a row — typing/refining the query shrinks the visible
-    /// set; an empty/whitespace query shows every chain. Non-chain nodes (frames, shapes)
-    /// are left untouched: they are hidden only when their parent chain is.
+    /// <paramref name="query"/> under <see cref="MatchesFilter"/>, or one of its frames holds
+    /// a shape (<see cref="AARectSave"/>/<see cref="CircleSave"/>) whose name matches (#726).
+    /// This is the <b>only</b> filter path allowed to hide a row — typing/refining the query
+    /// shrinks the visible set; an empty/whitespace query shows every chain. Non-chain nodes
+    /// (frames, shapes) are otherwise left untouched: they are hidden only when their parent
+    /// chain is.
+    /// <para>
+    /// A shape-level match also expands its owning chain and frame via
+    /// <see cref="ExpandAncestorsOf"/> so the matched row is actually visible, not just
+    /// present-but-collapsed.
+    /// </para>
     /// <para>
     /// Contrast with <see cref="ComputeVisibleAfterModelChange"/>, the grow-only path used
     /// when the model mutates but the query is unchanged.
@@ -492,8 +499,35 @@ public static class TreeBuilder
     public static void ApplyQueryFilter(IEnumerable<TreeNodeVm> roots, string? query)
     {
         foreach (var node in roots)
+        {
             if (node.Data is AnimationChainSave)
-                node.PinnedVisible = MatchesFilter(node.Header, query);
+            {
+                var matchingShapes = FindMatchingShapeNodes(node, query);
+                node.PinnedVisible = MatchesFilter(node.Header, query) || matchingShapes.Count > 0;
+
+                foreach (var shapeNode in matchingShapes)
+                    ExpandAncestorsOf(roots, shapeNode.Data!);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collects every shape child (<see cref="NodeKind.RectShape"/>/<see cref="NodeKind.CircleShape"/>)
+    /// across all of <paramref name="chainNode"/>'s frames whose name matches <paramref name="query"/>
+    /// under <see cref="MatchesFilter"/>. Returns empty for a blank query — a blank query means
+    /// "no filter", not "match every shape".
+    /// </summary>
+    private static List<TreeNodeVm> FindMatchingShapeNodes(TreeNodeVm chainNode, string? query)
+    {
+        var matches = new List<TreeNodeVm>();
+        if (string.IsNullOrWhiteSpace(query)) return matches;
+
+        foreach (var frameNode in chainNode.Children)
+            foreach (var shapeNode in frameNode.Children)
+                if ((shapeNode.Kind == NodeKind.RectShape || shapeNode.Kind == NodeKind.CircleShape)
+                    && MatchesFilter(shapeNode.Header, query))
+                    matches.Add(shapeNode);
+        return matches;
     }
 
     /// <summary>

@@ -1136,6 +1136,96 @@ public class HeadlessTreeViewTests
         finally { window.Close(); }
     }
 
+    // ── #726 regression diagnosis: drive the REAL SearchBox, not a reflection shortcut ──
+    //
+    // SetFilterAndApply (used by every other search test) sets the private _treeFilterQuery
+    // field and reflection-invokes ApplyQueryFilter() directly, bypassing the actual named
+    // "SearchBox" TextBox and its wired TextChanged handler entirely. If that wiring itself
+    // were ever broken, no existing test would catch it. This test drives the real control's
+    // Text property (which fires the real TextChanged handler) and asserts on the real
+    // rendered TreeViewItem container's IsVisible, not just the view-model's PinnedVisible.
+    [AvaloniaFact]
+    public void SearchBox_RealTextChanged_HidesNonMatchingChainContainer()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var walk = new AnimationChainSave { Name = "walkLeft" };
+            var idle = new AnimationChainSave { Name = "Idle" };
+            walk.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+            idle.Frames.Add(new AnimationFrameSave { TextureName = "b.png" });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(idle);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = GetTree(window);
+            var roots = GetRoots(tree);
+            var walkNode = roots.First(n => ReferenceEquals(n.Data, walk));
+            var idleNode = roots.First(n => ReferenceEquals(n.Data, idle));
+
+            var searchBox = window.FindControl<TextBox>("SearchBox")
+                ?? throw new InvalidOperationException("SearchBox control not found");
+
+            searchBox.Text = "walk"; // fires the real TextChanged handler, not a shortcut
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(walkNode.PinnedVisible);
+            Assert.False(idleNode.PinnedVisible);
+
+            var walkTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(tvi => ReferenceEquals(tvi.DataContext, walkNode));
+            var idleTvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(tvi => ReferenceEquals(tvi.DataContext, idleNode));
+
+            Assert.True(walkTvi.IsVisible);
+            Assert.False(idleTvi.IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── #726 regression diagnosis: shape search with a real on-disk project ────
+    //
+    // Every other search test in this file runs with ProjectManager.FileName == null,
+    // which makes SaveCompanionFile() a silent no-op. A real user always has FileName
+    // set, so a shape-name match's ExpandAncestorsOf call triggers a REAL synchronous
+    // companion-file write via OnTreeNodeIsExpandedChanged. This test reproduces that
+    // exact condition to check whether the write disrupts PinnedVisible correctness.
+    [AvaloniaFact]
+    public void SearchFilter_RealFileNameSet_ShapeMatchStillHidesNonMatchingChain()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var tempFile = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(), $"AE726_{Guid.NewGuid():N}.achx");
+            ctx.ProjectManager.FileName = tempFile;
+
+            var walk = new AnimationChainSave { Name = "walkLeft" };
+            var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+            frame.ShapesSave.Shapes.Add(new AARectSave { Name = "HitBox" });
+            walk.Frames.Add(frame);
+            var idle = new AnimationChainSave { Name = "Idle" };
+
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(walk);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(idle);
+
+            TriggerRefreshTreeView(window);
+            Dispatcher.UIThread.RunJobs();
+
+            SetFilterAndApply(window, "hit"); // matches the shape inside "walkLeft" only
+
+            var roots    = GetRoots(GetTree(window));
+            var walkNode = roots.First(n => ReferenceEquals(n.Data, walk));
+            var idleNode = roots.First(n => ReferenceEquals(n.Data, idle));
+
+            Assert.True(walkNode.PinnedVisible);
+            Assert.False(idleNode.PinnedVisible);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void RenameChain_DoesNotCollapseChainNode()
     {
