@@ -124,6 +124,15 @@ jobs:
           cp tools/AnimationEditorAvalonia/src/AnimationEditor.App/Assets/icons/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
           cp tools/AnimationEditorAvalonia/src/AnimationEditor.App/macos/Info.plist "$APP/Contents/Info.plist"
 
+      # Ad-hoc sign (no Apple Developer ID / notarization — none is configured for this repo).
+      # Without any signature, Gatekeeper rejects the bundle outright on first launch with
+      # "AnimationEditor.app is damaged and can't be opened", which is misleading — the bundle
+      # isn't corrupt, it's just unsigned. Ad-hoc signing replaces that hard rejection with the
+      # normal "unidentified developer" prompt users can approve once via Settings > Privacy.
+      - name: Ad-hoc sign macOS .app bundle
+        if: matrix.os == 'macos-latest'
+        run: codesign --force --deep --sign - dist/bundle/AnimationEditor.app
+
       - name: Package (zip, Windows)
         if: matrix.archive == 'zip' && matrix.os == 'windows-latest'
         shell: pwsh
@@ -136,10 +145,13 @@ jobs:
       # extracted binary loses its executable bit. Native `zip` preserves it.
       - name: Package (zip, macOS .app bundle)
         if: matrix.archive == 'zip' && matrix.os == 'macos-latest'
+        # `zip` doesn't preserve the extended-attribute/resource-fork data a code signature's
+        # seal depends on, so a plain-zipped signed bundle can still fail Gatekeeper validation
+        # after unzip. `ditto` is Apple's own tool for packaging signed .app bundles and
+        # preserves that metadata correctly.
         run: |
           mkdir -p dist/out
-          cd dist/bundle
-          zip -r "../out/${{ matrix.asset }}" AnimationEditor.app
+          ditto -c -k --sequesterRsrc --keepParent dist/bundle/AnimationEditor.app "dist/out/${{ matrix.asset }}"
 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
