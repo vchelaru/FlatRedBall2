@@ -326,7 +326,7 @@ public partial class MainWindow : Window
             row.Children.Add(closeBtn);
             tabBorder.Child = row;
 
-            // Attach a single managed ContextMenu (right-click → Detach / Close).  Letting Avalonia
+            // Attach a single managed ContextMenu (right-click → Detach / Copy / Close).  Letting Avalonia
             // own the menu via the ContextMenu property — rather than constructing and Open()-ing a
             // fresh ContextMenu on every right-click PointerPressed — is what prevents the menus from
             // stacking and failing to dismiss (issue #472): Avalonia reuses this one instance and
@@ -340,6 +340,14 @@ public partial class MainWindow : Window
                     Header = "Detach to New Window",
                     Command = new RelayCommand(() => DetachTab(captured)),
                 });
+            // Issue #546: same action as the title-bar "Copy Full Path", but for the right-clicked
+            // tab (which may not be the active one).
+            tabMenu.Items.Add(new MenuItem
+            {
+                Header = "Copy Full Path",
+                Command = new RelayCommand(() =>
+                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(captured.Path.FullPath)),
+            });
             tabMenu.Items.Add(new MenuItem
             {
                 Header = "Close Tab",

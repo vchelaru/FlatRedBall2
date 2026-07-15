@@ -520,9 +520,17 @@ public partial class App : Application
                     if (topLevel?.Launcher is { } launcher)
                         await launcher.LaunchUriAsync(new Uri(Program.PageUrl));
                 };
+                // Issue #546: same action as the header "Copy Full Path", for the right-clicked tab.
+                var copyPathTabItem = new MenuItem { Header = "Copy Full Path" };
+                copyPathTabItem.Click += async (_, _) =>
+                {
+                    var topLevel = TopLevel.GetTopLevel(tabBorder);
+                    if (topLevel?.Clipboard is { } clipboard)
+                        await clipboard.SetTextAsync(captured.Path.FullPath);
+                };
                 var closeTabItem = new MenuItem { Header = "Close Tab" };
                 closeTabItem.Click += (_, _) => CloseTab(captured);
-                tabBorder.ContextMenu = new ContextMenu { Items = { openNewTabItem, closeTabItem } };
+                tabBorder.ContextMenu = new ContextMenu { Items = { openNewTabItem, copyPathTabItem, closeTabItem } };
 
                 // Left-click activates (skipping the close button, which handles its own click);
                 // middle-click closes, matching desktop.

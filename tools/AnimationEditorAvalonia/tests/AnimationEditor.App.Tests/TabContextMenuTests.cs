@@ -64,6 +64,7 @@ public class TabContextMenuTests
                     .Select(m => (string?)m.Header)
                     .ToList();
                 Assert.Contains("Detach to New Window", headers);
+                Assert.Contains("Copy Full Path", headers);
                 Assert.Contains("Close Tab", headers);
             }
         }
