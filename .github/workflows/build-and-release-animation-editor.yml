@@ -108,6 +108,22 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: chmod +x dist/publish/AnimationEditor
 
+      # Wraps the published single-file binary as a real macOS .app bundle (Contents/MacOS,
+      # Contents/Resources, Contents/Info.plist) instead of shipping a bare executable. A bare
+      # exe has no CFBundleIdentifier at runtime, which breaks anything that resolves the app
+      # via NSRunningApplication/ScreenCaptureKit (e.g. screen-recording tools), and Finder has
+      # no icon/display name to show. Mirrors the dev-only CreateMacOSDevBundle MSBuild target
+      # in AnimationEditor.App.csproj, which only fires for local `dotnet build` on macOS.
+      - name: Assemble macOS .app bundle
+        if: matrix.os == 'macos-latest'
+        run: |
+          APP=dist/bundle/AnimationEditor.app
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp dist/publish/AnimationEditor "$APP/Contents/MacOS/AnimationEditor"
+          chmod +x "$APP/Contents/MacOS/AnimationEditor"
+          cp tools/AnimationEditorAvalonia/src/AnimationEditor.App/Assets/icons/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+          cp tools/AnimationEditorAvalonia/src/AnimationEditor.App/macos/Info.plist "$APP/Contents/Info.plist"
+
       - name: Package (zip, Windows)
         if: matrix.archive == 'zip' && matrix.os == 'windows-latest'
         shell: pwsh
@@ -118,12 +134,12 @@ jobs:
       # PowerShell's Compress-Archive doesn't store Unix permission bits in the zip's
       # external attributes, so the chmod +x above gets silently dropped and the
       # extracted binary loses its executable bit. Native `zip` preserves it.
-      - name: Package (zip, Unix)
-        if: matrix.archive == 'zip' && matrix.os != 'windows-latest'
+      - name: Package (zip, macOS .app bundle)
+        if: matrix.archive == 'zip' && matrix.os == 'macos-latest'
         run: |
           mkdir -p dist/out
-          cd dist/publish
-          zip -r "../out/${{ matrix.asset }}" .
+          cd dist/bundle
+          zip -r "../out/${{ matrix.asset }}" AnimationEditor.app
 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
