@@ -101,11 +101,27 @@ namespace AnimationEditor.Core
             }
         }
 
-        public List<AARectSave> SelectedRectangles =>
-            _selectedNodes.OfType<AARectSave>().ToList();
+        public List<AARectSave> SelectedRectangles
+        {
+            get
+            {
+                var rects = _selectedNodes.OfType<AARectSave>().ToList();
+                if (rects.Count == 0 && _selectedRectangle != null)
+                    rects.Add(_selectedRectangle);
+                return rects;
+            }
+        }
 
-        public List<CircleSave> SelectedCircles =>
-            _selectedNodes.OfType<CircleSave>().ToList();
+        public List<CircleSave> SelectedCircles
+        {
+            get
+            {
+                var circles = _selectedNodes.OfType<CircleSave>().ToList();
+                if (circles.Count == 0 && _selectedCircle != null)
+                    circles.Add(_selectedCircle);
+                return circles;
+            }
+        }
 
         /// <summary>
         /// Multi-selection bag. Can hold AnimationChainSave, AnimationFrameSave,

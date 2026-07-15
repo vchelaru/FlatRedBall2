@@ -1600,6 +1600,45 @@ namespace AnimationEditor.Core.CommandsAndState
             string name, float x, float y, float radius) =>
             _undoManager.Execute(SetShapePropsCommand.ForCircle(frame, circ, name, x, y, radius, this, _events));
 
+        public void SetRectPropsBulk(IReadOnlyList<AARectSave> rects,
+            string? name, float? x, float? y, float? scaleX, float? scaleY)
+        {
+            if (rects.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                rects.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var r in rects)
+                    {
+                        if (name != null) r.Name = name;
+                        if (x.HasValue) r.X = x.Value;
+                        if (y.HasValue) r.Y = y.Value;
+                        if (scaleX.HasValue) r.ScaleX = scaleX.Value;
+                        if (scaleY.HasValue) r.ScaleY = scaleY.Value;
+                    }
+                },
+                this, _events, _objectFinder, "Edit Rectangles"));
+        }
+
+        public void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles,
+            string? name, float? x, float? y, float? radius)
+        {
+            if (circles.Count == 0) return;
+            _undoManager.Execute(new BulkShapePropsCommand(
+                circles.Cast<object>().ToList(),
+                () =>
+                {
+                    foreach (var c in circles)
+                    {
+                        if (name != null) c.Name = name;
+                        if (x.HasValue) c.X = x.Value;
+                        if (y.HasValue) c.Y = y.Value;
+                        if (radius.HasValue) c.Radius = radius.Value;
+                    }
+                },
+                this, _events, _objectFinder, "Edit Circles"));
+        }
+
         // ── Paste (clipboard → project) ───────────────────────────────────────
 
         /// <inheritdoc cref="IAppCommands.PasteChains"/>
