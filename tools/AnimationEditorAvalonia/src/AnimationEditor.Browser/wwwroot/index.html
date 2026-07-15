@@ -6,6 +6,8 @@
     <title>AnimationEditor.Browser (#535 spike)</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
     <style>
         /* Avalonia's .avalonia-native-host div (hosts native text-input elements) sits on top of
            the canvas in DOM/paint order. Without an explicit transparent background it inherits an
@@ -40,17 +42,107 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        #loading .boot-error {
+            max-width: 36rem;
+            padding: 12px 16px;
+            border: 1px solid #c44;
+            border-radius: 6px;
+            background: #2a1515;
+            color: #ffb4b4;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Hidden gesture target: Avalonia File→Load programmatically clicks this so
+           showDirectoryPicker runs under a DOM click handler. Visually off-screen — no
+           separate web-only Open Folder chrome. */
+        #frb-open-folder {
+            position: fixed;
+            left: -10000px;
+            top: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 
 <body style="margin: 0; overflow: hidden">
+<button type="button" id="frb-open-folder" tabindex="-1" aria-hidden="true"></button>
 <div id="out">
     <div id="loading">
         <div class="spinner"></div>
         <div>Loading Animation Editor…</div>
     </div>
 </div>
-<script type='module' src="./main.js"></script>
+<!-- Patch BEFORE Avalonia's storage.js captures showDirectoryPicker into a closed-over
+     `native` const (native-file-system-adapter). Forces mode:readwrite on Avalonia's
+     OpenFolderPickerAsync path so Save can write without a second dialog. -->
+<script>
+(function () {
+    var original = globalThis.showDirectoryPicker;
+    if (typeof original === "function") {
+        function patched(options) {
+            // Diagnostic: proves whether Avalonia's picker call actually reaches this wrapper,
+            // or whether native-file-system-adapter captured its own unpatched reference to
+            // showDirectoryPicker before this script ran (the risk this comment block above
+            // already flags). If this never logs when Open Folder is used, the patch is a no-op
+            // for Avalonia's call path -- see docs/BROWSER_OPEN_FOLDER_SAVE_SESSION_HANDOFF.md.
+            console.log("[OpenFolder] globalThis.showDirectoryPicker patched wrapper called, options:", options);
+            return original.call(globalThis, Object.assign({}, options || {}, { mode: "readwrite" }));
+        }
+        patched.__frbReadWritePatched = true;
+        globalThis.showDirectoryPicker = patched;
+    }
+})();
+</script>
+<!--
+  Boot reliability for local WasmAppHost:
+  .NET fetches stable virtualPath URLs (e.g. AnimationEditor.Core.wasm) with cache:force-cache.
+  After a rebuild those URLs keep old bytes in Chrome's HTTP cache while the boot manifest's
+  SRI hash updates → "SRI's integrity checks failed" / Failed to fetch → endless spinner.
+  Clear Cache API + service workers, then force no-store on _framework fetches before main.js.
+-->
+<script>
+(async function () {
+    try {
+        if ("serviceWorker" in navigator) {
+            var regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }
+        if (window.caches && caches.keys) {
+            var keys = await caches.keys();
+            await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        }
+    } catch (e) {
+        console.warn("[frb-boot] cache/SW cleanup failed", e);
+    }
+
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        var url = typeof input === "string" ? input : (input && input.url);
+        if (url && url.indexOf("/_framework/") !== -1) {
+            init = Object.assign({}, init || {});
+            init.cache = "no-store";
+            // Drop integrity so a stale HTTP-cache entry can't block boot.
+            if ("integrity" in init) delete init.integrity;
+            if (typeof Request !== "undefined" && input instanceof Request) {
+                try {
+                    input = new Request(input, { cache: "no-store", integrity: "" });
+                } catch (_) { /* keep string url path */ }
+            }
+        }
+        return nativeFetch(input, init);
+    };
+
+    var s = document.createElement("script");
+    s.type = "module";
+    s.src = "./main.js?v=" + Date.now();
+    document.body.appendChild(s);
+})();
+</script>
 </body>
 
 </html>

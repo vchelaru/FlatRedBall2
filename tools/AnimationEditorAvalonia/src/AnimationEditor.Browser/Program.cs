@@ -23,7 +23,11 @@ internal sealed class Program
         // HttpClient needs an absolute BaseAddress to resolve relative request URIs; main.js
         // passes the page URL as args[0] (runMain(mainAssemblyName, [location.href])).
         PageUrl = args[0];
-        using var http = new HttpClient { BaseAddress = new Uri(args[0]) };
+        // WasmAppHost may pass location.href with ?arg=... query noise; BaseAddress must be
+        // origin+path only or relative sample fetches can fail and hang startup on the spinner.
+        var pageUri = new Uri(args[0]);
+        var contentBase = new UriBuilder(pageUri) { Query = "", Fragment = "" }.Uri;
+        using var http = new HttpClient { BaseAddress = contentBase };
         var achxTask = http.GetStringAsync("sample/player.achx");
         var pngTask = http.GetByteArrayAsync("sample/player.png");
         // #610: the localStorage JS module must be imported before any BrowserSettingsStore call
@@ -35,6 +39,10 @@ internal sealed class Program
         await Task.WhenAll(achxTask, pngTask, storageInitTask, downloadInitTask);
         SampleContent.AchxText = achxTask.Result;
         SampleContent.PngBytes = pngTask.Result;
+
+        await Task.WhenAll(
+            StoragePermissionInterop.InitializeAsync(),
+            NativeFolderInterop.InitializeAsync());
 
         await BuildAvaloniaApp()
             .WithInterFont()

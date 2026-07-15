@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices.JavaScript;
+using System.Threading.Tasks;
 using AnimationEditor.App.Controls;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core;
@@ -193,6 +196,19 @@ public partial class App : Application
         tabManager.OpenOrFocus(new FilePath("sample/player.achx"), "player.achx");
         appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
 
+        // Per-tab writable file handle for a direct "Save" (vs. "Save As", which always
+        // prompts). This is a browser-only concept (an IEditorFile -- see IEditorFile.cs) --
+        // kept local here rather than added to the portable, Avalonia-free Core TabEntry, which
+        // desktop also uses. Populated after a successful Open Folder load or drag-drop (both
+        // hand back a real writable handle, see BrowserProjectLoader.TryLoadAsync) and after a
+        // successful Save As. Absent for a brand-new/Untitled tab or the bundled sample --
+        // exactly the tabs where "Save" should fall back to Save As's prompt.
+        // Declared here (rather than beside the Save/Save As buttons below) so CloseTab -- a
+        // local function defined earlier in BuildView than the natural place to construct those
+        // buttons -- sees a definitely-assigned variable (same reasoning as textureListPanel's
+        // declaration site, see docs/BROWSER_FILES_PANEL_DECISION.md).
+        var tabFileHandles = new Dictionary<TabEntry, IEditorFile>();
+
         var preview = new PreviewControl();
         preview.InitializeServices(
             selectedState, appState, appCommands, applicationEvents,
@@ -298,6 +314,10 @@ public partial class App : Application
 
         // Hidden command stubs — menu items raise Click on these rather than duplicating handlers.
         var openButton = new Button { Content = "Open Folder…", IsVisible = false };
+        // Save writes straight to the active tab's known location (from Open Folder/drag-drop/a
+        // prior Save As) with no prompt, falling back to Save As's prompt only when no location
+        // is known yet (new/Untitled tab, bundled sample). Save As always prompts.
+        var saveButton = new Button { Content = "Save", IsVisible = false };
         var saveAsButton = new Button { Content = "Save As…", IsVisible = false };
         var reloadButton = new Button { Content = "Reload Changed Textures", IsVisible = false };
 
@@ -560,6 +580,7 @@ public partial class App : Application
         void CloseTab(TabEntry tab)
         {
             tabManager.Close(tab.Path);
+            tabFileHandles.Remove(tab);
             var next = tabManager.ActiveTab;
             if (next != null)
             {
@@ -700,7 +721,7 @@ public partial class App : Application
         // applied only when the user clicks Reload -- matching "see a diff, prompt to refresh"
         // rather than silently swapping textures out from under the user mid-edit.
         BrowserFolderWatcher? folderWatcher = null;
-        IStorageFolder? watchedFolder = null;
+        IEditorFolder? watchedFolder = null;
         var pendingChangedPngs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         MenuItem? menuReloadTextures = null;
 
@@ -1458,7 +1479,7 @@ public partial class App : Application
         var menuLoad = new MenuItem { Header = "_Load Folder…" };
         menuLoad.Click += (_, _) => openButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuSave = new MenuItem { Header = "_Save" };
-        menuSave.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        menuSave.Click += (_, _) => saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuSaveAs = new MenuItem { Header = "Save _As…" };
         menuSaveAs.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuExport = new MenuItem { Header = "_Export to PixiJS" };
@@ -1566,7 +1587,7 @@ public partial class App : Application
                     if (e.Key == Key.S)
                     {
                         e.Handled = true;
-                        saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }
                     else if (e.Key == Key.Z)
                     {
@@ -1590,51 +1611,71 @@ public partial class App : Application
         });
         root.AddHandler(DragDrop.DropEvent, async (_, e) =>
         {
-            var files = e.DataTransfer.TryGetFiles()?.OfType<IStorageFile>().ToList();
-            if (files is null || files.Count == 0) return;
+            var rawFiles = e.DataTransfer.TryGetFiles()?.OfType<IStorageFile>().ToList();
+            if (rawFiles is null || rawFiles.Count == 0) return;
 
-            bool loaded = await BrowserProjectLoader.TryLoadAsync(
+            var files = rawFiles.Select(f => (IEditorFile)new AvaloniaFileAdapter(f)).ToList();
+            var achxFile = await BrowserProjectLoader.TryLoadAsync(
                 files, projectManager, thumbnailService, selectedState);
-            status.Text = loaded
-                ? $"Loaded from {files.Count} dropped file(s)."
-                : "Drop must include an .achx file (drop its texture PNG(s) alongside it).";
 
-            if (loaded)
+            if (achxFile is not null)
             {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
                 OpenNewTabForLoadedProject(projectManager.FileName ?? "Untitled");
+                // Same readwrite upgrade as Open Folder used to attempt, requested here (right
+                // after the drop gesture) rather than at Save time -- see StoragePermissionInterop.
+                // Unlike Open Folder (NativeFolderInterop bypasses this entirely now), drag-drop
+                // has no equivalent "ask for readwrite mode as part of the picker" option to
+                // switch to, so this remains best-effort with a Save As fallback on denial.
+                var achxRawFile = rawFiles.First(f => f.Name == achxFile.Name);
+                var (canWrite, dropPermissionDiagnostic) = await StoragePermissionInterop.EnsureReadWriteAsync(achxRawFile);
+                if (canWrite) tabFileHandles[tabManager.ActiveTab!] = achxFile;
+                status.Text = $"Loaded from {rawFiles.Count} dropped file(s). [write-permission: {dropPermissionDiagnostic}]";
+            }
+            else
+            {
+                status.Text = "Drop must include an .achx file (drop its texture PNG(s) alongside it).";
             }
         });
 
-        openButton.Click += async (_, _) =>
+        // Diagnostic-only: not a decision point, just a console breadcrumb so a live repro shows
+        // exactly which await in the Open Folder chain never returns (session handoff's "freeze
+        // after clicking Upload" is otherwise unreproducible by the agent -- see docs/
+        // BROWSER_OPEN_FOLDER_SAVE_SESSION_HANDOFF.md "Suggested next steps" #1). Console.WriteLine
+        // (not Debug.WriteLine) because browser-wasm reliably pipes stdout to the DevTools console
+        // with no listener setup required; Debug.WriteLine does not.
+        var openFolderStopwatch = new Stopwatch();
+        void LogOpenFolderStep(string step) =>
+            Console.WriteLine($"[OpenFolder] {openFolderStopwatch.ElapsedMilliseconds}ms: {step}");
+
+        // File → Load Folder uses Avalonia's picker (only path that opens from WASM menus).
+        // Write grant is requested immediately after pick via EnsureReadWriteAsync.
+        async Task LoadFromNativeDirectoryAsync(JSObject nativeDir, string writeState)
         {
-            var topLevel = TopLevel.GetTopLevel(openButton);
-            if (topLevel is null) return;
-
-            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Open Animation Folder",
-                AllowMultiple = false,
-            });
-            var folder = folders.FirstOrDefault();
-            if (folder is null) return;
-
-            var files = new System.Collections.Generic.List<IStorageFile>();
+            LogOpenFolderStep($"LoadFromNativeDirectoryAsync start (writeState={writeState})");
+            var folder = new NativeReadWriteFolder(nativeDir);
+            var files = new List<IEditorFile>();
             await foreach (var item in folder.GetItemsAsync())
-                if (item is IStorageFile f) files.Add(f);
+                files.Add(item);
+            LogOpenFolderStep($"folder.GetItemsAsync() done ({files.Count} file(s))");
 
-            bool loaded = await BrowserProjectLoader.TryLoadAsync(
+            var achxFile = await BrowserProjectLoader.TryLoadAsync(
                 files, projectManager, thumbnailService, selectedState);
-            status.Text = loaded
-                ? $"Loaded from folder \"{folder.Name}\"."
-                : $"No .achx found in \"{folder.Name}\".";
+            LogOpenFolderStep($"BrowserProjectLoader.TryLoadAsync done (achxFile={achxFile?.Name ?? "null"})");
 
-            if (loaded)
+            var writeSuffix = " " + WritePermissionGate.FormatStatusSuffix(writeState);
+
+            status.Text = achxFile is not null
+                ? $"Loaded from folder \"{folder.Name}\".{writeSuffix}"
+                : $"No .achx found in \"{folder.Name}\".{writeSuffix}";
+
+            if (achxFile is not null)
             {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
-            textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
+                textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
                 OpenNewTabForLoadedProject(projectManager.FileName ?? folder.Name);
+                tabFileHandles[tabManager.ActiveTab!] = new NativeReadWriteFile(nativeDir, achxFile.Name);
             }
 
             folderWatcher?.Dispose();
@@ -1648,6 +1689,157 @@ public partial class App : Application
                 UpdateReloadButton();
             };
             await folderWatcher.StartAsync();
+            LogOpenFolderStep("folderWatcher.StartAsync() done -- LoadFromNativeDirectoryAsync complete");
+        }
+
+        // Avalonia OpenFolderPickerAsync is required for File→Load Folder — WASM menu clicks are
+        // not a browser user activation, so direct showDirectoryPicker JSImport never opens a dialog.
+        // Request write immediately after pick (same handler) while activation may still be valid.
+        openButton.Click += async (_, _) =>
+        {
+            openFolderStopwatch.Restart();
+            LogOpenFolderStep("openButton.Click -- calling OpenFolderPickerAsync");
+
+            var topLevel = TopLevel.GetTopLevel(openButton);
+            if (topLevel is null) return;
+
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Open Animation Folder",
+                AllowMultiple = false,
+            });
+            // Timing from here on is diagnostic, not user think-time -- the dialog has already
+            // closed once OpenFolderPickerAsync returns, so nothing past this point should
+            // legitimately wait on further user input.
+            LogOpenFolderStep($"OpenFolderPickerAsync returned ({folders.Count} folder(s))");
+            var rawFolder = folders.FirstOrDefault();
+            if (rawFolder is null) return;
+
+            var nativeDir = StoragePermissionInterop.TryGetNativeFileSystemHandle(rawFolder);
+            LogOpenFolderStep($"TryGetNativeFileSystemHandle done (nativeDir={(nativeDir is null ? "null" : "ok")})");
+            if (nativeDir is null)
+            {
+                status.Text = "Open Folder failed: no native directory handle (use a Chromium-based browser).";
+                return;
+            }
+
+            // Pick-time write grant — must run before long async load work, not at Save.
+            LogOpenFolderStep("calling NativeFolderInterop.EnsureReadWriteAsync");
+            var writeState = await NativeFolderInterop.EnsureReadWriteAsync(nativeDir);
+            LogOpenFolderStep($"EnsureReadWriteAsync returned (writeState={writeState})");
+
+            // Directory reads (enumeration, file access) can fail for reasons outside this app's
+            // control -- confirmed live: a valid, correctly-permissioned handle can still throw
+            // NotFoundError from dirHandle.entries() while getFileHandle() on the same handle
+            // succeeds (likely security-software interference with directory listing specifically;
+            // see docs/BROWSER_OPEN_FOLDER_SAVE_SESSION_HANDOFF.md). WASM is single-threaded, so an
+            // unhandled JSException here would abort the whole runtime, not just this operation --
+            // must catch and degrade gracefully instead.
+            try
+            {
+                await LoadFromNativeDirectoryAsync(nativeDir, writeState);
+            }
+            catch (JSException ex)
+            {
+                LogOpenFolderStep($"LoadFromNativeDirectoryAsync failed: {ex.Message}");
+                var message = OpenFolderLoadFailure.FormatMessage(
+                    NativeFolderInterop.DirectoryName(nativeDir), ex.Message);
+                status.Text = message;
+                notifications.ShowErrorBanner(message);
+            }
+        };
+
+        // Prompts for a new save location (the OS-level save dialog) and writes there --
+        // shared by Save As (always) and Save's first-time fallback (no known location yet).
+        async Task<IEditorFile?> PromptAndWriteAsync(Control anchor, AnimationChainListSave acls)
+        {
+            var topLevel = TopLevel.GetTopLevel(anchor);
+            if (topLevel is null) return null;
+
+            var rawFile = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save Animation Chain As",
+                SuggestedFileName = "player.achx",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("Animation Chain") { Patterns = new[] { "*.achx" } },
+                },
+            });
+            if (rawFile is null) return null;
+
+            await using var stream = await rawFile.OpenWriteAsync();
+            await projectManager.SaveAnimationChainListAsync(stream);
+            return new AvaloniaFileAdapter(rawFile);
+        }
+
+        // Pick-time write grant only — do not requestPermission here (WASM Save menu loses activation).
+        async Task<(bool Ok, string Diagnostic)> TryWriteToKnownFileAsync(IEditorFile knownFile, AnimationChainListSave acls)
+        {
+            if (knownFile is NativeReadWriteFile native)
+            {
+                var queryState = await NativeFolderInterop.QueryWritePermissionAsync(native.DirectoryHandle);
+                var (canSave, failure) = WritePermissionGate.EvaluateSaveFromQueryState(queryState);
+                if (!canSave)
+                    return (false, failure!);
+            }
+
+            var writeTask = WriteCoreAsync();
+            var winner = await Task.WhenAny(writeTask, Task.Delay(TimeSpan.FromSeconds(6)));
+            if (winner != writeTask)
+                return (false, "timed out after 6s (likely a stuck permission check)");
+            if (writeTask.IsFaulted)
+                return (false, writeTask.Exception?.GetBaseException().Message ?? "write faulted");
+            return (true, "ok");
+
+            async Task WriteCoreAsync()
+            {
+                await using var stream = await knownFile.OpenWriteAsync();
+                await projectManager.SaveAnimationChainListAsync(stream);
+            }
+        }
+
+        saveButton.Click += async (_, _) =>
+        {
+            var acls = projectManager.AnimationChainListSave;
+            if (acls is null)
+            {
+                notifications.ShowErrorBanner("Nothing to save.");
+                return;
+            }
+
+            var activeTab = tabManager.ActiveTab;
+            if (activeTab is not null && tabFileHandles.TryGetValue(activeTab, out var knownFile))
+            {
+                var (ok, diagnostic) = await TryWriteToKnownFileAsync(knownFile, acls);
+                if (ok)
+                {
+                    status.Text = $"Saved to {knownFile.Name}.";
+                    notifications.ShowToast($"Saved to {knownFile.Name}.");
+                }
+                else
+                {
+                    // Forget the handle rather than retrying it -- a subsequent Save falls
+                    // through to Save As's prompt below instead of hanging again. Deliberately
+                    // don't auto-open Save As here: if the real cause is a still-pending
+                    // permission prompt, popping a second dialog on top of it would only add to
+                    // the confusion.
+                    tabFileHandles.Remove(activeTab);
+                    status.Text = $"Save failed: {diagnostic}";
+                    notifications.ShowErrorBanner(
+                        $"Couldn't save to {knownFile.Name} directly ({diagnostic}). Use Save As.");
+                }
+                return;
+            }
+
+            // No known location yet (new/Untitled tab, or the bundled sample) -- fall back to
+            // Save As's prompt, same as a first-time save on desktop, and remember the picked
+            // file so the next plain Save writes straight there.
+            var savedFile = await PromptAndWriteAsync(saveButton, acls);
+            if (savedFile is null) return;
+
+            if (activeTab is not null) tabFileHandles[activeTab] = savedFile;
+            status.Text = $"Saved to {savedFile.Name}.";
+            notifications.ShowToast($"Saved to {savedFile.Name}.");
         };
 
         saveAsButton.Click += async (_, _) =>
@@ -1659,29 +1851,40 @@ public partial class App : Application
                 return;
             }
 
-            var topLevel = TopLevel.GetTopLevel(saveAsButton);
-            if (topLevel is null) return;
+            var savedFile = await PromptAndWriteAsync(saveAsButton, acls);
+            if (savedFile is null) return;
 
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            // Save As redirects the active tab's save target -- the next plain Save writes to
+            // this new location too, not back to wherever the tab was originally opened from.
+            var activeTab = tabManager.ActiveTab;
+            if (activeTab is not null) tabFileHandles[activeTab] = savedFile;
+            status.Text = $"Saved to {savedFile.Name}.";
+            notifications.ShowToast($"Saved to {savedFile.Name}.");
+        };
+
+        // Bug: these command-stub buttons (Open Folder, Save As, Reload Textures, ...) were
+        // never added to any panel -- IsVisible=false hides them from view, but an unattached
+        // Control also has no visual-tree Parent chain, so TopLevel.GetTopLevel(openButton)
+        // (used by openButton's and saveAsButton's own Click handlers to reach
+        // TopLevel.StorageProvider) always returned null and those handlers silently no-opped.
+        // That's the "Load Folder does nothing" bug: the click never even reached the native
+        // folder-picker call. Parenting them here (still IsVisible=false, so still invisible
+        // and out of layout) gives GetTopLevel a real chain to walk once `shell` is attached.
+        var hiddenCommandButtons = new StackPanel
+        {
+            IsVisible = false,
+            Children =
             {
-                Title = "Save Animation Chain As",
-                SuggestedFileName = "player.achx",
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("Animation Chain") { Patterns = new[] { "*.achx" } },
-                },
-            });
-            if (file is null) return;
-
-            await using var stream = await file.OpenWriteAsync();
-            await projectManager.SaveAnimationChainListAsync(stream);
-            status.Text = $"Saved to {file.Name}.";
-            notifications.ShowToast($"Saved to {file.Name}.");
+                openButton, saveButton, saveAsButton, reloadButton,
+                addFrameButton, addRectButton, addCircleButton, deleteSelectedButton,
+                exportPixiJsButton, diagnosticsButton,
+            },
         };
 
         var shell = new Grid();
         shell.Children.Add(root);
         shell.Children.Add(notifications);
+        shell.Children.Add(hiddenCommandButtons);
 
         return shell;
     }

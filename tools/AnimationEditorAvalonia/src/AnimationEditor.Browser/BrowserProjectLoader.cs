@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core;
-using Avalonia.Platform.Storage;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -13,7 +12,7 @@ using FilePath = AnimationEditor.Core.Paths.FilePath;
 namespace AnimationEditor.Browser;
 
 /// <summary>
-/// #535 M3: loads a project from a set of already-picked <see cref="IStorageFile"/>s (from a
+/// #535 M3: loads a project from a set of already-picked <see cref="IEditorFile"/>s (from a
 /// folder picker or a multi-file drag-drop) instead of a filesystem path. The browser has no
 /// local filesystem, so texture resolution can't rely on "same folder as the .achx" the way
 /// desktop's <see cref="AnimationEditor.Core.ProjectManager"/> does -- the caller must supply
@@ -25,17 +24,21 @@ internal static class BrowserProjectLoader
     /// Finds the one .achx among <paramref name="files"/>, parses it, seeds every other file
     /// whose name matches a frame's <c>TextureName</c> into <paramref name="thumbnailService"/>,
     /// loads it into <paramref name="projectManager"/>, and selects the first chain (which
-    /// auto-plays). Returns <c>false</c> (no-op) if <paramref name="files"/> contains no .achx.
+    /// auto-plays). Returns <c>null</c> (no-op) if <paramref name="files"/> contains no .achx;
+    /// otherwise returns the matched .achx file's own handle so the caller can remember it as
+    /// the tab's writable save location (a real folder-picker or drag-dropped file handle
+    /// supports <c>OpenWriteAsync</c> directly, letting a later plain "Save" write back to it
+    /// without prompting again the way "Save As" always does).
     /// </summary>
-    public static async Task<bool> TryLoadAsync(
-        IReadOnlyList<IStorageFile> files,
+    public static async Task<IEditorFile?> TryLoadAsync(
+        IReadOnlyList<IEditorFile> files,
         ProjectManager projectManager,
         ThumbnailService thumbnailService,
         ISelectedState selectedState)
     {
         var achxFile = files.FirstOrDefault(
             f => f.Name.EndsWith(".achx", StringComparison.OrdinalIgnoreCase));
-        if (achxFile is null) return false;
+        if (achxFile is null) return null;
 
         string achxText;
         await using (var achxStream = await achxFile.OpenReadAsync())
@@ -74,6 +77,6 @@ internal static class BrowserProjectLoader
         if (acls.AnimationChains.Count > 0)
             selectedState.SelectedChain = acls.AnimationChains[0];
 
-        return true;
+        return achxFile;
     }
 }
