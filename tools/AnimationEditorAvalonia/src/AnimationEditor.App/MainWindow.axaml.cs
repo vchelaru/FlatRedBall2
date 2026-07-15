@@ -3396,7 +3396,14 @@ public partial class MainWindow : Window
         if (sel is not null)
             TreeBuilder.ExpandAncestorsOf(_treeRoots, sel);
 
-        if (target is not null && !(AnimTree.SelectedItems?.Contains(target) ?? false))
+        // Exact-match check (not just Contains): a stale multi-selection can already contain
+        // target alongside other nodes, in which case Contains(target) alone would wrongly
+        // treat the tree as already synced and leave the other nodes selected (#727).
+        bool alreadySynced = target is not null
+            && AnimTree.SelectedItems?.Count == 1
+            && ReferenceEquals(AnimTree.SelectedItems[0], target);
+
+        if (target is not null && !alreadySynced)
         {
             // This is a one-way push of model selection into the tree. Suppress OnTreeSelectionChanged
             // so the assignment doesn't loop back through SelectedNodes/RouteNodeSelection and re-fire
@@ -3407,7 +3414,13 @@ public partial class MainWindow : Window
             _suppressTreeSelectionHandling = true;
             try
             {
-                WithPreservedAnimTreeScroll(() => AnimTree.SelectedItem = target);
+                // Clear + Add (rather than just SelectedItem = target) so any other stale
+                // selected nodes are actually dropped, mirroring SyncTreeMultiSelection.
+                WithPreservedAnimTreeScroll(() =>
+                {
+                    AnimTree.SelectedItems!.Clear();
+                    AnimTree.SelectedItems.Add(target);
+                });
             }
             finally { _suppressTreeSelectionHandling = prior; }
         }

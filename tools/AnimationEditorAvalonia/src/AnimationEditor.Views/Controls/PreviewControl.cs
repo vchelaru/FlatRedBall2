@@ -1732,6 +1732,7 @@ public class PreviewControl : Control, IZoomTarget
             float sy = cy - c.Y * om;
             if (PreviewShapeHitTester.HitsCircle(px, py, sx, sy, c.Radius * om, tolerance))
             {
+                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
                 _selectedState!.SelectedCircle = c;
                 return true;
             }
@@ -1745,6 +1746,7 @@ public class PreviewControl : Control, IZoomTarget
             float sy = cy - r.Y * om;
             if (PreviewShapeHitTester.HitsRect(px, py, sx, sy, r.ScaleX * om, r.ScaleY * om, tolerance))
             {
+                _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
                 _selectedState!.SelectedRectangle = r;
                 return true;
             }
