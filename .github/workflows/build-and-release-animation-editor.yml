@@ -108,12 +108,22 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: chmod +x dist/publish/AnimationEditor
 
-      - name: Package (zip)
-        if: matrix.archive == 'zip'
+      - name: Package (zip, Windows)
+        if: matrix.archive == 'zip' && matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/out | Out-Null
           Compress-Archive -Path "dist/publish/*" -DestinationPath "dist/out/${{ matrix.asset }}"
+
+      # PowerShell's Compress-Archive doesn't store Unix permission bits in the zip's
+      # external attributes, so the chmod +x above gets silently dropped and the
+      # extracted binary loses its executable bit. Native `zip` preserves it.
+      - name: Package (zip, Unix)
+        if: matrix.archive == 'zip' && matrix.os != 'windows-latest'
+        run: |
+          mkdir -p dist/out
+          cd dist/publish
+          zip -r "../out/${{ matrix.asset }}" .
 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
