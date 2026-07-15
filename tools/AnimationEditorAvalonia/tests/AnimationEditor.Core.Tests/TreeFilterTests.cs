@@ -26,6 +26,17 @@ public class TreeFilterTests
     private static List<string> VisibleNames(IEnumerable<TreeNodeVm> roots) =>
         roots.Where(n => n.PinnedVisible).Select(n => n.Header).ToList();
 
+    // Builds a chain node with one frame holding one AARectSave shape child, matching the
+    // shape produced by TreeBuilder.BuildChainNode (chain -> frame -> shape), for shape-search tests.
+    private static TreeNodeVm ChainWithShapeNode(string chainName, string shapeName)
+    {
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave.Shapes.Add(new AARectSave { Name = shapeName });
+        var chain = new AnimationChainSave { Name = chainName };
+        chain.Frames.Add(frame);
+        return TreeBuilder.BuildChainNode(chain);
+    }
+
     // ── Query-change path (can shrink) — ApplyQueryFilter ─────────────────────
 
     [Fact]
@@ -42,6 +53,22 @@ public class TreeFilterTests
         var roots = ChainNodes(Names);
         TreeBuilder.ApplyQueryFilter(roots, "");
         Assert.Equal(Names, VisibleNames(roots));
+    }
+
+    // Guards against a naive "match everything on blank query" shape search forcing every
+    // chain/frame open the moment the search box is cleared.
+    [Fact]
+    public void ApplyQueryFilter_EmptyQuery_DoesNotExpandCollapsedNodes()
+    {
+        var chainNode = ChainWithShapeNode("Idle", "HitBox");
+        chainNode.IsExpanded = false;
+        chainNode.Children[0].IsExpanded = false; // frame node
+        var roots = new List<TreeNodeVm> { chainNode };
+
+        TreeBuilder.ApplyQueryFilter(roots, "");
+
+        Assert.False(chainNode.IsExpanded);
+        Assert.False(chainNode.Children[0].IsExpanded);
     }
 
     [Fact]
@@ -71,6 +98,35 @@ public class TreeFilterTests
         TreeBuilder.ApplyQueryFilter(roots, "walk"); // frame header doesn't match
 
         Assert.True(frameNode.PinnedVisible); // untouched, stays visible
+    }
+
+    // Shape names (#726): a query matching a shape inside a frame reveals the owning chain
+    // even when the chain's own name doesn't match.
+    [Fact]
+    public void ApplyQueryFilter_ShapeNameMatch_ChainBecomesVisible()
+    {
+        var chainNode = ChainWithShapeNode("Idle", "HitBox");
+        var roots = new List<TreeNodeVm> { chainNode };
+
+        TreeBuilder.ApplyQueryFilter(roots, "hit");
+
+        Assert.True(chainNode.PinnedVisible);
+    }
+
+    // A shape-level match must also expand its owning chain/frame — otherwise the matched
+    // row stays hidden behind a collapsed chain/frame even though PinnedVisible is true.
+    [Fact]
+    public void ApplyQueryFilter_ShapeNameMatch_ExpandsOwningChainAndFrame()
+    {
+        var chainNode = ChainWithShapeNode("Idle", "HitBox");
+        chainNode.IsExpanded = false;
+        chainNode.Children[0].IsExpanded = false; // frame node
+        var roots = new List<TreeNodeVm> { chainNode };
+
+        TreeBuilder.ApplyQueryFilter(roots, "hit");
+
+        Assert.True(chainNode.IsExpanded);
+        Assert.True(chainNode.Children[0].IsExpanded);
     }
 
     [Fact]
