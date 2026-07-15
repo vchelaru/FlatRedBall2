@@ -4373,19 +4373,30 @@ public partial class MainWindow : Window
 
             if (rect is not null)
             {
-                PropRectName.Text    = rect.Name   ?? "";
-                PropRectX.Value      = (decimal)rect.X;
-                PropRectY.Value      = (decimal)rect.Y;
-                PropRectScaleX.Value = (decimal)rect.ScaleX;
-                PropRectScaleY.Value = (decimal)rect.ScaleY;
+                // Multi-selected rects can disagree on a property, same as multi-selected frames
+                // (#571) — show that field blank with a "(mixed)" placeholder instead of one rect's
+                // value; editing it then applies the new value to every selected rect. Name has no
+                // legitimate "mixed" display since it isn't numeric, so it's just disabled instead
+                // (see ApplyRectProps for why a shared literal name isn't applied across a batch).
+                var rects = _selectedState.SelectedRectangles;
+                bool rectsMulti = rects.Count > 1;
+                PropRectName.IsEnabled = !rectsMulti;
+                PropRectName.Text = rectsMulti ? "(multiple)" : (rect.Name ?? "");
+                SetValueOrMixed(PropRectX, rects.Select(r => (decimal)r.X).ToList());
+                SetValueOrMixed(PropRectY, rects.Select(r => (decimal)r.Y).ToList());
+                SetValueOrMixed(PropRectScaleX, rects.Select(r => (decimal)r.ScaleX).ToList());
+                SetValueOrMixed(PropRectScaleY, rects.Select(r => (decimal)r.ScaleY).ToList());
             }
 
             if (circ is not null)
             {
-                PropCircleName.Text    = circ.Name   ?? "";
-                PropCircleX.Value      = (decimal)circ.X;
-                PropCircleY.Value      = (decimal)circ.Y;
-                PropCircleRadius.Value = (decimal)circ.Radius;
+                var circles = _selectedState.SelectedCircles;
+                bool circlesMulti = circles.Count > 1;
+                PropCircleName.IsEnabled = !circlesMulti;
+                PropCircleName.Text = circlesMulti ? "(multiple)" : (circ.Name ?? "");
+                SetValueOrMixed(PropCircleX, circles.Select(c => (decimal)c.X).ToList());
+                SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
+                SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
             }
         }
         finally
@@ -4496,27 +4507,35 @@ public partial class MainWindow : Window
     private void ApplyRectProps()
     {
         if (_suppressPropRefresh) return;
-        var rect = _selectedState.SelectedRectangle;
-        if (rect is null || !PropRectX.Value.HasValue || !PropRectY.Value.HasValue ||
-            !PropRectScaleX.Value.HasValue || !PropRectScaleY.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetRectProps(frame, rect,
-            PropRectName.Text ?? "",
-            (float)PropRectX.Value.Value, (float)PropRectY.Value.Value,
-            (float)PropRectScaleX.Value.Value, (float)PropRectScaleY.Value.Value);
+        var rects = _selectedState.SelectedRectangles;
+        if (rects.Count == 0) return;
+
+        // A null component here means "still showing (mixed), not edited" — leave that axis alone
+        // per-rect. Name is only applied for a single selected rect: propagating one literal name
+        // to every rect in a multi-selection would clobber their distinct names (PropRectName is
+        // disabled in RefreshPropertyPanel whenever more than one rect is selected).
+        float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
+        float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
+        float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
+        float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
+        string? name = rects.Count == 1 ? (PropRectName.Text ?? "") : null;
+
+        _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
     }
 
     private void ApplyCircleProps()
     {
         if (_suppressPropRefresh) return;
-        var circ = _selectedState.SelectedCircle;
-        if (circ is null || !PropCircleX.Value.HasValue || !PropCircleY.Value.HasValue ||
-            !PropCircleRadius.Value.HasValue) return;
-        var frame = _selectedState.SelectedFrame;
-        _appCommands.SetCircleProps(frame, circ,
-            PropCircleName.Text ?? "",
-            (float)PropCircleX.Value.Value, (float)PropCircleY.Value.Value,
-            (float)PropCircleRadius.Value.Value);
+        var circles = _selectedState.SelectedCircles;
+        if (circles.Count == 0) return;
+
+        // See ApplyRectProps for the null-means-"don't touch" / single-selection-only-name semantics.
+        float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
+        float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
+        float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
+        string? name = circles.Count == 1 ? (PropCircleName.Text ?? "") : null;
+
+        _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
     }
 
     // ── Playback controls wiring ──────────────────────────────────────────────
