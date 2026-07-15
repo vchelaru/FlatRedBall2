@@ -154,6 +154,57 @@ public class PreviewCircleSelectionTests
         Assert.Same(rect, ctx.SelectedState.SelectedRectangle);
     }
 
+    // ── Clearing stale tree multi-selection (#727) ──────────────────────────
+
+    [AvaloniaFact]
+    public void SimulateCanvasClick_ClearsSelectedNodes_WhenCircleHit()
+    {
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
+
+        var frame = MakeFrameWithCircle(0f, 0f, radius: 8f, out _);
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.SelectedState.SelectedNodes = new List<object> { new object(), new object() };
+
+        ctrl.SimulateCanvasClick(CX, CY);
+
+        Assert.Empty(ctx.SelectedState.SelectedNodes);
+    }
+
+    [AvaloniaFact]
+    public void SimulateCanvasClick_ClearsSelectedNodes_WhenRectHit()
+    {
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
+
+        var rect = new AARectSave { X = 0f, Y = 0f, ScaleX = 15f, ScaleY = 10f };
+        var frame = new AnimationFrameSave { ShapesSave = new ShapesSave() };
+        frame.ShapesSave.Shapes.Add(rect);
+        ctx.SelectedState.SelectedFrame = frame;
+        ctx.SelectedState.SelectedNodes = new List<object> { new object(), new object() };
+
+        ctrl.SimulateCanvasClick(CX, CY);
+
+        Assert.Empty(ctx.SelectedState.SelectedNodes);
+    }
+
+    [AvaloniaFact]
+    public void SimulateCanvasClick_DoesNotClearSelectedNodes_WhenClickFarAway()
+    {
+        var ctx = ResetSingletons();
+        var ctrl = MakeControl(ctx);
+
+        var frame = MakeFrameWithCircle(0f, 0f, radius: 8f, out _);
+        ctx.SelectedState.SelectedFrame = frame;
+        var staleNode = new object();
+        ctx.SelectedState.SelectedNodes = new List<object> { staleNode };
+
+        // Click 100px away from the circle center — no shape is hit.
+        ctrl.SimulateCanvasClick(CX + 100f, CY + 100f);
+
+        Assert.Same(staleNode, Assert.Single(ctx.SelectedState.SelectedNodes));
+    }
+
     // ── Priority: circle over rect ───────────────────────────────────────────
 
     [AvaloniaFact]
