@@ -4,8 +4,10 @@ using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FlatRedBall2.Animation.Content;
 using System;
@@ -277,6 +279,44 @@ public class AnimationTreeControlTests
         control.CommitRename(walkNode, "Walk");
 
         Assert.Equal("Walk", acls.AnimationChains[0].Name);
+    }
+
+    // Desktop's MainWindow tree shows each chain's frame count + total playtime and each
+    // frame's own length beside the header (TreeBuilder.BuildChainMeta / TreeNodeVm.Meta,
+    // #623) -- but AnimationTreeControl's item template only ever bound Header, so the
+    // browser's tree never surfaced that data even though TreeBuilder already computed it.
+    // Realizes the tree in a real Window (mirrors AnimationEditor.App.Tests'
+    // TreeNodeIconSizeTests pattern) so this catches a template binding gap that a
+    // VM-property-only assertion (Meta already correct, per Core's TreeBuilderTests) would not.
+    [AvaloniaFact]
+    public void TreeItemTemplate_ShowsMetaText_ForChainAndFrameNodes()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.5f });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.5f });
+        acls.AnimationChains.Add(chain);
+
+        var pm = new FakeProjectManager { AnimationChainListSave = acls };
+        var selectedState = new SelectedState(pm);
+        var control = new AnimationTreeControl();
+        control.InitializeServices(selectedState, acls);
+
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        try
+        {
+            window.Show();
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var texts = control.TreeView.GetVisualDescendants().OfType<TextBlock>()
+                .Select(tb => tb.Text).ToList();
+
+            Assert.Contains("2 fr · 1.00s", texts); // chain node: frame count + total playtime
+            Assert.Contains("0.50s", texts);        // frame node: this frame's own length
+        }
+        finally { window.Close(); }
     }
 
     [AvaloniaFact]

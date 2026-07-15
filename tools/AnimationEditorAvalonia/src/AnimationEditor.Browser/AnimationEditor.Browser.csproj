@@ -24,6 +24,12 @@
       docs/BROWSER_ICON_SYSTEM_DECISION.md.
     -->
     <NoWarn>$(NoWarn);IL2026</NoWarn>
+    <!-- Hot reload swaps wasm fingerprints while the browser keeps a stale boot manifest,
+         producing 404/SRI failures on _framework/*.wasm. Disable for stable local dev. -->
+    <WasmEnableHotReload>false</WasmEnableHotReload>
+    <!-- Boot assets use stable virtualPath URLs with force-cache; after rebuilds Chrome keeps
+         stale bytes and SRI fails. Disable cache-boot-resources so Debug fetches stay fresh. -->
+    <BlazorCacheBootResources>false</BlazorCacheBootResources>
   </PropertyGroup>
 
   <ItemGroup>

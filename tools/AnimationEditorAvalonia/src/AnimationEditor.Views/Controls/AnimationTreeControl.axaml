@@ -22,18 +22,30 @@
         <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="models:TreeNodeVm" ItemsSource="{Binding Children}">
                 <Grid HorizontalAlignment="Stretch">
-                    <Panel>
-                        <TextBlock Text="{Binding Header}"
-                                   Padding="4,2"
-                                   Margin="0,0,28,0"
-                                   IsVisible="{Binding !IsEditing}"
-                                   DoubleTapped="OnHeaderDoubleTapped" />
-                        <TextBox Text="{Binding EditingText, Mode=TwoWay}"
-                                 IsVisible="{Binding IsEditing}"
-                                 Padding="2,1"
-                                 KeyDown="OnRenameKeyDown"
-                                 LostFocus="OnRenameLostFocus" />
-                    </Panel>
+                    <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                        <Panel Grid.Column="0">
+                            <TextBlock Text="{Binding Header}"
+                                       Padding="4,2"
+                                       Margin="0,0,4,0"
+                                       IsVisible="{Binding !IsEditing}"
+                                       DoubleTapped="OnHeaderDoubleTapped" />
+                            <TextBox Text="{Binding EditingText, Mode=TwoWay}"
+                                     IsVisible="{Binding IsEditing}"
+                                     Padding="2,1"
+                                     KeyDown="OnRenameKeyDown"
+                                     LostFocus="OnRenameLostFocus" />
+                        </Panel>
+                        <!-- Frame count + total playtime (chain nodes) or frame length (frame
+                             nodes), matching desktop's MainWindow tree (#623). Margin reserves
+                             the Add-Frame button's lane so it never overlaps this text. -->
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Meta}"
+                                   Foreground="{DynamicResource AccentCool}"
+                                   FontSize="11"
+                                   Margin="8,0,30,0"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </Grid>
                     <Button Classes="add-frame-btn plus"
                             IsVisible="{Binding IsChainNode}"
                             HorizontalAlignment="Right"
