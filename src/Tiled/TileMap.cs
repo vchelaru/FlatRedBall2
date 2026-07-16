@@ -322,6 +322,109 @@ public class TileMap
         _layersByName.TryGetValue(name, out layer!);
 
     /// <summary>
+    /// Returns a snapshot of every object on the object layer named <paramref name="layerName"/>
+    /// (case-insensitive) — position, size, class, tile global ID, and properties — for reading
+    /// Tiled object data directly instead of going through <see cref="CreateEntities{T}"/>
+    /// (spawns entities) or <see cref="GenerateCollisionFromClass"/> (builds collision).
+    /// </summary>
+    /// <remarks>
+    /// Only rectangle objects, tile-insert objects, and other simple (unsized) object types are
+    /// included. Polygon objects are skipped — their shape can't be represented as a single
+    /// axis-aligned rect; use <see cref="GenerateCollisionFromClass"/> or
+    /// <see cref="GenerateCollisionFromProperty"/> for polygon collision. Object rotation is
+    /// ignored — <see cref="ObjectLayerEntry"/> always describes the object's unrotated placement.
+    /// </remarks>
+    /// <param name="layerName">The object layer's name (case-insensitive).</param>
+    /// <returns>
+    /// One entry per supported object, in the layer's authoring order. Empty if the layer
+    /// doesn't exist or has no supported objects.
+    /// </returns>
+    public IReadOnlyList<ObjectLayerEntry> GetObjectLayerData(string layerName)
+    {
+        var entries = new List<ObjectLayerEntry>();
+        if (_tilemap == null)
+            return entries;
+
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is not TilemapObjectLayer objectLayer ||
+                !string.Equals(objectLayer.Name, layerName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            foreach (var obj in objectLayer.Objects)
+            {
+                switch (obj)
+                {
+                    case TilemapPolygonObject:
+                        continue;
+                    case TilemapTileObject tileObj:
+                        entries.Add(BuildTileObjectEntry(tileObj));
+                        break;
+                    case TilemapRectangleObject rectObj:
+                        entries.Add(BuildRectangleObjectEntry(rectObj));
+                        break;
+                    default:
+                        entries.Add(BuildPlainObjectEntry(obj));
+                        break;
+                }
+            }
+            break; // layer names are unique in Tiled
+        }
+
+        return entries;
+    }
+
+    private ObjectLayerEntry BuildTileObjectEntry(TilemapTileObject tileObj)
+    {
+        // Tile-insert objects anchor at the bottom-left corner (Y-down) — flip to the
+        // top-left-anchored convention every other entry from this method uses.
+        float worldX = _x + tileObj.Position.X;
+        float worldY = _y - tileObj.Position.Y + tileObj.Size.Y;
+
+        var classProps = tileObj.Tile.GetTileData(_tilemap!.Tilesets)?.Properties;
+        var merged = BuildMergedPropertySnapshot(classProps, tileObj.Properties);
+
+        return new ObjectLayerEntry(
+            worldX, worldY, tileObj.Size.X, tileObj.Size.Y,
+            tileObj.Class ?? string.Empty, tileObj.Tile.GlobalId, StringifyProperties(merged));
+    }
+
+    private ObjectLayerEntry BuildRectangleObjectEntry(TilemapRectangleObject rectObj)
+    {
+        float worldX = _x + rectObj.Position.X;
+        float worldY = _y - rectObj.Position.Y;
+
+        var merged = BuildMergedPropertySnapshot(classProps: null, rectObj.Properties);
+
+        return new ObjectLayerEntry(
+            worldX, worldY, rectObj.Size.X, rectObj.Size.Y,
+            rectObj.Class ?? string.Empty, GlobalId: 0, StringifyProperties(merged));
+    }
+
+    private ObjectLayerEntry BuildPlainObjectEntry(TilemapObject obj)
+    {
+        float worldX = _x + obj.Position.X;
+        float worldY = _y - obj.Position.Y;
+
+        var merged = BuildMergedPropertySnapshot(classProps: null, obj.Properties);
+
+        return new ObjectLayerEntry(
+            worldX, worldY, 0f, 0f, obj.Class ?? string.Empty, GlobalId: 0, StringifyProperties(merged));
+    }
+
+    private static Dictionary<string, string> StringifyProperties(Dictionary<string, TilemapPropertyValue> merged)
+    {
+        var result = new Dictionary<string, string>(merged.Count);
+        foreach (var (key, value) in merged)
+        {
+            var s = value.AsString();
+            if (s != null)
+                result[key] = s;
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Generates a <see cref="TileShapes"/> from tiles whose
     /// <see cref="TilemapTileData.Class"/> matches <paramref name="className"/>. Also matches
     /// rectangle and polygon objects on any object layer whose own <see cref="TilemapObject.Class"/>
