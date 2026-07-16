@@ -153,6 +153,10 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 - **Rectangles** support any position, size, and `rotation` that's an exact multiple of 90 — the rect stays axis-aligned (just reoriented/swapped) and is clipped against the grid, so it can span any number of cells and doesn't need to be grid-aligned at all. This is the recommended way to author a hand-drawn collision boundary that doesn't match the tile grid (a wall, a boss-arena floor, an irregular pit).
 - **Rotated rectangles at other angles, and all polygons,** are positioned relative to whichever grid cell contains their center (same convention as a tileset tile's sub-cell `<object>`s) and **must fit within roughly one cell** to be found by broad-phase collision queries — Tiled rotates around the object's own `(x,y)`, not its bounding-box center, so don't assume a rotated shape's world position matches a naive center-based mental model.
 
+### Reading object-layer data directly (no entity, no collision)
+
+`TileMap.GetObjectLayerData(layerName)` returns each object's world-space rect, Class, tile GlobalId, and merged properties as an `ObjectLayerEntry` — for object layers used purely as data markers (a Water zone's bounds, Coast tile terrain/side properties) rather than `CreateEntities` spawns or collision generation. Polygon objects are skipped (rect-only); use `GenerateCollisionFromClass`/`GenerateCollisionFromProperty` for polygon shapes.
+
 ### Add an object layer for entity spawns
 
 Object layers hold tile objects that represent entity spawn positions. Each tile object references a tile from the tileset via its GID. The tile's Class determines the entity type. Add an `<objectgroup>` after the tile layers:
