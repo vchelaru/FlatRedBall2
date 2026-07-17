@@ -123,4 +123,45 @@ public class UpdateCheckerTests
 
         Assert.False(result.IsUpdateAvailable);
     }
+
+    [Fact]
+    public async Task CheckAsync_ReleaseHasWindowsAsset_PopulatesWindowsDownloadUrl()
+    {
+        var client = new FakeGitHubReleaseClient
+        {
+            Response = new GitHubReleaseInfo
+            {
+                PublishedAt = new DateTimeOffset(2026, 7, 17, 0, 0, 0, TimeSpan.Zero),
+                HtmlUrl = "https://github.com/vchelaru/FlatRedBall2/releases/tag/ae-Release_July_17_2026",
+                Assets = new[]
+                {
+                    new ReleaseAsset { Name = "AnimationEditor-win-x64.zip", BrowserDownloadUrl = "https://example.com/win.zip" },
+                    new ReleaseAsset { Name = "AnimationEditor-linux-x64.tar.gz", BrowserDownloadUrl = "https://example.com/linux.tar.gz" },
+                },
+            }
+        };
+        var checker = new UpdateChecker(client);
+
+        var result = await checker.CheckAsync(new Version(2026, 7, 16));
+
+        Assert.Equal("https://example.com/win.zip", result.WindowsDownloadUrl);
+    }
+
+    [Fact]
+    public async Task CheckAsync_ReleaseHasNoWindowsAsset_WindowsDownloadUrlIsNull()
+    {
+        var client = new FakeGitHubReleaseClient
+        {
+            Response = new GitHubReleaseInfo
+            {
+                PublishedAt = new DateTimeOffset(2026, 7, 17, 0, 0, 0, TimeSpan.Zero),
+                HtmlUrl = "https://github.com/vchelaru/FlatRedBall2/releases/tag/ae-Release_July_17_2026",
+            }
+        };
+        var checker = new UpdateChecker(client);
+
+        var result = await checker.CheckAsync(new Version(2026, 7, 16));
+
+        Assert.Null(result.WindowsDownloadUrl);
+    }
 }

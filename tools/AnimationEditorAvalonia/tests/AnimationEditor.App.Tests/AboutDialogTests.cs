@@ -125,4 +125,41 @@ public class AboutDialogTests
 
         Assert.NotNull(downloadBtn);
     }
+
+    // ── Windows auto-update button (issue #681) ───────────────────────────────
+
+    [AvaloniaFact]
+    public void BuildAboutContent_UpdateAvailable_CanAutoUpdate_ButtonSaysGetUpdate()
+    {
+        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true);
+
+        var button = panel.Children.OfType<Button>().First();
+
+        Assert.Equal("Get Update", button.Content);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_UpdateAvailable_CannotAutoUpdate_ButtonSaysViewRelease()
+    {
+        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: false);
+
+        var button = panel.Children.OfType<Button>().First();
+
+        Assert.Equal("View Release", button.Content);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_ButtonClick_InvokesProvidedOnGetUpdateClick()
+    {
+        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+        var invoked = false;
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true, onGetUpdateClick: () => invoked = true);
+        var button = panel.Children.OfType<Button>().First();
+
+        button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.True(invoked);
+    }
 }

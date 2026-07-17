@@ -15,6 +15,15 @@ internal sealed class FakeUpdateChecker : IUpdateChecker
         Task.FromResult(UpdateCheckResult.NoUpdate);
 }
 
+/// <summary>No-op <see cref="IAppUpdateInstaller"/> — never reachable since <see cref="FakeUpdateChecker"/> never reports an update.</summary>
+internal sealed class FakeAppUpdateInstaller : IAppUpdateInstaller
+{
+    public bool IsSupported => false;
+
+    public Task InstallAndRestartAsync(string downloadUrl, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Doc screenshots never trigger an update install.");
+}
+
 /// <summary>
 /// Per-test service graph for headless doc-screenshot generation. Mirrors
 /// <c>AnimationEditor.App.Tests.TestServices</c> — kept separate because that project's
@@ -35,6 +44,7 @@ internal sealed class TestServices
     public ThumbnailService ThumbnailService { get; }
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
     public IUpdateChecker UpdateChecker { get; } = new FakeUpdateChecker();
+    public IAppUpdateInstaller UpdateInstaller { get; } = new FakeAppUpdateInstaller();
 
     public string SettingsRoot { get; } =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditorDocScreenshots", System.Guid.NewGuid().ToString("N"));
@@ -58,7 +68,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
+            ThumbnailService, FileAssociationService, UpdateChecker, UpdateInstaller, SettingsRoot);
 }
 
 internal static class TestHelpers

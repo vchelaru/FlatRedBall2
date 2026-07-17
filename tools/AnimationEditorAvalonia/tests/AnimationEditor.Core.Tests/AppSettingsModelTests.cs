@@ -203,6 +203,7 @@ public class AppSettingsModelTests
             LastUpdateCheckUtc = new System.DateTime(2026, 7, 17, 8, 0, 0, System.DateTimeKind.Utc),
             LatestKnownUpdateVersion = "2026.7.17",
             LatestKnownUpdateUrl = "https://github.com/vchelaru/FlatRedBall2/releases/tag/ae-Release_July_17_2026",
+            LatestKnownWindowsDownloadUrl = "https://github.com/vchelaru/FlatRedBall2/releases/download/ae-Release_July_17_2026/AnimationEditor-win-x64.zip",
         };
 
         var json = JsonSerializer.Serialize(model);
@@ -211,5 +212,6 @@ public class AppSettingsModelTests
         Assert.Equal(model.LastUpdateCheckUtc, restored!.LastUpdateCheckUtc);
         Assert.Equal(model.LatestKnownUpdateVersion, restored.LatestKnownUpdateVersion);
         Assert.Equal(model.LatestKnownUpdateUrl, restored.LatestKnownUpdateUrl);
+        Assert.Equal(model.LatestKnownWindowsDownloadUrl, restored.LatestKnownWindowsDownloadUrl);
     }
 }

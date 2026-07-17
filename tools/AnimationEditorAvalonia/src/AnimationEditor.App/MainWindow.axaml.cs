@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly IFileAssociationService _fileAssociation;
     private readonly IUpdateChecker _updateChecker;
+    private readonly IAppUpdateInstaller _updateInstaller;
     private readonly PngFolderWatcher _pngFolderWatcher = new();
 
     private AppSettingsModel _appSettings = new();
@@ -178,6 +179,7 @@ public partial class MainWindow : Window
         Services.ThumbnailService thumbnailService,
         IFileAssociationService fileAssociation,
         IUpdateChecker updateChecker,
+        IAppUpdateInstaller updateInstaller,
         string applicationDataRoot)
     {
         _applicationDataRoot = applicationDataRoot;
@@ -194,6 +196,7 @@ public partial class MainWindow : Window
         _thumbnailService = thumbnailService;
         _fileAssociation = fileAssociation;
         _updateChecker = updateChecker;
+        _updateInstaller = updateInstaller;
         // Desktop renders the tree with its own _treeRoots collection, so the controller
         // reads expand state from there (browser reads its AnimationTreeControl instead).
         _tabController = new TabController(_undoManager, _appCommands,
@@ -826,10 +829,11 @@ public partial class MainWindow : Window
     // Session-only (not persisted): dismissing just quiets the current run. The check
     // re-runs (and can re-show the banner) on the next launch until the user actually updates.
     private bool _updateBannerDismissed;
+    private UpdateCheckResult? _lastUpdateCheckResult;
 
     private void WireUpdateAvailableBanner()
     {
-        DownloadUpdateBtn.Click += (_, _) => OpenUrl((string)DownloadUpdateBtn.Tag!);
+        DownloadUpdateBtn.Click += (_, _) => _ = PerformGetUpdateActionAsync(_lastUpdateCheckResult ?? UpdateCheckResult.NoUpdate);
 
         DismissUpdateBannerBtn.Click += (_, _) =>
         {
@@ -843,9 +847,37 @@ public partial class MainWindow : Window
         if (!result.IsUpdateAvailable || _updateBannerDismissed)
             return;
 
+        _lastUpdateCheckResult = result;
         UpdateAvailableBannerText.Text = $"Animation Editor v{result.LatestVersion} is available — you're on v{typeof(MainWindow).Assembly.GetName().Version}.";
-        DownloadUpdateBtn.Tag = result.ReleaseUrl ?? ReleasesUrl;
+        DownloadUpdateBtn.Content = _updateInstaller.IsSupported && result.WindowsDownloadUrl is not null ? "Get Update" : "View Release";
         UpdateAvailableBanner.IsVisible = true;
+    }
+
+    /// <summary>
+    /// The one place "Get Update" clicks land, from both the banner and the About dialog.
+    /// Auto-updates on Windows when the release has a Windows asset; otherwise falls back to
+    /// opening the release page, same as before this existed.
+    /// </summary>
+    private async Task PerformGetUpdateActionAsync(UpdateCheckResult result)
+    {
+        var fallbackUrl = result.ReleaseUrl ?? ReleasesUrl;
+        if (!_updateInstaller.IsSupported || result.WindowsDownloadUrl is null)
+        {
+            OpenUrl(fallbackUrl);
+            return;
+        }
+
+        try
+        {
+            ShowStatusMessage("Downloading update…");
+            await _updateInstaller.InstallAndRestartAsync(result.WindowsDownloadUrl);
+            // The real installer exits the process on success (see WindowsAppUpdateInstaller) —
+            // this line only runs for a fake installer in tests that returns without exiting.
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ Update failed: {ex.Message}", isError: true);
+        }
     }
 
     // ── AppCommands wiring ────────────────────────────────────────────────────
@@ -1987,7 +2019,8 @@ public partial class MainWindow : Window
     private async Task ShowAboutDialogAsync()
     {
         var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        await BuildAboutWindow(result).ShowDialog(this);
+        var canAutoUpdate = _updateInstaller.IsSupported && result.WindowsDownloadUrl is not null;
+        await BuildAboutWindow(result, canAutoUpdate, () => _ = PerformGetUpdateActionAsync(result)).ShowDialog(this);
     }
 
     /// <summary>
@@ -2015,13 +2048,15 @@ public partial class MainWindow : Window
         if (!forceRefresh && !UpdateCheckPolicy.ShouldCheck(_appSettings.LastUpdateCheckUtc, now))
         {
             return UpdateCheckResult.FromCached(
-                _appSettings.LatestKnownUpdateVersion, _appSettings.LatestKnownUpdateUrl, currentVersion);
+                _appSettings.LatestKnownUpdateVersion, _appSettings.LatestKnownUpdateUrl,
+                _appSettings.LatestKnownWindowsDownloadUrl, currentVersion);
         }
 
         var result = await _updateChecker.CheckAsync(currentVersion);
         _appSettings.LastUpdateCheckUtc = now;
         _appSettings.LatestKnownUpdateVersion = result.LatestVersion?.ToString();
         _appSettings.LatestKnownUpdateUrl = result.ReleaseUrl;
+        _appSettings.LatestKnownWindowsDownloadUrl = result.WindowsDownloadUrl;
         SaveSettingsFile();
         return result;
     }
@@ -2093,9 +2128,13 @@ public partial class MainWindow : Window
     /// <summary>
     /// Returns a fully-configured About window centered on its owner. <paramref name="updateCheck"/>
     /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
+    /// <paramref name="canAutoUpdate"/> picks the button label ("Get Update" vs. "View Release")
+    /// and <paramref name="onGetUpdateClick"/> its click action — both supplied by the caller since
+    /// this method is static and has no access to the platform-aware <c>IAppUpdateInstaller</c>.
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
+    internal static Window BuildAboutWindow(
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action? onGetUpdateClick = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2103,14 +2142,15 @@ public partial class MainWindow : Window
             Height = 240,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Content = BuildAboutContent(updateCheck),
+            Content = BuildAboutContent(updateCheck, canAutoUpdate, onGetUpdateClick),
         };
 
     /// <summary>
     /// Builds the content panel for the About dialog.
     /// Extracted for testability.
     /// </summary>
-    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
+    internal static Control BuildAboutContent(
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action? onGetUpdateClick = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -2119,7 +2159,9 @@ public partial class MainWindow : Window
             ? $"Update available: v{updateCheck.LatestVersion}"
             : "Check here for updates:";
         var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
-        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
+        var buttonLabel = updateCheck?.IsUpdateAvailable != true
+            ? "View Releases on GitHub"
+            : canAutoUpdate ? "Get Update" : "View Release";
 
         return new StackPanel
         {
@@ -2131,7 +2173,7 @@ public partial class MainWindow : Window
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
                 new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildOpenUrlButton(releaseUrl, buttonLabel),
+                BuildActionButton(buttonLabel, releaseUrl, onGetUpdateClick ?? (() => OpenUrl(releaseUrl))),
             }
         };
     }
@@ -2150,13 +2192,14 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds a button that opens the given URL in the user's default browser when clicked.
-    /// The URL is stashed on <see cref="Button.Tag"/> so tests can verify it without triggering navigation.
+    /// Builds a button whose click runs <paramref name="onClick"/>. <paramref name="tag"/> is
+    /// stashed on <see cref="Button.Tag"/> (the release URL, whether or not the click actually
+    /// opens it) so tests can identify the button without triggering its click behavior.
     /// </summary>
-    private static Button BuildOpenUrlButton(string url, string label)
+    private static Button BuildActionButton(string label, string tag, Action onClick)
     {
-        var button = new Button { Content = label, Tag = url };
-        button.Click += (_, _) => OpenUrl(url);
+        var button = new Button { Content = label, Tag = tag };
+        button.Click += (_, _) => onClick();
         return button;
     }
 

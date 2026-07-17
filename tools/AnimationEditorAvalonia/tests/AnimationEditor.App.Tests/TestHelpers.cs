@@ -27,6 +27,29 @@ internal sealed class FakeUpdateChecker : IUpdateChecker
 }
 
 /// <summary>
+/// Fake <see cref="IAppUpdateInstaller"/> — the real one downloads a real zip and calls
+/// <see cref="Environment.Exit(int)"/> on success, which would kill the test runner. This
+/// never touches the network/filesystem/process and only exits via a thrown exception when
+/// <see cref="ThrowOnInstall"/> is set, so tests can drive the failure branch safely.
+/// </summary>
+internal sealed class FakeAppUpdateInstaller : IAppUpdateInstaller
+{
+    public bool IsSupported { get; set; } = true;
+    public Exception? ThrowOnInstall { get; set; }
+    public string? LastDownloadUrl { get; private set; }
+    public int CallCount { get; private set; }
+
+    public Task InstallAndRestartAsync(string downloadUrl, CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        LastDownloadUrl = downloadUrl;
+        if (ThrowOnInstall is not null)
+            throw ThrowOnInstall;
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
 /// Per-test service graph for headless App tests. Each call builds a brand-new
 /// set of services — no static state. Use <see cref="CreateMainWindow"/> to get
 /// a wired <see cref="MainWindow"/> backed by these services.
@@ -45,6 +68,7 @@ internal sealed class TestServices
     public ThumbnailService ThumbnailService { get; }
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
     public IUpdateChecker UpdateChecker { get; set; } = new FakeUpdateChecker();
+    public IAppUpdateInstaller UpdateInstaller { get; set; } = new FakeAppUpdateInstaller();
 
     /// <summary>
     /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
@@ -73,7 +97,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
+            ThumbnailService, FileAssociationService, UpdateChecker, UpdateInstaller, SettingsRoot);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

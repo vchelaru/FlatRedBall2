@@ -13,7 +13,7 @@ public class UpdateCheckResultTests
     [Fact]
     public void FromCached_NoCachedVersion_ReturnsNoUpdate()
     {
-        var result = UpdateCheckResult.FromCached(null, null, new Version(2026, 7, 16));
+        var result = UpdateCheckResult.FromCached(null, null, null, new Version(2026, 7, 16));
 
         Assert.False(result.IsUpdateAvailable);
         Assert.Null(result.LatestVersion);
@@ -22,7 +22,7 @@ public class UpdateCheckResultTests
     [Fact]
     public void FromCached_UnparsableCachedVersion_ReturnsNoUpdate()
     {
-        var result = UpdateCheckResult.FromCached("not-a-version", "https://example.com", new Version(2026, 7, 16));
+        var result = UpdateCheckResult.FromCached("not-a-version", "https://example.com", null, new Version(2026, 7, 16));
 
         Assert.False(result.IsUpdateAvailable);
     }
@@ -30,18 +30,31 @@ public class UpdateCheckResultTests
     [Fact]
     public void FromCached_CachedVersionNewerThanCurrent_ReturnsUpdateAvailable()
     {
-        var result = UpdateCheckResult.FromCached("2026.7.17", "https://example.com/latest", new Version(2026, 7, 16));
+        var result = UpdateCheckResult.FromCached(
+            "2026.7.17", "https://example.com/latest", "https://example.com/win.zip", new Version(2026, 7, 16));
 
         Assert.True(result.IsUpdateAvailable);
         Assert.Equal(new Version(2026, 7, 17), result.LatestVersion);
         Assert.Equal("https://example.com/latest", result.ReleaseUrl);
+        Assert.Equal("https://example.com/win.zip", result.WindowsDownloadUrl);
     }
 
     [Fact]
     public void FromCached_CachedVersionSameAsCurrent_ReturnsNoUpdate()
     {
-        var result = UpdateCheckResult.FromCached("2026.7.16", "https://example.com/latest", new Version(2026, 7, 16));
+        var result = UpdateCheckResult.FromCached(
+            "2026.7.16", "https://example.com/latest", "https://example.com/win.zip", new Version(2026, 7, 16));
 
         Assert.False(result.IsUpdateAvailable);
+    }
+
+    [Fact]
+    public void FromCached_NoWindowsAssetCached_WindowsDownloadUrlIsNull()
+    {
+        var result = UpdateCheckResult.FromCached(
+            "2026.7.17", "https://example.com/latest", null, new Version(2026, 7, 16));
+
+        Assert.True(result.IsUpdateAvailable);
+        Assert.Null(result.WindowsDownloadUrl);
     }
 }

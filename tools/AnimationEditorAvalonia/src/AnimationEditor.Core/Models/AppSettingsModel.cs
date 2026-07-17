@@ -64,6 +64,13 @@ namespace AnimationEditor.Core.Models
         /// <summary>Release page URL paired with <see cref="LatestKnownUpdateVersion"/>.</summary>
         public string? LatestKnownUpdateUrl { get; set; }
 
+        /// <summary>
+        /// The win-x64 release zip URL paired with <see cref="LatestKnownUpdateVersion"/>, or
+        /// <c>null</c> if that release had no Windows build. What the Windows auto-updater
+        /// downloads; <c>null</c> makes auto-update fall back to opening <see cref="LatestKnownUpdateUrl"/>.
+        /// </summary>
+        public string? LatestKnownWindowsDownloadUrl { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

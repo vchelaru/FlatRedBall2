@@ -7,4 +7,5 @@ public sealed class GitHubReleaseInfo
 {
     public required DateTimeOffset PublishedAt { get; init; }
     public required string HtmlUrl { get; init; }
+    public IReadOnlyList<ReleaseAsset> Assets { get; init; } = Array.Empty<ReleaseAsset>();
 }

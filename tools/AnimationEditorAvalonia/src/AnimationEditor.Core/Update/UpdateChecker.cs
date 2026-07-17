@@ -36,6 +36,7 @@ public sealed class UpdateChecker : IUpdateChecker
             return UpdateCheckResult.NoUpdate;
 
         var latestVersion = new Version(release.PublishedAt.Year, release.PublishedAt.Month, release.PublishedAt.Day);
-        return new UpdateCheckResult(latestVersion > currentVersion, latestVersion, release.HtmlUrl);
+        var windowsDownloadUrl = WindowsReleaseAsset.FindDownloadUrl(release.Assets);
+        return new UpdateCheckResult(latestVersion > currentVersion, latestVersion, release.HtmlUrl, windowsDownloadUrl);
     }
 }

@@ -137,4 +137,82 @@ public class UpdateCheckStartupTests
         Assert.Equal("2026.7.17", settings.LatestKnownUpdateVersion);
         Assert.Equal("https://example.com/latest", settings.LatestKnownUpdateUrl);
     }
+
+    // ── Windows auto-update (issue #681) ──────────────────────────────────────
+    // PerformGetUpdateActionAsync is reached via reflection: there's no non-modal public
+    // trigger (the real ones are the banner/About dialog buttons, both wired through it),
+    // and the real installer's success path calls Environment.Exit — FakeAppUpdateInstaller
+    // never does, so it's safe to drive directly here.
+
+    private static Task InvokePerformGetUpdateActionAsync(MainWindow window, UpdateCheckResult result)
+    {
+        var method = typeof(MainWindow).GetMethod("PerformGetUpdateActionAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (Task)method.Invoke(window, new object[] { result })!;
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_WindowsAssetAvailable_InvokesInstallerWithDownloadUrl()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+
+        await InvokePerformGetUpdateActionAsync(window, result);
+
+        Assert.Equal(1, installer.CallCount);
+        Assert.Equal("https://example.com/win.zip", installer.LastDownloadUrl);
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_NotSupported_DoesNotInvokeInstaller()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var installer = new FakeAppUpdateInstaller { IsSupported = false };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+
+        await InvokePerformGetUpdateActionAsync(window, result);
+
+        Assert.Equal(0, installer.CallCount);
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_NoWindowsAsset_DoesNotInvokeInstaller()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest");
+
+        await InvokePerformGetUpdateActionAsync(window, result);
+
+        Assert.Equal(0, installer.CallCount);
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_InstallerThrows_ShowsErrorBanner()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true, ThrowOnInstall = new InvalidOperationException("disk full") };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+
+        await InvokePerformGetUpdateActionAsync(window, result);
+
+        var errorBanner = window.FindControl<Border>("ErrorBanner");
+        Assert.True(errorBanner!.IsVisible);
+    }
 }

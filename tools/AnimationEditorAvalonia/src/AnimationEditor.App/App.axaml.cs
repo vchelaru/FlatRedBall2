@@ -193,6 +193,7 @@ public partial class App : Application
 
         sc.AddSingleton<IGitHubReleaseClient, HttpGitHubReleaseClient>();
         sc.AddSingleton<IUpdateChecker, UpdateChecker>();
+        sc.AddSingleton<IAppUpdateInstaller, WindowsAppUpdateInstaller>();
 
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
@@ -207,6 +208,7 @@ public partial class App : Application
             sp.GetRequiredService<ThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
             sp.GetRequiredService<IUpdateChecker>(),
+            sp.GetRequiredService<IAppUpdateInstaller>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));
 
         return sc.BuildServiceProvider();

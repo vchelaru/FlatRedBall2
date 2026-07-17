@@ -33,7 +33,12 @@ public sealed class HttpGitHubReleaseClient : IGitHubReleaseClient
         if (response?.HtmlUrl is null)
             return null;
 
-        return new GitHubReleaseInfo { PublishedAt = response.PublishedAt, HtmlUrl = response.HtmlUrl };
+        var assets = (response.Assets ?? new List<AssetResponse>())
+            .Where(a => a.Name is not null && a.BrowserDownloadUrl is not null)
+            .Select(a => new ReleaseAsset { Name = a.Name!, BrowserDownloadUrl = a.BrowserDownloadUrl! })
+            .ToList();
+
+        return new GitHubReleaseInfo { PublishedAt = response.PublishedAt, HtmlUrl = response.HtmlUrl, Assets = assets };
     }
 
     private sealed class ReleaseResponse
@@ -43,5 +48,17 @@ public sealed class HttpGitHubReleaseClient : IGitHubReleaseClient
 
         [JsonPropertyName("html_url")]
         public string? HtmlUrl { get; set; }
+
+        [JsonPropertyName("assets")]
+        public List<AssetResponse>? Assets { get; set; }
+    }
+
+    private sealed class AssetResponse
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("browser_download_url")]
+        public string? BrowserDownloadUrl { get; set; }
     }
 }
