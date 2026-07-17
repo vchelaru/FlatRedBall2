@@ -1410,9 +1410,12 @@ public class TileShapes : ICollidable
         }
     }
 
+    // _spanningPolygons is deliberately excluded here: unlike the other three collections, it
+    // stores world-space points with no col/row key and no GridSize in its position math, so
+    // changing GridSize while only spanning polygons exist can't corrupt anything.
     private void ThrowIfTilesExist()
     {
-        if (_tiles.Count > 0 || _polyTiles.Count > 0 || _subCellRects.Count > 0 || _spanningPolygons.Count > 0)
+        if (_tiles.Count > 0 || _polyTiles.Count > 0 || _subCellRects.Count > 0)
             throw new InvalidOperationException(
                 "Cannot change GridSize after tiles have been added. Call Clear() first, change the value, then re-add tiles.");
     }

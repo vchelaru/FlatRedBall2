@@ -392,6 +392,17 @@ public class TileShapesTests
         Should.Throw<InvalidOperationException>(() => tiles.GridSize = 32f);
     }
 
+    [Fact]
+    public void GridSize_SetAfterOnlySpanningPolygonAdded_DoesNotThrow()
+    {
+        // Spanning polygons store world-space points and don't reference GridSize at all -- unlike
+        // the other tile collections, changing GridSize can't corrupt them.
+        var tiles = new TileShapes();
+        tiles.AddSpanningPolygon(new[] { new Vector2(0f, 0f), new Vector2(32f, 0f), new Vector2(16f, 16f) });
+
+        Should.NotThrow(() => tiles.GridSize = 32f);
+    }
+
     // ── X / Y — shifts existing tiles ────────────────────────────────────────────
 
     [Fact]
