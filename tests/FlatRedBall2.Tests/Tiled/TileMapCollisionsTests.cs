@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Tiled;
@@ -497,6 +498,27 @@ public class TileMapCollisionsTests
         poly.Points[2].ShouldBe(new Vector2(-8f, -8f));
     }
 
+    [Fact]
+    public void GenerateFromClass_ObjectLayerPolygonSpansMultipleCells_DetectedOutsideCentroidCell()
+    {
+        // Triangle at Tiled points (0,16), (32,16), (16,0), position (0,0) -> world points
+        // (0,-16), (32,-16), (16,0): spans world X:[0,32] (cols 0-1), Y:[-16,0] (tsc row 1 on a
+        // 2-tile-tall map, since collection.Y = 0 - 2*16 = -32). Centroid ~(16,-10.67) sits in
+        // col 1; the player below sits in col 0, inside the triangle but outside the centroid cell.
+        var tri = new XnaVec2[] { new(0, 16), new(32, 16), new(16, 0) };
+        var layer = new TilemapObjectLayer("Objects");
+        layer.AddObject(new TilemapPolygonObject(
+            id: 1, position: new XnaVec2(0, 0), points: tri) { Class = "Solid" });
+        var tilemap = BuildObjectOnlyTilemap(2, 2, 16, layer);
+
+        var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
+
+        var player = new AARect { Width = 4f, Height = 4f, X = 4f, Y = -14f };
+        var sep = coll.GetSeparationFor(player);
+
+        sep.ShouldNotBe(Vector2.Zero);
+    }
+
     // ── Rotation ──────────────────────────────────────────────────────────────
     // TilemapObject.Rotation is radians (verified against MonoGame.Extended's own
     // Shape.GetCorners()), and Tiled rotates an object clockwise around its own (x,y) — the
@@ -558,6 +580,8 @@ public class TileMapCollisionsTests
     [Fact]
     public void GenerateFromClass_ObjectLayerRectArbitraryRotation_EmittedAsFourPointPolygon()
     {
+        // A 16x16 square rotated 45 degrees has a ~22.6 diagonal, exceeding one 16-unit cell --
+        // it's registered as a spanning polygon (world-space points) rather than a per-cell one.
         var layer = new TilemapObjectLayer("Objects");
         layer.AddObject(new TilemapRectangleObject(
             id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16))
@@ -567,18 +591,19 @@ public class TileMapCollisionsTests
         var coll = TileMapCollisions.GenerateFromClass(tilemap, "Solid");
 
         coll.GetTileAtCell(0, 0).ShouldBeNull();
-        var poly = coll.GetPolygonTileAtCell(0, 0);
-        poly.ShouldNotBeNull();
-        poly!.Points.Count.ShouldBe(4);
+        coll.GetPolygonTileAtCell(0, 0).ShouldBeNull();
+
+        var poly = coll.AllTiles.OfType<Polygon>().Single();
+        poly.Points.Count.ShouldBe(4);
         const float tol = 0.01f;
-        poly.Points[0].X.ShouldBe(-8f, tol);
-        poly.Points[0].Y.ShouldBe(8f, tol);
-        poly.Points[1].X.ShouldBe(3.3137f, tol);
-        poly.Points[1].Y.ShouldBe(-3.3137f, tol);
-        poly.Points[2].X.ShouldBe(-8f, tol);
-        poly.Points[2].Y.ShouldBe(-14.6274f, tol);
-        poly.Points[3].X.ShouldBe(-19.3137f, tol);
-        poly.Points[3].Y.ShouldBe(-3.3137f, tol);
+        poly.Points[0].X.ShouldBe(0f, tol);
+        poly.Points[0].Y.ShouldBe(0f, tol);
+        poly.Points[1].X.ShouldBe(11.3137f, tol);
+        poly.Points[1].Y.ShouldBe(-11.3137f, tol);
+        poly.Points[2].X.ShouldBe(0f, tol);
+        poly.Points[2].Y.ShouldBe(-22.6274f, tol);
+        poly.Points[3].X.ShouldBe(-11.3137f, tol);
+        poly.Points[3].Y.ShouldBe(-11.3137f, tol);
     }
 
     [Fact]

@@ -35,10 +35,13 @@ namespace FlatRedBall2.Tiled;
 /// Rectangle objects support any position, size, and rotation that's an exact multiple of 90
 /// degrees — the rectangle stays axis-aligned (just reoriented) and is clipped against the grid,
 /// so it can span any number of cells and doesn't need to be grid-aligned. Rectangles at an
-/// arbitrary (non-90-degree-multiple) angle, and all polygon objects, are instead positioned
-/// relative to whichever grid cell contains their center (the same convention used for per-tile
-/// <see cref="TilemapTileData.CollisionObjects"/>) — these must fit within roughly one cell to be
-/// found by broad-phase collision queries.
+/// arbitrary (non-90-degree-multiple) angle, and all polygon objects, are converted to a
+/// <see cref="Collision.Polygon"/>: one that fits within a single cell is positioned relative to
+/// whichever grid cell contains its center (the same convention used for per-tile
+/// <see cref="TilemapTileData.CollisionObjects"/>); one whose bounds span multiple cells is
+/// registered as a free-floating shape via <see cref="Collision.TileShapes.AddSpanningPolygon"/>
+/// instead, so it's found by broad-phase collision queries regardless of which cell the querying
+/// shape occupies.
 /// </para>
 /// </remarks>
 public static class TileMapCollisions
@@ -273,8 +276,11 @@ public static class TileMapCollisions
     /// <summary>
     /// Scans rectangle and polygon objects on <paramref name="layer"/> and adds a collision shape
     /// for each whose <see cref="TilemapObject.Class"/> or properties satisfy
-    /// <paramref name="predicate"/>. Each shape is positioned relative to whichever grid cell
-    /// contains its center — the same convention used for per-tile <see cref="TilemapTileData.CollisionObjects"/>.
+    /// <paramref name="predicate"/>. A shape that fits within a single cell is positioned relative
+    /// to whichever grid cell contains its center — the same convention used for per-tile
+    /// <see cref="TilemapTileData.CollisionObjects"/>. A shape spanning multiple cells is clipped
+    /// per cell (axis-aligned rectangles) or registered as a free-floating shape (polygons) so it's
+    /// still found regardless of which cell the querying shape occupies.
     /// Tile objects (placed with Tiled's "Insert Tile" tool) are not matched here — use
     /// <see cref="TileMap.CreateEntities"/> for those.
     /// </summary>
@@ -433,11 +439,35 @@ public static class TileMapCollisions
         }
     }
 
-    // Places a polygon at whichever single cell contains the average of its world points. Unlike
-    // AddClippedRectangleAcrossCells, this has no multi-cell splitting — the polygon must fit
-    // within roughly one cell to be found by broad-phase collision queries.
+    // A polygon whose bounds fit within a single cell is placed at the cell containing its
+    // centroid (participates in per-cell SolidSides bookkeeping, matching per-tile
+    // CollisionObjects). A polygon spanning multiple cells goes through AddSpanningPolygon
+    // instead — registering it at only its centroid cell would make broad-phase queries miss it
+    // whenever the querying shape occupies a different cell within the polygon's bounds.
     private static void AddPolygonFromWorldPoints(Vector2[] worldPoints, TileShapes collection)
     {
+        const float eps = 1e-4f;
+        float minX = worldPoints[0].X, maxX = worldPoints[0].X;
+        float minY = worldPoints[0].Y, maxY = worldPoints[0].Y;
+        foreach (var p in worldPoints)
+        {
+            if (p.X < minX) minX = p.X;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.Y > maxY) maxY = p.Y;
+        }
+
+        int colMin = (int)MathF.Floor((minX - collection.X) / collection.GridSize);
+        int colMax = (int)MathF.Floor((maxX - collection.X) / collection.GridSize - eps);
+        int rowMin = (int)MathF.Floor((minY - collection.Y) / collection.GridSize);
+        int rowMax = (int)MathF.Floor((maxY - collection.Y) / collection.GridSize - eps);
+
+        if (colMin != colMax || rowMin != rowMax)
+        {
+            collection.AddSpanningPolygon(worldPoints);
+            return;
+        }
+
         float sumX = 0f, sumY = 0f;
         foreach (var p in worldPoints) { sumX += p.X; sumY += p.Y; }
         var centroid = new Vector2(sumX / worldPoints.Length, sumY / worldPoints.Length);

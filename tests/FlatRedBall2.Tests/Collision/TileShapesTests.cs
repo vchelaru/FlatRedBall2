@@ -641,6 +641,27 @@ public class TileShapesTests
         sep.Y.ShouldBe(0f, tolerance: 0.01f);
     }
 
+    // ── AddSpanningPolygon (multi-cell polygon objects) ────────────────────────
+
+    [Fact]
+    public void AddSpanningPolygon_ShapeInsideBoundsButOutsideCentroidCell_GetSeparationForDetectsIt()
+    {
+        // Triangle (0,-16), (32,-16), (16,0): world X spans [0,32] (cols 0-1), Y spans [-16,0]
+        // (row -1). Centroid is at approximately (16, -10.67) -> col 1. The shape below sits at
+        // col 0 -- a different cell than the centroid -- but is still inside the triangle.
+        var tiles = new TileShapes { GridSize = 16f };
+        tiles.AddSpanningPolygon(new[]
+        {
+            new Vector2(0f, -16f), new Vector2(32f, -16f), new Vector2(16f, 0f)
+        });
+
+        var shape = new AARect { Width = 4f, Height = 4f, X = 4f, Y = -14f };
+
+        var sep = tiles.GetSeparationFor(shape);
+
+        sep.ShouldNotBe(Vector2.Zero);
+    }
+
     // ── Raycast (polygon tiles) ───────────────────────────────────────────────
 
     [Fact]
