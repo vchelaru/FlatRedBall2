@@ -1024,12 +1024,14 @@
                                     Background="{DynamicResource BgRail}"
                                     BorderBrush="{DynamicResource LineBrush}"
                                     BorderThickness="0,0,0,1"
-                                    Height="30">
-                                <StackPanel Orientation="Horizontal" Spacing="2"
-                                            HorizontalAlignment="Right" VerticalAlignment="Center"
-                                            Margin="0,0,4,0">
+                                    Padding="0,2,4,2">
+                                <!-- WrapPanel (not a fixed-Height StackPanel) so the buttons reflow onto a
+                                     second row instead of overflowing past the header's right edge when the
+                                     sidebar column is dragged narrower than their combined width (#541) —
+                                     matching the WrapPanel convention already used for the .achx toolbars. -->
+                                <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <Button x:Name="HistoryUndoButton"
-                                            Width="26" Height="26" Padding="0"
+                                            Width="26" Height="26" Padding="0" Margin="0,0,2,0"
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
                                             ToolTip.Tip="Undo">
@@ -1046,7 +1048,7 @@
                                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconRedo.svg"
                                                  CurrentColor="{DynamicResource IconInk}" />
                                     </Button>
-                                </StackPanel>
+                                </WrapPanel>
                             </Border>
                             <ScrollViewer x:Name="HistoryScrollViewer"
                                           Grid.Row="1"
