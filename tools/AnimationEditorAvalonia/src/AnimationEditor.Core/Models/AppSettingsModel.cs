@@ -48,6 +48,22 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public bool SuppressDefaultHandlerPrompt { get; set; }
 
+        /// <summary>
+        /// UTC time of the last update check (startup or forced). <c>null</c> means never
+        /// checked. See <see cref="Update.UpdateCheckPolicy"/> for the cache window this backs.
+        /// </summary>
+        public System.DateTime? LastUpdateCheckUtc { get; set; }
+
+        /// <summary>
+        /// The latest released version as of <see cref="LastUpdateCheckUtc"/>, or <c>null</c>
+        /// if no update was known at that time. Lets a cache-hit path (within the check window)
+        /// report the same result without re-hitting the GitHub API.
+        /// </summary>
+        public string? LatestKnownUpdateVersion { get; set; }
+
+        /// <summary>Release page URL paired with <see cref="LatestKnownUpdateVersion"/>.</summary>
+        public string? LatestKnownUpdateUrl { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

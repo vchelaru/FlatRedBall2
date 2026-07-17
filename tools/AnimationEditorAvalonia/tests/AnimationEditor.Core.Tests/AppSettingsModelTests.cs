@@ -186,4 +186,30 @@ public class AppSettingsModelTests
 
         Assert.True(restored!.SuppressDefaultHandlerPrompt);
     }
+
+    [Fact]
+    public void LastUpdateCheckUtc_DefaultsToNull()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.Null(model.LastUpdateCheckUtc);
+    }
+
+    [Fact]
+    public void UpdateCheckCacheFields_SurviveJsonRoundTrip()
+    {
+        var model = new AppSettingsModel
+        {
+            LastUpdateCheckUtc = new System.DateTime(2026, 7, 17, 8, 0, 0, System.DateTimeKind.Utc),
+            LatestKnownUpdateVersion = "2026.7.17",
+            LatestKnownUpdateUrl = "https://github.com/vchelaru/FlatRedBall2/releases/tag/ae-Release_July_17_2026",
+        };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.Equal(model.LastUpdateCheckUtc, restored!.LastUpdateCheckUtc);
+        Assert.Equal(model.LatestKnownUpdateVersion, restored.LatestKnownUpdateVersion);
+        Assert.Equal(model.LatestKnownUpdateUrl, restored.LatestKnownUpdateUrl);
+    }
 }

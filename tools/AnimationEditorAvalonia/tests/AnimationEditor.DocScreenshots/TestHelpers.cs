@@ -4,8 +4,16 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Update;
 
 namespace AnimationEditor.DocScreenshots;
+
+/// <summary>No-op <see cref="IUpdateChecker"/> — screenshot generation never needs a real check.</summary>
+internal sealed class FakeUpdateChecker : IUpdateChecker
+{
+    public Task<UpdateCheckResult> CheckAsync(Version currentVersion, CancellationToken cancellationToken = default) =>
+        Task.FromResult(UpdateCheckResult.NoUpdate);
+}
 
 /// <summary>
 /// Per-test service graph for headless doc-screenshot generation. Mirrors
@@ -26,6 +34,7 @@ internal sealed class TestServices
     public PendingCutState PendingCutState { get; }
     public ThumbnailService ThumbnailService { get; }
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
+    public IUpdateChecker UpdateChecker { get; } = new FakeUpdateChecker();
 
     public string SettingsRoot { get; } =
         System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimationEditorDocScreenshots", System.Guid.NewGuid().ToString("N"));
@@ -49,7 +58,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, FileAssociationService, SettingsRoot);
+            ThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
 }
 
 internal static class TestHelpers

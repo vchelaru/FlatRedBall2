@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Text.RegularExpressions;
+using AnimationEditor.Core.Update;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Xunit;
@@ -83,5 +84,45 @@ public class AboutDialogTests
         var window = MainWindow.BuildAboutWindow();
 
         Assert.Equal("About AnimationEditor", window.Title);
+    }
+
+    // ── Update-check surface (issue #681) ─────────────────────────────────────
+
+    [AvaloniaFact]
+    public void BuildAboutContent_NoUpdateAvailable_KeepsDefaultReleasesPromptAndButton()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent(UpdateCheckResult.NoUpdate);
+
+        var promptBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("updates", System.StringComparison.OrdinalIgnoreCase) == true);
+        var releasesBtn = panel.Children.OfType<Button>()
+            .FirstOrDefault(b => b.Tag?.ToString() == "https://github.com/vchelaru/FlatRedBall2/releases");
+
+        Assert.NotNull(promptBlock);
+        Assert.NotNull(releasesBtn);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_UpdateAvailable_ShowsLatestVersionText()
+    {
+        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
+
+        var updateBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("2026.7.17") == true);
+
+        Assert.NotNull(updateBlock);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_UpdateAvailable_ButtonPointsAtReleaseUrl()
+    {
+        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
+
+        var downloadBtn = panel.Children.OfType<Button>()
+            .FirstOrDefault(b => b.Tag?.ToString() == "https://example.com/latest");
+
+        Assert.NotNull(downloadBtn);
     }
 }

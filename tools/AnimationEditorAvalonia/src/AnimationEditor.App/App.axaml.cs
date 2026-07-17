@@ -3,6 +3,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Update;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -190,6 +191,9 @@ public partial class App : Application
         else
             sc.AddSingleton<IFileAssociationService, NullFileAssociationService>();
 
+        sc.AddSingleton<IGitHubReleaseClient, HttpGitHubReleaseClient>();
+        sc.AddSingleton<IUpdateChecker, UpdateChecker>();
+
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
             sp.GetRequiredService<ISelectedState>(),
@@ -202,6 +206,7 @@ public partial class App : Application
             sp.GetRequiredService<IPendingCutState>(),
             sp.GetRequiredService<ThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
+            sp.GetRequiredService<IUpdateChecker>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));
 
         return sc.BuildServiceProvider();

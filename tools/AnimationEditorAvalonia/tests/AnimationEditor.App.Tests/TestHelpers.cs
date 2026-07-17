@@ -4,8 +4,27 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Update;
 
 namespace AnimationEditor.App.Tests;
+
+/// <summary>
+/// No-op <see cref="IUpdateChecker"/> for tests that don't care about the update check — never
+/// hits the network. Tests exercising the update-check wiring itself set
+/// <see cref="TestServices.UpdateChecker"/> to a fake with a canned <see cref="UpdateCheckResult"/>
+/// before calling <see cref="TestServices.CreateMainWindow"/>.
+/// </summary>
+internal sealed class FakeUpdateChecker : IUpdateChecker
+{
+    public UpdateCheckResult Result { get; set; } = UpdateCheckResult.NoUpdate;
+    public int CallCount { get; private set; }
+
+    public Task<UpdateCheckResult> CheckAsync(Version currentVersion, CancellationToken cancellationToken = default)
+    {
+        CallCount++;
+        return Task.FromResult(Result);
+    }
+}
 
 /// <summary>
 /// Per-test service graph for headless App tests. Each call builds a brand-new
@@ -25,6 +44,7 @@ internal sealed class TestServices
     public PendingCutState PendingCutState { get; }
     public ThumbnailService ThumbnailService { get; }
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
+    public IUpdateChecker UpdateChecker { get; set; } = new FakeUpdateChecker();
 
     /// <summary>
     /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
@@ -53,7 +73,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, FileAssociationService, SettingsRoot);
+            ThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {
