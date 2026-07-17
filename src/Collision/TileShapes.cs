@@ -37,6 +37,10 @@ public class TileShapes : ICollidable
     // sub-cell rect or full-cell tile meets it — forming a continuous surface (e.g., two
     // half-height curbs side-by-side).
     private readonly Dictionary<(int col, int row), List<AARect>> _subCellRects = new();
+    // Polygons whose bounds span more than one cell (object-layer polygons too large to fit a
+    // single cell). Tested by world AABB overlap in GetSeparationFor rather than cell lookup, so
+    // there's no "must fit in one cell" limit and no per-cell exclusivity.
+    private readonly List<Polygon> _spanningPolygons = new();
 
     /// <summary>
     /// World X of the left edge of cell (0, 0). Can be changed at any time —
@@ -117,6 +121,7 @@ public class TileShapes : ICollidable
             foreach (var p in _polyTiles.Values) yield return p;
             foreach (var list in _subCellRects.Values)
                 foreach (var r in list) yield return r;
+            foreach (var p in _spanningPolygons) yield return p;
         }
     }
 
@@ -136,6 +141,8 @@ public class TileShapes : ICollidable
                 poly.Layer = value;
             foreach (var r in EnumerateSubCellRects())
                 r.Layer = value;
+            foreach (var poly in _spanningPolygons)
+                poly.Layer = value;
         }
     }
 
@@ -159,6 +166,8 @@ public class TileShapes : ICollidable
                 poly.IsVisible = value;
             foreach (var r in EnumerateSubCellRects())
                 r.IsVisible = value;
+            foreach (var poly in _spanningPolygons)
+                poly.IsVisible = value;
         }
     }
 
@@ -178,6 +187,8 @@ public class TileShapes : ICollidable
                 poly.Color = value;
             foreach (var r in EnumerateSubCellRects())
                 r.Color = value;
+            foreach (var poly in _spanningPolygons)
+                poly.Color = value;
         }
     }
 
@@ -197,6 +208,8 @@ public class TileShapes : ICollidable
                 poly.IsFilled = value;
             foreach (var r in EnumerateSubCellRects())
                 r.IsFilled = value;
+            foreach (var poly in _spanningPolygons)
+                poly.IsFilled = value;
         }
     }
 
@@ -216,6 +229,8 @@ public class TileShapes : ICollidable
                 poly.OutlineThickness = value;
             foreach (var r in EnumerateSubCellRects())
                 r.OutlineThickness = value;
+            foreach (var poly in _spanningPolygons)
+                poly.OutlineThickness = value;
         }
     }
 
@@ -237,9 +252,12 @@ public class TileShapes : ICollidable
             _onTileRemoved?.Invoke(poly);
         foreach (var r in EnumerateSubCellRects())
             _onTileRemoved?.Invoke(r);
+        foreach (var poly in _spanningPolygons)
+            _onTileRemoved?.Invoke(poly);
         _tiles.Clear();
         _polyTiles.Clear();
         _subCellRects.Clear();
+        _spanningPolygons.Clear();
     }
 
     /// <summary>
@@ -375,6 +393,27 @@ public class TileShapes : ICollidable
     /// </summary>
     public Polygon? GetPolygonTileAtCell(int col, int row) =>
         _polyTiles.TryGetValue((col, row), out var poly) ? poly : null;
+
+    /// <summary>
+    /// Adds a polygon collision shape at a fixed world position, independent of the grid.
+    /// Use this instead of <see cref="AddPolygonTileAtCell"/> for a polygon whose bounds span more
+    /// than one cell — <see cref="GetSeparationFor(ICollidable, SlopeCollisionMode)"/> tests it by
+    /// world AABB overlap rather than cell lookup, so there's no "must fit in one cell" limit and
+    /// no per-cell exclusivity with <see cref="AddPolygonTileAtCell"/> tiles.
+    /// </summary>
+    /// <param name="worldPoints">The polygon's points in world space (not cell-local).</param>
+    public void AddSpanningPolygon(IEnumerable<Vector2> worldPoints)
+    {
+        var poly = Polygon.FromPoints(worldPoints);
+        poly.Layer = _layer;
+        poly.IsVisible = _isVisible;
+        poly.Color = _color;
+        poly.IsFilled = _isFilled;
+        poly.OutlineThickness = _outlineThickness;
+
+        _spanningPolygons.Add(poly);
+        _onTileAdded?.Invoke(poly);
+    }
 
     /// <summary>
     /// Adds a sub-cell <see cref="AARect"/> whose center sits at the cell's world
@@ -868,6 +907,28 @@ public class TileShapes : ICollidable
             }
         }
 
+        // Spanning polygons aren't tied to a cell, so they're tested once here by world AABB
+        // overlap instead of inside the per-cell loop above.
+        foreach (var poly in _spanningPolygons)
+        {
+            var (polyMinX, polyMaxX, polyMinY, polyMaxY) = CollisionDispatcher.GetBounds(poly);
+            if (polyMaxX < minX || polyMinX > maxX || polyMaxY < minY || polyMinY > maxY)
+                continue;
+
+            Vector2 sep = slopeMode == SlopeCollisionMode.PlatformerFloor && IsFloorLikePolygon(poly)
+                ? GetHeightmapSeparation(poly, minX, maxX, minY, maxY)
+                : CollisionDispatcher.GetTilePolygonSeparation(shape, poly);
+            if (sep == Vector2.Zero) continue;
+
+            if (sep.X != 0f && sep.Y != 0f)
+                anyDiagonalContribution = true;
+            if (MathF.Abs(sep.X) > MathF.Abs(total.X))
+                total = new Vector2(sep.X, total.Y);
+            if (MathF.Abs(sep.Y) > MathF.Abs(total.Y) &&
+                (total.Y == 0f || MathF.Sign(sep.Y) == MathF.Sign(total.Y)))
+                total = new Vector2(total.X, sep.Y);
+        }
+
         axisAlignedAggregate = !anyDiagonalContribution;
         return total;
     }
@@ -1342,8 +1403,16 @@ public class TileShapes : ICollidable
             r.X += dx;
             r.Y += dy;
         }
+        foreach (var poly in _spanningPolygons)
+        {
+            poly.X += dx;
+            poly.Y += dy;
+        }
     }
 
+    // _spanningPolygons is deliberately excluded here: unlike the other three collections, it
+    // stores world-space points with no col/row key and no GridSize in its position math, so
+    // changing GridSize while only spanning polygons exist can't corrupt anything.
     private void ThrowIfTilesExist()
     {
         if (_tiles.Count > 0 || _polyTiles.Count > 0 || _subCellRects.Count > 0)
