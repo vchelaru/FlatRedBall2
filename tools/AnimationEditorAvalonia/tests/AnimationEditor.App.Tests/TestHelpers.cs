@@ -39,13 +39,21 @@ internal sealed class FakeAppUpdateInstaller : IAppUpdateInstaller
     public string? LastDownloadUrl { get; private set; }
     public int CallCount { get; private set; }
 
-    public Task InstallAndRestartAsync(string downloadUrl, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// When set, <see cref="InstallAndRestartAsync"/> returns this task instead of completing
+    /// immediately — lets a test inspect UI state (e.g. a button's disabled "Downloading…" state)
+    /// while the "download" is still in flight, then complete it explicitly.
+    /// </summary>
+    public TaskCompletionSource<bool>? PendingCompletion { get; set; }
+
+    public async Task InstallAndRestartAsync(string downloadUrl, CancellationToken cancellationToken = default)
     {
         CallCount++;
         LastDownloadUrl = downloadUrl;
+        if (PendingCompletion is not null)
+            await PendingCompletion.Task;
         if (ThrowOnInstall is not null)
             throw ThrowOnInstall;
-        return Task.CompletedTask;
     }
 }
 

@@ -154,12 +154,12 @@ public class AboutDialogTests
     public void BuildAboutContent_ButtonClick_InvokesProvidedOnGetUpdateClick()
     {
         var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
-        var invoked = false;
-        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true, onGetUpdateClick: () => invoked = true);
+        Button? clickedButton = null;
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true, onGetUpdateClick: btn => clickedButton = btn);
         var button = panel.Children.OfType<Button>().First();
 
         button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 
-        Assert.True(invoked);
+        Assert.Same(button, clickedButton);
     }
 }

@@ -144,10 +144,10 @@ public class UpdateCheckStartupTests
     // and the real installer's success path calls Environment.Exit — FakeAppUpdateInstaller
     // never does, so it's safe to drive directly here.
 
-    private static Task InvokePerformGetUpdateActionAsync(MainWindow window, UpdateCheckResult result)
+    private static Task InvokePerformGetUpdateActionAsync(MainWindow window, UpdateCheckResult result, Button? triggeringButton = null)
     {
         var method = typeof(MainWindow).GetMethod("PerformGetUpdateActionAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task)method.Invoke(window, new object[] { result })!;
+        return (Task)method.Invoke(window, new object?[] { result, triggeringButton })!;
     }
 
     [AvaloniaFact]
@@ -167,36 +167,54 @@ public class UpdateCheckStartupTests
         Assert.Equal("https://example.com/win.zip", installer.LastDownloadUrl);
     }
 
+    // These two check the gating decision (CanAutoUpdate) rather than calling
+    // PerformGetUpdateActionAsync end-to-end: its fallback branch calls the real OpenUrl
+    // (Process.Start with UseShellExecute=true), which would actually open a browser tab
+    // during the test run — exactly the kind of hermetic-test violation this file otherwise
+    // avoids by faking IAppUpdateInstaller in the first place.
+    private static bool InvokeCanAutoUpdate(MainWindow window, UpdateCheckResult result)
+    {
+        var method = typeof(MainWindow).GetMethod("CanAutoUpdate", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (bool)method.Invoke(window, new object[] { result })!;
+    }
+
     [AvaloniaFact]
-    public async Task PerformGetUpdateAction_NotSupported_DoesNotInvokeInstaller()
+    public void CanAutoUpdate_NotSupported_ReturnsFalse()
     {
         var ctx = TestHelpers.BuildServices();
-        var installer = new FakeAppUpdateInstaller { IsSupported = false };
-        ctx.UpdateInstaller = installer;
+        ctx.UpdateInstaller = new FakeAppUpdateInstaller { IsSupported = false };
         var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
         var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
 
-        await InvokePerformGetUpdateActionAsync(window, result);
-
-        Assert.Equal(0, installer.CallCount);
+        Assert.False(InvokeCanAutoUpdate(window, result));
     }
 
     [AvaloniaFact]
-    public async Task PerformGetUpdateAction_NoWindowsAsset_DoesNotInvokeInstaller()
+    public void CanAutoUpdate_NoWindowsAsset_ReturnsFalse()
     {
         var ctx = TestHelpers.BuildServices();
-        var installer = new FakeAppUpdateInstaller { IsSupported = true };
-        ctx.UpdateInstaller = installer;
+        ctx.UpdateInstaller = new FakeAppUpdateInstaller { IsSupported = true };
         var window = ctx.CreateMainWindow();
         window.Show();
         Dispatcher.UIThread.RunJobs();
         var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest");
 
-        await InvokePerformGetUpdateActionAsync(window, result);
+        Assert.False(InvokeCanAutoUpdate(window, result));
+    }
 
-        Assert.Equal(0, installer.CallCount);
+    [AvaloniaFact]
+    public void CanAutoUpdate_SupportedWithWindowsAsset_ReturnsTrue()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.UpdateInstaller = new FakeAppUpdateInstaller { IsSupported = true };
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+
+        Assert.True(InvokeCanAutoUpdate(window, result));
     }
 
     [AvaloniaFact]
@@ -214,5 +232,49 @@ public class UpdateCheckStartupTests
 
         var errorBanner = window.FindControl<Border>("ErrorBanner");
         Assert.True(errorBanner!.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_WhileDownloading_TriggeringButtonShowsDisabledDownloadingState()
+    {
+        // The About dialog is a separate modal window, so ShowStatusMessage on the main
+        // window's status bar underneath it would never be seen — the clicked button itself
+        // is the only feedback surface guaranteed visible regardless of which surface triggered it.
+        var ctx = TestHelpers.BuildServices();
+        var pending = new TaskCompletionSource<bool>();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true, PendingCompletion = pending };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+        var button = new Button { Content = "Get Update", IsEnabled = true };
+
+        var task = InvokePerformGetUpdateActionAsync(window, result, button);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(button.IsEnabled);
+        Assert.Equal("Downloading…", button.Content);
+
+        pending.SetResult(true);
+        await task;
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_InstallerThrows_RestoresTriggeringButton()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true, ThrowOnInstall = new InvalidOperationException("disk full") };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+        var button = new Button { Content = "Get Update", IsEnabled = true };
+
+        await InvokePerformGetUpdateActionAsync(window, result, button);
+
+        Assert.True(button.IsEnabled);
+        Assert.Equal("Get Update", button.Content);
     }
 }

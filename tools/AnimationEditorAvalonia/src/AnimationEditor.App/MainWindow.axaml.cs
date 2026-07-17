@@ -833,7 +833,7 @@ public partial class MainWindow : Window
 
     private void WireUpdateAvailableBanner()
     {
-        DownloadUpdateBtn.Click += (_, _) => _ = PerformGetUpdateActionAsync(_lastUpdateCheckResult ?? UpdateCheckResult.NoUpdate);
+        DownloadUpdateBtn.Click += (_, _) => _ = PerformGetUpdateActionAsync(_lastUpdateCheckResult ?? UpdateCheckResult.NoUpdate, DownloadUpdateBtn);
 
         DismissUpdateBannerBtn.Click += (_, _) =>
         {
@@ -849,7 +849,7 @@ public partial class MainWindow : Window
 
         _lastUpdateCheckResult = result;
         UpdateAvailableBannerText.Text = $"Animation Editor v{result.LatestVersion} is available — you're on v{typeof(MainWindow).Assembly.GetName().Version}.";
-        DownloadUpdateBtn.Content = _updateInstaller.IsSupported && result.WindowsDownloadUrl is not null ? "Get Update" : "View Release";
+        DownloadUpdateBtn.Content = CanAutoUpdate(result) ? "Get Update" : "View Release";
         UpdateAvailableBanner.IsVisible = true;
     }
 
@@ -858,27 +858,46 @@ public partial class MainWindow : Window
     /// Auto-updates on Windows when the release has a Windows asset; otherwise falls back to
     /// opening the release page, same as before this existed.
     /// </summary>
-    private async Task PerformGetUpdateActionAsync(UpdateCheckResult result)
+    /// <param name="triggeringButton">
+    /// The clicked button, flipped to a disabled "Downloading…" state for the duration. Passed
+    /// explicitly (rather than reporting through <see cref="ShowStatusMessage"/>) because the
+    /// About dialog is a separate modal window — a message on the main window's status bar
+    /// underneath it would never be seen.
+    /// </param>
+    private async Task PerformGetUpdateActionAsync(UpdateCheckResult result, Button? triggeringButton = null)
     {
-        var fallbackUrl = result.ReleaseUrl ?? ReleasesUrl;
-        if (!_updateInstaller.IsSupported || result.WindowsDownloadUrl is null)
+        if (!CanAutoUpdate(result))
         {
-            OpenUrl(fallbackUrl);
+            OpenUrl(result.ReleaseUrl ?? ReleasesUrl);
             return;
+        }
+
+        if (triggeringButton is not null)
+        {
+            triggeringButton.IsEnabled = false;
+            triggeringButton.Content = "Downloading…";
         }
 
         try
         {
-            ShowStatusMessage("Downloading update…");
-            await _updateInstaller.InstallAndRestartAsync(result.WindowsDownloadUrl);
+            await _updateInstaller.InstallAndRestartAsync(result.WindowsDownloadUrl!);
             // The real installer exits the process on success (see WindowsAppUpdateInstaller) —
             // this line only runs for a fake installer in tests that returns without exiting.
         }
         catch (Exception ex)
         {
             ShowStatusMessage($"⚠ Update failed: {ex.Message}", isError: true);
+            if (triggeringButton is not null)
+            {
+                triggeringButton.IsEnabled = true;
+                triggeringButton.Content = "Get Update";
+            }
         }
     }
+
+    /// <summary>Windows-only for now (see <see cref="WindowsAppUpdateInstaller"/>) and only when the release actually has a Windows asset.</summary>
+    private bool CanAutoUpdate(UpdateCheckResult result) =>
+        _updateInstaller.IsSupported && result.WindowsDownloadUrl is not null;
 
     // ── AppCommands wiring ────────────────────────────────────────────────────
 
@@ -2019,8 +2038,7 @@ public partial class MainWindow : Window
     private async Task ShowAboutDialogAsync()
     {
         var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        var canAutoUpdate = _updateInstaller.IsSupported && result.WindowsDownloadUrl is not null;
-        await BuildAboutWindow(result, canAutoUpdate, () => _ = PerformGetUpdateActionAsync(result)).ShowDialog(this);
+        await BuildAboutWindow(result, CanAutoUpdate(result), btn => _ = PerformGetUpdateActionAsync(result, btn)).ShowDialog(this);
     }
 
     /// <summary>
@@ -2134,7 +2152,7 @@ public partial class MainWindow : Window
     /// Extracted for testability.
     /// </summary>
     internal static Window BuildAboutWindow(
-        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action? onGetUpdateClick = null) =>
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button>? onGetUpdateClick = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2150,7 +2168,7 @@ public partial class MainWindow : Window
     /// Extracted for testability.
     /// </summary>
     internal static Control BuildAboutContent(
-        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action? onGetUpdateClick = null)
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button>? onGetUpdateClick = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -2173,7 +2191,7 @@ public partial class MainWindow : Window
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
                 new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildActionButton(buttonLabel, releaseUrl, onGetUpdateClick ?? (() => OpenUrl(releaseUrl))),
+                BuildActionButton(buttonLabel, releaseUrl, onGetUpdateClick ?? (_ => OpenUrl(releaseUrl))),
             }
         };
     }
@@ -2192,14 +2210,15 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds a button whose click runs <paramref name="onClick"/>. <paramref name="tag"/> is
-    /// stashed on <see cref="Button.Tag"/> (the release URL, whether or not the click actually
+    /// Builds a button whose click runs <paramref name="onClick"/> (passed the button itself, so
+    /// callers can flip its label/enabled state for in-place progress feedback). <paramref name="tag"/>
+    /// is stashed on <see cref="Button.Tag"/> (the release URL, whether or not the click actually
     /// opens it) so tests can identify the button without triggering its click behavior.
     /// </summary>
-    private static Button BuildActionButton(string label, string tag, Action onClick)
+    private static Button BuildActionButton(string label, string tag, Action<Button> onClick)
     {
         var button = new Button { Content = label, Tag = tag };
-        button.Click += (_, _) => onClick();
+        button.Click += (_, _) => onClick(button);
         return button;
     }
 
