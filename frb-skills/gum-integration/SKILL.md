@@ -119,7 +119,7 @@ var scoreText = new TextRuntime { Text = "0", FontSize = 48 };
 Add(scoreText);
 ```
 
-For `Label`, text styling still lives on the underlying `TextRuntime`. Changing `Label.Text` updates content only; change the visual for `FontSize`/opacity:
+For `Label`, text styling still lives on the underlying `TextRuntime`. Changing `Label.Text` updates content only; change the visual for `FontSize`/`Color`/opacity:
 
 ```csharp
 using MonoGameGum.GueDeriving;
@@ -127,11 +127,16 @@ using MonoGameGum.GueDeriving;
 if (scoreLabel.Visual is TextRuntime text)
 {
     text.FontSize = 28;
+    text.Color = Color.White;
     text.Alpha = 180; // 0..255 opacity
 }
 ```
 
-With Gum codegen, many text instances are already typed as `TextRuntime` properties (for example `mainMenu.TitleText`), so set `FontSize`/`Alpha` directly there.
+With Gum codegen, many text instances are already typed as `TextRuntime` properties (for example `mainMenu.TitleText`), so set `FontSize`/`Color`/`Alpha` directly there.
+
+**The `is TextRuntime` cast only holds for the default visual.** A `.gumx`-authored custom Label component makes `Visual` something else, so the cast silently no-ops. Use `scoreLabel.Visual.GetGraphicalUiElementByName("TextInstance")` instead — Gum's own `Label` looks up its text part by that same name, so any custom Label component already needs an instance called `TextInstance` for `Label.Text` to work.
+
+See also: Gum's [controls](https://docs.flatredball.com/gum/code/controls) and [styling individual controls](https://docs.flatredball.com/gum/code/styling/code-only-styling/styling-individual-controls) docs for state-safe styling — a highlight/push/focus state change can revert a color set this way.
 
 ## Render Ordering (Layers / Z)
 
@@ -275,7 +280,7 @@ The API differs by type:
 - **"Keyboard navigation" on Forms controls means Tab/accessibility focus only — not arrow keys.** Game action menus (battle commands, pause menus) require custom logic: maintain a `_selectedIndex` int and drive selection with `WasKeyPressed(Keys.Up/Down/Left/Right)` in `Screen.CustomActivity`. Apply visual highlight by toggling a property on the selected element. Do not try to use `Button.IsFocused` or `OnKeyDown` for this — Forms focus is designed for form tab-order, not game input.
 - **Namespace**: `TextRuntime` is in `MonoGameGum.GueDeriving`. Forms controls (`Button`, `Label`, etc.) are in `Gum.Forms.Controls`. `Anchor`/`Dock` enums are in `Gum.Wireframe`. `GetFrameworkElementByName` extension is in `Gum.Forms`. Shapes (`ColoredCircleRuntime`, `RoundedRectangleRuntime`, `ArcRuntime`) are in `MonoGameGum.GueDeriving` — same namespace as other visual types. Do **not** use `MonoGameGum.Forms.Controls` — all types there are `[Obsolete(error: true)]`.
 - **Visibility by type** — `FrameworkElement` uses `.IsVisible`; visual types (`ColoredRectangleRuntime`, etc.) use `.Visible`. Do not use `element.Visual.Visible` directly on FrameworkElement.
-- **`Label` style knobs are on `label.Visual`**. `Label` itself does not expose `FontSize`/`Alpha`; cast `label.Visual` to `TextRuntime` when you need runtime size/opacity changes.
+- **`Label` style knobs (`FontSize`, `Color`, `Alpha`) are on `label.Visual`, not `Label` itself.** Cast to `TextRuntime` for the default visual; use `GetGraphicalUiElementByName("TextInstance")` when the project gives `Label` a custom component (see *Displaying Text* above).
 - **`Add()` upscales fonts** when the window is larger than the design canvas (`PixelsPerUnit > 1`). At 2× scale a 22px font bitmap renders as a 44px upscale — blocky. Use `AddOverlay()` for text-bearing HUD to render at native back-buffer resolution (1:1). See *Overlay vs Camera UI: Rendering Quality* above.
 - **Gum coordinates are screen pixels, Y-down** — opposite of the game world (Y-up, centered). Use `Anchor`/`Dock` to avoid hard-coding pixel positions.
 - **Projected world coordinates under zoom** — `Camera.WorldToScreen` gives viewport pixels, but Gum applies zoom scaling during render. For projected Gum overlays (selection rectangles, tile highlights), convert viewport-pixel coordinates into Gum canvas units using zoom compensation (`1 / Camera.Zoom`) to avoid double-scaling drift.
