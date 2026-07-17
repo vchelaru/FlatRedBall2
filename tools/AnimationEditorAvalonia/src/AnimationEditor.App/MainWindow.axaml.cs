@@ -226,6 +226,7 @@ public partial class MainWindow : Window
         WireKeyboard();
         WireTabBar();
         WireDefaultHandlerBanner();
+        WireUpdateAvailableBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
@@ -818,6 +819,33 @@ public partial class MainWindow : Window
         {
             DefaultHandlerBanner.IsVisible = true;
         }
+    }
+
+    // ── Update-available banner (issue #681) ──────────────────────────────────
+
+    // Session-only (not persisted): dismissing just quiets the current run. The check
+    // re-runs (and can re-show the banner) on the next launch until the user actually updates.
+    private bool _updateBannerDismissed;
+
+    private void WireUpdateAvailableBanner()
+    {
+        DownloadUpdateBtn.Click += (_, _) => OpenUrl((string)DownloadUpdateBtn.Tag!);
+
+        DismissUpdateBannerBtn.Click += (_, _) =>
+        {
+            _updateBannerDismissed = true;
+            UpdateAvailableBanner.IsVisible = false;
+        };
+    }
+
+    private void ShowUpdateAvailableBannerIfAppropriate(UpdateCheckResult result)
+    {
+        if (!result.IsUpdateAvailable || _updateBannerDismissed)
+            return;
+
+        UpdateAvailableBannerText.Text = $"Animation Editor v{result.LatestVersion} is available — you're on v{typeof(MainWindow).Assembly.GetName().Version}.";
+        DownloadUpdateBtn.Tag = result.ReleaseUrl ?? ReleasesUrl;
+        UpdateAvailableBanner.IsVisible = true;
     }
 
     // ── AppCommands wiring ────────────────────────────────────────────────────
@@ -1964,17 +1992,14 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// Silent startup check (issue #681) — respects <see cref="UpdateCheckPolicy"/>'s cache
-    /// window so re-launching the same day doesn't re-hit the GitHub API. Shows a toast only
-    /// when an update is actually available; never blocks or errors visibly on failure.
+    /// window so re-launching the same day doesn't re-hit the GitHub API. Shows the persistent
+    /// <see cref="UpdateAvailableBanner"/> only when an update is actually available; never
+    /// blocks or errors visibly on failure.
     /// </summary>
     private async Task RunStartupUpdateCheckAsync()
     {
         var result = await GetUpdateCheckResultAsync(forceRefresh: false);
-        if (result.IsUpdateAvailable)
-        {
-            var url = result.ReleaseUrl ?? ReleasesUrl;
-            ShowToast($"Update available: v{result.LatestVersion}", retryAction: () => OpenUrl(url), actionLabel: "View");
-        }
+        ShowUpdateAvailableBannerIfAppropriate(result);
     }
 
     /// <summary>
@@ -5303,11 +5328,10 @@ public partial class MainWindow : Window
         };
     }
 
-    private void ShowToast(string message, Action? retryAction = null, string actionLabel = "Retry")
+    private void ShowToast(string message, Action? retryAction = null)
     {
         _toastRetryAction = retryAction;
         ToastMessage.Text = message;
-        ToastRetryBtn.Content = actionLabel;
         ToastRetryBtn.IsVisible = retryAction is not null;
         ToastPanel.IsVisible = true;
 

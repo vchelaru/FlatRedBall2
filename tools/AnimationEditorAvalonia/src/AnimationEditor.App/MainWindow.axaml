@@ -262,6 +262,54 @@
             </DockPanel>
         </Border>
 
+        <!-- ── Update-available banner (issue #681) ── same "actionable info" tier as
+             DefaultHandlerBanner above; stays until dismissed or the app is updated,
+             so it doesn't get missed the way an auto-dismissing toast would. ── -->
+        <Border x:Name="UpdateAvailableBanner"
+                DockPanel.Dock="Top"
+                IsVisible="False"
+                Background="{DynamicResource InfoBannerBg}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1">
+            <DockPanel>
+                <Border DockPanel.Dock="Left"
+                        Width="3"
+                        Background="{DynamicResource AccentCool}" />
+                <DockPanel Margin="12,6">
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Button x:Name="DownloadUpdateBtn"
+                                Content="Download Update"
+                                Padding="10,3"
+                                FontSize="12" />
+                        <Button x:Name="DismissUpdateBannerBtn"
+                                Content="Dismiss"
+                                Padding="10,3"
+                                FontSize="12"
+                                Background="Transparent"
+                                Foreground="{DynamicResource InkMid}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Path Width="16"
+                              Height="16"
+                              VerticalAlignment="Center"
+                              Stretch="Uniform"
+                              Fill="{DynamicResource AccentCool}"
+                              Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+                        <TextBlock x:Name="UpdateAvailableBannerText"
+                                   Text="A new version of the Animation Editor is available."
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Ink}" />
+                    </StackPanel>
+                </DockPanel>
+            </DockPanel>
+        </Border>
+
         <Border DockPanel.Dock="Bottom"
                 Background="{DynamicResource BgRail}"
                 BorderBrush="{DynamicResource LineBrush}"
