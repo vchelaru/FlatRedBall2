@@ -47,4 +47,44 @@ public class SelfUpdateScriptBuilderTests
         Assert.Contains("Remove-Item", script);
         Assert.Contains(@"C:\temp\work", script);
     }
+
+    // ── Status window (so the user isn't staring at nothing between the app closing and the
+    // updated one appearing) ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Build_ShowsAWinFormsStatusWindow()
+    {
+        var script = SelfUpdateScriptBuilder.Build(1234, @"C:\temp\extracted", @"C:\Apps\AnimationEditor", "AnimationEditor.exe", @"C:\temp\work");
+
+        Assert.Contains("System.Windows.Forms.Form", script);
+        Assert.Contains("$form.Show()", script);
+    }
+
+    [Fact]
+    public void Build_ReportsEachPhaseOfTheUpdate()
+    {
+        var script = SelfUpdateScriptBuilder.Build(1234, @"C:\temp\extracted", @"C:\Apps\AnimationEditor", "AnimationEditor.exe", @"C:\temp\work");
+
+        Assert.Contains("Waiting for Animation Editor to close", script);
+        Assert.Contains("Installing update", script);
+        Assert.Contains("Launching Animation Editor", script);
+    }
+
+    [Fact]
+    public void Build_PumpsTheMessageLoopWhileWaiting()
+    {
+        // Without periodic DoEvents() calls the form would never paint or respond while this
+        // script's own while-loop/Copy-Item are running on the same thread.
+        var script = SelfUpdateScriptBuilder.Build(1234, @"C:\temp\extracted", @"C:\Apps\AnimationEditor", "AnimationEditor.exe", @"C:\temp\work");
+
+        Assert.Contains("[System.Windows.Forms.Application]::DoEvents()", script);
+    }
+
+    [Fact]
+    public void Build_ClosesTheFormBeforeCleanup()
+    {
+        var script = SelfUpdateScriptBuilder.Build(1234, @"C:\temp\extracted", @"C:\Apps\AnimationEditor", "AnimationEditor.exe", @"C:\temp\work");
+
+        Assert.True(script.IndexOf("$form.Close()") < script.IndexOf("Remove-Item"));
+    }
 }

@@ -155,11 +155,25 @@ public class AboutDialogTests
     {
         var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
         Button? clickedButton = null;
-        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true, onGetUpdateClick: btn => clickedButton = btn);
+        ProgressBar? passedProgressBar = null;
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, canAutoUpdate: true,
+            onGetUpdateClick: (btn, progressBar) => { clickedButton = btn; passedProgressBar = progressBar; });
         var button = panel.Children.OfType<Button>().First();
 
         button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 
         Assert.Same(button, clickedButton);
+        Assert.NotNull(passedProgressBar);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_ContainsHiddenProgressBar()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent();
+
+        var progressBar = panel.Children.OfType<ProgressBar>().FirstOrDefault();
+
+        Assert.NotNull(progressBar);
+        Assert.False(progressBar!.IsVisible);
     }
 }

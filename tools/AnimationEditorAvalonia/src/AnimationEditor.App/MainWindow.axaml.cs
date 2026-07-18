@@ -833,7 +833,7 @@ public partial class MainWindow : Window
 
     private void WireUpdateAvailableBanner()
     {
-        DownloadUpdateBtn.Click += (_, _) => _ = PerformGetUpdateActionAsync(_lastUpdateCheckResult ?? UpdateCheckResult.NoUpdate, DownloadUpdateBtn);
+        DownloadUpdateBtn.Click += (_, _) => _ = PerformGetUpdateActionAsync(_lastUpdateCheckResult ?? UpdateCheckResult.NoUpdate, DownloadUpdateBtn, UpdateDownloadProgress);
 
         DismissUpdateBannerBtn.Click += (_, _) =>
         {
@@ -864,7 +864,11 @@ public partial class MainWindow : Window
     /// About dialog is a separate modal window — a message on the main window's status bar
     /// underneath it would never be seen.
     /// </param>
-    private async Task PerformGetUpdateActionAsync(UpdateCheckResult result, Button? triggeringButton = null)
+    /// <param name="progressBar">
+    /// Shown alongside the button for the duration — the download of a self-contained build is
+    /// tens of MB, so a spinner communicates "working" beyond the button's static text change.
+    /// </param>
+    private async Task PerformGetUpdateActionAsync(UpdateCheckResult result, Button? triggeringButton = null, ProgressBar? progressBar = null)
     {
         if (!CanAutoUpdate(result))
         {
@@ -877,6 +881,8 @@ public partial class MainWindow : Window
             triggeringButton.IsEnabled = false;
             triggeringButton.Content = "Downloading…";
         }
+        if (progressBar is not null)
+            progressBar.IsVisible = true;
 
         try
         {
@@ -892,6 +898,8 @@ public partial class MainWindow : Window
                 triggeringButton.IsEnabled = true;
                 triggeringButton.Content = "Get Update";
             }
+            if (progressBar is not null)
+                progressBar.IsVisible = false;
         }
     }
 
@@ -2038,7 +2046,8 @@ public partial class MainWindow : Window
     private async Task ShowAboutDialogAsync()
     {
         var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        await BuildAboutWindow(result, CanAutoUpdate(result), btn => _ = PerformGetUpdateActionAsync(result, btn)).ShowDialog(this);
+        await BuildAboutWindow(result, CanAutoUpdate(result),
+            (btn, progressBar) => _ = PerformGetUpdateActionAsync(result, btn, progressBar)).ShowDialog(this);
     }
 
     /// <summary>
@@ -2152,7 +2161,7 @@ public partial class MainWindow : Window
     /// Extracted for testability.
     /// </summary>
     internal static Window BuildAboutWindow(
-        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button>? onGetUpdateClick = null) =>
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button, ProgressBar>? onGetUpdateClick = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2168,7 +2177,7 @@ public partial class MainWindow : Window
     /// Extracted for testability.
     /// </summary>
     internal static Control BuildAboutContent(
-        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button>? onGetUpdateClick = null)
+        UpdateCheckResult? updateCheck = null, bool canAutoUpdate = false, Action<Button, ProgressBar>? onGetUpdateClick = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -2181,6 +2190,10 @@ public partial class MainWindow : Window
             ? "View Releases on GitHub"
             : canAutoUpdate ? "Get Update" : "View Release";
 
+        var progressBar = new ProgressBar { IsIndeterminate = true, IsVisible = false, Height = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
+        var button = BuildActionButton(buttonLabel, releaseUrl,
+            onGetUpdateClick is null ? _ => OpenUrl(releaseUrl) : btn => onGetUpdateClick(btn, progressBar));
+
         return new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
@@ -2191,7 +2204,8 @@ public partial class MainWindow : Window
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
                 new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildActionButton(buttonLabel, releaseUrl, onGetUpdateClick ?? (_ => OpenUrl(releaseUrl))),
+                button,
+                progressBar,
             }
         };
     }

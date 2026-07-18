@@ -144,10 +144,11 @@ public class UpdateCheckStartupTests
     // and the real installer's success path calls Environment.Exit — FakeAppUpdateInstaller
     // never does, so it's safe to drive directly here.
 
-    private static Task InvokePerformGetUpdateActionAsync(MainWindow window, UpdateCheckResult result, Button? triggeringButton = null)
+    private static Task InvokePerformGetUpdateActionAsync(
+        MainWindow window, UpdateCheckResult result, Button? triggeringButton = null, ProgressBar? progressBar = null)
     {
         var method = typeof(MainWindow).GetMethod("PerformGetUpdateActionAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task)method.Invoke(window, new object?[] { result, triggeringButton })!;
+        return (Task)method.Invoke(window, new object?[] { result, triggeringButton, progressBar })!;
     }
 
     [AvaloniaFact]
@@ -261,7 +262,29 @@ public class UpdateCheckStartupTests
     }
 
     [AvaloniaFact]
-    public async Task PerformGetUpdateAction_InstallerThrows_RestoresTriggeringButton()
+    public async Task PerformGetUpdateAction_WhileDownloading_ProgressBarBecomesVisible()
+    {
+        var ctx = TestHelpers.BuildServices();
+        var pending = new TaskCompletionSource<bool>();
+        var installer = new FakeAppUpdateInstaller { IsSupported = true, PendingCompletion = pending };
+        ctx.UpdateInstaller = installer;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
+        var progressBar = new ProgressBar { IsVisible = false };
+
+        var task = InvokePerformGetUpdateActionAsync(window, result, progressBar: progressBar);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(progressBar.IsVisible);
+
+        pending.SetResult(true);
+        await task;
+    }
+
+    [AvaloniaFact]
+    public async Task PerformGetUpdateAction_InstallerThrows_RestoresTriggeringButtonAndHidesProgressBar()
     {
         var ctx = TestHelpers.BuildServices();
         var installer = new FakeAppUpdateInstaller { IsSupported = true, ThrowOnInstall = new InvalidOperationException("disk full") };
@@ -271,10 +294,12 @@ public class UpdateCheckStartupTests
         Dispatcher.UIThread.RunJobs();
         var result = new UpdateCheckResult(true, new Version(2026, 7, 17), "https://example.com/latest", "https://example.com/win.zip");
         var button = new Button { Content = "Get Update", IsEnabled = true };
+        var progressBar = new ProgressBar { IsVisible = true };
 
-        await InvokePerformGetUpdateActionAsync(window, result, button);
+        await InvokePerformGetUpdateActionAsync(window, result, button, progressBar);
 
         Assert.True(button.IsEnabled);
         Assert.Equal("Get Update", button.Content);
+        Assert.False(progressBar.IsVisible);
     }
 }

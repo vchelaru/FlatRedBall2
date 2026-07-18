@@ -280,6 +280,12 @@
                                 Orientation="Horizontal"
                                 Spacing="8"
                                 VerticalAlignment="Center">
+                        <ProgressBar x:Name="UpdateDownloadProgress"
+                                     IsIndeterminate="True"
+                                     IsVisible="False"
+                                     Width="60"
+                                     Height="4"
+                                     VerticalAlignment="Center" />
                         <Button x:Name="DownloadUpdateBtn"
                                 Content="Get Update"
                                 Padding="10,3"
