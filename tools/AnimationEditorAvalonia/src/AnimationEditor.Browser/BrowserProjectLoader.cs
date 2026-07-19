@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using AnimationEditor.App.Services;
 using AnimationEditor.Core;
+using AnimationEditor.Core.Data;
+using AnimationEditor.Core.IO;
 using FlatRedBall2.Animation.Content;
 using SkiaSharp;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -72,6 +74,54 @@ internal static class BrowserProjectLoader
 
         // achxFile.Name has no real filesystem meaning here -- it's only the logical identity
         // ProjectManager.FileName exposes, and preParsed means it's never read from disk.
+        selectedState.Reset();
+        projectManager.LoadAnimationChain(new FilePath(achxFile.Name), acls, knownTextureSizes);
+        if (acls.AnimationChains.Count > 0)
+            selectedState.SelectedChain = acls.AnimationChains[0];
+
+        return achxFile;
+    }
+
+    /// <summary>
+    /// #763 fallback: loads from a single already-identified .achx file plus targeted
+    /// per-texture-name lookups via <paramref name="resolveTextureFile"/>, instead of a
+    /// pre-enumerated file list. Used when directory enumeration
+    /// (<c>dirHandle.entries()</c>) throws but named lookups (<c>getFileHandle</c>) on the same
+    /// handle still work. A texture name <paramref name="resolveTextureFile"/> can't resolve --
+    /// e.g. one living outside the granted folder, the separate cross-folder-texture problem --
+    /// is silently skipped rather than failing the whole load.
+    /// </summary>
+    public static async Task<IEditorFile> TryLoadFromNamedAchxAsync(
+        IEditorFile achxFile,
+        Func<string, Task<IEditorFile?>> resolveTextureFile,
+        ProjectManager projectManager,
+        ThumbnailService thumbnailService,
+        ISelectedState selectedState)
+    {
+        string achxText;
+        await using (var achxStream = await achxFile.OpenReadAsync())
+        using (var reader = new StreamReader(achxStream))
+            achxText = await reader.ReadToEndAsync();
+
+        var acls = AnimationChainListSave.FromString(achxText);
+        var textureNames = TextureListBuilder.GetAvailableTextures(acls);
+
+        var knownTextureSizes = await NamedTextureResolver.ResolveSizesAsync(textureNames, async name =>
+        {
+            var file = await resolveTextureFile(name);
+            if (file is null) return null;
+
+            await using var pngStream = await file.OpenReadAsync();
+            using var buffer = new MemoryStream();
+            await pngStream.CopyToAsync(buffer);
+
+            var bitmap = SKBitmap.Decode(buffer.ToArray());
+            if (bitmap is null) return null;
+
+            thumbnailService.SeedTexture(name, bitmap);
+            return (bitmap.Width, bitmap.Height);
+        });
+
         selectedState.Reset();
         projectManager.LoadAnimationChain(new FilePath(achxFile.Name), acls, knownTextureSizes);
         if (acls.AnimationChains.Count > 0)

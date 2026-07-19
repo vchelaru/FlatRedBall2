@@ -60,6 +60,9 @@ internal static partial class NativeFolderInterop
     [JSImport("fileInfo", ModuleName)]
     private static partial Task<string> FileInfoJsonAsync(JSObject dirHandle, string name);
 
+    [JSImport("pickAchxFile", ModuleName)]
+    public static partial Task<string?> PickAchxFileNameAsync(JSObject dirHandle);
+
     [JSImport("readFileBase64", ModuleName)]
     private static partial Task<string> ReadFileBase64JsAsync(JSObject dirHandle, string name);
 

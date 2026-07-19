@@ -45,6 +45,7 @@ public class BrowserIoManager : IIoManager
     public void WriteRecoveryFile(AnimationChainListSave? animationChainListSave) { }
     public void DeleteRecoveryFile() { }
     public bool RecoveryFileExists() => false;
+    public AnimationChainListSave? TryReadRecoveryFile() => null;
 
     /// <summary>
     /// Computes the companion file's bare name from an .achx file name, dropping any directory

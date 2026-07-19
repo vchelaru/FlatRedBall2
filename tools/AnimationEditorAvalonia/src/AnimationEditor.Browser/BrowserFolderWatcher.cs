@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
 using AnimationEditor.Core.IO;
 using Avalonia.Threading;
@@ -23,6 +24,7 @@ internal sealed class BrowserFolderWatcher : IDisposable
     private bool _seeded;
     private bool _pollInFlight;
     private bool _disposed;
+    private bool _enumerationFailed;
 
     /// <summary>Fires with the names of every .png whose size or last-modified time changed
     /// since the previous poll. Never fires on the very first poll (that just seeds the baseline).</summary>
@@ -35,11 +37,13 @@ internal sealed class BrowserFolderWatcher : IDisposable
         _timer.Tick += async (_, _) => await PollAsync();
     }
 
-    /// <summary>Seeds the baseline snapshot (reporting nothing) and starts polling.</summary>
+    /// <summary>Seeds the baseline snapshot (reporting nothing) and starts polling -- a no-op if
+    /// the seeding poll already found enumeration unsupported in this environment (#763).</summary>
     public async Task StartAsync()
     {
         await PollAsync();
-        _timer.Start();
+        if (!_enumerationFailed)
+            _timer.Start();
     }
 
     // Enumerating a folder and fetching each file's properties is async and can plausibly
@@ -72,6 +76,16 @@ internal sealed class BrowserFolderWatcher : IDisposable
 
             _seeded = true;
             _lastKnown = current;
+        }
+        catch (JSException ex)
+        {
+            // Same enumeration failure Open Folder itself can hit (#763) -- WASM is
+            // single-threaded, so letting this escape the DispatcherTimer.Tick handler would
+            // abort the whole runtime, not just watching. Watching this folder just isn't
+            // possible this session; disable it instead of retrying every tick forever.
+            Console.WriteLine($"[OpenFolder] folder watch disabled -- enumeration failed: {ex.Message}");
+            _enumerationFailed = true;
+            _timer.Stop();
         }
         finally
         {
