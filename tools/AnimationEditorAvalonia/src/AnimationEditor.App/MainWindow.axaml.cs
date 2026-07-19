@@ -769,24 +769,72 @@ public partial class MainWindow : Window
 
     private void OnOpened(object? sender, EventArgs e)
     {
-        var args = Environment.GetCommandLineArgs();
-        if (args.Length >= 2 && File.Exists(args[1]))
+        _ = HandleStartupAsync();
+    }
+
+    private async Task HandleStartupAsync()
+    {
+        if (!await TryRestoreRecoveryFileAsync())
         {
-            _ = LoadAnimationFileAsync(args[1]);
-        }
-        else if (_appSettings.OpenTabPaths.Count > 0)
-        {
-            _ = RestoreTabsAsync();
-        }
-        else
-        {
-            _projectManager.AnimationChainListSave =
-                new AnimationChainListSave();
+            var args = Environment.GetCommandLineArgs();
+            if (args.Length >= 2 && File.Exists(args[1]))
+            {
+                _ = LoadAnimationFileAsync(args[1]);
+            }
+            else if (_appSettings.OpenTabPaths.Count > 0)
+            {
+                _ = RestoreTabsAsync();
+            }
+            else
+            {
+                _projectManager.AnimationChainListSave =
+                    new AnimationChainListSave();
+            }
         }
 
         RefreshFilesPanel();
         ShowDefaultHandlerBannerIfAppropriate();
         _ = RunStartupUpdateCheckAsync();
+    }
+
+    /// <summary>
+    /// Checks for a crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/> after
+    /// an unclean shutdown of an unsaved document (see <see cref="AppCommands.SaveCurrentAnimationChainList"/>).
+    /// When found, asks the user via <see cref="IAppCommands.ConfirmAsync"/> whether to restore it.
+    /// Returns <c>true</c> when recovered content was loaded as the active document (still
+    /// unsaved — <see cref="ProjectManager.FileName"/> stays null, matching the pre-crash state),
+    /// so the caller should skip its normal open-file / restore-tabs / blank-document startup.
+    /// Returns <c>false</c> when there was nothing to restore, the user declined, or the file
+    /// could not be parsed — in the latter two cases the stale recovery file is deleted first.
+    /// </summary>
+    private async Task<bool> TryRestoreRecoveryFileAsync()
+    {
+        if (!_ioManager.RecoveryFileExists()) return false;
+
+        bool restore = await _appCommands.ConfirmAsync(
+            "A recovery file was found from an unexpected shutdown. Restore the unsaved animation?",
+            "Restore Recovery File");
+
+        if (!restore)
+        {
+            _ioManager.DeleteRecoveryFile();
+            return false;
+        }
+
+        var recovered = _ioManager.TryReadRecoveryFile();
+        if (recovered is null)
+        {
+            _ioManager.DeleteRecoveryFile();
+            return false;
+        }
+
+        _projectManager.AnimationChainListSave = recovered;
+        _projectManager.FileName = null;
+        _selectedState.Reset();
+        _selectedState.SelectedChain = recovered.AnimationChains.FirstOrDefault();
+        _undoManager.Clear();
+        RefreshTreeView();
+        return true;
     }
 
     // ── Default-handler prompt banner ─────────────────────────────────────────
