@@ -13,6 +13,7 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Update;
+using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -1025,10 +1026,7 @@ public partial class MainWindow : Window
         SaveCompanionFile();
     }
 
-    private int GetGridSizeFromInput()
-    {
-        return int.TryParse(GridSizeInput.Text, out int v) && v >= 1 ? Math.Min(v, 512) : 16;
-    }
+    private int GetGridSizeFromInput() => NumericToolbarInput.ParseGridSize(GridSizeInput.Text);
 
     private void OnGridSizeInputLostFocus(object? sender, RoutedEventArgs e) => ApplyGridSize();
 
@@ -4629,13 +4627,13 @@ public partial class MainWindow : Window
         SpeedUpBtn.Click   += (_, _) =>
         {
             double s = Math.Min(Math.Round(GetSpeedFromInput() + 0.1, 1), 10.0);
-            SpeedInput.Text = s.ToString("0.0#");
+            SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
             PreviewCtrl.SpeedMultiplier = s;
         };
         SpeedDownBtn.Click += (_, _) =>
         {
             double s = Math.Max(Math.Round(GetSpeedFromInput() - 0.1, 1), 0.1);
-            SpeedInput.Text = s.ToString("0.0#");
+            SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
             PreviewCtrl.SpeedMultiplier = s;
         };
     }
@@ -4718,16 +4716,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private double GetSpeedFromInput() =>
-        double.TryParse(SpeedInput.Text, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out double v)
-            ? Math.Clamp(v, 0.1, 10.0)
-            : 1.0;
+    private double GetSpeedFromInput() => NumericToolbarInput.ParseSpeed(SpeedInput.Text);
 
     private void ApplySpeedFromInput()
     {
         double s = GetSpeedFromInput();
-        SpeedInput.Text = s.ToString("0.0#");
+        SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
         PreviewCtrl.SpeedMultiplier = s;
     }
 
