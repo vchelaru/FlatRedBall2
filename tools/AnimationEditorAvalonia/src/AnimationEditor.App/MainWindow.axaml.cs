@@ -3872,135 +3872,72 @@ public partial class MainWindow : Window
         AnimTree.ContextMenu.Items.Clear();
 
         var vm = AnimTree.SelectedItem as TreeNodeVm;
+        var data = vm?.Data;
 
-        if (vm?.Data is AARectSave rect)
+        // Rename and the chain-duplicate flip variants need the tree's visual nodes / a
+        // captured node reference, so they stay host callbacks rather than moving into the
+        // shared plan.
+        Action? rename = data switch
         {
-            AddShapeReorderItems(rect, _objectFinder.GetAnimationFrameContaining(rect));
-            AddMenuItem("Match Frame Size", () =>
-            {
-                var frame = _selectedState.SelectedFrame;
-                if (frame is not null)
-                {
-                    _appCommands.MatchRectangleToFrame(rect, frame);
-                    _appCommands.RefreshAnimationFrameDisplay();
-                    _appCommands.SaveCurrentAnimationChainList();
-                }
-            });
-            AddSeparator();
-            AddMenuItem("Copy",  () => _ = HandleCopyAsync());
-            AddMenuItem("Cut",   () => _ = HandleCutAsync());
-            AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", HandleDuplicate);
-            AddSeparator();
-            AddMenuItem("Rename…", () => BeginInlineRename(vm!, rect.Name));
-            AddSeparator();
-            AddMenuItem("Delete Rectangle", HandleDelete);
-        }
-        else if (vm?.Data is CircleSave circle)
-        {
-            AddShapeReorderItems(circle, _objectFinder.GetAnimationFrameContaining(circle));
-            AddMenuItem("Copy",  () => _ = HandleCopyAsync());
-            AddMenuItem("Cut",   () => _ = HandleCutAsync());
-            AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddMenuItem("Duplicate", HandleDuplicate);
-            AddSeparator();
-            AddMenuItem("Rename…", () => BeginInlineRename(vm!, circle.Name));
-            AddSeparator();
-            AddMenuItem("Delete Circle", HandleDelete);
-        }
-        else if (vm?.Data is AnimationFrameSave frame2)
-        {
-            var chain2 = _objectFinder.GetAnimationChainContaining(frame2);
-            if (chain2 is not null && chain2.Frames.Count > 1)
-            {
-                var frameIndex = chain2.Frames.IndexOf(frame2);
-                var isFirst    = frameIndex == 0;
-                var isLast     = frameIndex == chain2.Frames.Count - 1;
-                if (!isFirst) AddMenuItem("^^ Move To Top",   () => _appCommands.MoveFrameToTop(frame2, chain2));
-                if (!isFirst) AddMenuItem("^  Move Up",        () => _appCommands.MoveFrame(frame2, chain2, -1));
-                if (!isLast)  AddMenuItem("v  Move Down",      () => _appCommands.MoveFrame(frame2, chain2, +1));
-                if (!isLast)  AddMenuItem("vv Move To Bottom", () => _appCommands.MoveFrameToBottom(frame2, chain2));
-                AddSeparator();
-            }
-            AddMenuItem("Add AxisAlignedRectangle", () => _appCommands.AddAxisAlignedRectangle(frame2));
-            AddMenuItem("Add Circle",               () => _appCommands.AddCircle(frame2));
-            AddSeparator();
-            AddMenuItem("Copy",  () => _ = HandleCopyAsync());
-            AddMenuItem("Cut",   () => _ = HandleCutAsync());
-            AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            if (chain2 is not null)
-                AddMenuItem("Duplicate", HandleDuplicate);
-            AddSeparator();
-            AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame2));
-            AddSeparator();
-            AddMenuItem("Delete Frame", HandleDelete);
-        }
-        else if (vm?.Data is AnimationChainSave chain)
-        {
-            var chains = _projectManager.AnimationChainListSave?.AnimationChains;
-            if (chains is not null && chains.Count > 1)
-            {
-                var chainIndex = chains.IndexOf(chain);
-                var isFirst    = chainIndex == 0;
-                var isLast     = chainIndex == chains.Count - 1;
-                if (!isFirst) AddMenuItem("^^ Move To Top",   () => _appCommands.MoveChainToTop(chain));
-                if (!isFirst) AddMenuItem("^  Move Up",        () => _appCommands.MoveChain(chain, -1));
-                if (!isLast)  AddMenuItem("v  Move Down",      () => _appCommands.MoveChain(chain, +1));
-                if (!isLast)  AddMenuItem("vv Move To Bottom", () => _appCommands.MoveChainToBottom(chain));
-                AddSeparator();
-            }
-            AddMenuItem("Adjust Frame Time…", () => AskAdjustFrameTime(chain));
-            AddMenuItem("Flip Horizontally",  () => _appCommands.FlipChainHorizontally(chain));
-            AddMenuItem("Flip Vertically",    () => _appCommands.FlipChainVertically(chain));
-            AddMenuItem("Invert Frame Order", () => _appCommands.InvertFrameOrder(chain));
-            AddSeparator();
-            AddMenuItem("Add Animation", AddAnimationChainAndBeginInlineRename);
-            AddMenuItem("Add Frame",          () => _appCommands.AddFrame(chain));
-            AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
-            AddSeparator();
-            AddMenuItem("Copy",  () => _ = HandleCopyAsync());
-            AddMenuItem("Cut",   () => _ = HandleCutAsync());
-            AddMenuItem("Paste", () => _ = HandlePasteAsync());
-            AddSubMenu("Duplicate",
-                ("Original",        HandleDuplicate),
-                ("Flip Horizontal", () => HandleDuplicateChainsFlip(chain, flipH: true, flipV: false)),
-                ("Flip Vertical",   () => HandleDuplicateChainsFlip(chain, flipH: false, flipV: true)));
-            AddSeparator();
-            AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
-            AddMenuItem("Rename…",          () => BeginInlineRenameSelected(chain));
-            AddSeparator();
-            AddMenuItem("Delete Animation", HandleDelete);
-        }
-        else
-        {
-            AddMenuItem("Add Animation", () =>
-            {
-                if (_projectManager.AnimationChainListSave is null)
-                    _projectManager.AnimationChainListSave = new AnimationChainListSave();
-                AddAnimationChainAndBeginInlineRename();
-            });
-        }
+            AARectSave rect          => () => BeginInlineRename(vm!, rect.Name),
+            CircleSave circle        => () => BeginInlineRename(vm!, circle.Name),
+            AnimationChainSave chain => () => BeginInlineRenameSelected(chain),
+            _                        => null
+        };
+        Action<bool, bool>? duplicateChainFlip = data is AnimationChainSave flipChain
+            ? (flipH, flipV) => HandleDuplicateChainsFlip(flipChain, flipH, flipV)
+            : null;
 
-        AddSeparator();
-        AddMenuItem("Sort Animations Alphabetically",
-            () => _appCommands.SortAnimationsAlphabetically());
+        var actions = new TreeMenuActions(
+            Copy: () => _ = HandleCopyAsync(),
+            Cut: () => _ = HandleCutAsync(),
+            Paste: () => _ = HandlePasteAsync(),
+            Duplicate: HandleDuplicate,
+            Delete: HandleDelete,
+            Rename: rename,
+            AddAnimation: AddAnimationChainAndBeginInlineRename,
+            DuplicateChainFlip: duplicateChainFlip);
+
+        var plan = TreeMenuPlanBuilder.Build(data, _appCommands, _selectedState, _objectFinder, _projectManager, actions);
+        RenderMenuPlan(plan, data);
     }
 
-    // Adds the four reorder items (To Top / Up / Down / To Bottom) for a shape,
-    // guarded by the shape's position within its frame's combined shape list — the
-    // same convention the frame menu uses. No-op when the frame has one shape or less.
-    private void AddShapeReorderItems(object shape, AnimationFrameSave? frame)
+    // Thin walk over the shared plan built by TreeMenuPlanBuilder: adds each entry via the
+    // existing Avalonia-building helpers below, substituting the real dialog/filesystem menu
+    // item at each host-slot placeholder (see TreeMenuHostSlot — these four stay desktop-only
+    // until issue #756).
+    private void RenderMenuPlan(IReadOnlyList<TreeMenuItem> plan, object? nodeData)
     {
-        var shapes = frame?.ShapesSave?.Shapes;
-        if (shapes is null || shapes.Count <= 1) return;
-        int  index   = shapes.IndexOf(shape);
-        bool isFirst = index == 0;
-        bool isLast  = index == shapes.Count - 1;
-        if (!isFirst) AddMenuItem("^^ Move To Top",   () => _appCommands.MoveShapeToTop(shape, frame!));
-        if (!isFirst) AddMenuItem("^  Move Up",        () => _appCommands.MoveShape(shape, frame!, -1));
-        if (!isLast)  AddMenuItem("v  Move Down",      () => _appCommands.MoveShape(shape, frame!, +1));
-        if (!isLast)  AddMenuItem("vv Move To Bottom", () => _appCommands.MoveShapeToBottom(shape, frame!));
-        AddSeparator();
+        foreach (var entry in plan)
+        {
+            if (entry.IsSeparator)
+                AddSeparator();
+            else if (entry.HostSlot is { } slot)
+                AddHostSlotItem(slot, nodeData);
+            else if (entry.Children is { } children)
+                AddSubMenu(entry.Header!, children.Select(c => (c.Header!, c.OnClick!)).ToArray());
+            else
+                AddMenuItem(entry.Header!, entry.OnClick!);
+        }
+    }
+
+    private void AddHostSlotItem(TreeMenuHostSlot slot, object? nodeData)
+    {
+        switch (slot)
+        {
+            case TreeMenuHostSlot.AdjustFrameTime when nodeData is AnimationChainSave chain:
+                AddMenuItem("Adjust Frame Time…", () => AskAdjustFrameTime(chain));
+                break;
+            case TreeMenuHostSlot.AddMultipleFrames when nodeData is AnimationChainSave chain:
+                AddMenuItem("Add Multiple Frames…", () => _ = AskAddMultipleFramesAsync(chain));
+                break;
+            case TreeMenuHostSlot.AdjustOffsets when nodeData is AnimationChainSave chain:
+                AddMenuItem("Adjust Offsets…", () => _ = AskAdjustOffsetsAsync(chain));
+                break;
+            case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
+                AddMenuItem("View Texture in Explorer", () => ViewTextureInExplorer(frame));
+                break;
+        }
     }
 
     private void AddMenuItem(string header, Action onClick)
