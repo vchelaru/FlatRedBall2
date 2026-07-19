@@ -1296,37 +1296,11 @@ public partial class App : Application
         DockPanel.SetDock(speedUpButton, Dock.Right);
         speedUpButton.BorderThickness = new Thickness(1, 0, 0, 0);
 
-        AnimationChainSave? GetTimelineChain()
-        {
-            var chain = selectedState.SelectedChain;
-            if (chain is null && selectedState.SelectedFrame is { } selectedFrame)
-                chain = objectFinder.GetAnimationChainContaining(selectedFrame);
-            return chain;
-        }
-
-        int GetPreferredTimelineFrameIndex(AnimationChainSave? chain)
-        {
-            if (chain is null || chain.Frames.Count == 0)
-                return -1;
-
-            if (selectedState.SelectedFrame is { } selectedFrame)
-            {
-                var selectedFrameChain = objectFinder.GetAnimationChainContaining(selectedFrame);
-                if (ReferenceEquals(selectedFrameChain, chain))
-                {
-                    int selectedFrameIndex = chain.Frames.IndexOf(selectedFrame);
-                    if (selectedFrameIndex >= 0)
-                        return selectedFrameIndex;
-                }
-            }
-
-            return preview.Playback.CurrentFrameIndex;
-        }
-
         void RefreshTimelineStrip()
         {
-            var chain = GetTimelineChain();
-            int preferred = GetPreferredTimelineFrameIndex(chain);
+            var chain = TimelineChainResolver.GetChain(selectedState, objectFinder);
+            int preferred = TimelineChainResolver.GetPreferredFrameIndex(
+                selectedState, objectFinder, chain, preview.Playback.CurrentFrameIndex);
             timelineStrip.SetChain(chain, preferred);
             if (preferred >= 0)
                 timelineStrip.ApplyPlaybackPosition(preferred, preview.Playback.FrameElapsed);
@@ -1342,7 +1316,7 @@ public partial class App : Application
         preview.Playback.FrameIndexChanged += index =>
         {
             if (selectedState.SelectedFrame is not null) return;
-            timelineStrip.SetChain(GetTimelineChain(), index);
+            timelineStrip.SetChain(TimelineChainResolver.GetChain(selectedState, objectFinder), index);
         };
         preview.Playback.PlaybackTicked += () =>
         {
