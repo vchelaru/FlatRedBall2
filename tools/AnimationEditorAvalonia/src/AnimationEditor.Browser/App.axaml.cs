@@ -458,15 +458,11 @@ public partial class App : Application
 
         void RefreshHistoryList()
         {
-            var undoHistory = undoManager.UndoHistory;
-            var redoHistory = undoManager.RedoHistory;
             historyRows.Clear();
-            // Photoshop order: oldest applied at top, newest applied (current) at bottom, then
-            // redo entries (next-to-redo first).
-            for (int i = 0; i < undoHistory.Count; i++)
-                historyRows.Add(new HistoryRowVm(undoHistory[i].Description, IsCurrent: i == undoHistory.Count - 1, IsRedo: false));
-            foreach (var cmd in redoHistory)
-                historyRows.Add(new HistoryRowVm(cmd.Description, IsCurrent: false, IsRedo: true));
+            // Ordering/marking (oldest-applied first, current entry, then redo entries) lives in
+            // Core's HistoryRowBuilder so desktop and browser stay in lockstep (#748).
+            foreach (var row in HistoryRowBuilder.BuildRows(undoManager.UndoHistory, undoManager.RedoHistory))
+                historyRows.Add(new HistoryRowVm(row.Description, row.IsCurrent, row.IsRedo));
             // New list instance so ItemsControl always sees a source change, even if it was
             // detached from the visual tree while History was not the selected sidebar tab.
             historyList.ItemsSource = historyRows.ToList();
