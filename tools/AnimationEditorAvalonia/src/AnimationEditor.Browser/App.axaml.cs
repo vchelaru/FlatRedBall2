@@ -11,6 +11,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.App.Theming;
 using AnimationEditor.Core.Export;
+using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Utilities;
@@ -121,6 +122,19 @@ public partial class App : Application
         };
         divider.Bind(Border.BackgroundProperty, divider.GetResourceObservable("LineBrush"));
         return divider;
+    }
+
+    // Translates Avalonia's native modifier flags into the UI-independent HotkeyModifiers used by
+    // AnimationEditor.Core.Hotkeys -- mirrors MainWindow.ToHotkeyModifiers (desktop host); kept in
+    // sync manually since the two hosts don't share an Avalonia-dependent project to host it in.
+    private static HotkeyModifiers ToHotkeyModifiers(KeyModifiers modifiers)
+    {
+        var result = HotkeyModifiers.None;
+        if (modifiers.HasFlag(KeyModifiers.Shift)) result |= HotkeyModifiers.Shift;
+        if (modifiers.HasFlag(KeyModifiers.Alt)) result |= HotkeyModifiers.Alt;
+        if (modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Meta))
+            result |= HotkeyModifiers.Command;
+        return result;
     }
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -1522,42 +1536,61 @@ public partial class App : Application
         // F3 is a best-effort accelerator only -- the diagnostics button above is the reliable
         // path, since browsers may intercept F3 themselves (e.g. "Find next") before the page
         // ever sees it.
+        //
+        // Dispatch goes through the same AnimationEditor.Core.Hotkeys.HotkeyRegistry.FindMatch
+        // the desktop host uses (MainWindow.WireKeyboard/BuildHotkeyDefinitions), instead of a
+        // hand-rolled if/else chain, so keypress-to-gesture matching exists in exactly one place
+        // (#748). Ids/gestures below mirror BuildHotkeyDefinitions's save/undo/redo/toggle-
+        // diagnostics entries -- keep them in sync if that table changes. Everything else in the
+        // desktop table is left out: New/Load/Duplicate/panel-zoom-in/panel-zoom-out are
+        // hard-reserved by the browser itself (BrowserHotkeys.ReservedIds -- Ctrl+N/L/D/+/- are
+        // intercepted before the page ever sees them), and Copy/Cut/Paste/Delete/Rename/Space/
+        // Move-up/Move-down have no action to wire in this build yet.
+        var browserHotkeys = BrowserHotkeys.Filter(new List<HotkeyDefinition>
+        {
+            new()
+            {
+                Id = "save", Description = "Save", Category = "File",
+                Gestures = new[] { new HotkeyGesture("S", HotkeyModifiers.Command) },
+                Action = () => saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)),
+            },
+            new()
+            {
+                Id = "undo", Description = "Undo", Category = "Edit",
+                Gestures = new[] { new HotkeyGesture("Z", HotkeyModifiers.Command, Forbidden: HotkeyModifiers.Shift) },
+                Action = () => historyUndoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)),
+            },
+            new()
+            {
+                Id = "redo", Description = "Redo", Category = "Edit",
+                Gestures = new[]
+                {
+                    new HotkeyGesture("Y", HotkeyModifiers.Command),
+                    new HotkeyGesture("Z", HotkeyModifiers.Command | HotkeyModifiers.Shift, Forbidden: HotkeyModifiers.Alt),
+                },
+                Action = () => historyRedoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)),
+            },
+            new()
+            {
+                Id = "toggle-diagnostics", Description = "Toggle Render Diagnostics", Category = "View",
+                Gestures = new[] { new HotkeyGesture("F3") },
+                Action = () => ApplyDiagnostics(diagnosticsButton.IsChecked != true),
+            },
+        });
+
         root.AttachedToVisualTree += (_, _) =>
         {
             var topLevelForKeys = TopLevel.GetTopLevel(root);
             if (topLevelForKeys is null) return;
             topLevelForKeys.KeyDown += (_, e) =>
             {
-                if (e.Key == Key.F3)
-                {
-                    e.Handled = true;
-                    ApplyDiagnostics(diagnosticsButton.IsChecked != true);
-                    return;
-                }
+                if (e.Handled) return;
 
-                // Phase 13 (#662): only the browser-safe subset from the roadmap's shortcut
-                // table -- Ctrl+S is interceptable via preventDefault; Ctrl+Z/Ctrl+Y aren't
-                // reserved. Ctrl+N/Ctrl+L/Ctrl+D/Ctrl+(+/-)/Ctrl+Shift+(+/-) are hard-reserved by
-                // Chrome (new window, address bar, bookmark, page zoom) and stay menu-only --
-                // no accelerator wired for those here, matching the roadmap's recommendation.
-                if (e.KeyModifiers == KeyModifiers.Control)
-                {
-                    if (e.Key == Key.S)
-                    {
-                        e.Handled = true;
-                        saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    }
-                    else if (e.Key == Key.Z)
-                    {
-                        e.Handled = true;
-                        historyUndoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    }
-                    else if (e.Key == Key.Y)
-                    {
-                        e.Handled = true;
-                        historyRedoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    }
-                }
+                var match = HotkeyRegistry.FindMatch(browserHotkeys, e.Key.ToString(), ToHotkeyModifiers(e.KeyModifiers));
+                if (match is null) return;
+
+                e.Handled = true;
+                match.Action();
             };
         };
 
