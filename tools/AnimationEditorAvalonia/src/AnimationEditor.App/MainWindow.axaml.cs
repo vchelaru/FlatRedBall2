@@ -1577,7 +1577,6 @@ public partial class MainWindow : Window
     {
         var undoHistory = _undoManager.UndoHistory;
         var redoHistory = _undoManager.RedoHistory;
-        var items = new List<Models.HistoryEntryVm>();
         // Applied (undo) rows use full-strength ink; redo rows are muted. All brushes come from
         // theme tokens so the panel stays legible in both light and dark (this method re-runs on
         // ActualThemeVariantChanged). The current entry gets an accent fill with on-accent text —
@@ -1587,15 +1586,14 @@ public partial class MainWindow : Window
         IBrush redoInk    = new SolidColorBrush(Color.Parse(dark ? "#6a6e76" : "#9aa1ad"));
         IBrush accentFill = ThemedBrush("Accent");
         IBrush onAccent   = ThemedBrush("OnAccent");
-        // Photoshop order: oldest applied at top, newest applied at bottom, redo items below.
-        foreach (var cmd in undoHistory)
-            items.Add(new Models.HistoryEntryVm(cmd.Description, appliedInk, Brushes.Transparent));
-        // Mark the most recently applied command as "you are here".
-        if (items.Count > 0)
-            items[^1] = items[^1] with { IsCurrent = true, Foreground = onAccent, Background = accentFill };
-        // Redo items follow: next-to-redo first, furthest future last.
-        foreach (var cmd in redoHistory)
-            items.Add(new Models.HistoryEntryVm(cmd.Description, redoInk, Brushes.Transparent));
+        // Ordering/marking (oldest-applied first, current entry, then redo entries) lives in
+        // Core's HistoryRowBuilder so desktop and browser stay in lockstep (#748); only the
+        // brush mapping below is host-specific.
+        var items = HistoryRowBuilder.BuildRows(undoHistory, redoHistory)
+            .Select(row => row.IsCurrent
+                ? new Models.HistoryEntryVm(row.Description, onAccent, accentFill, IsCurrent: true)
+                : new Models.HistoryEntryVm(row.Description, row.IsRedo ? redoInk : appliedInk, Brushes.Transparent))
+            .ToList();
         HistoryList.ItemsSource = items;
         int currentIndex = undoHistory.Count - 1;
         ScrollHistoryToCurrent(currentIndex, items.Count);
