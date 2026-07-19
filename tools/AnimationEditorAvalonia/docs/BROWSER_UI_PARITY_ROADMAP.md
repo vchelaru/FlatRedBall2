@@ -1,5 +1,13 @@
 # Animation Editor browser — UI/UX design-parity roadmap (Phases 6–15)
 
+**Standing goal (supersedes the "~95%, not pixel-perfect" framing below):** full feature
+parity between `AnimationEditor.App` (desktop) and `AnimationEditor.Browser` (web), achieved by
+sharing as much code as possible between the two hosts. Code-duplication removal is the top
+priority — always, even on passes that ship no new functionality — because every host-level bug
+fixed once instead of twice (see #714, #748) is the whole point. See **issue #754** for the active
+backlog and process. Do not re-scope this goal in conversation — it's fixed; only the backlog order
+is a day-to-day call.
+
 **Status:** Living document, reconciled against the original plan
 (`ok-whats-next-what-golden-shore.md`, authored during Phase 6 planning). An earlier version of
 this file was reconstructed from issue/PR text because the original hadn't been committed to git;
