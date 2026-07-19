@@ -102,6 +102,20 @@ namespace AnimationEditor.Core.IO
 
         public bool RecoveryFileExists() => File.Exists(RecoveryFilePath);
 
+        public AnimationChainListSave? TryReadRecoveryFile()
+        {
+            if (!RecoveryFileExists()) return null;
+
+            try
+            {
+                return AnimationChainListSave.FromFile(RecoveryFilePath);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private void ApplySettings(AESettingsSave settings)
         {
             _appState.IsSnapToGridChecked = settings.SnapToGrid;

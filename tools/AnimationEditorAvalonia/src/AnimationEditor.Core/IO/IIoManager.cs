@@ -25,5 +25,12 @@ namespace AnimationEditor.Core.IO
         void WriteRecoveryFile(AnimationChainListSave? animationChainListSave);
         void DeleteRecoveryFile();
         bool RecoveryFileExists();
+
+        /// <summary>
+        /// Reads back a recovery file written by <see cref="WriteRecoveryFile"/>. Returns null
+        /// when no recovery file exists or it fails to parse — callers should treat a null result
+        /// the same as "nothing to restore" and delete the stale file.
+        /// </summary>
+        AnimationChainListSave? TryReadRecoveryFile();
     }
 }
