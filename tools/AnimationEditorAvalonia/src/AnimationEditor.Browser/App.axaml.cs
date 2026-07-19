@@ -258,6 +258,9 @@ public partial class App : Application
         });
         animationTree.InitializeServices(selectedState, acls);
         animationTree.EnableRename(appCommands);
+        // Phase 2 of #754: right-click tree context menu, matching desktop's MainWindow menu
+        // (see docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md).
+        animationTree.EnableContextMenu(appCommands, objectFinder, projectManager, pendingCutState);
 
         // Phase 12 (#655): declared here (rather than alongside the Files TabItem UI below) so
         // CloseTab/SwitchToTab -- local functions defined earlier in this method that reference
