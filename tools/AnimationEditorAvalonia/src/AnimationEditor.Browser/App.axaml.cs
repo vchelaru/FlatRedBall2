@@ -10,6 +10,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.App.Theming;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
@@ -162,7 +163,14 @@ public partial class App : Application
         var applicationEvents = new ApplicationEvents();
         var selectedState     = new SelectedState(projectManager);
         var appState          = new AppState(applicationEvents, selectedState);
-        var ioManager         = new IoManager(appState);
+        // #754 Phase B: real companion-file (.aeproperties) persistence for zoom/grid-snap/guides,
+        // replacing the desktop-only IoManager this used to hold (which writes straight to disk --
+        // silently a no-op in WASM). companionFileStore starts with no backing store (nothing to
+        // write to until Open Folder grants a directory handle -- set below in
+        // LoadFromNativeDirectoryAsync); the bundled sample and drag-dropped loose files never get
+        // one, so companion persistence stays a no-op for those, same as having no file open at all.
+        var companionFileStore = new SwappableCompanionFileStore();
+        var ioManager         = new BrowserIoManager(appState, companionFileStore);
         var objectFinder      = new ObjectFinder(projectManager);
         var undoManager       = new UndoManager();
         var pendingCutState   = new PendingCutState();
@@ -667,6 +675,12 @@ public partial class App : Application
 
             tabManager.OpenOrFocus(new FilePath(displayName), displayName);
             appCommands.CaptureTabEditorState(tabManager.ActiveTab!);
+            // #754 Phase B: unlike desktop's FinishLoadIntoEditor, BrowserProjectLoader loads
+            // straight into projectManager without going through AppCommands, so this is the one
+            // spot both Open Folder and drag-drop share to hydrate zoom/grid/guides for the
+            // newly-opened file. A no-op when no companion file exists yet (or no folder is open
+            // to read one from -- e.g. drag-drop of loose files).
+            ioManager.LoadAndApplyCompanionFileFor(displayName);
             undoManager.Clear();
             UpdateUndoRedoButtons();
             RebuildTabStrip();
@@ -862,6 +876,13 @@ public partial class App : Application
         var previewZoom = new ZoomControl();
         previewZoom.Attach(preview);
 
+        // Declared this early (rather than beside SaveCompanionFile/ApplyCompanionSettings below)
+        // so the grid toggle's Click/IsCheckedChanged handlers -- wired further down, which call
+        // into SaveCompanionFile through ApplyGrid -- have a definitely-assigned capture; C#'s
+        // definite-assignment check runs at the point a local-function delegate is created, not
+        // at the point it's eventually invoked.
+        bool suppressCompanionSave = false;
+
         var snapToGridCheck = new ToggleButton
         {
             Height = 26, MinHeight = 0, Padding = new Thickness(10, 0),
@@ -916,6 +937,7 @@ public partial class App : Application
             var size = GetGridSizeFromInput();
             gridSizeInput.Text = size.ToString();
             wireframe.SetGrid(snapToGridCheck.IsChecked == true, size);
+            SaveCompanionFile();
         }
 
         var gridSizeDock = new DockPanel();
@@ -966,6 +988,47 @@ public partial class App : Application
             gridSizeInput.Text = Math.Min(GetGridSizeFromInput() + 1, 512).ToString();
             ApplyGrid();
         };
+
+        // ── Companion file (.aeproperties) ─────────────────────────────────────
+        // #754 Phase B: persists zoom/grid-snap/guides through BrowserIoManager, mirroring
+        // desktop MainWindow's SaveCompanionFile/ApplyCompanionSettings. The field mapping is the
+        // tested CompanionSettingsApplier; this closure only decides *when* to call it -- untested
+        // Avalonia-host glue, same category as the rest of this file (no dedicated test project;
+        // see docs/BROWSER_FOLDER_WATCH_DECISION.md).
+        void SaveCompanionFile()
+        {
+            if (suppressCompanionSave) return;
+            if (string.IsNullOrEmpty(projectManager.FileName)) return;
+            var settings = CompanionSettingsApplier.Build(
+                wireframe, preview, snapToGridCheck.IsChecked == true, GetGridSizeFromInput());
+            ioManager.SaveCompanionFileFor(new FilePath(projectManager.FileName), settings);
+        }
+
+        void ApplyCompanionSettings(AESettingsSave settings)
+        {
+            suppressCompanionSave = true;
+            try
+            {
+                snapToGridCheck.IsChecked = settings.SnapToGrid;
+                gridSizeInput.Text = settings.GridSize.ToString();
+                gridSizePill.IsEnabled = settings.SnapToGrid;
+                CompanionSettingsApplier.Apply(settings, wireframe, preview);
+            }
+            finally
+            {
+                suppressCompanionSave = false;
+            }
+        }
+        // BrowserIoManager.SettingsLoaded fires once the async companion-file read completes --
+        // WASM is single-threaded, so the continuation lands back on this same thread with no
+        // Dispatcher hop needed (unlike a real multi-threaded host).
+        ioManager.SettingsLoaded += ApplyCompanionSettings;
+
+        // Zoom persists once the smooth wheel-zoom animation settles, not on every animated frame
+        // (mirrors desktop's WireframeCtrl.ZoomChanged/PreviewCtrl.ZoomChanged wiring).
+        wireframe.ZoomChanged += _ => { if (!wireframe.IsZoomAnimating) SaveCompanionFile(); };
+        preview.ZoomChanged   += _ => { if (!preview.IsZoomAnimating) SaveCompanionFile(); };
+        preview.GuidesChanged += SaveCompanionFile;
 
         // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
         // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
@@ -1645,6 +1708,10 @@ public partial class App : Application
         async Task LoadFromNativeDirectoryAsync(JSObject nativeDir, string writeState)
         {
             LogOpenFolderStep($"LoadFromNativeDirectoryAsync start (writeState={writeState})");
+            // #754 Phase B: this folder is now where companion (.aeproperties) files live --
+            // must be set before OpenNewTabForLoadedProject's load-and-apply call below, so the
+            // very first companion read for this file finds the real store instead of no-op-ing.
+            companionFileStore.Inner = new NativeFolderCompanionFileStore(nativeDir);
             var folder = new NativeReadWriteFolder(nativeDir);
             var files = new List<IEditorFile>();
             await foreach (var item in folder.GetItemsAsync())
