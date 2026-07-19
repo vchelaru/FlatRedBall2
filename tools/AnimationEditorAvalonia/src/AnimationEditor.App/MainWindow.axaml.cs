@@ -3544,7 +3544,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var chain = GetTimelineChain();
+        var chain = TimelineChainResolver.GetChain(_selectedState, _objectFinder);
 
         // Show the active chain's total play time next to the ruler label so the duration is
         // visible without adding up per-frame times (#623).
@@ -3565,7 +3565,8 @@ public partial class MainWindow : Window
             _timelineSignature = signature;
         }
 
-        int preferred = GetPreferredTimelineFrameIndex(chain);
+        int preferred = TimelineChainResolver.GetPreferredFrameIndex(
+            _selectedState, _objectFinder, chain, PreviewCtrl.Playback.CurrentFrameIndex);
         UpdateTimelineScrubber(preferred);
         // Drive the playhead from the live playback position so a paused/scrubbed frame keeps its
         // sub-frame offset instead of snapping to the cell's left edge (#432).
@@ -3706,33 +3707,6 @@ public partial class MainWindow : Window
         var result = TimelineScrubMapper.Resolve(contentX, widths);
         // Fires GroupPlaybackTicked synchronously, which refreshes every track's playhead.
         PreviewCtrl.ScrubGroupTrack(track.Chain, result.FrameIndex, result.Fraction);
-    }
-
-    private AnimationChainSave? GetTimelineChain()
-    {
-        var chain = _selectedState.SelectedChain;
-        if (chain is null && _selectedState.SelectedFrame is { } selectedFrame)
-            chain = _objectFinder.GetAnimationChainContaining(selectedFrame);
-        return chain;
-    }
-
-    private int GetPreferredTimelineFrameIndex(AnimationChainSave? chain)
-    {
-        if (chain is null || chain.Frames.Count == 0)
-            return -1;
-
-        if (_selectedState.SelectedFrame is { } selectedFrame)
-        {
-            var selectedFrameChain = _objectFinder.GetAnimationChainContaining(selectedFrame);
-            if (ReferenceEquals(selectedFrameChain, chain))
-            {
-                var selectedFrameIndex = chain.Frames.IndexOf(selectedFrame);
-                if (selectedFrameIndex >= 0)
-                    return selectedFrameIndex;
-            }
-        }
-
-        return PreviewCtrl.Playback.CurrentFrameIndex;
     }
 
     private void UpdateTimelineScrubber(int frameIndex)
