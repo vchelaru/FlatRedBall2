@@ -621,6 +621,21 @@ namespace AnimationEditor.Core.CommandsAndState
             AddAnimationChainWithName(name);
         }
 
+        /// <summary>
+        /// Adds a new chain named "NewAnimation" (or a de-duped variant, e.g. "NewAnimation2")
+        /// without prompting — the toolbar/menu "Add Animation" entry point shared by both hosts.
+        /// Returns <c>null</c> when no project is loaded.
+        /// </summary>
+        public AnimationChainSave? AddNewAnimationChain()
+        {
+            var acls = _pm.AnimationChainListSave;
+            if (acls is null) return null;
+
+            var existingNames = acls.AnimationChains.Select(c => c.Name).ToList();
+            var defaultName = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
+            return AddAnimationChainWithName(defaultName);
+        }
+
         public AnimationChainSave? AddAnimationChainWithName(string name)
         {
             var acls = _pm.AnimationChainListSave;

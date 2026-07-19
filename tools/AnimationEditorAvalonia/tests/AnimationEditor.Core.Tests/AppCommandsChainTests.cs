@@ -114,6 +114,46 @@ public class AppCommandsChainTests
         Assert.Same(chain, ctx.SelectedState.SelectedChain);
     }
 
+    // ── AddNewAnimationChain (shared "NewAnimation" recipe used by both hosts) ──
+
+    [Fact]
+    public void AddNewAnimationChain_AddsChainNamedNewAnimation()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+
+        var chain = ctx.AppCommands.AddNewAnimationChain();
+
+        Assert.NotNull(chain);
+        Assert.Equal("NewAnimation", chain!.Name);
+        Assert.Single(acls.AnimationChains);
+    }
+
+    [Fact]
+    public void AddNewAnimationChain_UsesUniqueNamesWhenCalledMultipleTimes()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var acls = ctx.Acls;
+
+        ctx.AppCommands.AddNewAnimationChain();
+        ctx.AppCommands.AddNewAnimationChain();
+        ctx.AppCommands.AddNewAnimationChain();
+
+        var names = acls.AnimationChains.Select(c => c.Name).ToList();
+        Assert.Equal(3, names.Distinct().Count());
+    }
+
+    [Fact]
+    public void AddNewAnimationChain_WhenAclsIsNull_ReturnsNull()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        ctx.ProjectManager.AnimationChainListSave = null;
+
+        var chain = ctx.AppCommands.AddNewAnimationChain();
+
+        Assert.Null(chain);
+    }
+
     // ── MoveChain ────────────────────────────────────────────────────────────
 
     [Fact]

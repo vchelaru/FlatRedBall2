@@ -70,6 +70,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.DeleteFrames)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChain)]            = Category.MutatingUndoable,
         [nameof(IAppCommands.AddAnimationChainWithName)]    = Category.MutatingUndoable,
+        [nameof(IAppCommands.AddNewAnimationChain)]         = Category.MutatingUndoable,
         [nameof(IAppCommands.RenameChain)]                  = Category.MutatingUndoable,
         [nameof(IAppCommands.AddFrame)]                     = Category.MutatingUndoable,
         [nameof(IAppCommands.MoveChain)]                    = Category.MutatingUndoable,
@@ -221,6 +222,8 @@ public class UndoCoverageRosterTests
             ctx => ctx.AppCommands.AddAnimationChain());
         yield return Row(nameof(IAppCommands.AddAnimationChainWithName),
             ctx => Sync(() => ctx.AppCommands.AddAnimationChainWithName("Brand New")));
+        yield return Row(nameof(IAppCommands.AddNewAnimationChain),
+            ctx => Sync(() => ctx.AppCommands.AddNewAnimationChain()));
         yield return Row(nameof(IAppCommands.RenameChain),
             ctx => Sync(() => ctx.AppCommands.RenameChain(Zebra(ctx), "Renamed")));
         yield return Row(nameof(IAppCommands.AddFrame),

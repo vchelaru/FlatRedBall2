@@ -37,7 +37,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
-using StringFunctions = AnimationEditor.Core.Utilities.StringFunctions;
 
 namespace AnimationEditor.App;
 
@@ -2513,11 +2512,7 @@ public partial class MainWindow : Window
         if (_projectManager.AnimationChainListSave is null)
             _projectManager.AnimationChainListSave = new AnimationChainListSave();
 
-        var existingNames = _projectManager.AnimationChainListSave.AnimationChains
-            .Select(c => c.Name)
-            .ToList();
-        var defaultName = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
-        var chain = _appCommands.AddAnimationChainWithName(defaultName);
+        var chain = _appCommands.AddNewAnimationChain();
         if (chain is null) return;
 
         Dispatcher.UIThread.Post(() =>

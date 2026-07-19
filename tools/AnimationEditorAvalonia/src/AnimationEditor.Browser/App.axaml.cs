@@ -673,14 +673,7 @@ public partial class App : Application
         // tab switch (e.g. Add Frame on a chain that borrows a different texture).
         applicationEvents.AnimationChainsChanged += () => textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
 
-        addAnimationButton.Click += (_, _) =>
-        {
-            var currentAcls = projectManager.AnimationChainListSave;
-            if (currentAcls is null) return;
-            var existingNames = currentAcls.AnimationChains.Select(c => c.Name).ToList();
-            var name = StringFunctions.MakeStringUnique("NewAnimation", existingNames);
-            appCommands.AddAnimationChainWithName(name);
-        };
+        addAnimationButton.Click += (_, _) => appCommands.AddNewAnimationChain();
 
         addFrameButton.Click += (_, _) =>
         {

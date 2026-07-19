@@ -135,6 +135,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
+        AnimationChainSave? AddNewAnimationChain();
         bool RenameChain(AnimationChainSave chain, string newName);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
         void MoveChain(AnimationChainSave chain, int delta);
