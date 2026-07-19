@@ -906,8 +906,7 @@ public partial class App : Application
         };
         gridSizePlusBtn.Bind(Button.BorderBrushProperty, gridSizePlusBtn.GetResourceObservable("LineBrush"));
 
-        int GetGridSizeFromInput() =>
-            int.TryParse(gridSizeInput.Text, out var v) && v >= 1 ? Math.Min(v, 512) : 16;
+        int GetGridSizeFromInput() => NumericToolbarInput.ParseGridSize(gridSizeInput.Text);
 
         void ApplyGrid()
         {
@@ -1238,15 +1237,11 @@ public partial class App : Application
             Height = 26,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        double GetSpeedFromInput() =>
-            double.TryParse(speedInput.Text, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out double v)
-                ? Math.Clamp(v, 0.1, 10.0)
-                : 1.0;
+        double GetSpeedFromInput() => NumericToolbarInput.ParseSpeed(speedInput.Text);
         void ApplySpeedFromInput()
         {
             double s = GetSpeedFromInput();
-            speedInput.Text = s.ToString("0.0#");
+            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
             preview.SpeedMultiplier = s;
         }
         speedInput.LostFocus += (_, _) => ApplySpeedFromInput();
@@ -1260,7 +1255,7 @@ public partial class App : Application
         speedDownButton.Click += (_, _) =>
         {
             double s = Math.Max(Math.Round(GetSpeedFromInput() - 0.1, 1), 0.1);
-            speedInput.Text = s.ToString("0.0#");
+            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
             preview.SpeedMultiplier = s;
         };
         var speedUpButton = new Button
@@ -1273,7 +1268,7 @@ public partial class App : Application
         speedUpButton.Click += (_, _) =>
         {
             double s = Math.Min(Math.Round(GetSpeedFromInput() + 0.1, 1), 10.0);
-            speedInput.Text = s.ToString("0.0#");
+            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
             preview.SpeedMultiplier = s;
         };
         var speedPill = new Border
