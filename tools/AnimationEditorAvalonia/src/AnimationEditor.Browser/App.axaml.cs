@@ -1643,20 +1643,65 @@ public partial class App : Application
         void LogOpenFolderStep(string step) =>
             Console.WriteLine($"[OpenFolder] {openFolderStopwatch.ElapsedMilliseconds}ms: {step}");
 
+        // #763 fallback: directory enumeration (dirHandle.entries(), used by
+        // folder.GetItemsAsync() below) can throw NotFoundError on some environments even though
+        // named lookups (getFileHandle) on the identical handle keep working -- confirmed live on
+        // a real project folder, deterministic (retrying does not help). Recover by asking the
+        // user to pick the .achx directly (seeded already inside the granted folder), then
+        // resolve it and its textures by name instead of by enumerating. If this fallback itself
+        // fails or is cancelled, it propagates/returns null and the caller's existing
+        // catch (JSException) around LoadFromNativeDirectoryAsync still shows the error toast.
+        async Task<IEditorFile?> LoadViaNamedAchxFallbackAsync(JSObject nativeDir)
+        {
+            var achxName = await NativeFolderInterop.PickAchxFileNameAsync(nativeDir);
+            if (achxName is null) return null; // user cancelled the fallback picker
+
+            var achxFile = new NativeReadWriteFile(nativeDir, achxName);
+
+            async Task<IEditorFile?> ResolveTextureAsync(string textureName)
+            {
+                try
+                {
+                    var file = new NativeReadWriteFile(nativeDir, textureName);
+                    await file.GetBasicPropertiesAsync(); // getFileHandle(name) -- proven-working named lookup
+                    return file;
+                }
+                catch (JSException)
+                {
+                    // Separate, out-of-scope problem (#763): a texture living outside the
+                    // granted folder, or genuinely missing -- skip it instead of failing the load.
+                    return null;
+                }
+            }
+
+            return await BrowserProjectLoader.TryLoadFromNamedAchxAsync(
+                achxFile, ResolveTextureAsync, projectManager, thumbnailService, selectedState);
+        }
+
         // File → Load Folder uses Avalonia's picker (only path that opens from WASM menus).
         // Write grant is requested immediately after pick via EnsureReadWriteAsync.
         async Task LoadFromNativeDirectoryAsync(JSObject nativeDir, string writeState)
         {
             LogOpenFolderStep($"LoadFromNativeDirectoryAsync start (writeState={writeState})");
             var folder = new NativeReadWriteFolder(nativeDir);
-            var files = new List<IEditorFile>();
-            await foreach (var item in folder.GetItemsAsync())
-                files.Add(item);
-            LogOpenFolderStep($"folder.GetItemsAsync() done ({files.Count} file(s))");
 
-            var achxFile = await BrowserProjectLoader.TryLoadAsync(
-                files, projectManager, thumbnailService, selectedState);
-            LogOpenFolderStep($"BrowserProjectLoader.TryLoadAsync done (achxFile={achxFile?.Name ?? "null"})");
+            IEditorFile? achxFile;
+            try
+            {
+                var files = new List<IEditorFile>();
+                await foreach (var item in folder.GetItemsAsync())
+                    files.Add(item);
+                LogOpenFolderStep($"folder.GetItemsAsync() done ({files.Count} file(s))");
+
+                achxFile = await BrowserProjectLoader.TryLoadAsync(
+                    files, projectManager, thumbnailService, selectedState);
+            }
+            catch (JSException ex)
+            {
+                LogOpenFolderStep($"folder.GetItemsAsync() failed ({ex.Message}) -- falling back to named .achx picker");
+                achxFile = await LoadViaNamedAchxFallbackAsync(nativeDir);
+            }
+            LogOpenFolderStep($"achx resolution done (achxFile={achxFile?.Name ?? "null"})");
 
             var writeSuffix = " " + WritePermissionGate.FormatStatusSuffix(writeState);
 

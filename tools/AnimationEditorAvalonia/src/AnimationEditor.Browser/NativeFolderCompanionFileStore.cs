@@ -28,21 +28,25 @@ internal sealed class NativeFolderCompanionFileStore : ICompanionFileStore
     public Task WriteAsync(string fileName, string contents) =>
         NativeFolderInterop.WriteFileBytesAsync(_dirHandle, fileName, Encoding.UTF8.GetBytes(contents));
 
+    /// <summary>
+    /// Fetches <paramref name="fileName"/> directly via <c>getFileHandle</c> instead of
+    /// pre-checking existence through directory enumeration -- enumeration
+    /// (<c>dirHandle.entries()</c>) can throw <c>NotFoundError</c> on some environments even
+    /// though this exact named lookup keeps working (issue #763). A missing file surfaces the
+    /// same <c>NotFoundError</c> from the named lookup itself, which this treats as "doesn't
+    /// exist yet" -- the same outcome the old enumeration precheck produced, just without
+    /// depending on enumeration succeeding.
+    /// </summary>
     public async Task<string?> TryReadAsync(string fileName)
     {
-        var names = await NativeFolderInterop.ListFileNamesAsync(_dirHandle);
-        var found = false;
-        foreach (var name in names)
+        try
         {
-            if (string.Equals(name, fileName, System.StringComparison.OrdinalIgnoreCase))
-            {
-                found = true;
-                break;
-            }
+            var bytes = await NativeFolderInterop.ReadFileBytesAsync(_dirHandle, fileName);
+            return Encoding.UTF8.GetString(bytes);
         }
-        if (!found) return null;
-
-        var bytes = await NativeFolderInterop.ReadFileBytesAsync(_dirHandle, fileName);
-        return Encoding.UTF8.GetString(bytes);
+        catch (JSException ex) when (ex.Message.Contains("NotFoundError"))
+        {
+            return null;
+        }
     }
 }

@@ -161,6 +161,30 @@ export async function listFileNames(dirHandle) {
     return JSON.stringify(names);
 }
 
+/**
+ * #763 fallback: directory *enumeration* (dirHandle.entries()) can throw NotFoundError on some
+ * environments even though named lookups (getFileHandle) on the identical handle keep working
+ * (see listFileNames's doc comment above). When that happens, ask the user to pick the .achx
+ * directly instead of auto-discovering it via enumeration -- seeded with startIn so the picker
+ * opens already inside the folder just granted, no re-navigation required. Returns the picked
+ * file's name (resolved via the original dirHandle afterward, same as every other named lookup
+ * here), or null if the user cancels.
+ */
+export async function pickAchxFile(dirHandle) {
+    if (typeof globalThis.showOpenFilePicker !== "function") return null;
+    try {
+        const [fileHandle] = await globalThis.showOpenFilePicker({
+            startIn: dirHandle,
+            types: [{ description: "Animation Chain", accept: { "text/xml": [".achx"] } }],
+            excludeAcceptAllOption: true,
+        });
+        return fileHandle ? fileHandle.name : null;
+    } catch (e) {
+        if (e && e.name === "AbortError") return null;
+        throw e;
+    }
+}
+
 export async function fileInfo(dirHandle, name) {
     const fileHandle = await dirHandle.getFileHandle(name);
     const file = await fileHandle.getFile();
