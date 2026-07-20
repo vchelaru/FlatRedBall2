@@ -74,8 +74,13 @@ Each `<AnimationChain>` is a named sequence of frames.
 | `TopCoordinate` | Yes | — | Top edge of source rectangle in pixels |
 | `BottomCoordinate` | Yes | — | Bottom edge of source rectangle in pixels |
 | `FlipHorizontal` | No | `false` | Mirror the frame horizontally — used for left-facing variants |
-| `RelativeY` | No | `0` | Vertical offset from entity origin in world units. For a 16x32 character with origin at the feet, use `16` (half height) to center the sprite |
+| `RelativeX` | No | `0` | Horizontal offset from entity origin — sprites already draw X-centered, so this is usually `0`. See Ground-Contact Point below |
+| `RelativeY` | No | `0` | Marks the frame's ground-contact point above the entity origin — set by eye to match the art, not computed from sprite height. See Ground-Contact Point below |
 | `ShapesSave` | No | — | Per-frame collision shapes (not yet implemented in FRB2 — present in the XML format for forward compatibility with FRB1 files) |
+
+### Ground-Contact Point
+
+`RelativeY` marks where a frame's visual ground contact sits relative to the entity origin — it is not derived from sprite height. Flush-bottom (half-height, e.g. `16` on a 32px-tall frame) is only correct for a strictly side-on camera (Mario-style platformers), where the sprite's bounding-box bottom *is* the ground-contact point. Any camera with vertical tilt — a top-down RPG, isometric, or a platformer with a downward-tilted camera (Donkey Kong Country-style) — shows a sliver of the ground plane, so the contact point sits somewhere inside the bounding box and has to be set by eye per frame. `RelativeX` stays `0` in almost all cases since sprites already draw X-centered on the entity; only an asymmetric frame (a lunging attack, an off-center pivot) needs a nonzero value.
 
 ### Coordinate System
 

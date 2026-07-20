@@ -133,7 +133,7 @@ The `!_platformer.IsApplyingJump` guard prevents the air jump from triggering du
 
 ## Entity Origin and Shape Offset
 
-In platformers, an entity's Y position represents **the feet** (the bottom of the character). This means collision shapes and sprites must be offset upward so their bottom edge aligns with Y=0 on the entity:
+In platformers, an entity's Y position represents **the feet** — the point collision resolves ground contact against. The **collision shape** must be offset upward so its bottom edge is flush with Y=0; this is non-negotiable, it's what "standing on the ground" means physically:
 
 ```csharp
 // For a 12×28 collision box, offset Y by half the height so the bottom sits at the entity's feet
@@ -146,9 +146,9 @@ var collisionBox = new AARect
 Add(collisionBox);
 ```
 
-The same applies to sprites — the `.achx` template uses `<RelativeY>16</RelativeY>` on a 32-pixel-tall character for exactly this reason (16 = half of 32).
+**The sprite's `RelativeY` is different — it's art, not physics.** It only needs to match the shape's flush-bottom offset for a strictly side-on camera (Mario-style). A platformer with a tilted camera (Donkey Kong Country-style) shows a sliver of the ground plane, so the sprite's ground-contact point sits inside its bounding box and must be set by eye — see `animation` skill's `references/achx-authoring.md` (Ground-Contact Point section). `RelativeX` stays `0` in both cases since sprites already draw X-centered.
 
-**If you skip this offset**, the character's feet will not align with the ground.
+**If you skip the shape offset**, the character's feet will not align with the ground.
 
 ## Collision Setup
 
