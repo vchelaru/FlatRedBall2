@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             x:Class="AnimationEditor.Views.Controls.FolderExpanderIcon"
+             x:Name="Root"
+             Width="16" Height="16">
+    <!--
+        Open/closed folder glyph that toggles expand/collapse on click (VS Code style),
+        shared by FilesPanelControl (App) and ProjectPanelControl (Views), see #770 follow-up.
+        Bindings target this control's own IsOpen property via #Root rather than DataContext, so
+        placing DataContext = this here (like FilesPanelControl/ProjectPanelControl do for their
+        own content) isn't needed and won't shadow the ambient tree-node DataContext a consumer's
+        IsOpen="{Binding ...}" binding depends on.
+    -->
+    <Panel Cursor="Hand" PointerPressed="OnPressed">
+        <svg:Svg IsVisible="{Binding #Root.IsOpen}"
+                 Width="16" Height="16"
+                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolderOpen.svg"
+                 CurrentColor="{DynamicResource IconInkDim}" />
+        <svg:Svg IsVisible="{Binding !#Root.IsOpen}"
+                 Width="16" Height="16"
+                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolder.svg"
+                 CurrentColor="{DynamicResource IconInkDim}" />
+    </Panel>
+</UserControl>

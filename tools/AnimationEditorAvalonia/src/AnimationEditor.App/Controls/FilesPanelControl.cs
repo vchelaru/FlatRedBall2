@@ -169,16 +169,12 @@ public partial class FilesPanelControl : UserControl
         FilesTree.SelectedItems.Clear();
     }
 
-    private void OnFolderExpanderPressed(object? sender, PointerPressedEventArgs e)
+    private void OnFolderExpanderToggled(object? sender, EventArgs e)
     {
-        if (!e.GetCurrentPoint(sender as Control).Properties.IsLeftButtonPressed)
-            return;
-
         if (GetNodeVmFromSource(sender) is not { IsFolder: true } node)
             return;
 
         node.IsExpanded = !node.IsExpanded;
-        e.Handled = true;
         ClearTreeSelection();
     }
 
@@ -319,7 +315,6 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
     public ObservableCollection<PngFilesTreeNodeVm> Children { get; } = new();
 
     public bool IsFolderOpen => _isExpanded;
-    public bool IsFolderClosed => !_isExpanded;
 
     public bool IsExpanded
     {
@@ -330,7 +325,6 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
             _isExpanded = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFolderOpen));
-            OnPropertyChanged(nameof(IsFolderClosed));
         }
     }
 

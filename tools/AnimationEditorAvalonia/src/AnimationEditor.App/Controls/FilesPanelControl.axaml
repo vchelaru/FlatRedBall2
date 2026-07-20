@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:AnimationEditor.App.Controls"
-             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             xmlns:viewsControls="clr-namespace:AnimationEditor.Views.Controls;assembly=AnimationEditor.Views"
              x:Class="AnimationEditor.App.Controls.FilesPanelControl"
              x:DataType="local:FilesPanelControl">
     <UserControl.Resources>
@@ -32,6 +32,7 @@
 
         <TreeView x:Name="FilesTree"
                   Grid.Row="1"
+                  Classes="folder-tree"
                   ItemsSource="{Binding TreeRoots}"
                   Background="Transparent"
                   Focusable="False"
@@ -58,15 +59,8 @@
                 <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
                     <Setter Property="Background" Value="Transparent" />
                 </Style>
-                <!-- No separate chevron — folder icon toggles expand/collapse (VS Code style). -->
-                <Style Selector="TreeViewItem /template/ Panel#PART_ExpandCollapseChevronContainer">
-                    <Setter Property="Width" Value="0" />
-                    <Setter Property="IsVisible" Value="False" />
-                </Style>
-                <Style Selector="TreeViewItem:empty /template/ Panel#PART_ExpandCollapseChevronContainer">
-                    <Setter Property="Width" Value="0" />
-                    <Setter Property="IsVisible" Value="False" />
-                </Style>
+                <!-- Chevron hidden via the shared TreeView.folder-tree style (ThemeStyles.axaml) —
+                     folder icon toggles expand/collapse instead (VS Code style). -->
             </TreeView.Styles>
             <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="local:PngFilesTreeNodeVm"
@@ -81,20 +75,9 @@
                             </Style>
                         </Border.Styles>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
-                            <Panel x:Name="FolderExpander"
-                                   IsVisible="{Binding IsFolder}"
-                                   Width="16" Height="16"
-                                   Cursor="Hand"
-                                   PointerPressed="OnFolderExpanderPressed">
-                                <svg:Svg IsVisible="{Binding IsFolderOpen}"
-                                         Width="16" Height="16"
-                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolderOpen.svg"
-                                         CurrentColor="{DynamicResource IconInkDim}" />
-                                <svg:Svg IsVisible="{Binding IsFolderClosed}"
-                                         Width="16" Height="16"
-                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconFolder.svg"
-                                         CurrentColor="{DynamicResource IconInkDim}" />
-                            </Panel>
+                            <viewsControls:FolderExpanderIcon IsVisible="{Binding IsFolder}"
+                                                               IsOpen="{Binding IsFolderOpen}"
+                                                               Toggled="OnFolderExpanderToggled" />
                             <Image IsVisible="{Binding IsFile}"
                                    Width="{StaticResource FilesTreeThumbSize}"
                                    Height="{StaticResource FilesTreeThumbSize}"

@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.SearchToggleBox"
+             x:Name="Root">
+    <!--
+        Icon-toggled inline search box (#770 follow-up): same visual pattern as the ANIMATIONS
+        tree's search box in MainWindow.axaml (magnifier toggles a box with a two-stage clear),
+        extracted here as the second consumer (Project tab). MainWindow's own search box is left
+        as-is, since it is "sticky" (filter survives selection) while callers of this control
+        decide their own post-selection behavior (e.g. ProjectPanelControl clears on selection).
+    -->
+    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+        <TextBox x:Name="SearchBox" x:FieldModifier="Public"
+                 Width="140" Height="24"
+                 Padding="6,2"
+                 FontSize="11"
+                 VerticalAlignment="Center"
+                 VerticalContentAlignment="Center"
+                 IsVisible="False"
+                 PlaceholderText="{Binding #Root.Placeholder}">
+            <TextBox.InnerRightContent>
+                <Button x:Name="SearchClearBtn"
+                        Width="20" Height="20"
+                        Padding="0"
+                        Margin="0,0,2,0"
+                        Focusable="False"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="{DynamicResource IconInkDim}"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        ToolTip.Tip="Clear filter (empties, then closes)">
+                    <TextBlock Text="&#x2715;" FontSize="10" />
+                </Button>
+            </TextBox.InnerRightContent>
+        </TextBox>
+        <Button x:Name="SearchToggleBtn"
+                Width="24" Height="24"
+                Padding="0"
+                Background="Transparent"
+                BorderThickness="0"
+                Foreground="{DynamicResource IconInkDim}"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center"
+                ToolTip.Tip="Search">
+            <TextBlock Text="&#x1F50D;" FontSize="11" />
+        </Button>
+    </StackPanel>
+</UserControl>

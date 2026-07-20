@@ -235,6 +235,11 @@ public partial class MainWindow : Window
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
+        ProjectPanel.FileSelected += entry =>
+        {
+            if (entry.File is DiskEditorFile diskFile)
+                _ = OpenFileAsTab(diskFile.FullPath);
+        };
         _pngFolderWatcher.FolderContentsChanged += changed =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -792,6 +797,11 @@ public partial class MainWindow : Window
             }
         }
 
+        // Independent of which branch above ran -- the Project tab tree isn't tied to which
+        // document tab is open (#772).
+        if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
+            await LoadProjectFolderAsync(lastProjectFolder);
+
         RefreshFilesPanel();
         ShowDefaultHandlerBannerIfAppropriate();
         _ = RunStartupUpdateCheckAsync();
@@ -811,9 +821,9 @@ public partial class MainWindow : Window
     {
         if (!_ioManager.RecoveryFileExists()) return false;
 
-        bool restore = await _appCommands.ConfirmAsync(
-            "A recovery file was found from an unexpected shutdown. Restore the unsaved animation?",
-            "Restore Recovery File");
+        bool restore = await ShowTwoButtonDialogAsync(
+            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or delete them permanently?",
+            "Restore Recovery File", "Restore", "Delete");
 
         if (!restore)
         {
@@ -828,6 +838,7 @@ public partial class MainWindow : Window
             return false;
         }
 
+        _ioManager.DeleteRecoveryFile();
         _projectManager.AnimationChainListSave = recovered;
         _projectManager.FileName = null;
         _selectedState.Reset();
@@ -903,6 +914,7 @@ public partial class MainWindow : Window
         _appCommands.DoOnUiThread = action => Dispatcher.UIThread.InvokeAsync(action);
         _appCommands.ConfirmAsync = ShowConfirmDialogAsync;
         _appCommands.PromptStringAsync = ShowStringInputDialogAsync;
+        ShowTwoButtonDialogAsync = ShowTwoButtonDialogAsyncCore;
 
         // File dialog service
         _appCommands.FileDialogService = new Services.AvaloniaFileDialogService(this);
@@ -1848,6 +1860,7 @@ public partial class MainWindow : Window
     {
         MenuNew.Click    += OnNewClick;
         MenuLoad.Click   += OnLoadClick;
+        MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
@@ -1996,6 +2009,55 @@ public partial class MainWindow : Window
 
         if (files.Count > 0)
             await LoadAnimationFileAsync(files[0].Path.LocalPath);
+    }
+
+    private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
+
+    /// <summary>
+    /// Open Project Folder (#770): picks a folder, then loads + persists it via
+    /// <see cref="LoadAndPersistProjectFolderAsync"/> so the next launch remembers it (#772).
+    /// </summary>
+    private async Task OpenProjectFolderAsync()
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Open Project Folder",
+            AllowMultiple = false,
+        });
+        if (folders.Count == 0 || folders[0].Path.LocalPath is not { } path) return;
+
+        await LoadAndPersistProjectFolderAsync(path);
+    }
+
+    /// <summary>Test seam: exercises the same load+persist path as <see cref="OpenProjectFolderAsync"/>
+    /// without the native folder picker, which headless tests can't drive.</summary>
+    public async Task OpenProjectFolderForTestAsync(string path) => await LoadAndPersistProjectFolderAsync(path);
+
+    private async Task LoadAndPersistProjectFolderAsync(string path)
+    {
+        await LoadProjectFolderAsync(path);
+        SidebarTabs.SelectedItem = ProjectTab;
+
+        // Immediate, not deferred to window Closed -- a debugger Stop or crash skips Closed
+        // entirely (see TabSessionPersistenceTests / issue #439), so this must be safe there too.
+        _appSettings.LastProjectFolderPath = path;
+        SaveSettingsFile();
+    }
+
+    /// <summary>
+    /// Recursively discovers every .achx under <paramref name="path"/> via
+    /// <see cref="AchxFolderScanner"/> and populates the Project tab instead of guessing which one
+    /// to load -- the folder can have more than one .achx (a normal Content-folder layout). Shared
+    /// by the interactive Open Project Folder flow and by startup's last-folder restore (#772).
+    /// </summary>
+    private async Task LoadProjectFolderAsync(string path)
+    {
+        var rootFolder = new DiskEditorFolder(path);
+        var entries = await AchxFolderScanner.ScanAsync(rootFolder);
+        ProjectPanel.SetEntries(entries);
+        ShowStatusMessage(entries.Count == 0
+            ? $"No .achx files found under \"{rootFolder.Name}\"."
+            : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
     }
 
     private void OnSaveClick(object? sender, RoutedEventArgs e)
@@ -5072,11 +5134,34 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds the yes/no confirmation dialog. ENTER confirms (Yes), ESC cancels
-    /// (No), and closing the window by any other means resolves
-    /// <paramref name="tcs"/> to false. Extracted for testability.
+    /// Test seam for <see cref="ShowTwoButtonDialogAsyncCore"/> -- assigned to the real dialog in
+    /// <see cref="WireAppCommands"/>, mirroring <c>IAppCommands.ConfirmAsync</c>'s pattern. Not a
+    /// property on <c>IAppCommands</c> itself: that delegate is shared by ~20 test stubs across
+    /// unrelated tests, and this is UI-layer-only (used by exactly one caller,
+    /// <see cref="TryRestoreRecoveryFileAsync"/>) so it doesn't need that shared indirection.
     /// </summary>
-    internal static Window BuildConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs)
+    internal Func<string, string, string, string, Task<bool>> ShowTwoButtonDialogAsync { get; set; } = null!;
+
+    /// <summary>
+    /// Same as <see cref="ShowConfirmDialogAsync"/> but with caller-chosen button text instead of
+    /// generic Yes/No, for prompts where "Yes"/"No" would force the user to mentally map a named
+    /// choice (e.g. Restore/Delete) back onto Yes/No.
+    /// </summary>
+    private async Task<bool> ShowTwoButtonDialogAsyncCore(string message, string title, string confirmLabel, string cancelLabel)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        var dialog = BuildConfirmDialog(message, title, tcs, confirmLabel, cancelLabel);
+        await dialog.ShowDialog(this);
+        return await tcs.Task;
+    }
+
+    /// <summary>
+    /// Builds the confirmation dialog. ENTER confirms (<paramref name="confirmLabel"/>), ESC
+    /// cancels (<paramref name="cancelLabel"/>), and closing the window by any other means
+    /// resolves <paramref name="tcs"/> to false. Extracted for testability.
+    /// </summary>
+    internal static Window BuildConfirmDialog(string message, string title, TaskCompletionSource<bool> tcs,
+        string confirmLabel = "Yes", string cancelLabel = "No")
     {
         var dialog = new Window
         {
@@ -5100,8 +5185,8 @@ public partial class MainWindow : Window
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
         };
 
-        var yesBtn = new Button { Content = "Yes" };
-        var noBtn  = new Button { Content = "No" };
+        var yesBtn = new Button { Content = confirmLabel };
+        var noBtn  = new Button { Content = cancelLabel };
         yesBtn.Click += (_, _) => { tcs.TrySetResult(true);  dialog.Close(); };
         noBtn.Click  += (_, _) => { tcs.TrySetResult(false); dialog.Close(); };
         buttons.Children.Add(yesBtn);

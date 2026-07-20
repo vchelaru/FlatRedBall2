@@ -64,6 +64,14 @@ namespace AnimationEditor.Core.Models
         /// <summary>Release page URL paired with <see cref="LatestKnownUpdateVersion"/>.</summary>
         public string? LatestKnownUpdateUrl { get; set; }
 
+        /// <summary>
+        /// The folder last picked via File → Open Project Folder (#770). Rescanned on the next
+        /// launch to repopulate the Project tab without requiring a re-pick. Left stale (not
+        /// cleared) if the folder no longer exists -- the startup check just skips it, same as
+        /// <see cref="OpenTabPaths"/> silently dropping paths that no longer exist on disk.
+        /// </summary>
+        public string? LastProjectFolderPath { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);

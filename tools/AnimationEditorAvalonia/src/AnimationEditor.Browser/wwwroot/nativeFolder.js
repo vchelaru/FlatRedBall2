@@ -161,6 +161,18 @@ export async function listFileNames(dirHandle) {
     return JSON.stringify(names);
 }
 
+export async function listSubfolderNames(dirHandle) {
+    const names = [];
+    for await (const [name, entry] of dirHandle.entries()) {
+        if (entry.kind === "directory") names.push(name);
+    }
+    return JSON.stringify(names);
+}
+
+export async function getDirectoryHandle(dirHandle, name) {
+    return await dirHandle.getDirectoryHandle(name);
+}
+
 /**
  * #763 fallback: directory *enumeration* (dirHandle.entries()) can throw NotFoundError on some
  * environments even though named lookups (getFileHandle) on the identical handle keep working

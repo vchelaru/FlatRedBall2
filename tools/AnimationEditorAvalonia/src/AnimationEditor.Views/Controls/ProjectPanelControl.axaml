@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:AnimationEditor.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             x:Class="AnimationEditor.Views.Controls.ProjectPanelControl"
+             x:DataType="controls:ProjectPanelControl">
+    <!--
+        Open Project Folder (#770): recursively-discovered .achx tree for a picked folder.
+        Deliberately no drag/thumbnail support (unlike desktop's FilesPanelControl): click a
+        file row to open it, click a folder row to expand/collapse. That's what keeps this
+        control shareable between desktop and the browser build (no Window dependency).
+    -->
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Border Grid.Row="0"
+                Background="{DynamicResource BgRail}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,5">
+            <DockPanel>
+                <controls:SearchToggleBox x:Name="ProjectSearchBox" x:FieldModifier="Public" DockPanel.Dock="Right"
+                                           Placeholder="Filter .achx…"
+                                           KeepOpenWhenFocusMovesInto="{Binding #ProjectTree}"
+                                           QueryChanged="OnSearchQueryChanged" />
+                <CheckBox x:Name="ExcludeBinObjCheck" x:FieldModifier="Public"
+                          Content="Exclude bin/obj folders"
+                          FontSize="11"
+                          IsChecked="True" />
+            </DockPanel>
+        </Border>
+
+        <TreeView x:Name="ProjectTree" x:FieldModifier="Public"
+                  Grid.Row="1"
+                  Classes="folder-tree"
+                  ItemsSource="{Binding TreeRoots}"
+                  Background="Transparent"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.AllowAutoHide="False">
+            <TreeView.Styles>
+                <Style Selector="TreeViewItem">
+                    <Setter Property="IsExpanded"
+                            Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="MinHeight" Value="24" />
+                </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+                <TreeDataTemplate DataType="controls:AchxTreeNodeVm"
+                                  ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                        <controls:FolderExpanderIcon IsVisible="{Binding IsFolder}"
+                                                      IsOpen="{Binding IsFolderOpen}"
+                                                      Toggled="OnFolderExpanderToggled" />
+                        <svg:Svg IsVisible="{Binding IsFile}"
+                                 Width="16" Height="16"
+                                 Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
+                                 CurrentColor="{DynamicResource IconInkMuted}" />
+                        <TextBlock Text="{Binding Name}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+
+        <TextBlock x:Name="EmptyMessage" x:FieldModifier="Public"
+                   Grid.Row="2"
+                   Margin="8,4"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource InkDim}"
+                   IsVisible="False" />
+    </Grid>
+</UserControl>
