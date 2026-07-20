@@ -265,10 +265,10 @@ namespace AnimationEditor.Core
 
                     if (!sizeCache.TryGetValue(frame.TextureName, out var size))
                     {
-                        // A caller-supplied sizeCache (knownTextureSizes) is keyed by bare
-                        // filename on the browser build, since folder enumeration there is
-                        // non-recursive and never learns a texture's subfolder. Fall back to a
-                        // bare-filename match before assuming a real disk read is possible.
+                        // Browser callers (#768) key knownTextureSizes by the frame's own
+                        // TextureName, so the TryGetValue above normally already succeeds. This
+                        // bare-filename fallback covers any other caller-supplied sizeCache keyed
+                        // by leaf name instead, before assuming a real disk read is possible.
                         var bareName = System.IO.Path.GetFileName(frame.TextureName);
                         if (bareName != frame.TextureName && sizeCache.TryGetValue(bareName, out size))
                         {

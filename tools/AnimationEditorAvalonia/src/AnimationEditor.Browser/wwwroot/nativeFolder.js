@@ -141,17 +141,29 @@ export function directoryName(dirHandle) {
     return dirHandle.name;
 }
 
+/**
+ * Recursively walks dirHandle so projects that nest textures in subfolders resolve (#768) --
+ * `prefix` accumulates the "sub/dir/" segments as recursion descends. Files are returned as
+ * root-relative, forward-slash paths (a root-level file's path is unchanged from before this
+ * became recursive, so single-folder projects see identical output).
+ */
+async function collectFileNamesRecursive(dirHandle, prefix, names) {
+    for await (const [name, entry] of dirHandle.entries()) {
+        const path = prefix + name;
+        // Diagnostic-only (see docs/BROWSER_OPEN_FOLDER_SAVE_SESSION_HANDOFF.md): a
+        // NotFoundError crashed this exact enumeration once already (2026-07-14, Edge, real
+        // readwrite grant) with no indication of which entry triggered it. Logging each entry
+        // as it's seen pinpoints exactly where a repeat failure happens.
+        console.log("[OpenFolder] listFileNames entry:", path, entry.kind);
+        if (entry.kind === "file") names.push(path);
+        else if (entry.kind === "directory") await collectFileNamesRecursive(entry, path + "/", names);
+    }
+}
+
 export async function listFileNames(dirHandle) {
     const names = [];
     try {
-        for await (const [name, entry] of dirHandle.entries()) {
-            // Diagnostic-only (see docs/BROWSER_OPEN_FOLDER_SAVE_SESSION_HANDOFF.md): a
-            // NotFoundError crashed this exact enumeration once already (2026-07-14, Edge, real
-            // readwrite grant) with no indication of which entry triggered it. Logging each entry
-            // as it's seen pinpoints exactly where a repeat failure happens.
-            console.log("[OpenFolder] listFileNames entry:", name, entry.kind);
-            if (entry.kind === "file") names.push(name);
-        }
+        await collectFileNamesRecursive(dirHandle, "", names);
     } catch (e) {
         console.log(
             "[OpenFolder] listFileNames threw after", names.length, "entries -- last successful:",
@@ -179,8 +191,11 @@ export async function getDirectoryHandle(dirHandle, name) {
  * (see listFileNames's doc comment above). When that happens, ask the user to pick the .achx
  * directly instead of auto-discovering it via enumeration -- seeded with startIn so the picker
  * opens already inside the folder just granted, no re-navigation required. Returns the picked
- * file's name (resolved via the original dirHandle afterward, same as every other named lookup
- * here), or null if the user cancels.
+ * file's path relative to dirHandle (via dirHandle.resolve(), which walks however many folders
+ * deep the user navigated in the OS picker -- #768: without this, a texture referenced relative
+ * to a *nested* achx's own folder would be looked up from dirHandle's root instead and never
+ * resolve), or the bare name if resolve() can't place it (should not happen since the picker was
+ * seeded with dirHandle as startIn). Returns null if the user cancels.
  */
 export async function pickAchxFile(dirHandle) {
     if (typeof globalThis.showOpenFilePicker !== "function") return null;
@@ -190,22 +205,41 @@ export async function pickAchxFile(dirHandle) {
             types: [{ description: "Animation Chain", accept: { "text/xml": [".achx"] } }],
             excludeAcceptAllOption: true,
         });
-        return fileHandle ? fileHandle.name : null;
+        if (!fileHandle) return null;
+        try {
+            const segments = await dirHandle.resolve(fileHandle);
+            if (segments) return segments.join("/");
+        } catch (e) {
+            console.log("[OpenFolder] pickAchxFile: dirHandle.resolve failed, falling back to bare name:", e && e.message);
+        }
+        return fileHandle.name;
     } catch (e) {
         if (e && e.name === "AbortError") return null;
         throw e;
     }
 }
 
+/**
+ * Walks from dirHandle to the FileSystemFileHandle at relativePath, which may contain "/"
+ * segments (#768 -- lets textures nested in subfolders resolve). A slash-free name walks zero
+ * directories and behaves exactly as the old flat `getFileHandle(name)` call did.
+ */
+async function resolveFileHandle(dirHandle, relativePath, { create = false } = {}) {
+    const parts = relativePath.replace(/\\/g, "/").split("/").filter(p => p.length > 0 && p !== ".");
+    let dir = dirHandle;
+    for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i], { create });
+    return dir.getFileHandle(parts[parts.length - 1], { create });
+}
+
 export async function fileInfo(dirHandle, name) {
-    const fileHandle = await dirHandle.getFileHandle(name);
+    const fileHandle = await resolveFileHandle(dirHandle, name);
     const file = await fileHandle.getFile();
     return JSON.stringify({ size: file.size, lastModified: file.lastModified });
 }
 
 /** Fast base64 via FileReader (manual btoa loops hang on large PNGs). */
 export async function readFileBase64(dirHandle, name) {
-    const fileHandle = await dirHandle.getFileHandle(name);
+    const fileHandle = await resolveFileHandle(dirHandle, name);
     const file = await fileHandle.getFile();
     const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -219,7 +253,7 @@ export async function readFileBase64(dirHandle, name) {
 
 export async function writeFileBytes(dirHandle, name, bytes) {
     try {
-        const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+        const fileHandle = await resolveFileHandle(dirHandle, name, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(bytes);
         await writable.close();
