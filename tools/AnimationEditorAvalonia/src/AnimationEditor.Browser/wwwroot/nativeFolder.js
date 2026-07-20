@@ -179,8 +179,11 @@ export async function listFileNames(dirHandle) {
  * (see listFileNames's doc comment above). When that happens, ask the user to pick the .achx
  * directly instead of auto-discovering it via enumeration -- seeded with startIn so the picker
  * opens already inside the folder just granted, no re-navigation required. Returns the picked
- * file's name (resolved via the original dirHandle afterward, same as every other named lookup
- * here), or null if the user cancels.
+ * file's path relative to dirHandle (via dirHandle.resolve(), which walks however many folders
+ * deep the user navigated in the OS picker -- #768: without this, a texture referenced relative
+ * to a *nested* achx's own folder would be looked up from dirHandle's root instead and never
+ * resolve), or the bare name if resolve() can't place it (should not happen since the picker was
+ * seeded with dirHandle as startIn). Returns null if the user cancels.
  */
 export async function pickAchxFile(dirHandle) {
     if (typeof globalThis.showOpenFilePicker !== "function") return null;
@@ -190,7 +193,14 @@ export async function pickAchxFile(dirHandle) {
             types: [{ description: "Animation Chain", accept: { "text/xml": [".achx"] } }],
             excludeAcceptAllOption: true,
         });
-        return fileHandle ? fileHandle.name : null;
+        if (!fileHandle) return null;
+        try {
+            const segments = await dirHandle.resolve(fileHandle);
+            if (segments) return segments.join("/");
+        } catch (e) {
+            console.log("[OpenFolder] pickAchxFile: dirHandle.resolve failed, falling back to bare name:", e && e.message);
+        }
+        return fileHandle.name;
     } catch (e) {
         if (e && e.name === "AbortError") return null;
         throw e;

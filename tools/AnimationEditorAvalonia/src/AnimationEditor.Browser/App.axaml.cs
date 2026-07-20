@@ -14,6 +14,7 @@ using AnimationEditor.Core.Export;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
@@ -1653,23 +1654,34 @@ public partial class App : Application
         // catch (JSException) around LoadFromNativeDirectoryAsync still shows the error toast.
         async Task<IEditorFile?> LoadViaNamedAchxFallbackAsync(JSObject nativeDir)
         {
+            // achxName is root-relative (e.g. "Chains/player.achx") when the user navigated into
+            // a subfolder in the OS picker -- nativeFolder.js's pickAchxFile resolves it via
+            // dirHandle.resolve() rather than returning just the picked file's bare leaf name.
             var achxName = await NativeFolderInterop.PickAchxFileNameAsync(nativeDir);
             if (achxName is null) return null; // user cancelled the fallback picker
 
             var achxFile = new NativeReadWriteFile(nativeDir, achxName);
+            var achxDirectory = RootRelativePath.DirectoryOf(achxName);
 
             async Task<IEditorFile?> ResolveTextureAsync(string textureName)
             {
+                // #768: resolve relative to the achx's own folder, not nativeDir's root -- a
+                // texture referenced from a nested achx (e.g. "box.png" from "Chains/player.achx")
+                // otherwise gets looked up at the wrong path and never found.
+                var resolvedPath = RootRelativePath.Combine(achxDirectory, textureName);
+                if (resolvedPath is null) return null; // escapes the granted root -- #768 part 2, not yet supported
+
                 try
                 {
-                    var file = new NativeReadWriteFile(nativeDir, textureName);
+                    var file = new NativeReadWriteFile(nativeDir, resolvedPath);
                     await file.GetBasicPropertiesAsync(); // getFileHandle(name) -- proven-working named lookup
                     return file;
                 }
                 catch (JSException)
                 {
-                    // Separate, out-of-scope problem (#763): a texture living outside the
-                    // granted folder, or genuinely missing -- skip it instead of failing the load.
+                    // Genuinely missing, or the granted root's enumeration/permission is degraded
+                    // enough that even a direct named lookup fails -- skip it instead of failing
+                    // the load.
                     return null;
                 }
             }
