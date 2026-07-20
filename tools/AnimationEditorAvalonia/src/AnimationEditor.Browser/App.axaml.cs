@@ -1132,18 +1132,29 @@ public partial class App : Application
             VerticalContentAlignment = VerticalAlignment.Center,
             Content = new Border { Padding = new Thickness(4), Child = textureListPanel },
         };
+        // Project (#770): recursive .achx tree for File → Open Project Folder…, shared unmodified with
+        // desktop -- see ProjectPanelControl's doc comment for why it needs no Window reference.
+        var projectPanel = new ProjectPanelControl();
+        var projectTab = new TabItem
+        {
+            Header = "Project",
+            FontSize = 11, FontWeight = Avalonia.Media.FontWeight.SemiBold,
+            Padding = new Thickness(12, 0), Height = 36, MinHeight = 36,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Content = projectPanel,
+        };
         ((Border)inspectorTab.Content!).Bind(Border.BackgroundProperty, inspectorTab.GetResourceObservable("BgPanel"));
         ((Border)filesTab.Content!).Bind(Border.BackgroundProperty, filesTab.GetResourceObservable("BgPanel"));
 
         var sidebarTabs = new TabControl
         {
             Padding = new Thickness(0),
-            Items = { inspectorTab, historyTab, filesTab },
+            Items = { inspectorTab, historyTab, filesTab, projectTab },
         };
         sidebarTabs.Bind(TabControl.BackgroundProperty, sidebarTabs.GetResourceObservable("BgRail"));
 
         // Mirrors desktop's TabItem/TabItem:selected style pair (InkMid unselected, Ink selected)
-        // -- only three fixed tabs here, so plain instance-level rebinding is simpler than a Style.
+        // -- only four fixed tabs here, so plain instance-level rebinding is simpler than a Style.
         void UpdateSidebarTabForegrounds()
         {
             inspectorTab.Bind(TabItem.ForegroundProperty,
@@ -1152,6 +1163,8 @@ public partial class App : Application
                 historyTab.GetResourceObservable(sidebarTabs.SelectedItem == historyTab ? "Ink" : "InkMid"));
             filesTab.Bind(TabItem.ForegroundProperty,
                 filesTab.GetResourceObservable(sidebarTabs.SelectedItem == filesTab ? "Ink" : "InkMid"));
+            projectTab.Bind(TabItem.ForegroundProperty,
+                projectTab.GetResourceObservable(sidebarTabs.SelectedItem == projectTab ? "Ink" : "InkMid"));
         }
         sidebarTabs.SelectionChanged += (_, _) =>
         {
@@ -1451,7 +1464,7 @@ public partial class App : Application
             textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
             RebuildTabStrip();
         };
-        var menuLoad = new MenuItem { Header = "_Load Folder…" };
+        var menuLoad = new MenuItem { Header = "Open _Project Folder…" };
         menuLoad.Click += (_, _) => openButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuSave = new MenuItem { Header = "_Save" };
         menuSave.Click += (_, _) => saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -1643,6 +1656,9 @@ public partial class App : Application
         void LogOpenFolderStep(string step) =>
             Console.WriteLine($"[OpenFolder] {openFolderStopwatch.ElapsedMilliseconds}ms: {step}");
 
+        // Set by openButton.Click, read by a later Project-tree click -- see its assignment site.
+        string lastOpenFolderWriteState = "";
+
         // #763 fallback: directory enumeration (dirHandle.entries(), used by
         // folder.GetItemsAsync() below) can throw NotFoundError on some environments even though
         // named lookups (getFileHandle) on the identical handle keep working -- confirmed live on
@@ -1678,60 +1694,88 @@ public partial class App : Application
                 achxFile, ResolveTextureAsync, projectManager, thumbnailService, selectedState);
         }
 
-        // File → Load Folder uses Avalonia's picker (only path that opens from WASM menus).
-        // Write grant is requested immediately after pick via EnsureReadWriteAsync.
-        async Task LoadFromNativeDirectoryAsync(JSObject nativeDir, string writeState)
+        // Finishes an achx load regardless of how it was resolved (Project tree pick, or the
+        // #763 named-picker fallback): opens the tab and (re)starts watching whichever folder
+        // that achx's textures actually live in.
+        async Task FinishAchxLoadAsync(
+            IEditorFile? achxFile, IEditorFolder watchFolder, string loadedLabel, string writeState)
         {
-            LogOpenFolderStep($"LoadFromNativeDirectoryAsync start (writeState={writeState})");
-            var folder = new NativeReadWriteFolder(nativeDir);
-
-            IEditorFile? achxFile;
-            try
-            {
-                var files = new List<IEditorFile>();
-                await foreach (var item in folder.GetItemsAsync())
-                    files.Add(item);
-                LogOpenFolderStep($"folder.GetItemsAsync() done ({files.Count} file(s))");
-
-                achxFile = await BrowserProjectLoader.TryLoadAsync(
-                    files, projectManager, thumbnailService, selectedState);
-            }
-            catch (JSException ex)
-            {
-                LogOpenFolderStep($"folder.GetItemsAsync() failed ({ex.Message}) -- falling back to named .achx picker");
-                achxFile = await LoadViaNamedAchxFallbackAsync(nativeDir);
-            }
-            LogOpenFolderStep($"achx resolution done (achxFile={achxFile?.Name ?? "null"})");
-
             var writeSuffix = " " + WritePermissionGate.FormatStatusSuffix(writeState);
-
             status.Text = achxFile is not null
-                ? $"Loaded from folder \"{folder.Name}\".{writeSuffix}"
-                : $"No .achx found in \"{folder.Name}\".{writeSuffix}";
+                ? $"Loaded \"{loadedLabel}\".{writeSuffix}"
+                : $"No .achx found in \"{loadedLabel}\".{writeSuffix}";
 
             if (achxFile is not null)
             {
                 animationTree.InitializeServices(selectedState, projectManager.AnimationChainListSave);
                 textureListPanel.SetAnimationChainList(projectManager.AnimationChainListSave);
-                OpenNewTabForLoadedProject(projectManager.FileName ?? folder.Name);
-                tabFileHandles[tabManager.ActiveTab!] = new NativeReadWriteFile(nativeDir, achxFile.Name);
+                OpenNewTabForLoadedProject(projectManager.FileName ?? loadedLabel);
+                tabFileHandles[tabManager.ActiveTab!] = achxFile;
             }
 
             folderWatcher?.Dispose();
             pendingChangedPngs.Clear();
             UpdateReloadButton();
-            watchedFolder = folder;
-            folderWatcher = new BrowserFolderWatcher(folder, TimeSpan.FromSeconds(2));
+            watchedFolder = watchFolder;
+            folderWatcher = new BrowserFolderWatcher(watchFolder, TimeSpan.FromSeconds(2));
             folderWatcher.ChangedPngsDetected += names =>
             {
                 foreach (var name in names) pendingChangedPngs.Add(name);
                 UpdateReloadButton();
             };
             await folderWatcher.StartAsync();
-            LogOpenFolderStep("folderWatcher.StartAsync() done -- LoadFromNativeDirectoryAsync complete");
         }
 
-        // Avalonia OpenFolderPickerAsync is required for File→Load Folder — WASM menu clicks are
+        // Loads one already-discovered .achx from the Project tree plus its sibling files from its
+        // own enclosing folder -- not necessarily the picked root, since the entry can be nested
+        // (issue #770).
+        async Task LoadAchxEntryAsync(AchxFileEntry entry, string writeState)
+        {
+            LogOpenFolderStep($"LoadAchxEntryAsync start ({entry.RelativePath})");
+
+            var siblingFiles = new List<IEditorFile>();
+            await foreach (var file in entry.ParentFolder.GetItemsAsync())
+                siblingFiles.Add(file);
+
+            var achxFile = await BrowserProjectLoader.TryLoadAsync(
+                siblingFiles, projectManager, thumbnailService, selectedState);
+            LogOpenFolderStep($"achx load done (achxFile={achxFile?.Name ?? "null"})");
+
+            await FinishAchxLoadAsync(achxFile, entry.ParentFolder, entry.RelativePath, writeState);
+            LogOpenFolderStep("LoadAchxEntryAsync complete");
+        }
+
+        // File → Open Project Folder uses Avalonia's picker (only path that opens from WASM menus). Write
+        // grant is requested immediately after pick via EnsureReadWriteAsync. #770: recursively
+        // discovers every .achx under the folder and populates the Project tab instead of guessing
+        // which one to load -- the folder can have more than one (a normal Content layout).
+        async Task PopulateProjectTreeAsync(JSObject nativeDir, string writeState)
+        {
+            LogOpenFolderStep($"PopulateProjectTreeAsync start (writeState={writeState})");
+            var folder = new NativeReadWriteFolder(nativeDir);
+
+            IReadOnlyList<AchxFileEntry> entries;
+            try
+            {
+                entries = await AchxFolderScanner.ScanAsync(folder);
+                LogOpenFolderStep($"AchxFolderScanner.ScanAsync() done ({entries.Count} .achx file(s))");
+            }
+            catch (JSException ex)
+            {
+                LogOpenFolderStep($"AchxFolderScanner.ScanAsync() failed ({ex.Message}) -- falling back to named .achx picker");
+                var achxFile = await LoadViaNamedAchxFallbackAsync(nativeDir);
+                await FinishAchxLoadAsync(achxFile, folder, achxFile?.Name ?? folder.Name, writeState);
+                return;
+            }
+
+            projectPanel.SetEntries(entries);
+            sidebarTabs.SelectedItem = projectTab;
+            status.Text = entries.Count == 0
+                ? $"No .achx files found under \"{folder.Name}\"."
+                : $"Found {entries.Count} .achx file(s) under \"{folder.Name}\" -- pick one from the Project tab.";
+        }
+
+        // Avalonia OpenFolderPickerAsync is required for File→Open Project Folder — WASM menu clicks are
         // not a browser user activation, so direct showDirectoryPicker JSImport never opens a dialog.
         // Request write immediately after pick (same handler) while activation may still be valid.
         openButton.Click += async (_, _) =>
@@ -1744,7 +1788,7 @@ public partial class App : Application
 
             var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Open Animation Folder",
+                Title = "Open Project Folder",
                 AllowMultiple = false,
             });
             // Timing from here on is diagnostic, not user think-time -- the dialog has already
@@ -1766,6 +1810,10 @@ public partial class App : Application
             LogOpenFolderStep("calling NativeFolderInterop.EnsureReadWriteAsync");
             var writeState = await NativeFolderInterop.EnsureReadWriteAsync(nativeDir);
             LogOpenFolderStep($"EnsureReadWriteAsync returned (writeState={writeState})");
+            // Remembered so a later Project-tree click (a separate user gesture, once the tree is
+            // populated) can finish the load with the same write-permission suffix in the status
+            // text, without re-running EnsureReadWriteAsync.
+            lastOpenFolderWriteState = writeState;
 
             // Directory reads (enumeration, file access) can fail for reasons outside this app's
             // control -- confirmed live: a valid, correctly-permissioned handle can still throw
@@ -1776,17 +1824,19 @@ public partial class App : Application
             // must catch and degrade gracefully instead.
             try
             {
-                await LoadFromNativeDirectoryAsync(nativeDir, writeState);
+                await PopulateProjectTreeAsync(nativeDir, writeState);
             }
             catch (JSException ex)
             {
-                LogOpenFolderStep($"LoadFromNativeDirectoryAsync failed: {ex.Message}");
+                LogOpenFolderStep($"PopulateProjectTreeAsync failed: {ex.Message}");
                 var message = OpenFolderLoadFailure.FormatMessage(
                     NativeFolderInterop.DirectoryName(nativeDir), ex.Message);
                 status.Text = message;
                 notifications.ShowErrorBanner(message);
             }
         };
+
+        projectPanel.FileSelected += entry => _ = LoadAchxEntryAsync(entry, lastOpenFolderWriteState);
 
         // Prompts for a new save location (the OS-level save dialog) and writes there --
         // shared by Save As (always) and Save's first-time fallback (no known location yet).

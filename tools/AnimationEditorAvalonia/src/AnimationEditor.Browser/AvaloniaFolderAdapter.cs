@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AnimationEditor.Core.IO;
 using Avalonia.Platform.Storage;
 
 namespace AnimationEditor.Browser;
@@ -23,6 +24,15 @@ internal sealed class AvaloniaFolderAdapter : IEditorFolder
         {
             if (item is IStorageFile file)
                 yield return new AvaloniaFileAdapter(file);
+        }
+    }
+
+    public async IAsyncEnumerable<IEditorFolder> GetSubfoldersAsync()
+    {
+        await foreach (var item in _folder.GetItemsAsync())
+        {
+            if (item is IStorageFolder folder)
+                yield return new AvaloniaFolderAdapter(folder);
         }
     }
 

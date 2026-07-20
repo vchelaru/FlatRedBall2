@@ -57,6 +57,12 @@ internal static partial class NativeFolderInterop
     [JSImport("listFileNames", ModuleName)]
     private static partial Task<string> ListFileNamesJsonAsync(JSObject dirHandle);
 
+    [JSImport("listSubfolderNames", ModuleName)]
+    private static partial Task<string> ListSubfolderNamesJsonAsync(JSObject dirHandle);
+
+    [JSImport("getDirectoryHandle", ModuleName)]
+    public static partial Task<JSObject> GetDirectoryHandleAsync(JSObject dirHandle, string name);
+
     [JSImport("fileInfo", ModuleName)]
     private static partial Task<string> FileInfoJsonAsync(JSObject dirHandle, string name);
 
@@ -108,6 +114,15 @@ internal static partial class NativeFolderInterop
         var json = await ListFileNamesJsonAsync(dirHandle);
         // Reflection-based JsonSerializer.Deserialize<string[]>(json) crashes the whole Mono
         // runtime here -- see NativeFolderJsonContext's doc comment.
+        return JsonSerializer.Deserialize(json, NativeFolderJsonContext.Default.StringArray) ?? Array.Empty<string>();
+    }
+
+    /// <summary>Immediate (non-recursive) subfolder names, for <c>AchxFolderScanner</c>'s
+    /// recursive walk (#770). Same enumeration (<c>dirHandle.entries()</c>) as
+    /// <see cref="ListFileNamesAsync"/>, so it can throw the same #763 <c>NotFoundError</c>.</summary>
+    public static async Task<IReadOnlyList<string>> ListSubfolderNamesAsync(JSObject dirHandle)
+    {
+        var json = await ListSubfolderNamesJsonAsync(dirHandle);
         return JsonSerializer.Deserialize(json, NativeFolderJsonContext.Default.StringArray) ?? Array.Empty<string>();
     }
 

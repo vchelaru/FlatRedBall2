@@ -235,6 +235,11 @@ public partial class MainWindow : Window
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
+        ProjectPanel.FileSelected += entry =>
+        {
+            if (entry.File is DiskEditorFile diskFile)
+                _ = OpenFileAsTab(diskFile.FullPath);
+        };
         _pngFolderWatcher.FolderContentsChanged += changed =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -1848,6 +1853,7 @@ public partial class MainWindow : Window
     {
         MenuNew.Click    += OnNewClick;
         MenuLoad.Click   += OnLoadClick;
+        MenuOpenProjectFolder.Click += OnOpenProjectFolderClick;
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
@@ -1996,6 +2002,31 @@ public partial class MainWindow : Window
 
         if (files.Count > 0)
             await LoadAnimationFileAsync(files[0].Path.LocalPath);
+    }
+
+    private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
+
+    /// <summary>
+    /// Open Project Folder (#770): picks a folder, recursively discovers every .achx under it via
+    /// <see cref="AchxFolderScanner"/>, and populates the Project tab instead of guessing which one
+    /// to load -- the folder can have more than one .achx (a normal Content-folder layout).
+    /// </summary>
+    private async Task OpenProjectFolderAsync()
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Open Project Folder",
+            AllowMultiple = false,
+        });
+        if (folders.Count == 0 || folders[0].Path.LocalPath is not { } path) return;
+
+        var rootFolder = new DiskEditorFolder(path);
+        var entries = await AchxFolderScanner.ScanAsync(rootFolder);
+        ProjectPanel.SetEntries(entries);
+        SidebarTabs.SelectedItem = ProjectTab;
+        ShowStatusMessage(entries.Count == 0
+            ? $"No .achx files found under \"{rootFolder.Name}\"."
+            : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
     }
 
     private void OnSaveClick(object? sender, RoutedEventArgs e)

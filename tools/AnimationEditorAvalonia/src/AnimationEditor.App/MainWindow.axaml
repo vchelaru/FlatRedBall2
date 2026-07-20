@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:controls="clr-namespace:AnimationEditor.App.Controls"
         xmlns:views="clr-namespace:AnimationEditor.App.Controls;assembly=AnimationEditor.Views"
+        xmlns:viewsControls="clr-namespace:AnimationEditor.Views.Controls;assembly=AnimationEditor.Views"
         xmlns:conv="clr-namespace:AnimationEditor.App.Converters"
         xmlns:models="clr-namespace:AnimationEditor.Core.ViewModels;assembly=AnimationEditor.Core"
         xmlns:appModels="clr-namespace:AnimationEditor.App.Models"
@@ -89,6 +90,7 @@
                              can never drift from what the KeyDown handler actually does. -->
                         <MenuItem Header="_New"          x:Name="MenuNew" />
                         <MenuItem Header="_Load..."       x:Name="MenuLoad" />
+                        <MenuItem Header="Open _Project Folder…" x:Name="MenuOpenProjectFolder" />
                         <MenuItem Header="Load _Recent"   x:Name="MenuLoadRecent" />
                         <MenuItem Header="_Save"          x:Name="MenuSave" />
                         <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
@@ -1063,6 +1065,11 @@
                     <!-- Files -->
                     <TabItem x:Name="FilesTab" Header="Files">
                         <controls:FilesPanelControl x:Name="FilesPanel" />
+                    </TabItem>
+
+                    <!-- Project (#770): recursive .achx tree for File → Open Project Folder…. -->
+                    <TabItem x:Name="ProjectTab" Header="Project">
+                        <viewsControls:ProjectPanelControl x:Name="ProjectPanel" />
                     </TabItem>
 
                     <!-- History (Undo/Redo toolbar + read-only history list) -->

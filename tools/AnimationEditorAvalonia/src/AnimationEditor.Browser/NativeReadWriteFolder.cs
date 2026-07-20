@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
+using AnimationEditor.Core.IO;
 
 namespace AnimationEditor.Browser;
 
@@ -21,6 +22,15 @@ internal sealed class NativeReadWriteFolder : IEditorFolder
     {
         foreach (var name in await NativeFolderInterop.ListFileNamesAsync(_dirHandle))
             yield return new NativeReadWriteFile(_dirHandle, name);
+    }
+
+    public async IAsyncEnumerable<IEditorFolder> GetSubfoldersAsync()
+    {
+        foreach (var name in await NativeFolderInterop.ListSubfolderNamesAsync(_dirHandle))
+        {
+            var subHandle = await NativeFolderInterop.GetDirectoryHandleAsync(_dirHandle, name);
+            yield return new NativeReadWriteFolder(subHandle);
+        }
     }
 
     public async Task<IEditorFile?> GetFileAsync(string name)
