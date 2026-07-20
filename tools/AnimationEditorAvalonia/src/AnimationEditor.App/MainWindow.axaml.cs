@@ -797,6 +797,11 @@ public partial class MainWindow : Window
             }
         }
 
+        // Independent of which branch above ran -- the Project tab tree isn't tied to which
+        // document tab is open (#772).
+        if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
+            await LoadProjectFolderAsync(lastProjectFolder);
+
         RefreshFilesPanel();
         ShowDefaultHandlerBannerIfAppropriate();
         _ = RunStartupUpdateCheckAsync();
@@ -2008,9 +2013,8 @@ public partial class MainWindow : Window
     private void OnOpenProjectFolderClick(object? sender, RoutedEventArgs e) => _ = OpenProjectFolderAsync();
 
     /// <summary>
-    /// Open Project Folder (#770): picks a folder, recursively discovers every .achx under it via
-    /// <see cref="AchxFolderScanner"/>, and populates the Project tab instead of guessing which one
-    /// to load -- the folder can have more than one .achx (a normal Content-folder layout).
+    /// Open Project Folder (#770): picks a folder, then loads + persists it via
+    /// <see cref="LoadAndPersistProjectFolderAsync"/> so the next launch remembers it (#772).
     /// </summary>
     private async Task OpenProjectFolderAsync()
     {
@@ -2021,10 +2025,35 @@ public partial class MainWindow : Window
         });
         if (folders.Count == 0 || folders[0].Path.LocalPath is not { } path) return;
 
+        await LoadAndPersistProjectFolderAsync(path);
+    }
+
+    /// <summary>Test seam: exercises the same load+persist path as <see cref="OpenProjectFolderAsync"/>
+    /// without the native folder picker, which headless tests can't drive.</summary>
+    public async Task OpenProjectFolderForTestAsync(string path) => await LoadAndPersistProjectFolderAsync(path);
+
+    private async Task LoadAndPersistProjectFolderAsync(string path)
+    {
+        await LoadProjectFolderAsync(path);
+        SidebarTabs.SelectedItem = ProjectTab;
+
+        // Immediate, not deferred to window Closed -- a debugger Stop or crash skips Closed
+        // entirely (see TabSessionPersistenceTests / issue #439), so this must be safe there too.
+        _appSettings.LastProjectFolderPath = path;
+        SaveSettingsFile();
+    }
+
+    /// <summary>
+    /// Recursively discovers every .achx under <paramref name="path"/> via
+    /// <see cref="AchxFolderScanner"/> and populates the Project tab instead of guessing which one
+    /// to load -- the folder can have more than one .achx (a normal Content-folder layout). Shared
+    /// by the interactive Open Project Folder flow and by startup's last-folder restore (#772).
+    /// </summary>
+    private async Task LoadProjectFolderAsync(string path)
+    {
         var rootFolder = new DiskEditorFolder(path);
         var entries = await AchxFolderScanner.ScanAsync(rootFolder);
         ProjectPanel.SetEntries(entries);
-        SidebarTabs.SelectedItem = ProjectTab;
         ShowStatusMessage(entries.Count == 0
             ? $"No .achx files found under \"{rootFolder.Name}\"."
             : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
