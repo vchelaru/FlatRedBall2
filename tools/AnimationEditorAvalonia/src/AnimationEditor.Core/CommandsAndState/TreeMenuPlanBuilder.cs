@@ -107,10 +107,14 @@ public static class TreeMenuPlanBuilder
         return items;
     }
 
+    // Matches the whole multi-selection, not just the right-clicked rectangle (issue #567) —
+    // mirrors HandleDelete's fallback-to-single-item pattern. Each rectangle is matched to its
+    // own owning frame (see AppCommands.MatchRectanglesToFrames), so a selection spanning
+    // multiple frames still resizes correctly.
     private static void MatchFrameSize(AARectSave rect, IAppCommands appCommands, ISelectedState selectedState)
     {
-        if (selectedState.SelectedFrame is not { } frame) return;
-        appCommands.MatchRectangleToFrame(rect, frame);
+        var rects = selectedState.SelectedRectangles;
+        appCommands.MatchRectanglesToFrames(rects.Count > 0 ? rects : new List<AARectSave> { rect });
         appCommands.RefreshAnimationFrameDisplay();
         appCommands.SaveCurrentAnimationChainList();
     }

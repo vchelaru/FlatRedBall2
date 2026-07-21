@@ -129,6 +129,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void AddCircle(AnimationFrameSave frame);
         void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame);
         void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame);
+        void MatchRectanglesToFrames(List<AARectSave> rectangles);
         void DeleteCircle(CircleSave circle, AnimationFrameSave owner);
         void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
         void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles);

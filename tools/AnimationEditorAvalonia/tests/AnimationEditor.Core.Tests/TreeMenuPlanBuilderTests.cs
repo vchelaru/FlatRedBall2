@@ -180,4 +180,61 @@ public class TreeMenuPlanBuilderTests
         Assert.True(IndexOf(items, "Rename…") >= 0);
         Assert.True(IndexOf(items, "Delete Rectangle") >= 0);
     }
+
+    // ── Match Frame Size on a multi-selection (issue #567) ────────────────────
+
+    [Fact]
+    public void Build_RectNode_MatchFrameSizeClick_OnMultiSelection_MatchesEveryRectangle()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var frame = TestHelpers.MakeFrame();
+        frame.RelativeX = 40f;
+        frame.RelativeY = -20f;
+        chain.Frames.Add(frame);
+        var r0 = new AARectSave { Name = "R0", X = 1f, Y = 1f };
+        var r1 = new AARectSave { Name = "R1", X = 2f, Y = 2f };
+        frame.ShapesSave!.Shapes.Add(r0);
+        frame.ShapesSave.Shapes.Add(r1);
+        ctx.SelectedState.SelectedNodes = new List<object> { r0, r1 };
+
+        // Menu built for r0 (the right-clicked node) — Click must still act on the whole
+        // preserved multi-selection (r0 and r1), not just r0.
+        var items = TreeMenuPlanBuilder.Build(
+            r0, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+        items.Single(i => i.Header == "Match Frame Size").OnClick!();
+
+        Assert.Equal(40f, r0.X);
+        Assert.Equal(-20f, r0.Y);
+        Assert.Equal(40f, r1.X);
+        Assert.Equal(-20f, r1.Y);
+    }
+
+    [Fact]
+    public void Build_RectNode_MatchFrameSizeClick_OnMultiSelectionSpanningFrames_MatchesEachToItsOwnFrame()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        var frameA = TestHelpers.MakeFrame("a.png");
+        var frameB = TestHelpers.MakeFrame("b.png");
+        frameA.RelativeX = 5f;  frameA.RelativeY = 6f;
+        frameB.RelativeX = 50f; frameB.RelativeY = 60f;
+        chain.Frames.Add(frameA);
+        chain.Frames.Add(frameB);
+        var rectInA = new AARectSave { Name = "InA", X = 1f, Y = 1f };
+        var rectInB = new AARectSave { Name = "InB", X = 2f, Y = 2f };
+        frameA.ShapesSave!.Shapes.Add(rectInA);
+        frameB.ShapesSave!.Shapes.Add(rectInB);
+        ctx.SelectedState.SelectedNodes = new List<object> { rectInA, rectInB };
+
+        var items = TreeMenuPlanBuilder.Build(
+            rectInA, ctx.AppCommands, ctx.SelectedState, ctx.ObjectFinder, ctx.ProjectManager, NoOpActions());
+        items.Single(i => i.Header == "Match Frame Size").OnClick!();
+
+        // Each rectangle matches its OWN frame, not frameA (the node the menu was built for).
+        Assert.Equal(5f, rectInA.X);
+        Assert.Equal(6f, rectInA.Y);
+        Assert.Equal(50f, rectInB.X);
+        Assert.Equal(60f, rectInB.Y);
+    }
 }

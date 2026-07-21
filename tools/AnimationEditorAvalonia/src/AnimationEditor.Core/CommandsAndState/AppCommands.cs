@@ -532,6 +532,29 @@ namespace AnimationEditor.Core.CommandsAndState
                 animationFrame.RelativeX, animationFrame.RelativeY, this, _events));
         }
 
+        /// <summary>
+        /// Batched "Match Frame Size" for a multi-selection of rectangles. Each rectangle is
+        /// matched to its own containing frame (via <see cref="ObjectFinder"/>), not a single
+        /// shared frame, so a selection spanning multiple frames still resizes correctly.
+        /// Records one undo entry for the whole batch.
+        /// </summary>
+        public void MatchRectanglesToFrames(List<AARectSave> rectangles)
+        {
+            var commands = new List<IUndoableCommand>();
+            foreach (var rect in rectangles.ToArray())
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (ownerFrame is null) continue;
+                commands.Add(new MoveShapeCommand(
+                    ownerFrame, rect, rect.X, rect.Y,
+                    ownerFrame.RelativeX, ownerFrame.RelativeY, this, _events));
+            }
+            if (commands.Count == 0) return;
+
+            string desc = commands.Count == 1 ? commands[0].Description : $"Match {commands.Count} Shapes to Frame";
+            _undoManager.Execute(new CompositeCommand(commands, desc));
+        }
+
         // Raw position assignment used by the internal shape-creation paths to set a
         // new shape's initial offset before it is handed to its Add command.
         private static void ApplyRectangleMatch(AARectSave rectangle, AnimationFrameSave animationFrame)

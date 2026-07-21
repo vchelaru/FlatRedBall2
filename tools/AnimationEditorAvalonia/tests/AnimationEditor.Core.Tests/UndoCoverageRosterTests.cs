@@ -64,6 +64,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.AddCircle)]                    = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchRectangleToFrame)]        = Category.MutatingUndoable,
         [nameof(IAppCommands.MatchCircleToFrame)]           = Category.MutatingUndoable,
+        [nameof(IAppCommands.MatchRectanglesToFrames)]      = Category.MutatingUndoable,
         [nameof(IAppCommands.DeleteCircle)]                 = Category.MutatingUndoable,
         [nameof(IAppCommands.DeleteAxisAlignedRectangle)]   = Category.MutatingUndoable,
         [nameof(IAppCommands.DeleteShapes)]                 = Category.MutatingUndoable,
@@ -210,6 +211,8 @@ public class UndoCoverageRosterTests
             ctx => Sync(() => ctx.AppCommands.MatchRectangleToFrame(Rect(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.MatchCircleToFrame),
             ctx => Sync(() => ctx.AppCommands.MatchCircleToFrame(Circle(ctx), Zebra(ctx).Frames[0])));
+        yield return Row(nameof(IAppCommands.MatchRectanglesToFrames),
+            ctx => Sync(() => ctx.AppCommands.MatchRectanglesToFrames(new() { Rect(ctx) })));
         yield return Row(nameof(IAppCommands.DeleteCircle),
             ctx => Sync(() => ctx.AppCommands.DeleteCircle(Circle(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.DeleteAxisAlignedRectangle),

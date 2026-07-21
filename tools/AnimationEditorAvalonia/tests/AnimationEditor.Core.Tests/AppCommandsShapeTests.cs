@@ -1,6 +1,7 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using FlatRedBall2.Animation.Content;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
@@ -333,6 +334,80 @@ public class AppCommandsShapeTests
         ctx.AppCommands.MatchRectangleToFrame(rect, frame);
 
         Assert.Equal(-9f, rect.Y);
+    }
+
+    // ── MatchRectanglesToFrames (issue #567: multi-selection) ────────────────
+
+    [Fact]
+    public void MatchRectanglesToFrames_MatchesEveryRectangleInTheBatch()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var frame = chain.Frames[0];
+        frame.RelativeX = 12f;
+        frame.RelativeY = -4f;
+        var r0 = new AARectSave { Name = "R0" };
+        var r1 = new AARectSave { Name = "R1" };
+        frame.ShapesSave!.Shapes.Add(r0);
+        frame.ShapesSave!.Shapes.Add(r1);
+
+        ctx.AppCommands.MatchRectanglesToFrames(new List<AARectSave> { r0, r1 });
+
+        Assert.Equal(12f, r0.X);
+        Assert.Equal(-4f, r0.Y);
+        Assert.Equal(12f, r1.X);
+        Assert.Equal(-4f, r1.Y);
+    }
+
+    [Fact]
+    public void MatchRectanglesToFrames_UsesEachRectanglesOwnFrame_NotASharedFrame()
+    {
+        // Root cause from #567: a naive fix would resize every selected rectangle to the
+        // single "current" frame. A multi-selection spanning two frames must match each
+        // rectangle to its *own* containing frame instead.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var frameA = chain.Frames[0];
+        var frameB = chain.Frames[1];
+        frameA.RelativeX = 5f;  frameA.RelativeY = 6f;
+        frameB.RelativeX = 50f; frameB.RelativeY = 60f;
+        var rectInA = new AARectSave { Name = "InA" };
+        var rectInB = new AARectSave { Name = "InB" };
+        frameA.ShapesSave!.Shapes.Add(rectInA);
+        frameB.ShapesSave!.Shapes.Add(rectInB);
+
+        ctx.AppCommands.MatchRectanglesToFrames(new List<AARectSave> { rectInA, rectInB });
+
+        Assert.Equal(5f, rectInA.X);
+        Assert.Equal(6f, rectInA.Y);
+        Assert.Equal(50f, rectInB.X);
+        Assert.Equal(60f, rectInB.Y);
+    }
+
+    [Fact]
+    public void MatchRectanglesToFrames_RecordsOneUndoStepForTheWholeBatch()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var frameA = chain.Frames[0];
+        var frameB = chain.Frames[1];
+        frameA.RelativeX = 5f;  frameA.RelativeY = 6f;
+        frameB.RelativeX = 50f; frameB.RelativeY = 60f;
+        var rectInA = new AARectSave { Name = "InA", X = 1f, Y = 1f };
+        var rectInB = new AARectSave { Name = "InB", X = 2f, Y = 2f };
+        frameA.ShapesSave!.Shapes.Add(rectInA);
+        frameB.ShapesSave!.Shapes.Add(rectInB);
+
+        ctx.AppCommands.MatchRectanglesToFrames(new List<AARectSave> { rectInA, rectInB });
+        Assert.True(ctx.UndoManager.CanUndo);
+
+        ctx.UndoManager.Undo();
+
+        Assert.Equal(1f, rectInA.X);
+        Assert.Equal(1f, rectInA.Y);
+        Assert.Equal(2f, rectInB.X);
+        Assert.Equal(2f, rectInB.Y);
+        Assert.False(ctx.UndoManager.CanUndo);
     }
 
     [Fact]
