@@ -459,6 +459,52 @@ public class AutomationModeReflectionTests
     }
 }
 
+// --- AutomationMode reader loop ---
+
+public class AutomationModeReaderLoopTests
+{
+    // Returns null a fixed number of times (simulating a FIFO with no writer currently
+    // connected) before returning the given lines, then throws to end the loop.
+    private class TransientEofReader : System.IO.TextReader
+    {
+        private readonly Queue<string?> _results;
+        public TransientEofReader(int nullCount, params string[] lines)
+        {
+            _results = new Queue<string?>();
+            for (int i = 0; i < nullCount; i++) _results.Enqueue(null);
+            foreach (var line in lines) _results.Enqueue(line);
+        }
+        public override string? ReadLine()
+        {
+            if (_results.Count > 0) return _results.Dequeue();
+            throw new System.IO.IOException("simulated stream closed for good");
+        }
+    }
+
+    [Fact]
+    public void ReaderLoop_ReadThrows_LogsAndReturns()
+    {
+        var reader = new TransientEofReader(nullCount: 0);
+        var logs = new List<string>();
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter(), log: logs.Add);
+
+        mode.ReaderLoop(reader);
+
+        logs.ShouldContain(l => l.Contains("ReaderLoop"));
+    }
+
+    [Fact]
+    public void ReaderLoop_TransientNullThenData_ProcessesLineAfterGap()
+    {
+        var reader = new TransientEofReader(nullCount: 2, "{\"cmd\":\"step\"}");
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter());
+
+        mode.ReaderLoop(reader);
+
+        mode.TryAdvanceFrame(0).ShouldBeTrue();
+    }
+}
+
 // --- AutomationMode screenshot ---
 
 public class AutomationModeScreenshotTests

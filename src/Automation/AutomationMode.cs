@@ -11,8 +11,13 @@ namespace FlatRedBall2.Automation;
 
 internal class AutomationMode
 {
+    // Delay before retrying ReadLine() after a null (EOF) result, so a FIFO with no writer
+    // currently connected doesn't spin the reader thread in a tight loop.
+    private const int EofRetryDelayMs = 25;
+
     private readonly FlatRedBallService _engine;
     private readonly System.IO.TextWriter _output;
+    private readonly Action<string> _log;
     // Single FIFO of every parsed command — including step. The reader thread enqueues; the
     // game thread drains. Keeping all command kinds in one queue is what makes a recorded
     // NDJSON file reproducible: a query sent after a step is guaranteed to observe the
@@ -29,10 +34,11 @@ internal class AutomationMode
     // about isn't rendered until Draw() runs, which happens after ProcessCommand returns.
     private string? _pendingScreenshotPath;
 
-    internal AutomationMode(FlatRedBallService engine, System.IO.TextWriter? output = null)
+    internal AutomationMode(FlatRedBallService engine, System.IO.TextWriter? output = null, Action<string>? log = null)
     {
         _engine = engine;
         _output = output ?? Console.Out;
+        _log = log ?? (static message => System.Diagnostics.Debug.WriteLine(message));
     }
 
     internal void Start(System.IO.TextReader? input = null)
@@ -111,11 +117,43 @@ internal class AutomationMode
     internal void RegisterValueSetter(string entityName, string propName, Action<double> setter)
         => _valueSetters[$"{entityName}.{propName}"] = setter;
 
-    private void ReaderLoop(System.IO.TextReader reader)
+    // A null from ReadLine() means "no data right now," not "stream closed for good" — a
+    // named-pipe stdin reports EOF whenever no writer is currently connected, then resumes
+    // delivering data once a new writer reopens it. Only a read exception is treated as
+    // terminal. See issue #773.
+    internal void ReaderLoop(System.IO.TextReader reader)
     {
-        string? line;
-        while ((line = reader.ReadLine()) != null)
+        bool waitingForData = false;
+        while (true)
         {
+            string? line;
+            try
+            {
+                line = reader.ReadLine();
+            }
+            catch (Exception ex)
+            {
+                _log($"[AutomationMode] ReaderLoop exiting after read error: {ex.Message}");
+                return;
+            }
+
+            if (line == null)
+            {
+                if (!waitingForData)
+                {
+                    waitingForData = true;
+                    _log("[AutomationMode] ReaderLoop: input stream reported EOF; retrying.");
+                }
+                Thread.Sleep(EofRetryDelayMs);
+                continue;
+            }
+
+            if (waitingForData)
+            {
+                waitingForData = false;
+                _log("[AutomationMode] ReaderLoop: input resumed after EOF gap.");
+            }
+
             if (!string.IsNullOrWhiteSpace(line))
                 ProcessLine(line);
         }
