@@ -395,8 +395,8 @@ public class GameScreen : Screen
 
     private (float worldX, float worldY) SlotWorldCenter(GraphicalUiElement slot)
     {
-        float canvasX = slot.AbsoluteLeft + slot.GetAbsoluteWidth() / 2f;
-        float canvasY = slot.AbsoluteTop + slot.GetAbsoluteHeight() / 2f;
+        float canvasX = slot.AbsoluteLeft + slot.AbsoluteWidth / 2f;
+        float canvasY = slot.AbsoluteTop + slot.AbsoluteHeight / 2f;
         float worldX = canvasX - Camera.OrthogonalWidth / 2f;
         float worldY = Camera.OrthogonalHeight / 2f - canvasY;
         return (worldX, worldY);
@@ -506,8 +506,8 @@ public class GameScreen : Screen
     private bool CursorOver(GraphicalUiElement slot, Vector2 world)
     {
         var (cx, cy) = SlotWorldCenter(slot);
-        float halfW = slot.GetAbsoluteWidth() / 2f;
-        float halfH = slot.GetAbsoluteHeight() / 2f;
+        float halfW = slot.AbsoluteWidth / 2f;
+        float halfH = slot.AbsoluteHeight / 2f;
         return world.X >= cx - halfW && world.X <= cx + halfW
             && world.Y >= cy - halfH && world.Y <= cy + halfH;
     }
@@ -637,8 +637,8 @@ public class GameScreen : Screen
     private bool IsCursorOverTableauColumn(GraphicalUiElement slot, TableauPile pile, Vector2 world)
     {
         var (cx, cy) = SlotWorldCenter(slot);
-        float halfW = slot.GetAbsoluteWidth() / 2f;
-        float halfH = slot.GetAbsoluteHeight() / 2f;
+        float halfW = slot.AbsoluteWidth / 2f;
+        float halfH = slot.AbsoluteHeight / 2f;
 
         // Compute the bottom of the visible stack.
         float bottomY = cy - halfH;
