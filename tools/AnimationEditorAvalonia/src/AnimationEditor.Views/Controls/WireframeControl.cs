@@ -75,9 +75,10 @@ public class WireframeControl : TextureViewport
         /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
         /// </summary>
         public float SelectionRevealProgress = 1f;
-        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Stays 0 until
-        /// <see cref="SelectionRevealProgress"/> reaches 1, so handles never overlap the
-        /// still-inflated frame outline.</summary>
+        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Ramps from
+        /// <see cref="RevealAnimation.HandleFadeStartFraction"/> via
+        /// <see cref="RevealAnimation.HandleAlpha"/> so the fade overlaps the tail of the
+        /// selection shrink.</summary>
         public float HandleAlpha = 1f;
     }
 
