@@ -1,33 +1,56 @@
-# AnimationEditor.Browser.Ui (#690)
+# AnimationEditor.Browser.Ui
 
-External **Playwright** harness (Decision **C2**) for UI-driven verification of
-`AnimationEditor.Browser`. Does **not** wire `?demo=` / `FeatureDemos` into shipping App code.
+External **Playwright** smoke for `AnimationEditor.Browser` (WASM). This is **not** the primary test suite and **must not** mirror `Core.Tests` / `App.Tests`.
 
-## Decisions
+For where tests belong in general, see skill **`animation-editor-testing`**. For Browser landmines and run tips, see **`animation-editor-browser-verify`**.
 
-| Decision | Choice | Notes |
-|---|---|---|
-| A — done bar | **A2** assertable History undo labels | Via DEBUG dump of `UndoManager` Descriptions |
-| B — surface | **B1** `AutomationProperties` / AutomationId | Names land on controls; see Phase 0 |
-| C — harness | **C2** external Playwright | `tests/AnimationEditor.Browser.Ui/` |
+## What this suite is for
 
-## Phase 0 spike (Avalonia.Browser 12.0.1) — B1 DOM/ARIA = NO-GO
+Prove a **small** set of Browser-only paths that desktop Headless cannot catch:
 
-After setting `AutomationProperties.Name` / `AutomationId` on History, tree, Add Animation:
+- WASM boot → canvas up → Debug automation bridge ready
+- Browser host wiring (actions reachable through `__aeUiAutomation` / Browser-only menus/hotkeys)
+- Optional assertable undo Descriptions after a scripted path (A2), without shipping `?demo=` / FeatureDemos
 
-- CDP `Accessibility.getFullAXTree` exposes **only the page title**
-- DOM has **no** Avalonia control `aria-*` (canvas host only; `body.innerText` empty)
-- Playwright `getByRole('button', { name: 'Add Animation' })` cannot find controls
+Today that is one smoke: Add Frame → Add Animation → open History → assert labels + screenshot.
 
-**Go/no-go:** pure Browser ARIA for Playwright is a dead end on 12.0.1. Keep B1 names for desktop a11y + as stable AutomationIds.
+## What this suite is *not* for
 
-**Phase 1 path:** DEBUG-only `globalThis.__aeUiAutomation` (`BrowserUiAutomation` + `wwwroot/aeUiAutomation.js`) clicks by AutomationId and dumps undo Descriptions. `#if DEBUG` only — not in Release, not query-string activated.
+| Do not add here | Put it here instead |
+|---|---|
+| Undo/command label correctness | `AnimationEditor.Core.Tests` |
+| Desktop input routing / layout | `AnimationEditor.App.Tests` (`[AvaloniaFact]`) |
+| Doc / History PNGs on desktop | `AnimationEditor.DocScreenshots` |
+| “Same test as Headless but on Browser” | Don’t — different shell, high cost, low extra signal |
 
-## Prerequisites
+If Core already covers the behavior, stop. Only add a Browser test when a **Browser-specific** regression or gap showed up (or you are extending this intentional smoke).
 
-1. Node.js 20+
-2. From this folder: `npm install` then `npm run install-browsers`
-3. **Debug** Browser host (Release omits the bridge):
+## How driving works (why not `getByRole`)
+
+Avalonia.Browser paints to a **canvas**. Control ARIA is not exposed to the DOM today, so Playwright `getByRole` cannot find History / Add Animation.
+
+**Debug-only bridge** (`BrowserUiAutomation` + `wwwroot/aeUiAutomation.js`):
+
+1. Controls carry stable `AutomationProperties.AutomationId` (also useful on desktop a11y).
+2. Debug builds register `globalThis.__aeUiAutomation`.
+3. Playwright calls `clickByAutomationId` / `dumpUndoDescriptionsJson` — C# finds the control and raises a real Avalonia click, or reads `UndoManager`.
+
+Not compiled into Release. Not activated by a public query string. Do not replace this with FeatureDemos wiring in shipping `App.axaml.cs`.
+
+## When to add another test
+
+Add a new spec only if **all** are true:
+
+1. Headless/Core cannot catch the failure mode.
+2. The scenario is Browser-host-specific (boot, FS APIs, Browser hotkey filter, bridge wiring, WASM render smoke).
+3. You can keep the suite small (prefer one focused path over combinatorial coverage).
+
+Prefer extending the existing smoke with one more step over adding many near-duplicate specs.
+
+## Prerequisites and run
+
+1. Node.js 20+ — `npm install` then `npm run install-browsers` in this folder.
+2. **Debug** Browser host (Release has no bridge):
 
 ```powershell
 dotnet run --project ../../src/AnimationEditor.Browser --no-launch-profile --urls "http://127.0.0.1:5420"
@@ -35,23 +58,22 @@ dotnet run --project ../../src/AnimationEditor.Browser --no-launch-profile --url
 
 Use the printed ephemeral `App url:` as `AE_BROWSER_URL`.
 
-## Run
-
 ```powershell
 $env:AE_BROWSER_URL = "http://127.0.0.1:<port>/"
 npm test
 ```
 
-Or from repo root: `scripts/run-browser-ui-drive.ps1`
+Or from repo root: `scripts/run-browser-ui-drive.ps1`.
 
-## Smoke script
+## Outputs
 
-1. Wait for canvas + `__aeUiAutomation`
-2. Click `add-frame` → `add-animation` → `history-tab`
-3. Assert undo Descriptions contain `Add Frame to 'ColorCycle'` and `Add Animation 'NewAnimation'`
-4. Screenshot → `tests/_out/browser-ui-drive/history-after-ui-drive.png`
+Under `tools/AnimationEditorAvalonia/tests/_out/browser-ui-drive/` (gitignored):
 
-## Stable AutomationIds (B1)
+- `history-after-ui-drive.png`
+- `undo-descriptions.json`
+- `ax-tree-before.json` / `phase0-findings.md` (ARIA spike evidence)
+
+## Stable AutomationIds
 
 | Control | Name | AutomationId |
 |---|---|---|
@@ -62,3 +84,6 @@ Or from repo root: `scripts/run-browser-ui-drive.ps1`
 | Add Frame (hidden cmd) | `Add Frame` | `add-frame` |
 | Show History menu | `Show History` | `show-history` |
 | Undo / Redo | `Undo` / `Redo` | `history-undo` / `history-redo` |
+
+Expected smoke Descriptions (locked in `BrowserUiDriveLabelTests`):  
+`Add Frame to 'ColorCycle'`, `Add Animation 'NewAnimation'`.
