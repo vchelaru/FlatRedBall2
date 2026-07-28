@@ -1,11 +1,14 @@
 using AnimationEditor.App.Controls;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using FlatRedBall2.Animation.Content;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -238,6 +241,52 @@ public class PngTabTests
             Assert.True(window.FindControl<TabItem>("HistoryTab")!.IsVisible);
             Assert.True(window.FindControl<TabItem>("FilesTab")!.IsVisible);   // Files comes back for the achx editor
             Assert.True(window.FindControl<Grid>("LeftPanelGrid")!.RowDefinitions[0].Height.Value > 0);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task OpenAchxAfterPng_RestoresPriorSidebarTab()
+    {
+        // #686: opening a PNG forces the Diff sidebar tab; returning to the achx tab must restore
+        // whichever tool tab (Files/Textures, History, …) was selected beforehand — not hard-reset
+        // to Inspector.
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        ctx.AppCommands.ConfirmAsync = (_, _) => Task.FromResult(true);
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var achxPath = WriteAchx(dir, "hero.achx");
+            await window.OpenFileAsTab(achxPath);
+            Dispatcher.UIThread.RunJobs();
+
+            var filesTab = window.FindControl<TabItem>("FilesTab")!;
+            var sidebar = window.FindControl<TabControl>("SidebarTabs")!;
+            sidebar.SelectedItem = filesTab;
+            Assert.Same(filesTab, sidebar.SelectedItem);
+
+            window.OpenPngAsTab(WritePng(dir, "sheet.png"));
+            Dispatcher.UIThread.RunJobs();
+            await window.WhenPngTabLoaded();
+
+            var tabManager = (TabManager)typeof(MainWindow)
+                .GetField("_tabManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .GetValue(window)!;
+            var achxTab = tabManager.Tabs.First(t => t.Path == new FilePath(achxPath));
+            var activateMethod = typeof(MainWindow)
+                .GetMethod("ActivateTabAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            await (Task)activateMethod.Invoke(window, [achxTab])!;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Same(filesTab, sidebar.SelectedItem);
         }
         finally
         {
