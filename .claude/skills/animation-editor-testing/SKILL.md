@@ -34,8 +34,9 @@ A fourth: `window.MouseDown`/`MouseUp` fully pump any `Dispatcher.UIThread.Invok
 
 ## Undo labels vs screenshots
 
-- **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests`.
-- **"Show me the History panel":** DocScreenshots / browser verify — **`animation-editor-screenshots`** and **`animation-editor-browser-verify`**. Those drive the same `FeatureDemos` helpers; they do not replace unit asserts.
+- **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests` / `BrowserUiDriveLabelTests`.
+- **"Show me the History panel":** DocScreenshots / browser verify — **`animation-editor-screenshots`** and **`animation-editor-browser-verify`**. Desktop DocScreenshots drive `FeatureDemos` helpers; they do not replace unit asserts.
+- **True Browser UI-drive (#690):** Playwright under `tests/AnimationEditor.Browser.Ui/` — click/named a11y path, assert History labels. Never seed History UI models with hand-written strings to "prove" a label.
 
 Never seed History UI models with hand-written strings to "prove" a label.
 ## Service wiring in tests
