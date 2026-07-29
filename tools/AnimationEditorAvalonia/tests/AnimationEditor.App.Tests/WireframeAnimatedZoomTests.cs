@@ -79,6 +79,32 @@ public class WireframeAnimatedZoomTests
         ctrl.SettleZoomAnimation(); // clean up the timer
     }
 
+    /// <summary>
+    /// The settling tick must land the zoom scalar <em>exactly</em> on its target, not merely
+    /// within 1e-5 of it. <c>StepZoomAnimation</c> applies each eased value as a factor relative
+    /// to the current zoom (<c>next / _zoom</c>), and <c>zoom * (next / zoom)</c> is not exactly
+    /// <c>next</c> in float — so the pane comes to rest on 1.5000001 instead of 1.5. Any consumer
+    /// that reads the settled zoom as "which preset am I on?" then works from a value that isn't a
+    /// preset. #451 fixed this for the preview pane; this is the same guarantee for the
+    /// wireframe/PNG panes.
+    /// </summary>
+    [AvaloniaFact]
+    public void StepZoomAnimation_AfterSettle_LandsOnExactPresetAndNextNotchStepsPastIt()
+    {
+        var ctrl = MakeControl(ResetSingletons());
+        ctrl.SetZoomPercent(100);
+
+        ctrl.SimulateWheelZoomBegin(200f, 150f, zoomIn: true);   // target 150 %
+        ctrl.SettleZoomAnimation();
+
+        Assert.Equal(1.5f, ctrl.CameraState.Zoom);
+
+        ctrl.SimulateWheelZoomBegin(200f, 150f, zoomIn: true);
+        Assert.Equal(2.0f, ctrl.TargetZoom);
+
+        ctrl.SettleZoomAnimation();
+    }
+
     [AvaloniaFact]
     public void StepZoomAnimation_PivotStaysAnchoredDuringAnimation()
     {
