@@ -562,6 +562,8 @@ public partial class MainWindow : Window
     private bool _sidebarCollapsedForPng;
     private GridLength _savedTreeRowHeight = new(2, GridUnitType.Star);
     private GridLength _savedSplitterRowHeight = new(4, GridUnitType.Pixel);
+    // Tool tab selected before Diff was forced for a PNG preview (#686) — restored when returning to achx.
+    private TabItem? _sidebarTabBeforePng;
 
     /// <summary>
     /// Collapses the animation-editing sidebar surfaces for a read-only PNG-preview tab (issue #604)
@@ -585,6 +587,8 @@ public partial class MainWindow : Window
             InspectorTab.IsVisible = false;
             HistoryTab.IsVisible = false;
             FilesTab.IsVisible = false;
+            // Remember the achx tool tab so returning from Diff restores Files/History/etc. (#686).
+            _sidebarTabBeforePng = SidebarTabs.SelectedItem as TabItem;
             // Diff is the only PNG surface; select it before hiding Files so the strip never shows
             // a hidden selected tab (blank content).
             DiffBlameTab.IsVisible = true;
@@ -599,11 +603,15 @@ public partial class MainWindow : Window
             InspectorTab.IsVisible = true;
             HistoryTab.IsVisible = true;
             FilesTab.IsVisible = true;
-            // A now-hidden PNG tab can't stay selected or the strip would show blank content — fall
-            // back to the Inspector, the achx editor's default surface.
-            if (ReferenceEquals(SidebarTabs.SelectedItem, DiffBlameTab))
-                SidebarTabs.SelectedItem = InspectorTab;
+            // Diff must not stay selected once hidden (#604). Prefer the tab that was active before
+            // the PNG forced Diff (#686); fall back to Inspector when that tab is gone or invalid.
+            var restore = _sidebarTabBeforePng;
+            SidebarTabs.SelectedItem =
+                restore is { IsVisible: true } && !ReferenceEquals(restore, DiffBlameTab)
+                    ? restore
+                    : InspectorTab;
             DiffBlameTab.IsVisible = false;
+            _sidebarTabBeforePng = null;
         }
         _sidebarCollapsedForPng = png;
     }
