@@ -1,0 +1,35 @@
+[
+  {
+    "id": "elder_1",
+    "speaker": "Village Elder",
+    "text": "The rift tore through here three days ago. Half the town... just gone.",
+    "nextId": "elder_2"
+  },
+  {
+    "id": "elder_2",
+    "speaker": "Village Elder",
+    "text": "Your daughter... I'm sorry, Kael. She was taken to the other side.",
+    "nextId": "elder_3"
+  },
+  {
+    "id": "elder_3",
+    "speaker": "Village Elder",
+    "text": "But there may be hope. The Cogspire scholars — they've been studying the rift.",
+    "choices": [
+      { "text": "I'll find them.", "nextId": "elder_4a" },
+      { "text": "Is there another way?", "nextId": "elder_4b" }
+    ]
+  },
+  {
+    "id": "elder_4a",
+    "speaker": "Village Elder",
+    "text": "Go to Cogspire Academy, northeast of here. Ask for Professor Venn.",
+    "nextId": null
+  },
+  {
+    "id": "elder_4b",
+    "speaker": "Village Elder",
+    "text": "The scholars are our only lead. Cogspire Academy — it's your best chance.",
+    "nextId": null
+  }
+]

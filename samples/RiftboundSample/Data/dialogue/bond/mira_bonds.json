@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "mira_bond_20",
+    "Speaker": "Mira",
+    "Text": "I used to study the stars from the Cogspire observatory. Every night, charting constellations, calculating trajectories. It was so... orderly.",
+    "NextId": "mira_bond_20b"
+  },
+  {
+    "Id": "mira_bond_20b",
+    "Speaker": "Mira",
+    "Text": "Then the Rift happened. Now the stars look different from every realm. Nothing is orderly anymore. But maybe that's not entirely bad.",
+    "NextId": null
+  },
+  {
+    "Id": "mira_bond_40",
+    "Speaker": "Mira",
+    "Text": "My magic frightens me sometimes. Before the Rift, it was academic — theory, equations, controlled experiments. Now it just... flows.",
+    "NextId": "mira_bond_40b"
+  },
+  {
+    "Id": "mira_bond_40b",
+    "Speaker": "Mira",
+    "Text": "What if I lose control? What if the starlight decides it doesn't want to listen anymore?",
+    "NextId": null
+  },
+  {
+    "Id": "mira_bond_60",
+    "Speaker": "Mira",
+    "Text": "I had a mentor at the Academy. Professor Lendara. She vanished during the Rift — pulled into the Ethereal Realm, we think.",
+    "NextId": "mira_bond_60b"
+  },
+  {
+    "Id": "mira_bond_60b",
+    "Speaker": "Mira",
+    "Text": "If we find her there... I don't know what I'll say. 'Sorry I couldn't save you'? 'Thank you for everything'? Both, probably.",
+    "NextId": null
+  },
+  {
+    "Id": "mira_bond_80",
+    "Speaker": "Mira",
+    "Text": "I've been practicing something new. Weaving starlight into protective wards. It's delicate work — one wrong harmonic and the whole thing collapses.",
+    "NextId": "mira_bond_80b"
+  },
+  {
+    "Id": "mira_bond_80b",
+    "Speaker": "Mira",
+    "Text": "But when it works... it's beautiful. Like holding a piece of the sky in your hands. I want to show you sometime.",
+    "NextId": null
+  },
+  {
+    "Id": "mira_bond_100",
+    "Speaker": "Mira",
+    "Text": "The Rift took so much from all of us. But it also brought us together. I never would have left the observatory if not for this journey.",
+    "NextId": "mira_bond_100b"
+  },
+  {
+    "Id": "mira_bond_100b",
+    "Speaker": "Mira",
+    "Text": "I'm grateful. For the stars, for the magic, for all of you. Whatever happens at the Fade — we face it together.",
+    "NextId": null
+  }
+]

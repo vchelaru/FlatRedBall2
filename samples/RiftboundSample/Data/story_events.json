@@ -1,0 +1,333 @@
+[
+  {
+    "Id": "act1_intro",
+    "TriggerType": "map_enter",
+    "TriggerValue": "brasshollow",
+    "RequiredFlags": [],
+    "SetFlags": ["act1_intro_done"],
+    "DialogueFile": "Data/dialogue/story/act1_intro.json",
+    "RecruitCharacter": null,
+    "StartBattle": null,
+    "UnlockMap": null
+  },
+  {
+    "Id": "act1_meet_mira",
+    "TriggerType": "map_enter",
+    "TriggerValue": "brasshollow",
+    "RequiredFlags": ["act1_intro_done"],
+    "SetFlags": ["act1_meet_mira_done"],
+    "DialogueFile": "Data/dialogue/story/act1_meet_mira.json",
+    "RecruitCharacter": "mira"
+  },
+  {
+    "Id": "act1_elder",
+    "TriggerType": "map_enter",
+    "TriggerValue": "brasshollow",
+    "RequiredFlags": ["act1_meet_mira_done"],
+    "SetFlags": ["act1_elder_done"],
+    "DialogueFile": "Data/dialogue/story/act1_elder.json"
+  },
+  {
+    "Id": "act1_venn",
+    "TriggerType": "map_enter",
+    "TriggerValue": "cogspire_academy",
+    "RequiredFlags": ["act1_elder_done"],
+    "SetFlags": ["act1_venn_done"],
+    "DialogueFile": "Data/dialogue/story/act1_venn.json",
+    "RecruitCharacter": "venn"
+  },
+  {
+    "Id": "act1_thorne",
+    "TriggerType": "map_enter",
+    "TriggerValue": "fort_ironmaw",
+    "RequiredFlags": ["act1_venn_done"],
+    "SetFlags": ["act1_thorne_done"],
+    "DialogueFile": "Data/dialogue/story/act1_thorne.json",
+    "RecruitCharacter": "thorne"
+  },
+  {
+    "Id": "act1_pip",
+    "TriggerType": "map_enter",
+    "TriggerValue": "rustfields",
+    "RequiredFlags": ["act1_thorne_done"],
+    "SetFlags": ["act1_pip_done"],
+    "DialogueFile": "Data/dialogue/story/act1_pip.json",
+    "RecruitCharacter": "pip"
+  },
+  {
+    "Id": "act1_sera",
+    "TriggerType": "map_enter",
+    "TriggerValue": "cogspire_academy",
+    "RequiredFlags": ["act1_pip_done"],
+    "SetFlags": ["act1_sera_done"],
+    "DialogueFile": "Data/dialogue/story/act1_sera.json",
+    "RecruitCharacter": "sera"
+  },
+  {
+    "Id": "act1_forge",
+    "TriggerType": "map_enter",
+    "TriggerValue": "scorched_vents",
+    "RequiredFlags": ["act1_sera_done"],
+    "SetFlags": ["act1_forge_done"],
+    "DialogueFile": "Data/dialogue/story/act1_forge.json",
+    "RecruitCharacter": "forge"
+  },
+  {
+    "Id": "act1_boss_furnace",
+    "TriggerType": "quest_complete",
+    "TriggerValue": "act1_scorched_vents",
+    "RequiredFlags": ["act1_forge_done"],
+    "SetFlags": ["act1_boss_furnace_done"],
+    "DialogueFile": "Data/dialogue/story/act1_boss_intro.json",
+    "StartBattle": "furnace_guardian"
+  },
+  {
+    "Id": "act1_rift_opens",
+    "TriggerType": "boss_defeat",
+    "TriggerValue": "furnace_guardian",
+    "RequiredFlags": ["act1_boss_furnace_done"],
+    "SetFlags": ["act1_complete"],
+    "DialogueFile": "Data/dialogue/story/act1_rift_opens.json",
+    "UnlockMap": "crystal_glade"
+  },
+
+  {
+    "Id": "act2_enter_ethereal",
+    "TriggerType": "map_enter",
+    "TriggerValue": "crystal_glade",
+    "RequiredFlags": ["act1_complete"],
+    "SetFlags": ["act2_entered"],
+    "DialogueFile": "Data/dialogue/story/act2_enter_ethereal.json"
+  },
+  {
+    "Id": "act2_lyris",
+    "TriggerType": "map_enter",
+    "TriggerValue": "crystal_glade",
+    "RequiredFlags": ["act2_entered"],
+    "SetFlags": ["act2_lyris_done"],
+    "DialogueFile": "Data/dialogue/story/act2_lyris.json",
+    "RecruitCharacter": "lyris"
+  },
+  {
+    "Id": "act2_solace",
+    "TriggerType": "map_enter",
+    "TriggerValue": "dreamspire_temple",
+    "RequiredFlags": ["act2_lyris_done"],
+    "SetFlags": ["act2_solace_done"],
+    "DialogueFile": "Data/dialogue/story/act2_solace.json",
+    "RecruitCharacter": "solace"
+  },
+  {
+    "Id": "act2_wraith",
+    "TriggerType": "map_enter",
+    "TriggerValue": "shimmering_grotto",
+    "RequiredFlags": ["act2_solace_done"],
+    "SetFlags": ["act2_wraith_done"],
+    "DialogueFile": "Data/dialogue/story/act2_wraith.json",
+    "RecruitCharacter": "wraith"
+  },
+  {
+    "Id": "act2_orin",
+    "TriggerType": "map_enter",
+    "TriggerValue": "floating_isles",
+    "RequiredFlags": ["act2_wraith_done"],
+    "SetFlags": ["act2_orin_done"],
+    "DialogueFile": "Data/dialogue/story/act2_orin.json",
+    "RecruitCharacter": "orin"
+  },
+  {
+    "Id": "act2_zephyr",
+    "TriggerType": "map_enter",
+    "TriggerValue": "luminous_spire",
+    "RequiredFlags": ["act2_orin_done"],
+    "SetFlags": ["act2_zephyr_done"],
+    "DialogueFile": "Data/dialogue/story/act2_zephyr.json",
+    "RecruitCharacter": "zephyr"
+  },
+  {
+    "Id": "act2_nyx",
+    "TriggerType": "map_enter",
+    "TriggerValue": "shimmering_grotto",
+    "RequiredFlags": ["act2_zephyr_done"],
+    "SetFlags": ["act2_nyx_done"],
+    "DialogueFile": "Data/dialogue/story/act2_nyx.json",
+    "RecruitCharacter": "nyx"
+  },
+  {
+    "Id": "act2_echo",
+    "TriggerType": "map_enter",
+    "TriggerValue": "dreamspire_temple",
+    "RequiredFlags": ["act2_nyx_done"],
+    "SetFlags": ["act2_echo_done"],
+    "DialogueFile": "Data/dialogue/story/act2_echo.json",
+    "RecruitCharacter": "echo"
+  },
+  {
+    "Id": "act2_nightmare_boss",
+    "TriggerType": "quest_complete",
+    "TriggerValue": "nightmares_end",
+    "RequiredFlags": ["act2_echo_done"],
+    "SetFlags": ["act2_nightmare_done"],
+    "DialogueFile": "Data/dialogue/story/act2_nightmare_boss.json",
+    "StartBattle": "nightmare_core"
+  },
+  {
+    "Id": "act2_dreamer_boss",
+    "TriggerType": "boss_defeat",
+    "TriggerValue": "nightmare_core",
+    "RequiredFlags": ["act2_nightmare_done"],
+    "SetFlags": ["act2_dreamer_done"],
+    "DialogueFile": "Data/dialogue/story/act2_dreamer_boss.json",
+    "StartBattle": "the_dreamer"
+  },
+  {
+    "Id": "act2_nexus_revealed",
+    "TriggerType": "boss_defeat",
+    "TriggerValue": "the_dreamer",
+    "RequiredFlags": ["act2_dreamer_done"],
+    "SetFlags": ["act2_complete"],
+    "DialogueFile": "Data/dialogue/story/act2_nexus_revealed.json",
+    "UnlockMap": "data_core"
+  },
+
+  {
+    "Id": "act3_enter_nexus",
+    "TriggerType": "map_enter",
+    "TriggerValue": "data_core",
+    "RequiredFlags": ["act2_complete"],
+    "SetFlags": ["act3_entered"],
+    "DialogueFile": "Data/dialogue/story/act3_enter_nexus.json"
+  },
+  {
+    "Id": "act3_byte",
+    "TriggerType": "map_enter",
+    "TriggerValue": "data_core",
+    "RequiredFlags": ["act3_entered"],
+    "SetFlags": ["act3_byte_done"],
+    "DialogueFile": "Data/dialogue/story/act3_byte.json",
+    "RecruitCharacter": "byte"
+  },
+  {
+    "Id": "act3_pixel",
+    "TriggerType": "map_enter",
+    "TriggerValue": "pixel_bazaar",
+    "RequiredFlags": ["act3_byte_done"],
+    "SetFlags": ["act3_pixel_done"],
+    "DialogueFile": "Data/dialogue/story/act3_pixel.json",
+    "RecruitCharacter": "pixel"
+  },
+  {
+    "Id": "act3_cipher",
+    "TriggerType": "map_enter",
+    "TriggerValue": "firewall_fortress",
+    "RequiredFlags": ["act3_pixel_done"],
+    "SetFlags": ["act3_cipher_done"],
+    "DialogueFile": "Data/dialogue/story/act3_cipher.json",
+    "RecruitCharacter": "cipher"
+  },
+  {
+    "Id": "act3_glitch",
+    "TriggerType": "map_enter",
+    "TriggerValue": "glitch_wastes",
+    "RequiredFlags": ["act3_cipher_done"],
+    "SetFlags": ["act3_glitch_done"],
+    "DialogueFile": "Data/dialogue/story/act3_glitch.json",
+    "RecruitCharacter": "glitch"
+  },
+  {
+    "Id": "act3_nova",
+    "TriggerType": "map_enter",
+    "TriggerValue": "nexus_spire",
+    "RequiredFlags": ["act3_glitch_done"],
+    "SetFlags": ["act3_nova_done"],
+    "DialogueFile": "Data/dialogue/story/act3_nova.json",
+    "RecruitCharacter": "nova"
+  },
+  {
+    "Id": "act3_root",
+    "TriggerType": "map_enter",
+    "TriggerValue": "glitch_wastes",
+    "RequiredFlags": ["act3_nova_done"],
+    "SetFlags": ["act3_root_done"],
+    "DialogueFile": "Data/dialogue/story/act3_root.json",
+    "RecruitCharacter": "root"
+  },
+  {
+    "Id": "act3_kernel_boss",
+    "TriggerType": "quest_complete",
+    "TriggerValue": "the_kernel_quest",
+    "RequiredFlags": ["act3_root_done"],
+    "SetFlags": ["act3_kernel_done"],
+    "DialogueFile": "Data/dialogue/story/act3_kernel_boss.json",
+    "StartBattle": "the_kernel"
+  },
+  {
+    "Id": "act3_system_override",
+    "TriggerType": "boss_defeat",
+    "TriggerValue": "the_kernel",
+    "RequiredFlags": ["act3_kernel_done"],
+    "SetFlags": ["act3_override_done"],
+    "DialogueFile": "Data/dialogue/story/act3_system_override.json"
+  },
+  {
+    "Id": "act3_fade_opens",
+    "TriggerType": "flag_set",
+    "TriggerValue": "act3_override_done",
+    "RequiredFlags": ["act3_override_done"],
+    "SetFlags": ["act3_complete"],
+    "DialogueFile": "Data/dialogue/story/act3_fade_opens.json",
+    "UnlockMap": "rift_entrance"
+  },
+
+  {
+    "Id": "act4_enter_fade",
+    "TriggerType": "map_enter",
+    "TriggerValue": "rift_entrance",
+    "RequiredFlags": ["act3_complete"],
+    "SetFlags": ["act4_entered"],
+    "DialogueFile": "Data/dialogue/story/act4_enter_fade.json"
+  },
+  {
+    "Id": "act4_lira_found",
+    "TriggerType": "map_enter",
+    "TriggerValue": "temporal_nexus",
+    "RequiredFlags": ["act4_entered"],
+    "SetFlags": ["act4_lira_found_done"],
+    "DialogueFile": "Data/dialogue/story/act4_lira_found.json",
+    "RecruitCharacter": "lira"
+  },
+  {
+    "Id": "act4_architect",
+    "TriggerType": "map_enter",
+    "TriggerValue": "temporal_nexus",
+    "RequiredFlags": ["act4_lira_found_done"],
+    "SetFlags": ["act4_architect_done"],
+    "DialogueFile": "Data/dialogue/story/act4_architect.json",
+    "RecruitCharacter": "architect"
+  },
+  {
+    "Id": "act4_draven_confrontation",
+    "TriggerType": "map_enter",
+    "TriggerValue": "final_sanctum",
+    "RequiredFlags": ["act4_architect_done"],
+    "SetFlags": ["act4_draven_confronted"],
+    "DialogueFile": "Data/dialogue/story/act4_draven_confrontation.json"
+  },
+  {
+    "Id": "act4_final_boss",
+    "TriggerType": "flag_set",
+    "TriggerValue": "act4_draven_confronted",
+    "RequiredFlags": ["act4_draven_confronted"],
+    "SetFlags": ["act4_boss_done"],
+    "DialogueFile": "Data/dialogue/story/act4_final_boss.json",
+    "StartBattle": "chancellor_draven"
+  },
+  {
+    "Id": "act4_ending",
+    "TriggerType": "boss_defeat",
+    "TriggerValue": "chancellor_draven",
+    "RequiredFlags": ["act4_boss_done"],
+    "SetFlags": ["act4_complete", "game_complete"],
+    "DialogueFile": "Data/dialogue/story/act4_ending.json"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_nexus_revealed_1",
+    "Speaker": "Venn",
+    "Text": "The second Harmonic Crystal is ours. But look — the Dreamer's defeat opened something else.",
+    "NextId": "act2_nexus_revealed_2"
+  },
+  {
+    "Id": "act2_nexus_revealed_2",
+    "Speaker": "Mira",
+    "Text": "That light... it's not ethereal. It's structured. Geometric. Like a window into another world.",
+    "NextId": "act2_nexus_revealed_3"
+  },
+  {
+    "Id": "act2_nexus_revealed_3",
+    "Speaker": "Venn",
+    "Text": "The Nexus. The virtual bridge between realms. The third crystal is inside.",
+    "NextId": "act2_nexus_revealed_4"
+  },
+  {
+    "Id": "act2_nexus_revealed_4",
+    "Speaker": "Kael",
+    "Text": "Then that's where we go next. Lira is waiting.",
+    "NextId": null
+  }
+]

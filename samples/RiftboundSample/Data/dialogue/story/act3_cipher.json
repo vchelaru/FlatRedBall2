@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act3_cipher_1",
+    "Speaker": "Cipher",
+    "Text": "The Firewall Fortress — last line of defense before the core. I built half of it.",
+    "NextId": "act3_cipher_2"
+  },
+  {
+    "Id": "act3_cipher_2",
+    "Speaker": "Kael",
+    "Text": "Then you can get us through.",
+    "NextId": "act3_cipher_3"
+  },
+  {
+    "Id": "act3_cipher_3",
+    "Speaker": "Cipher",
+    "Text": "I can. But the Kernel has corrupted my own protocols. Help me purge the infection, and I'll open the gates.",
+    "NextId": null
+  }
+]

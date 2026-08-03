@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act1_elder_1",
+    "Speaker": "Village Elder",
+    "Text": "Kael. You're really going through with this. I can see it in your eyes.",
+    "NextId": "act1_elder_2"
+  },
+  {
+    "Id": "act1_elder_2",
+    "Speaker": "Kael",
+    "Text": "I need the Harmonic Crystal. Ashcroft's notes say there's one at Cogspire Academy.",
+    "NextId": "act1_elder_3"
+  },
+  {
+    "Id": "act1_elder_3",
+    "Speaker": "Village Elder",
+    "Text": "Cogspire... yes. Professor Venn was Ashcroft's colleague. If anyone has the crystal, it's him.",
+    "NextId": "act1_elder_4"
+  },
+  {
+    "Id": "act1_elder_4",
+    "Speaker": "Village Elder",
+    "Text": "But be careful. The Ironclad Authority has eyes everywhere. They don't want anyone crossing the Rift.",
+    "NextId": null
+  }
+]

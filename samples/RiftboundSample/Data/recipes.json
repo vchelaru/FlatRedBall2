@@ -1,0 +1,352 @@
+[
+  {
+    "Id": "bronze_sword",
+    "Name": "Bronze Sword",
+    "Description": "A sturdy blade forged from bronze alloy.",
+    "Category": "weapon",
+    "Materials": { "bronze_ingot": 3, "leather_strip": 1 },
+    "OutputItemId": "bronze_sword",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "iron_shield",
+    "Name": "Iron Shield",
+    "Description": "A heavy shield that absorbs incoming blows.",
+    "Category": "armor",
+    "Materials": { "iron_gear": 2, "leather_strip": 2 },
+    "OutputItemId": "iron_shield",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "steam_goggles",
+    "Name": "Steam Goggles",
+    "Description": "Precision lenses that sharpen reflexes. Grants +SPD.",
+    "Category": "accessory",
+    "Materials": { "iron_gear": 1, "beetle_shell": 2, "rat_tail": 1 },
+    "OutputItemId": "steam_goggles",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "health_potion",
+    "Name": "Health Potion",
+    "Description": "Restores 50 HP to one ally.",
+    "Category": "consumable",
+    "Materials": { "herb": 2, "rat_tail": 1 },
+    "OutputItemId": "health_potion",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "mana_elixir",
+    "Name": "Mana Elixir",
+    "Description": "Restores 30 MP to one ally.",
+    "Category": "consumable",
+    "Materials": { "herb": 1, "aether_shard": 2 },
+    "OutputItemId": "mana_elixir",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "pet_kibble",
+    "Name": "Pet Kibble",
+    "Description": "Basic pet food. Restores a small amount of satiety.",
+    "Category": "consumable",
+    "Materials": { "herb": 1, "rat_tail": 2 },
+    "OutputItemId": "pet_kibble",
+    "OutputCount": 3,
+    "World": "overworld"
+  },
+  {
+    "Id": "premium_pet_treat",
+    "Name": "Premium Pet Treat",
+    "Description": "A gourmet treat that greatly boosts satiety and bond.",
+    "Category": "consumable",
+    "Materials": { "herb": 2, "beetle_shell": 1, "aether_shard": 1 },
+    "OutputItemId": "premium_pet_treat",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "smoke_bomb",
+    "Name": "Smoke Bomb",
+    "Description": "Guarantees escape from non-boss encounters.",
+    "Category": "consumable",
+    "Materials": { "rat_tail": 3, "herb": 1 },
+    "OutputItemId": "smoke_bomb",
+    "OutputCount": 2,
+    "World": "overworld"
+  },
+  {
+    "Id": "bronze_armor",
+    "Name": "Bronze Armor",
+    "Description": "Solid bronze plating that reduces physical damage.",
+    "Category": "armor",
+    "Materials": { "bronze_ingot": 4, "iron_gear": 1 },
+    "OutputItemId": "bronze_armor",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "spark_ring",
+    "Name": "Spark Ring",
+    "Description": "A crackling ring imbued with lightning. Grants +MAG.",
+    "Category": "accessory",
+    "Materials": { "aether_shard": 3, "iron_gear": 1, "rare_alloy": 1 },
+    "OutputItemId": "spark_ring",
+    "OutputCount": 1,
+    "World": "overworld"
+  },
+  {
+    "Id": "circuit_blade",
+    "Name": "Circuit Blade",
+    "Description": "A sword with circuitry etched into the blade. Deals bonus Glitch damage.",
+    "Category": "weapon",
+    "Materials": { "circuit_board": 3, "energy_cell": 1 },
+    "OutputItemId": "circuit_blade",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "fiber_armor",
+    "Name": "Fiber Armor",
+    "Description": "Lightweight armor woven from nano fibers. High RES.",
+    "Category": "armor",
+    "Materials": { "nano_fiber": 4, "data_fragment": 2 },
+    "OutputItemId": "fiber_armor",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "neural_link",
+    "Name": "Neural Link",
+    "Description": "An accessory that boosts MAG and SPD by interfacing directly with the mind.",
+    "Category": "accessory",
+    "Materials": { "circuit_board": 2, "nano_fiber": 1, "data_fragment": 3 },
+    "OutputItemId": "neural_link",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "data_potion",
+    "Name": "Data Potion",
+    "Description": "Restores 60 HP by reconstructing damaged data.",
+    "Category": "consumable",
+    "Materials": { "data_fragment": 3, "energy_cell": 1 },
+    "OutputItemId": "data_potion",
+    "OutputCount": 2,
+    "World": "nexus"
+  },
+  {
+    "Id": "pixel_shield",
+    "Name": "Pixel Shield",
+    "Description": "A shield made of hardened pixel clusters. High DEF.",
+    "Category": "armor",
+    "Materials": { "data_fragment": 2, "circuit_board": 2, "energy_cell": 1 },
+    "OutputItemId": "pixel_shield",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "energy_drink",
+    "Name": "Energy Drink",
+    "Description": "Restores 40 MP by injecting raw energy.",
+    "Category": "consumable",
+    "Materials": { "energy_cell": 2, "data_fragment": 1 },
+    "OutputItemId": "energy_drink",
+    "OutputCount": 2,
+    "World": "nexus"
+  },
+  {
+    "Id": "virus_bomb",
+    "Name": "Virus Bomb",
+    "Description": "A throwable that inflicts Glitch debuffs on all enemies.",
+    "Category": "consumable",
+    "Materials": { "data_fragment": 4, "nano_fiber": 2 },
+    "OutputItemId": "virus_bomb",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "overclock_chip",
+    "Name": "Overclock Chip",
+    "Description": "An accessory that grants +SPD but lowers DEF.",
+    "Category": "accessory",
+    "Materials": { "circuit_board": 3, "energy_cell": 2 },
+    "OutputItemId": "overclock_chip",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "kernel_gauntlets",
+    "Name": "Kernel Gauntlets",
+    "Description": "Forged from a Kernel core. Powerful weapon with Glitch affinity.",
+    "Category": "weapon",
+    "Materials": { "kernel_core": 1, "circuit_board": 2, "nano_fiber": 2 },
+    "OutputItemId": "kernel_gauntlets",
+    "OutputCount": 1,
+    "World": "nexus"
+  },
+  {
+    "Id": "digital_pet_food",
+    "Name": "Digital Pet Food",
+    "Description": "Synthesized pet food for digital companions. Restores satiety.",
+    "Category": "consumable",
+    "Materials": { "data_fragment": 2, "energy_cell": 1 },
+    "OutputItemId": "digital_pet_food",
+    "OutputCount": 3,
+    "World": "nexus"
+  },
+  {
+    "Id": "crystal_blade",
+    "Name": "Crystal Blade",
+    "Description": "A sword forged from living crystal. Deals bonus Ice damage.",
+    "Category": "weapon",
+    "Materials": { "crystal_dust": 4, "phantom_steel": 1 },
+    "OutputItemId": "crystal_blade",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "dreamweave_robe",
+    "Name": "Dreamweave Robe",
+    "Description": "A robe woven from dream threads. Grants high RES and MAG.",
+    "Category": "armor",
+    "Materials": { "dream_shard": 3, "ether_essence": 2 },
+    "OutputItemId": "dreamweave_robe",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "aether_pendant",
+    "Name": "Aether Pendant",
+    "Description": "A pendant pulsing with aether energy. Boosts MAG and Aether resistance.",
+    "Category": "accessory",
+    "Materials": { "ether_essence": 3, "crystal_dust": 2 },
+    "OutputItemId": "aether_pendant",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "spirit_elixir",
+    "Name": "Spirit Elixir",
+    "Description": "Restores 80 HP using ethereal essence.",
+    "Category": "consumable",
+    "Materials": { "ether_essence": 2, "dream_shard": 1 },
+    "OutputItemId": "spirit_elixir",
+    "OutputCount": 2,
+    "World": "ethereal"
+  },
+  {
+    "Id": "phantom_armor",
+    "Name": "Phantom Armor",
+    "Description": "Armor that phases in and out of existence. Grants evasion and DEF.",
+    "Category": "armor",
+    "Materials": { "phantom_steel": 3, "ether_essence": 2, "dream_shard": 1 },
+    "OutputItemId": "phantom_armor",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "dream_catcher",
+    "Name": "Dream Catcher",
+    "Description": "An accessory that protects against sleep and nightmare effects.",
+    "Category": "accessory",
+    "Materials": { "dream_shard": 4, "crystal_dust": 1 },
+    "OutputItemId": "dream_catcher",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "aether_potion",
+    "Name": "Aether Potion",
+    "Description": "Restores 50 MP using concentrated aether.",
+    "Category": "consumable",
+    "Materials": { "ether_essence": 3, "crystal_dust": 1 },
+    "OutputItemId": "aether_potion",
+    "OutputCount": 2,
+    "World": "ethereal"
+  },
+  {
+    "Id": "nightmare_blade",
+    "Name": "Nightmare Blade",
+    "Description": "A terrifying weapon forged from nightmare energy. May inflict sleep.",
+    "Category": "weapon",
+    "Materials": { "nightmare_core_shard": 1, "phantom_steel": 2, "dream_shard": 2 },
+    "OutputItemId": "nightmare_blade",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "ethereal_pet_treat",
+    "Name": "Ethereal Pet Treat",
+    "Description": "A treat infused with dream energy for ethereal pets.",
+    "Category": "consumable",
+    "Materials": { "dream_shard": 1, "ether_essence": 1, "crystal_dust": 1 },
+    "OutputItemId": "ethereal_pet_treat",
+    "OutputCount": 3,
+    "World": "ethereal"
+  },
+  {
+    "Id": "crystal_shield",
+    "Name": "Crystal Shield",
+    "Description": "A shield grown from ethereal crystal. Very high DEF.",
+    "Category": "armor",
+    "Materials": { "crystal_dust": 5, "phantom_steel": 1, "ether_essence": 1 },
+    "OutputItemId": "crystal_shield",
+    "OutputCount": 1,
+    "World": "ethereal"
+  },
+  {
+    "Id": "rift_blade",
+    "Name": "Rift Blade",
+    "Description": "A weapon forged from overworld steel and ethereal essence. Cuts between dimensions.",
+    "Category": "weapon",
+    "Materials": { "rare_alloy": 2, "aether_shard": 3, "iron_gear": 2 },
+    "OutputItemId": "rift_blade",
+    "OutputCount": 1,
+    "World": "cross"
+  },
+  {
+    "Id": "quantum_armor",
+    "Name": "Quantum Armor",
+    "Description": "Armor that exists in multiple states. Requires materials from all three worlds.",
+    "Category": "armor",
+    "Materials": { "rare_alloy": 2, "aether_shard": 2, "nano_fiber": 2, "circuit_board": 1 },
+    "OutputItemId": "quantum_armor",
+    "OutputCount": 1,
+    "World": "cross"
+  },
+  {
+    "Id": "dimensional_ring",
+    "Name": "Dimensional Ring",
+    "Description": "A ring that resonates across the Ethereal and Nexus planes. Grants +MAG and +RES.",
+    "Category": "accessory",
+    "Materials": { "aether_shard": 3, "data_fragment": 3, "energy_cell": 1 },
+    "OutputItemId": "dimensional_ring",
+    "OutputCount": 1,
+    "World": "cross"
+  },
+  {
+    "Id": "unity_staff",
+    "Name": "Unity Staff",
+    "Description": "A staff channeling the power of all three worlds. The ultimate magical weapon.",
+    "Category": "weapon",
+    "Materials": { "furnace_core": 1, "aether_shard": 3, "kernel_core": 1, "rare_alloy": 2 },
+    "OutputItemId": "unity_staff",
+    "OutputCount": 1,
+    "World": "cross"
+  },
+  {
+    "Id": "convergence_elixir",
+    "Name": "Convergence Elixir",
+    "Description": "A potent elixir brewed from materials across worlds. Fully restores HP and MP.",
+    "Category": "consumable",
+    "Materials": { "herb": 3, "aether_shard": 2, "energy_cell": 2 },
+    "OutputItemId": "convergence_elixir",
+    "OutputCount": 1,
+    "World": "cross"
+  }
+]

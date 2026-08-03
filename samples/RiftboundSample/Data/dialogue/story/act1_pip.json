@@ -1,0 +1,38 @@
+[
+  {
+    "Id": "act1_pip_1",
+    "Speaker": "Kael",
+    "Text": "Hey — that's my supply pack!",
+    "NextId": "act1_pip_2"
+  },
+  {
+    "Id": "act1_pip_2",
+    "Speaker": "Pip",
+    "Text": "Whoa, whoa! I wasn't stealing! I was... redistributing!",
+    "NextId": "act1_pip_3"
+  },
+  {
+    "Id": "act1_pip_3",
+    "Speaker": "Mira",
+    "Text": "Redistributing. Into your own pockets.",
+    "NextId": "act1_pip_4"
+  },
+  {
+    "Id": "act1_pip_4",
+    "Speaker": "Pip",
+    "Text": "Look, I'm sorry! The Rustfields are picked clean. People are hungry. I was just trying to help.",
+    "NextId": "act1_pip_5"
+  },
+  {
+    "Id": "act1_pip_5",
+    "Speaker": "Kael",
+    "Text": "Then help properly. Come with us — we could use someone who knows these fields.",
+    "NextId": "act1_pip_6"
+  },
+  {
+    "Id": "act1_pip_6",
+    "Speaker": "Pip",
+    "Text": "Really? You'd trust me? After I... okay, yeah. I'm in. I won't let you down!",
+    "NextId": null
+  }
+]

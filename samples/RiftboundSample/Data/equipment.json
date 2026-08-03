@@ -1,0 +1,74 @@
+[
+  {
+    "id": "rusty_wrench",
+    "name": "Rusty Wrench",
+    "description": "Kael's starting tool. Better than bare fists.",
+    "slot": "weapon",
+    "statBonuses": { "STR": 3 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "old_robes",
+    "name": "Old Robes",
+    "description": "Mira's worn robes. Offer some magical resistance.",
+    "slot": "armor",
+    "statBonuses": { "RES": 3, "DEF": 1 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "iron_wrench",
+    "name": "Iron Wrench",
+    "description": "A sturdy wrench for bashing gears and skulls alike.",
+    "slot": "weapon",
+    "statBonuses": { "STR": 6 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "apprentice_staff",
+    "name": "Apprentice Staff",
+    "description": "A basic staff that amplifies magical energy.",
+    "slot": "weapon",
+    "statBonuses": { "MAG": 5, "RES": 2 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "leather_vest",
+    "name": "Leather Vest",
+    "description": "Light armor offering modest protection.",
+    "slot": "armor",
+    "statBonuses": { "DEF": 4 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "chain_shirt",
+    "name": "Chain Shirt",
+    "description": "Heavier armor with solid defense but lower mobility.",
+    "slot": "armor",
+    "statBonuses": { "DEF": 7, "SPD": -1 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "copper_ring",
+    "name": "Copper Ring",
+    "description": "A simple ring that boosts luck slightly.",
+    "slot": "accessory",
+    "statBonuses": { "LCK": 3 },
+    "elementBonus": null,
+    "specialEffect": null
+  },
+  {
+    "id": "steam_gauntlet",
+    "name": "Steam Gauntlet",
+    "description": "Adds steam elemental damage to attacks.",
+    "slot": "accessory",
+    "statBonuses": { "STR": 2 },
+    "elementBonus": "Steam",
+    "specialEffect": null
+  }
+]

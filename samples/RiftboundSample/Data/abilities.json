@@ -1,0 +1,1647 @@
+[
+  {
+    "Id": "attack",
+    "Name": "Attack",
+    "Description": "A basic physical strike.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "defend",
+    "Name": "Defend",
+    "Description": "Brace for impact, halving incoming damage this turn.",
+    "MPCost": 0,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "fire_bolt",
+    "Name": "Fire Bolt",
+    "Description": "Hurl a bolt of flame at a single enemy.",
+    "MPCost": 8,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Fire",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "steam_blast",
+    "Name": "Steam Blast",
+    "Description": "Release a burst of pressurized steam at all enemies.",
+    "MPCost": 12,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Steam",
+    "Multiplier": 1.1
+  },
+  {
+    "Id": "heal",
+    "Name": "Heal",
+    "Description": "Restore HP to a single ally.",
+    "MPCost": 6,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "wrench_strike",
+    "Name": "Wrench Strike",
+    "Description": "A heavy swing with a wrench. May lower enemy DEF.",
+    "MPCost": 4,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "ice_shard",
+    "Name": "Ice Shard",
+    "Description": "Launch a razor-sharp shard of ice.",
+    "MPCost": 7,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "gear_shield",
+    "Name": "Gear Shield",
+    "Description": "Summon rotating gears to protect an ally, raising DEF.",
+    "MPCost": 5,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "Steam",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "rust_bite",
+    "Name": "Rust Bite",
+    "Description": "A corrosive bite that weakens armor.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.9
+  },
+  {
+    "Id": "furnace_breath",
+    "Name": "Furnace Breath",
+    "Description": "Exhale superheated air at all enemies.",
+    "MPCost": 15,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Fire",
+    "Multiplier": 1.6
+  },
+  {
+    "Id": "cog_bash",
+    "Name": "Cog Bash",
+    "Description": "Cogsworth hurls a heavy cog at a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "gear_storm",
+    "Name": "Gear Storm",
+    "Description": "Cogsworth unleashes a barrage of steam-powered gears at all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Steam",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "overdrive",
+    "Name": "Overdrive",
+    "Description": "Cogsworth overclocks and delivers a devastating strike that ignores defense.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "data_drain",
+    "Name": "Data Drain",
+    "Description": "Siphon data from the target, dealing Glitch damage and draining MP.",
+    "MPCost": 10,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "virus",
+    "Name": "Virus",
+    "Description": "Inject a virus into all enemies. Chance to debuff.",
+    "MPCost": 14,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "overload",
+    "Name": "Overload",
+    "Description": "Channel a massive surge of lightning into a single target.",
+    "MPCost": 22,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Lightning",
+    "Multiplier": 1.8
+  },
+  {
+    "Id": "firewall",
+    "Name": "Firewall",
+    "Description": "Raise a digital barrier, boosting DEF by 50% for 3 turns.",
+    "MPCost": 8,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "system_shield",
+    "Name": "System Shield",
+    "Description": "Project a protective shield onto an ally that absorbs the next hit.",
+    "MPCost": 10,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "counter",
+    "Name": "Counter",
+    "Description": "Enter a counter stance, automatically retaliating against the next physical attack.",
+    "MPCost": 6,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "glitch_bolt",
+    "Name": "Glitch Bolt",
+    "Description": "Fire a bolt of corrupted data at a single enemy.",
+    "MPCost": 7,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "corrupt",
+    "Name": "Corrupt",
+    "Description": "Corrupt a target's defenses, lowering DEF and RES by 25%.",
+    "MPCost": 9,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Debuff",
+    "Element": "Glitch",
+    "Multiplier": 0.75
+  },
+  {
+    "Id": "pixel_storm",
+    "Name": "Pixel Storm",
+    "Description": "Unleash a storm of fragmented pixels on all enemies.",
+    "MPCost": 16,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "rapid_strike",
+    "Name": "Rapid Strike",
+    "Description": "Strike a single target three times in rapid succession.",
+    "MPCost": 8,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "dash",
+    "Name": "Dash",
+    "Description": "Blitz forward with blinding speed. Always acts first.",
+    "MPCost": 6,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "multi_hit",
+    "Name": "Multi Hit",
+    "Description": "Deliver a sweeping strike that hits all enemies.",
+    "MPCost": 12,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "data_restore",
+    "Name": "Data Restore",
+    "Description": "Reconstruct a single ally's data, restoring HP.",
+    "MPCost": 10,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "defrag",
+    "Name": "Defrag",
+    "Description": "Defragment the party's data, healing all allies and curing status effects.",
+    "MPCost": 18,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "buffer",
+    "Name": "Buffer",
+    "Description": "Boost all stats of a single ally by 25% for 3 turns.",
+    "MPCost": 14,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.25
+  },
+  {
+    "Id": "root_access",
+    "Name": "Root Access",
+    "Description": "Bypass all defenses with a direct system-level attack. Ignores RES.",
+    "MPCost": 15,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "exploit",
+    "Name": "Exploit",
+    "Description": "Exploit a target's weakness. Deals 1.5x damage if the target has a debuff, 0.5x otherwise.",
+    "MPCost": 12,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "memory_leak",
+    "Name": "Memory Leak",
+    "Description": "Corrupt memory across all enemies, dealing Glitch damage and draining MP.",
+    "MPCost": 16,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "bit_swarm",
+    "Name": "Bit Swarm",
+    "Description": "A pet summons a swarm of data bits to strike a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "data_burst",
+    "Name": "Data Burst",
+    "Description": "A pet unleashes a burst of raw data at all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "system_crash",
+    "Name": "System Crash",
+    "Description": "A pet triggers a devastating system crash on a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "static_zap",
+    "Name": "Static Zap",
+    "Description": "A pet zaps a single enemy with static electricity.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Lightning",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "surge_pulse",
+    "Name": "Surge Pulse",
+    "Description": "A pet sends an electric pulse through all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Lightning",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "overcharge",
+    "Name": "Overcharge",
+    "Description": "A pet overcharges and delivers a devastating shock to a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Lightning",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "nano_mend",
+    "Name": "Nano Mend",
+    "Description": "A pet repairs a single ally using nanobots.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "nano_field",
+    "Name": "Nano Field",
+    "Description": "A pet deploys a nanite healing field for all allies.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "full_restore",
+    "Name": "Full Restore",
+    "Description": "A pet fully reconstructs a single ally's data.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "pixel_nibble",
+    "Name": "Pixel Nibble",
+    "Description": "A pet nibbles at enemy data with corrupted pixels.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "pixel_barrage",
+    "Name": "Pixel Barrage",
+    "Description": "A pet launches a barrage of pixels at all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "render_crash",
+    "Name": "Render Crash",
+    "Description": "A pet crashes the rendering pipeline on a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "quick_jab",
+    "Name": "Quick Jab",
+    "Description": "A pet delivers a swift jab to a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "blade_rush",
+    "Name": "Blade Rush",
+    "Description": "A pet rushes through all enemies with spinning blades.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.6
+  },
+  {
+    "Id": "omega_slash",
+    "Name": "Omega Slash",
+    "Description": "A pet delivers a devastating slash to a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "debug_scan",
+    "Name": "Debug Scan",
+    "Description": "A pet scans an enemy, lowering their defenses.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Debuff",
+    "Element": "Glitch",
+    "Multiplier": 0.75
+  },
+  {
+    "Id": "malware_spread",
+    "Name": "Malware Spread",
+    "Description": "A pet spreads malware to all enemies, weakening them.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Debuff",
+    "Element": "Glitch",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "zero_day",
+    "Name": "Zero Day",
+    "Description": "A pet exploits a zero-day vulnerability for massive damage.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "analyze",
+    "Name": "Analyze",
+    "Description": "Study an enemy, revealing weaknesses and lowering RES.",
+    "MPCost": 5,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Debuff",
+    "Element": "None",
+    "Multiplier": 0.75
+  },
+  {
+    "Id": "mana_shield",
+    "Name": "Mana Shield",
+    "Description": "Convert MP into a protective barrier that absorbs damage.",
+    "MPCost": 12,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "heavy_strike",
+    "Name": "Heavy Strike",
+    "Description": "A powerful overhead blow that deals 1.5x physical damage.",
+    "MPCost": 6,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "guard",
+    "Name": "Guard",
+    "Description": "Take a defensive stance, redirecting attacks meant for allies to self.",
+    "MPCost": 4,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "rally",
+    "Name": "Rally",
+    "Description": "Boost the party's STR by 20% for 3 turns.",
+    "MPCost": 8,
+    "TargetType": "AllAllies",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "steal",
+    "Name": "Steal",
+    "Description": "Attempt to pilfer an item from an enemy.",
+    "MPCost": 3,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.3
+  },
+  {
+    "Id": "backstab",
+    "Name": "Backstab",
+    "Description": "Strike from the shadows. Deals 2x damage if the user acts first.",
+    "MPCost": 8,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 2.0
+  },
+  {
+    "Id": "smoke_screen",
+    "Name": "Smoke Screen",
+    "Description": "Throw a smoke bomb, lowering all enemies' accuracy.",
+    "MPCost": 6,
+    "TargetType": "AllEnemies",
+    "DamageType": "Debuff",
+    "Element": "None",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "cure_status",
+    "Name": "Cure Status",
+    "Description": "Remove all negative status effects from a single ally.",
+    "MPCost": 5,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.0
+  },
+  {
+    "Id": "holy_light",
+    "Name": "Holy Light",
+    "Description": "Bathe all allies in purifying light, restoring HP.",
+    "MPCost": 14,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "hammer_blow",
+    "Name": "Hammer Blow",
+    "Description": "Smash an enemy with a massive hammer. May stun.",
+    "MPCost": 7,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "forge_armor",
+    "Name": "Forge Armor",
+    "Description": "Temper an ally's armor mid-battle, boosting DEF by 30%.",
+    "MPCost": 8,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "Fire",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "ethereal_dance",
+    "Name": "Ethereal Dance",
+    "Description": "Perform a mesmerizing dance that boosts party SPD and evasion.",
+    "MPCost": 10,
+    "TargetType": "AllAllies",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "aether_bolt",
+    "Name": "Aether Bolt",
+    "Description": "Launch a bolt of pure aether energy at a single enemy.",
+    "MPCost": 8,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "haste",
+    "Name": "Haste",
+    "Description": "Accelerate an ally, doubling their SPD for 2 turns.",
+    "MPCost": 7,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 2.0
+  },
+  {
+    "Id": "dream_heal",
+    "Name": "Dream Heal",
+    "Description": "Weave dream energy into healing light, restoring a large amount of HP.",
+    "MPCost": 12,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 2.0
+  },
+  {
+    "Id": "purify",
+    "Name": "Purify",
+    "Description": "Cleanse all allies of negative statuses and restore minor HP.",
+    "MPCost": 10,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "resurrect",
+    "Name": "Resurrect",
+    "Description": "Bring a fallen ally back with 50% HP.",
+    "MPCost": 20,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "shadow_strike",
+    "Name": "Shadow Strike",
+    "Description": "Phase through defenses and strike from the shadows.",
+    "MPCost": 7,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "phase_shift",
+    "Name": "Phase Shift",
+    "Description": "Shift partially into the ethereal plane, greatly boosting evasion.",
+    "MPCost": 6,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "void_slash",
+    "Name": "Void Slash",
+    "Description": "Tear through space itself, dealing heavy Aether damage to one enemy.",
+    "MPCost": 14,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 1.8
+  },
+  {
+    "Id": "crystal_spike",
+    "Name": "Crystal Spike",
+    "Description": "Summon a spike of crystal from the ground to impale an enemy.",
+    "MPCost": 9,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "crystal_wall",
+    "Name": "Crystal Wall",
+    "Description": "Erect a wall of crystal, boosting all allies' DEF and RES.",
+    "MPCost": 12,
+    "TargetType": "AllAllies",
+    "DamageType": "Buff",
+    "Element": "Ice",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "shatter",
+    "Name": "Shatter",
+    "Description": "Shatter existing crystals, dealing heavy damage to all enemies.",
+    "MPCost": 16,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "gust",
+    "Name": "Gust",
+    "Description": "Blast an enemy with a concentrated gust of wind.",
+    "MPCost": 6,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.1
+  },
+  {
+    "Id": "tornado",
+    "Name": "Tornado",
+    "Description": "Conjure a tornado that sweeps through all enemies.",
+    "MPCost": 14,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "tailwind",
+    "Name": "Tailwind",
+    "Description": "Summon a tailwind that boosts party SPD for 3 turns.",
+    "MPCost": 8,
+    "TargetType": "AllAllies",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "dark_pulse",
+    "Name": "Dark Pulse",
+    "Description": "Emit a pulse of dark energy that damages all enemies.",
+    "MPCost": 10,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.9
+  },
+  {
+    "Id": "nightmare",
+    "Name": "Nightmare",
+    "Description": "Trap an enemy in a nightmare, dealing heavy damage and chance to sleep.",
+    "MPCost": 12,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.6
+  },
+  {
+    "Id": "hex",
+    "Name": "Hex",
+    "Description": "Place a hex on an enemy, lowering all stats by 15%.",
+    "MPCost": 9,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Debuff",
+    "Element": "Aether",
+    "Multiplier": 0.85
+  },
+  {
+    "Id": "mimic",
+    "Name": "Mimic",
+    "Description": "Copy the last ability used by an ally or enemy.",
+    "MPCost": 5,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "echo_strike",
+    "Name": "Echo Strike",
+    "Description": "Strike an enemy, then echo the hit for half damage.",
+    "MPCost": 8,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "resonance",
+    "Name": "Resonance",
+    "Description": "Resonate with the battlefield, dealing damage to all enemies based on their debuffs.",
+    "MPCost": 14,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.1
+  },
+  {
+    "Id": "aether_wisp",
+    "Name": "Aether Wisp",
+    "Description": "A pet sends a small wisp of aether to strike an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "aether_storm",
+    "Name": "Aether Storm",
+    "Description": "A pet conjures an aether storm hitting all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "aether_nova",
+    "Name": "Aether Nova",
+    "Description": "A pet unleashes a devastating nova of pure aether energy.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "dream_touch",
+    "Name": "Dream Touch",
+    "Description": "A pet touches an ally with dream energy, healing a small amount.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "dream_wave",
+    "Name": "Dream Wave",
+    "Description": "A pet sends a wave of dream energy healing all allies.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "dream_cascade",
+    "Name": "Dream Cascade",
+    "Description": "A pet cascades dream energy, fully healing one ally.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "shadow_claw",
+    "Name": "Shadow Claw",
+    "Description": "A pet slashes with shadow-infused claws.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "shadow_rush",
+    "Name": "Shadow Rush",
+    "Description": "A pet rushes through all enemies as a living shadow.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "void_rend",
+    "Name": "Void Rend",
+    "Description": "A pet tears through the void to strike a single enemy with devastating force.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "crystal_shard",
+    "Name": "Crystal Shard",
+    "Description": "A pet launches a small crystal shard at an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "crystal_rain",
+    "Name": "Crystal Rain",
+    "Description": "A pet showers all enemies with crystal fragments.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "crystal_prison",
+    "Name": "Crystal Prison",
+    "Description": "A pet encases an enemy in crystal, dealing heavy damage.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "breeze",
+    "Name": "Breeze",
+    "Description": "A pet sends a gentle breeze to strike an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "gale_force",
+    "Name": "Gale Force",
+    "Description": "A pet whips up gale-force winds hitting all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "cyclone",
+    "Name": "Cyclone",
+    "Description": "A pet conjures a devastating cyclone on a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "dark_whisper",
+    "Name": "Dark Whisper",
+    "Description": "A pet whispers dark words, dealing minor damage to an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "dark_shroud",
+    "Name": "Dark Shroud",
+    "Description": "A pet envelops all enemies in darkness, weakening them.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Debuff",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "eternal_night",
+    "Name": "Eternal Night",
+    "Description": "A pet plunges a single enemy into eternal darkness.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "echo_ping",
+    "Name": "Echo Ping",
+    "Description": "A pet sends an echoing pulse at an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.4
+  },
+  {
+    "Id": "harmonic_wave",
+    "Name": "Harmonic Wave",
+    "Description": "A pet creates a harmonic wave that hits all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "resonance_burst",
+    "Name": "Resonance Burst",
+    "Description": "A pet unleashes a powerful resonance burst on a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+
+  {
+    "Id": "steamwright_overdrive",
+    "Name": "Steamwright Overdrive",
+    "Description": "Kael overclocks every gear in his arsenal, unleashing a devastating steam explosion on all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Steam",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "arcane_cataclysm",
+    "Name": "Arcane Cataclysm",
+    "Description": "Mira channels raw starlight into a cataclysmic burst that annihilates all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.5
+  },
+  {
+    "Id": "system_crash_lb",
+    "Name": "System Crash",
+    "Description": "Byte triggers a catastrophic system crash across all enemy processes.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "total_lockdown",
+    "Name": "Total Lockdown",
+    "Description": "Proxy erects an impenetrable firewall, absorbing all damage for 2 turns and reflecting it back.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 2.5
+  },
+  {
+    "Id": "reality_fracture",
+    "Name": "Reality Fracture",
+    "Description": "Pixel shatters the boundary between code and reality, glitching all enemies into oblivion.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "infinite_recursion",
+    "Name": "Infinite Recursion",
+    "Description": "Vector strikes so fast that time loops, hitting a single enemy an uncountable number of times.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 4.0
+  },
+  {
+    "Id": "full_restore_lb",
+    "Name": "Full Restore",
+    "Description": "Cache reconstructs the entire party from backup data, fully healing all allies and curing all statuses.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "kernel_panic",
+    "Name": "Kernel Panic",
+    "Description": "Root injects a kernel panic into every enemy, dealing massive Glitch damage that bypasses all resistance.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Glitch",
+    "Multiplier": 3.5
+  },
+  {
+    "Id": "absolute_zero",
+    "Name": "Absolute Zero",
+    "Description": "Venn drops the temperature to absolute zero, freezing all enemies in place and shattering their defenses.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "last_stand",
+    "Name": "Last Stand",
+    "Description": "Thorne makes a final desperate charge, dealing massive damage to one enemy and boosting own DEF by 50%.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 2.5
+  },
+  {
+    "Id": "phantom_heist",
+    "Name": "Phantom Heist",
+    "Description": "Pip vanishes and reappears behind each enemy, striking them all and stealing their items.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 2.0
+  },
+  {
+    "Id": "divine_intervention",
+    "Name": "Divine Intervention",
+    "Description": "Sera calls upon divine power to fully heal all allies, cure all statuses, and revive the fallen.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "magnum_opus",
+    "Name": "Magnum Opus",
+    "Description": "Forge creates his ultimate weapon in an instant and strikes a single enemy with world-shattering force.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 4.0
+  },
+  {
+    "Id": "ethereal_symphony",
+    "Name": "Ethereal Symphony",
+    "Description": "Lyris dances between realms, dealing Aether damage to all enemies while boosting party speed.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "dreams_embrace",
+    "Name": "Dream's Embrace",
+    "Description": "Solace wraps all allies in a protective dream that fully heals and grants a regeneration effect.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 3.5
+  },
+  {
+    "Id": "shadow_requiem",
+    "Name": "Shadow Requiem",
+    "Description": "Wraith becomes one with the shadows, striking all enemies from the void between realms.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "crystal_apocalypse",
+    "Name": "Crystal Apocalypse",
+    "Description": "Orin shatters every crystal in existence, raining devastation on all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "tempest_fury",
+    "Name": "Tempest Fury",
+    "Description": "Zephyr summons the mother of all storms, tearing through every enemy with gale-force winds.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "eternal_nightmare",
+    "Name": "Eternal Nightmare",
+    "Description": "Nyx traps all enemies in a nightmare from which there is no waking, dealing massive dark damage.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+  {
+    "Id": "perfect_copy",
+    "Name": "Perfect Copy",
+    "Description": "Echo perfectly replicates the strongest attack used in battle and unleashes it on all enemies at double power.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  },
+
+  {
+    "Id": "star_spark",
+    "Name": "Star Spark",
+    "Description": "Nova sparks a tiny burst of starlight at an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "star_shower",
+    "Name": "Star Shower",
+    "Description": "Nova rains starlight on all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "supernova",
+    "Name": "Supernova",
+    "Description": "Nova explodes with the fury of a dying star, devastating all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "frost_nip",
+    "Name": "Frost Nip",
+    "Description": "Frostbite nips an enemy with freezing cold.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "blizzard_breath",
+    "Name": "Blizzard Breath",
+    "Description": "Frostbite exhales a blizzard on all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "ice_age",
+    "Name": "Ice Age",
+    "Description": "Frostbite triggers a localized ice age, freezing and shattering all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Ice",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "shield_bash",
+    "Name": "Shield Bash",
+    "Description": "Bastion rams an enemy with its armored shell.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "iron_charge",
+    "Name": "Iron Charge",
+    "Description": "Bastion charges through all enemies with its iron hide.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "fortress_slam",
+    "Name": "Fortress Slam",
+    "Description": "Bastion leaps and crashes down with earth-shattering force.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "None",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "quick_bite",
+    "Name": "Quick Bite",
+    "Description": "Flick darts in for a quick bite on an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "venom_strike",
+    "Name": "Venom Strike",
+    "Description": "Flick strikes an enemy with venom-tipped fangs.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 0.8
+  },
+  {
+    "Id": "inferno_dash",
+    "Name": "Inferno Dash",
+    "Description": "Flick ignites and dashes through all enemies in a trail of fire.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "gentle_mend",
+    "Name": "Gentle Mend",
+    "Description": "Patch gently heals a single ally.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "soothing_aura",
+    "Name": "Soothing Aura",
+    "Description": "Patch emits a soothing aura that heals all allies.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "miracle_heal",
+    "Name": "Miracle Heal",
+    "Description": "Patch performs a miracle, fully healing one ally.",
+    "MPCost": 0,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "None",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "ember_snap",
+    "Name": "Ember Snap",
+    "Description": "Cinder snaps at an enemy with a fiery bite.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "flame_rush",
+    "Name": "Flame Rush",
+    "Description": "Cinder rushes through enemies in a blaze of fire.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "inferno_blast",
+    "Name": "Inferno Blast",
+    "Description": "Cinder detonates in a massive fire explosion on a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Physical",
+    "Element": "Fire",
+    "Multiplier": 1.5
+  },
+
+  {
+    "Id": "rift_heal",
+    "Name": "Rift Heal",
+    "Description": "Channel rift energy to mend wounds, restoring HP to a single ally.",
+    "MPCost": 8,
+    "TargetType": "SingleAlly",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 1.8
+  },
+  {
+    "Id": "dual_beam",
+    "Name": "Dual Beam",
+    "Description": "Fire converging beams of light and shadow at a single enemy.",
+    "MPCost": 10,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "hope",
+    "Name": "Hope",
+    "Description": "Inspire the party with unwavering hope, boosting all stats by 15% for 3 turns.",
+    "MPCost": 12,
+    "TargetType": "AllAllies",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.15
+  },
+  {
+    "Id": "boundless_love",
+    "Name": "Boundless Love",
+    "Description": "Lira's love transcends the rift, fully healing the party, removing all debuffs, and reviving the fallen.",
+    "MPCost": 0,
+    "TargetType": "AllAllies",
+    "DamageType": "Healing",
+    "Element": "Aether",
+    "Multiplier": 3.5
+  },
+  {
+    "Id": "construct",
+    "Name": "Construct",
+    "Description": "Build a protective construct that shields an ally, boosting DEF and RES by 30%.",
+    "MPCost": 10,
+    "TargetType": "SingleAlly",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "deconstruct",
+    "Name": "Deconstruct",
+    "Description": "Tear apart an enemy's defenses at the molecular level, dealing heavy magical damage.",
+    "MPCost": 14,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.7
+  },
+  {
+    "Id": "reality_weave",
+    "Name": "Reality Weave",
+    "Description": "Rewrite local reality, dealing Aether damage to all enemies.",
+    "MPCost": 18,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.3
+  },
+  {
+    "Id": "genesis_protocol",
+    "Name": "Genesis Protocol",
+    "Description": "The Architect invokes the fundamental code of reality, annihilating all enemies with pure creation energy.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 5.0
+  },
+
+  {
+    "Id": "rift_pulse",
+    "Name": "Rift Pulse",
+    "Description": "A pet sends a pulse of rift energy at an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "rift_wave",
+    "Name": "Rift Wave",
+    "Description": "A pet unleashes a wave of rift energy at all enemies.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "rift_collapse",
+    "Name": "Rift Collapse",
+    "Description": "A pet collapses local reality onto a single enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "blueprint_bolt",
+    "Name": "Blueprint Bolt",
+    "Description": "A pet fires a bolt of blueprint energy at an enemy.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.5
+  },
+  {
+    "Id": "schema_storm",
+    "Name": "Schema Storm",
+    "Description": "A pet bombards all enemies with raw architectural data.",
+    "MPCost": 0,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 0.7
+  },
+  {
+    "Id": "design_override",
+    "Name": "Design Override",
+    "Description": "A pet overwrites an enemy's existence with a new design.",
+    "MPCost": 0,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+
+  {
+    "Id": "shadow_decree",
+    "Name": "Shadow Decree",
+    "Description": "Draven issues a decree of shadow, dealing dark damage to a single target.",
+    "MPCost": 15,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.6
+  },
+  {
+    "Id": "void_lance",
+    "Name": "Void Lance",
+    "Description": "Hurl a lance of pure void at a single target, piercing defenses.",
+    "MPCost": 18,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.8
+  },
+  {
+    "Id": "dark_barrier",
+    "Name": "Dark Barrier",
+    "Description": "Erect a barrier of dark energy, boosting DEF and RES by 40%.",
+    "MPCost": 12,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "Aether",
+    "Multiplier": 1.4
+  },
+  {
+    "Id": "rift_distortion",
+    "Name": "Rift Distortion",
+    "Description": "Distort the rift around all enemies, dealing Aether damage and lowering SPD.",
+    "MPCost": 20,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.2
+  },
+  {
+    "Id": "summon_minion",
+    "Name": "Summon Minion",
+    "Description": "Draven summons a Rift Fragment to fight alongside him.",
+    "MPCost": 15,
+    "TargetType": "Self",
+    "DamageType": "Buff",
+    "Element": "None",
+    "Multiplier": 1.0
+  },
+  {
+    "Id": "gravity_well",
+    "Name": "Gravity Well",
+    "Description": "Create a gravity well that crushes all enemies with immense force.",
+    "MPCost": 22,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 1.5
+  },
+  {
+    "Id": "annihilation_wave",
+    "Name": "Annihilation Wave",
+    "Description": "Unleash a wave of pure destruction across all enemies.",
+    "MPCost": 30,
+    "TargetType": "AllEnemies",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 2.0
+  },
+  {
+    "Id": "time_stop",
+    "Name": "Time Stop",
+    "Description": "Freeze time for all enemies, stunning them for 1 turn.",
+    "MPCost": 25,
+    "TargetType": "AllEnemies",
+    "DamageType": "Debuff",
+    "Element": "Aether",
+    "Multiplier": 0.0
+  },
+  {
+    "Id": "oblivion",
+    "Name": "Oblivion",
+    "Description": "Draven's ultimate — erase a target from existence with overwhelming power.",
+    "MPCost": 35,
+    "TargetType": "SingleEnemy",
+    "DamageType": "Magical",
+    "Element": "Aether",
+    "Multiplier": 3.0
+  }
+]

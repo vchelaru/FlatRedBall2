@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "kael_bond_20",
+    "Speaker": "Kael",
+    "Text": "You know, Lira used to help me in the workshop. She'd hand me tools before I even asked for them. Like she could read my mind.",
+    "NextId": "kael_bond_20b"
+  },
+  {
+    "Id": "kael_bond_20b",
+    "Speaker": "Kael",
+    "Text": "I keep thinking... if I'd just held on tighter when the Rift hit. But you can't hold onto someone when reality itself is tearing apart.",
+    "NextId": null
+  },
+  {
+    "Id": "kael_bond_40",
+    "Speaker": "Kael",
+    "Text": "Maren — my wife — she always said I was too stubborn for my own good. That I'd fix a broken pipe until my hands bled rather than call for help.",
+    "NextId": "kael_bond_40b"
+  },
+  {
+    "Id": "kael_bond_40b",
+    "Speaker": "Kael",
+    "Text": "She was right. But this time, stubbornness might be the only thing that brings Lira home.",
+    "NextId": null
+  },
+  {
+    "Id": "kael_bond_60",
+    "Speaker": "Kael",
+    "Text": "I found one of Lira's drawings in my pack yesterday. A picture of our family — me, Maren, her, and Cinder. She drew steam coming out of everyone's ears.",
+    "NextId": "kael_bond_60b"
+  },
+  {
+    "Id": "kael_bond_60b",
+    "Speaker": "Kael",
+    "Text": "I laughed. First time in a long while. Thank you for being here. I mean that.",
+    "NextId": null
+  },
+  {
+    "Id": "kael_bond_80",
+    "Speaker": "Kael",
+    "Text": "The seer said Lira might have changed. That the Ethereal Realm changes people. I've been trying not to think about what that means.",
+    "NextId": "kael_bond_80b"
+  },
+  {
+    "Id": "kael_bond_80b",
+    "Speaker": "Kael",
+    "Text": "But even if she's different... she's still my daughter. That doesn't change. It can't.",
+    "NextId": null
+  },
+  {
+    "Id": "kael_bond_100",
+    "Speaker": "Kael",
+    "Text": "When this is over — when Lira is safe — I want to rebuild the workshop. A real one, not just for steam engines. For whatever comes next.",
+    "NextId": "kael_bond_100b"
+  },
+  {
+    "Id": "kael_bond_100b",
+    "Speaker": "Kael",
+    "Text": "And I want you all there. Every one of you. You're family now. The kind you choose.",
+    "NextId": null
+  }
+]

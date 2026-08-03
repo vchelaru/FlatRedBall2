@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "dream2_1",
+    "Speaker": "Lira",
+    "Text": "Something changed today. The Fade pulled back — just a little. Like it was surprised.",
+    "NextId": "dream2_2"
+  },
+  {
+    "Id": "dream2_2",
+    "Speaker": "Lira",
+    "Text": "I felt Dad. Not an echo this time — really felt him. He's closer. He's actually getting closer.",
+    "NextId": "dream2_3"
+  },
+  {
+    "Id": "dream2_3",
+    "Speaker": "Lira",
+    "Text": "The Ethereal Realm has been changing me. I can feel magic in my bones now. The crystals respond to my voice.",
+    "NextId": "dream2_4"
+  },
+  {
+    "Id": "dream2_4",
+    "Speaker": "Lira",
+    "Text": "I'm scared of what I'm becoming. But I'm more scared of disappearing before Dad gets here.",
+    "NextId": "dream2_5"
+  },
+  {
+    "Id": "dream2_5",
+    "Speaker": "Lira",
+    "Text": "Keep coming, Dad. I'll keep the light on for you.",
+    "NextId": null
+  }
+]

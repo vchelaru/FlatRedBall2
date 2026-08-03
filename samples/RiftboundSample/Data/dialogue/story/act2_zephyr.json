@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_zephyr_1",
+    "Speaker": "Zephyr",
+    "Text": "Another group of travelers. The Luminous Spire sees many, but few make it this high.",
+    "NextId": "act2_zephyr_2"
+  },
+  {
+    "Id": "act2_zephyr_2",
+    "Speaker": "Kael",
+    "Text": "We need to reach the deeper ethereal. The Fade.",
+    "NextId": "act2_zephyr_3"
+  },
+  {
+    "Id": "act2_zephyr_3",
+    "Speaker": "Zephyr",
+    "Text": "Wind-walking. That's how you cross the great distances here. I can carry your group on the currents.",
+    "NextId": "act2_zephyr_4"
+  },
+  {
+    "Id": "act2_zephyr_4",
+    "Speaker": "Zephyr",
+    "Text": "In return, I ask only one thing — show me the sky from your world. I've heard it's... still.",
+    "NextId": null
+  }
+]

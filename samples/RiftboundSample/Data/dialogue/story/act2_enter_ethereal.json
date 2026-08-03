@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_enter_ethereal_1",
+    "Speaker": "Kael",
+    "Text": "The air here... it hums. Like the whole world is vibrating at a frequency I can almost hear.",
+    "NextId": "act2_enter_ethereal_2"
+  },
+  {
+    "Id": "act2_enter_ethereal_2",
+    "Speaker": "Mira",
+    "Text": "Magic flows freely here. No conduits, no crystals — it's just... ambient. Everywhere.",
+    "NextId": "act2_enter_ethereal_3"
+  },
+  {
+    "Id": "act2_enter_ethereal_3",
+    "Speaker": "Venn",
+    "Text": "Fascinating. The crystalline structures appear to grow naturally. This glade is ancient.",
+    "NextId": "act2_enter_ethereal_4"
+  },
+  {
+    "Id": "act2_enter_ethereal_4",
+    "Speaker": "Kael",
+    "Text": "Lira is deeper in. A place called the Fade, where reality is dissolving. We need to move quickly.",
+    "NextId": null
+  }
+]

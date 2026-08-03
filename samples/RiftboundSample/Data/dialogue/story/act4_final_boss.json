@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act4_final_boss_1",
+    "Speaker": "Lira",
+    "Text": "Dad — he's drawing power from the Rift itself. Be careful!",
+    "NextId": "act4_final_boss_2"
+  },
+  {
+    "Id": "act4_final_boss_2",
+    "Speaker": "Kael",
+    "Text": "Everyone — this is what we've been fighting for. Every world, every friend, every sacrifice. It ends here.",
+    "NextId": "act4_final_boss_3"
+  },
+  {
+    "Id": "act4_final_boss_3",
+    "Speaker": "Thorne",
+    "Text": "For those we lost. Ready when you are, Kael.",
+    "NextId": null
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "architect_bond_20",
+    "Speaker": "The Architect",
+    "Text": "I have existed since before the worlds separated. I remember when steam, dreams, and data were one.",
+    "NextId": "architect_bond_20b"
+  },
+  {
+    "Id": "architect_bond_20b",
+    "Speaker": "The Architect",
+    "Text": "It was... chaotic. Beautiful, but chaotic. Structure was needed. That is why I built the Nexus.",
+    "NextId": null
+  },
+  {
+    "Id": "architect_bond_40",
+    "Speaker": "The Architect",
+    "Text": "Draven was my student once. Brilliant mind. But he saw the connections between worlds as chains to be seized, not bridges to be crossed.",
+    "NextId": "architect_bond_40b"
+  },
+  {
+    "Id": "architect_bond_40b",
+    "Speaker": "The Architect",
+    "Text": "I should have seen the ambition in him. That failure is mine to carry.",
+    "NextId": null
+  },
+  {
+    "Id": "architect_bond_60",
+    "Speaker": "The Architect",
+    "Text": "You ask if I feel loneliness. An interesting question for a being of pure design.",
+    "NextId": "architect_bond_60b"
+  },
+  {
+    "Id": "architect_bond_60b",
+    "Speaker": "The Architect",
+    "Text": "The answer is yes. Every structure needs a purpose, and purpose requires others to serve.",
+    "NextId": null
+  },
+  {
+    "Id": "architect_bond_80",
+    "Speaker": "The Architect",
+    "Text": "I have redesigned reality seventeen times. Each iteration improved upon the last. But none were perfect.",
+    "NextId": "architect_bond_80b"
+  },
+  {
+    "Id": "architect_bond_80b",
+    "Speaker": "The Architect",
+    "Text": "Perhaps perfection was never the goal. Perhaps the imperfections are what make it worth preserving.",
+    "NextId": null
+  },
+  {
+    "Id": "architect_bond_100",
+    "Speaker": "The Architect",
+    "Text": "When the rift is sealed, my role as Architect may end. The worlds will no longer need a designer.",
+    "NextId": "architect_bond_100b"
+  },
+  {
+    "Id": "architect_bond_100b",
+    "Speaker": "The Architect",
+    "Text": "But perhaps I can learn a new role. Builder. Teacher. Friend. These are designs I have never attempted.",
+    "NextId": null
+  }
+]

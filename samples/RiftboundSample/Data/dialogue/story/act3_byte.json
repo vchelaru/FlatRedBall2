@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_byte_1",
+    "Speaker": "Byte",
+    "Text": "ALERT: Unregistered entities detected in Data Core sector 7. Initiating... wait. You're organic?",
+    "NextId": "act3_byte_2"
+  },
+  {
+    "Id": "act3_byte_2",
+    "Speaker": "Kael",
+    "Text": "We crossed in from the Ethereal Realm. We need to reach the Nexus core.",
+    "NextId": "act3_byte_3"
+  },
+  {
+    "Id": "act3_byte_3",
+    "Speaker": "Byte",
+    "Text": "The core is locked down. The Kernel has gone rogue — it's rewriting the Nexus architecture.",
+    "NextId": "act3_byte_4"
+  },
+  {
+    "Id": "act3_byte_4",
+    "Speaker": "Byte",
+    "Text": "I'm a data fragment — I can navigate the system pathways. Let me help.",
+    "NextId": null
+  }
+]

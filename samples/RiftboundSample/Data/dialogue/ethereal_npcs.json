@@ -1,0 +1,80 @@
+[
+  {
+    "id": "glade_spirit_1",
+    "speaker": "Glade Spirit",
+    "text": "Welcome, traveler from the waking world. Few find their way here.",
+    "nextId": "glade_spirit_2"
+  },
+  {
+    "id": "glade_spirit_2",
+    "speaker": "Glade Spirit",
+    "text": "The crystals remember everything. Every joy, every sorrow, every soul that has passed through.",
+    "nextId": "glade_spirit_3"
+  },
+  {
+    "id": "glade_spirit_3",
+    "speaker": "Glade Spirit",
+    "text": "But something dark stirs in the deeper reaches. The Nightmare Core grows stronger.",
+    "choices": [
+      { "text": "I'll stop it.", "nextId": "glade_spirit_4a" },
+      { "text": "What is the Nightmare Core?", "nextId": "glade_spirit_4b" }
+    ]
+  },
+  {
+    "id": "glade_spirit_4a",
+    "speaker": "Glade Spirit",
+    "text": "Brave words. Seek the Dreamspire Temple — the seers there may know its weakness.",
+    "nextId": null
+  },
+  {
+    "id": "glade_spirit_4b",
+    "speaker": "Glade Spirit",
+    "text": "A mass of nightmares given form. It feeds on fear and corrupts the dream paths. The Temple seers know more.",
+    "nextId": null
+  },
+  {
+    "id": "temple_seer_1",
+    "speaker": "Temple Seer",
+    "text": "The Nightmare Core was once a guardian of this realm. It fell to corruption when the rift opened.",
+    "nextId": "temple_seer_2"
+  },
+  {
+    "id": "temple_seer_2",
+    "speaker": "Temple Seer",
+    "text": "To reach it, you must pass through the Shimmering Grotto and cross the Floating Isles.",
+    "nextId": "temple_seer_3"
+  },
+  {
+    "id": "temple_seer_3",
+    "speaker": "Temple Seer",
+    "text": "Be warned — the deeper you go, the stronger the nightmares become. Prepare well.",
+    "nextId": null
+  },
+  {
+    "id": "ethereal_merchant_1",
+    "speaker": "Dream Merchant",
+    "text": "Wares from beyond the veil! Crystal dust, dream shards, and things that don't quite exist.",
+    "nextId": "ethereal_merchant_2"
+  },
+  {
+    "id": "ethereal_merchant_2",
+    "speaker": "Dream Merchant",
+    "text": "Everything here has a price, but not always in gold. Sometimes memories will do.",
+    "choices": [
+      { "text": "Show me what you have.", "nextId": "ethereal_merchant_3a" },
+      { "text": "I'll pass for now.", "nextId": "ethereal_merchant_3b" }
+    ]
+  },
+  {
+    "id": "ethereal_merchant_3a",
+    "speaker": "Dream Merchant",
+    "text": "A discerning customer! Browse at your leisure.",
+    "nextId": null
+  },
+  {
+    "id": "ethereal_merchant_3b",
+    "speaker": "Dream Merchant",
+    "text": "The door is always open, traveler. Or is it? Hard to tell in this place.",
+    "nextId": null
+  }
+]

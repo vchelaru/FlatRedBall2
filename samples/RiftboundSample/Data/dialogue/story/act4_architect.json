@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act4_architect_1",
+    "Speaker": "The Architect",
+    "Text": "You've made it further than anyone should have. I designed the Nexus to prevent exactly this.",
+    "NextId": "act4_architect_2"
+  },
+  {
+    "Id": "act4_architect_2",
+    "Speaker": "Kael",
+    "Text": "Why? Why would you want to keep the realms apart?",
+    "NextId": "act4_architect_3"
+  },
+  {
+    "Id": "act4_architect_3",
+    "Speaker": "The Architect",
+    "Text": "Because the Rift wasn't random. It was engineered — by Chancellor Draven. He wanted to harness interdimensional energy as a weapon.",
+    "NextId": "act4_architect_4"
+  },
+  {
+    "Id": "act4_architect_4",
+    "Speaker": "The Architect",
+    "Text": "I built the Nexus to contain the damage. But Draven is still out there, still trying to weaponize the Rift.",
+    "NextId": "act4_architect_5"
+  },
+  {
+    "Id": "act4_architect_5",
+    "Speaker": "The Architect",
+    "Text": "If you want to truly save your daughter — and everyone else — Draven must be stopped. I'll help you.",
+    "NextId": null
+  }
+]

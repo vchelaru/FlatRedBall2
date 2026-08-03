@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act2_dreamer_boss_1",
+    "Speaker": "The Dreamer",
+    "Text": "You dare wake me? I am the dream this realm is built upon.",
+    "NextId": "act2_dreamer_boss_2"
+  },
+  {
+    "Id": "act2_dreamer_boss_2",
+    "Speaker": "Kael",
+    "Text": "Your dream is a prison. The people trapped here deserve to choose for themselves.",
+    "NextId": "act2_dreamer_boss_3"
+  },
+  {
+    "Id": "act2_dreamer_boss_3",
+    "Speaker": "The Dreamer",
+    "Text": "Then prove your conviction. Show me a will stronger than a dream.",
+    "NextId": null
+  }
+]

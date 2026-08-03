@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "dream3_1",
+    "Speaker": "Lira",
+    "Text": "The Fade is everywhere now. I can see through the walls of reality — the Overworld, the Nexus, all of it. Layered like glass.",
+    "NextId": "dream3_2"
+  },
+  {
+    "Id": "dream3_2",
+    "Speaker": "Lira",
+    "Text": "Dad is in the Nexus. I can feel his heartbeat through the data streams. Stubborn as ever.",
+    "NextId": "dream3_3"
+  },
+  {
+    "Id": "dream3_3",
+    "Speaker": "Lira",
+    "Text": "I'm not the girl he remembers. The Fade wove itself into me — I'm part of this place now.",
+    "NextId": "dream3_4"
+  },
+  {
+    "Id": "dream3_4",
+    "Speaker": "Lira",
+    "Text": "But I'm still me. Still Lira. Still his daughter. That part — the Fade can't take.",
+    "NextId": "dream3_5"
+  },
+  {
+    "Id": "dream3_5",
+    "Speaker": "Lira",
+    "Text": "I'll hold on, Dad. No matter what I've become — I'll hold on.",
+    "NextId": null
+  }
+]

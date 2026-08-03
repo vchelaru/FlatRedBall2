@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act3_pixel_1",
+    "Speaker": "Pixel",
+    "Text": "Welcome to the Bazaar! Everything's for sale — data, memories, even time. Well, simulated time.",
+    "NextId": "act3_pixel_2"
+  },
+  {
+    "Id": "act3_pixel_2",
+    "Speaker": "Kael",
+    "Text": "We're not shopping. We need to reach the Nexus core.",
+    "NextId": "act3_pixel_3"
+  },
+  {
+    "Id": "act3_pixel_3",
+    "Speaker": "Pixel",
+    "Text": "The core? That's premium access. But I know the back channels. Get me out of this marketplace loop and I'll show you.",
+    "NextId": null
+  }
+]

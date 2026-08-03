@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act4_draven_1",
+    "Speaker": "Draven",
+    "Text": "The steamwright who wouldn't stay in his workshop. You've caused me considerable inconvenience, Kael.",
+    "NextId": "act4_draven_2"
+  },
+  {
+    "Id": "act4_draven_2",
+    "Speaker": "Kael",
+    "Text": "You caused the Rift. You killed my wife. You trapped my daughter. This ends now.",
+    "NextId": "act4_draven_3"
+  },
+  {
+    "Id": "act4_draven_3",
+    "Speaker": "Draven",
+    "Text": "The Rift was the beginning of a new age! Interdimensional energy — limitless power! And you'd throw it all away for one girl?",
+    "NextId": "act4_draven_4"
+  },
+  {
+    "Id": "act4_draven_4",
+    "Speaker": "Kael",
+    "Text": "She's not 'one girl.' She's my daughter. And these people behind me? They all lost something to your ambition.",
+    "NextId": "act4_draven_5"
+  },
+  {
+    "Id": "act4_draven_5",
+    "Speaker": "Draven",
+    "Text": "Then come. Let's see if a father's love is stronger than the power of three worlds.",
+    "NextId": null
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "RequiredEntries": 8,
+    "RewardType": "gold",
+    "RewardId": "gold",
+    "RewardCount": 500,
+    "Description": "25% completion: 500 gold"
+  },
+  {
+    "RequiredEntries": 16,
+    "RewardType": "recipe",
+    "RewardId": "bestiary_badge",
+    "RewardCount": 1,
+    "Description": "50% completion: Bestiary Badge recipe"
+  },
+  {
+    "RequiredEntries": 24,
+    "RewardType": "gold",
+    "RewardId": "gold",
+    "RewardCount": 2000,
+    "Description": "75% completion: 2000 gold + rare material x5"
+  },
+  {
+    "RequiredEntries": 24,
+    "RewardType": "item",
+    "RewardId": "rare_alloy",
+    "RewardCount": 5,
+    "Description": "75% completion bonus: rare alloy x5"
+  },
+  {
+    "RequiredEntries": 30,
+    "RewardType": "item",
+    "RewardId": "naturalists_ring",
+    "RewardCount": 1,
+    "Description": "100% completion: Naturalist's Ring (+10 all stats)"
+  }
+]

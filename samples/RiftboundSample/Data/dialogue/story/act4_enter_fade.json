@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act4_enter_fade_1",
+    "Speaker": "Kael",
+    "Text": "The air here isn't air. It's... possibility. Unformed reality.",
+    "NextId": "act4_enter_fade_2"
+  },
+  {
+    "Id": "act4_enter_fade_2",
+    "Speaker": "Wraith",
+    "Text": "The Fade. I warned you — it pulls at your edges. Don't let it take anything you can't afford to lose.",
+    "NextId": "act4_enter_fade_3"
+  },
+  {
+    "Id": "act4_enter_fade_3",
+    "Speaker": "Kael",
+    "Text": "Lira is here. I can feel her presence, stronger than ever. We're close.",
+    "NextId": null
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act2_nightmare_boss_1",
+    "Speaker": "Solace",
+    "Text": "The Nightmare Core — the source of the corruption. It feeds on fear and regret.",
+    "NextId": "act2_nightmare_boss_2"
+  },
+  {
+    "Id": "act2_nightmare_boss_2",
+    "Speaker": "Kael",
+    "Text": "Then it's going to find plenty to eat. But we end this now.",
+    "NextId": "act2_nightmare_boss_3"
+  },
+  {
+    "Id": "act2_nightmare_boss_3",
+    "Speaker": "Solace",
+    "Text": "Stay focused. Don't let it show you visions of what you've lost. They aren't real.",
+    "NextId": null
+  }
+]

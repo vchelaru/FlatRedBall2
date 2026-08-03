@@ -1,0 +1,653 @@
+[
+  {
+    "Id": "gear_golem",
+    "Name": "Gear Golem",
+    "HP": 80,
+    "MP": 10,
+    "STR": 12,
+    "MAG": 4,
+    "DEF": 15,
+    "RES": 5,
+    "SPD": 4,
+    "XPReward": 12,
+    "AbilityIds": ["attack", "gear_shield"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 1.5 },
+      { "Element": "Fire", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "iron_gear", "Rate": 0.4 },
+      { "ItemId": "potion", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "steam_rat",
+    "Name": "Steam Rat",
+    "HP": 35,
+    "MP": 5,
+    "STR": 8,
+    "MAG": 3,
+    "DEF": 5,
+    "RES": 4,
+    "SPD": 14,
+    "XPReward": 6,
+    "AbilityIds": ["attack", "rust_bite"],
+    "ElementAffinities": [
+      { "Element": "Ice", "Multiplier": 1.5 },
+      { "Element": "Steam", "Multiplier": 0.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "rat_tail", "Rate": 0.3 }
+    ]
+  },
+  {
+    "Id": "rust_beetle",
+    "Name": "Rust Beetle",
+    "HP": 50,
+    "MP": 0,
+    "STR": 10,
+    "MAG": 2,
+    "DEF": 18,
+    "RES": 3,
+    "SPD": 6,
+    "XPReward": 8,
+    "AbilityIds": ["attack", "rust_bite"],
+    "ElementAffinities": [
+      { "Element": "Fire", "Multiplier": 1.5 },
+      { "Element": "Steam", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "beetle_shell", "Rate": 0.25 },
+      { "ItemId": "potion", "Rate": 0.15 }
+    ]
+  },
+  {
+    "Id": "furnace_guardian",
+    "Name": "Furnace Guardian",
+    "HP": 300,
+    "MP": 50,
+    "STR": 22,
+    "MAG": 16,
+    "DEF": 20,
+    "RES": 12,
+    "SPD": 8,
+    "IsBoss": true,
+    "XPReward": 120,
+    "AbilityIds": ["attack", "furnace_breath", "gear_shield"],
+    "ElementAffinities": [
+      { "Element": "Ice", "Multiplier": 2.0 },
+      { "Element": "Fire", "Multiplier": 0.0 },
+      { "Element": "Steam", "Multiplier": 0.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "furnace_core", "Rate": 1.0 },
+      { "ItemId": "rare_alloy", "Rate": 0.3 }
+    ]
+  },
+  {
+    "Id": "bit_bug",
+    "Name": "Bit Bug",
+    "HP": 120,
+    "MP": 15,
+    "STR": 18,
+    "MAG": 14,
+    "DEF": 10,
+    "RES": 10,
+    "SPD": 22,
+    "XPReward": 35,
+    "AbilityIds": ["attack", "glitch_bolt"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.5 },
+      { "Element": "Lightning", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "data_fragment", "Rate": 0.4 }
+    ]
+  },
+  {
+    "Id": "firewall_drone",
+    "Name": "Firewall Drone",
+    "HP": 200,
+    "MP": 30,
+    "STR": 20,
+    "MAG": 16,
+    "DEF": 30,
+    "RES": 22,
+    "SPD": 12,
+    "XPReward": 45,
+    "AbilityIds": ["attack", "firewall", "system_shield"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 0.5 },
+      { "Element": "Glitch", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "circuit_board", "Rate": 0.3 },
+      { "ItemId": "energy_cell", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "corrupted_process",
+    "Name": "Corrupted Process",
+    "HP": 160,
+    "MP": 40,
+    "STR": 16,
+    "MAG": 25,
+    "DEF": 14,
+    "RES": 18,
+    "SPD": 16,
+    "XPReward": 40,
+    "AbilityIds": ["attack", "corrupt", "virus"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.7 },
+      { "Element": "Ice", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "data_fragment", "Rate": 0.35 },
+      { "ItemId": "nano_fiber", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "data_wraith",
+    "Name": "Data Wraith",
+    "HP": 130,
+    "MP": 30,
+    "STR": 22,
+    "MAG": 20,
+    "DEF": 12,
+    "RES": 14,
+    "SPD": 28,
+    "XPReward": 38,
+    "AbilityIds": ["attack", "data_drain", "dash"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.7 },
+      { "Element": "Fire", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "nano_fiber", "Rate": 0.3 }
+    ]
+  },
+  {
+    "Id": "security_bot",
+    "Name": "Security Bot",
+    "HP": 250,
+    "MP": 20,
+    "STR": 25,
+    "MAG": 18,
+    "DEF": 28,
+    "RES": 20,
+    "SPD": 14,
+    "XPReward": 50,
+    "AbilityIds": ["attack", "counter", "system_shield"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 1.3 },
+      { "Element": "Glitch", "Multiplier": 0.8 }
+    ],
+    "DropTable": [
+      { "ItemId": "circuit_board", "Rate": 0.35 },
+      { "ItemId": "energy_cell", "Rate": 0.25 }
+    ]
+  },
+  {
+    "Id": "virus_cluster",
+    "Name": "Virus Cluster",
+    "HP": 140,
+    "MP": 50,
+    "STR": 14,
+    "MAG": 22,
+    "DEF": 12,
+    "RES": 12,
+    "SPD": 18,
+    "XPReward": 36,
+    "AbilityIds": ["attack", "virus", "buffer"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.5 },
+      { "Element": "Fire", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "data_fragment", "Rate": 0.5 }
+    ]
+  },
+  {
+    "Id": "the_kernel",
+    "Name": "The Kernel",
+    "HP": 900,
+    "MP": 120,
+    "STR": 35,
+    "MAG": 42,
+    "DEF": 30,
+    "RES": 28,
+    "SPD": 20,
+    "IsBoss": true,
+    "XPReward": 300,
+    "AbilityIds": ["attack", "pixel_storm", "corrupt", "overload", "memory_leak"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.0 },
+      { "Element": "Lightning", "Multiplier": 1.5 },
+      { "Element": "Ice", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "kernel_core", "Rate": 1.0 },
+      { "ItemId": "circuit_board", "Rate": 0.5 }
+    ]
+  },
+  {
+    "Id": "system_override",
+    "Name": "System Override",
+    "HP": 1800,
+    "MP": 200,
+    "STR": 45,
+    "MAG": 55,
+    "DEF": 40,
+    "RES": 38,
+    "SPD": 24,
+    "IsBoss": true,
+    "XPReward": 600,
+    "AbilityIds": ["attack", "pixel_storm", "root_access", "exploit", "memory_leak", "overload", "virus"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.3 },
+      { "Element": "Lightning", "Multiplier": 1.2 },
+      { "Element": "Fire", "Multiplier": 1.2 }
+    ],
+    "DropTable": [
+      { "ItemId": "override_key", "Rate": 1.0 },
+      { "ItemId": "kernel_core", "Rate": 0.5 },
+      { "ItemId": "energy_cell", "Rate": 0.8 }
+    ]
+  },
+  {
+    "Id": "wisp",
+    "Name": "Wisp",
+    "HP": 150,
+    "MP": 25,
+    "STR": 14,
+    "MAG": 22,
+    "DEF": 10,
+    "RES": 18,
+    "SPD": 24,
+    "XPReward": 30,
+    "AbilityIds": ["attack", "aether_bolt"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.5 },
+      { "Element": "Fire", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "ether_essence", "Rate": 0.4 }
+    ]
+  },
+  {
+    "Id": "crystal_crawler",
+    "Name": "Crystal Crawler",
+    "HP": 220,
+    "MP": 10,
+    "STR": 24,
+    "MAG": 10,
+    "DEF": 32,
+    "RES": 20,
+    "SPD": 10,
+    "XPReward": 38,
+    "AbilityIds": ["attack", "crystal_spike"],
+    "ElementAffinities": [
+      { "Element": "Ice", "Multiplier": 0.3 },
+      { "Element": "Fire", "Multiplier": 1.8 }
+    ],
+    "DropTable": [
+      { "ItemId": "crystal_dust", "Rate": 0.5 },
+      { "ItemId": "dream_shard", "Rate": 0.15 }
+    ]
+  },
+  {
+    "Id": "dream_eater",
+    "Name": "Dream Eater",
+    "HP": 180,
+    "MP": 50,
+    "STR": 18,
+    "MAG": 28,
+    "DEF": 16,
+    "RES": 30,
+    "SPD": 18,
+    "XPReward": 42,
+    "AbilityIds": ["attack", "dark_pulse", "dream_heal"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.0 },
+      { "Element": "Lightning", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "dream_shard", "Rate": 0.35 },
+      { "ItemId": "ether_essence", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "phantom_knight",
+    "Name": "Phantom Knight",
+    "HP": 300,
+    "MP": 20,
+    "STR": 30,
+    "MAG": 14,
+    "DEF": 28,
+    "RES": 16,
+    "SPD": 16,
+    "XPReward": 55,
+    "AbilityIds": ["attack", "shadow_strike", "guard"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 1.5 },
+      { "Element": "Ice", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "phantom_steel", "Rate": 0.3 },
+      { "ItemId": "ether_essence", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "rift_hound",
+    "Name": "Rift Hound",
+    "HP": 170,
+    "MP": 15,
+    "STR": 26,
+    "MAG": 16,
+    "DEF": 14,
+    "RES": 12,
+    "SPD": 30,
+    "XPReward": 35,
+    "AbilityIds": ["attack", "gust"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 0.5 },
+      { "Element": "Ice", "Multiplier": 1.5 }
+    ],
+    "DropTable": [
+      { "ItemId": "ether_essence", "Rate": 0.3 },
+      { "ItemId": "crystal_dust", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "spore_shade",
+    "Name": "Spore Shade",
+    "HP": 160,
+    "MP": 60,
+    "STR": 12,
+    "MAG": 24,
+    "DEF": 14,
+    "RES": 26,
+    "SPD": 14,
+    "XPReward": 34,
+    "AbilityIds": ["attack", "heal", "haste"],
+    "ElementAffinities": [
+      { "Element": "Fire", "Multiplier": 1.8 },
+      { "Element": "Aether", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "dream_shard", "Rate": 0.3 },
+      { "ItemId": "crystal_dust", "Rate": 0.25 }
+    ]
+  },
+  {
+    "Id": "nightmare_core",
+    "Name": "Nightmare Core",
+    "HP": 800,
+    "MP": 100,
+    "STR": 35,
+    "MAG": 40,
+    "DEF": 30,
+    "RES": 28,
+    "SPD": 18,
+    "IsBoss": true,
+    "XPReward": 280,
+    "AbilityIds": ["attack", "dark_pulse", "nightmare", "void_slash", "crystal_spike"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.5 },
+      { "Element": "Lightning", "Multiplier": 1.3 },
+      { "Element": "Fire", "Multiplier": 1.2 }
+    ],
+    "DropTable": [
+      { "ItemId": "nightmare_core_shard", "Rate": 1.0 },
+      { "ItemId": "phantom_steel", "Rate": 0.5 }
+    ]
+  },
+  {
+    "Id": "the_dreamer",
+    "Name": "The Dreamer",
+    "HP": 1500,
+    "MP": 250,
+    "STR": 42,
+    "MAG": 55,
+    "DEF": 36,
+    "RES": 40,
+    "SPD": 22,
+    "IsBoss": true,
+    "XPReward": 550,
+    "AbilityIds": ["attack", "nightmare", "dream_heal", "dark_pulse", "ethereal_dance", "tornado", "resurrect"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.3 },
+      { "Element": "Lightning", "Multiplier": 1.2 },
+      { "Element": "Fire", "Multiplier": 1.0 }
+    ],
+    "DropTable": [
+      { "ItemId": "dreamers_tear", "Rate": 1.0 },
+      { "ItemId": "nightmare_core_shard", "Rate": 0.5 },
+      { "ItemId": "phantom_steel", "Rate": 0.8 }
+    ]
+  },
+  {
+    "Id": "the_convergence",
+    "Name": "The Convergence",
+    "HP": 9999,
+    "MP": 500,
+    "STR": 65,
+    "MAG": 75,
+    "DEF": 60,
+    "RES": 60,
+    "SPD": 30,
+    "IsBoss": true,
+    "XPReward": 2000,
+    "AbilityIds": ["attack", "pixel_storm", "nightmare", "furnace_breath", "overload", "memory_leak", "crystal_spike", "tornado"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.5 },
+      { "Element": "Glitch", "Multiplier": 0.5 },
+      { "Element": "Fire", "Multiplier": 0.8 },
+      { "Element": "Ice", "Multiplier": 0.8 }
+    ],
+    "DropTable": [
+      { "ItemId": "convergence_shard", "Rate": 1.0 }
+    ]
+  },
+  {
+    "Id": "iron_colossus",
+    "Name": "The Iron Colossus",
+    "HP": 19999,
+    "MP": 100,
+    "STR": 80,
+    "MAG": 30,
+    "DEF": 75,
+    "RES": 40,
+    "SPD": 12,
+    "IsBoss": true,
+    "XPReward": 9999,
+    "AbilityIds": ["attack", "heavy_strike", "hammer_blow", "furnace_breath", "guard", "rally"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 1.5 },
+      { "Element": "Fire", "Multiplier": 0.0 },
+      { "Element": "Ice", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "colossus_core", "Rate": 1.0 }
+    ]
+  },
+  {
+    "Id": "eternal_dream",
+    "Name": "The Eternal Dream",
+    "HP": 15999,
+    "MP": 999,
+    "STR": 35,
+    "MAG": 80,
+    "DEF": 40,
+    "RES": 75,
+    "SPD": 25,
+    "IsBoss": true,
+    "XPReward": 9999,
+    "AbilityIds": ["attack", "nightmare", "dream_heal", "dark_pulse", "tornado", "resurrect", "purify"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.0 },
+      { "Element": "Lightning", "Multiplier": 1.5 },
+      { "Element": "Glitch", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "eternal_dream_shard", "Rate": 1.0 }
+    ]
+  },
+  {
+    "Id": "zero_day_boss",
+    "Name": "ZERO_DAY",
+    "HP": 17999,
+    "MP": 500,
+    "STR": 50,
+    "MAG": 60,
+    "DEF": 50,
+    "RES": 50,
+    "SPD": 80,
+    "IsBoss": true,
+    "XPReward": 9999,
+    "AbilityIds": ["attack", "pixel_storm", "corrupt", "overload", "memory_leak", "virus", "root_access", "exploit"],
+    "ElementAffinities": [
+      { "Element": "Glitch", "Multiplier": 0.0 },
+      { "Element": "Ice", "Multiplier": 1.5 },
+      { "Element": "Aether", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "zero_day_exploit", "Rate": 1.0 }
+    ]
+  },
+  {
+    "Id": "rift_fragment",
+    "Name": "Rift Fragment",
+    "HP": 130,
+    "MP": 15,
+    "STR": 16,
+    "MAG": 16,
+    "DEF": 10,
+    "RES": 10,
+    "SPD": 20,
+    "XPReward": 32,
+    "AbilityIds": ["attack", "glitch_bolt", "aether_bolt"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 1.3 },
+      { "Element": "Glitch", "Multiplier": 1.3 },
+      { "Element": "Ice", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "reality_shard", "Rate": 0.3 },
+      { "ItemId": "ether_essence", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "temporal_echo",
+    "Name": "Temporal Echo",
+    "HP": 200,
+    "MP": 40,
+    "STR": 20,
+    "MAG": 26,
+    "DEF": 16,
+    "RES": 18,
+    "SPD": 24,
+    "XPReward": 45,
+    "AbilityIds": ["attack", "mimic", "echo_strike", "haste"],
+    "ElementAffinities": [
+      { "Element": "Lightning", "Multiplier": 1.5 },
+      { "Element": "Aether", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "reality_shard", "Rate": 0.25 },
+      { "ItemId": "dream_shard", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "void_walker",
+    "Name": "Void Walker",
+    "HP": 170,
+    "MP": 30,
+    "STR": 22,
+    "MAG": 18,
+    "DEF": 14,
+    "RES": 16,
+    "SPD": 32,
+    "XPReward": 40,
+    "AbilityIds": ["attack", "phase_shift", "void_slash", "dash"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.5 },
+      { "Element": "Fire", "Multiplier": 1.5 },
+      { "Element": "Ice", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "ether_essence", "Rate": 0.3 },
+      { "ItemId": "phantom_steel", "Rate": 0.15 }
+    ]
+  },
+  {
+    "Id": "reality_shard_enemy",
+    "Name": "Reality Shard",
+    "HP": 260,
+    "MP": 25,
+    "STR": 14,
+    "MAG": 22,
+    "DEF": 36,
+    "RES": 34,
+    "SPD": 10,
+    "XPReward": 48,
+    "AbilityIds": ["attack", "crystal_wall", "counter", "shatter"],
+    "ElementAffinities": [
+      { "Element": "Fire", "Multiplier": 1.5 },
+      { "Element": "Ice", "Multiplier": 0.3 },
+      { "Element": "Aether", "Multiplier": 0.7 }
+    ],
+    "DropTable": [
+      { "ItemId": "reality_shard", "Rate": 0.5 },
+      { "ItemId": "crystal_dust", "Rate": 0.3 }
+    ]
+  },
+  {
+    "Id": "fade_beast",
+    "Name": "Fade Beast",
+    "HP": 340,
+    "MP": 20,
+    "STR": 35,
+    "MAG": 14,
+    "DEF": 26,
+    "RES": 16,
+    "SPD": 18,
+    "XPReward": 55,
+    "AbilityIds": ["attack", "heavy_strike", "rapid_strike", "steam_blast"],
+    "ElementAffinities": [
+      { "Element": "Steam", "Multiplier": 0.5 },
+      { "Element": "Lightning", "Multiplier": 0.7 },
+      { "Element": "Ice", "Multiplier": 1.5 },
+      { "Element": "Aether", "Multiplier": 1.3 }
+    ],
+    "DropTable": [
+      { "ItemId": "fade_fang", "Rate": 0.35 },
+      { "ItemId": "rare_alloy", "Rate": 0.2 }
+    ]
+  },
+  {
+    "Id": "chancellor_draven",
+    "Name": "Chancellor Draven",
+    "HP": 5000,
+    "MP": 400,
+    "STR": 50,
+    "MAG": 65,
+    "DEF": 45,
+    "RES": 42,
+    "SPD": 26,
+    "IsBoss": true,
+    "XPReward": 2000,
+    "AbilityIds": ["attack", "shadow_decree", "void_lance", "dark_barrier", "rift_distortion", "gravity_well", "annihilation_wave", "time_stop", "oblivion"],
+    "ElementAffinities": [
+      { "Element": "Aether", "Multiplier": 0.5 },
+      { "Element": "Lightning", "Multiplier": 1.2 },
+      { "Element": "Fire", "Multiplier": 1.0 },
+      { "Element": "Ice", "Multiplier": 1.0 }
+    ],
+    "DropTable": [
+      { "ItemId": "dravens_sigil", "Rate": 1.0 },
+      { "ItemId": "reality_shard", "Rate": 1.0 },
+      { "ItemId": "fade_fang", "Rate": 0.8 }
+    ]
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_orin_1",
+    "Speaker": "Orin",
+    "Text": "Oh! You're from the material plane! I have so many questions. How does gravity feel? Is it constant?",
+    "NextId": "act2_orin_2"
+  },
+  {
+    "Id": "act2_orin_2",
+    "Speaker": "Kael",
+    "Text": "...Yes? It's constant.",
+    "NextId": "act2_orin_3"
+  },
+  {
+    "Id": "act2_orin_3",
+    "Speaker": "Orin",
+    "Text": "Fascinating! Here on the Floating Isles, it shifts with mood. Happy thoughts make you lighter. Grief makes you sink.",
+    "NextId": "act2_orin_4"
+  },
+  {
+    "Id": "act2_orin_4",
+    "Speaker": "Orin",
+    "Text": "I'm a scholar of inter-realm physics. Take me with you — I need to study the boundary firsthand!",
+    "NextId": null
+  }
+]

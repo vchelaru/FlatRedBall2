@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_glitch_1",
+    "Speaker": "Glitch",
+    "Text": "H-hello? Is someone there? My rendering keeps flickering. I think I'm broken.",
+    "NextId": "act3_glitch_2"
+  },
+  {
+    "Id": "act3_glitch_2",
+    "Speaker": "Mira",
+    "Text": "You're a Nexus entity? What happened to you?",
+    "NextId": "act3_glitch_3"
+  },
+  {
+    "Id": "act3_glitch_3",
+    "Speaker": "Glitch",
+    "Text": "The Kernel's corruption. It hit the Wastes first. Everyone else here has been overwritten. I'm the last one.",
+    "NextId": "act3_glitch_4"
+  },
+  {
+    "Id": "act3_glitch_4",
+    "Speaker": "Glitch",
+    "Text": "Please — take me with you. I don't want to be overwritten too.",
+    "NextId": null
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "dream1_1",
+    "Speaker": "Lira",
+    "Text": "The sky here doesn't have stars. Just light — endless, shifting light that never quite becomes anything.",
+    "NextId": "dream1_2"
+  },
+  {
+    "Id": "dream1_2",
+    "Speaker": "Lira",
+    "Text": "I've been counting days by the way the crystals hum. Higher pitch means morning, I think. I'm not sure anymore.",
+    "NextId": "dream1_3"
+  },
+  {
+    "Id": "dream1_3",
+    "Speaker": "Lira",
+    "Text": "Sometimes I hear Dad's voice. Just echoes. The Ethereal Realm is full of echoes — memories that don't belong to anyone.",
+    "NextId": "dream1_4"
+  },
+  {
+    "Id": "dream1_4",
+    "Speaker": "Lira",
+    "Text": "But I know he's looking for me. Dad doesn't give up. He never gives up.",
+    "NextId": "dream1_5"
+  },
+  {
+    "Id": "dream1_5",
+    "Speaker": "Lira",
+    "Text": "I just have to hold on a little longer. I can do that. I have to.",
+    "NextId": null
+  }
+]

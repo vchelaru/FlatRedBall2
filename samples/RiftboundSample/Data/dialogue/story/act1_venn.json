@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act1_venn_1",
+    "Speaker": "Venn",
+    "Text": "Ashcroft's student? No, no — her research partner. Ah, you must be Kael. She mentioned you in her notes.",
+    "NextId": "act1_venn_2"
+  },
+  {
+    "Id": "act1_venn_2",
+    "Speaker": "Kael",
+    "Text": "I need the Harmonic Crystal. I know you have it.",
+    "NextId": "act1_venn_3"
+  },
+  {
+    "Id": "act1_venn_3",
+    "Speaker": "Venn",
+    "Text": "Direct. I like that. Yes, I have it — and I'll give it to you. On one condition.",
+    "NextId": "act1_venn_4"
+  },
+  {
+    "Id": "act1_venn_4",
+    "Speaker": "Venn",
+    "Text": "Let me come along. I've spent decades studying the Rift from this side. I need to see it from the other.",
+    "NextId": null
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_meet_mira_1",
+    "Speaker": "Mira",
+    "Text": "Excuse me — you're the one who activated Ashcroft's prototype, aren't you?",
+    "NextId": "act1_meet_mira_2"
+  },
+  {
+    "Id": "act1_meet_mira_2",
+    "Speaker": "Kael",
+    "Text": "Word travels fast. Who are you?",
+    "NextId": "act1_meet_mira_3"
+  },
+  {
+    "Id": "act1_meet_mira_3",
+    "Speaker": "Mira",
+    "Text": "Mira. Cogspire graduate, starlight mage. I've been studying the Rift since it opened. I want to help.",
+    "NextId": "act1_meet_mira_4"
+  },
+  {
+    "Id": "act1_meet_mira_4",
+    "Speaker": "Kael",
+    "Text": "This isn't a research expedition. It's a rescue mission.",
+    "NextId": "act1_meet_mira_5"
+  },
+  {
+    "Id": "act1_meet_mira_5",
+    "Speaker": "Mira",
+    "Text": "I know. My mentor was taken too. We have the same goal, Kael. Let me come with you.",
+    "NextId": null
+  }
+]

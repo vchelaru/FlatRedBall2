@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act3_nova_1",
+    "Speaker": "Nova",
+    "Text": "The Nexus Spire. Highest point in the virtual world. From here you can see every data stream in the system.",
+    "NextId": "act3_nova_2"
+  },
+  {
+    "Id": "act3_nova_2",
+    "Speaker": "Nova",
+    "Text": "I was the Spire's guardian before the Kernel went rogue. Now I'm just... watching it all fall apart.",
+    "NextId": "act3_nova_3"
+  },
+  {
+    "Id": "act3_nova_3",
+    "Speaker": "Nova",
+    "Text": "You're going to fight the Kernel. Good. I'll lend you my processing power.",
+    "NextId": null
+  }
+]

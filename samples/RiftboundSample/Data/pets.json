@@ -1,0 +1,354 @@
+[
+  {
+    "Id": "cogsworth",
+    "Name": "Cogsworth",
+    "OwnerCharacterId": "kael",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["cog_bash"],
+      "Advanced": ["gear_storm"],
+      "Ultimate": ["overdrive"]
+    }
+  },
+  {
+    "Id": "glitchling",
+    "Name": "Glitchling",
+    "OwnerCharacterId": "byte",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["bit_swarm"],
+      "Advanced": ["data_burst"],
+      "Ultimate": ["system_crash"]
+    }
+  },
+  {
+    "Id": "shieldbot",
+    "Name": "Shieldbot",
+    "OwnerCharacterId": "proxy",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["static_zap"],
+      "Advanced": ["surge_pulse"],
+      "Ultimate": ["overcharge"]
+    }
+  },
+  {
+    "Id": "nanopup",
+    "Name": "Nanopup",
+    "OwnerCharacterId": "cache",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.08,
+    "Abilities": {
+      "Basic": ["nano_mend"],
+      "Advanced": ["nano_field"],
+      "Ultimate": ["full_restore"]
+    }
+  },
+  {
+    "Id": "pixelpet",
+    "Name": "Pixelpet",
+    "OwnerCharacterId": "pixel",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["pixel_nibble"],
+      "Advanced": ["pixel_barrage"],
+      "Ultimate": ["render_crash"]
+    }
+  },
+  {
+    "Id": "bladedrone",
+    "Name": "Bladedrone",
+    "OwnerCharacterId": "vector",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.3,
+    "BondDecayRate": 0.12,
+    "Abilities": {
+      "Basic": ["quick_jab"],
+      "Advanced": ["blade_rush"],
+      "Ultimate": ["omega_slash"]
+    }
+  },
+  {
+    "Id": "virusworm",
+    "Name": "Virusworm",
+    "OwnerCharacterId": "root",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.6,
+    "TrainingDecayRate": 0.3,
+    "BondDecayRate": 0.15,
+    "Abilities": {
+      "Basic": ["debug_scan"],
+      "Advanced": ["malware_spread"],
+      "Ultimate": ["zero_day"]
+    }
+  },
+  {
+    "Id": "aethersprite",
+    "Name": "Aethersprite",
+    "OwnerCharacterId": "lyris",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["aether_wisp"],
+      "Advanced": ["aether_storm"],
+      "Ultimate": ["aether_nova"]
+    }
+  },
+  {
+    "Id": "dreamling",
+    "Name": "Dreamling",
+    "OwnerCharacterId": "solace",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.3,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.08,
+    "Abilities": {
+      "Basic": ["dream_touch"],
+      "Advanced": ["dream_wave"],
+      "Ultimate": ["dream_cascade"]
+    }
+  },
+  {
+    "Id": "shadowpaw",
+    "Name": "Shadowpaw",
+    "OwnerCharacterId": "wraith",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.3,
+    "BondDecayRate": 0.12,
+    "Abilities": {
+      "Basic": ["shadow_claw"],
+      "Advanced": ["shadow_rush"],
+      "Ultimate": ["void_rend"]
+    }
+  },
+  {
+    "Id": "crystalite",
+    "Name": "Crystalite",
+    "OwnerCharacterId": "orin",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["crystal_shard"],
+      "Advanced": ["crystal_rain"],
+      "Ultimate": ["crystal_prison"]
+    }
+  },
+  {
+    "Id": "zephyrine",
+    "Name": "Zephyrine",
+    "OwnerCharacterId": "zephyr",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["breeze"],
+      "Advanced": ["gale_force"],
+      "Ultimate": ["cyclone"]
+    }
+  },
+  {
+    "Id": "nightshade",
+    "Name": "Nightshade",
+    "OwnerCharacterId": "nyx",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.12,
+    "Abilities": {
+      "Basic": ["dark_whisper"],
+      "Advanced": ["dark_shroud"],
+      "Ultimate": ["eternal_night"]
+    }
+  },
+  {
+    "Id": "mimicube",
+    "Name": "Mimicube",
+    "OwnerCharacterId": "echo",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["echo_ping"],
+      "Advanced": ["harmonic_wave"],
+      "Ultimate": ["resonance_burst"]
+    }
+  },
+  {
+    "Id": "nova",
+    "Name": "Nova",
+    "OwnerCharacterId": "mira",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.08,
+    "Abilities": {
+      "Basic": ["star_spark"],
+      "Advanced": ["star_shower"],
+      "Ultimate": ["supernova"]
+    }
+  },
+  {
+    "Id": "frostbite",
+    "Name": "Frostbite",
+    "OwnerCharacterId": "venn",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["frost_nip"],
+      "Advanced": ["blizzard_breath"],
+      "Ultimate": ["ice_age"]
+    }
+  },
+  {
+    "Id": "bastion",
+    "Name": "Bastion",
+    "OwnerCharacterId": "thorne",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.25,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["shield_bash"],
+      "Advanced": ["iron_charge"],
+      "Ultimate": ["fortress_slam"]
+    }
+  },
+  {
+    "Id": "flick",
+    "Name": "Flick",
+    "OwnerCharacterId": "pip",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.3,
+    "BondDecayRate": 0.12,
+    "Abilities": {
+      "Basic": ["quick_bite"],
+      "Advanced": ["venom_strike"],
+      "Ultimate": ["inferno_dash"]
+    }
+  },
+  {
+    "Id": "patch",
+    "Name": "Patch",
+    "OwnerCharacterId": "sera",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.3,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.08,
+    "Abilities": {
+      "Basic": ["gentle_mend"],
+      "Advanced": ["soothing_aura"],
+      "Ultimate": ["miracle_heal"]
+    }
+  },
+  {
+    "Id": "cinder",
+    "Name": "Cinder",
+    "OwnerCharacterId": "forge",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.5,
+    "TrainingDecayRate": 0.3,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["ember_snap"],
+      "Advanced": ["flame_rush"],
+      "Ultimate": ["inferno_blast"]
+    }
+  },
+  {
+    "Id": "riftling",
+    "Name": "Riftling",
+    "OwnerCharacterId": "lira",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.08,
+    "Abilities": {
+      "Basic": ["rift_pulse"],
+      "Advanced": ["rift_wave"],
+      "Ultimate": ["rift_collapse"]
+    }
+  },
+  {
+    "Id": "schematic",
+    "Name": "Schematic",
+    "OwnerCharacterId": "architect",
+    "Satiety": 100.0,
+    "Training": 50.0,
+    "Bond": 50.0,
+    "SatietyDecayRate": 0.4,
+    "TrainingDecayRate": 0.2,
+    "BondDecayRate": 0.1,
+    "Abilities": {
+      "Basic": ["blueprint_bolt"],
+      "Advanced": ["schema_storm"],
+      "Ultimate": ["design_override"]
+    }
+  }
+]

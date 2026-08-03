@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act3_kernel_boss_1",
+    "Speaker": "The Kernel",
+    "Text": "You think you can shut me down? I am the operating system. I am the foundation.",
+    "NextId": "act3_kernel_boss_2"
+  },
+  {
+    "Id": "act3_kernel_boss_2",
+    "Speaker": "Byte",
+    "Text": "You were the foundation. Now you're a virus. Time for a hard reboot.",
+    "NextId": "act3_kernel_boss_3"
+  },
+  {
+    "Id": "act3_kernel_boss_3",
+    "Speaker": "Kael",
+    "Text": "Everyone — this is it. Take it down!",
+    "NextId": null
+  }
+]

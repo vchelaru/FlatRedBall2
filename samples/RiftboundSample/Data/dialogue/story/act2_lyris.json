@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_lyris_1",
+    "Speaker": "Lyris",
+    "Text": "Outsiders? You crossed the Rift? I didn't think that was possible.",
+    "NextId": "act2_lyris_2"
+  },
+  {
+    "Id": "act2_lyris_2",
+    "Speaker": "Kael",
+    "Text": "It took three years and a Harmonic Crystal. We're looking for someone — a girl named Lira.",
+    "NextId": "act2_lyris_3"
+  },
+  {
+    "Id": "act2_lyris_3",
+    "Speaker": "Lyris",
+    "Text": "Lira... the name echoes in the glade's memory. She passed through here, heading toward the Fade.",
+    "NextId": "act2_lyris_4"
+  },
+  {
+    "Id": "act2_lyris_4",
+    "Speaker": "Lyris",
+    "Text": "The Fade is where this realm comes apart. You'll need a guide. I know these paths.",
+    "NextId": null
+  }
+]

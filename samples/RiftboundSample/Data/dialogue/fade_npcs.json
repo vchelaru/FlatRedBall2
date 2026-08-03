@@ -1,0 +1,98 @@
+[
+  {
+    "id": "fade_wanderer_1",
+    "speaker": "Fade Wanderer",
+    "text": "You've crossed into The Fade. This place is where all three worlds bleed together.",
+    "nextId": "fade_wanderer_2"
+  },
+  {
+    "id": "fade_wanderer_2",
+    "speaker": "Fade Wanderer",
+    "text": "I was a traveler once, like you. Then the rift swallowed my world. Now I exist between.",
+    "nextId": "fade_wanderer_3"
+  },
+  {
+    "id": "fade_wanderer_3",
+    "speaker": "Fade Wanderer",
+    "text": "Chancellor Draven did this. He opened the rift to seize power, and now reality itself is coming apart.",
+    "choices": [
+      { "text": "Where is Draven now?", "nextId": "fade_wanderer_4a" },
+      { "text": "How do we stop this?", "nextId": "fade_wanderer_4b" }
+    ]
+  },
+  {
+    "id": "fade_wanderer_4a",
+    "speaker": "Fade Wanderer",
+    "text": "He retreated to the Final Sanctum, beyond the Temporal Nexus. But the path is treacherous — fragments of time itself block the way.",
+    "nextId": null
+  },
+  {
+    "id": "fade_wanderer_4b",
+    "speaker": "Fade Wanderer",
+    "text": "Defeat Draven, and the rift may close. But you'll need allies — strong ones. The Architect may be able to help.",
+    "nextId": null
+  },
+  {
+    "id": "temporal_scholar_1",
+    "speaker": "Temporal Scholar",
+    "text": "Time moves strangely here. I've seen the same moment repeat a hundred times.",
+    "nextId": "temporal_scholar_2"
+  },
+  {
+    "id": "temporal_scholar_2",
+    "speaker": "Temporal Scholar",
+    "text": "The Temporal Echoes are fragments of people who once existed. They mimic what they remember.",
+    "nextId": "temporal_scholar_3"
+  },
+  {
+    "id": "temporal_scholar_3",
+    "speaker": "Temporal Scholar",
+    "text": "Be careful — some of them remember how to fight very well.",
+    "nextId": null
+  },
+  {
+    "id": "architect_intro_1",
+    "speaker": "The Architect",
+    "text": "I built the Nexus to connect worlds peacefully. Draven corrupted my work to tear them apart.",
+    "nextId": "architect_intro_2"
+  },
+  {
+    "id": "architect_intro_2",
+    "speaker": "The Architect",
+    "text": "I cannot undo what he's done alone. But together, we might weave reality back together.",
+    "choices": [
+      { "text": "Join us.", "nextId": "architect_intro_3a" },
+      { "text": "What can you do?", "nextId": "architect_intro_3b" }
+    ]
+  },
+  {
+    "id": "architect_intro_3a",
+    "speaker": "The Architect",
+    "text": "Very well. My knowledge of the rift's structure will be invaluable. Let us end this.",
+    "nextId": null
+  },
+  {
+    "id": "architect_intro_3b",
+    "speaker": "The Architect",
+    "text": "I can construct and deconstruct matter at will. I can weave the fabric of reality itself. Is that enough?",
+    "nextId": null
+  },
+  {
+    "id": "lira_rescue_1",
+    "speaker": "Lira",
+    "text": "...Dad? Is that really you?",
+    "nextId": "lira_rescue_2"
+  },
+  {
+    "id": "lira_rescue_2",
+    "speaker": "Kael",
+    "text": "Lira! I've crossed three worlds to find you. I'm not leaving without you.",
+    "nextId": "lira_rescue_3"
+  },
+  {
+    "id": "lira_rescue_3",
+    "speaker": "Lira",
+    "text": "The Fade changed me, Dad. I can feel the rift — I can heal it. Let me help.",
+    "nextId": null
+  }
+]

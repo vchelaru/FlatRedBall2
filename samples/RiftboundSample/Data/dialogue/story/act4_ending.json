@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act4_ending_1",
+    "Speaker": "Kael",
+    "Text": "It's over. Draven is finished. The Rift... it's stabilizing.",
+    "NextId": "act4_ending_2"
+  },
+  {
+    "Id": "act4_ending_2",
+    "Speaker": "Lira",
+    "Text": "The Fade is receding. I can feel the worlds settling into place — not merging, but... coexisting.",
+    "NextId": "act4_ending_3"
+  },
+  {
+    "Id": "act4_ending_3",
+    "Speaker": "Kael",
+    "Text": "Can you come home?",
+    "NextId": "act4_ending_4"
+  },
+  {
+    "Id": "act4_ending_4",
+    "Speaker": "Lira",
+    "Text": "I am home, Dad. Wherever you are — that's home.",
+    "NextId": null
+  }
+]

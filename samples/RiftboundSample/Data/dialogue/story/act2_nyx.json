@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_nyx_1",
+    "Speaker": "Nyx",
+    "Text": "...",
+    "NextId": "act2_nyx_2"
+  },
+  {
+    "Id": "act2_nyx_2",
+    "Speaker": "Mira",
+    "Text": "Someone's watching us from the shadows. Hello?",
+    "NextId": "act2_nyx_3"
+  },
+  {
+    "Id": "act2_nyx_3",
+    "Speaker": "Nyx",
+    "Text": "You see things others don't. That starlight in your veins — interesting.",
+    "NextId": "act2_nyx_4"
+  },
+  {
+    "Id": "act2_nyx_4",
+    "Speaker": "Nyx",
+    "Text": "I've been following you since the Glade. You're heading somewhere that interests me. I'll join — but don't ask questions I won't answer.",
+    "NextId": null
+  }
+]

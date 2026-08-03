@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_root_1",
+    "Speaker": "Root",
+    "Text": "So you're the ones tearing through the system. Impressive. Reckless, but impressive.",
+    "NextId": "act3_root_2"
+  },
+  {
+    "Id": "act3_root_2",
+    "Speaker": "Kael",
+    "Text": "We need to stop the Kernel and reach the core crystal.",
+    "NextId": "act3_root_3"
+  },
+  {
+    "Id": "act3_root_3",
+    "Speaker": "Root",
+    "Text": "The Kernel won't go down easy. It has root access to everything. But so do I.",
+    "NextId": "act3_root_4"
+  },
+  {
+    "Id": "act3_root_4",
+    "Speaker": "Root",
+    "Text": "Consider this a partnership. Beat the Kernel, and I'll make sure the Nexus doesn't crash.",
+    "NextId": null
+  }
+]

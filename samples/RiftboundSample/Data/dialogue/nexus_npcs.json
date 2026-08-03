@@ -1,0 +1,71 @@
+[
+  {
+    "id": "admin_1",
+    "speaker": "System Admin",
+    "text": "Welcome to the Data Core — the central hub of the Nexus. Everything flows through here.",
+    "nextId": "admin_2"
+  },
+  {
+    "id": "admin_2",
+    "speaker": "System Admin",
+    "text": "Lately, corrupted processes have been multiplying. The Kernel — our central controller — has gone rogue.",
+    "nextId": "admin_3"
+  },
+  {
+    "id": "admin_3",
+    "speaker": "System Admin",
+    "text": "If we don't stop it, the entire Nexus will crash. And when a virtual world crashes... its inhabitants don't come back.",
+    "choices": [
+      { "text": "Where is the Kernel?", "nextId": "admin_4a" },
+      { "text": "How can I help?", "nextId": "admin_4b" }
+    ]
+  },
+  {
+    "id": "admin_4a",
+    "speaker": "System Admin",
+    "text": "At the top of the Nexus Spire. But the path is blocked by firewalls and corrupted zones. You'll need to fight your way through.",
+    "nextId": null
+  },
+  {
+    "id": "admin_4b",
+    "speaker": "System Admin",
+    "text": "Clear out the Bit Bugs infesting the network, then push through the Firewall Fortress and the Glitch Wastes. The Spire awaits beyond.",
+    "nextId": null
+  },
+  {
+    "id": "engineer_1",
+    "speaker": "Network Engineer",
+    "text": "The firewalls were supposed to protect us. Now they attack anything that moves — even friendlies.",
+    "nextId": "engineer_2"
+  },
+  {
+    "id": "engineer_2",
+    "speaker": "Network Engineer",
+    "text": "The Kernel reprogrammed them. If you can take down the Firewall Drone Commander, I can open a path to the Glitch Wastes.",
+    "nextId": null
+  },
+  {
+    "id": "archivist_1",
+    "speaker": "Archivist",
+    "text": "I used to catalog every byte of data in this world. Now half of it is scattered or corrupted.",
+    "nextId": "archivist_2"
+  },
+  {
+    "id": "archivist_2",
+    "speaker": "Archivist",
+    "text": "If you find any data fragments out there, bring them to me. Every piece recovered is a life preserved.",
+    "nextId": null
+  },
+  {
+    "id": "merchant_1",
+    "speaker": "Pixel Merchant",
+    "text": "Welcome to the Pixel Bazaar! Best digital wares in the Nexus. Everything's for sale — if you've got the fragments.",
+    "nextId": "merchant_2"
+  },
+  {
+    "id": "merchant_2",
+    "speaker": "Pixel Merchant",
+    "text": "Circuit boards, nano fibers, energy cells — I've got it all. The Glitch Wastes are dangerous, but the loot is worth it.",
+    "nextId": null
+  }
+]

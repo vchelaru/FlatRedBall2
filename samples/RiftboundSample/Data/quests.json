@@ -1,0 +1,315 @@
+[
+  {
+    "Id": "gear_collection",
+    "Name": "Gear Collection",
+    "Description": "The blacksmith needs proof that the Gear Golems can be stopped. Defeat 5 of them.",
+    "Giver": "Blacksmith",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "gear_golem", "RequiredCount": 5 }
+    ],
+    "Reward": {
+      "Gold": 0,
+      "XP": 50,
+      "Items": { "bronze_ingot": 5 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "rat_problem",
+    "Name": "Rat Problem",
+    "Description": "Steam Rats have been chewing through the village pipes. Exterminate 10 of them.",
+    "Giver": "Village Elder",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "steam_rat", "RequiredCount": 10 }
+    ],
+    "Reward": {
+      "Gold": 100,
+      "XP": 30,
+      "Items": {}
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "elders_request",
+    "Name": "The Elder's Request",
+    "Description": "The Village Elder has something important to discuss. Speak with him.",
+    "Giver": "Village Elder",
+    "Objectives": [
+      { "Type": "talk_to", "TargetId": "village_elder", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 0,
+      "XP": 20,
+      "Items": { "health_potion": 3 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "missing_parts",
+    "Name": "Missing Parts",
+    "Description": "An inventor needs gear fragments for a special project. Collect 3 from defeated enemies.",
+    "Giver": "Inventor",
+    "Objectives": [
+      { "Type": "collect", "TargetId": "gear_fragment", "RequiredCount": 3 }
+    ],
+    "Reward": {
+      "Gold": 50,
+      "XP": 40,
+      "Items": {},
+      "UnlockRecipeId": "steam_goggles"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "debug_mode",
+    "Name": "Debug Mode",
+    "Description": "The Data Core is swarming with Bit Bugs. Clear out 10 of them to stabilize the system.",
+    "Giver": "System Admin",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "bit_bug", "RequiredCount": 10 }
+    ],
+    "Reward": {
+      "Gold": 150,
+      "XP": 60,
+      "Items": { "data_fragment": 5 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "firewall_breach",
+    "Name": "Firewall Breach",
+    "Description": "A rogue Firewall Drone Commander is blocking access to the inner network. Destroy it.",
+    "Giver": "Network Engineer",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "firewall_drone", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 200,
+      "XP": 80,
+      "Items": { "circuit_board": 3 },
+      "UnlockRecipeId": "neural_link"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "data_recovery",
+    "Name": "Data Recovery",
+    "Description": "Critical data fragments have been scattered across the Nexus. Recover 5 of them.",
+    "Giver": "Archivist",
+    "Objectives": [
+      { "Type": "collect", "TargetId": "data_fragment", "RequiredCount": 5 }
+    ],
+    "Reward": {
+      "Gold": 100,
+      "XP": 50,
+      "Items": { "energy_cell": 2 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "system_scan",
+    "Name": "System Scan",
+    "Description": "Map the full Nexus network by visiting all five locations: Data Core, Pixel Bazaar, Firewall Fortress, Glitch Wastes, and Nexus Spire.",
+    "Giver": "System Admin",
+    "Objectives": [
+      { "Type": "visit", "TargetId": "data_core", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "pixel_bazaar", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "firewall_fortress", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "glitch_wastes", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "nexus_spire", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 300,
+      "XP": 120,
+      "Items": { "nano_fiber": 5 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "the_kernel_quest",
+    "Name": "The Kernel",
+    "Description": "The Kernel has gone rogue and threatens to crash the entire Nexus. Reach the Nexus Spire and shut it down.",
+    "Giver": "System Admin",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "the_kernel", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 500,
+      "XP": 500,
+      "Items": { "kernel_core": 1 }
+    },
+    "IsMainQuest": true
+  },
+  {
+    "Id": "root_kit",
+    "Name": "Root Kit",
+    "Description": "Root has challenged you to a duel in the Glitch Wastes. Prove your strength to earn his respect.",
+    "Giver": "Root",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "root", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 250,
+      "XP": 200,
+      "Items": { "circuit_board": 3, "nano_fiber": 3 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "crystal_harvest",
+    "Name": "Crystal Harvest",
+    "Description": "Orin needs crystal dust to study the ethereal realm's structure. Collect 5 crystal_dust.",
+    "Giver": "Orin",
+    "Objectives": [
+      { "Type": "collect", "TargetId": "crystal_dust", "RequiredCount": 5 }
+    ],
+    "Reward": {
+      "Gold": 150,
+      "XP": 60,
+      "Items": { "ether_essence": 3 },
+      "UnlockRecipeId": "crystal_blade"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "dream_walker",
+    "Name": "Dream Walker",
+    "Description": "Dream Eaters are consuming the memories of lost souls. Defeat 8 of them.",
+    "Giver": "Solace",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "dream_eater", "RequiredCount": 8 }
+    ],
+    "Reward": {
+      "Gold": 200,
+      "XP": 80,
+      "Items": { "dream_shard": 5 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "phantoms_challenge",
+    "Name": "The Phantom's Challenge",
+    "Description": "Phantom Knights guard the deeper reaches of the Ethereal Realm. Defeat 3 to prove your worth.",
+    "Giver": "Wraith",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "phantom_knight", "RequiredCount": 3 }
+    ],
+    "Reward": {
+      "Gold": 250,
+      "XP": 100,
+      "Items": { "phantom_steel": 2 },
+      "UnlockRecipeId": "phantom_armor"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "whispers_in_the_glade",
+    "Name": "Whispers in the Glade",
+    "Description": "A mysterious presence has been detected in Crystal Glade. Speak to the NPC there.",
+    "Giver": "Lyris",
+    "Objectives": [
+      { "Type": "talk_to", "TargetId": "glade_spirit", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 0,
+      "XP": 40,
+      "Items": { "dream_shard": 3, "ether_essence": 2 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "nightmares_end",
+    "Name": "Nightmare's End",
+    "Description": "The Nightmare Core is the source of the ethereal realm's corruption. Destroy it.",
+    "Giver": "Solace",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "nightmare_core", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 500,
+      "XP": 500,
+      "Items": { "nightmare_core_shard": 1 }
+    },
+    "IsMainQuest": true
+  },
+  {
+    "Id": "lost_memories",
+    "Name": "Lost Memories",
+    "Description": "Fragments of lost memories are scattered across the Ethereal Realm. Find 3 memory_fragments in different maps.",
+    "Giver": "Echo",
+    "Objectives": [
+      { "Type": "collect", "TargetId": "memory_fragment", "RequiredCount": 3 }
+    ],
+    "Reward": {
+      "Gold": 200,
+      "XP": 120,
+      "Items": { "dream_shard": 3, "crystal_dust": 3 },
+      "UnlockRecipeId": "dream_catcher"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "echoes_of_the_past",
+    "Name": "Echoes of the Past",
+    "Description": "Temporal Echoes are distorting the Fade's timeline. Defeat 5 of them to stabilize the flow of time.",
+    "Giver": "Fade Wanderer",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "temporal_echo", "RequiredCount": 5 }
+    ],
+    "Reward": {
+      "Gold": 300,
+      "XP": 150,
+      "Items": { "reality_shard": 3 }
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "the_last_fragment",
+    "Name": "The Last Fragment",
+    "Description": "Collect 3 reality shards from The Fade to help The Architect rebuild the barriers between worlds.",
+    "Giver": "The Architect",
+    "Objectives": [
+      { "Type": "collect", "TargetId": "reality_shard", "RequiredCount": 3 }
+    ],
+    "Reward": {
+      "Gold": 400,
+      "XP": 200,
+      "Items": { "ether_essence": 5 },
+      "UnlockRecipeId": "reality_blade"
+    },
+    "IsMainQuest": false
+  },
+  {
+    "Id": "draven_must_fall",
+    "Name": "Draven Must Fall",
+    "Description": "Chancellor Draven holds the key to the rift's corruption. Reach the Final Sanctum and defeat him to save all three worlds.",
+    "Giver": "Lira",
+    "Objectives": [
+      { "Type": "defeat", "TargetId": "chancellor_draven", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 1000,
+      "XP": 2000,
+      "Items": { "dravens_sigil": 1 }
+    },
+    "IsMainQuest": true
+  },
+  {
+    "Id": "fade_survey",
+    "Name": "Fade Survey",
+    "Description": "Map all four regions of The Fade to understand its structure.",
+    "Giver": "The Architect",
+    "Objectives": [
+      { "Type": "visit", "TargetId": "rift_entrance", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "fractured_path", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "temporal_nexus", "RequiredCount": 1 },
+      { "Type": "visit", "TargetId": "final_sanctum", "RequiredCount": 1 }
+    ],
+    "Reward": {
+      "Gold": 500,
+      "XP": 300,
+      "Items": { "reality_shard": 5 }
+    },
+    "IsMainQuest": false
+  }
+]

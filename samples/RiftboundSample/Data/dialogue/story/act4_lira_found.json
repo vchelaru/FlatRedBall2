@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act4_lira_found_1",
+    "Speaker": "Kael",
+    "Text": "Lira!",
+    "NextId": "act4_lira_found_2"
+  },
+  {
+    "Id": "act4_lira_found_2",
+    "Speaker": "Lira",
+    "Text": "Dad? You're... you're really here? I thought the visions were lying again.",
+    "NextId": "act4_lira_found_3"
+  },
+  {
+    "Id": "act4_lira_found_3",
+    "Speaker": "Kael",
+    "Text": "It's me. I'm real. I crossed three worlds to find you.",
+    "NextId": "act4_lira_found_4"
+  },
+  {
+    "Id": "act4_lira_found_4",
+    "Speaker": "Lira",
+    "Text": "I've changed, Dad. The Fade... it wove itself into me. I exist in both realms now. I don't know if I can leave.",
+    "NextId": "act4_lira_found_5"
+  },
+  {
+    "Id": "act4_lira_found_5",
+    "Speaker": "Kael",
+    "Text": "Then we'll find a way. Together. I didn't come this far to lose you again.",
+    "NextId": null
+  }
+]

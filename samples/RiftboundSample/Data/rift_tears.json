@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "brasshollow_rift",
+    "Location": "brasshollow",
+    "Difficulty": 1,
+    "Reward": {
+      "Type": "item",
+      "ItemId": "steam_crystal",
+      "Count": 3
+    }
+  },
+  {
+    "Id": "cogspire_rift",
+    "Location": "cogspire_academy",
+    "Difficulty": 2,
+    "Reward": {
+      "Type": "recipe",
+      "ItemId": "rift_lens_recipe",
+      "Count": 1
+    }
+  },
+  {
+    "Id": "scorched_rift",
+    "Location": "scorched_vents",
+    "Difficulty": 3,
+    "Reward": {
+      "Type": "item",
+      "ItemId": "rare_ore",
+      "Count": 2
+    }
+  }
+]

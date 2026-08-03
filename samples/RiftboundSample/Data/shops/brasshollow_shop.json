@@ -1,0 +1,82 @@
+[
+  {
+    "itemId": "iron_wrench",
+    "name": "Iron Wrench",
+    "description": "A sturdy wrench for bashing gears and skulls alike.",
+    "buyPrice": 120,
+    "sellPrice": 60,
+    "category": "weapon"
+  },
+  {
+    "itemId": "apprentice_staff",
+    "name": "Apprentice Staff",
+    "description": "A basic staff that amplifies magical energy.",
+    "buyPrice": 150,
+    "sellPrice": 75,
+    "category": "weapon"
+  },
+  {
+    "itemId": "leather_vest",
+    "name": "Leather Vest",
+    "description": "Light armor offering modest protection.",
+    "buyPrice": 100,
+    "sellPrice": 50,
+    "category": "armor"
+  },
+  {
+    "itemId": "chain_shirt",
+    "name": "Chain Shirt",
+    "description": "Heavier armor with solid defense but lower mobility.",
+    "buyPrice": 200,
+    "sellPrice": 100,
+    "category": "armor"
+  },
+  {
+    "itemId": "copper_ring",
+    "name": "Copper Ring",
+    "description": "A simple ring that boosts luck slightly.",
+    "buyPrice": 80,
+    "sellPrice": 40,
+    "category": "accessory"
+  },
+  {
+    "itemId": "health_potion",
+    "name": "Health Potion",
+    "description": "Restores 50 HP to one ally.",
+    "buyPrice": 30,
+    "sellPrice": 15,
+    "category": "consumable"
+  },
+  {
+    "itemId": "mana_tonic",
+    "name": "Mana Tonic",
+    "description": "Restores 30 MP to one ally.",
+    "buyPrice": 40,
+    "sellPrice": 20,
+    "category": "consumable"
+  },
+  {
+    "itemId": "basic_pet_food",
+    "name": "Basic Pet Food",
+    "description": "Nourishing food for your companion. Restores satiety.",
+    "buyPrice": 20,
+    "sellPrice": 10,
+    "category": "consumable"
+  },
+  {
+    "itemId": "antidote",
+    "name": "Antidote",
+    "description": "Cures poison status.",
+    "buyPrice": 25,
+    "sellPrice": 12,
+    "category": "consumable"
+  },
+  {
+    "itemId": "smoke_bomb",
+    "name": "Smoke Bomb",
+    "description": "Guarantees escape from non-boss battles.",
+    "buyPrice": 50,
+    "sellPrice": 25,
+    "category": "consumable"
+  }
+]

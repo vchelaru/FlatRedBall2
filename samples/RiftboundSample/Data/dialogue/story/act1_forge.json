@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_forge_1",
+    "Speaker": "Forge",
+    "Text": "The furnaces here have been running wild since the Rift. No one to tend them. No one brave enough to try.",
+    "NextId": "act1_forge_2"
+  },
+  {
+    "Id": "act1_forge_2",
+    "Speaker": "Kael",
+    "Text": "You're still here though.",
+    "NextId": "act1_forge_3"
+  },
+  {
+    "Id": "act1_forge_3",
+    "Speaker": "Forge",
+    "Text": "A blacksmith doesn't abandon his forge. Even when the forge tries to kill him. It's a matter of honor.",
+    "NextId": "act1_forge_4"
+  },
+  {
+    "Id": "act1_forge_4",
+    "Speaker": "Forge",
+    "Text": "You're heading deeper, aren't you? I've seen something down there. A guardian — made of living metal and fire.",
+    "NextId": "act1_forge_5"
+  },
+  {
+    "Id": "act1_forge_5",
+    "Speaker": "Forge",
+    "Text": "You'll need good steel at your side. I'm coming with you.",
+    "NextId": null
+  }
+]

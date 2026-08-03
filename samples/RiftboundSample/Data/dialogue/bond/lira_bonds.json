@@ -1,0 +1,62 @@
+[
+  {
+    "Id": "lira_bond_20",
+    "Speaker": "Lira",
+    "Text": "It's strange being back with people. In The Fade, I only had the echoes for company. They're not great conversationalists.",
+    "NextId": "lira_bond_20b"
+  },
+  {
+    "Id": "lira_bond_20b",
+    "Speaker": "Lira",
+    "Text": "But they taught me something — every person leaves an impression on reality. Even after they're gone.",
+    "NextId": null
+  },
+  {
+    "Id": "lira_bond_40",
+    "Speaker": "Lira",
+    "Text": "Dad thinks I don't remember Mom. I do. I remember her laugh, and the way she'd sing while cooking.",
+    "NextId": "lira_bond_40b"
+  },
+  {
+    "Id": "lira_bond_40b",
+    "Speaker": "Lira",
+    "Text": "The Fade showed me echoes of her. It was cruel and kind at the same time.",
+    "NextId": null
+  },
+  {
+    "Id": "lira_bond_60",
+    "Speaker": "Lira",
+    "Text": "I can feel the rift in everything now. In the ground, in the air, in people. It's like a heartbeat that's slightly off.",
+    "NextId": "lira_bond_60b"
+  },
+  {
+    "Id": "lira_bond_60b",
+    "Speaker": "Lira",
+    "Text": "When we heal it, I wonder... will I still be able to feel it? Will I still be me?",
+    "NextId": null
+  },
+  {
+    "Id": "lira_bond_80",
+    "Speaker": "Lira",
+    "Text": "I used to be scared of the dark. Now I've lived in a place where light and dark have no meaning.",
+    "NextId": "lira_bond_80b"
+  },
+  {
+    "Id": "lira_bond_80b",
+    "Speaker": "Lira",
+    "Text": "I'm not scared anymore. Not of the dark, not of Draven, not of what comes next. Because I'm not alone.",
+    "NextId": null
+  },
+  {
+    "Id": "lira_bond_100",
+    "Speaker": "Lira",
+    "Text": "After this is over, I want to learn how to build things. Like Dad. But not just machines — bridges between worlds.",
+    "NextId": "lira_bond_100b"
+  },
+  {
+    "Id": "lira_bond_100b",
+    "Speaker": "Lira",
+    "Text": "The rift doesn't have to be a wound. It could be a door. And doors are meant to be opened — together.",
+    "NextId": null
+  }
+]

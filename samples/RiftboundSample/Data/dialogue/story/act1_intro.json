@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_intro_1",
+    "Speaker": "Kael",
+    "Text": "Three years. Three years since the Rift tore through Brasshollow and took everything.",
+    "NextId": "act1_intro_2"
+  },
+  {
+    "Id": "act1_intro_2",
+    "Speaker": "Kael",
+    "Text": "Maren is gone. But Lira... she's still out there, somewhere in the Ethereal Realm.",
+    "NextId": "act1_intro_3"
+  },
+  {
+    "Id": "act1_intro_3",
+    "Speaker": "Kael",
+    "Text": "Dr. Ashcroft's device nearly worked. I saw the other side — just for a moment. It's real.",
+    "NextId": "act1_intro_4"
+  },
+  {
+    "Id": "act1_intro_4",
+    "Speaker": "Kael",
+    "Text": "I need Harmonic Crystals to stabilize the crossing. One for each realm. I have to find Lira before the Rift closes for good.",
+    "NextId": "act1_intro_5"
+  },
+  {
+    "Id": "act1_intro_5",
+    "Speaker": "Kael",
+    "Text": "First things first — the Elder may know something. He was here when the Rift opened.",
+    "NextId": null
+  }
+]

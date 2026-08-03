@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_thorne_1",
+    "Speaker": "Thorne",
+    "Text": "Halt. Fort Ironmaw is under Ironclad Authority jurisdiction. State your business.",
+    "NextId": "act1_thorne_2"
+  },
+  {
+    "Id": "act1_thorne_2",
+    "Speaker": "Kael",
+    "Text": "I'm looking for passage through the Scorched Vents. I'm told you control access.",
+    "NextId": "act1_thorne_3"
+  },
+  {
+    "Id": "act1_thorne_3",
+    "Speaker": "Thorne",
+    "Text": "The Vents are dangerous. Full of constructs gone haywire since the Rift. Why would a steamwright go there?",
+    "NextId": "act1_thorne_4"
+  },
+  {
+    "Id": "act1_thorne_4",
+    "Speaker": "Kael",
+    "Text": "My daughter is on the other side of the Rift. I'll go through whatever I have to.",
+    "NextId": "act1_thorne_5"
+  },
+  {
+    "Id": "act1_thorne_5",
+    "Speaker": "Thorne",
+    "Text": "...I lost my squad to the Rift. Half of them, gone in an instant. If there's a chance to fix this — I'm in.",
+    "NextId": null
+  }
+]

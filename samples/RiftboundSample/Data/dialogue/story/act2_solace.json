@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_solace_1",
+    "Speaker": "Solace",
+    "Text": "Welcome to the Dreamspire Temple. I've been expecting you.",
+    "NextId": "act2_solace_2"
+  },
+  {
+    "Id": "act2_solace_2",
+    "Speaker": "Kael",
+    "Text": "Expecting us? How?",
+    "NextId": "act2_solace_3"
+  },
+  {
+    "Id": "act2_solace_3",
+    "Speaker": "Solace",
+    "Text": "The dreams told me. In this realm, dreams are as real as stone. And the dreams have been screaming about a father who won't stop searching.",
+    "NextId": "act2_solace_4"
+  },
+  {
+    "Id": "act2_solace_4",
+    "Speaker": "Solace",
+    "Text": "The Nightmare Core is corrupting this temple. Help me cleanse it, and I'll guide you deeper.",
+    "NextId": null
+  }
+]

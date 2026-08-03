@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_wraith_1",
+    "Speaker": "Wraith",
+    "Text": "You shouldn't be here. The grotto is dangerous for those who still have solid form.",
+    "NextId": "act2_wraith_2"
+  },
+  {
+    "Id": "act2_wraith_2",
+    "Speaker": "Kael",
+    "Text": "We're passing through. Looking for the Fade.",
+    "NextId": "act2_wraith_3"
+  },
+  {
+    "Id": "act2_wraith_3",
+    "Speaker": "Wraith",
+    "Text": "The Fade. Where things stop being things. I've drifted close to its edge. It calls to you — makes you want to dissolve.",
+    "NextId": "act2_wraith_4"
+  },
+  {
+    "Id": "act2_wraith_4",
+    "Speaker": "Wraith",
+    "Text": "I know how to resist the pull. If you'll have a shadow at your side, I'll come.",
+    "NextId": null
+  }
+]

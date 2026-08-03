@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_sera_1",
+    "Speaker": "Sera",
+    "Text": "Hold still. This poultice needs another minute to set.",
+    "NextId": "act1_sera_2"
+  },
+  {
+    "Id": "act1_sera_2",
+    "Speaker": "Kael",
+    "Text": "You're a healer?",
+    "NextId": "act1_sera_3"
+  },
+  {
+    "Id": "act1_sera_3",
+    "Speaker": "Sera",
+    "Text": "Field medic. These refugees have been coming in waves since the Vents destabilized. Burns, rift-sickness, broken bones.",
+    "NextId": "act1_sera_4"
+  },
+  {
+    "Id": "act1_sera_4",
+    "Speaker": "Kael",
+    "Text": "We're heading into the Vents. A healer would be invaluable.",
+    "NextId": "act1_sera_5"
+  },
+  {
+    "Id": "act1_sera_5",
+    "Speaker": "Sera",
+    "Text": "Into the Vents? You're either brave or foolish. Either way, you'll need someone to patch you up. I'll come.",
+    "NextId": null
+  }
+]

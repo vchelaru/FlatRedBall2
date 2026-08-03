@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_fade_opens_1",
+    "Speaker": "Mira",
+    "Text": "Three crystals. Three harmonics aligned. The path to the Fade is open.",
+    "NextId": "act3_fade_opens_2"
+  },
+  {
+    "Id": "act3_fade_opens_2",
+    "Speaker": "Kael",
+    "Text": "The Fade — where reality dissolves. Where Lira has been trapped for three years.",
+    "NextId": "act3_fade_opens_3"
+  },
+  {
+    "Id": "act3_fade_opens_3",
+    "Speaker": "Thorne",
+    "Text": "We've crossed two worlds to get here. One more boundary won't stop us.",
+    "NextId": "act3_fade_opens_4"
+  },
+  {
+    "Id": "act3_fade_opens_4",
+    "Speaker": "Kael",
+    "Text": "Hold on, Lira. I'm coming.",
+    "NextId": null
+  }
+]

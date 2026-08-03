@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "act1_boss_intro_1",
+    "Speaker": "Forge",
+    "Text": "There it is. The Furnace Guardian. It's been feeding on the geothermal vents, growing stronger.",
+    "NextId": "act1_boss_intro_2"
+  },
+  {
+    "Id": "act1_boss_intro_2",
+    "Speaker": "Kael",
+    "Text": "It's blocking the path to the Rift conduit. We have to go through it.",
+    "NextId": "act1_boss_intro_3"
+  },
+  {
+    "Id": "act1_boss_intro_3",
+    "Speaker": "Thorne",
+    "Text": "Everyone ready? This won't be like the constructs topside. Stay sharp.",
+    "NextId": null
+  }
+]

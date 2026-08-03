@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act2_echo_1",
+    "Speaker": "Echo",
+    "Text": "I remember... fragments. A name. A face. They slip away like water through fingers.",
+    "NextId": "act2_echo_2"
+  },
+  {
+    "Id": "act2_echo_2",
+    "Speaker": "Kael",
+    "Text": "You lost your memories?",
+    "NextId": "act2_echo_3"
+  },
+  {
+    "Id": "act2_echo_3",
+    "Speaker": "Echo",
+    "Text": "The Ethereal Realm takes from those who stay too long. Memories first, then identity. I'm fighting to hold on to what's left.",
+    "NextId": "act2_echo_4"
+  },
+  {
+    "Id": "act2_echo_4",
+    "Speaker": "Echo",
+    "Text": "You're trying to save someone from the Fade. If I help you, maybe I can find what I've lost too.",
+    "NextId": null
+  }
+]

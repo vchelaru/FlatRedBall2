@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_enter_nexus_1",
+    "Speaker": "Kael",
+    "Text": "This place... it's like being inside a machine. Everything is light and geometry.",
+    "NextId": "act3_enter_nexus_2"
+  },
+  {
+    "Id": "act3_enter_nexus_2",
+    "Speaker": "Venn",
+    "Text": "The Nexus — built from computational steam-logic and crystallized magic. It's the bridge between our worlds.",
+    "NextId": "act3_enter_nexus_3"
+  },
+  {
+    "Id": "act3_enter_nexus_3",
+    "Speaker": "Mira",
+    "Text": "The third Harmonic Crystal is embedded in the core architecture. Removing it could collapse the entire Nexus.",
+    "NextId": "act3_enter_nexus_4"
+  },
+  {
+    "Id": "act3_enter_nexus_4",
+    "Speaker": "Kael",
+    "Text": "We'll find another way. There has to be one.",
+    "NextId": null
+  }
+]

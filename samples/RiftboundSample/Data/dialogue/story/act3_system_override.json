@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "act3_system_override_1",
+    "Speaker": "Root",
+    "Text": "The Kernel is down. System integrity holding at 73%. The Nexus will survive.",
+    "NextId": "act3_system_override_2"
+  },
+  {
+    "Id": "act3_system_override_2",
+    "Speaker": "Venn",
+    "Text": "The third crystal — it's accessible now. But removing it will weaken the bridge.",
+    "NextId": "act3_system_override_3"
+  },
+  {
+    "Id": "act3_system_override_3",
+    "Speaker": "Kael",
+    "Text": "Root can stabilize the Nexus without it. Right?",
+    "NextId": "act3_system_override_4"
+  },
+  {
+    "Id": "act3_system_override_4",
+    "Speaker": "Root",
+    "Text": "It'll be rough, but yes. Take the crystal. Save your daughter.",
+    "NextId": null
+  }
+]

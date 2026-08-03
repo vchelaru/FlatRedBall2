@@ -1,0 +1,32 @@
+[
+  {
+    "Id": "act1_rift_opens_1",
+    "Speaker": "Venn",
+    "Text": "The crystal is resonating! The Rift conduit is stabilizing!",
+    "NextId": "act1_rift_opens_2"
+  },
+  {
+    "Id": "act1_rift_opens_2",
+    "Speaker": "Mira",
+    "Text": "I can see it — the Ethereal Realm. It's... beautiful. And terrifying.",
+    "NextId": "act1_rift_opens_3"
+  },
+  {
+    "Id": "act1_rift_opens_3",
+    "Speaker": "Kael",
+    "Text": "Lira is in there somewhere. I can feel it. The connection is real.",
+    "NextId": "act1_rift_opens_4"
+  },
+  {
+    "Id": "act1_rift_opens_4",
+    "Speaker": "Kael",
+    "Text": "Everyone — this is where it gets dangerous. No turning back.",
+    "NextId": "act1_rift_opens_5"
+  },
+  {
+    "Id": "act1_rift_opens_5",
+    "Speaker": "Thorne",
+    "Text": "We didn't come this far to stop. Lead the way, Kael.",
+    "NextId": null
+  }
+]
