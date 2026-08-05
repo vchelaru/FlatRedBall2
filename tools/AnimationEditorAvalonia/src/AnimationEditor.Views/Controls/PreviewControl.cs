@@ -27,7 +27,7 @@ namespace AnimationEditor.App.Controls;
 /// (one frame = FrameLength seconds). When a single frame is selected, shows that
 /// frame statically with optional onion-skin overlay.
 /// </summary>
-public class PreviewControl : Control, IZoomTarget
+public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 {
     // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;
@@ -951,24 +951,26 @@ public class PreviewControl : Control, IZoomTarget
     }
 
     /// <summary>
-    /// Sets the horizontal pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.
+    /// Sets the horizontal pan from a scrollbar value (see <see cref="PanScrollBar"/>) and
+    /// repaints. Clamped defensively to the pan band. The scroll→pan inversion is applied here,
+    /// not by the caller, so both <see cref="IPanScrollTarget"/> implementations agree.
     /// </summary>
-    public void SetPanX(float panX)
+    public void SetPanX(float scrollValue)
     {
-        _panX = panX;
+        _panX = PanScrollBar.PanFromValue(scrollValue);
         ClampPan();
         InvalidateVisual();
         RaiseViewChanged();
     }
 
     /// <summary>
-    /// Sets the vertical pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.
+    /// Sets the vertical pan from a scrollbar value (see <see cref="PanScrollBar"/>) and
+    /// repaints. Clamped defensively to the pan band. The scroll→pan inversion is applied here,
+    /// not by the caller, so both <see cref="IPanScrollTarget"/> implementations agree.
     /// </summary>
-    public void SetPanY(float panY)
+    public void SetPanY(float scrollValue)
     {
-        _panY = panY;
+        _panY = PanScrollBar.PanFromValue(scrollValue);
         ClampPan();
         InvalidateVisual();
         RaiseViewChanged();

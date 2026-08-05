@@ -41,8 +41,8 @@ public class GuardedActionTests
                 () => throw new InvalidOperationException("boom"), "Copy");
             Dispatcher.UIThread.RunJobs();
 
-            var banner = window.FindControl<Border>("ErrorBanner")!;
-            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            var banner = window.Notifications.ErrorBanner;
+            var text   = window.Notifications.ErrorBannerText;
             Assert.True(banner.IsVisible);
             Assert.Contains("Copy", text.Text);
             Assert.Contains("boom", text.Text);

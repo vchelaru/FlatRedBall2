@@ -1,8 +1,23 @@
 # Duplication Audit — Avalonia Animation Editor (issue #695)
 
 High-level inventory of duplicated logic and refactor wins in `tools/AnimationEditorAvalonia/`.
-Audit only — no production code was changed. Line numbers are from the state of the tree at the
-time of the audit and are meant as landmarks, not exact anchors.
+Line numbers are from the state of the tree at the time of the audit and are meant as landmarks,
+not exact anchors — the clusters listed as landed below have since moved.
+
+## Implementation status
+
+All six clusters in section A have been extracted on this branch. What each one shipped:
+
+| Cluster | Extracted to | Notes |
+| --- | --- | --- |
+| A1 | `Views/Controls/ZoomAnimator.cs` | Ported `PreviewControl`'s float-drift fix to `TextureViewport` (test-first) — the divergence this cluster flagged. |
+| A2 | `Views/Controls/RevealHost.cs` | `PngPreviewControl` gained the `Step`/`Settle` test seams `WireframeControl` already had. |
+| A3 | `Views/Controls/DiagnosticsOverlayHost.cs`, `DrawTimeOverlay.TimeAndDraw` | Settled the GPU/CPU-label inconsistency between the two panels. |
+| A4 | `Views/Controls/IPanScrollTarget.cs`, `PanScrollBinder.cs` | Collapsed three `MainWindow` copies and all three suppression flags. `PreviewControl.SetPanX/Y` now take a raw scrollbar value like `TextureViewport`'s, so the two conventions became one. |
+| A5 | `Views/Controls/EditorNotificationOverlay` (already existed) | `MainWindow` hosts it as `Notifications`; the desktop toast/banner code-behind and its XAML are gone. |
+| A6 | `Views/Services/RevealInExplorerMenu.cs` | |
+
+Section C (non-wins) was left alone as recommended.
 
 ## Motivating precedent
 

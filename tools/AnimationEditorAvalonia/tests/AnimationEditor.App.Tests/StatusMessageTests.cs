@@ -23,6 +23,9 @@ public class StatusMessageTests
 
     // Errors route to the prominent top-centre ErrorBanner, not the thin bottom status bar,
     // so failures can't be missed (#479 follow-up). The bottom StatusMessage stays for info.
+    //
+    // The banner lives inside the shared EditorNotificationOverlay (#695 A5), which has its own
+    // namescope — reach it through the hosted control, not window.FindControl by name.
 
     [AvaloniaFact]
     public void CommitInlineRename_EmptyName_ShowsErrorBanner()
@@ -37,8 +40,8 @@ public class StatusMessageTests
             window.CommitInlineRenamePublic(vm, "");
             Dispatcher.UIThread.RunJobs();
 
-            var banner = window.FindControl<Border>("ErrorBanner")!;
-            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            var banner = window.Notifications.ErrorBanner;
+            var text   = window.Notifications.ErrorBannerText;
             Assert.True(banner.IsVisible);
             Assert.Contains("cannot be empty", text.Text);
             Assert.Equal("Walk", chain.Name);
@@ -58,8 +61,8 @@ public class StatusMessageTests
             ctx.AppCommands.LoadAnimationChain("hero.achx");
             Dispatcher.UIThread.RunJobs();
 
-            var banner = window.FindControl<Border>("ErrorBanner")!;
-            var text   = window.FindControl<TextBlock>("ErrorBannerText")!;
+            var banner = window.Notifications.ErrorBanner;
+            var text   = window.Notifications.ErrorBannerText;
             Assert.True(banner.IsVisible);
             Assert.Contains("hero.achx", text.Text);
         }
@@ -77,7 +80,7 @@ public class StatusMessageTests
             Dispatcher.UIThread.RunJobs();
 
             // The banner renders its own ⚠ icon, so the text must not also start with one.
-            var text = window.FindControl<TextBlock>("ErrorBannerText")!;
+            var text = window.Notifications.ErrorBannerText;
             Assert.DoesNotContain("⚠", text.Text);
         }
         finally { window.Close(); }
@@ -92,11 +95,11 @@ public class StatusMessageTests
             ctx.AppCommands.LoadAnimationChain("hero.achx");
             Dispatcher.UIThread.RunJobs();
 
-            var banner  = window.FindControl<Border>("ErrorBanner")!;
+            var banner  = window.Notifications.ErrorBanner;
             Assert.True(banner.IsVisible);
 
-            var dismiss = window.FindControl<Button>("ErrorBannerDismissBtn")!;
-            RaiseClick(dismiss);   // Click handler is wired in InitErrorBanner
+            var dismiss = window.Notifications.ErrorBannerDismissBtn;
+            RaiseClick(dismiss);   // Click handler is wired in the overlay's constructor
             Dispatcher.UIThread.RunJobs();
 
             Assert.False(banner.IsVisible);

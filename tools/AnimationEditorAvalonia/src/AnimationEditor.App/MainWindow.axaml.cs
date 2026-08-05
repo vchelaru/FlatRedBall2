@@ -99,9 +99,6 @@ public partial class MainWindow : Window
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
-    private bool _suppressPreviewScrollSync;
-    private bool _suppressWireframeScrollSync;
-    private bool _suppressPngScrollSync;
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
@@ -152,7 +149,6 @@ public partial class MainWindow : Window
     private bool _suppressInterpolateSync;
     private bool _suppressGuideVisibilitySync;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
-    private System.Threading.CancellationTokenSource? _toastCts;
 
     // The platform application-data root under which settings live. Injected (not read from
     // Environment here) so headless tests can redirect it to a temp dir and never touch the
@@ -204,8 +200,6 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsMacOS())
             ApplyMacOSWindowChrome();
 
-        InitToast();
-        InitErrorBanner();
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
 
         WireAppCommands();
@@ -986,12 +980,7 @@ public partial class MainWindow : Window
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
-        ItemDeletedToastUndoBtn.Click += (_, _) =>
-        {
-            _toastCts?.Cancel();
-            ItemDeletedToastPanel.IsVisible = false;
-            _undoManager.Undo();
-        };
+        Notifications.WireUndo(() => _undoManager.Undo());
 
         // Wire hot reload watcher
         _appCommands.HotReloadWatcher = new HotReloadWatcher();
@@ -1154,80 +1143,19 @@ public partial class MainWindow : Window
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
 
         // ── Wireframe scrollbars (#422) ──
-        // Two-way sync between the manual camera pan and the scrollbars, mirroring the Preview
-        // panel (#415). The scroll axis runs opposite the pan axis (PanScrollBar inverts it).
-        WireframeHScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: true);
-        WireframeVScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: false);
         // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
-        WireframeHScroll.Scroll += OnPreviewScrollEnded;
-        WireframeVScroll.Scroll += OnPreviewScrollEnded;
-        WireframeCtrl.ViewChanged += RefreshWireframeScrollBars;
-    }
-
-    private void OnWireframeScrollValueChanged(bool horizontal)
-    {
-        if (_suppressWireframeScrollSync) return;
-        _suppressWireframeScrollSync = true;
-        if (horizontal)
-            WireframeCtrl.SetPanX((float)WireframeHScroll.Value);
-        else
-            WireframeCtrl.SetPanY((float)WireframeVScroll.Value);
-        _suppressWireframeScrollSync = false;
-    }
-
-    /// <summary>
-    /// Pushes the wireframe's current pan/zoom/texture size into its two scrollbars. Fired by
-    /// <see cref="WireframeControl.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshWireframeScrollBars()
-    {
-        if (_suppressWireframeScrollSync) return;
-        _suppressWireframeScrollSync = true;
-        var (h, v) = WireframeCtrl.GetScrollBarRanges();
-        ApplyScrollRange(WireframeHScroll, h);
-        ApplyScrollRange(WireframeVScroll, v);
-        _suppressWireframeScrollSync = false;
+        PanScrollBinder.Attach(WireframeCtrl, WireframeHScroll, WireframeVScroll, SaveCompanionFile);
     }
 
     // ── PngPreviewControl scrollbar wiring (#604) ─────────────────────────────
 
     private void WirePngViewport()
     {
-        // Two-way sync between the PNG viewer's manual camera pan and its scrollbars, mirroring
-        // the wireframe (#422). No companion-file persistence — a PNG tab carries no editor state.
-        PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
-        PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
-        PngPane.ViewChanged += RefreshPngScrollBars;
+        // No companion-file persistence — a PNG tab carries no editor state.
+        PanScrollBinder.Attach(PngPane, PngHScroll, PngVScroll);
         // The PNG bar's zoom widget both shows the live zoom and drives it (type/step to 1:1 for
         // screenshots), sharing the wireframe/preview implementation.
         PngZoom.Attach(PngPane);
-    }
-
-    private void OnPngScrollValueChanged(bool horizontal)
-    {
-        if (_suppressPngScrollSync) return;
-        _suppressPngScrollSync = true;
-        if (horizontal)
-            PngPane.SetPanX((float)PngHScroll.Value);
-        else
-            PngPane.SetPanY((float)PngVScroll.Value);
-        _suppressPngScrollSync = false;
-    }
-
-    /// <summary>
-    /// Pushes the PNG viewer's current pan/zoom/texture size into its two scrollbars. Fired by
-    /// <see cref="TextureViewport.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshPngScrollBars()
-    {
-        if (_suppressPngScrollSync) return;
-        _suppressPngScrollSync = true;
-        var (h, v) = PngPane.GetScrollBarRanges();
-        ApplyScrollRange(PngHScroll, h);
-        ApplyScrollRange(PngVScroll, v);
-        _suppressPngScrollSync = false;
     }
 
     // ── PNG Diff wiring (#606) ──────────────────────────────────────────
@@ -2327,15 +2255,8 @@ public partial class MainWindow : Window
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
-        // Two-way sync between the manual pan and the scrollbars, using the same suppression-flag
-        // pattern that breaks feedback loops elsewhere. The scroll axis runs
-        // opposite the pan axis (PanScrollBar handles the inversion).
-        PreviewHScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: true);
-        PreviewVScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: false);
         // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
-        PreviewHScroll.Scroll += OnPreviewScrollEnded;
-        PreviewVScroll.Scroll += OnPreviewScrollEnded;
-        PreviewCtrl.ViewChanged += RefreshPreviewScrollBars;
+        PanScrollBinder.Attach(PreviewCtrl, PreviewHScroll, PreviewVScroll, SaveCompanionFile);
 
         UpdateGuideToggleVisibility();
     }
@@ -2352,46 +2273,6 @@ public partial class MainWindow : Window
         _suppressGuideVisibilitySync = true;
         ShowUserGuidesCheck.IsChecked = PreviewCtrl.ShowUserGuides;
         _suppressGuideVisibilitySync = false;
-    }
-
-    private void OnPreviewScrollValueChanged(bool horizontal)
-    {
-        if (_suppressPreviewScrollSync) return;
-        _suppressPreviewScrollSync = true;
-        if (horizontal)
-            PreviewCtrl.SetPanX(PanScrollBar.PanFromValue((float)PreviewHScroll.Value));
-        else
-            PreviewCtrl.SetPanY(PanScrollBar.PanFromValue((float)PreviewVScroll.Value));
-        _suppressPreviewScrollSync = false;
-    }
-
-    private void OnPreviewScrollEnded(object? sender, ScrollEventArgs e)
-    {
-        if (e.ScrollEventType == ScrollEventType.EndScroll) SaveCompanionFile();
-    }
-
-    /// <summary>
-    /// Pushes the Preview's current pan/zoom/content extent into the two scrollbars. Fired by
-    /// <see cref="PreviewControl.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshPreviewScrollBars()
-    {
-        if (_suppressPreviewScrollSync) return;
-        _suppressPreviewScrollSync = true;
-        var (h, v) = PreviewCtrl.GetScrollBarRanges();
-        ApplyScrollRange(PreviewHScroll, h);
-        ApplyScrollRange(PreviewVScroll, v);
-        _suppressPreviewScrollSync = false;
-    }
-
-    // Order matters: set Minimum/Maximum before Value so RangeBase doesn't coerce it.
-    private static void ApplyScrollRange(ScrollBar bar, ScrollBarRange r)
-    {
-        bar.Minimum      = r.Minimum;
-        bar.Maximum      = r.Maximum;
-        bar.ViewportSize = r.ViewportSize;
-        bar.Value        = r.Value;
     }
 
     private void OnPreviewPlaybackFrameIndexChanged(int index)
@@ -5319,72 +5200,18 @@ public partial class MainWindow : Window
         _statusMessageTimer.Start();
     }
 
-    // ── Error banner ──────────────────────────────────────────────────────────
-
-    private DispatcherTimer? _errorBannerTimer;
-
-    private void InitErrorBanner()
-    {
-        ErrorBannerDismissBtn.Click += (_, _) => HideErrorBanner();
-    }
+    // ── Toast / banner notifications ──────────────────────────────────────────
+    // All three surfaces (item-deleted undo toast, generic toast, error banner) live in the
+    // shared EditorNotificationOverlay hosted as "Notifications" — see MainWindow.axaml.
 
     /// <summary>
     /// Shows the prominent top-centre error banner. Auto-dismisses after 8s (longer than the
     /// informational status bar's 5s — errors deserve more dwell time) or on manual dismiss.
     /// </summary>
-    private void ShowErrorBanner(string text)
-    {
-        // The banner draws its own ⚠ icon, so drop a leading warning glyph that callers prepend
-        // (many ShowStatusMessage sites use "⚠ ..."), otherwise the icon shows twice.
-        ErrorBannerText.Text = text.TrimStart('⚠', ' ');
-        ErrorBanner.IsVisible = true;
+    private void ShowErrorBanner(string text) => Notifications.ShowErrorBanner(text);
 
-        _errorBannerTimer?.Stop();
-        _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-        _errorBannerTimer.Tick += (_, _) => HideErrorBanner();
-        _errorBannerTimer.Start();
-    }
-
-    private void HideErrorBanner()
-    {
-        _errorBannerTimer?.Stop();
-        ErrorBanner.IsVisible = false;
-        ErrorBannerText.Text = string.Empty;
-    }
-
-    // ── Toast notification ────────────────────────────────────────────────────
-
-    private DispatcherTimer? _toastTimer;
-    private Action? _toastRetryAction;
-
-    private void InitToast()
-    {
-        ToastDismissBtn.Click += (_, _) => HideToast();
-        ToastRetryBtn.Click   += (_, _) =>
-        {
-            HideToast();
-            _toastRetryAction?.Invoke();
-        };
-    }
-
-    private void ShowToast(string message, Action? retryAction = null)
-    {
-        _toastRetryAction = retryAction;
-        ToastMessage.Text = message;
-        ToastRetryBtn.IsVisible = retryAction is not null;
-        ToastPanel.IsVisible = true;
-
-        _toastTimer?.Stop();
-        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _toastTimer.Tick += (_, _) => HideToast();
-        _toastTimer.Start();
-    }
-
-    private void HideToast()
-    {
-        _toastTimer?.Stop();
-        ToastPanel.IsVisible = false;
-    }
+    private void ShowToast(string message, Action? retryAction = null) =>
+        Notifications.ShowToast(message, retryAction);
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
@@ -6005,22 +5832,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ShowItemDeletedToast(string label)
-    {
-        _toastCts?.Cancel();
-        _toastCts = new System.Threading.CancellationTokenSource();
-        System.Threading.CancellationToken token = _toastCts.Token;
-
-        ItemDeletedToastLabel.Text = $"\"{label}\" deleted";
-        ItemDeletedToastPanel.IsVisible = true;
-
-        try
-        {
-            await System.Threading.Tasks.Task.Delay(4000, token);
-            ItemDeletedToastPanel.IsVisible = false;
-        }
-        catch (System.Threading.Tasks.TaskCanceledException) { }
-    }
+    private void ShowItemDeletedToast(string label) => Notifications.ShowItemDeleted(label);
 
     /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>
     internal void HandleDeleteForTest() => HandleDelete();
