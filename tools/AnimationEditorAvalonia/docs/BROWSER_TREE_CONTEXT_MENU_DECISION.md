@@ -41,10 +41,9 @@ Remapped to "Copy Texture Path" (writes `AnimationFrameSave.TextureName` to the 
 mirroring that same decision doc's "Copy Full Path" precedent — low ceremony, and gives the user
 *something* actionable with the texture reference instead of a dropped item.
 
-The other three host slots (`AdjustFrameTime`, `AddMultipleFrames`, `AdjustOffsets` — all
-dialog-based, chain-only) are left unhandled by `AnimationTreeControl`'s `AddHostSlotItem`, so
-they're silently omitted from the browser menu. Tracked separately, issue #756 (no browser dialog
-pattern exists yet).
+The three dialog-based chain slots (`AdjustFrameTime`, `AddMultipleFrames`, `AdjustOffsets`) are
+implemented by #756 through the shared dialog content and browser overlay described in
+`BROWSER_DIALOGS_DECISION.md`.
 
 ## Verification
 

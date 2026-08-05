@@ -5,6 +5,7 @@ using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
+using AnimationEditor.Views.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -34,6 +35,21 @@ namespace AnimationEditor.Views.Tests;
 /// </summary>
 public class AnimationTreeControlContextMenuTests
 {
+    private sealed class AutoConfirmDialogHost : IEditorDialogHost
+    {
+        public Task<T> ShowAsync<T>(EditorDialog<T> dialog)
+        {
+            dialog.Confirm();
+            return dialog.Result;
+        }
+    }
+
+    private sealed class FakeDialogHost : IEditorDialogHost
+    {
+        public Task<T> ShowAsync<T>(EditorDialog<T> dialog) =>
+            throw new InvalidOperationException("This test only inspects menu construction.");
+    }
+
     private sealed class FakeProjectManager : IProjectManager
     {
         public AnimationChainListSave? AnimationChainListSave { get; set; }
@@ -66,7 +82,9 @@ public class AnimationTreeControlContextMenuTests
         public required IPendingCutState PendingCutState;
     }
 
-    private static Harness Build(AnimationChainListSave? acls = null)
+    private static Harness Build(
+        AnimationChainListSave? acls = null,
+        IEditorDialogHost? dialogHost = null)
     {
         acls ??= new AnimationChainListSave();
         var pm = new FakeProjectManager { AnimationChainListSave = acls };
@@ -82,7 +100,9 @@ public class AnimationTreeControlContextMenuTests
         var control = new AnimationTreeControl();
         control.InitializeServices(selectedState, acls);
         control.EnableRename(appCommands);
-        control.EnableContextMenu(appCommands, objectFinder, pm, pendingCutState);
+        control.EnableContextMenu(
+            appCommands, objectFinder, pm, pendingCutState, dialogHost ?? new FakeDialogHost(),
+            getTextureHeight: _ => 64);
         events.AnimationChainsChanged += control.Refresh;
 
         var window = new Window { Content = control, Width = 400, Height = 400 };
@@ -140,6 +160,24 @@ public class AnimationTreeControlContextMenuTests
     }
 
     // ── Menu shape ────────────────────────────────────────────────────────────
+
+    [AvaloniaFact]
+    public void ChainMenu_HasDialogCommands()
+    {
+        var chain = new AnimationChainSave { Name = "Run" };
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(chain);
+        var h = Build(acls);
+        try
+        {
+            var items = OpenMenuFor(h, Roots(h)[0]);
+
+            Assert.True(IndexOfItem(items, "Adjust Frame Time…") >= 0);
+            Assert.True(IndexOfItem(items, "Add Multiple Frames…") >= 0);
+            Assert.True(IndexOfItem(items, "Adjust Offsets…") >= 0);
+        }
+        finally { h.Window.Close(); }
+    }
 
     [AvaloniaFact]
     public void ChainMenu_DuplicateIsSubmenuWithThreeVariants()
@@ -253,6 +291,23 @@ public class AnimationTreeControlContextMenuTests
     }
 
     // ── Behavior ──────────────────────────────────────────────────────────────
+
+    [AvaloniaFact]
+    public void AddMultipleFrames_ContextMenu_Confirmed_AddsFrame()
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(chain);
+        var h = Build(acls, new AutoConfirmDialogHost());
+        try
+        {
+            OpenMenuFor(h, Roots(h)[0]);
+            ClickMenuItem(h, "Add Multiple Frames…");
+
+            Assert.Single(chain.Frames);
+        }
+        finally { h.Window.Close(); }
+    }
 
     [AvaloniaFact]
     public void DeleteFrame_ContextMenu_DeletesFrame()
