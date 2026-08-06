@@ -122,8 +122,8 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public event Action<string>? SaveAsCompleted;
 
-        /// <inheritdoc cref="IAppCommands.PixiJsExportCompleted"/>
-        public event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+        /// <inheritdoc cref="IAppCommands.ExportCompleted"/>
+        public event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <inheritdoc cref="IAppCommands.LoadFailed"/>
         public event Action<string, Exception>? LoadFailed;
@@ -400,24 +400,25 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         /// <summary>
-        /// Show a file picker and export the current animation chain list as a PixiJS spritesheet
-        /// JSON (<c>SpriteSheetJson</c>). Does nothing if there is no project or the user cancels.
-        /// Fires <see cref="PixiJsExportCompleted"/> with the path and any non-fatal warnings
-        /// (dropped per-frame duration, multiple source textures) on success.
+        /// Show a file picker and export the current animation chain list using
+        /// <paramref name="format"/>. Does nothing if there is no project or the user cancels.
+        /// Fires <see cref="ExportCompleted"/> with the path and any non-fatal warnings on success.
         /// </summary>
-        public async Task ExportToPixiJsAsync()
+        public async Task ExportAsync(Export.ExportFormat format)
         {
+            ArgumentNullException.ThrowIfNull(format);
+
             var acls = _pm.AnimationChainListSave;
             if (acls == null) return;
 
             var path = await FileDialogService.PickSaveFileAsync(
-                "Export to PixiJS", "json", "PixiJS Spritesheet (*.json)");
+                format.DialogTitle, format.Extension, format.Filter);
             if (string.IsNullOrEmpty(path)) return;
 
-            var result = Export.PixiJsSpriteSheetExporter.Export(acls, _pm.GetTextureSizeInPixels);
-            System.IO.File.WriteAllText(path, result.Json);
+            var result = format.Export(acls, _pm.GetTextureSizeInPixels);
+            System.IO.File.WriteAllText(path, result.Text);
 
-            // PixiJS resolves meta.image relative to the JSON, so when exporting elsewhere the
+            // Loaders resolve textures relative to the export file, so when exporting elsewhere the
             // referenced textures must travel with it. Copy each relative texture (preserving any
             // subdirectory) from the .achx's directory into the export directory.
             var exportDir = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
@@ -426,7 +427,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 : System.IO.Path.GetDirectoryName(_pm.FileName) ?? string.Empty;
             var copyWarnings = CopyReferencedTextures(result.ReferencedTextures, sourceDir, exportDir);
 
-            PixiJsExportCompleted?.Invoke(path, result.Warnings.Concat(copyWarnings).ToList());
+            ExportCompleted?.Invoke(path, result.Warnings.Concat(copyWarnings).ToList());
         }
 
         /// <summary>

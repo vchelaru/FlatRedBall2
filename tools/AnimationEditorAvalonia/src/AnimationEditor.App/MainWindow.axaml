@@ -96,6 +96,7 @@
                         <MenuItem Header="Save _As..."    x:Name="MenuSaveAs" />
                         <MenuItem Header="_Export">
                             <MenuItem Header="_PixiJS..." x:Name="MenuExportPixiJs" />
+                            <MenuItem Header="_Godot SpriteFrames..." x:Name="MenuExportGodot" />
                         </MenuItem>
                     </MenuItem>
                     <MenuItem Header="_Edit">

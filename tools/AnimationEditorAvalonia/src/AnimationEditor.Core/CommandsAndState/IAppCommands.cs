@@ -42,11 +42,11 @@ namespace AnimationEditor.Core.CommandsAndState
         event Action<string>? SaveAsCompleted;
 
         /// <summary>
-        /// Raised after <see cref="ExportToPixiJsAsync"/> writes a PixiJS spritesheet JSON. The first
-        /// argument is the export path; the second is a (possibly empty) list of non-fatal warnings
-        /// (e.g. dropped per-frame duration, multiple source textures) for the app layer to surface.
+        /// Raised after <see cref="ExportAsync"/> writes an export file. The first argument is the
+        /// export path; the second is a (possibly empty) list of non-fatal warnings (e.g. dropped
+        /// fields, missing textures) for the app layer to surface.
         /// </summary>
-        event Action<string, IReadOnlyList<string>>? PixiJsExportCompleted;
+        event Action<string, IReadOnlyList<string>>? ExportCompleted;
 
         /// <summary>
         /// Raised after a frame, shape, or animation chain is deleted, carrying a short
@@ -123,7 +123,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void RefreshTreeView();
         void SaveCurrentAnimationChainList(string? fileName = null);
         Task SaveCurrentAnimationChainListAsync();
-        Task ExportToPixiJsAsync();
+        /// <summary>
+        /// Show a file picker and export the current animation chain list using
+        /// <paramref name="format"/>. Does nothing if there is no project or the user cancels.
+        /// Fires <see cref="ExportCompleted"/> on success.
+        /// </summary>
+        Task ExportAsync(Export.ExportFormat format);
         void DeleteAnimationChains(List<AnimationChainSave> animationChains);
         void AddAxisAlignedRectangle(AnimationFrameSave frame);
         void AddCircle(AnimationFrameSave frame);

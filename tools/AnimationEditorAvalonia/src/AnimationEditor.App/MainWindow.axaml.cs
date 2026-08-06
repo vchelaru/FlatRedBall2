@@ -7,6 +7,7 @@ using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.DragDrop;
+using AnimationEditor.Core.Export;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.Hotkeys;
 using AnimationEditor.Core.IO;
@@ -980,7 +981,7 @@ public partial class MainWindow : Window
         _appCommands.ItemsDeleted += label =>
             Dispatcher.UIThread.InvokeAsync(() => ShowItemDeletedToast(label));
 
-        _appCommands.PixiJsExportCompleted += (path, warnings) =>
+        _appCommands.ExportCompleted += (path, warnings) =>
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 var name = System.IO.Path.GetFileName(path);
@@ -1875,6 +1876,7 @@ public partial class MainWindow : Window
         MenuSave.Click   += OnSaveClick;
         MenuSaveAs.Click += OnSaveAsClick;
         MenuExportPixiJs.Click += OnExportPixiJsClick;
+        MenuExportGodot.Click += OnExportGodotClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
         // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
@@ -2088,7 +2090,10 @@ public partial class MainWindow : Window
         _ = _appCommands.SaveCurrentAnimationChainListAsync();
 
     private void OnExportPixiJsClick(object? sender, RoutedEventArgs e) =>
-        _ = _appCommands.ExportToPixiJsAsync();
+        _ = _appCommands.ExportAsync(ExportFormats.PixiJs);
+
+    private void OnExportGodotClick(object? sender, RoutedEventArgs e) =>
+        _ = _appCommands.ExportAsync(ExportFormats.Godot);
 
     internal const string ReleasesUrl = "https://github.com/vchelaru/FlatRedBall2/releases";
 

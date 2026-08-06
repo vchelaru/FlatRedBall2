@@ -50,7 +50,7 @@ public class UndoCoverageRosterTests
         [nameof(IAppCommands.NewFile)]                            = Category.MutatingNotUndoable, // resets the project; clears the undo stack
         [nameof(IAppCommands.SaveCurrentAnimationChainList)]      = Category.MutatingNotUndoable, // writes a file; no model change
         [nameof(IAppCommands.SaveCurrentAnimationChainListAsync)] = Category.MutatingNotUndoable, // writes a file; no model change
-        [nameof(IAppCommands.ExportToPixiJsAsync)]                = Category.MutatingNotUndoable, // writes a PixiJS json; no model change
+        [nameof(IAppCommands.ExportAsync)]                        = Category.MutatingNotUndoable, // writes an export file; no model change
 
         // Non-mutating -----------------------------------------------------------
         [nameof(IAppCommands.RefreshTreeNode)]              = Category.NonMutating,

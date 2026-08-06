@@ -1000,57 +1000,19 @@ public partial class App : Application
             ApplyGrid();
         };
 
-        // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
-        // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
-        // desktop writes the JSON + copies referenced PNGs to disk next to it; the browser has no
-        // disk to write to, so both the JSON and each referenced texture (re-encoded from
-        // ThumbnailService's already-decoded bitmap, never read from disk) are handed to the
-        // browser as Blob downloads instead (see DownloadInterop / wwwroot/download.js).
+        // PixiJsSpriteSheetExporter.Export / GodotSpriteFramesExporter.Export are the same pure,
+        // already-tested cores desktop's AppCommands.ExportAsync calls -- what differs here is
+        // entirely the output path: desktop writes the file + copies referenced PNGs to disk next
+        // to it; the browser has no disk to write to, so both the text and each referenced texture
+        // (re-encoded from ThumbnailService's already-decoded bitmap, never read from disk) are
+        // handed to the browser as Blob downloads instead (see DownloadInterop / wwwroot/download.js).
         var exportPixiJsButton = new Button { Content = "Export to PixiJS", IsVisible = false };
         exportPixiJsButton.Click += (_, _) =>
-        {
-            var currentAcls = projectManager.AnimationChainListSave;
-            if (currentAcls is null)
-            {
-                notifications.ShowErrorBanner("Nothing to export.");
-                return;
-            }
+            RunBrowserExport(ExportFormats.PixiJs, projectManager, thumbnailService, status, notifications);
 
-            (int Width, int Height)? ResolveTextureSize(string name)
-            {
-                var bmp = thumbnailService.GetBitmap(name);
-                return bmp is null ? null : (bmp.Width, bmp.Height);
-            }
-
-            var result = PixiJsSpriteSheetExporter.Export(currentAcls, ResolveTextureSize);
-            var baseName = string.IsNullOrEmpty(projectManager.FileName)
-                ? "spritesheet"
-                : System.IO.Path.GetFileNameWithoutExtension(projectManager.FileName);
-
-            DownloadInterop.DownloadText($"{baseName}.json", result.Json, "application/json");
-
-            var warnings = new List<string>(result.Warnings);
-            foreach (var textureName in result.ReferencedTextures)
-            {
-                var bitmap = thumbnailService.GetBitmap(textureName);
-                if (bitmap is null)
-                {
-                    warnings.Add($"Texture '{textureName}' was not found in memory, so it was not downloaded.");
-                    continue;
-                }
-
-                using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
-                var base64 = System.Convert.ToBase64String(data.ToArray());
-                DownloadInterop.DownloadBase64(System.IO.Path.GetFileName(textureName), base64, "image/png");
-            }
-
-            status.Text = warnings.Count == 0
-                ? $"Exported {baseName}.json and {result.ReferencedTextures.Count} texture(s)."
-                : $"Exported {baseName}.json with {warnings.Count} warning(s): {string.Join(' ', warnings)}";
-            notifications.ShowToast(warnings.Count == 0
-                ? $"Exported {baseName}.json and {result.ReferencedTextures.Count} texture(s)."
-                : $"Exported {baseName}.json with {warnings.Count} warning(s).");
-        };
+        var exportGodotButton = new Button { Content = "Export to Godot", IsVisible = false };
+        exportGodotButton.Click += (_, _) =>
+            RunBrowserExport(ExportFormats.Godot, projectManager, thumbnailService, status, notifications);
 
         var wireframeZoomLabel = new TextBlock
         {
@@ -1504,8 +1466,15 @@ public partial class App : Application
         menuSave.Click += (_, _) => saveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menuSaveAs = new MenuItem { Header = "Save _As…" };
         menuSaveAs.Click += (_, _) => saveAsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        var menuExport = new MenuItem { Header = "_Export to PixiJS" };
-        menuExport.Click += (_, _) => exportPixiJsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuExportPixiJs = new MenuItem { Header = "_Export to PixiJS" };
+        menuExportPixiJs.Click += (_, _) => exportPixiJsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuExportGodot = new MenuItem { Header = "Export to _Godot SpriteFrames" };
+        menuExportGodot.Click += (_, _) => exportGodotButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var menuExport = new MenuItem
+        {
+            Header = "_Export",
+            Items = { menuExportPixiJs, menuExportGodot },
+        };
         var fileMenu = new MenuItem
         {
             Header = "_File",
@@ -2026,7 +1995,7 @@ public partial class App : Application
             {
                 openButton, saveButton, saveAsButton, reloadButton,
                 addFrameButton, addRectButton, addCircleButton, deleteSelectedButton,
-                exportPixiJsButton, diagnosticsButton,
+                exportPixiJsButton, exportGodotButton, diagnosticsButton,
             },
         };
 
@@ -2044,5 +2013,57 @@ public partial class App : Application
 #endif
 
         return shell;
+    }
+
+    private static void RunBrowserExport(
+        ExportFormat format,
+        IProjectManager projectManager,
+        ThumbnailService thumbnailService,
+        TextBlock status,
+        EditorNotificationOverlay notifications)
+    {
+        var currentAcls = projectManager.AnimationChainListSave;
+        if (currentAcls is null)
+        {
+            notifications.ShowErrorBanner("Nothing to export.");
+            return;
+        }
+
+        (int Width, int Height)? ResolveTextureSize(string name)
+        {
+            var bmp = thumbnailService.GetBitmap(name);
+            return bmp is null ? null : (bmp.Width, bmp.Height);
+        }
+
+        var result = format.Export(currentAcls, ResolveTextureSize);
+        var baseName = string.IsNullOrEmpty(projectManager.FileName)
+            ? "spritesheet"
+            : System.IO.Path.GetFileNameWithoutExtension(projectManager.FileName);
+        var fileName = $"{baseName}.{format.Extension}";
+        var mime = format.Extension == "json" ? "application/json" : "text/plain";
+
+        DownloadInterop.DownloadText(fileName, result.Text, mime);
+
+        var warnings = new List<string>(result.Warnings);
+        foreach (var textureName in result.ReferencedTextures)
+        {
+            var bitmap = thumbnailService.GetBitmap(textureName);
+            if (bitmap is null)
+            {
+                warnings.Add($"Texture '{textureName}' was not found in memory, so it was not downloaded.");
+                continue;
+            }
+
+            using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+            var base64 = System.Convert.ToBase64String(data.ToArray());
+            DownloadInterop.DownloadBase64(System.IO.Path.GetFileName(textureName), base64, "image/png");
+        }
+
+        status.Text = warnings.Count == 0
+            ? $"Exported {fileName} and {result.ReferencedTextures.Count} texture(s)."
+            : $"Exported {fileName} with {warnings.Count} warning(s): {string.Join(' ', warnings)}";
+        notifications.ShowToast(warnings.Count == 0
+            ? $"Exported {fileName} and {result.ReferencedTextures.Count} texture(s)."
+            : $"Exported {fileName} with {warnings.Count} warning(s).");
     }
 }
