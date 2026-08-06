@@ -26,6 +26,8 @@ public class BrowserHotkeysTests
             MakeDefinition("undo"),
             MakeDefinition("redo"),
             MakeDefinition("toggle-diagnostics"),
+            MakeDefinition("move-up"),
+            MakeDefinition("move-down"),
             MakeDefinition("new"),
             MakeDefinition("load"),
             MakeDefinition("duplicate"),
@@ -36,7 +38,7 @@ public class BrowserHotkeysTests
         var filtered = BrowserHotkeys.Filter(hotkeys);
 
         Assert.Equal(
-            new[] { "save", "undo", "redo", "toggle-diagnostics" },
+            new[] { "save", "undo", "redo", "toggle-diagnostics", "move-up", "move-down" },
             filtered.Select(h => h.Id));
     }
 }

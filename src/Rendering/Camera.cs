@@ -118,6 +118,19 @@ public class Camera
     // implementation detail; children opt into events normally.
     public GraphicalUiElement UiRoot => _uiRoot ??= new ContainerRuntime { Name = "Camera.UiRoot", HasEvents = false };
 
+    private GraphicalUiElement? _screenSpaceRoot;
+
+    // Sized (unzoomed) alongside UiRoot in SizeUiRootToOrthogonalExtents and FlatRedBallService.Draw.
+    /// <summary>
+    /// This camera's screen-space HUD root; visuals added via <see cref="Add(GraphicalUiElement, FlatRedBall2.Rendering.Layer?)"/>
+    /// with a <see cref="Layer.IsScreenSpace"/> layer are parented here instead of <see cref="UiRoot"/>.
+    /// Sized to this camera's orthogonal extents at all times — unlike <see cref="UiRoot"/>, never
+    /// divided by <see cref="Zoom"/> — so its content stays fixed regardless of runtime zoom changes.
+    /// </summary>
+    // HasEvents = false: see comment on UiRoot. Same rationale — a full-canvas root that absorbs the
+    // cursor would steal clicks from any authored UI under it.
+    public GraphicalUiElement ScreenSpaceRoot => _screenSpaceRoot ??= new ContainerRuntime { Name = "Camera.ScreenSpaceRoot", HasEvents = false };
+
     private InteractiveGue? _popupRoot;
     private InteractiveGue? _modalRoot;
 
@@ -145,16 +158,18 @@ public class Camera
 
     /// <summary>
     /// Adds <paramref name="visual"/> to this camera's UI. The visual is parented under
-    /// <see cref="UiRoot"/> (so its layout is computed against this camera's canvas dimensions)
-    /// and registered on <see cref="Screen"/>'s render list with this camera as the owner —
-    /// only this camera's draw pass will render it.
+    /// <see cref="UiRoot"/> (so its layout is computed against this camera's canvas dimensions),
+    /// or under <see cref="ScreenSpaceRoot"/> when <paramref name="layer"/>'s
+    /// <see cref="Layer.IsScreenSpace"/> is <c>true</c> — and registered on <see cref="Screen"/>'s
+    /// render list with this camera as the owner — only this camera's draw pass will render it.
     /// </summary>
     public void Add(GraphicalUiElement visual, Layer? layer = null)
     {
         if (Screen == null)
             throw new System.InvalidOperationException(
                 "Camera.Add requires the camera to be part of a Screen. Add the camera to Screen.Cameras first.");
-        UiRoot.Children.Add(visual);
+        var root = layer?.IsScreenSpace == true ? ScreenSpaceRoot : UiRoot;
+        root.Children.Add(visual);
         Screen.AddGumForCamera(visual, this, layer);
     }
 
@@ -164,7 +179,10 @@ public class Camera
     /// <summary>Removes a Gum visual previously added with <see cref="Add(GraphicalUiElement, Layer?)"/>.</summary>
     public void Remove(GraphicalUiElement visual)
     {
+        // Caller doesn't know which root it landed in (depends on the Layer passed at Add time) —
+        // removing from both is cheap and one is always a no-op.
         UiRoot.Children.Remove(visual);
+        ScreenSpaceRoot.Children.Remove(visual);
         Screen?.RemoveGumForCamera(visual);
     }
 
@@ -181,6 +199,7 @@ public class Camera
     internal void AttachManagers(RenderingLibrary.ISystemManagers managers)
     {
         UiRoot.AttachManagersOnly(managers);
+        ScreenSpaceRoot.AttachManagersOnly(managers);
         PopupRoot.AttachManagersOnly(managers);
         ModalRoot.AttachManagersOnly(managers);
     }
@@ -215,6 +234,10 @@ public class Camera
     {
         UiRoot.Width  = OrthogonalWidth  / Zoom;
         UiRoot.Height = OrthogonalHeight / Zoom;
+        // Deliberately NOT divided by Zoom — this is what keeps ScreenSpaceRoot content immune
+        // to runtime Camera.Zoom changes (issue #798).
+        ScreenSpaceRoot.Width  = OrthogonalWidth;
+        ScreenSpaceRoot.Height = OrthogonalHeight;
     }
 
     internal void PhysicsUpdate(float dt)

@@ -49,7 +49,8 @@ The **start node is excluded**; the end node is the last entry. Returns empty / 
 ## Finding Nodes
 
 ```csharp
-TileNode? node = network.NodeAt(worldX, worldY);            // exact cell, null if empty
+TileNode? node = network.NodeAt(col, row);                  // by grid index, null if empty
+TileNode? node = network.NodeAtWorld(worldX, worldY);       // by world position, null if empty
 TileNode? node = network.GetClosestNode(worldX, worldY);    // nearest occupied node
 ```
 

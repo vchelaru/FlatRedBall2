@@ -1,0 +1,126 @@
+{
+  "In2D": true,
+  "ResolutionWidth": 800,
+  "ResolutionHeight": 600,
+  "OrthogonalWidth": 800,
+  "OrthogonalHeight": 600,
+  "Screens": [],
+  "Entities": [],
+  "GlobalFiles": [
+    {
+      "Name": "GumProject/GumProject.gumx",
+      "Properties": [
+        {
+          "Name": "FileAdditionBehavior",
+          "Value": 1,
+          "Type": "int"
+        },
+        {
+          "Name": "AutoCreateGumScreens",
+          "Value": true,
+          "Type": "bool"
+        },
+        {
+          "Name": "ShowMouse",
+          "Value": true,
+          "Type": "bool"
+        },
+        {
+          "Name": "MakeGumInstancesPublic",
+          "Value": true,
+          "Type": "bool"
+        },
+        {
+          "Name": "IsMatchGameResolutionInGumChecked",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "IsSharedStatic": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    }
+  ],
+  "GlobalContentSettingsSave": {
+    "GenerateLoadGlobalContentCode": true
+  },
+  "SyncedProjects": [],
+  "StartUpScreen": "Screens\\Level1",
+  "ResolutionPresets": [],
+  "PerformanceSettingsSave": {},
+  "IgnoredDirectories": [],
+  "CustomClasses": [
+    {
+      "Name": "TileMapInfo",
+      "CsvFilesUsingThis": [],
+      "RequiredProperties": [
+        {
+          "Type": "string",
+          "Member": "Name",
+          "Time": 0.0
+        },
+        {
+          "Type": "System.Collections.Generic.List<FlatRedBall.Content.AnimationChain.AnimationFrameSave>",
+          "Member": "EmbeddedAnimation",
+          "Time": 0.0
+        }
+      ],
+      "GenerateCode": true
+    },
+    {
+      "Name": "PlatformerValues",
+      "CsvFilesUsingThis": [
+        "Entities/Player/PlatformerValuesStatic.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true
+    }
+  ],
+  "ApplyToFixedResolutionPlatforms": true,
+  "ExternallyBuiltFileDirectory": "../../",
+  "FileVersion": 60,
+  "ScreenReferences": [
+    {
+      "Name": "Screens\\GameScreen"
+    },
+    {
+      "Name": "Screens\\Level1"
+    }
+  ],
+  "EntityReferences": [
+    {
+      "Name": "Entities\\Door"
+    },
+    {
+      "Name": "Entities\\Player"
+    }
+  ],
+  "Bookmarks": [],
+  "PluginData": {
+    "RequiredPlugins": [
+      {
+        "Name": "Tiled Plugin",
+        "Version": "2.16.0.0",
+        "VersionRequirement": 2
+      }
+    ]
+  },
+  "DisplaySettings": {
+    "Name": "Custom",
+    "GenerateDisplayCode": true,
+    "Is2D": true,
+    "ResolutionWidth": 256,
+    "ResolutionHeight": 224,
+    "FixedAspectRatio": true,
+    "AspectRatioBehavior": 1,
+    "AspectRatioWidth": 8.0,
+    "AspectRatioHeight": 7.0,
+    "SupportLandscape": true,
+    "Scale": 300,
+    "ScaleGum": 100,
+    "DominantInternalCoordinates": 1,
+    "TextureFilter": 1
+  },
+  "AllDisplaySettings": []
+}

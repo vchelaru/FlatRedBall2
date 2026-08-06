@@ -43,7 +43,7 @@
     <None Remove="Content\GumProject\**\*.*" />
   </ItemGroup>
 
-  <!-- Bundle mode: copy ONLY the .gumpkg. The runtime sees no .gumx and switches to bundle load. -->
+  <!-- Bundle mode: copy ONLY the .gumpkg. The runtime sees no .gumj and switches to bundle load. -->
   <ItemGroup Condition="'$(UseGumPackage)' == 'true'">
     <Content Include="Content\GumProject\GumProject.gumpkg"
              CopyToOutputDirectory="PreserveNewest" />

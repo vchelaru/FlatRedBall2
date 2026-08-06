@@ -1,0 +1,55 @@
+{
+  "Name": "ButtonBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "ButtonCategory",
+      "States": [
+        {
+          "Name": "Enabled",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Disabled",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Highlighted",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Pushed",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedFocused",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Focused",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledFocused",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    }
+  ],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/ButtonStandard"
+}

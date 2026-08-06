@@ -45,7 +45,7 @@ public class Game1 : Game
 #if GUM_BUNDLE
             GumProjectFile = "GumProject/GumProject.gumpkg"
 #else
-            GumProjectFile = "GumProject/GumProject.gumx"
+            GumProjectFile = "GumProject/GumProject.gumj"
 #endif
         });
         FlatRedBallService.Default.Start<GameScreen>();

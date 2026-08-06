@@ -61,7 +61,7 @@
                       Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**;..\Solitaire.Common\Content\GumProject\**\*.*" />
     <!-- Glob form ensures the CopyCommonRawAssetsToWwwroot target's %(RecursiveDir)
          resolves to "GumProject\" so the file lands at wwwroot/Content/GumProject/GumProject.gumpkg
-         (sibling of where the .gumx would be in loose mode). -->
+         (sibling of where the .gumj would be in loose mode). -->
     <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.gumpkg" />
   </ItemGroup>
   <Target Name="CopyCommonRawAssetsToWwwroot"

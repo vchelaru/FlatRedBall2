@@ -1,0 +1,70 @@
+{
+  "Name": "ScrollBarBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "ScrollBarCategory",
+      "States": []
+    }
+  ],
+  "RequiredInstances": [
+    {
+      "Behaviors": [
+        {
+          "Name": "ButtonBehavior",
+          "SourcePath": null,
+          "DefaultImplementationOverride": null
+        }
+      ],
+      "Name": "UpButtonInstance",
+      "BaseType": "",
+      "DefinedByBase": false,
+      "Locked": false,
+      "IsSlot": false
+    },
+    {
+      "Behaviors": [
+        {
+          "Name": "ButtonBehavior",
+          "SourcePath": null,
+          "DefaultImplementationOverride": null
+        }
+      ],
+      "Name": "DownButtonInstance",
+      "BaseType": "",
+      "DefinedByBase": false,
+      "Locked": false,
+      "IsSlot": false
+    },
+    {
+      "Behaviors": [
+        {
+          "Name": "ButtonBehavior",
+          "SourcePath": null,
+          "DefaultImplementationOverride": null
+        }
+      ],
+      "Name": "ThumbInstance",
+      "BaseType": "",
+      "DefinedByBase": false,
+      "Locked": false,
+      "IsSlot": false
+    },
+    {
+      "Behaviors": [],
+      "Name": "TrackInstance",
+      "BaseType": "Container",
+      "DefinedByBase": false,
+      "Locked": false,
+      "IsSlot": false
+    }
+  ],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/ScrollBar"
+}

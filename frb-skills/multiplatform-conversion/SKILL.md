@@ -185,8 +185,10 @@ Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head ow
 3. `dotnet run --project GameName.Desktop/` plays the original game unchanged.
 4. `dotnet run --project GameName.BlazorGL/` serves the dev URL; canvas fills viewport; resizing the window keeps rendering correct (proves `AllowUserResizing` is set).
 
-## Known limitations (as of 2026-04-25)
+## Known limitations (as of 2026-07-30)
 
 - **Tiled external tileset/image resolution on WASM is broken.** `TileMap` itself loads via `TitleContainer.OpenStream`, but `MonoGame.Extended`'s parser still uses `File.IO` for external TSX and image references inside the TMX. Symptom: `External tileset 'Foo.tsx' could not be found`. Tracked in `design/TODOS.md` until upstream exposes a resource-resolution callback or we route around it. A game with no Tiled content (e.g. `samples/ShmupSpace/`) is unaffected.
 - **No gamepad polling guarantee on web.** Browser gamepad APIs require a connected-device gesture before reporting state.
 - **Audio gated by user gesture.** Browsers block audio playback until the user interacts with the page once. Have a "click to start" affordance if music plays on screen entry.
+- **`DynamicSoundEffectInstance` sample rate must match the browser's `AudioContext` rate on Blazor.GL, or `SubmitBuffer` throws** (`Sample rate 44100 does not match AudioContext sample rate 48000`). Desktop OpenAL resamples any source rate for free; Blazor.GL does not, and Kni exposes no public way to read the actual `AudioContext` rate (feature-requested: kniEngine/kni#2690). Until that lands, fall back to a couple of common candidate rates (48000, then 44100) and retry on failure.
+- **`Pitch` on `SoundEffectInstance`/`DynamicSoundEffectInstance` throws on Blazor.GL** with the currently-published Kni NuGet packages. Fixed upstream (kniEngine/kni#2614, #2615) but not yet released — confirmed via `diagnostics/MusicPitchWebSpike`. Re-check once Kni cuts a release containing both.

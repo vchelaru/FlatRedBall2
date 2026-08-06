@@ -1,0 +1,90 @@
+{
+  "Name": "PlayerJoinViewItemBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "PlayerJoinCategory",
+      "States": [
+        {
+          "Name": "NotConnected",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Connected",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "ConnectedAndJoined",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    },
+    {
+      "Name": "GamepadLayoutCategory",
+      "States": [
+        {
+          "Name": "Unknown",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Keyboard",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "NES",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "SuperNintendo",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Nintendo64",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "GameCube",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "SwitchPro",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Genesis",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Xbox360",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "PlayStationDualShock",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    }
+  ],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/PlayerJoinViewItem"
+}

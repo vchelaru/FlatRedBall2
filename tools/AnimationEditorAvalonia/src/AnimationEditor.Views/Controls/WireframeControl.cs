@@ -92,30 +92,34 @@ public class WireframeControl : TextureViewport
     {
         var s = (WireframeSnapshot)snapshot;
 
-        // Frame region rectangles
-        using var frameFill = new SKPaint { Style = SKPaintStyle.Fill };
+        // Frame region rectangles. Fills are batched per selection tier (#817): drawing each
+        // frame's semi-transparent fill directly onto the canvas compounds alpha via normal
+        // SrcOver blending wherever frames overlap (e.g. a whole-chain selection with duplicate
+        // UV rects), saturating toward solid blue. Instead, each tier's fills are drawn opaque
+        // into an offscreen layer (SaveLayerAlpha) — overlapping opaque draws are idempotent —
+        // then the whole layer composites onto the canvas once at the tier's target alpha.
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
+        using var solidFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(80, 160, 255, 255) };
 
         float revealInflation = RevealAnimation.InflationPixels(s.SelectionRevealProgress);
 
+        var screenRects = new List<(SKRect Sr, bool IsSelected)>(s.Frames.Count);
         foreach (var (bounds, isSelected) in s.Frames)
         {
             var sr = SnapToScreen(bounds, s);
-            if (isSelected)
-            {
-                frameFill.Color = new SKColor(80, 160, 255, 45);
-                frameStroke.Color = new SKColor(80, 160, 255, 230);
-                // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the
-                // box's own size) so the pop stays visible at any zoom level.
-                if (revealInflation > 0f)
-                    sr = InflateBy(sr, revealInflation);
-            }
-            else
-            {
-                frameFill.Color = new SKColor(80, 160, 255, 18);
-                frameStroke.Color = new SKColor(80, 160, 255, 120);
-            }
-            canvas.DrawRect(sr, frameFill);
+            // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the box's
+            // own size) so the pop stays visible at any zoom level.
+            if (isSelected && revealInflation > 0f)
+                sr = InflateBy(sr, revealInflation);
+            screenRects.Add((sr, isSelected));
+        }
+
+        DrawFillLayer(canvas, screenRects, solidFill, isSelected: true, alpha: 45);
+        DrawFillLayer(canvas, screenRects, solidFill, isSelected: false, alpha: 18);
+
+        foreach (var (sr, isSelected) in screenRects)
+        {
+            frameStroke.Color = isSelected ? new SKColor(80, 160, 255, 230) : new SKColor(80, 160, 255, 120);
             canvas.DrawRect(sr, frameStroke);
         }
 
@@ -174,6 +178,32 @@ public class WireframeControl : TextureViewport
             using var dotPaint = new SKPaint { Color = new SKColor(255, 220, 0, 230) };
             canvas.DrawCircle(ox, oy, 2f, dotPaint);
         }
+    }
+
+    /// <summary>
+    /// Draws every rect in <paramref name="rects"/> matching <paramref name="isSelected"/> as an
+    /// opaque fill into an offscreen layer, then composites that layer onto <paramref name="canvas"/>
+    /// once at <paramref name="alpha"/> (#817). No-ops when no rect in this tier exists, so the
+    /// layer is never allocated for an empty pass.
+    /// </summary>
+    private static void DrawFillLayer(
+        SKCanvas canvas, List<(SKRect Sr, bool IsSelected)> rects, SKPaint solidFill, bool isSelected, byte alpha)
+    {
+        bool any = false;
+        foreach (var (_, sel) in rects)
+        {
+            if (sel == isSelected) { any = true; break; }
+        }
+        if (!any) return;
+
+        using var layerPaint = new SKPaint { Color = new SKColor(255, 255, 255, alpha) };
+        canvas.SaveLayer(layerPaint);
+        foreach (var (sr, sel) in rects)
+        {
+            if (sel == isSelected)
+                canvas.DrawRect(sr, solidFill);
+        }
+        canvas.Restore();
     }
 
     private static readonly SKColor HoverLabelBackground = new(80, 160, 255, 235);

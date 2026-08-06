@@ -1,0 +1,49 @@
+{
+  "Name": "SliderBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "SliderCategory",
+      "States": [
+        {
+          "Name": "Enabled",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Focused",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "Highlighted",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedFocused",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    }
+  ],
+  "RequiredInstances": [
+    {
+      "Behaviors": [],
+      "Name": "TrackInstance",
+      "BaseType": "Container",
+      "DefinedByBase": false,
+      "Locked": false,
+      "IsSlot": false
+    }
+  ],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/Slider"
+}

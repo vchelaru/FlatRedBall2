@@ -5,7 +5,7 @@ description: "Bundle a Gum project into a single .gumpkg file (tar+brotli) for d
 
 # Gum Packaging (.gumpkg)
 
-`gumcli pack` walks a `.gumx` project's dependencies and writes a single tar+brotli bundle (`.gumpkg`) containing the elements, font cache, and external textures. At runtime, Gum (2026.6+) picks loose vs. bundle **from the extension of the path you pass** — `.gumx` loads loose, `.gumpkg` loads the bundle. There is **no sibling probing**: the extension is the single source of truth (a probe would be a guaranteed-404 HTTP request on Blazor/WASM). So the path your code passes must match the artifact your build deployed.
+`gumcli pack` walks a Gum project's dependencies and writes a single tar+brotli bundle (`.gumpkg`) containing the elements, font cache, and external textures. The project can be either of Gum's two on-disk formats — XML (`.gumx`/`.gusx`/`.gucx`/`.gutx`/`.behx`) or JSON (`.gumj`/`.gusj`/`.gucj`/`.gutj`/`.behj`, converted from XML via `gumcli convert-to-json`) — pack and runtime bundle loading both resolve dependencies against whichever family the project actually is. At runtime, Gum picks loose vs. bundle **from the extension of the path you pass** — `.gumx`/`.gumj` load loose, `.gumpkg` loads the bundle. There is **no sibling probing**: the extension is the single source of truth (a probe would be a guaranteed-404 HTTP request on Blazor/WASM). So the path your code passes must match the artifact your build deployed.
 
 ## When to use
 
@@ -33,7 +33,7 @@ gumcli is the `GumCli` .NET tool — `dotnet tool install -g GumCli`, or pin it 
 
 Default is `core,fontcache,external` — everything. Trim if your build pipeline regenerates pieces:
 
-- `core` — `.gumx` + `.gusx`/`.gucx`/`.gutx`/`.behx`
+- `core` — the project + element files (`.gumx`+`.gusx`/`.gucx`/`.gutx`/`.behx`, or the JSON equivalents)
 - `fontcache` — generated `.fnt`/`.png` under `FontCache/`
 - `external` — sprite-source `.png`s and custom fonts referenced by the project but living outside Core/FontCache
 
@@ -43,7 +43,7 @@ Default is `core,fontcache,external` — everything. Trim if your build pipeline
 
 ## Runtime loading
 
-**Pass the extension that matches the deployed artifact** — `.gumpkg` in bundle builds, `.gumx` in loose builds. The build already knows the mode, so surface it as a compile constant and switch on it:
+**Pass the extension that matches the deployed artifact** — `.gumpkg` in bundle builds, `.gumx`/`.gumj` in loose builds. The build already knows the mode, so surface it as a compile constant and switch on it:
 
 ```csharp
 FlatRedBallService.Default.Initialize(this, new EngineInitSettings

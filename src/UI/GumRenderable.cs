@@ -93,7 +93,7 @@ public class GumRenderable : IRenderable, IAttachable
             Visual.X = canvasPos.X;
             Visual.Y = canvasPos.Y;
         }
-        GumRenderBatch.Instance.DrawElement(Visual);
+        ((GumRenderBatch)Batch).DrawElement(Visual);
     }
 
     /// <inheritdoc/>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MusicPitchWebSpike</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Raw KNI packages only — no FlatRedBall2 engine reference. This isolates the test to the
+         same primitive as diagnostics/MusicPitchSpike (DynamicSoundEffectInstance.Pitch), just
+         on the KNI/BlazorGL backend instead of MonoGame.Framework.DesktopGL. -->
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+  </ItemGroup>
+</Project>

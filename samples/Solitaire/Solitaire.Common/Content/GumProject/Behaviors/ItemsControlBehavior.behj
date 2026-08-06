@@ -1,0 +1,14 @@
+{
+  "Name": "ItemsControlBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": null
+}

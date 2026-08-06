@@ -385,7 +385,8 @@ public class Screen : ILifecycleEvents
 
     internal void AddGumForCamera(GraphicalUiElement visual, Camera owningCamera, Layer? layer)
     {
-        var renderable = new GumRenderable(visual) { OwningCamera = owningCamera, Layer = layer ?? Layer };
+        var batch = layer?.IsScreenSpace == true ? GumRenderBatch.ScreenSpaceInstance : GumRenderBatch.Instance;
+        var renderable = new GumRenderable(visual) { OwningCamera = owningCamera, Layer = layer ?? Layer, Batch = batch };
         _gumRenderables.Add(renderable);
         _gumByVisual[visual] = renderable;
         _renderList.Add(renderable);
@@ -408,8 +409,21 @@ public class Screen : ILifecycleEvents
 
     internal void SetGumRenderableLayer(GraphicalUiElement visual, Layer? layer)
     {
-        if (_gumByVisual.TryGetValue(visual, out var renderable))
-            renderable.Layer = layer;
+        if (!_gumByVisual.TryGetValue(visual, out var renderable))
+            return;
+        renderable.Layer = layer;
+
+        // Camera-owned HUD: moving to/from a screen-space Layer must reparent between UiRoot and
+        // ScreenSpaceRoot and swap the batch, or the visual would keep the old root's zoom coupling.
+        if (renderable.OwningCamera is Camera camera)
+        {
+            bool screenSpace = layer?.IsScreenSpace == true;
+            var newRoot = screenSpace ? camera.ScreenSpaceRoot : camera.UiRoot;
+            var oldRoot = screenSpace ? camera.UiRoot : camera.ScreenSpaceRoot;
+            if (oldRoot.Children.Remove(visual))
+                newRoot.Children.Add(visual);
+            renderable.Batch = screenSpace ? GumRenderBatch.ScreenSpaceInstance : GumRenderBatch.Instance;
+        }
     }
 
     // Tween list — advanced each frame, cleared on screen teardown.

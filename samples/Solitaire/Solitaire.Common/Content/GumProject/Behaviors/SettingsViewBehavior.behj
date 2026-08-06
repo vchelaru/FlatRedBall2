@@ -1,0 +1,14 @@
+{
+  "Name": "SettingsViewBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/SettingsView"
+}

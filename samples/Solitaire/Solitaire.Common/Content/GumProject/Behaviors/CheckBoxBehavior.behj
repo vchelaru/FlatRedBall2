@@ -1,0 +1,90 @@
+{
+  "Name": "CheckBoxBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "CheckBoxCategory",
+      "States": [
+        {
+          "Name": "EnabledOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "EnabledOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "PushedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "PushedOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "FocusedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "FocusedOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedFocusedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedFocusedOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledFocusedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledFocusedOff",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    }
+  ],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/CheckBox"
+}
