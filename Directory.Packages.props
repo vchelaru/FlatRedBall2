@@ -36,15 +36,15 @@
     <PackageVersion Include="FlatRedBall.InterpolationCore" Version="2025.4.22.1" />
     <PackageVersion Include="Apos.Shapes" Version="$(AposShapesVersion)" />
     <PackageVersion Include="Apos.Shapes.KNI" Version="$(AposShapesVersion)" />
-    <PackageVersion Include="Gum.MonoGame" Version="2026.7.25.1-preview.1" />
-    <PackageVersion Include="Gum.Shapes.MonoGame" Version="2026.7.25.1-preview.1" />
-    <PackageVersion Include="Gum.KNI" Version="2026.7.25.1-preview.1" />
-    <PackageVersion Include="Gum.Shapes.KNI" Version="2026.7.25.1-preview.1" />
+    <PackageVersion Include="Gum.MonoGame" Version="2026.8.5.2-preview.2" />
+    <PackageVersion Include="Gum.Shapes.MonoGame" Version="2026.8.5.2-preview.2" />
+    <PackageVersion Include="Gum.KNI" Version="2026.8.5.2-preview.2" />
+    <PackageVersion Include="Gum.Shapes.KNI" Version="2026.8.5.2-preview.2" />
     <!-- KernSmith moved from a 0.x scheme to the same date-based versioning as Gum, tracking
          Gum's release cadence 1:1. 0.16.0 was its last 0.x release, so a floating "0.16.*" no
          longer matches anything published; pin exactly like the Gum.* packages above. -->
-    <PackageVersion Include="KernSmith.MonoGameGum" Version="2026.7.22.1" />
-    <PackageVersion Include="KernSmith.KniGum" Version="2026.7.22.1" />
+    <PackageVersion Include="KernSmith.MonoGameGum" Version="2026.8.2.1" />
+    <PackageVersion Include="KernSmith.KniGum" Version="2026.8.2.1" />
     <PackageVersion Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
     <PackageVersion Include="MonoGame.Content.Builder.Task" Version="3.8.4.1" />
     <PackageVersion Include="MonoGame.Extended" Version="6.0.0" />

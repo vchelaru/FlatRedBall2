@@ -18,6 +18,7 @@ using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
@@ -354,7 +355,11 @@ public partial class App : Application
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Height = 30,
         };
+        AutomationProperties.SetName(addAnimationButton, "Add Animation");
+        AutomationProperties.SetAutomationId(addAnimationButton, "add-animation");
         var addFrameButton = new Button { IsVisible = false };
+        AutomationProperties.SetName(addFrameButton, "Add Frame");
+        AutomationProperties.SetAutomationId(addFrameButton, "add-frame");
         var addRectButton = new Button { IsVisible = false };
         var addCircleButton = new Button { IsVisible = false };
         var deleteSelectedButton = new Button { IsVisible = false };
@@ -370,6 +375,8 @@ public partial class App : Application
             IsEnabled = false,
         };
         ToolTip.SetTip(historyUndoButton, "Undo");
+        AutomationProperties.SetName(historyUndoButton, "Undo");
+        AutomationProperties.SetAutomationId(historyUndoButton, "history-undo");
         var historyRedoButton = new Button
         {
             Width = 26,
@@ -381,6 +388,8 @@ public partial class App : Application
             IsEnabled = false,
         };
         ToolTip.SetTip(historyRedoButton, "Redo");
+        AutomationProperties.SetName(historyRedoButton, "Redo");
+        AutomationProperties.SetAutomationId(historyRedoButton, "history-redo");
 
         // Phase 8 (#648): mirrors desktop's Move/Magic-Wand edit-mode pill exactly -- two
         // mutually-exclusive ToggleButtons in one bordered group, split corner radii, no gap.
@@ -465,13 +474,22 @@ public partial class App : Application
         // regardless of which sidebar tab is open); we re-push it onto the ItemsControl whenever
         // History becomes selected.
         var historyList = new ItemsControl();
+        AutomationProperties.SetName(historyList, "Undo history");
+        AutomationProperties.SetAutomationId(historyList, "undo-history");
         var historyRows = new List<HistoryRowVm>();
-        historyList.ItemTemplate = new FuncDataTemplate<HistoryRowVm>((row, _) => new TextBlock
+        historyList.ItemTemplate = new FuncDataTemplate<HistoryRowVm>((row, _) =>
         {
-            Text = row!.Text,
-            FontWeight = row.IsCurrent ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
-            Opacity = row.IsRedo ? 0.55 : 1.0,
-            Margin = new Thickness(4, 2),
+            var block = new TextBlock
+            {
+                Text = row!.Text,
+                FontWeight = row.IsCurrent ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal,
+                Opacity = row.IsRedo ? 0.55 : 1.0,
+                Margin = new Thickness(4, 2),
+            };
+            // #690: expose the undo Description as the accessible name so Browser Playwright
+            // can assert History labels via the a11y tree (A2), not pixel OCR.
+            AutomationProperties.SetName(block, row.Text);
+            return block;
         });
 
         void RefreshHistoryList()
@@ -1121,6 +1139,8 @@ public partial class App : Application
             VerticalContentAlignment = VerticalAlignment.Center,
             Content = historyContent,
         };
+        AutomationProperties.SetName(historyTab, "History");
+        AutomationProperties.SetAutomationId(historyTab, "history-tab");
         // Phase 12 (#655): "This File" scope only -- TextureListPanel.SetAnimationChainList is
         // re-pushed at every point animationTree.InitializeServices already is (tab switch/close,
         // Open Folder load, AnimationChainsChanged), since there's no single "the loaded file
@@ -1152,6 +1172,8 @@ public partial class App : Application
             Padding = new Thickness(0),
             Items = { inspectorTab, historyTab, filesTab, projectTab },
         };
+        AutomationProperties.SetName(sidebarTabs, "Sidebar");
+        AutomationProperties.SetAutomationId(sidebarTabs, "sidebar-tabs");
         sidebarTabs.Bind(TabControl.BackgroundProperty, sidebarTabs.GetResourceObservable("BgRail"));
 
         // Mirrors desktop's TabItem/TabItem:selected style pair (InkMid unselected, Ink selected)
@@ -1514,6 +1536,8 @@ public partial class App : Application
         var menuPreviewZoomOut = new MenuItem { Header = "Preview Zoom O_ut" };
         menuPreviewZoomOut.Click += (_, _) => previewZoom.StepDown();
         var menuShowHistory = new MenuItem { Header = "Show _History" };
+        AutomationProperties.SetName(menuShowHistory, "Show History");
+        AutomationProperties.SetAutomationId(menuShowHistory, "show-history");
         menuShowHistory.Click += (_, _) => sidebarTabs.SelectedItem = historyTab;
         var menuThemeLight = new MenuItem { Header = "_Light" };
         menuThemeLight.Click += (_, _) => SetTheme(AppTheme.Light);
@@ -1558,11 +1582,12 @@ public partial class App : Application
         // the desktop host uses (MainWindow.WireKeyboard/BuildHotkeyDefinitions), instead of a
         // hand-rolled if/else chain, so keypress-to-gesture matching exists in exactly one place
         // (#748). Ids/gestures below mirror BuildHotkeyDefinitions's save/undo/redo/toggle-
-        // diagnostics entries -- keep them in sync if that table changes. Everything else in the
-        // desktop table is left out: New/Load/Duplicate/panel-zoom-in/panel-zoom-out are
-        // hard-reserved by the browser itself (BrowserHotkeys.ReservedIds -- Ctrl+N/L/D/+/- are
-        // intercepted before the page ever sees them), and Copy/Cut/Paste/Delete/Rename/Space/
-        // Move-up/Move-down have no action to wire in this build yet.
+        // diagnostics/move-up/move-down entries -- keep them in sync if that table changes.
+        // Everything else in the desktop table is left out: New/Load/Duplicate/panel-zoom-in/
+        // panel-zoom-out are hard-reserved by the browser itself (BrowserHotkeys.ReservedIds --
+        // Ctrl+N/L/D/+/- are intercepted before the page ever sees them), and Copy/Cut/Paste/
+        // Delete/Rename/Space have no action to wire in this build yet.
+        // #690: Alt+Up/Down Move is required for UI-driven Browser verify (not browser-reserved).
         var browserHotkeys = BrowserHotkeys.Filter(new List<HotkeyDefinition>
         {
             new()
@@ -1592,6 +1617,18 @@ public partial class App : Application
                 Id = "toggle-diagnostics", Description = "Toggle Render Diagnostics", Category = "View",
                 Gestures = new[] { new HotkeyGesture("F3") },
                 Action = () => ApplyDiagnostics(diagnosticsButton.IsChecked != true),
+            },
+            new()
+            {
+                Id = "move-up", Description = "Move Selected Chain/Frame Up", Category = "Tree",
+                Gestures = new[] { new HotkeyGesture("Up", HotkeyModifiers.Alt) },
+                Action = () => appCommands.HandleReorder(-1),
+            },
+            new()
+            {
+                Id = "move-down", Description = "Move Selected Chain/Frame Down", Category = "Tree",
+                Gestures = new[] { new HotkeyGesture("Down", HotkeyModifiers.Alt) },
+                Action = () => appCommands.HandleReorder(+1),
             },
         });
 
@@ -1986,6 +2023,13 @@ public partial class App : Application
         shell.Children.Add(root);
         shell.Children.Add(notifications);
         shell.Children.Add(hiddenCommandButtons);
+
+#if DEBUG
+        // #690: DEBUG-only Playwright bridge (AutomationId click + undo Description dump).
+        // Fire-and-forget — ImportAsync must not block first paint; Playwright waits for
+        // globalThis.__aeUiAutomation before driving.
+        _ = BrowserUiAutomation.AttachAsync(shell, undoManager);
+#endif
 
         return shell;
     }

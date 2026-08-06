@@ -1,0 +1,13 @@
+{
+  "name": "animation-editor-browser-ui",
+  "private": true,
+  "description": "Playwright UI-drive harness for AnimationEditor.Browser (#690). External runner only — does not modify shipping App demo hooks.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "install-browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0"
+  }
+}

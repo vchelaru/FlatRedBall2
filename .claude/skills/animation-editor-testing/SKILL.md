@@ -1,22 +1,34 @@
 ---
 name: animation-editor-testing
-description: Writing headless tests for the Animation Editor (Avalonia). Triggers: AnimationEditor.App.Tests, [AvaloniaFact], TestServices, CreateMainWindow, service wiring in tests, UI-thread RunJobs.
+description: >-
+  Headless AE tests — Core first, [AvaloniaFact] only for real UI. Triggers:
+  AnimationEditor.App.Tests, Core.Tests, TestServices, CreateMainWindow, Browser.Ui.
 ---
 
 # Animation Editor — Testing
 
-Headless-test discipline for the Avalonia Animation Editor. Tool layout, the two-panel mental model, and the `FilePath` path-handling rule live in the **`animation-editor`** skill.
+Headless-test discipline for the Avalonia Animation Editor. Tool layout lives in the **`animation-editor`** skill. Browser/WASM smoke lives in **`animation-editor-browser-verify`** (do not mirror Core/App suites there).
 
 ```
-dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/
+dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.App.Tests/
 ```
+
+## Pick the right layer (do not duplicate)
+
+| Layer | Project | Use when | Do not use for |
+|---|---|---|---|
+| **Core** | `AnimationEditor.Core.Tests` | Commands, undo `Description`s, selection/state, pure logic | Layout, pointer routing, pixels |
+| **Headless UI** | `AnimationEditor.App.Tests` (`[AvaloniaFact]`) | Desktop visual tree, input routing, control templates — the bug *is* UI | Re-proving Core math; Browser/WASM |
+| **Browser smoke** | `AnimationEditor.Browser.Ui` (Playwright) | Browser-*only* gaps (WASM boot, Browser host wiring, Debug automation bridge). See that folder’s README | Cloning Core/App tests; primary label gate |
+
+Default: **Core `[Fact]`**. Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI. Reach for Browser Playwright only when Headless/desktop cannot catch it — a small smoke set, not a 1:1 port.
 
 ## `[AvaloniaFact]` is a last resort
 
 `[AvaloniaFact]` (from `Avalonia.Headless.XUnit`) runs the test on a headless Avalonia UI thread. It is slow and **deadlocks** on anything that blocks the UI thread waiting for the UI — a code path reaching `Window.ShowDialog` hangs forever with nothing to close the dialog. The `MainWindow` constructor also overwrites injected delegates (`AppCommands.ConfirmAsync`, `PromptStringAsync`, `FileDialogService`), so a stub installed *before* construction is silently lost.
 
-Default to a plain `[Fact]` against `AnimationEditor.Core` (`AppCommands`, commands, `SelectedState`, `AppState`). Reach for `[AvaloniaFact]` only when the behavior under test genuinely *is* UI — layout, control templates, input routing, visual tree. Logic reachable only by reflecting into a private `MainWindow` method is a signal to move it into Core, not to write an `[AvaloniaFact]`.
+Logic reachable only by reflecting into a private `MainWindow` method is a signal to move it into Core, not to write an `[AvaloniaFact]`.
 
 Tests that do need it construct `MainWindow` and drive it with `Dispatcher.UIThread.RunJobs()` between actions — see `WireframePanZoomTests.cs` for the established pattern.
 
@@ -34,10 +46,12 @@ A fourth: `window.MouseDown`/`MouseUp` fully pump any `Dispatcher.UIThread.Invok
 
 ## Undo labels vs screenshots
 
-- **Correctness of a command's `Description`:** assert on the command (or `UndoManager.UndoHistory` after `AppCommands`) in Core.Tests — see `CommandDescriptionTests` / `FeatureDemosTests`.
-- **"Show me the History panel":** DocScreenshots / browser verify — **`animation-editor-screenshots`** and **`animation-editor-browser-verify`**. Those drive the same `FeatureDemos` helpers; they do not replace unit asserts.
+- **Correctness of a command's `Description`:** Core.Tests (`CommandDescriptionTests` / `FeatureDemosTests` / `BrowserUiDriveLabelTests`).
+- **"Show me the History panel" (desktop):** DocScreenshots + `FeatureDemos` — **`animation-editor-screenshots`**.
+- **Browser/WASM smoke only:** Playwright — **`animation-editor-browser-verify`** + `tests/AnimationEditor.Browser.Ui/README.md`. Not a substitute for Core asserts.
 
 Never seed History UI models with hand-written strings to "prove" a label.
+
 ## Service wiring in tests
 
 Services (`ProjectManager`, `SelectedState`, `AppCommands`, `AppState`, `ApplicationEvents`, `IoManager`, `ObjectFinder`, `UndoManager`) are constructor-injected — no static `Self` accessors, no global state. Production wires them through a `Microsoft.Extensions.DependencyInjection` container in `App.axaml.cs`.

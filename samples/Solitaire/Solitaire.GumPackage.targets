@@ -1,24 +1,29 @@
 <Project>
   <!--
     ================================================================
-    Gum content deployment mode (loose .gumx vs. bundled .gumpkg)
+    Gum content deployment mode (loose .gumj vs. bundled .gumpkg)
     ================================================================
     Imported by every Solitaire .csproj so Common, Desktop, and
     BlazorGL flip together.
 
     Toggle:
       dotnet build -p:UseGumPackage=true    # bundle: pack + ship .gumpkg only (DEFAULT)
-      dotnet build -p:UseGumPackage=false   # loose: ship the raw .gumx + project files
+      dotnet build -p:UseGumPackage=false   # loose: ship the raw .gumj + project files
 
     Default is BUNDLE. Gum 2026.6 picks the load mode purely from the
     file EXTENSION the game passes to GumProjectFile (.gumpkg = bundle,
-    .gumx = loose) with NO sibling probing — a probe would be a
+    .gumj = loose) with NO sibling probing — a probe would be a
     guaranteed 404 on Blazor/WASM. So the deployed artifact and the
     path in code must agree: this file defines the GUM_BUNDLE compile
     constant when bundling, and Game1 selects the extension from it
     (#if GUM_BUNDLE).
 
-    Web needs the bundle — loose .ganx animation files can't be
+    The project files themselves are the JSON family (.gumj/.gusj/.gucj/
+    .gutj/.behj/.ganj), converted from Gum's older XML family via
+    `gumcli convert-to-json` — source-generated System.Text.Json, no
+    reflection, smaller/faster to parse than XML (see #814).
+
+    Web needs the bundle — loose .ganj animation files can't be
     enumerated over HTTP, so animations silently don't load in loose
     mode on WASM. Flip to loose for desktop authoring when you want
     Gum-editor round-trip + FRB2 hot reload on the raw files.
@@ -33,14 +38,14 @@
     <!--
       Surface the build-time mode to game code as a compile constant. Gum 2026.6 loads
       bundle-vs-loose purely from the path extension, so Game1 must pass GumProject.gumpkg
-      in bundle mode and GumProject.gumx in loose mode — this is the flag it switches on.
+      in bundle mode and GumProject.gumj in loose mode — this is the flag it switches on.
     -->
     <DefineConstants Condition="'$(UseGumPackage)' == 'true'">$(DefineConstants);GUM_BUNDLE</DefineConstants>
 
     <!-- Common owns the canonical Gum project; everyone else links to it. -->
     <SolitaireCommonDir>$(MSBuildThisFileDirectory)Solitaire.Common\</SolitaireCommonDir>
     <GumProjectDir>$(SolitaireCommonDir)Content\GumProject\</GumProjectDir>
-    <GumProjectFile>$(GumProjectDir)GumProject.gumx</GumProjectFile>
+    <GumProjectFile>$(GumProjectDir)GumProject.gumj</GumProjectFile>
     <GumPackageFile>$(GumProjectDir)GumProject.gumpkg</GumPackageFile>
   </PropertyGroup>
 

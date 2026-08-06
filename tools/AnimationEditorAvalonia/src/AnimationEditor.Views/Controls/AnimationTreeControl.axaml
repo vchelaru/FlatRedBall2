@@ -2,7 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:models="using:AnimationEditor.Core.ViewModels"
              x:Class="AnimationEditor.Views.Controls.AnimationTreeControl">
-    <TreeView x:Name="Tree" SelectionMode="Single">
+    <TreeView x:Name="Tree"
+              SelectionMode="Single"
+              AutomationProperties.Name="Animations"
+              AutomationProperties.AutomationId="animations-tree">
         <TreeView.Styles>
             <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
@@ -25,6 +28,7 @@
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
                         <Panel Grid.Column="0">
                             <TextBlock Text="{Binding Header}"
+                                       AutomationProperties.Name="{Binding Header}"
                                        Padding="4,2"
                                        Margin="0,0,4,0"
                                        IsVisible="{Binding !IsEditing}"

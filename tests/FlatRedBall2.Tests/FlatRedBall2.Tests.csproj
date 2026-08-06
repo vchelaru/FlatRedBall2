@@ -3,6 +3,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
+    <!--
+      Not set here, though it would be valuable: JsonSerializerIsReflectionEnabledByDefault=false
+      makes reflection-based System.Text.Json throw, so a test cannot pass while the code it covers
+      would fail once published AOT. It is assembly-wide, and AutomationMode deliberately uses
+      reflection-based serialization (see the IL2026/IL3050 suppressions in src/Automation/
+      AutomationMode.cs), so turning it on fails ~12 automation tests that are working as intended.
+      Enforcing it would mean giving AutomationMode its own serializer context first.
+    -->
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AsepriteDotNet" />
@@ -23,5 +31,6 @@
   <ItemGroup>
     <None Include="Animation\Content\Corpus\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Animation\Content\Snapshot\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Glue\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

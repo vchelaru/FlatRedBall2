@@ -21,11 +21,13 @@ AddCollisionRelationship<Player, Wall>(_playerFactory, _wallFactory)
 To collide entities within the same list (e.g., enemies pushing each other apart):
 
 ```csharp
-AddCollisionRelationship<Enemy>(_enemyFactory)
+AddSelfCollisionRelationship<Enemy>(_enemyFactory)
     .MoveBothOnCollision(firstMass: 1f, secondMass: 1f);
 ```
 
-This single-list overload iterates unique pairs only — no duplicate checks or self-collision.
+Iterates unique unordered pairs only — no duplicate checks, and never an entity against itself.
+Set `AllowDuplicatePairs = true` if `CollisionOccurred` should also fire in the `(b, a)` ordering
+(physics still runs once per pair).
 
 ## Fluent Modifiers
 
@@ -250,7 +252,7 @@ if (_patrolInput.X > 0f && !_rightFoot.CollidesWith(SolidCollision))
 
 - **Both sides move when only one should** — Use `.MoveFirstOnCollision()` for solid terrain.
 - **Nothing happens on collision** — Confirm both entities have visible, correctly-sized shape children.
-- **Type argument mismatch on overloads** — `AddCollisionRelationship<Enemy>(_enemies, _players)` is not the 2-list overload. Use two type args for entity-vs-entity (`<Enemy, Player>`), one type arg only for self-collision, and no explicit type args for `TileShapes`.
+- **Type argument mismatch on overloads** — `AddCollisionRelationship<Enemy>(_enemies, _players)` is not the 2-list overload. Use two type args for entity-vs-entity (`<Enemy, Player>`), `AddSelfCollisionRelationship<Enemy>(_enemies)` for same-list collision, and no explicit type args for `TileShapes`.
 - **Player tunnels through thin walls** — Discrete collision detection; keep velocities reasonable.
 - **Don't use a `DiedThisFrame` flag** — The frame order is collision → entity `CustomActivity` → screen `CustomActivity`. A flag set during collision is stale by the time the screen reads it. Instead, destroy entities directly in `CollisionOccurred` and detect cleared groups via `_factory.Instances.Count == 0`.
 - **Platformer gotcha**: using the raw `BounceOnCollision(firstMass, secondMass, elasticity)` with swapped masses can make the player phase through the floor. Prefer `BounceFirstOnCollision` / `BounceSecondOnCollision` / `BounceBothOnCollision` — they name the intent and don't require decoding mass numbers at the call site.

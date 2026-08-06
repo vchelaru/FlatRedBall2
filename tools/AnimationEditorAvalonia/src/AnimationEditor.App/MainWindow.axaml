@@ -131,7 +131,9 @@
                         <MenuItem Header="Preview Zoom _In"     x:Name="MenuPreviewZoomIn" />
                         <MenuItem Header="Preview Zoom O_ut"    x:Name="MenuPreviewZoomOut" />
                         <Separator />
-                        <MenuItem Header="Show _History" x:Name="MenuShowHistory" />
+                        <MenuItem Header="Show _History" x:Name="MenuShowHistory"
+                                  AutomationProperties.Name="Show History"
+                                  AutomationProperties.AutomationId="show-history" />
                         <Separator />
                         <MenuItem Header="_Theme">
                             <MenuItem Header="_Light"         x:Name="MenuThemeLight"  ToggleType="Radio" />
@@ -460,6 +462,8 @@
                 <TreeView x:Name="AnimTree" Grid.Row="1"
                           Background="{DynamicResource BgCanvas}"
                           SelectionMode="Multiple"
+                          AutomationProperties.Name="Animations"
+                          AutomationProperties.AutomationId="animations-tree"
                           ScrollViewer.VerticalScrollBarVisibility="Visible"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           ScrollViewer.AllowAutoHide="False">
@@ -698,7 +702,9 @@
                             Content="+ Add Animation"
                             HorizontalAlignment="Stretch"
                             Height="30"
-                            Foreground="{DynamicResource Ink}" />
+                            Foreground="{DynamicResource Ink}"
+                            AutomationProperties.Name="Add Animation"
+                            AutomationProperties.AutomationId="add-animation" />
                 </Border>
 
                 </Grid>
@@ -713,7 +719,9 @@
                      A single tab strip below the always-visible ANIMATIONS tree. Inspector is the
                      default tab (it's referenced constantly while clicking through frames/chains);
                      Files and History sit behind it. The tree above is never covered by a tab. -->
-                <TabControl x:Name="SidebarTabs" Grid.Row="2"
+                    <TabControl x:Name="SidebarTabs" Grid.Row="2"
+                                AutomationProperties.Name="Sidebar"
+                                AutomationProperties.AutomationId="sidebar-tabs"
                             Padding="0"
                             MinHeight="80"
                             Background="{DynamicResource BgRail}">
@@ -1073,7 +1081,9 @@
                     </TabItem>
 
                     <!-- History (Undo/Redo toolbar + read-only history list) -->
-                    <TabItem x:Name="HistoryTab" Header="History">
+                    <TabItem x:Name="HistoryTab" Header="History"
+                             AutomationProperties.Name="History"
+                             AutomationProperties.AutomationId="history-tab">
                         <Grid RowDefinitions="Auto,*" Background="{DynamicResource BgPanel}">
                             <Border Grid.Row="0"
                                     Background="{DynamicResource BgRail}"
@@ -1089,6 +1099,8 @@
                                             Width="26" Height="26" Padding="0" Margin="0,0,2,0"
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
+                                            AutomationProperties.Name="Undo"
+                                            AutomationProperties.AutomationId="history-undo"
                                             ToolTip.Tip="Undo">
                                         <svg:Svg Width="14" Height="14"
                                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconUndo.svg"
@@ -1098,6 +1110,8 @@
                                             Width="26" Height="26" Padding="0"
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
+                                            AutomationProperties.Name="Redo"
+                                            AutomationProperties.AutomationId="history-redo"
                                             ToolTip.Tip="Redo">
                                         <svg:Svg Width="14" Height="14"
                                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconRedo.svg"
@@ -1109,11 +1123,14 @@
                                           Grid.Row="1"
                                           Background="{DynamicResource BgPanel}"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <ItemsControl x:Name="HistoryList">
+                                <ItemsControl x:Name="HistoryList"
+                                              AutomationProperties.Name="Undo history"
+                                              AutomationProperties.AutomationId="undo-history">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="appModels:HistoryEntryVm">
                                             <Border Background="{Binding Background}">
                                                 <TextBlock Text="{Binding Description}"
+                                                           AutomationProperties.Name="{Binding Description}"
                                                            FontSize="11"
                                                            Foreground="{Binding Foreground}"
                                                            Padding="8,3"

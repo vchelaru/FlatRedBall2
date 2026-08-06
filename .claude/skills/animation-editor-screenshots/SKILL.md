@@ -5,7 +5,7 @@ description: Generating headless documentation screenshots of the Animation Edit
 
 # Animation Editor — Documentation Screenshots
 
-Headless PNG capture of the Animation Editor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) — not for verifying behavior. For correctness tests, use the **`animation-editor-testing`** skill instead. The two share test infrastructure (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`, `Dispatcher.UIThread.RunJobs()`) but serve different purposes and audiences — keep scenario code in the project matching its purpose, not the one matching its plumbing.
+Headless PNG capture of the Animation Editor's UI, for illustrating documentation pages (Timing, Offsets, Collision, etc.) — not for verifying behavior. For correctness tests, use **`animation-editor-testing`**. For WASM browser smoke (not a Core/App mirror), see **`animation-editor-browser-verify`**. The DocScreenshots project shares plumbing with App.Tests (`TestServices`, `CreateMainWindow`, `[AvaloniaFact]`) but serves a different purpose — keep scenario code in the project matching its purpose.
 
 ## Where, and why it's a separate project
 

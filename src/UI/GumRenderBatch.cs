@@ -13,10 +13,22 @@ namespace FlatRedBall2.UI;
 /// </summary>
 public class GumRenderBatch : IRenderBatch
 {
-    /// <summary>Singleton — every <see cref="GumRenderable"/> shares this batch.</summary>
-    public static readonly GumRenderBatch Instance = new GumRenderBatch();
+    /// <summary>Singleton for normal per-camera HUD — zoom-coupled. Every <see cref="GumRenderable"/> on a non-screen-space <see cref="Layer"/> shares this batch.</summary>
+    public static readonly GumRenderBatch Instance = new GumRenderBatch(usesCameraZoom: true);
 
+    /// <summary>
+    /// Singleton for HUD on a <see cref="Layer"/> with <see cref="Layer.IsScreenSpace"/> — applies the
+    /// window-vs-design-resolution scale but ignores <see cref="Camera.Zoom"/> (issue #798).
+    /// </summary>
+    public static readonly GumRenderBatch ScreenSpaceInstance = new GumRenderBatch(usesCameraZoom: false);
+
+    private readonly bool _usesCameraZoom;
     private NativeGumBatch? _inner;
+
+    private GumRenderBatch(bool usesCameraZoom)
+    {
+        _usesCameraZoom = usesCameraZoom;
+    }
 
     /// <summary>
     /// Creates the inner <c>RenderingLibrary.Graphics.GumBatch</c>.
@@ -31,6 +43,15 @@ public class GumRenderBatch : IRenderBatch
     /// <inheritdoc/>
     public bool FlipsY => false; // Gum renders in screen space; no Y-flip transform applied
 
+    /// <summary>
+    /// The Gum render-zoom this instance drives from <paramref name="camera"/>: <see cref="Camera.PixelsPerUnit"/>
+    /// (window scale × <see cref="Camera.Zoom"/>) for <see cref="Instance"/>, or window scale alone
+    /// (<c>Camera.Zoom</c> excluded) for <see cref="ScreenSpaceInstance"/>. Extracted from <see cref="Begin"/>
+    /// so it's testable without a <c>GraphicsDevice</c>-backed <c>SystemManagers.Default</c>.
+    /// </summary>
+    internal float ResolveZoom(Camera camera) =>
+        _usesCameraZoom ? camera.PixelsPerUnit : camera.Viewport.Height / (float)camera.OrthogonalHeight;
+
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
@@ -40,7 +61,7 @@ public class GumRenderBatch : IRenderBatch
         // Cursor.XRespectingGumZoomAndBounds reads directly when converting window pixels into
         // canvas units. Pass null to GumBatch.Begin so we don't double-apply the scale on top
         // of Camera.Zoom.
-        RenderingLibrary.SystemManagers.Default.Renderer.Camera.Zoom = camera.PixelsPerUnit;
+        RenderingLibrary.SystemManagers.Default.Renderer.Camera.Zoom = ResolveZoom(camera);
         _inner!.Begin(null);
     }
 

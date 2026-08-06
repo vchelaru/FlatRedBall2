@@ -50,6 +50,23 @@ public class CameraTests
     }
 
     [Fact]
+    public void ApplyToHostRect_ZoomTwo_ScreenSpaceRootStaysAtOrthogonalExtentsWhileUiRootHalves()
+    {
+        // Issue #798: Camera.Zoom must not rescale screen-space HUD. UiRoot intentionally shrinks
+        // (existing zoom-coupled HUD behavior); ScreenSpaceRoot must stay pinned to the Zoom=1 canvas.
+        var camera = new Camera();
+        camera.ApplyToHostRect(new Viewport(0, 0, 1280, 720), orthogonalHeight: 720);
+
+        camera.Zoom = 2f;
+        camera.ApplyToHostRect(new Viewport(0, 0, 1280, 720), orthogonalHeight: 720);
+
+        camera.ScreenSpaceRoot.Width.ShouldBe(1280f);
+        camera.ScreenSpaceRoot.Height.ShouldBe(720f);
+        camera.UiRoot.Width.ShouldBe(640f);
+        camera.UiRoot.Height.ShouldBe(360f);
+    }
+
+    [Fact]
     public void Zoom_Default_IsOne()
     {
         var camera = new Camera();

@@ -1,0 +1,610 @@
+{
+  "FontRanges": "32-126,160-255",
+  "FontSpacingVertical": 1,
+  "FontSpacingHorizontal": 1,
+  "UseFontCharacterFile": false,
+  "AutoSizeFontOutputs": false,
+  "FontGenerator": 0,
+  "Version": 2,
+  "DefaultCanvasWidth": 800,
+  "DefaultCanvasHeight": 640,
+  "CustomCanvasSizes": [
+    {
+      "Width": null,
+      "Height": null,
+      "FriendlyName": "Project Default"
+    },
+    {
+      "Width": 640,
+      "Height": 480,
+      "FriendlyName": "480p"
+    },
+    {
+      "Width": 1280,
+      "Height": 720,
+      "FriendlyName": "720p"
+    },
+    {
+      "Width": 1280,
+      "Height": 800,
+      "FriendlyName": "Steam Deck"
+    },
+    {
+      "Width": 1920,
+      "Height": 1080,
+      "FriendlyName": "1080p"
+    },
+    {
+      "Width": 3840,
+      "Height": 2160,
+      "FriendlyName": "4k"
+    }
+  ],
+  "ShowOutlines": false,
+  "ShowCanvasOutline": true,
+  "ShowRuler": true,
+  "ShowCheckerBackground": true,
+  "TextureFilter": "Point",
+  "ConvertVariablesOnUnitTypeChange": false,
+  "RestrictToUnitValues": true,
+  "RestrictFileNamesForAndroid": false,
+  "Guides": [],
+  "FavoriteComponents": [],
+  "ParentProjectRoot": "",
+  "LocalizationFiles": [],
+  "ShowLocalizationInGum": true,
+  "CurrentLanguageIndex": 0,
+  "ScreenReferences": [
+    {
+      "Name": "GameScreenGum",
+      "ElementType": 0,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "TestScreen",
+      "ElementType": 0,
+      "LinkType": 0,
+      "Link": null
+    }
+  ],
+  "ComponentReferences": [
+    {
+      "Name": "CardGum",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonClose",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonConfirm",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonDeny",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonIcon",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonStandard",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonStandardIcon",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ButtonTab",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/CheckBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ComboBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/DialogBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ItemsControl",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Keyboard",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/KeyboardKey",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Label",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ListBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ListBoxItem",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Menu",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/MenuItem",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Panel",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/PasswordBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/RadioButton",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ScrollBar",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/ScrollViewer",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/SettingsView",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Slider",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/SplitterStandard",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/StackPanel",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/TextBox",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Toast",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/TreeView",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/TreeViewItem",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/TreeViewToggle",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/UserControl",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Controls/Window",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/CautionLines",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/Divider",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/DividerHorizontal",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/DividerVertical",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/Icon",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/PercentBar",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/PercentBarIcon",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Elements/VerticalLines",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "FoundationSlot",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Styles",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "WinOverlayGum",
+      "ElementType": 1,
+      "LinkType": 0,
+      "Link": null
+    }
+  ],
+  "StandardElementReferences": [
+    {
+      "Name": "Arc",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Canvas",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Circle",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "ColoredCircle",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "ColoredRectangle",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Component",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Container",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Line",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "LottieAnimation",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "NineSlice",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Polygon",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Rectangle",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "RoundedRectangle",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Sprite",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Svg",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    },
+    {
+      "Name": "Text",
+      "ElementType": 2,
+      "LinkType": 0,
+      "Link": null
+    }
+  ],
+  "BehaviorReferences": [
+    {
+      "Name": "ButtonBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "CheckBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ComboBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "DialogBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "InputDeviceSelectionItemBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "InputDeviceSelectorBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ItemsControlBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "LabelBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ListBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ListBoxItemBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "MenuBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "MenuItemBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "OnScreenKeyboardBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "PanelBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "PasswordBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "PlayerJoinViewBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "PlayerJoinViewItemBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "RadioButtonBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ScrollBarBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ScrollViewerBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "SettingsViewBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "SliderBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "SplitterBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "StackPanelBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "TextBoxBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ToastBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "ToggleBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "TreeViewBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "TreeViewItemBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "UserControlBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    },
+    {
+      "Name": "WindowBehavior",
+      "SourcePath": null,
+      "DefaultImplementationOverride": null
+    }
+  ],
+  "SinglePixelTextureFile": "",
+  "SinglePixelTextureTop": null,
+  "SinglePixelTextureLeft": null,
+  "SinglePixelTextureRight": null,
+  "SinglePixelTextureBottom": null,
+  "CustomProperties": []
+}

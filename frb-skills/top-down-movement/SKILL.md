@@ -46,8 +46,8 @@ public class Player : Entity
 | Field | Description |
 |---|---|
 | `MaxSpeed` | Maximum speed in world units/sec |
-| `AccelerationTime` | Seconds to reach `MaxSpeed` from rest. 0 = instant |
-| `DecelerationTime` | Seconds to stop from `MaxSpeed`. 0 = instant. Setting either accel or decel time to a non-zero value enables the ramp — no separate flag. |
+| `AccelerationTime` | `TimeSpan` to reach `MaxSpeed` from rest. `TimeSpan.Zero` = instant |
+| `DecelerationTime` | `TimeSpan` to stop from `MaxSpeed`. `TimeSpan.Zero` = instant. Setting either accel or decel time to a non-zero value enables the ramp — no separate flag. |
 | `UpdateDirectionFromInput` | If true (default), `DirectionFacing` follows input direction |
 | `UpdateDirectionFromVelocity` | If true and `UpdateDirectionFromInput` is false, `DirectionFacing` follows actual velocity |
 | `IsUsingCustomDeceleration` | If true, uses `CustomDecelerationValue` when entity exceeds `MaxSpeed` (e.g. after a knockback) |
@@ -72,10 +72,12 @@ Template: `.claude/templates/TopDownConfig/player.topdown.json`. Omitted fields 
 var values = new TopDownValues
 {
     MaxSpeed = 200f,
-    AccelerationTime = 0.2f,   // 200ms to reach full speed
-    DecelerationTime = 0.1f,   // 100ms to stop
+    AccelerationTime = TimeSpan.FromSeconds(0.2),   // 200ms to reach full speed
+    DecelerationTime = TimeSpan.FromSeconds(0.1),   // 100ms to stop
 };
 ```
+
+The duration fields are `TimeSpan`, not `float` — a bare `0.2f` will not compile. (`TopDownConfig` JSON authors them as plain seconds; the conversion happens in `ApplyTo`.)
 
 When either time is non-zero, the behavior blends between `AccelerationTime` and `DecelerationTime`
 based on the angle between the current velocity and the desired direction. Perfectly reversing direction

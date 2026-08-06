@@ -20,9 +20,18 @@ public class Layer
     public string Name { get; }
 
     /// <summary>
-    /// When <c>true</c>, renderables on this layer are drawn in screen-space pixels with
-    /// the camera transform bypassed — useful for HUD and UI that should not pan or zoom
-    /// with the world. Defaults to <c>false</c> (world-space).
+    /// When <c>true</c> and passed to <c>Camera.Add</c>/<c>Screen.Add</c>, the Gum visual is
+    /// parented to the owning camera's <c>Camera.ScreenSpaceRoot</c> instead of <c>Camera.UiRoot</c>:
+    /// it stays confined to that camera's own viewport (correct in split-screen, unlike
+    /// <c>Screen.AddOverlay</c>, which is screen-wide) but is immune to that camera's <c>Zoom</c>
+    /// (unlike plain <c>Camera.Add</c>, which is intentionally zoom-coupled for cinematic effects).
+    /// The window-vs-design-resolution scale still applies, so authored pixel positions still track
+    /// window size — only <c>Zoom</c> is excluded.
+    /// <para>
+    /// Only Gum renderables added via <c>Camera.Add</c>/<c>Screen.Add</c> consult this flag today —
+    /// Sprites, shapes, and tilemaps choose their <see cref="IRenderable.Batch"/> directly per
+    /// instance and do not. Defaults to <c>false</c> (normal zoom-coupled HUD).
+    /// </para>
     /// </summary>
     public bool IsScreenSpace { get; init; }
 

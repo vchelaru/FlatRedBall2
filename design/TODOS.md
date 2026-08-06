@@ -4,6 +4,57 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
+## `TileMap.TmxLoader` is mutable static state, which the architecture rules forbid
+
+`src/Tiled/TileMap.cs:52` declares `internal static Func<string, GraphicsDevice, Tilemap> TmxLoader { get; set; }`
+as an injectable seam so tests never touch disk and WASM can route reads through `TitleContainer`.
+The seam itself is right and worth keeping — the *static mutable* part is the problem. CLAUDE.md's
+architecture rules say "No static state: only `FlatRedBallService.Default` is static," and this is a
+settable static that any test can leave modified for every subsequent test in the assembly.
+`tests/FlatRedBall2.Tests/Tiled/TileMapLoadingTests.cs` already has to save and restore it in a
+`try`/`finally` to stay safe, which is the tell.
+
+Found while designing the equivalent read seam for the Glue project loader (#804), which routes its
+seam through an options object instead of copying this shape. Two ways out: move `TmxLoader` onto an
+options/parameter passed to the `TileMap` constructor (matching what #804 does, but it changes an
+internal signature and every call site), or leave it and accept the test-isolation hazard. Worth
+deciding deliberately rather than letting the next seam copy it a third time.
+
+## External tileset images resolve against the map, not the `.tsx`
+
+Loading a `.tmx` that references an external tileset in a *different directory* fails to find that
+tileset's image. `Level1Map.tmx` (at `Content/Screens/Level1/`) references
+`source="../../StandardTileset.tsx"`, which resolves correctly to `Content/StandardTileset.tsx`. That
+`.tsx` then references `source="StandardTilesetIcons.png"` — which per the TMX spec is relative to
+**the tileset file**, so `Content/StandardTilesetIcons.png`. The loader instead looks in
+`Content/Screens/Level1/StandardTilesetIcons.png` and throws
+`TilemapParseException: Failed to load texture for tileset 'TiledIcons'`.
+
+`TileMap.DefaultTmxLoader` (`src/Tiled/TileMap.cs:54-65`) passes a single `baseDirectory` — the TMX's
+own folder — to `TiledTmxParser`, and that one base path is evidently used for both the `.tsx` lookup
+and the image lookup inside it. External tilesets in a sibling or parent folder are the normal way
+Tiled projects share a tileset across levels, so this affects real projects rather than a corner case.
+
+Repro: `tests/FlatRedBall2.Tests/Glue/Fixtures/DoorsDemo/` — the fixture currently carries a
+**duplicate** copy of `StandardTilesetIcons.png` under `Content/Screens/Level1/` purely to work
+around this. Delete that duplicate to reproduce, and delete it for real once this is fixed.
+
+Open question before fixing: whether `TiledTmxParser` can be given a per-tileset base directory, or
+whether the resolution has to happen in FRB2's `resourceResolver` by tracking which `.tsx` a request
+came from. Confirm which layer owns it before changing anything.
+
+## Kni Blazor.GL Pitch support unreleased — blocks #799 web-side verification
+
+Kni merged `Pitch` support for `SoundEffectInstance` on Blazor.GL in [kniEngine/kni#2614](https://github.com/kniEngine/kni/pull/2614) (2026-07-26) and for `DynamicSoundEffectInstance` in [#2615](https://github.com/kniEngine/kni/pull/2615) (2026-07-28), but neither is in a published NuGet release yet — latest `nkast.Kni.Platform.Blazor.GL` (4.2.9001.2) is pinned to a commit from 2025-11-16. Until Kni publishes a release containing both PRs, Pitch does not work on Kni's web backend for any sound type, one-shot or streaming — confirmed via `diagnostics/MusicPitchWebSpike` throwing `DynamicSoundEffectInstance does not support Pitch` at runtime.
+
+Once a release lands, bump `nkast.Kni.Platform.Blazor.GL` (and matching `nkast.Xna.Framework.*`) in `Directory.Packages.props` and re-run `MusicPitchWebSpike` to confirm Pitch is audible before resuming the #799 `IMusicBackend` design work on the web side.
+
+## Wire templates' Program.cs to LinuxVideoDriver.ApplyWaylandFallback()
+
+`FlatRedBall2.Utilities.LinuxVideoDriver.ApplyWaylandFallback()` (added in `src/Utilities/LinuxVideoDriver.cs`) sets `SDL_VIDEODRIVER=wayland,x11` on Linux so games run on native Wayland with an automatic X11 fallback, instead of always going through XWayland. The templates' `MyGame.Desktop/Program.cs` (`frb2-desktop` and `frb2-multiplatform`) should call it as the first line before `new MyGame.Game1()`, but can't yet: the templates resolve `FlatRedBall2.MonoGame`/`FlatRedBall2.Kni` as a floating NuGet package from nuget.org, and the latest published release predates this API. Once a release containing `LinuxVideoDriver` is published, add the call to both templates' `Program.cs`.
+
+Known caveats to flag in that follow-up, not solved by the helper itself: SDL2 on Wayland needs `libdecor` for window borders/titlebar, or the window comes up borderless (the `wayland,x11` fallback won't catch this since Wayland itself still succeeds); and fractional-scaling compositors can rescale the window, since MonoGame/SDL2 HiDPI support on Wayland is imperfect.
+
 ## Remove templates' precompiled Apos.Shapes shader workaround
 
 `templates/frb2-desktop` and `templates/frb2-multiplatform` still import `build/AposShapesPrecompiled.props` and ship precompiled `apos-shapes.xnb` files, even though the engine itself dropped this workaround once Apos.Shapes 0.7.2+ started embedding its shader in the assembly. The templates can't drop it yet because they resolve `FlatRedBall2.MonoGame`/`FlatRedBall2.Kni` as a floating NuGet package from nuget.org (not this repo's source), and the latest published release still depends on a pre-0.7.2 Apos.Shapes.
@@ -30,11 +81,11 @@ Repro is mobile Solitaire; confirm the fix on at least one Android Chrome and on
 
 ## Web load times for large Gum projects
 
-Initial load is slow on the BlazorGL/KNI target when a `.gumx` references many components — fonts, control templates, generated runtime types all compile/initialize on the main thread before the first frame draws. Need to (a) measure where the time actually goes (Gum project load vs. runtime registration via `RegisterRuntimeType` module initializers vs. asset decode), (b) decide whether the fix is engine-side (lazy/deferred runtime registration, parallel asset decode) or Gum-side (incremental project load), and (c) confirm WASM-specific costs separate from the same load on desktop. Solitaire's `.gumx` is the readily-available large project to profile against.
+Initial load is slow on the BlazorGL/KNI target when a Gum project references many components — fonts, control templates, generated runtime types all compile/initialize on the main thread before the first frame draws. `.gumpkg` bundling (fewer HTTP round-trips) is already Solitaire's default (`Solitaire.GumPackage.targets`, `UseGumPackage` defaults `true`). Solitaire's Gum project is now also converted to Gum's JSON format (`.gumj`/`.gusj`/`.gucj`/`.gutj`/`.behj`, replacing XML) — `Gum.*`/`gumcli` `2026.8.5.2-preview.2` fixed both the pack-time (Gum PR #4346) and runtime bundle-loader (follow-up fix) bugs that blocked this; `convert-to-json`, a real `dotnet build` pack, and actually running the built exe in both loose and bundled mode all verified clean.
 
-## Multiple Gum screens and transitions
+**JSON's win here is Native AOT compatibility, not raw size or parse speed.** A benchmark comparing XML vs. JSON on the identical 123-file Solitaire project (desktop JIT, `GumProjectSave.Load`, 30 iterations × 4 runs) found JSON 25–45% *slower* to parse and its compressed `.gumpkg` ~2.6% *larger* than XML's — the opposite of the "smaller/faster" framing in Gum's ADR. That framing doesn't matter for FRB2: `src/FlatRedBall2.csproj` and `FlatRedBall2.Animation.Content.csproj` both already declare `IsAotCompatible=true`, and `XmlSerializer`'s reflection-based (de)serialization is unreliable/unsupported under trimming+AOT while `System.Text.Json` source generators are AOT-safe by construction. JSON is the correct default regardless of the JIT-desktop numbers above — those numbers just mean this conversion is not the fix for the web load-time problem itself.
 
-Today a screen calls `this.Add(new GameScreenGum())` once in `CustomInitialize` and that visual lives until the FRB Screen tears down. There's no first-class story for (a) hosting multiple Gum screens within one FRB Screen with a current/next swap, or (b) cross-fading / sliding between them. Game code can hand-roll this with two `FrameworkElement`s and a tween on alpha/position, but the absence of an idiomatic pattern means every consumer reinvents it. Decide: is this a sample-level recipe (document the tween-between-two-roots pattern), a Gum-level Forms feature (a `ScreenHost` control), or an FRB-level helper (`Screen.PushGumScreen` / `PopGumScreen` with a built-in transition arg)?
+Still need to (a) measure actual before/after web load-time improvement from the JSON conversion on Solitaire under WASM specifically (JIT-desktop parse time doesn't predict WASM/AOT behavior), (b) measure where any remaining load time goes (Gum project load vs. runtime registration via `RegisterRuntimeType` module initializers vs. asset decode), (c) decide whether further fixes are engine-side (lazy/deferred runtime registration, parallel asset decode) or Gum-side (incremental project load), and (d) confirm WASM-specific costs separate from the same load on desktop.
 
 ## SVG and Lottie support in Gum
 

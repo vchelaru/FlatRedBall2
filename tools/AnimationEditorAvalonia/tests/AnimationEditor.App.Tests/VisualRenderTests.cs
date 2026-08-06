@@ -376,6 +376,83 @@ public class VisualRenderTests
     }
 
     /// <summary>
+    /// Regression (#817): two frames with identical, fully-overlapping UV rects both drawn
+    /// selected (whole-chain selection highlights every frame) must NOT compound their fill
+    /// alpha into a darker/more-saturated blue than a single selected frame — the fill is a
+    /// single highlight over the region, not one layer per overlapping frame.
+    /// </summary>
+    [AvaloniaFact]
+    public void WireframeOverlappingSelectedFrames_FillDoesNotCompound()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var png = Path.Combine(dir, "white.png");
+        try
+        {
+            WriteColorPng(png, SKColors.White, size: 64);
+
+            // Single-frame baseline.
+            var ctxSingle = ResetSingletons();
+            var frame0 = new AnimationFrameSave
+            {
+                TextureName      = "white.png",
+                LeftCoordinate   = 0f, TopCoordinate    = 0f,
+                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chainSingle = new AnimationChainSave { Name = "Single" };
+            chainSingle.Frames.Add(frame0);
+            ctxSingle.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainSingle);
+            ctxSingle.SelectedState.SelectedChain = chainSingle;   // whole-chain select → IsSelected=true
+
+            var ctrlSingle = ctxSingle.CreateWireframeControl();
+            ctrlSingle.LoadTexture(png);
+            ctrlSingle.CenterFitForSize(128, 128);
+            ctrlSingle.RefreshFrames();
+            using var bmSingle = ctrlSingle.RenderToBitmap(128, 128);
+            var pxSingle = bmSingle.GetPixel(30, 30);
+
+            // Two frames, identical UV rects (fully overlapping), whole-chain selected → both
+            // draw the same selected fill over the same screen rect.
+            var ctxDouble = ResetSingletons();
+            var frame1 = new AnimationFrameSave
+            {
+                TextureName      = "white.png",
+                LeftCoordinate   = 0f, TopCoordinate    = 0f,
+                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var frame2 = new AnimationFrameSave
+            {
+                TextureName      = "white.png",
+                LeftCoordinate   = 0f, TopCoordinate    = 0f,
+                RightCoordinate  = 1f, BottomCoordinate = 1f,
+                ShapesSave = new ShapesSave()
+            };
+            var chainDouble = new AnimationChainSave { Name = "Double" };
+            chainDouble.Frames.Add(frame1);
+            chainDouble.Frames.Add(frame2);
+            ctxDouble.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainDouble);
+            ctxDouble.SelectedState.SelectedChain = chainDouble;
+
+            var ctrlDouble = ctxDouble.CreateWireframeControl();
+            ctrlDouble.LoadTexture(png);
+            ctrlDouble.CenterFitForSize(128, 128);
+            ctrlDouble.RefreshFrames();
+            using var bmDouble = ctrlDouble.RenderToBitmap(128, 128);
+            var pxDouble = bmDouble.GetPixel(30, 30);
+
+            // Two overlapping selected frames should look identical to one — the highlight is
+            // per-region, not per-frame. Before the fix this compounds (R drops further, e.g.
+            // ~224 for one frame vs. ~199 for two), which this assertion catches.
+            Assert.True(Math.Abs(pxSingle.Red - pxDouble.Red) <= 1,
+                $"Overlapping selected frames should not compound fill alpha; " +
+                $"single R={pxSingle.Red}, double R={pxDouble.Red}");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    /// <summary>
     /// GetFrameRects reports IsSelected=true only for the frame that matches
     /// SelectedState.SelectedFrame — proving the agent can read selection state
     /// from the control's metadata API.

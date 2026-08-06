@@ -56,6 +56,20 @@ public class GumRootManagersTests
     }
 
     [Fact]
+    public void AttachManagers_EveryCameraScreenSpaceRoot_EffectiveManagersResolves()
+    {
+        var screen = new TestScreen();
+        var second = new FlatRedBall2.Rendering.Camera();
+        screen.Cameras.Add(second);
+        var managers = new StubSystemManagers();
+
+        screen.AttachManagers(managers);
+
+        screen.Cameras[0].ScreenSpaceRoot.EffectiveManagers.ShouldBe(managers);
+        second.ScreenSpaceRoot.EffectiveManagers.ShouldBe(managers);
+    }
+
+    [Fact]
     public void AttachManagers_EveryCameraUiRoot_EffectiveManagersResolves()
     {
         var screen = new TestScreen();

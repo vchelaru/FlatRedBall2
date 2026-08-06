@@ -1,0 +1,60 @@
+{
+  "Name": "ToggleBehavior",
+  "RequiredVariables": {
+    "Name": "",
+    "Variables": [],
+    "VariableLists": []
+  },
+  "FormsProperties": [],
+  "ToolOnlyVariableReferences": [],
+  "Categories": [
+    {
+      "Name": "ToggleCategory",
+      "States": [
+        {
+          "Name": "EnabledOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "EnabledOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "DisabledOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "HighlightedOff",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "PushedOn",
+          "Variables": [],
+          "VariableLists": []
+        },
+        {
+          "Name": "PushedOff",
+          "Variables": [],
+          "VariableLists": []
+        }
+      ]
+    }
+  ],
+  "RequiredInstances": [],
+  "RequiredAnimations": [],
+  "DefaultImplementation": "Controls/TreeViewToggle"
+}

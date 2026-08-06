@@ -282,6 +282,7 @@ public class FlatRedBallService
         CustomSetPropertyOnRenderable.InMemoryFontCreator =
             new KernSmithFontCreator(game.GraphicsDevice);
         GumRenderBatch.Instance.Initialize();
+        GumRenderBatch.ScreenSpaceInstance.Initialize();
         ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
 
         // Route Gum Forms popups (ComboBox dropdowns, MenuItem submenus) opened by a control on a
@@ -1151,6 +1152,9 @@ public class FlatRedBallService
             // UpdateLayout when changed; no explicit gating needed here.
             camera.UiRoot.Width  = camera.OrthogonalWidth  / camera.Zoom;
             camera.UiRoot.Height = camera.OrthogonalHeight / camera.Zoom;
+            // ScreenSpaceRoot deliberately NOT divided by Zoom — see Camera.SizeUiRootToOrthogonalExtents.
+            camera.ScreenSpaceRoot.Width  = camera.OrthogonalWidth;
+            camera.ScreenSpaceRoot.Height = camera.OrthogonalHeight;
             // Popup/modal roots share the camera's canvas so popups routed here (via
             // GraphicalUiElement.ResolvePopupRoots) lay out and clip against the same extents as the
             // HUD; their draw pass inherits this camera's zoom. (Edge-repositioning of the popup

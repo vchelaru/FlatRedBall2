@@ -189,6 +189,8 @@ Add(scoreLabel, layer: hudLayer);
 
 `AddOverlay()` parents UI under `Screen.OverlayRoot`, sized to the back-buffer and rendered 1:1. `FontSize=22` generates a 22px bitmap rendered at 22px — sharp at any `PixelsPerUnit`. Use `AddOverlay()` for any text-bearing screen-space HUD when the window is larger than the design resolution.
 
+`Add()`'s `PixelsPerUnit` also bakes in `Camera.Zoom` — so HUD zooms whenever you animate `Zoom` for a cinematic effect. `AddOverlay()` is immune to this too, but it's screen-wide and can't be confined to one camera's viewport in split-screen. For a per-camera, zoom-immune HUD (e.g. one player's minimap border that shouldn't zoom with their camera), pass a `Layer { IsScreenSpace = true }` to `Add()` instead — it parents to `Camera.ScreenSpaceRoot`, which tracks the window-vs-design-resolution scale but not `Zoom`.
+
 Coordinate values for overlay elements are in back-buffer pixels (design coords × `PixelsPerUnit`). For hit-testing overlay UI from world-space cursor input:
 
 ```csharp

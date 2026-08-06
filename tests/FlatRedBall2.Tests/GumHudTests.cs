@@ -1,5 +1,6 @@
 using System.Linq;
 using FlatRedBall2.Rendering;
+using FlatRedBall2.UI;
 using Gum.Wireframe;
 using Gum.GueDeriving;
 using Shouldly;
@@ -60,6 +61,59 @@ public class GumHudTests
 
         renderable.ShouldDrawForCamera(screen.Cameras[0]).ShouldBeTrue();
         renderable.ShouldDrawForCamera(second).ShouldBeFalse();
+    }
+
+    // Issue #798: a Layer with IsScreenSpace=true gives per-camera HUD that stays confined to that
+    // camera's own viewport (correct in split-screen, unlike AddOverlay) but immune to that camera's
+    // Zoom (unlike plain Camera.Add, which is intentionally zoom-coupled for cinematic effects).
+
+    [Fact]
+    public void CameraAdd_ScreenSpaceLayer_VisualParentedToScreenSpaceRootNotUiRoot()
+    {
+        var screen = new TestScreen();
+        var layer = new Layer("hud") { IsScreenSpace = true };
+        var visual = new ContainerRuntime();
+
+        screen.Cameras[0].Add(visual, layer);
+
+        screen.Cameras[0].ScreenSpaceRoot.Children.ShouldContain(visual);
+        screen.Cameras[0].UiRoot.Children.ShouldNotContain(visual);
+    }
+
+    [Fact]
+    public void CameraAdd_ScreenSpaceLayer_RenderableUsesScreenSpaceBatch()
+    {
+        var screen = new TestScreen();
+        var layer = new Layer("hud") { IsScreenSpace = true };
+        var visual = new ContainerRuntime();
+
+        screen.Cameras[0].Add(visual, layer);
+
+        screen.GumRenderables[0].Batch.ShouldBeSameAs(GumRenderBatch.ScreenSpaceInstance);
+    }
+
+    [Fact]
+    public void CameraAdd_NullLayer_RenderableUsesDefaultBatch()
+    {
+        var screen = new TestScreen();
+        var visual = new ContainerRuntime();
+
+        screen.Cameras[0].Add(visual);
+
+        screen.GumRenderables[0].Batch.ShouldBeSameAs(GumRenderBatch.Instance);
+    }
+
+    [Fact]
+    public void CameraRemove_ScreenSpaceVisual_UnparentsFromScreenSpaceRoot()
+    {
+        var screen = new TestScreen();
+        var layer = new Layer("hud") { IsScreenSpace = true };
+        var visual = new ContainerRuntime();
+        screen.Cameras[0].Add(visual, layer);
+
+        screen.Cameras[0].Remove(visual);
+
+        screen.Cameras[0].ScreenSpaceRoot.Children.ShouldNotContain(visual);
     }
 
     [Fact]
