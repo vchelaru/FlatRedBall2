@@ -24,9 +24,11 @@ thinner versions of `MainWindow`'s `HandleCopyCoreAsync`/`HandleCutCoreAsync`/
   raises `AnimationChainsChanged`, which `App.axaml.cs` already wires to `animationTree.Refresh`
   (Phase 1, #603/#610) — so paste/duplicate/delete just work without extra bookkeeping here.
 - `SelectedChains`/`SelectedFrames`/`SelectedRectangles`/`SelectedCircles` on `ISelectedState`
-  already fall back to the singular `Selected*` property when the multi-select bag is empty (see
-  `SelectedState`), so `SelectionCopyContext`/`HandleDelete`'s dispatch logic works unchanged even
-  though `AnimationTreeControl`'s `TreeView` is `SelectionMode="Single"` today.
+  fall back to the singular `Selected*` property when the multi-select bag is empty (see
+  `SelectedState` / `SelectionCopyContext.CollectChains`), so `SelectionCopyContext`/
+  `HandleDelete`'s dispatch logic works for both single- and multi-select. #757 flipped
+  `AnimationTreeControl`'s `TreeView` to `SelectionMode="Multiple"` and keeps `SelectedNodes`
+  in sync, so context-menu Delete/Duplicate/Copy now act on the whole multi-selection.
 
 **Rename** (rectangle/circle/chain) reuses the existing `TreeNodeVm.BeginEdit()`/`CommitRename`
 inline-edit mechanism `EnableRename` already wired for chain double-tap-rename (Phase 2, #610) —

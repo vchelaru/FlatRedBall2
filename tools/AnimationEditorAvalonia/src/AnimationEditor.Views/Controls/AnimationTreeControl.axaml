@@ -3,7 +3,7 @@
              xmlns:models="using:AnimationEditor.Core.ViewModels"
              x:Class="AnimationEditor.Views.Controls.AnimationTreeControl">
     <TreeView x:Name="Tree"
-              SelectionMode="Single"
+              SelectionMode="Multiple"
               AutomationProperties.Name="Animations"
               AutomationProperties.AutomationId="animations-tree">
         <TreeView.Styles>

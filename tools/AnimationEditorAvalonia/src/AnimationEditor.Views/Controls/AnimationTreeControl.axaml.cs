@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FlatRedBall2.Animation.Content;
 
@@ -18,14 +19,15 @@ namespace AnimationEditor.Views.Controls;
 /// Phase 1 (#603) read-only chain/frame/shape browser: renders the tree built by
 /// <see cref="TreeBuilder.BuildTree"/> and routes row selection through the already-portable,
 /// already-tested <see cref="TreeBuilder.RouteNodeSelection"/>. Adds no new selection logic --
-/// only the Avalonia wiring MainWindow's desktop tree already has, minus multi-select/
-/// drag-reorder (see docs/BROWSER_TREE_INSPECTOR_DECISION.md for why this is a new, smaller
-/// control rather than a port of MainWindow's). Phase 2 (#610) adds <see cref="Refresh"/> so
-/// mutation commands can keep the tree in sync, and chain inline-rename (double-tap a chain's
-/// label), mirroring MainWindow's own double-tap-to-rename. Phase 2 of #754 adds
-/// <see cref="EnableContextMenu"/>: the same right-click plan desktop's MainWindow builds from
-/// <see cref="TreeMenuPlanBuilder"/>, translated into real Avalonia menu items here (see
-/// docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md).
+/// only the Avalonia wiring MainWindow's desktop tree already has, minus drag-reorder (see
+/// docs/BROWSER_TREE_INSPECTOR_DECISION.md for why this is a new, smaller control rather than a
+/// port of MainWindow's). Phase 2 (#610) adds <see cref="Refresh"/> so mutation commands can
+/// keep the tree in sync, and chain inline-rename (double-tap a chain's label), mirroring
+/// MainWindow's own double-tap-to-rename. Phase 2 of #754 adds <see cref="EnableContextMenu"/>:
+/// the same right-click plan desktop's MainWindow builds from <see cref="TreeMenuPlanBuilder"/>,
+/// translated into real Avalonia menu items here (see docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md).
+/// #757 enables <c>SelectionMode=Multiple</c> and syncs <see cref="ISelectedState.SelectedNodes"/>
+/// the same way desktop's <c>OnTreeSelectionChanged</c>/<c>SyncTreeSelection</c> do.
 /// </summary>
 public partial class AnimationTreeControl : UserControl
 {
@@ -39,6 +41,7 @@ public partial class AnimationTreeControl : UserControl
     private IEditorDialogHost? _dialogHost;
     private Func<AnimationFrameSave, float?>? _getTextureHeight;
     private Action<string>? _showStatus;
+    private bool _suppressTreeSelectionHandling;
 
     public AnimationTreeControl()
     {
@@ -104,10 +107,15 @@ public partial class AnimationTreeControl : UserControl
     /// </summary>
     public void InitializeServices(ISelectedState selectedState, AnimationChainListSave? acls)
     {
+        if (_selectedState is not null)
+            _selectedState.SelectionChanged -= OnSelectedStateChanged;
+
         _selectedState = selectedState;
         _acls = acls;
         _roots = acls is null ? null : new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(acls));
         Tree.ItemsSource = _roots;
+
+        _selectedState.SelectionChanged += OnSelectedStateChanged;
     }
 
     /// <summary>
@@ -116,11 +124,14 @@ public partial class AnimationTreeControl : UserControl
     /// state and selection instead of rebuilding from scratch -- the same
     /// <see cref="TreeBuilder.SyncChainsInto"/> desktop's <c>MainWindow.RefreshTreeView</c> uses.
     /// No-op if no file is loaded ((<see cref="InitializeServices"/> was called with a null acls).
+    /// Re-applies model selection into the tree afterward (multi-select included), matching
+    /// desktop's <c>RefreshTreeView</c> → <c>SyncTreeSelection</c>.
     /// </summary>
     public void Refresh()
     {
         if (_acls is null || _roots is null) return;
         TreeBuilder.SyncChainsInto(_roots, _acls.AnimationChains);
+        SyncTreeSelection();
     }
 
     /// <summary>
@@ -141,9 +152,112 @@ public partial class AnimationTreeControl : UserControl
 
     private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (_suppressTreeSelectionHandling) return;
         if (_selectedState is null) return;
         if (Tree.SelectedItem is not TreeNodeVm vm) return;
+
+        // Sync multi-select into SelectedState — same as MainWindow.OnTreeSelectionChanged.
+        _selectedState.SelectedNodes = Tree.SelectedItems
+            .OfType<TreeNodeVm>()
+            .Select(n => n.Data)
+            .OfType<object>()
+            .ToList();
+
         TreeBuilder.RouteNodeSelection(vm.Data, _selectedState, _acls);
+    }
+
+    // Defer so OnTreeSelectionChanged can finish writing SelectedNodes + RouteNodeSelection
+    // before we push model→tree (same reason MainWindow.HandleSelectionChanged uses InvokeAsync).
+    private void OnSelectedStateChanged() =>
+        Dispatcher.UIThread.Post(SyncTreeSelection, DispatcherPriority.Normal);
+
+    /// <summary>
+    /// One-way push of model selection into the tree. Mirrors MainWindow.SyncTreeSelection —
+    /// multi-select bag when Count &gt; 1, otherwise the singular shape/frame/chain focus.
+    /// </summary>
+    private void SyncTreeSelection()
+    {
+        if (_selectedState is null || _roots is null) return;
+
+        if (_selectedState.SelectedNodes.Count > 1)
+        {
+            SyncTreeMultiSelection(_selectedState.SelectedNodes);
+            return;
+        }
+
+        object? sel = (object?)_selectedState.SelectedCircle
+                   ?? _selectedState.SelectedRectangle
+                   ?? _selectedState.SelectedFrame
+                   ?? (object?)_selectedState.SelectedChain;
+
+        var target = sel is not null ? TreeBuilder.FindNodeForData(_roots, sel) : null;
+
+        if (sel is not null)
+            TreeBuilder.ExpandAncestorsOf(_roots, sel);
+
+        bool alreadySynced = target is not null
+            && Tree.SelectedItems?.Count == 1
+            && ReferenceEquals(Tree.SelectedItems[0], target);
+
+        if (target is not null && !alreadySynced)
+        {
+            bool prior = _suppressTreeSelectionHandling;
+            _suppressTreeSelectionHandling = true;
+            try
+            {
+                Tree.SelectedItems!.Clear();
+                Tree.SelectedItems.Add(target);
+            }
+            finally { _suppressTreeSelectionHandling = prior; }
+        }
+    }
+
+    private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)
+    {
+        if (Tree.SelectedItems is null) return dataObjects.Count == 0;
+        var selected = Tree.SelectedItems.OfType<TreeNodeVm>().ToList();
+        if (selected.Count != dataObjects.Count) return false;
+        var dataSet = new HashSet<object>(dataObjects);
+        return selected.All(n => n.Data is not null && dataSet.Contains(n.Data));
+    }
+
+    /// <summary>
+    /// One-way push of model multi-selection into the tree. Must not write back to
+    /// <see cref="ISelectedState.SelectedNodes"/> or call <see cref="TreeBuilder.RouteNodeSelection"/> —
+    /// that is <see cref="OnTreeSelectionChanged"/>'s job and causes a SelectionChanged loop.
+    /// </summary>
+    private void SyncTreeMultiSelection(IReadOnlyList<object> dataObjects)
+    {
+        if (_roots is null) return;
+        if (TreeMultiSelectionAlreadySynced(dataObjects))
+            return;
+
+        var nodes = new List<TreeNodeVm>();
+        bool chainsOnly = dataObjects.All(d => d is AnimationChainSave);
+        foreach (var data in dataObjects)
+        {
+            if (!chainsOnly)
+                TreeBuilder.ExpandAncestorsOf(_roots, data);
+            var node = TreeBuilder.FindNodeForData(_roots, data);
+            if (node is not null)
+                nodes.Add(node);
+        }
+
+        if (nodes.Count == 0 && dataObjects.Count > 0)
+            return;
+
+        bool prior = _suppressTreeSelectionHandling;
+        _suppressTreeSelectionHandling = true;
+        try
+        {
+            Tree.SelectedItems!.Clear();
+            foreach (var node in nodes)
+                Tree.SelectedItems.Add(node);
+        }
+        finally
+        {
+            _suppressTreeSelectionHandling = prior;
+        }
     }
 
     private void OnHeaderDoubleTapped(object? sender, TappedEventArgs e)
@@ -240,7 +354,10 @@ public partial class AnimationTreeControl : UserControl
         if (!e.GetCurrentPoint(Tree).Properties.IsRightButtonPressed) return;
         if (e.Source is not Control src) return;
         var tvi = src.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-        if (tvi?.DataContext is TreeNodeVm vm)
+        // Right-clicking a node that's already part of the current multi-selection must
+        // leave the whole selection intact (Explorer-style) so the context menu acts on the
+        // whole group. Only collapse to just this node when it isn't already selected.
+        if (tvi?.DataContext is TreeNodeVm vm && Tree.SelectedItems?.Contains(vm) != true)
             Tree.SelectedItem = vm;
     }
 
@@ -258,7 +375,7 @@ public partial class AnimationTreeControl : UserControl
             _ => null,
         };
         Action<bool, bool>? duplicateChainFlip = data is AnimationChainSave flipChain
-            ? (flipH, flipV) => _appCommands.DuplicateChains(new[] { flipChain }, flipH, flipV)
+            ? (flipH, flipV) => HandleDuplicateChainsFlip(flipChain, flipH, flipV)
             : null;
 
         var actions = new TreeMenuActions(
@@ -354,9 +471,9 @@ public partial class AnimationTreeControl : UserControl
     // HandleDuplicate/HandleDelete, minus the desktop-only bits: IsTextInputFocused (this is a
     // menu click, not a global hotkey, so no focus gate is needed), status-message error
     // surfacing, and tree-selection/expand bookkeeping (AnimationChainsChanged already drives
-    // Refresh() for every mutation here -- see App.axaml.cs's wiring). SelectedChains/
-    // SelectedFrames/etc. already fall back to the singular Selected* property when empty (see
-    // SelectedState), so this works unchanged even though Tree is SelectionMode="Single" today.
+    // Refresh() for every mutation here -- see App.axaml.cs's wiring). With SelectionMode=Multiple
+    // (#757), SelectedNodes is kept in sync so SelectedChains/SelectedFrames/etc. cover the
+    // whole multi-selection (singular Selected* remains the fallback when the bag is empty).
 
     private async Task HandleCopyAsync()
     {
@@ -455,22 +572,51 @@ public partial class AnimationTreeControl : UserControl
         _appCommands!.DuplicateSelection(payload);
     }
 
+    private void HandleDuplicateChainsFlip(AnimationChainSave rightClicked, bool flipH, bool flipV)
+    {
+        var selected = _selectedState!.SelectedChains;
+        var sources = selected.Count > 0 ? selected : new List<AnimationChainSave> { rightClicked };
+        _appCommands!.DuplicateChains(sources, flipH, flipV);
+    }
+
     private void HandleDelete(object? nodeData)
     {
+        // Delete the whole multi-selection of the focused node's kind, not just the
+        // focused/right-clicked node — matches MainWindow.HandleDelete (#561 / #757).
         switch (nodeData)
         {
-            case AnimationChainSave chain:
-                _appCommands!.DeleteAnimationChains(new List<AnimationChainSave> { chain });
+            case AnimationChainSave chainToDel:
+            {
+                var chains = _selectedState!.SelectedChains;
+                _appCommands!.DeleteAnimationChains(
+                    chains.Count > 0 ? chains : new List<AnimationChainSave> { chainToDel });
                 break;
-            case AnimationFrameSave frame:
-                _appCommands!.DeleteFrames(new List<AnimationFrameSave> { frame });
+            }
+            case AnimationFrameSave frameToDel:
+            {
+                var frames = _selectedState!.SelectedFrames;
+                _appCommands!.DeleteFrames(
+                    frames.Count > 0 ? frames : new List<AnimationFrameSave> { frameToDel });
                 break;
-            case AARectSave rect:
-                _appCommands!.DeleteShapes(_selectedState!.SelectedFrame!, new List<AARectSave> { rect }, new List<CircleSave>());
+            }
+            case AARectSave rectToDel:
+            {
+                var frame = _selectedState!.SelectedFrame!;
+                var rects = _selectedState.SelectedRectangles;
+                var circles = _selectedState.SelectedCircles;
+                _appCommands!.DeleteShapes(
+                    frame, rects.Count > 0 ? rects : new List<AARectSave> { rectToDel }, circles);
                 break;
-            case CircleSave circle:
-                _appCommands!.DeleteShapes(_selectedState!.SelectedFrame!, new List<AARectSave>(), new List<CircleSave> { circle });
+            }
+            case CircleSave circleToDel:
+            {
+                var frame = _selectedState!.SelectedFrame!;
+                var circles = _selectedState.SelectedCircles;
+                var rects = _selectedState.SelectedRectangles;
+                _appCommands!.DeleteShapes(
+                    frame, rects, circles.Count > 0 ? circles : new List<CircleSave> { circleToDel });
                 break;
+            }
         }
     }
 

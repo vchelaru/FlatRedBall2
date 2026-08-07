@@ -53,9 +53,10 @@ supplied by the hosting `Application` (`AnimationEditor.Browser/App.axaml`), not
 Implemented Option 2:
 
 - **`AnimationTreeControl`** (`AnimationEditor.Views/Controls/AnimationTreeControl.axaml(.cs)`) —
-  a `TreeView` built from `TreeBuilder.BuildTree(acls)`, single-select only. Row selection calls
-  `TreeBuilder.RouteNodeSelection(vm.Data, selectedState, acls)` — the exact routing logic
-  desktop's `OnTreeSelectionChanged` uses, unmodified.
+  a `TreeView` built from `TreeBuilder.BuildTree(acls)`, multi-select (`SelectionMode=Multiple`,
+  #757) synced into `ISelectedState.SelectedNodes` the same way desktop's AnimTree does. Row
+  selection also calls `TreeBuilder.RouteNodeSelection(vm.Data, selectedState, acls)` — the exact
+  singular-focus routing logic desktop's `OnTreeSelectionChanged` uses, unmodified.
 - **`InspectorControl`** (`AnimationEditor.Views/Controls/InspectorControl.axaml(.cs)`) — three
   read-only panels (frame / rectangle / circle), each a handful of `TextBlock`s populated
   imperatively on `ISelectedState.SelectionChanged`. Deliberately not data-bound to the model's
@@ -76,10 +77,11 @@ Implemented Option 2:
 ## Explicitly out of scope for this phase
 
 No mutation (add/delete/rename/duplicate/reorder/flip/paste on chains, frames, or shapes), no
-Undo/Redo UI, no drag-reorder/multi-select/inline-rename/context-menus, no editable inspector
+Undo/Redo UI, no drag-reorder/inline-rename/context-menus, no editable inspector
 fields, no tree thumbnails/zebra-striping, no wireframe shape editing, no settings persistence,
-no search/filter wiring. All are real desktop features, deferred to their own later phase rather
-than bolted onto this one — see the phased roadmap tracked alongside #588's follow-up work.
+no search/filter wiring. (Multi-select landed later in #757.) All are real desktop features,
+deferred to their own later phase rather than bolted onto this one — see the phased roadmap
+tracked alongside #588's follow-up work.
 
 ## Consequences
 

@@ -330,4 +330,79 @@ public class AnimationTreeControlTests
 
         Assert.Equal(3, acls.AnimationChains[0].Frames.Count);
     }
+
+    // ── Multi-select (#757) ───────────────────────────────────────────────────
+    // Browser's AnimationTreeControl was SelectionMode=Single; desktop's AnimTree is Multiple
+    // and pushes SelectedItems into ISelectedState.SelectedNodes so SelectedChains/Frames work.
+    // These tests pin that parity for the shared Views control.
+
+    [AvaloniaFact]
+    public void TreeView_SelectionMode_IsMultiple()
+    {
+        var (control, _, _) = Build();
+        Assert.Equal(SelectionMode.Multiple, control.TreeView.SelectionMode);
+    }
+
+    [AvaloniaFact]
+    public void SelectingTwoChainRows_PopulatesSelectedNodesAndSelectedChains()
+    {
+        var (control, selectedState, acls) = Build();
+        var tree = control.TreeView;
+        var roots = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+
+        tree.SelectedItems!.Clear();
+        tree.SelectedItems.Add(roots[0]);
+        tree.SelectedItems.Add(roots[1]);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, selectedState.SelectedNodes.Count);
+        Assert.Equal(2, selectedState.SelectedChains.Count);
+        Assert.Contains(acls.AnimationChains[0], selectedState.SelectedChains);
+        Assert.Contains(acls.AnimationChains[1], selectedState.SelectedChains);
+    }
+
+    [AvaloniaFact]
+    public void SelectingTwoFrameRows_PopulatesSelectedFrames()
+    {
+        var (control, selectedState, acls) = Build();
+        var tree = control.TreeView;
+        var roots = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        var frame0 = roots[0].Children[0];
+        var frame1 = roots[0].Children[1];
+
+        tree.SelectedItems!.Clear();
+        tree.SelectedItems.Add(frame0);
+        tree.SelectedItems.Add(frame1);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, selectedState.SelectedFrames.Count);
+        Assert.Contains(acls.AnimationChains[0].Frames[0], selectedState.SelectedFrames);
+        Assert.Contains(acls.AnimationChains[0].Frames[1], selectedState.SelectedFrames);
+    }
+
+    [AvaloniaFact]
+    public void SettingSelectedNodes_ThenRefresh_SyncsTreeSelectedItems()
+    {
+        var (control, selectedState, acls) = Build();
+        var tree = control.TreeView;
+        var roots = ((System.Collections.IEnumerable)tree.ItemsSource!)
+            .Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+
+        // Model-side multi-selection (e.g. after DuplicateChains) must push into the tree,
+        // matching MainWindow.SyncTreeSelection after RefreshTreeView.
+        selectedState.SelectedNodes = new List<object>
+        {
+            acls.AnimationChains[0],
+            acls.AnimationChains[1],
+        };
+        control.Refresh();
+        Dispatcher.UIThread.RunJobs();
+
+        var selected = tree.SelectedItems!.Cast<AnimationEditor.Core.ViewModels.TreeNodeVm>().ToList();
+        Assert.Equal(2, selected.Count);
+        Assert.Contains(roots[0], selected);
+        Assert.Contains(roots[1], selected);
+    }
 }

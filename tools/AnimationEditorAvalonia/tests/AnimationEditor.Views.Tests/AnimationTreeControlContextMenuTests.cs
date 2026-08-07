@@ -520,4 +520,112 @@ public class AnimationTreeControlContextMenuTests
         }
         finally { h.Window.Close(); }
     }
+
+    // #757: Explorer-style — right-clicking a node already in a multi-selection must not
+    // collapse it, so Delete/Duplicate/Copy act on the whole group (desktop #561 parity).
+
+    [AvaloniaFact]
+    public void RightClick_OnMemberOfMultiSelection_PreservesSelection()
+    {
+        var walk = new AnimationChainSave { Name = "Walk" };
+        var run = new AnimationChainSave { Name = "Run" };
+        var jump = new AnimationChainSave { Name = "Jump" };
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(walk);
+        acls.AnimationChains.Add(run);
+        acls.AnimationChains.Add(jump);
+        var h = Build(acls);
+        try
+        {
+            var roots = Roots(h);
+            var tree = h.Control.TreeView;
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(roots[0]);
+            tree.SelectedItems.Add(roots[1]);
+            tree.SelectedItems.Add(roots[2]);
+            Dispatcher.UIThread.RunJobs();
+
+            var tvi = tree.GetVisualDescendants().OfType<TreeViewItem>()
+                .First(t => ReferenceEquals(t.DataContext, roots[1]));
+            var centre = new Point(tvi.Bounds.Width / 2, tvi.Bounds.Height / 2);
+            var pointInWindow = tvi.TranslatePoint(centre, h.Window)!.Value;
+            h.Window.MouseDown(pointInWindow, MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(3, tree.SelectedItems!.Count);
+            Assert.Equal(3, h.SelectedState.SelectedChains.Count);
+        }
+        finally { h.Window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void DeleteFrame_ContextMenu_OnMultiSelection_DeletesAllSelectedFrames()
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var f0 = new AnimationFrameSave { TextureName = "a.png" };
+        var f1 = new AnimationFrameSave { TextureName = "b.png" };
+        var f2 = new AnimationFrameSave { TextureName = "c.png" };
+        chain.Frames.Add(f0);
+        chain.Frames.Add(f1);
+        chain.Frames.Add(f2);
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(chain);
+        var h = Build(acls);
+        try
+        {
+            var chainNode = Roots(h)[0];
+            chainNode.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var frameNodes = chainNode.Children;
+            var tree = h.Control.TreeView;
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(frameNodes[0]);
+            tree.SelectedItems.Add(frameNodes[1]);
+            tree.SelectedItems.Add(frameNodes[2]);
+            Dispatcher.UIThread.RunJobs();
+
+            // Rebuild menu against the multi-selection (primary = last SelectedItem).
+            typeof(AnimationTreeControl)
+                .GetMethod("OnTreeContextMenuOpening", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(h.Control, new object?[] { null, new CancelEventArgs() });
+            ClickMenuItem(h, "Delete Frame");
+
+            Assert.Empty(chain.Frames);
+        }
+        finally { h.Window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void DuplicateChain_ContextMenu_FlipHorizontal_OnMultiSelection_DuplicatesAllSelected()
+    {
+        var walk = new AnimationChainSave { Name = "Walk" };
+        walk.Frames.Add(new AnimationFrameSave { TextureName = "a.png", FlipHorizontal = false });
+        var run = new AnimationChainSave { Name = "Run" };
+        run.Frames.Add(new AnimationFrameSave { TextureName = "b.png", FlipHorizontal = false });
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(walk);
+        acls.AnimationChains.Add(run);
+        var h = Build(acls);
+        try
+        {
+            var roots = Roots(h);
+            var tree = h.Control.TreeView;
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(roots[0]);
+            tree.SelectedItems.Add(roots[1]);
+            Dispatcher.UIThread.RunJobs();
+
+            typeof(AnimationTreeControl)
+                .GetMethod("OnTreeContextMenuOpening", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(h.Control, new object?[] { null, new CancelEventArgs() });
+            ClickSubMenuItem(h, "Duplicate", "Flip Horizontal");
+
+            Assert.Equal(4, acls.AnimationChains.Count);
+            Assert.All(
+                acls.AnimationChains.Where(c => c != walk && c != run),
+                copy => Assert.True(copy.Frames[0].FlipHorizontal));
+        }
+        finally { h.Window.Close(); }
+    }
 }
