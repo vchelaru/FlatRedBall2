@@ -1,3 +1,4 @@
+using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Xunit;
@@ -12,13 +13,13 @@ namespace AnimationEditor.App.Tests;
 public class AdjustOffsetDialogLayoutTests
 {
     /// <summary>
-    /// Verifies that <see cref="MainWindow.BuildAdjustAllRow"/> returns a Grid
+    /// Verifies that <see cref="EditorDialogs.BuildAdjustAllRow"/> returns a Grid
     /// whose star columns ensure the NumericUpDown inputs grow with the dialog.
     /// </summary>
     [AvaloniaFact]
     public void BuildAdjustAllRow_UsesGrid_WithStarColumnsForInputs()
     {
-        var (row, xInput, yInput) = MainWindow.BuildAdjustAllRow();
+        var (row, xInput, yInput) = EditorDialogs.BuildAdjustAllRow();
 
         Assert.Equal(4, row.ColumnDefinitions.Count);
         Assert.Equal(GridUnitType.Auto, row.ColumnDefinitions[0].Width.GridUnitType);

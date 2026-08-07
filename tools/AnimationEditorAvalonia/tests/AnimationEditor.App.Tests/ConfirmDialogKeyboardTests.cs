@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using AnimationEditor.Views.Dialogs;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -14,9 +15,9 @@ namespace AnimationEditor.App.Tests;
 /// <summary>
 /// Regression tests for issue #239: modal confirmation dialogs must be
 /// keyboard-accessible — ENTER confirms, ESC cancels, immediately on open
-/// without a prior click. Covers the yes/no confirmation dialog and the shared
-/// <see cref="MainWindow.WireDialogKeyboard"/> helper used by the dialogs that
-/// contain input controls.
+/// without a prior click. Covers the shared confirmation dialog through its
+/// desktop Window host and <see cref="MainWindow.WireDialogKeyboard"/> for the
+/// remaining desktop-only dialogs.
 /// </summary>
 public class ConfirmDialogKeyboardTests
 {
@@ -34,48 +35,54 @@ public class ConfirmDialogKeyboardTests
         dialog.KeyPress(key, RawInputModifiers.None, PhysicalKey.None, null);
 
     [AvaloniaFact]
-    public void BuildConfirmDialog_EnterKey_ResolvesTrue()
+    public async Task ConfirmAsync_EnterKey_ResolvesTrue()
     {
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = MainWindow.BuildConfirmDialog("Delete this frame?", "Delete?", tcs);
-        dialog.Show();
+        var owner = new Window();
+        owner.Show();
+        var resultTask = EditorDialogs.ConfirmAsync(
+            new WindowEditorDialogHost(owner), "Delete this frame?", "Delete?");
         Dispatcher.UIThread.RunJobs();
+        var dialog = owner.OwnedWindows.Single();
 
         PressKey(dialog, Key.Enter);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.True(tcs.Task.IsCompletedSuccessfully, "ENTER should dismiss the dialog");
-        Assert.True(tcs.Task.Result, "ENTER should confirm (Yes)");
+        Assert.True(await resultTask);
+        owner.Close();
     }
 
     [AvaloniaFact]
-    public void BuildConfirmDialog_EscapeKey_ResolvesFalse()
+    public async Task ConfirmAsync_EscapeKey_ResolvesFalse()
     {
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = MainWindow.BuildConfirmDialog("Delete this frame?", "Delete?", tcs);
-        dialog.Show();
+        var owner = new Window();
+        owner.Show();
+        var resultTask = EditorDialogs.ConfirmAsync(
+            new WindowEditorDialogHost(owner), "Delete this frame?", "Delete?");
         Dispatcher.UIThread.RunJobs();
+        var dialog = owner.OwnedWindows.Single();
 
         PressKey(dialog, Key.Escape);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.True(tcs.Task.IsCompletedSuccessfully, "ESC should dismiss the dialog");
-        Assert.False(tcs.Task.Result, "ESC should cancel (No)");
+        Assert.False(await resultTask);
+        owner.Close();
     }
 
     [AvaloniaFact]
-    public void BuildConfirmDialog_ClosedWithoutChoice_ResolvesFalse()
+    public async Task ConfirmAsync_ClosedWithoutChoice_ResolvesFalse()
     {
-        var tcs = new TaskCompletionSource<bool>();
-        var dialog = MainWindow.BuildConfirmDialog("Delete this frame?", "Delete?", tcs);
-        dialog.Show();
+        var owner = new Window();
+        owner.Show();
+        var resultTask = EditorDialogs.ConfirmAsync(
+            new WindowEditorDialogHost(owner), "Delete this frame?", "Delete?");
         Dispatcher.UIThread.RunJobs();
+        var dialog = owner.OwnedWindows.Single();
 
         dialog.Close();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.True(tcs.Task.IsCompletedSuccessfully);
-        Assert.False(tcs.Task.Result, "Closing the dialog without choosing must not delete");
+        Assert.False(await resultTask);
+        owner.Close();
     }
 
     // ── WireDialogKeyboard ────────────────────────────────────────────────────

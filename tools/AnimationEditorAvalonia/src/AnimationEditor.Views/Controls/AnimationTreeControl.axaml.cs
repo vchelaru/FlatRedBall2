@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
+using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -35,6 +36,9 @@ public partial class AnimationTreeControl : UserControl
     private IObjectFinder? _objectFinder;
     private IProjectManager? _projectManager;
     private IPendingCutState? _pendingCutState;
+    private IEditorDialogHost? _dialogHost;
+    private Func<AnimationFrameSave, float?>? _getTextureHeight;
+    private Action<string>? _showStatus;
 
     public AnimationTreeControl()
     {
@@ -64,12 +68,18 @@ public partial class AnimationTreeControl : UserControl
         IAppCommands appCommands,
         IObjectFinder objectFinder,
         IProjectManager projectManager,
-        IPendingCutState pendingCutState)
+        IPendingCutState pendingCutState,
+        IEditorDialogHost? dialogHost = null,
+        Func<AnimationFrameSave, float?>? getTextureHeight = null,
+        Action<string>? showStatus = null)
     {
         _appCommands = appCommands;
         _objectFinder = objectFinder;
         _projectManager = projectManager;
         _pendingCutState = pendingCutState;
+        _dialogHost = dialogHost;
+        _getTextureHeight = getTextureHeight;
+        _showStatus = showStatus;
 
         if (Tree.ContextMenu is not null) return;
 
@@ -283,15 +293,31 @@ public partial class AnimationTreeControl : UserControl
         }
     }
 
-    // Only ViewTextureInExplorer ever reaches this control's plan for a frame node -- the other
-    // three host slots are chain-only dialogs with no browser dialog pattern yet (issue #756) and
-    // are silently omitted here, same as MainWindow would omit them for a host that didn't
-    // implement dialogs. See docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md for the "Copy Texture
-    // Path" remap (no filesystem to open an Explorer window onto in the browser).
     private void AddHostSlotItem(TreeMenuHostSlot slot, object? nodeData)
     {
-        if (slot == TreeMenuHostSlot.ViewTextureInExplorer && nodeData is AnimationFrameSave frame)
-            AddMenuItem("Copy Texture Path", () => _ = CopyTexturePathAsync(frame));
+        switch (slot)
+        {
+            case TreeMenuHostSlot.AdjustFrameTime when nodeData is AnimationChainSave chain
+                && _dialogHost is not null:
+                AddMenuItem("Adjust Frame Time…",
+                    () => _ = EditorDialogs.ShowAdjustFrameTimeAsync(_dialogHost, _appCommands!, chain));
+                break;
+            case TreeMenuHostSlot.AddMultipleFrames when nodeData is AnimationChainSave chain
+                && _dialogHost is not null:
+                AddMenuItem("Add Multiple Frames…",
+                    () => _ = EditorDialogs.ShowAddMultipleFramesAsync(
+                        _dialogHost, _appCommands!, chain, _showStatus));
+                break;
+            case TreeMenuHostSlot.AdjustOffsets when nodeData is AnimationChainSave chain
+                && _dialogHost is not null && _getTextureHeight is not null:
+                AddMenuItem("Adjust Offsets…",
+                    () => _ = EditorDialogs.ShowAdjustOffsetsAsync(
+                        _dialogHost, _appCommands!, chain, _getTextureHeight));
+                break;
+            case TreeMenuHostSlot.ViewTextureInExplorer when nodeData is AnimationFrameSave frame:
+                AddMenuItem("Copy Texture Path", () => _ = CopyTexturePathAsync(frame));
+                break;
+        }
     }
 
     private async Task CopyTexturePathAsync(AnimationFrameSave frame)

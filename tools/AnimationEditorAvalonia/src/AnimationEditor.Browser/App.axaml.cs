@@ -17,6 +17,7 @@ using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Views.Controls;
+using AnimationEditor.Views.Dialogs;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -176,6 +177,11 @@ public partial class App : Application
         var notifications = new EditorNotificationOverlay();
         notifications.WireUndo(() => undoManager.Undo());
         appCommands.ItemsDeleted += notifications.ShowItemDeleted;
+        var dialogs = new EditorDialogOverlay();
+        appCommands.ConfirmAsync = (message, title) =>
+            EditorDialogs.ConfirmAsync(dialogs, message, title);
+        appCommands.PromptStringAsync = (title, prompt, initial) =>
+            EditorDialogs.PromptStringAsync(dialogs, title, prompt, initial);
 
         // #610: the first browser setting worth persisting -- theme has a real toggle button
         // below, unlike zoom/grid/recent-files, which have no browser UI yet (see
@@ -262,7 +268,12 @@ public partial class App : Application
         animationTree.EnableRename(appCommands);
         // Phase 2 of #754: right-click tree context menu, matching desktop's MainWindow menu
         // (see docs/BROWSER_TREE_CONTEXT_MENU_DECISION.md).
-        animationTree.EnableContextMenu(appCommands, objectFinder, projectManager, pendingCutState);
+        animationTree.EnableContextMenu(
+            appCommands, objectFinder, projectManager, pendingCutState, dialogs,
+            frame => string.IsNullOrEmpty(frame.TextureName)
+                ? null
+                : thumbnailService.GetBitmap(frame.TextureName)?.Height,
+            message => notifications.ShowToast(message));
 
         // Phase 12 (#655): declared here (rather than alongside the Files TabItem UI below) so
         // CloseTab/SwitchToTab -- local functions defined earlier in this method that reference
@@ -2022,6 +2033,7 @@ public partial class App : Application
         var shell = new Grid();
         shell.Children.Add(root);
         shell.Children.Add(notifications);
+        shell.Children.Add(dialogs);
         shell.Children.Add(hiddenCommandButtons);
 
 #if DEBUG
