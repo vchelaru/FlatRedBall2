@@ -159,6 +159,8 @@ Gum file types (`.gumx`, `.gusx`, `.gutx`, `.behx`, `.ganx`) are intentionally e
 
 Other extensions still follow the dest-exists gate — a brand-new `.json` or `.tmx` still requires one rebuild before hot-reload notices it (acceptable for non-asset files, since code usually needs to reference them anyway).
 
+Changes under `bin`, `obj`, `.vs`, `.git` are dropped before they reach the dirty set at all (`ContentDirectoryWatcher.IgnoredDirectories`). This matters once a watch is rooted above `Content/` — a background build would otherwise restart the screen on every compile. `glue-project-loading` uses that shape.
+
 ## Gotchas
 
 - **Watch the source folder, not `bin/Debug`.** The engine handles this for you when you use the path-based overloads (`WatchContent("Content/foo.json", ...)`); paths are resolved against `SourceContentRoots`. If you bypass it with the `IFileWatcher` injection overload, you choose the path yourself.

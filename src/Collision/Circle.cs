@@ -45,13 +45,13 @@ public class Circle : IAttachable, IRenderable, ICollidable
     /// <summary>Optional logical name for diagnostics.</summary>
     public string? Name { get; set; }
 
+    /// <summary>Fill or outline color. Defaults to opaque white, matching the Glue editor.</summary>
+    public XnaColor Color { get; set; } = XnaColor.White;
     /// <summary>
-    /// Fill or outline color. Defaults to semi-transparent white so overlapping shapes are obvious
-    /// when made visible for debugging.
+    /// When <c>true</c>, the circle renders as a filled disk; when <c>false</c>, as a ring outline.
+    /// Defaults to <c>false</c> so shapes read as outlines the way FRB1 draws them.
     /// </summary>
-    public XnaColor Color { get; set; } = new XnaColor(255, 255, 255, 128);
-    /// <summary>When <c>true</c>, the circle renders as a filled disk; when <c>false</c>, as a ring outline.</summary>
-    public bool IsFilled { get; set; } = true;
+    public bool IsFilled { get; set; } = false;
     /// <summary>Outline thickness in pixels when <see cref="IsFilled"/> is <c>false</c>.</summary>
     public float OutlineThickness { get; set; } = 2f;
 

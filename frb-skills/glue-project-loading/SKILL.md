@@ -55,6 +55,23 @@ the `.gluj` has been read. See `gum-integration` for what goes wrong otherwise.
 a derived element to supply, so it is incomplete by construction. `CreateScreen`/`CreateEntity`
 throw; this is normal for a `GameScreen` base that levels derive from.
 
+## Hot reload
+
+A `GlueScreen` watches the source tree the `.gluj` sits in and restarts itself when Glue writes
+there: copy the changed file to the build output, reparse the project, rebuild the same screen from
+the new data. Nothing to call — it registers in `CustomInitialize` whenever
+`FlatRedBallService.SourceContentRoots` is non-empty, so it is dev-only by construction. Opt out with
+`FlatRedBallService.IsGlueHotReloadEnabled` before the first screen starts.
+
+**The reload restart replaces the retained `configure` callback.** Anything else your
+`Start<GlueScreen>` callback did — a difficulty, a seed, a hand-built object — is gone from every
+restart after the first Glue edit, because the replacement only reassigns `Save` and `Project`. Put
+that setup in a `GlueScreen` subclass's `CustomInitialize` or in `RestoreHotReloadState`.
+
+Gum files are left to Gum's own in-place pipeline, and `bin`/`obj` are filtered by
+`ContentDirectoryWatcher.IgnoredDirectories`. `content-hot-reload` covers the watch/copy machinery
+underneath.
+
 ## Variables: two surfaces, two intents
 
 `Objects` is the typed dictionary of built objects — `(Circle)screen.Objects["CooldownCircle"]`. The

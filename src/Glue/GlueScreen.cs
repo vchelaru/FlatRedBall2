@@ -122,7 +122,101 @@ public class GlueScreen : Screen
     }
 
     /// <inheritdoc />
-    public override void CustomInitialize() => BuildObjects();
+    public override void CustomInitialize()
+    {
+        BuildObjects();
+        WatchGlueProject();
+    }
+
+    // Glue writes into the project's source tree while the game reads the build output, so a save
+    // in Glue is invisible until the file is copied across and the project reparsed. One watcher
+    // rooted at the .gluj's own directory covers all of it: the .gluj, the .glsj/.glej element
+    // files Glue writes beside it, and the assets under Content/.
+    private void WatchGlueProject()
+    {
+        if (Engine is not { IsGlueHotReloadEnabled: true } engine) return;
+        if (engine.GlueProjectFile is not string glujPath) return;
+        // The watch maps the project directory onto each source root, which only means anything for
+        // a path relative to the output folder — and GlueContentSource requires that anyway.
+        if (System.IO.Path.IsPathRooted(glujPath)) return;
+
+        var watcher = WatchContentDirectoryContaining(
+            anchorFile: glujPath,
+            sourceDirectory: System.IO.Path.GetDirectoryName(glujPath) ?? string.Empty,
+            _ => ReloadAndRestart());
+        if (watcher is null) return;
+
+        foreach (var extension in GlueAuthoredExtensions)
+            watcher.AutoCopyExtensions.Add(extension);
+        // Gum patches its own files in place. Restarting the screen underneath that pass would tear
+        // down the visuals it just updated.
+        foreach (var gumExtension in GumOwnedExtensions)
+            watcher.IgnoredExtensions.Add(gumExtension);
+    }
+
+    /// <summary>
+    /// File types Glue creates that must reach the build output even when no copy is there yet.
+    /// </summary>
+    /// <remarks>
+    /// The dest-exists gate assumes a new source file is editor scratch. In a Glue project the
+    /// opposite holds — a screen, entity, or asset appearing in the tree is the editor doing its
+    /// job — and without this, "add something in Glue" would be the one edit hot reload cannot see.
+    /// </remarks>
+    private static readonly string[] GlueAuthoredExtensions =
+    {
+        ".gluj", ".glsj", ".glej",       // project and element files
+        ".tmx", ".csv", ".achx",         // assets GlueContentSource loads (.png/.tsx already default)
+    };
+
+    // Gum's XML file types and their JSON successors. Gum's own hot-reload pipeline owns both.
+    private static readonly string[] GumOwnedExtensions =
+    {
+        ".gumx", ".gusx", ".gucx", ".gutx", ".behx", ".ganx",
+        ".gumj", ".gusj", ".gucj", ".gutj", ".behj", ".ganj",
+    };
+
+    private bool _reloadRequested;
+
+    /// <summary>
+    /// Queues a restart onto the same Glue screen, rebuilt from the project as it stands on disk.
+    /// </summary>
+    /// <remarks>
+    /// Guarded because one save in Glue touches several files and the watcher reports each of them.
+    /// The guard needs no reset: the restart replaces this screen instance.
+    /// </remarks>
+    private void ReloadAndRestart()
+    {
+        if (_reloadRequested) return;
+        _reloadRequested = true;
+
+        // The configure the game passed to Start closes over the project loaded at boot, so a plain
+        // RestartScreen would rebuild from the pre-edit data. This one reparses instead, and stays
+        // in place for later restarts.
+        var engine = Engine;
+        var glueName = GlueName;
+        engine.RequestScreenRestart(
+            screen => ApplyReloadedProject((GlueScreen)screen, engine, glueName), RestartMode.HotReload);
+    }
+
+    /// <summary>
+    /// Reparses the project and points a restarted screen at it, keeping it on the same Glue screen.
+    /// </summary>
+    /// <remarks>
+    /// The reparse happens here rather than when the file event fired because one save in Glue writes
+    /// several files and the watcher copies them one at a time — reading mid-batch would see a tree
+    /// that is only half updated. By the time this queued restart runs, every copy has landed.
+    /// <para>
+    /// Falls back to the start-up screen when the name is gone: renaming a screen in Glue is a normal
+    /// edit, and booting somewhere beats booting nowhere.
+    /// </para>
+    /// </remarks>
+    internal static void ApplyReloadedProject(GlueScreen screen, FlatRedBallService engine, string? glueName)
+    {
+        engine.ReloadGlueProject();
+        var project = engine.GlueProject;
+        screen.Project = project;
+        screen.Save = (glueName is null ? null : project?.FindScreen(glueName)) ?? project?.StartUpScreen;
+    }
 
     /// <summary>
     /// Builds every object in <see cref="Save"/>, registers it on this screen, and applies the

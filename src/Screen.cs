@@ -809,17 +809,7 @@ public class Screen : ILifecycleEvents
             watcher ??= w;
             registered = true;
 
-            // Engine-level content watching deliberately filters out Gum file types
-            // (.gumx, .gusx, .gucx, .gutx, .behx, .ganx) because Gum runs its own
-            // hot-reload pipeline. That pipeline is opt-in — without this, callers
-            // would have to follow every WatchContentDirectory with a separate
-            // Engine.Gum.EnableHotReload call. When the watched directory contains
-            // a Gum project, auto-start it.
-            foreach (var gumx in Directory.EnumerateFiles(srcAbs, "*.gumx", SearchOption.AllDirectories))
-            {
-                Engine.EnableGumHotReload(gumx);
-                break; // one project per watched tree is the assumed shape
-            }
+            EnableGumHotReloadIfProjectUnder(srcAbs, w);
         }
 
         if (!registered)
@@ -833,6 +823,60 @@ public class Screen : ILifecycleEvents
         }
 
         return ContentWatchRegistrationStatus.Registered;
+    }
+
+    /// <summary>
+    /// Starts Gum's own hot-reload pipeline when a Gum project sits under a directory this screen
+    /// is watching.
+    /// </summary>
+    /// <remarks>
+    /// Engine-level content watching deliberately leaves Gum file types (<c>.gumx</c>, <c>.gusx</c>,
+    /// <c>.gucx</c>, <c>.gutx</c>, <c>.behx</c>, <c>.ganx</c>) alone, because Gum reloads them in
+    /// place. That pipeline is opt-in, so without this every <c>WatchContentDirectory</c> call would
+    /// have to be followed by a separate <c>Engine.Gum.EnableHotReload</c>.
+    /// <para>
+    /// Skipping the watcher's ignored folders matters once the watched root sits above
+    /// <c>Content/</c> (the Glue project layout): the build output holds a copy of the <c>.gumx</c>,
+    /// and enabling reload on that copy would watch a file the user never edits.
+    /// </para>
+    /// </remarks>
+    private void EnableGumHotReloadIfProjectUnder(string sourceAbsoluteRoot, ContentDirectoryWatcher watcher)
+    {
+        foreach (var gumx in Directory.EnumerateFiles(sourceAbsoluteRoot, "*.gumx", SearchOption.AllDirectories))
+        {
+            if (watcher.IgnoredDirectories.Overlaps(Path.GetRelativePath(sourceAbsoluteRoot, gumx)
+                    .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)))
+                continue;
+            Engine.EnableGumHotReload(gumx);
+            return; // one project per watched tree is the assumed shape
+        }
+    }
+
+    /// <summary>
+    /// Watches the one source root that holds <paramref name="anchorFile"/>, rather than every root
+    /// containing the directory.
+    /// </summary>
+    /// <remarks>
+    /// For a watch rooted at a project directory rather than at <c>Content/</c>, "every root that
+    /// contains this directory" is every root there is — including sibling projects that have
+    /// nothing to do with the file being watched. The anchor picks the one that does.
+    /// </remarks>
+    /// <returns><c>null</c> when no source root holds the anchor (shipping builds included).</returns>
+    internal ContentDirectoryWatcher? WatchContentDirectoryContaining(
+        string anchorFile, string sourceDirectory, Action<string> onChanged)
+    {
+        foreach (var root in Engine.SourceContentRoots)
+        {
+            if (!File.Exists(Path.Combine(root, anchorFile))) continue;
+
+            var srcAbs = Path.Combine(root, sourceDirectory);
+            var watcher = WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
+                sourceAbsoluteRoot: srcAbs,
+                destinationAbsoluteRoot: Path.Combine(Engine.OutputContentRoot, sourceDirectory));
+            EnableGumHotReloadIfProjectUnder(srcAbs, watcher);
+            return watcher;
+        }
+        return null;
     }
 
     /// <summary>

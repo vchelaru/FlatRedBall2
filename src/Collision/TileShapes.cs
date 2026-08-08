@@ -95,7 +95,7 @@ public class TileShapes : ICollidable
 
     private Layer? _layer;
     private bool _isVisible;
-    private XnaColor _color = new XnaColor(255, 255, 255, 128);
+    private XnaColor _color = XnaColor.White;
     private bool _isFilled = false;
     private float _outlineThickness = 2f;
 

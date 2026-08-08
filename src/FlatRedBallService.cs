@@ -220,18 +220,78 @@ public class FlatRedBallService
     public Glue.GlueProject? GlueProject { get; set; }
 
     /// <summary>
+    /// The path <see cref="EngineInitSettings.GlueProjectFile"/> named, or null when none was given.
+    /// Relative to <see cref="OutputContentRoot"/>, which is where the build drops the project.
+    /// </summary>
+    public string? GlueProjectFile { get; private set; }
+
+    /// <summary>
+    /// Whether a <see cref="Glue.GlueScreen"/> watches the Glue project's source tree and restarts
+    /// itself when Glue writes to it. On by default; hot-reload is already a no-op in shipping
+    /// builds, where <see cref="SourceContentRoots"/> is empty. Set before starting the first
+    /// screen to opt out.
+    /// </summary>
+    public bool IsGlueHotReloadEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Re-reads <see cref="GlueProjectFile"/> from the build output, replacing <see cref="GlueProject"/>.
+    /// </summary>
+    /// <remarks>
+    /// The screens and entities built from the old project are untouched — they hold the previous
+    /// <c>ScreenSave</c>s. Restart the screen against the new project to see the change; that is
+    /// what <see cref="Glue.GlueScreen"/>'s hot-reload watcher does.
+    /// </remarks>
+    /// <returns><c>false</c> when no Glue project was configured.</returns>
+    public bool ReloadGlueProject()
+    {
+        if (GlueProjectFile is not string file) return false;
+        LoadGlueProject(file);
+        return true;
+    }
+
+    /// <summary>
     /// Reads the Glue project so its Gum project is known before Gum initializes. A project that
     /// fails to load leaves <see cref="GlueProject"/> holding the diagnostics that say why.
     /// </summary>
-    private void LoadGlueProject(string glueProjectFile)
+    internal void LoadGlueProject(string glueProjectFile)
     {
+        GlueProjectFile = glueProjectFile;
+
         // Assets sit under the .gluj's own Content folder, which is also the game's — Glue writes
-        // every referenced-file path relative to it.
+        // every referenced-file path relative to it. This one stays relative: GlueContentSource
+        // resolves through TitleContainer, which rejects a rooted path.
         string projectDirectory = Path.GetDirectoryName(glueProjectFile) ?? string.Empty;
 
         GlueProject = Glue.GlueProject.Load(
             glueProjectFile,
-            new Glue.GlueContentSource(Content, projectDirectory));
+            new Glue.GlueContentSource(Content, projectDirectory),
+            OutputRootedLoadOptions());
+    }
+
+    /// <summary>
+    /// Reads the <c>.gluj</c> and its element files from <see cref="OutputContentRoot"/> rather than
+    /// the process working directory, which is the project folder under <c>dotnet run</c> and the
+    /// output folder under a debugger — so the plain-relative read would find a different (stale)
+    /// project depending on how the game was launched.
+    /// </summary>
+    private Glue.GlueLoadOptions OutputRootedLoadOptions()
+    {
+        var options = new Glue.GlueLoadOptions();
+        var resolve = options.ResolveFilePath;
+        string Rebase(string path) => Path.IsPathRooted(path) ? path : Path.Combine(OutputContentRoot, path);
+
+        options.ResolveFilePath = requested =>
+        {
+            var rebased = Rebase(requested);
+            var resolved = resolve(rebased);
+            if (resolved is null) return null;
+            // Hand the caller's own string back when the file was found exactly as asked for. The
+            // loader treats "resolved != requested" as a case mismatch worth warning about, and the
+            // rebase alone must not trip that.
+            return string.Equals(resolved, rebased, StringComparison.Ordinal) ? requested : resolved;
+        };
+        options.ReadAllText = path => File.ReadAllText(Rebase(path));
+        return options;
     }
 
     /// <summary>
