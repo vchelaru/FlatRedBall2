@@ -77,6 +77,9 @@
         <div>Loading Animation Editor…</div>
     </div>
 </div>
+<!-- #761: patch WebGL getParameter before Avalonia/Skia creates a context (WebKit console
+     noise when UNMASKED_* is probed without enabling WEBGL_debug_renderer_info). -->
+<script src="./webglDebugRendererInfoPatch.js"></script>
 <!-- Patch BEFORE Avalonia's storage.js captures showDirectoryPicker into a closed-over
      `native` const (native-file-system-adapter). Forces mode:readwrite on Avalonia's
      OpenFolderPickerAsync path so Save can write without a second dialog. -->

@@ -5,6 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
+    "test:unit": "node --test tests/*.node.test.mjs",
     "install-browsers": "playwright install chromium"
   },
   "devDependencies": {
