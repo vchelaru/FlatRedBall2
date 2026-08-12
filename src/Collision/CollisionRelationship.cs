@@ -124,6 +124,40 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     public bool AllowDuplicatePairs { get; set; }
 
     /// <summary>
+    /// When <c>false</c>, this relationship detects collisions and raises its events but withholds
+    /// the response — nothing is separated, bounced, or carried by a moving platform. Defaults to
+    /// <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    /// For a game that decides per collision whether the response should happen: take the event,
+    /// inspect the pair, then call <see cref="ApplyPhysics"/> on the ones that should separate. It
+    /// is not the same as configuring no physics at all — the masses, elasticity and move/bounce
+    /// choice stay configured and are simply applied later, by you.
+    /// </remarks>
+    public bool ArePhysicsAppliedAutomatically { get; set; } = true;
+
+    /// <summary>
+    /// Applies this relationship's configured response to one pair, as the automatic pass would.
+    /// Returns false when the pair is not overlapping, leaving both untouched.
+    /// </summary>
+    /// <remarks>
+    /// The companion to <see cref="ArePhysicsAppliedAutomatically"/>. Raises no events and records
+    /// no contact — those already happened on the frame the collision was detected, and firing them
+    /// again would double-count enter/exit.
+    /// </remarks>
+    public bool ApplyPhysics(A a, B b)
+    {
+        var sep = ComputeSeparationVector(GetEffectiveA(a), GetEffectiveB(b), out var axisAligned);
+
+        if (sep == Vector2.Zero || !TryApplyOneWayGate(a, b, ref sep))
+            return false;
+
+        ApplyResponse(a, b, sep, axisAligned);
+        TryTransferPlatformVelocity(a, b, sep);
+        return true;
+    }
+
+    /// <summary>
     /// Number of deep (narrow-phase) collision checks performed during the last <see cref="RunCollisions"/> call.
     /// Useful for profiling. When both lists come from a <see cref="Factory{T}"/> with a matching
     /// <see cref="Factory{T}.PartitionAxis"/>, this will be much lower than the O(n×m) worst case.
@@ -484,8 +518,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         var sep = ComputeSeparationVector(effectiveA, effectiveB, out var axisAligned);
         if (sep == Vector2.Zero) return;
         if (!TryApplyOneWayGate(a, (B)(object)b, ref sep)) return;
-        ApplyResponse(a, (B)(object)b, sep, axisAligned);
-        TryTransferPlatformVelocity(a, (B)(object)b, sep);
+        if (ArePhysicsAppliedAutomatically)
+        {
+            ApplyResponse(a, (B)(object)b, sep, axisAligned);
+            TryTransferPlatformVelocity(a, (B)(object)b, sep);
+        }
         RecordContact(a, (B)(object)b);
         CollisionOccurred?.Invoke(a, (B)(object)b);
         if (AllowDuplicatePairs)
@@ -511,8 +548,12 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             TryOfferGroundSnap(a, b);
             return;
         }
-        ApplyResponse(a, b, sep, axisAligned);
-        TryTransferPlatformVelocity(a, b, sep);
+        if (ArePhysicsAppliedAutomatically)
+        {
+            ApplyResponse(a, b, sep, axisAligned);
+            TryTransferPlatformVelocity(a, b, sep);
+        }
+
         RecordContact(a, b);
         CollisionOccurred?.Invoke(a, b);
         TryOfferGroundSnap(a, b);

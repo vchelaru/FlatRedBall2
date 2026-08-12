@@ -128,7 +128,7 @@ Camera.Zoom = 0.5f; // zoom out: shows double the world area
 
 `Camera.OrthogonalWidth/Height` do **not** control the actual window pixel size. Window size is set via `DisplaySettings` and applied in two ways:
 
-**Startup** — call `PrepareWindow<T>` from the `Game1` constructor (before `Initialize`) so the window opens at the right size with no flicker:
+**Startup** — `Initialize<T>` sizes the window from the starting screen's `PreferredDisplaySettings`, falling back to the engine's, so set them in the constructor and the window opens at that size:
 ```csharp
 public Game1()
 {
@@ -136,9 +136,9 @@ public Game1()
     var ds = FlatRedBallService.Default.DisplaySettings;
     ds.PreferredWindowWidth  = 1280;
     ds.PreferredWindowHeight = 720;
-    FlatRedBallService.Default.PrepareWindow<MyStartScreen>(_graphics);
 }
 ```
+A Glue project's own display block wins over both — it is applied as the project loads, before sizing.
 
 **Runtime** (settings menu, F11 toggle) — call `ApplyWindowSettings` at any time:
 ```csharp

@@ -33,6 +33,7 @@ internal sealed class TestServices
     public AppCommands AppCommands { get; }
     public PendingCutState PendingCutState { get; }
     public ThumbnailService ThumbnailService { get; }
+    public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
     public IFileAssociationService FileAssociationService { get; } = new NullFileAssociationService();
     public IUpdateChecker UpdateChecker { get; } = new FakeUpdateChecker();
 
@@ -58,7 +59,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
+            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
 }
 
 internal static class TestHelpers

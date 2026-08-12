@@ -237,6 +237,10 @@ internal static class GlueCollisionBuilder
         where TA : ICollidable
         where TB : ICollidable
     {
+        // Unchecked in Glue means the response is the game's to apply, per collision, from the
+        // event. The type below is still configured — it is withheld, not discarded.
+        relationship.ArePhysicsAppliedAutomatically = settings.ArePhysicsAppliedAutomatically;
+
         switch (settings.CollisionType)
         {
             case GlueCollisionType.NoPhysics:

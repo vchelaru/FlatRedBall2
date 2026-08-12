@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlatRedBall2.csproj" />
+  </ItemGroup>
+  <!--
+    Everything the Glue editor authors lives in this one folder, so copying it needs one rule and no
+    exclusions - the same shape as Content\GumProject\. The editor never touches this .csproj, so the
+    files are globbed rather than listed. Do not widen this to the project root: a glob rooted there
+    also matches bin\ and obj\, so each build copies the previous build's copies in again.
+  -->
+  <ItemGroup>
+    <Content Include="Content\FrbEditor\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="Content\FrbEditor\**\*.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Content\obj\**" />
+    <EmbeddedResource Remove="Content\obj\**" />
+    <None Remove="Content\obj\**" />
+  </ItemGroup>
+</Project>

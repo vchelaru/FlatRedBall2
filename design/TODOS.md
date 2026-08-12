@@ -20,29 +20,6 @@ options/parameter passed to the `TileMap` constructor (matching what #804 does, 
 internal signature and every call site), or leave it and accept the test-isolation hazard. Worth
 deciding deliberately rather than letting the next seam copy it a third time.
 
-## External tileset images resolve against the map, not the `.tsx`
-
-Loading a `.tmx` that references an external tileset in a *different directory* fails to find that
-tileset's image. `Level1Map.tmx` (at `Content/Screens/Level1/`) references
-`source="../../StandardTileset.tsx"`, which resolves correctly to `Content/StandardTileset.tsx`. That
-`.tsx` then references `source="StandardTilesetIcons.png"` — which per the TMX spec is relative to
-**the tileset file**, so `Content/StandardTilesetIcons.png`. The loader instead looks in
-`Content/Screens/Level1/StandardTilesetIcons.png` and throws
-`TilemapParseException: Failed to load texture for tileset 'TiledIcons'`.
-
-`TileMap.DefaultTmxLoader` (`src/Tiled/TileMap.cs:54-65`) passes a single `baseDirectory` — the TMX's
-own folder — to `TiledTmxParser`, and that one base path is evidently used for both the `.tsx` lookup
-and the image lookup inside it. External tilesets in a sibling or parent folder are the normal way
-Tiled projects share a tileset across levels, so this affects real projects rather than a corner case.
-
-Repro: `tests/FlatRedBall2.Tests/Glue/Fixtures/DoorsDemo/` — the fixture currently carries a
-**duplicate** copy of `StandardTilesetIcons.png` under `Content/Screens/Level1/` purely to work
-around this. Delete that duplicate to reproduce, and delete it for real once this is fixed.
-
-Open question before fixing: whether `TiledTmxParser` can be given a per-tileset base directory, or
-whether the resolution has to happen in FRB2's `resourceResolver` by tracking which `.tsx` a request
-came from. Confirm which layer owns it before changing anything.
-
 ## Kni Blazor.GL Pitch support unreleased — blocks #799 web-side verification
 
 Kni merged `Pitch` support for `SoundEffectInstance` on Blazor.GL in [kniEngine/kni#2614](https://github.com/kniEngine/kni/pull/2614) (2026-07-26) and for `DynamicSoundEffectInstance` in [#2615](https://github.com/kniEngine/kni/pull/2615) (2026-07-28), but neither is in a published NuGet release yet — latest `nkast.Kni.Platform.Blazor.GL` (4.2.9001.2) is pinned to a commit from 2025-11-16. Until Kni publishes a release containing both PRs, Pitch does not work on Kni's web backend for any sound type, one-shot or streaming — confirmed via `diagnostics/MusicPitchWebSpike` throwing `DynamicSoundEffectInstance does not support Pitch` at runtime.

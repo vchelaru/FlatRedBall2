@@ -286,18 +286,28 @@ namespace AnimationEditor.Core.CommandsAndState
         /// undoable operation — the multi-select counterpart to <see cref="SetRectProps"/>. Rects may
         /// belong to different frames. <paramref name="name"/> and each numeric parameter may be
         /// <c>null</c> to leave that field untouched per-rect (its own existing value survives) —
-        /// used when the inspector field is showing "(mixed)", or (for name) when more than one
-        /// rect is selected and applying one literal name to every rect would clobber their
-        /// distinct names. See <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
+        /// used when the inspector field is showing "(mixed)". Applying one literal
+        /// <paramref name="name"/> to every rect is safe as long as no two rects share a frame (shape
+        /// names only need to be unique within a frame); callers should check
+        /// <see cref="HasSameFrameNameCollision"/> before passing a non-null name for a multi-selection.
+        /// See <see cref="SetFrameRelative"/> for why <c>null</c> is unambiguous here.
         /// </summary>
         void SetRectPropsBulk(IReadOnlyList<AARectSave> rects, string? name, float? x, float? y, float? scaleX, float? scaleY);
 
         /// <summary>
         /// Sets Name/X/Y/Radius on every circle in <paramref name="circles"/> as a single undoable
         /// operation — the multi-select counterpart to <see cref="SetCircleProps"/>. See
-        /// <see cref="SetRectPropsBulk"/> for the null-means-"don't touch" semantics.
+        /// <see cref="SetRectPropsBulk"/> for the null-means-"don't touch" semantics and the
+        /// same-frame name-collision caveat.
         /// </summary>
         void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles, string? name, float? x, float? y, float? radius);
+
+        /// <summary>
+        /// True when two or more of <paramref name="shapes"/> (AARectSave and/or CircleSave) are
+        /// owned by the same frame — batch-applying one literal name to all of them would collide,
+        /// since shape names only need to be unique within a frame, not across frames.
+        /// </summary>
+        bool HasSameFrameNameCollision(IReadOnlyList<object> shapes);
 
         // ── Hot Reload ────────────────────────────────────────────────────────────
 

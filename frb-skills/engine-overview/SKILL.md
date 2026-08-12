@@ -40,7 +40,7 @@ Each frame runs in this order:
 
 ## Bootstrapping a Game
 
-`Game1.cs` wires the MonoGame loop to FRB: `PrepareWindow<TScreen>` in the constructor, then `FlatRedBallService.Default.Initialize(this)` + `Start<TScreen>()` in `Initialize`, then `Update`/`Draw` each frame. The complete template — including the `GraphicsProfile.HiDef` setup that crashes at startup if omitted — lives in `sample-project-setup`; don't hand-roll it.
+`Game1.cs` wires the MonoGame loop to FRB: `FlatRedBallService.Default.Initialize<TScreen>(this)` in `Initialize` (sizes the window, initializes, starts the screen — or `Initialize(this, "…gluj")` to boot a whole Glue project), then `Update`/`Draw` each frame. The complete template — including the `GraphicsProfile.HiDef` setup that crashes at startup if omitted — lives in `sample-project-setup`; don't hand-roll it.
 
 ## Key Design Rules
 

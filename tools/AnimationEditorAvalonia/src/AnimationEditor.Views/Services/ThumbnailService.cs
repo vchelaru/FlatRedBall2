@@ -296,9 +296,11 @@ public sealed class ThumbnailService : IDisposable
     /// Wraps a Skia bitmap as an Avalonia <see cref="Avalonia.Media.Imaging.WriteableBitmap"/> by
     /// copying its pixels straight into the framebuffer — no PNG encode/decode. Skia converts to
     /// the destination BGRA/premultiplied layout during <see cref="SKBitmap.ReadPixels(SKImageInfo,
-    /// IntPtr, int, int, int)"/>, so the source colour/alpha type does not matter.
+    /// IntPtr, int, int, int)"/>, so the source colour/alpha type does not matter. Internal (not
+    /// private) so <c>ProjectTreeThumbnailService</c> can share this conversion for project-tree
+    /// thumbnails (issue #839) instead of duplicating it.
     /// </summary>
-    private static Avalonia.Media.Imaging.Bitmap ToAvaloniaBitmap(SKBitmap thumb)
+    internal static Avalonia.Media.Imaging.Bitmap ToAvaloniaBitmap(SKBitmap thumb)
     {
         var size   = new PixelSize(thumb.Width, thumb.Height);
         var bitmap = new Avalonia.Media.Imaging.WriteableBitmap(

@@ -4,7 +4,7 @@
 |---|---|
 | **Initiative** | Load FRB1 Glue projects (`.gluj`/`.glsj`/`.glej`) into FRB2 |
 | **Tracking issue** | [vchelaru/FlatRedBall2#804](https://github.com/vchelaru/FlatRedBall2/issues/804) |
-| **Status** | Partly implemented — spawning by name works; pooling and partitioning deferred, see §9. |
+| **Status** | Implemented — pooling landed; SortAxis is an engine gap, see §9. |
 | **Depends on** | Phase 6 (abstract elements get no factory; entity instances exist) |
 | **Blocks** | Phase 9 (relationships take entity lists), Phase 10 (TMX spawns entities) |
 | **Suggested branch** | `804-phase-8-factories` |
@@ -277,13 +277,38 @@ a per-Glue-name instance list and registers through that.
 |---|---|---|
 | Create by name | `PlayerFactory.CreateNew()` | `project.CreateEntity(@"Entities\Player", screen)` |
 | The list to collide against | `ListsToAddTo` | `project.InstancesOf(@"Entities\Player")` |
-| Pooling | `PooledByFactory` → free list | **not wired** |
-| Spatial partitioning | `SortAxis` | **not wired** |
+| Pooling | `PooledByFactory` → free list | per-Glue-name free list on `GlueProject` |
+| Spatial partitioning | `SortAxis` | **not wired — FRB2 has no equivalent at all** |
 
-**What this costs:** pooling and partitioning are unavailable to loaded entities. No vendored fixture
-sets `PooledByFactory` — 14 files repo-wide, all in FRB1's test project — so nothing exercised it
-either way, and shipping it untested was the worse option. `AssociateWithFactory` is parsed and not
-consulted, because with one instance list per name there is nothing to associate.
+`AssociateWithFactory` is parsed and not consulted, because with one instance list per name there is
+nothing to associate: `InstancesOf` *is* the association, always on.
+
+### Pooling, and the latent bug it uncovered
+
+**`Forget` had zero call sites.** It was written to drop a destroyed instance from the live list, with
+a comment saying a relationship would otherwise "keep collecting corpses" — and nothing ever called
+it. Every destroyed entity stayed in `InstancesOf` forever, so a collision relationship built on that
+list kept colliding against the dead. Found while looking for the destroy hook pooling needed;
+`Destroy_AnInstance_StopsTrackingIt` is the regression test.
+
+The hook is `Entity._onDestroy`, which fires on both the normal and the pooled destroy path.
+`CreateEntity` now assigns it, so tracking and recycling share one signal.
+
+**Pools are keyed on the Glue name, not the CLR type — which is what makes this possible at all.**
+G80's blocker is that `Factory<T>` keys on `typeof(T)` and every loaded entity is a `GlueEntity`, so
+one engine factory would serve every element and hand a `Door` back where a `Player` was asked for.
+A per-name pool owned by `GlueProject` sidesteps the registry entirely, so no core API changed.
+
+Only the **shell** is recycled: `BuildObjects` runs on a reused instance exactly as on a fresh one,
+clearing what the previous life left behind. So the saving is one `GlueEntity` allocation rather than
+the whole object graph — smaller than FRB1's pooling, and honest about it. The double-pool guard in
+`Release` matters: destroying an already-destroyed entity would otherwise queue the same shell twice
+and hand it to two callers.
+
+**`SortAxis` stays unwired, and not for want of a mapping — FRB2 has no partitioned collision.**
+There is no `SortAxis` anywhere in `src/`. Honouring it would mean building sorted-list collision
+partitioning into the engine, which is engine work with its own design, not a loader translation.
+Revisit if a real project's collision cost actually calls for it.
 
 **What it buys:** nested entities instantiate. Beefball's `GameScreen` now spawns its players, puck
 and goals from `PositionedObjectList` contents, which is what makes it look like the game rather

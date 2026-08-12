@@ -10,7 +10,7 @@ namespace FlatRedBall2;
 /// <c>async/await</c> in game code executes within the normal Update loop.
 /// <para>
 /// Set as the active <see cref="SynchronizationContext"/> during
-/// <see cref="FlatRedBallService.Initialize"/>. Call <see cref="Update"/>
+/// <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>. Call <see cref="Update"/>
 /// once per frame (after task completion logic, before screen activity).
 /// Call <see cref="Clear"/> on screen transition to discard stale continuations.
 /// </para>

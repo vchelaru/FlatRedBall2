@@ -111,7 +111,7 @@ public class GlueMovementTests
         {
             Save = project.FindEntity(@"Entities\Player"),
             Content = new GlueContentSource(
-                new ContentLoader(), Path.Combine("Glue", "Fixtures", "DoorsDemo")),
+                new ContentLoader(), Path.Combine("Glue", "Fixtures", "DoorsDemo", "Content")),
         };
 
         entity.BuildObjects();

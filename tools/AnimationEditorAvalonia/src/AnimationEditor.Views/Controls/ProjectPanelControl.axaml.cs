@@ -1,5 +1,7 @@
+using AnimationEditor.App.Services;
 using AnimationEditor.Core.IO;
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
@@ -7,6 +9,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AnimationEditor.Views.Controls;
 
@@ -14,12 +18,18 @@ namespace AnimationEditor.Views.Controls;
 /// Displays the recursively-discovered <c>.achx</c> tree for a picked project folder (#770).
 /// Platform-agnostic: everything it renders comes from <see cref="AchxFolderScanner"/> /
 /// <see cref="AchxFolderTreeBuilder"/> over <see cref="IEditorFolder"/>, so this same control is
-/// shared unmodified by desktop (real filesystem) and the browser build (native folder handle).
+/// shared unmodified by desktop (real filesystem) and the browser build (native folder handle) --
+/// including first-frame thumbnails (issue #839), generated lazily via
+/// <see cref="ProjectTreeThumbnailService"/> after <see cref="SetEntries"/>.
 /// </summary>
 public partial class ProjectPanelControl : UserControl
 {
+    private const int ThumbnailSize = 28;
+
     private IReadOnlyList<AchxFileEntry> _allEntries = Array.Empty<AchxFileEntry>();
     private string _searchQuery = string.Empty;
+    private ProjectTreeThumbnailService? _thumbnailService;
+    private CancellationTokenSource? _thumbnailLoadCts;
 
     // Guards against re-entrant SelectionChanged while ClearSearchAndReveal restores the
     // selection post-rebuild -- without it, that restore would re-fire FileSelected for the
@@ -31,6 +41,13 @@ public partial class ProjectPanelControl : UserControl
     /// <summary>Raised when the user clicks a file row.</summary>
     public event Action<AchxFileEntry>? FileSelected;
 
+    /// <summary>
+    /// Completes once every thumbnail from the most recent <see cref="Rebuild"/> has finished
+    /// loading (or been cancelled by a newer one). Test seam for awaiting the async thumbnail
+    /// load -- production code never needs to await this.
+    /// </summary>
+    public Task ThumbnailLoadTask { get; private set; } = Task.CompletedTask;
+
     public ProjectPanelControl()
     {
         InitializeComponent();
@@ -39,6 +56,14 @@ public partial class ProjectPanelControl : UserControl
         ProjectTree.SelectionChanged += OnTreeSelectionChanged;
         Rebuild();
     }
+
+    /// <summary>
+    /// Wires the thumbnail generator (issue #839). Not passed to the constructor because
+    /// <see cref="AnimationEditor.Views"/> controls are constructed by XAML with no arguments;
+    /// call this once, before the first real <see cref="SetEntries"/>.
+    /// </summary>
+    public void Initialize(ProjectTreeThumbnailService thumbnailService) =>
+        _thumbnailService = thumbnailService;
 
     /// <summary>
     /// Replaces the scanned entries (e.g. after a fresh Open Project Folder pick) and rebuilds
@@ -73,6 +98,73 @@ public partial class ProjectPanelControl : UserControl
 
         foreach (var node in AchxFolderTreeBuilder.Build(files))
             TreeRoots.Add(AchxTreeNodeVm.FromNode(node));
+
+        StartThumbnailLoad();
+    }
+
+    /// <summary>
+    /// Kicks off thumbnail generation for every file row now in <see cref="TreeRoots"/>, a few at
+    /// a time (the throttle lives in <see cref="ProjectTreeThumbnailService"/>) so rows fill in
+    /// as they finish instead of blocking the tree. Cancels any load still running from a
+    /// previous <see cref="Rebuild"/> (e.g. the user typed in search again) first, so a stale
+    /// generation can't overwrite a node from the new tree.
+    /// </summary>
+    private void StartThumbnailLoad()
+    {
+        _thumbnailLoadCts?.Cancel();
+        _thumbnailLoadCts?.Dispose();
+        if (_thumbnailService is null) { ThumbnailLoadTask = Task.CompletedTask; return; }
+
+        var cts = new CancellationTokenSource();
+        _thumbnailLoadCts = cts;
+
+        var fileNodes = new List<AchxTreeNodeVm>();
+        CollectFileNodes(TreeRoots, fileNodes);
+
+        ThumbnailLoadTask = Task.WhenAll(fileNodes.Select(node => LoadOneThumbnailAsync(node, cts.Token)));
+    }
+
+    private static void CollectFileNodes(IEnumerable<AchxTreeNodeVm> nodes, List<AchxTreeNodeVm> results)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsFile) results.Add(node);
+            else CollectFileNodes(node.Children, results);
+        }
+    }
+
+    private async Task LoadOneThumbnailAsync(AchxTreeNodeVm node, CancellationToken cancellationToken)
+    {
+        Bitmap? thumbnail;
+        try
+        {
+            thumbnail = await _thumbnailService!.GetThumbnailAsync(
+                node.Entry!, ThumbnailSize, ThumbnailSize, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (!cancellationToken.IsCancellationRequested)
+            node.Thumbnail = thumbnail;
+    }
+
+    /// <summary>
+    /// Re-generates the thumbnail for a single already-visible node after its file changed on
+    /// disk (issue #839 follow-up: a save wasn't reflected in the tree at all). No-op if
+    /// <paramref name="entry"/> isn't currently in the tree, or before <see cref="Initialize"/>.
+    /// Callers fire-and-forget this; it's <c>async Task</c> only so tests can await it.
+    /// </summary>
+    public async Task InvalidateThumbnail(AchxFileEntry entry)
+    {
+        if (_thumbnailService is null) return;
+
+        var node = FindNode(TreeRoots, entry);
+        if (node is null) return;
+
+        _thumbnailService.InvalidateEntry(entry);
+        await LoadOneThumbnailAsync(node, CancellationToken.None);
     }
 
     private void OnSearchQueryChanged(object? sender, string query)
@@ -140,6 +232,7 @@ public partial class ProjectPanelControl : UserControl
 public sealed class AchxTreeNodeVm : INotifyPropertyChanged
 {
     private bool _isExpanded = true;
+    private Bitmap? _thumbnail;
 
     public string Name { get; }
     public AchxFileEntry? Entry { get; }
@@ -148,6 +241,25 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
     public ObservableCollection<AchxTreeNodeVm> Children { get; } = new();
 
     public bool IsFolderOpen => _isExpanded;
+
+    /// <summary>First-frame preview (issue #839), populated asynchronously after the row appears --
+    /// null until <see cref="ProjectTreeThumbnailService"/> finishes (or if it can't produce one),
+    /// in which case the row keeps showing the generic chain icon.</summary>
+    public Bitmap? Thumbnail
+    {
+        get => _thumbnail;
+        set
+        {
+            if (ReferenceEquals(_thumbnail, value)) return;
+            _thumbnail = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasThumbnail));
+            OnPropertyChanged(nameof(ShowFallbackIcon));
+        }
+    }
+
+    public bool HasThumbnail => _thumbnail is not null;
+    public bool ShowFallbackIcon => IsFile && _thumbnail is null;
 
     public bool IsExpanded
     {

@@ -160,8 +160,14 @@ internal static class GlueVariableApplier
         List<CustomVariable>? variables,
         object element,
         IReadOnlyDictionary<string, object> objects,
-        IReadOnlyDictionary<string, JsonElement> bag)
+        IReadOnlyDictionary<string, JsonElement> bag,
+        IReadOnlyDictionary<string, object?>? runtimeBag = null)
     {
+        // A value set at runtime wins over the authored one, and is stored as-is rather than
+        // round-tripped through JSON — Write only puts a name here when nothing else claimed it.
+        if (runtimeBag is not null && runtimeBag.TryGetValue(name, out object? live))
+            return Coerce<T>(live);
+
         var variable = FindVariable(variables, name);
 
         if (variable?.IsTunneling == true &&
@@ -184,6 +190,82 @@ internal static class GlueVariableApplier
         }
 
         return bag.TryGetValue(name, out var raw) ? PropertySaveExtensions.Decode<T>(raw) : default;
+    }
+
+    /// <summary>
+    /// Writes a variable by name, to the same three destinations <see cref="Apply"/> uses.
+    /// </summary>
+    /// <remarks>
+    /// Resolution order matters: a name matching a real CLR member has to reach that member rather
+    /// than shadow it in the bag, or the property keeps its old value while reads look correct
+    /// (G144). Only a name nothing else claims lands in <paramref name="runtimeBag"/>.
+    /// </remarks>
+    internal static void Write(
+        string name,
+        object? value,
+        List<CustomVariable>? variables,
+        object element,
+        IReadOnlyDictionary<string, object> objects,
+        Dictionary<string, object?> runtimeBag)
+    {
+        var variable = FindVariable(variables, name);
+
+        if (variable?.IsTunneling == true &&
+            objects.TryGetValue(variable.SourceObject!, out object? source) &&
+            TryWriteProperty(source, variable.SourceObjectProperty!, value))
+        {
+            return;
+        }
+
+        if ((variable is null || !variable.IsTunneling) && TryWriteProperty(element, name, value))
+            return;
+
+        runtimeBag[name] = value;
+    }
+
+    private static bool TryWriteProperty(object target, string glueMemberName, object? value)
+    {
+        var property = GlueMemberWriter.FindProperty(
+            target, GlueMemberWriter.ResolveMemberName(glueMemberName));
+
+        if (property is null || !property.CanWrite)
+            return false;
+
+        object? converted = ConvertTo(value, property.PropertyType);
+        if (converted is null && property.PropertyType.IsValueType &&
+            Nullable.GetUnderlyingType(property.PropertyType) is null)
+        {
+            return false;
+        }
+
+        property.SetValue(target, converted);
+        return true;
+    }
+
+    /// <summary>
+    /// Converts a runtime-supplied value to the member's type. Glue authors numbers loosely — an
+    /// int where a float is declared is normal — so an exact type match cannot be required.
+    /// </summary>
+    private static object? ConvertTo(object? value, Type target)
+    {
+        if (value is null)
+            return null;
+
+        var underlying = Nullable.GetUnderlyingType(target) ?? target;
+
+        if (underlying.IsInstanceOfType(value))
+            return value;
+
+        try
+        {
+            return underlying.IsEnum
+                ? Enum.ToObject(underlying, value)
+                : Convert.ChangeType(value, underlying, CultureInfo.InvariantCulture);
+        }
+        catch (Exception e) when (e is InvalidCastException or FormatException or OverflowException)
+        {
+            return null;
+        }
     }
 
     private static CustomVariable? FindVariable(List<CustomVariable>? variables, string name)

@@ -4,11 +4,16 @@
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="AnimationEditor.Views.Controls.ProjectPanelControl"
              x:DataType="controls:ProjectPanelControl">
+    <UserControl.Resources>
+        <x:Double x:Key="ProjectTreeThumbSize">28</x:Double>
+    </UserControl.Resources>
     <!--
         Open Project Folder (#770): recursively-discovered .achx tree for a picked folder.
-        Deliberately no drag/thumbnail support (unlike desktop's FilesPanelControl): click a
-        file row to open it, click a folder row to expand/collapse. That's what keeps this
-        control shareable between desktop and the browser build (no Window dependency).
+        Click a file row to open it, click a folder row to expand/collapse. First-frame
+        thumbnails (#839) load lazily via ProjectTreeThumbnailService and need no Window,
+        so this control stays shareable, unmodified, between desktop and the browser build.
+        Deliberately still no drag support (unlike desktop's FilesPanelControl), which does
+        need a Window.
     -->
     <Grid RowDefinitions="Auto,*,Auto">
         <Border Grid.Row="0"
@@ -49,10 +54,16 @@
                         <controls:FolderExpanderIcon IsVisible="{Binding IsFolder}"
                                                       IsOpen="{Binding IsFolderOpen}"
                                                       Toggled="OnFolderExpanderToggled" />
-                        <svg:Svg IsVisible="{Binding IsFile}"
+                        <svg:Svg IsVisible="{Binding ShowFallbackIcon}"
                                  Width="16" Height="16"
                                  Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
                                  CurrentColor="{DynamicResource IconInkMuted}" />
+                        <Image IsVisible="{Binding HasThumbnail}"
+                               Width="{StaticResource ProjectTreeThumbSize}"
+                               Height="{StaticResource ProjectTreeThumbSize}"
+                               Source="{Binding Thumbnail}"
+                               Stretch="Uniform"
+                               VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Name}"
                                    FontSize="11"
                                    VerticalAlignment="Center"

@@ -206,14 +206,15 @@ When a `.gumx` project is loaded (via `EngineInitSettings.GumProjectFile`), you 
 ```csharp
 using Gum.Forms;     // GetFrameworkElementByName extension method
 using Gum.Managers;  // ObjectFinder
-using MonoGameGum;   // ToGraphicalUiElement — easy to miss, different namespace from Gum.DataTypes
+using Gum;           // ToGraphicalUiElement — easy to miss, different namespace from Gum.DataTypes
 
 var gumScreenSave = ObjectFinder.Self.GumProjectSave.Screens
     .Find(s => s.Name == "MainMenuScreen");
 Add(gumScreenSave!.ToGraphicalUiElement());
 ```
 
-- `using MonoGameGum;` is required even though `ScreenSave` lives in `Gum.DataTypes` — the extension method is in `MonoGameGum`.
+- `using Gum;` is required even though `ScreenSave` lives in `Gum.DataTypes` — the extension method is in `Gum`. The `MonoGameGum` forwarder for this call is `[Obsolete]`; it still compiles but warns.
+- **This only works for a project Gum itself loaded** (via `GumProjectFile`). Assigning `ObjectFinder.Self.GumProjectSave` from your own `GumProjectSave.Load(...)` leaves the runtime half-configured — `ToGraphicalUiElement()` then builds children and throws `NotImplementedException` deep in `UnitConverter.ConvertToGeneralUnit`, which reads like bad data rather than bad setup.
 - **`GumProjectFile` path must NOT include `Content/`** — Gum's `FileManager` is already rooted at the MonoGame `Content/` directory. Use `"GumProject/GumProject.gumx"`, not `"Content/GumProject/GumProject.gumx"`. The double-`Content` causes a runtime load failure.
 
 ### If the project was created with gumcli

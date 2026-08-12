@@ -29,7 +29,7 @@ namespace FlatRedBall2;
 /// MonoGame <see cref="Microsoft.Xna.Framework.Game"/> loop.
 /// <para>
 /// Most games access the engine through <see cref="Default"/>, the single static instance,
-/// and call <see cref="Initialize"/>, <see cref="Update"/>, and <see cref="Draw"/> from the
+/// and call <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>, <see cref="Update"/>, and <see cref="Draw"/> from the
 /// matching <c>Game</c> hooks.
 /// </para>
 /// </summary>
@@ -194,15 +194,195 @@ public class FlatRedBallService
     }
 
     /// <summary>
-    /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize"/>.
+    /// The MonoGame <see cref="Microsoft.Xna.Framework.Game"/> instance passed to <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>.
     /// Use this to call <see cref="Microsoft.Xna.Framework.Game.Exit"/> or access window/graphics properties.
-    /// Throws if accessed before <see cref="Initialize"/> is called.
+    /// Throws if accessed before <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/> is called.
     /// </summary>
     public Game Game => _game ?? throw new InvalidOperationException(
         "FlatRedBallService has not been initialized. Call Initialize() first.");
 
     /// <summary>
-    /// Initializes the engine. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
+    /// The Glue project named by <see cref="EngineInitSettings.GlueProjectFile"/>, or null when none
+    /// was given. Its content source is already wired to this engine's loader.
+    /// </summary>
+    /// <remarks>
+    /// Loading happens during <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/> because the project's Gum project has to be
+    /// known before Gum initializes. Holding the result here spares the caller a second load:
+    /// <code>
+    /// service.Initialize(game, new EngineInitSettings { GlueProjectFile = "MyGame.gluj" });
+    /// service.Start&lt;GlueScreen&gt;(screen =&gt;
+    /// {
+    ///     screen.Save = service.GlueProject!.StartUpScreen;
+    ///     screen.Project = service.GlueProject;
+    /// });
+    /// </code>
+    /// </remarks>
+    public Glue.GlueProject? GlueProject { get; set; }
+
+    /// <summary>
+    /// The path <see cref="EngineInitSettings.GlueProjectFile"/> named, or null when none was given.
+    /// Relative to <see cref="OutputContentRoot"/>, which is where the build drops the project.
+    /// </summary>
+    public string? GlueProjectFile { get; private set; }
+
+    /// <summary>
+    /// Whether a <see cref="Glue.GlueScreen"/> watches the Glue project's source tree and restarts
+    /// itself when Glue writes to it. On by default; hot-reload is already a no-op in shipping
+    /// builds, where <see cref="SourceContentRoots"/> is empty. Set before starting the first
+    /// screen to opt out.
+    /// </summary>
+    public bool IsGlueHotReloadEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Re-reads <see cref="GlueProjectFile"/> from the build output, replacing <see cref="GlueProject"/>.
+    /// </summary>
+    /// <remarks>
+    /// The screens and entities built from the old project are untouched — they hold the previous
+    /// <c>ScreenSave</c>s. Restart the screen against the new project to see the change; that is
+    /// what <see cref="Glue.GlueScreen"/>'s hot-reload watcher does.
+    /// </remarks>
+    /// <returns><c>false</c> when no Glue project was configured.</returns>
+    public bool ReloadGlueProject()
+    {
+        if (GlueProjectFile is not string file) return false;
+        LoadGlueProject(file);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the Glue project so its Gum project is known before Gum initializes. A project that
+    /// fails to load leaves <see cref="GlueProject"/> holding the diagnostics that say why.
+    /// </summary>
+    internal void LoadGlueProject(string glueProjectFile)
+    {
+        GlueProjectFile = glueProjectFile;
+
+        // Everything a Glue project references lives beside its .gluj - the editor keeps the project
+        // and its content in one self-contained folder - so this is simply that file's directory.
+        //
+        // Stays relative rather than rooted at OutputContentRoot: GlueContentSource resolves through
+        // TitleContainer, which rejects a rooted path.
+        string projectDirectory = Path.GetDirectoryName(glueProjectFile) ?? string.Empty;
+
+        // The device is what lets referenced .tmx files load at all — without it the content source
+        // skips every tile map and says so only in a diagnostic nobody reads. Null before Initialize
+        // has a game, which is the headless case the source already handles.
+        GlueProject = Glue.GlueProject.Load(
+            glueProjectFile,
+            new Glue.GlueContentSource(Content, projectDirectory, _game?.GraphicsDevice),
+            OutputRootedLoadOptions());
+    }
+
+    /// <summary>
+    /// Reads the <c>.gluj</c> and its element files from <see cref="OutputContentRoot"/> rather than
+    /// the process working directory, which is the project folder under <c>dotnet run</c> and the
+    /// output folder under a debugger — so the plain-relative read would find a different (stale)
+    /// project depending on how the game was launched.
+    /// </summary>
+    private Glue.GlueLoadOptions OutputRootedLoadOptions()
+    {
+        var options = new Glue.GlueLoadOptions();
+        var resolve = options.ResolveFilePath;
+        string Rebase(string path) => Path.IsPathRooted(path) ? path : Path.Combine(OutputContentRoot, path);
+
+        options.ResolveFilePath = requested =>
+        {
+            var rebased = Rebase(requested);
+            var resolved = resolve(rebased);
+            if (resolved is null) return null;
+            // Hand the caller's own string back when the file was found exactly as asked for. The
+            // loader treats "resolved != requested" as a case mismatch worth warning about, and the
+            // rebase alone must not trip that.
+            return string.Equals(resolved, rebased, StringComparison.Ordinal) ? requested : resolved;
+        };
+        options.ReadAllText = path => File.ReadAllText(Rebase(path));
+        return options;
+    }
+
+    /// <summary>
+    /// Initializes the engine, sizes the window for <typeparamref name="TScreen"/>, and starts it —
+    /// the whole boot. Call this inside <c>Game.Initialize</c>, after <c>base.Initialize()</c>.
+    /// </summary>
+    /// <remarks>
+    /// A Glue project named by <paramref name="settings"/> is loaded before the screen starts, so
+    /// <paramref name="configure"/> can read <see cref="GlueProject"/>.
+    /// <para>
+    /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
+    /// <c>Game1</c> constructor before calling this if the game uses mouse or cursor input —
+    /// MonoGame defaults the property to <c>false</c>.
+    /// </para>
+    /// </remarks>
+    /// <summary>
+    /// Boots a whole Glue project: loads <paramref name="glueProjectFile"/>, applies the display
+    /// settings it declares, and starts its start-up screen. Call this inside <c>Game.Initialize</c>,
+    /// after <c>base.Initialize()</c>.
+    /// </summary>
+    /// <remarks>
+    /// The project names its own start-up screen, its own Gum project and its own resolution, so
+    /// there is nothing else for the caller to supply — and nothing to pass back in.
+    /// <para>
+    /// The path must be <b>relative</b>: it resolves through <c>TitleContainer</c>, which throws on a
+    /// rooted path, so an absolute one loads the project and then fails every asset it references.
+    /// </para>
+    /// <para>
+    /// Use <see cref="Initialize{TScreen}"/> instead to load a Glue project but boot a screen of
+    /// your own, or to pass a <c>configure</c> callback.
+    /// </para>
+    /// </remarks>
+    public void Initialize(Game game, string glueProjectFile) =>
+        Initialize<Glue.GlueScreen>(
+            game, new EngineInitSettings { GlueProjectFile = glueProjectFile });
+
+    public void Initialize<TScreen>(
+        Game game, EngineInitSettings? settings = null, Action<TScreen>? configure = null)
+        where TScreen : Screen, new()
+    {
+        Initialize(game, settings);
+
+        // A Glue project declares the resolution, so it has to be read before the window is sized —
+        // which is why sizing follows the load rather than preceding it. Nothing else applies this;
+        // a game that loaded a project by hand had to call it itself.
+        GlueProject?.ApplyDisplaySettings(DisplaySettings);
+
+        // Sizing the window is Start's job — ActivateScreen applies the starting screen's window
+        // settings, and does it from the real screen instance rather than a throwaway one. The
+        // window is not visible until the run loop begins, after Game.Initialize, so applying it
+        // there costs nothing on screen.
+        Start(WithLoadedProject(configure));
+    }
+
+    /// <summary>
+    /// Gives a <see cref="Glue.GlueScreen"/> the project and screen data it is about to build from,
+    /// before <paramref name="configure"/> gets its say.
+    /// </summary>
+    /// <remarks>
+    /// The engine loaded the project and knows which screen the project starts on, so requiring the
+    /// caller to hand both back was pure ceremony — and a hazard, since a hot reload replaces the
+    /// caller's callback and would drop wiring that lived only there. Assigned only when unset, so
+    /// a <paramref name="configure"/> that boots a different Glue screen still wins.
+    /// </remarks>
+    private Action<TScreen>? WithLoadedProject<TScreen>(Action<TScreen>? configure)
+        where TScreen : Screen, new()
+    {
+        if (GlueProject is null)
+            return configure;
+
+        return screen =>
+        {
+            if (screen is Glue.GlueScreen glueScreen)
+            {
+                glueScreen.Project ??= GlueProject;
+                glueScreen.Save ??= GlueProject.StartUpScreen;
+            }
+
+            configure?.Invoke(screen);
+        };
+    }
+
+    /// <summary>
+    /// Initializes the engine without starting a screen. Prefer <see cref="Initialize{TScreen}"/>,
+    /// which also sizes the window and starts the first screen; this overload is for a caller that
+    /// decides its start screen after initialization.
     /// </summary>
     /// <remarks>
     /// Does not modify <c>Game.IsMouseVisible</c>. Set <c>IsMouseVisible = true</c> in the
@@ -260,7 +440,16 @@ public class FlatRedBallService
         }
 #endif
 
-        if (settings?.GumProjectFile is string gumProjectFile)
+        // A Glue project names its own Gum project, but only after it has been read — and Gum will
+        // not work with a project it did not load itself (assigning ObjectFinder.GumProjectSave
+        // leaves the runtime half-configured and throws deep inside UnitConverter). So the Glue
+        // project is read here, before Gum initializes, purely to learn that path.
+        if (settings?.GlueProjectFile is string glueProjectFile)
+        {
+            LoadGlueProject(glueProjectFile);
+        }
+
+        if ((settings?.GumProjectFile ?? GlueProject?.Result.GumProjectFile) is string gumProjectFile)
         {
             _gum.Initialize(game, gumProjectFile);
 #pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
@@ -283,7 +472,14 @@ public class FlatRedBallService
             new KernSmithFontCreator(game.GraphicsDevice);
         GumRenderBatch.Instance.Initialize();
         GumRenderBatch.ScreenSpaceInstance.Initialize();
-        ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
+        // Guarded because ShapeRenderer is a Gum-side singleton that throws on a second Initialize,
+        // and GumService.Uninitialize does not reset it — so without this, no engine can ever be
+        // initialized after another has shut down. Correct while one graphics device serves the
+        // process, which is every game and every test that reuses its Game. Two live devices would
+        // leave this bound to the first; the fix for that belongs in Gum's UninitializePlatform,
+        // which already resets its sibling renderers.
+        if (!ShapeRenderer.Self.IsInitialized)
+            ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
 
         // Route Gum Forms popups (ComboBox dropdowns, MenuItem submenus) opened by a control on a
         // camera to that camera's per-camera PopupRoot/ModalRoot, so they draw in that camera's pass
@@ -309,7 +505,7 @@ public class FlatRedBallService
     /// should use: the pair of the camera whose <see cref="Rendering.Camera.UiRoot"/>/<see cref="Rendering.Camera.PopupRoot"/>/<see cref="Rendering.Camera.ModalRoot"/>
     /// is the control's topmost ancestor, else the (<paramref name="globalPopup"/>, <paramref name="globalModal"/>)
     /// fallback when the control lives under a non-camera root (screen overlay, entity visuals). Wired into
-    /// <see cref="GraphicalUiElement.ResolvePopupRoots"/> at <see cref="Initialize"/> so Gum routes ComboBox/
+    /// <see cref="GraphicalUiElement.ResolvePopupRoots"/> at <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/> so Gum routes ComboBox/
     /// MenuItem popups to the opening camera's per-camera roots — drawn in that camera's pass at its zoom.
     /// </summary>
     internal static (InteractiveGue popup, InteractiveGue modal) ResolvePopupRootsFor(
@@ -453,6 +649,13 @@ public class FlatRedBallService
     /// </summary>
     public Screen CurrentScreen { get; private set; } = new Screen();
 
+    /// <summary>
+    /// Starts <typeparamref name="T"/> as the first screen. A game boots through
+    /// <see cref="Initialize{TScreen}"/> instead, which does this and the engine initialization
+    /// together; this overload is for a caller with no <c>Game</c> — a headless test — or one that
+    /// boots into something other than the screen it prepared the window for.
+    /// </summary>
+    /// <remarks>Mid-game transitions go through <c>Screen.MoveToScreen&lt;T&gt;</c>, not this.</remarks>
     /// <param name="configure">
     /// Optional callback invoked on the new screen instance before <see cref="Screen.CustomInitialize"/> runs.
     /// Use this to set public properties that <c>CustomInitialize</c> depends on.
@@ -771,7 +974,13 @@ public class FlatRedBallService
     /// }
     /// </code>
     /// </example>
-    public void PrepareWindow<T>(GraphicsDeviceManager graphics) where T : Screen, new()
+    [Obsolete("Starting a screen sizes the window for it, so this is no longer needed. Delete the " +
+              "call and pass the screen type to Initialize instead; calling both is harmless, " +
+              "because the starting screen's settings are applied last either way.")]
+    public void PrepareWindow<T>(GraphicsDeviceManager graphics) where T : Screen, new() =>
+        ApplyWindowSettings<T>(graphics);
+
+    private void ApplyWindowSettings<T>(GraphicsDeviceManager graphics) where T : Screen, new()
     {
 #if KNI
         // Browser host: the canvas DOM owns the back-buffer size. Setting
@@ -892,7 +1101,7 @@ public class FlatRedBallService
     }
 
     // Sub-systems
-    /// <summary>The MonoGame graphics device. Throws if accessed before <see cref="Initialize"/>.</summary>
+    /// <summary>The MonoGame graphics device. Throws if accessed before <see cref="Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>.</summary>
     public GraphicsDevice GraphicsDevice => _game!.GraphicsDevice;
     /// <summary>
     /// Engine-owned random number source — used by gameplay systems that want a seedable shared instance.
@@ -1008,6 +1217,45 @@ public class FlatRedBallService
         => _automationMode?.RegisterValueSetter(entityName, propName, setter);
 
     /// <summary>
+    /// Stands the engine back down: destroys the current screen, releases the resources
+    /// <see cref="Initialize(Game, EngineInitSettings)"/> created, and returns Gum to its
+    /// uninitialized state. Safe to call more than once.
+    /// </summary>
+    /// <remarks>
+    /// A game normally never calls this — the process is ending anyway. It exists because Gum keeps
+    /// its project, managers and canvas size in process-wide statics, so a second engine cannot be
+    /// initialized while a first still holds them. Tearing down releases them, which is what lets a
+    /// test own an engine instead of sharing one, and what a hot restart would need.
+    /// <para>
+    /// The engine is reusable afterwards only by constructing a new one: this releases the graphics
+    /// resources tied to the old <c>Game</c>, and re-initializing the same instance is not a case
+    /// anything needs.
+    /// </para>
+    /// </remarks>
+    public void Shutdown()
+    {
+        if (_game is null)
+            return;
+
+        TeardownCurrentScreen();
+        CurrentScreen = new Screen();
+
+        _automationMode = null;
+
+        _gum.Uninitialize();
+
+        _spriteBatch?.Dispose();
+        _spriteBatch = null;
+        _whitePixel?.Dispose();
+        _whitePixel = null;
+
+        _game = null;
+        _graphicsManager = null;
+        GlueProject = null;
+        GlueProjectFile = null;
+    }
+
+    /// <summary>
     /// Per-frame engine tick. Call from <c>Game.Update</c>. Drives screen transitions, input
     /// polling, content hot-reload, time accumulation, async continuations, and the active
     /// screen's <see cref="Screen.CustomActivity"/> in that order.
@@ -1019,7 +1267,10 @@ public class FlatRedBallService
         {
             if (!_automationMode.TryAdvanceFrame(Time.CurrentFrame))
             {
-                _game!.SuppressDraw();
+                // An armed screenshot still needs one draw to capture — suppressing every
+                // ungranted tick would starve it, since no further step is coming.
+                if (!_automationMode.HasPendingScreenshot)
+                    _game!.SuppressDraw();
                 return;
             }
         }
@@ -1090,6 +1341,12 @@ public class FlatRedBallService
         _syncContext.Update();
 
         CurrentScreen.Update(Time.CurrentFrameTime);
+
+        // Answer the step here rather than in Draw: MonoGame coalesces draws under a fixed timestep,
+        // so three stepped Updates can share one Draw and a caller counting one response per step
+        // waits forever for the rest. A screenshot still has to wait for Draw — the back buffer it
+        // wants does not exist until then — and carries its own response.
+        _automationMode?.FlushStepResponse(Time.CurrentFrame);
 
         _frameProfile.UpdateTotalMs = ProfileClock.Ms(updateStart, System.Diagnostics.Stopwatch.GetTimestamp());
         // FrameTotalMs is finalized at end of Draw (when both Update and Draw measurements exist
@@ -1200,7 +1457,6 @@ public class FlatRedBallService
             CurrentScreen.DrawOverlay(_spriteBatch, RenderDiagnostics, _overlayCamera);
         }
 
-        _automationMode?.FlushStepResponse(Time.CurrentFrame);
         _automationMode?.FulfillPendingScreenshot(gd, Time.CurrentFrame);
 
         _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());

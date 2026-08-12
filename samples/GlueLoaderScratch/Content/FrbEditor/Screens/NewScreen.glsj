@@ -1,0 +1,212 @@
+{
+  "Tags": [
+    "GLUE"
+  ],
+  "Source": "GLUE",
+  "ReferencedFiles": [
+    {
+      "Name": "Screens/NewScreen/Bear.png",
+      "IsSharedStatic": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Graphics.Texture2D",
+      "ProjectsToExcludeFrom": []
+    }
+  ],
+  "CustomVariables": [
+    {
+      "Properties": [
+        {
+          "Name": "Type",
+          "Value": "string",
+          "Type": "String"
+        },
+        {
+          "Name": "Category",
+          "Value": "Layer",
+          "Type": "String"
+        }
+      ],
+      "Name": "DefaultLayer",
+      "Category": "Layer"
+    }
+  ],
+  "NamedObjects": [
+    {
+      "InstanceName": "CircleInstance",
+      "SourceClassType": "FlatRedBall.Math.Geometry.Circle",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "Color",
+          "Member": "Color",
+          "Value": "Red",
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Radius",
+          "Value": 32.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "X",
+          "Value": 200.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 2,
+      "SourceFile": "Circle",
+      "HasPublicProperty": true,
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    },
+    {
+      "InstanceName": "AxisAlignedRectangleInstance",
+      "SourceClassType": "FlatRedBall.Math.Geometry.AxisAlignedRectangle",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "Color",
+          "Member": "Color",
+          "Value": "Sienna",
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Height",
+          "Value": 32.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Width",
+          "Value": 128.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Y",
+          "Value": 95.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 2,
+      "SourceFile": "AxisAlignedRectangle",
+      "HasPublicProperty": true,
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    },
+    {
+      "InstanceName": "SpriteInstance",
+      "SourceClassType": "FlatRedBall.Sprite",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "Texture2D",
+          "Member": "Texture",
+          "Value": "Bear",
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "TextureScale",
+          "Value": 5.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "X",
+          "Value": -176.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Y",
+          "Value": -207.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 2,
+      "SourceFile": "Sprite",
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    },
+    {
+      "InstanceName": "BearEntityInstance",
+      "SourceClassType": "Entities\\BearEntity",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "float",
+          "Member": "X",
+          "Value": -194.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Y",
+          "Value": 22.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 1,
+      "SourceFile": "Entities/BearEntity",
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    },
+    {
+      "InstanceName": "BearEntityInstance1",
+      "SourceClassType": "Entities\\BearEntity",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "float",
+          "Member": "X",
+          "Value": 181.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Y",
+          "Value": 149.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 1,
+      "SourceFile": "Entities/BearEntity",
+      "GenerateTimedEmit": true
+    }
+  ],
+  "Name": "Screens\\NewScreen",
+  "CustomClassesForExport": []
+}

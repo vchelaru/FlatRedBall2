@@ -95,9 +95,9 @@ public class TileShapes : ICollidable
 
     private Layer? _layer;
     private bool _isVisible;
-    private XnaColor _color = new XnaColor(255, 255, 255, 128);
+    private XnaColor _color = XnaColor.White;
     private bool _isFilled = false;
-    private float _outlineThickness = 2f;
+    private float _outlineThickness = 1f;
 
     // Invoked when a tile shape is created or destroyed so Screen.Add can keep its render list in sync.
     internal Action<IRenderable>? _onTileAdded;
@@ -172,7 +172,7 @@ public class TileShapes : ICollidable
     }
 
     /// <summary>
-    /// Color applied to all tiles. Defaults to semi-transparent white.
+    /// Color applied to all tiles. Defaults to opaque white.
     /// Tiles added after this is set inherit the current value automatically.
     /// </summary>
     public XnaColor Color
@@ -214,7 +214,7 @@ public class TileShapes : ICollidable
     }
 
     /// <summary>
-    /// Outline thickness in pixels when <see cref="IsFilled"/> is false. Defaults to 2.
+    /// Outline thickness in pixels when <see cref="IsFilled"/> is false. Defaults to 1.
     /// Tiles added after this is set inherit the current value automatically.
     /// </summary>
     public float OutlineThickness

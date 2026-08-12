@@ -42,6 +42,17 @@ public sealed class DiskEditorFolder : IEditorFolder
         var full = Path.Combine(_path, name);
         return Task.FromResult<IEditorFile?>(File.Exists(full) ? new DiskEditorFile(full) : null);
     }
+
+    /// <summary>
+    /// Overrides <see cref="IEditorFolder"/>'s subfolder-only default with real <c>System.IO</c>
+    /// resolution, so a texture reached via <c>..</c> (living outside the .achx's own folder)
+    /// resolves correctly on desktop (issue #839's project-tree thumbnails).
+    /// </summary>
+    public Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath)
+    {
+        var full = new FilePath(Path.Combine(_path, relativePath)).FullPath;
+        return Task.FromResult<IEditorFile?>(File.Exists(full) ? new DiskEditorFile(full) : null);
+    }
 }
 
 /// <summary>

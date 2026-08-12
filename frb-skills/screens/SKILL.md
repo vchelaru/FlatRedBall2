@@ -140,17 +140,17 @@ MoveToScreen<GameOverScreen>(s =>
 
 ## Starting the First Screen
 
-In `Game1.Initialize`, after `FlatRedBallService.Default.Initialize(this)`:
+In `Game1.Initialize`, after `base.Initialize()`. One call sizes the window, initializes the engine
+and starts the screen:
 
 ```csharp
-FlatRedBallService.Default.Start<MainMenuScreen>();
+FlatRedBallService.Default.Initialize<MainMenuScreen>(this);
+FlatRedBallService.Default.Initialize<GameScreen>(this, configure: s => s.DebugMode = true);
+FlatRedBallService.Default.Initialize(this, "Content/FrbEditor/MyGame.gluj");  // whole Glue project
 ```
 
-`Start<T>` activates the first screen and accepts the same optional configure callback as `MoveToScreen`:
-
-```csharp
-FlatRedBallService.Default.Start<GameScreen>(s => s.DebugMode = true);
-```
+The `configure` callback is the same one `MoveToScreen` takes. `Start<T>` is the boot without a
+`Game` — a headless test, or a game that decides its first screen after initializing.
 
 ## Observability — Screen.Entities and SceneSnapshot
 

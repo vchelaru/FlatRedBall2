@@ -23,7 +23,7 @@ public class GlueContentTests
     // Relative: the loader reads through TitleContainer, which resolves from the working
     // directory rather than from an absolute path.
     private static string FixtureDirectory(string project) =>
-        Path.Combine("Glue", "Fixtures", project);
+        Path.Combine("Glue", "Fixtures", project, "Content");
 
     private static EntitySave LoadFixtureEntity(string project, string fileName) =>
         JsonSerializer.Deserialize(
@@ -122,7 +122,7 @@ public class GlueContentTests
 
         var source = new GlueContentSource(
             _graphics.ContentLoader!,
-            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo"));
+            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "Content"));
 
         var entity = new GlueEntity
         {

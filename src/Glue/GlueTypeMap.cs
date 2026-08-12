@@ -39,6 +39,28 @@ public static class GlueTypeMap
         ["FlatRedBall.Entities.CameraControllingEntity"] = typeof(Entities.CameraControllingEntity),
     };
 
+    /// <summary>
+    /// Short spellings Glue writes instead of the fully-qualified name.
+    /// </summary>
+    /// <remarks>
+    /// Older projects (`FileVersion` 54 and below) write <c>SourceClassType</c> unqualified, and
+    /// <em>mix both spellings inside one file</em> — so this is not a version gate that could be
+    /// applied per project. Aliasing in its own table rather than duplicating dictionary keys keeps
+    /// one row per type as the unit by which a phase claims a type.
+    /// <para>No ambiguity with element references: those contain a backslash and are rejected before
+    /// this is consulted.</para>
+    /// </remarks>
+    private static readonly Dictionary<string, string> QualifiedByShortName = new(StringComparer.Ordinal)
+    {
+        ["Sprite"] = "FlatRedBall.Sprite",
+        ["AxisAlignedRectangle"] = "FlatRedBall.Math.Geometry.AxisAlignedRectangle",
+        ["Circle"] = "FlatRedBall.Math.Geometry.Circle",
+        ["Polygon"] = "FlatRedBall.Math.Geometry.Polygon",
+    };
+
+    private static string Canonical(string openTypeName) =>
+        QualifiedByShortName.TryGetValue(openTypeName, out string? qualified) ? qualified : openTypeName;
+
     /// <summary>Constructs an instance of the mapped type, without reflection.</summary>
     /// <returns>False if a later phase owns this type.</returns>
     public static bool TryCreate(GlueTypeName typeName, [NotNullWhen(true)] out object? instance)
@@ -48,7 +70,7 @@ public static class GlueTypeMap
         if (typeName.IsElementReference)
             return false;
 
-        if (!FactoriesByGlueName.TryGetValue(typeName.OpenTypeName, out var factory))
+        if (!FactoriesByGlueName.TryGetValue(Canonical(typeName.OpenTypeName), out var factory))
             return false;
 
         instance = factory();
@@ -65,7 +87,7 @@ public static class GlueTypeMap
         if (typeName.IsElementReference)
             return false;
 
-        return TypesByGlueName.TryGetValue(typeName.OpenTypeName, out type);
+        return TypesByGlueName.TryGetValue(Canonical(typeName.OpenTypeName), out type);
     }
 
     /// <summary>Resolves a raw Glue type string, parsing it first.</summary>

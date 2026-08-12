@@ -18,6 +18,11 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- MainWindow is DI-only; runtime XAML instantiation is intentionally not supported -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <!-- Release CI stamps -p:Version=yyyy.M.d (build-and-release-animation-editor.yml), which wins
+         here as an MSBuild global property. Local builds fall back to today's date in the same
+         format so UpdateChecker's version comparison (Update/UpdateChecker.cs) runs for real
+         instead of being skipped as an incomparable dev build. -->
+    <Version Condition="'$(Version)' == ''">$([System.DateTime]::Now.ToString('yyyy.MM.dd'))</Version>
   </PropertyGroup>
 
   <ItemGroup>

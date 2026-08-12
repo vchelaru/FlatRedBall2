@@ -84,8 +84,9 @@ public class UpdateCheckerTests
     [Fact]
     public async Task CheckAsync_DevBuildVersion_SkipsCheckEntirely()
     {
-        // Local `dotnet build` without -p:Version defaults to 1.0.0.0 — not date-comparable,
-        // so the check must not run at all (never claim a dev build is "out of date").
+        // Backstop for any Version below MinReleaseYear (e.g. a build that bypasses
+        // AnimationEditor.App.csproj's today's-date fallback) — not date-comparable, so the
+        // check must not run at all (never claim such a build is "out of date").
         var client = new FakeGitHubReleaseClient
         {
             Response = new GitHubReleaseInfo

@@ -31,7 +31,8 @@ internal static class GlueElementBuilder
 
         // Tile objects come last and in their own order: a map is loaded from a file, and a
         // collection is derived from a map, so neither fits the construct-and-configure pass.
-        GlueTileBuilder.Build(namedObjects, elementName, objects, diagnostics, content, register);
+        GlueTileBuilder.Build(
+            namedObjects, elementName, objects, diagnostics, content, register, builder);
 
         // The camera follows a list and bounds itself to a map, so it is finished once both exist.
         GlueCameraBuilder.Build(namedObjects, elementName, objects, diagnostics);

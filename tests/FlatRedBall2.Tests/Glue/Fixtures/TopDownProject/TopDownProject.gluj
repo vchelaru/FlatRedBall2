@@ -1,0 +1,412 @@
+{
+  "In2D": true,
+  "SetResolution": true,
+  "ResolutionWidth": 800,
+  "ResolutionHeight": 600,
+  "OrthogonalWidth": 800,
+  "OrthogonalHeight": 600,
+  "Screens": [],
+  "Entities": [],
+  "GlobalFiles": [
+    {
+      "Name": "GlobalContent/LocalizationDatabase.csv",
+      "Properties": [
+        {
+          "Name": "IsDatabaseForLocalizing",
+          "Value": true
+        }
+      ],
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/CsvFolder/SpreadsheetFile1.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/CsvFolder/SpreadsheetFile2.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/GlobalCsv.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/Waves.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/SharedClassGlobalCsv.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/Resources.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/Book.png",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/arrow01.png",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/TextureSettingsInfo.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/FolderInGlobalContent/SceneFileInFolder.scnx",
+      "IsSharedStatic": true,
+      "IncludeDirectoryRelativeToContainer": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "FolderAtContentRoot/OtherRedBall.bmp",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/ListCsv.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/DogBarkSoundEffect.wav",
+      "Properties": [
+        {
+          "Name": "UseContentPipeline",
+          "Value": true
+        }
+      ],
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Audio.SoundEffect",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/DogBarkSoundEffect2.wav",
+      "Properties": [
+        {
+          "Name": "UseContentPipeline",
+          "Value": true
+        }
+      ],
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Audio.SoundEffectInstance",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/HugeCsv.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/SpreadsheetToReplace.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/NotLoadedTextFile.txt",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "LoadedAtRuntime": false,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GumProject/GumProject.gumx",
+      "Properties": [
+        {
+          "Name": "FileAdditionBehavior",
+          "Value": 1
+        },
+        {
+          "Name": "IncludeFormsInComponents",
+          "Value": true
+        },
+        {
+          "Name": "IncludeComponentToFormsAssociation",
+          "Value": true
+        },
+        {
+          "Name": "AutoCreateGumScreens",
+          "Value": true
+        },
+        {
+          "Name": "ShowMouse",
+          "Value": false
+        }
+      ],
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/BearContentPipeline.png",
+      "Properties": [
+        {
+          "Name": "UseContentPipeline",
+          "Value": true
+        }
+      ],
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/LoadedAtRuntimeFalseCsv.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "LoadedAtRuntime": false,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/CreatedByExcel1.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/GlobalBmfcToFnt.fnt",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "SourceFile": "GlobalContent/GlobalBmfcToFnt.bmfc",
+      "BuildTool": "*.bmfc -> bmfont.exe -> *.fnt",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/LoadedOnlyWhenReferencedGlobal.mp3",
+      "Properties": [
+        {
+          "Name": "UseContentPipeline",
+          "Value": true
+        },
+        {
+          "Name": "LoadedOnlyWhenReferenced",
+          "Value": true
+        }
+      ],
+      "IsSharedStatic": true,
+      "LoadedOnlyWhenReferenced": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/EmptyAnimationForReload.achx",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/ReloadableContent/ReloadableTexture1.png",
+      "IsSharedStatic": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Graphics.Texture2D",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/ReloadableContent/ReloadableTexture2.png",
+      "IsSharedStatic": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Graphics.Texture2D",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/ReloadableContent/ReloadableAnimation1.achx",
+      "IsSharedStatic": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "RuntimeType": "FlatRedBall.Graphics.Animation.AnimationChainList",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "GlobalContent/ReloadableContent/ReloadableAnimation2.achx",
+      "IsSharedStatic": true,
+      "DestroyOnUnload": false,
+      "HasPublicProperty": true,
+      "RuntimeType": "FlatRedBall.Graphics.Animation.AnimationChainList",
+      "ProjectsToExcludeFrom": []
+    }
+  ],
+  "GlobalContentSettingsSave": {
+    "GenerateLoadGlobalContentCode": true
+  },
+  "SyncedProjects": [],
+  "StartUpScreen": "",
+  "ResolutionPresets": [],
+  "PerformanceSettingsSave": {
+    "ThrowExceptionOnPostInitializeContentLoad": true
+  },
+  "IgnoredDirectories": [],
+  "CustomClasses": [
+    {
+      "Name": "SpreadsheetClass",
+      "CsvFilesUsingThis": [
+        "GlobalContent/CsvFolder/SpreadsheetFile1.csv",
+        "GlobalContent/CsvFolder/SpreadsheetFile2.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true,
+      "CustomNamespace": ""
+    },
+    {
+      "Name": "SharedClass1",
+      "CsvFilesUsingThis": [
+        "GlobalContent/SharedClassGlobalCsv.csv",
+        "Screens/CsvScreen/SharedClassScreenCsv.csv",
+        "Entities/CsvEntity/SharedClassEntityCsv.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true
+    },
+    {
+      "Name": "ClassWithNoAssociatedCsvs",
+      "CsvFilesUsingThis": [],
+      "RequiredProperties": [],
+      "GenerateCode": true
+    },
+    {
+      "Name": "TileMapInfo",
+      "CsvFilesUsingThis": [
+        "Screens/CsvScreen/CustomCsvClassLoadedOnlyWhenReferenced.csv"
+      ],
+      "RequiredProperties": [
+        {
+          "Type": "bool",
+          "Member": "HasCollision",
+          "Value": false,
+          "Time": 0.0
+        },
+        {
+          "Type": "string",
+          "Member": "Name",
+          "Time": 0.0
+        },
+        {
+          "Type": "string",
+          "Member": "EntityToCreate",
+          "Time": 0.0
+        },
+        {
+          "Type": "System.Collections.Generic.List<FlatRedBall.Content.AnimationChain.AnimationFrameSave>",
+          "Member": "EmbeddedAnimation",
+          "Time": 0.0
+        }
+      ],
+      "GenerateCode": true,
+      "CustomNamespace": ""
+    },
+    {
+      "Name": "CustomDataType",
+      "CsvFilesUsingThis": [
+        "Screens/CsvScreen/CsvUsingCustomDataFile.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true,
+      "CustomNamespace": "GlueTestProject.CustomDataTypes"
+    },
+    {
+      "Name": "CustomClassForDupeTest",
+      "CsvFilesUsingThis": [
+        "Screens/CsvScreen/CsvCustomClass1.csv",
+        "Screens/CsvScreen/CsvCustomClass2.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true,
+      "CustomNamespace": ""
+    },
+    {
+      "Name": "PlatformerValues",
+      "CsvFilesUsingThis": [
+        "Entities/PlatformerPluginEntity/PlatformerValues.csv",
+        "Entities/PlatformerPluginEntity2/PlatformerValues.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true
+    },
+    {
+      "Name": "TopDownValues",
+      "CsvFilesUsingThis": [
+        "Entities/TopDownPluginEntity/TopDownValuesStatic.csv",
+        "Entities/TopDownAnimatedEntity/TopDownValuesStatic.csv",
+        "Entities/TopDownMovementEntity/TopDownValuesStatic.csv",
+        "Entities/TopDownMovementEntityDerived/TopDownValuesStatic.csv",
+        "Entities/TopDownMovementEntityDerivedDerived/TopDownValuesStatic.csv"
+      ],
+      "RequiredProperties": [],
+      "GenerateCode": true,
+      "CustomNamespace": ""
+    }
+  ],
+  "ApplyToFixedResolutionPlatforms": true,
+  "ExternallyBuiltFileDirectory": "../../",
+  "FileVersion": 54,
+  "ScreenReferences": [],
+  "EntityReferences": [
+    {
+      "Name": "Entities\\TopDownMovementEntity"
+    }
+  ],
+  "Bookmarks": [],
+  "PluginData": {
+    "RequiredPlugins": [
+      {
+        "Name": "Tiled Plugin",
+        "Version": "1.1.1.7",
+        "VersionRequirement": 2
+      }
+    ]
+  },
+  "DisplaySettings": {
+    "Name": "Custom",
+    "GenerateDisplayCode": true,
+    "Is2D": true,
+    "ResolutionWidth": 1000,
+    "ResolutionHeight": 600,
+    "AspectRatioWidth": 4.0,
+    "AspectRatioHeight": 2.0,
+    "SupportLandscape": true,
+    "AllowWindowResizing": true,
+    "Scale": 100,
+    "ScaleGum": 100,
+    "DominantInternalCoordinates": 1
+  },
+  "AllDisplaySettings": []
+}

@@ -1,0 +1,74 @@
+{
+  "Tags": [
+    "GLUE"
+  ],
+  "Source": "GLUE",
+  "BaseScreen": "Screens\\GameScreen",
+  "BaseElement": "Screens\\GameScreen",
+  "ReferencedFiles": [
+    {
+      "Name": "Screens/Level1/Level1Map.tmx",
+      "Properties": [
+        {
+          "Name": "CreationOptions",
+          "Value": "{\"WithVisualType\":1,\"WithVisualsUiVisibility\":2,\"SelectedLevel\":3,\"IsWithVisualsChecked\":false,\"IsOverworldPlatformerASelected\":false,\"IsOverworldPlatformerBSelected\":false,\"IsOverworldPlatformerCSelected\":false,\"IsOverworldTopDownASelected\":true,\"IsOverworldTopDownBSelected\":false,\"IsOverworldTopDownCSelected\":false,\"PlatformerLevelVisibility\":2,\"TopDownLevelVisibility\":0,\"IncludeDefaultTileset\":true,\"IncludeGameplayLayer\":true,\"SolidCollisionCheckBoxVisibility\":0,\"IsSolidCollisionBorderChecked\":true,\"ShouldAddCollisionBorder\":true,\"IsNoVisualsChecked\":true,\"NoVisualsUiVisibility\":0}"
+        }
+      ],
+      "IsSharedStatic": true,
+      "RuntimeType": "FlatRedBall.TileGraphics.LayeredTileMap",
+      "ProjectsToExcludeFrom": []
+    }
+  ],
+  "CustomVariables": [
+    {
+      "Properties": [
+        {
+          "Name": "Type",
+          "Value": "string",
+          "Type": "String"
+        },
+        {
+          "Name": "Category",
+          "Value": "Layer",
+          "Type": "String"
+        }
+      ],
+      "Name": "DefaultLayer",
+      "Category": "Layer"
+    }
+  ],
+  "NamedObjects": [
+    {
+      "InstanceName": "Map",
+      "SourceClassType": "FlatRedBall.TileGraphics.LayeredTileMap",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "bool",
+          "Member": "CreateEntitiesFromTiles",
+          "Value": true,
+          "Time": 0.0
+        },
+        {
+          "Type": "bool",
+          "Member": "ShiftMapToMoveGameplayLayerToZ0",
+          "Value": true,
+          "Time": 0.0
+        }
+      ],
+      "SourceFile": "Screens/Level1/Level1Map.tmx",
+      "SourceName": "Entire File (LayeredTileMap)",
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true,
+      "DefinedByBase": true
+    }
+  ],
+  "Name": "Screens\\Level1",
+  "CustomClassesForExport": []
+}

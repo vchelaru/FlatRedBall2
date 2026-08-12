@@ -92,6 +92,27 @@ public static class GlueMovementValues
         return values;
     }
 
+    /// <summary>
+    /// The platformer row that opts into climbing, or null when no row does.
+    /// </summary>
+    /// <remarks>
+    /// <c>CanClimb</c> is a per-row bool rather than a named slot, which is how FRB1 models climbing:
+    /// game code swaps the climbing row into the ground slot while the character is on a ladder.
+    /// FRB2 has a climbing slot of its own, so the row it identifies is what fills it.
+    /// </remarks>
+    public static PlatformerValues? FindClimbingRow(string csv)
+    {
+        var table = CsvTable.Parse(csv);
+
+        foreach (var row in table.Rows)
+        {
+            if (table.Bool(row, "CanClimb"))
+                return ReadPlatformerRow(table, row);
+        }
+
+        return null;
+    }
+
     private static TopDownValues ReadTopDownRow(CsvTable table, IReadOnlyList<string> row)
     {
         var values = new TopDownValues
@@ -120,6 +141,19 @@ public static class GlueMovementValues
 
     /// <summary>Glue stores durations as plain seconds; FRB2's are <see cref="TimeSpan"/>.</summary>
     private static TimeSpan Seconds(float seconds) => TimeSpan.FromSeconds(seconds);
+
+    /// <summary>
+    /// Gives <paramref name="entity"/> its top-down movement set, selecting the first row.
+    /// </summary>
+    /// <remarks>
+    /// Glue's generated code defaults to the first entry of the dictionary it built, so an entity
+    /// with a movement CSV is never left with no values at all. <see cref="GlueEntity.SetTopDownMovement"/>
+    /// picks a different one by name.
+    /// </remarks>
+    public static void ApplyTopDown(GlueEntity entity, IReadOnlyDictionary<string, TopDownValues> values)
+    {
+        entity.SetTopDownMovementSet(values);
+    }
 
     /// <summary>
     /// Resolves Glue's <c>"&lt;Row&gt; in &lt;File&gt;.csv"</c> variable syntax to a row name.

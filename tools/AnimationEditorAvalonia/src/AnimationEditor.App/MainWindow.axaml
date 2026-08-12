@@ -1767,98 +1767,12 @@
 
         </Grid>
     </DockPanel>
-        <!-- Item-deleted undo toast (frames, shapes, animation chains) -->
-        <Border x:Name="ItemDeletedToastPanel"
-                IsVisible="False"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Bottom"
-                Margin="0,0,0,30"
-                Background="#333"
-                CornerRadius="4"
-                Padding="12,6"
-                ZIndex="50">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <TextBlock x:Name="ItemDeletedToastLabel"
-                           Foreground="White"
-                           VerticalAlignment="Center"
-                           FontSize="12" />
-                <Button x:Name="ItemDeletedToastUndoBtn"
-                        Content="Undo"
-                        Padding="8,3"
-                        FontSize="12" />
-            </StackPanel>
-        </Border>
-        <!-- ── Error banner ── prominent, framed, top-centre so failures can't be missed.
-             Self-contained dark+red styling (theme-independent, like ItemDeletedToastPanel). -->
-        <Border x:Name="ErrorBanner"
-                IsVisible="False"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Margin="0,16,0,0"
-                MaxWidth="640"
-                Background="#2D2122"
-                BorderBrush="#E0533F"
-                BorderThickness="1.5"
-                CornerRadius="6"
-                Padding="14,10"
-                ZIndex="60">
-            <DockPanel>
-                <Button x:Name="ErrorBannerDismissBtn"
-                        DockPanel.Dock="Right"
-                        Content="✕"
-                        Width="24" Height="22"
-                        Margin="10,0,0,0"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        Foreground="#E8B0A8"
-                        VerticalAlignment="Top" />
-                <TextBlock DockPanel.Dock="Left"
-                           Text="⚠"
-                           FontSize="15"
-                           Foreground="#F2A03E"
-                           Margin="0,0,10,0"
-                           VerticalAlignment="Top" />
-                <TextBlock x:Name="ErrorBannerText"
-                           FontSize="12"
-                           Foreground="#F5E2DF"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center" />
-            </DockPanel>
-        </Border>
-        <!-- ── Toast notification overlay ── -->
-        <Border x:Name="ToastPanel"
-                IsVisible="False"
-                VerticalAlignment="Bottom"
-                HorizontalAlignment="Stretch"
-                Margin="0,0,0,22"
-                Background="{DynamicResource BgRail}"
-                BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="0,1,0,0"
-                Height="36"
-                ZIndex="10">
-            <DockPanel Margin="16,0">
-                <Button x:Name="ToastDismissBtn"
-                        DockPanel.Dock="Right"
-                        Content="✕"
-                        Width="28" Height="22"
-                        Padding="0" BorderThickness="0"
-                        Background="Transparent"
-                        Foreground="{DynamicResource InkMid}"
-                        VerticalAlignment="Center" />
-                <Button x:Name="ToastRetryBtn"
-                        DockPanel.Dock="Right"
-                        Content="Retry"
-                        Height="22"
-                        Padding="8,0"
-                        Margin="0,0,4,0"
-                        VerticalAlignment="Center" />
-                <TextBlock x:Name="ToastMessage"
-                           VerticalAlignment="Center"
-                           FontSize="11"
-                           Foreground="{DynamicResource InkMid}"
-                           TextTrimming="CharacterEllipsis" />
-            </DockPanel>
-        </Border>
+        <!-- Item-deleted undo toast, generic status toast, and error banner. Shared with the
+             browser head (#695 A5) — the panels and their timer/dismiss logic live in the control,
+             so a tweak to dwell time or wording lands on both heads at once. ZIndex 60 keeps the
+             whole overlay above the editor content but below the drag canvas / resize grips,
+             matching the per-panel ZIndex values these three used to carry individually. -->
+        <viewsControls:EditorNotificationOverlay x:Name="Notifications" ZIndex="60" />
         <!-- Resize grips — 4px edges + 8px corners, transparent overlays -->
         <Canvas x:Name="DragOverlayCanvas" IsHitTestVisible="False" ZIndex="99" />
         <Border x:Name="GripN"  Height="4" VerticalAlignment="Top"    Background="Transparent" Cursor="TopSide"         PointerPressed="OnResizeGrip" />

@@ -104,6 +104,41 @@ internal static class GlueTileDefaults
     internal static float CollisionFillTop(NamedObjectSave save) =>
         Or(save, "CollisionFillTop", 0f);
 
+    /// <summary>Which tiles become nodes. Read from its own key, not the collision one.</summary>
+    /// <remarks>
+    /// The two enums are near-identical and their keys are near-identically named, but their
+    /// ordinals differ — <c>FromType</c> is 4 for collision and 3 here — so reading one with the
+    /// other's key silently builds the wrong thing rather than failing.
+    /// </remarks>
+    internal static TileNodeNetworkCreationOptions NodeNetworkCreationOptions(NamedObjectSave save) =>
+        (TileNodeNetworkCreationOptions)save.Properties.GetValue<int>("TileNodeNetworkCreationOptions");
+
+    /// <summary>The tile type whose tiles become nodes, under <see cref="TileNodeNetworkCreationOptions.FromType"/>.</summary>
+    internal static string? NodeNetworkTileTypeName(NamedObjectSave save) =>
+        save.Properties.GetValue<string>("NodeNetworkTileTypeName");
+
+    /// <summary>The tile property whose tiles become nodes.</summary>
+    internal static string? NodeNetworkPropertyName(NamedObjectSave save) =>
+        save.Properties.GetValue<string>("NodeNetworkPropertyName");
+
+    /// <summary>The map layer to restrict nodes to, when one is named.</summary>
+    internal static string? NodeNetworkLayerName(NamedObjectSave save) =>
+        save.Properties.GetValue<string>("NodeNetworkLayerName");
+
+    /// <summary>Whether diagonal links that cut a blocked corner are removed.</summary>
+    internal static bool EliminateCutCorners(NamedObjectSave save) =>
+        save.Properties.GetValue<bool>("EliminateCutCorners");
+
+    /// <summary>Whether nodes link diagonally as well as orthogonally.</summary>
+    /// <remarks>
+    /// Glue's key is a directional-type ordinal where 1 means eight-way; FRB2 spells the same choice
+    /// as <see cref="AI.DirectionalType"/>.
+    /// </remarks>
+    internal static AI.DirectionalType NodeNetworkDirectionalType(NamedObjectSave save) =>
+        save.Properties.GetValue<int>("DirectionalType") == 1
+            ? AI.DirectionalType.Eight
+            : AI.DirectionalType.Four;
+
     private static float Or(NamedObjectSave save, string name, float fallback) =>
         save.Properties.ContainsValue(name) ? save.Properties.GetValue<float>(name) : fallback;
 

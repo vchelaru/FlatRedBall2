@@ -163,14 +163,14 @@ public Game1()
 #endif
     Content.RootDirectory = "Content";  // REQUIRED for ContentManager.Load of textures/fonts/audio
     IsMouseVisible = true;              // set to false only for keyboard/gamepad-only games
-    FlatRedBall2.FlatRedBallService.Default.PrepareWindow<YourScreen>(_graphics);
 }
 
 protected override void Initialize()
 {
     base.Initialize();
-    FlatRedBall2.FlatRedBallService.Default.Initialize(this);
-    FlatRedBall2.FlatRedBallService.Default.Start<YourScreen>();
+    // Sizes the window, initializes, and starts the screen. A Glue project instead:
+    // Initialize(this, "Content/FrbEditor/YourGame.gluj") — path relative, never rooted.
+    FlatRedBall2.FlatRedBallService.Default.Initialize<YourScreen>(this);
 }
 protected override void Update(GameTime gt)
 {

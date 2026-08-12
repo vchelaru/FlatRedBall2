@@ -255,7 +255,8 @@ public static class GlueProjectLoader
             // unmapped would report as missing the very things that now work.
             bool isBuiltElsewhere =
                 GlueTileBuilder.IsTileObject(namedObject) ||
-                GlueCollisionBuilder.IsRelationship(namedObject);
+                GlueCollisionBuilder.IsRelationship(namedObject) ||
+                GlueGumResolver.IsGumObject(namedObject);
 
             if (!isKnownElement && !isBuiltElsewhere && !GlueTypeMap.TryGetType(typeName, out _))
             {

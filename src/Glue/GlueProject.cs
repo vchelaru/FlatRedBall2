@@ -22,6 +22,7 @@ public sealed class GlueProject
     private readonly Dictionary<string, ScreenSave> _screens = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, EntitySave> _entities = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntity>> _instances = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<GlueEntity>> _pool = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<GlueLoadDiagnostic> _diagnostics = new();
 
     private GlueProject(GlueLoadResult result, GlueContentSource? content)
@@ -101,6 +102,13 @@ public sealed class GlueProject
             : Array.Empty<GlueEntity>();
 
     /// <summary>
+    /// The screen <paramref name="screen"/> names as the one to advance to, or null when it names
+    /// none — Glue's own idiom for level progression.
+    /// </summary>
+    public ScreenSave? NextScreenOf(ScreenSave screen) =>
+        string.IsNullOrEmpty(screen.NextScreen) ? null : FindScreen(screen.NextScreen!);
+
+    /// <summary>
     /// Builds a screen from its Glue name, ready to hand to the engine's screen machinery.
     /// </summary>
     /// <exception cref="ArgumentException">No element has that name.</exception>
@@ -135,6 +143,18 @@ public sealed class GlueProject
         var save = FindEntity(glueName)
             ?? throw UnknownName(glueName, "entity", _entities.Keys);
 
+        return CreateEntity(save, screen);
+    }
+
+    /// <summary>
+    /// Creates an entity from a save this project already holds, skipping the name lookup.
+    /// </summary>
+    /// <remarks>
+    /// For callers already iterating the project's elements — looking the name back up would repeat
+    /// work, and would fail outright for a save whose name no longer matches its dictionary key.
+    /// </remarks>
+    internal GlueEntity CreateEntity(EntitySave save, Screen screen)
+    {
         if (save.IsAbstract)
         {
             throw new InvalidOperationException(
@@ -142,12 +162,69 @@ public sealed class GlueProject
                 "created on its own.");
         }
 
-        var entity = new GlueEntity { Save = save, Project = this };
+        var entity = TakeFromPool(save) ?? new GlueEntity { Save = save, Project = this };
+
         screen.Register(entity);
+
+        // Rebuilt even for a recycled instance: BuildObjects clears what the previous life left
+        // behind, so a reused shell is indistinguishable from a fresh one.
         entity.BuildObjects();
+
+        BindInput(entity, save, screen);
+
+        // Destroy is the only signal that an instance is gone. Without this the instance list keeps
+        // handing out corpses, and a collision relationship built on it collides with them forever.
+        entity._onDestroy = () => Release(entity);
 
         Track(save.Name!, entity);
         return entity;
+    }
+
+    /// <summary>
+    /// A recycled instance for <paramref name="save"/>, or null when it is not pooled or none is
+    /// free.
+    /// </summary>
+    /// <remarks>
+    /// Pools are per Glue name, not per CLR type. Every loaded entity is a <see cref="GlueEntity"/>,
+    /// so a single shared pool would hand back a <c>Door</c> where a <c>Player</c> was asked for —
+    /// the hazard G80 describes. Only the shell is reused; its contents are rebuilt.
+    /// </remarks>
+    private GlueEntity? TakeFromPool(EntitySave save)
+    {
+        if (!save.PooledByFactory || save.Name is null)
+            return null;
+
+        if (!_pool.TryGetValue(save.Name, out var free) || free.Count == 0)
+            return null;
+
+        var recycled = free[free.Count - 1];
+        free.RemoveAt(free.Count - 1);
+        return recycled;
+    }
+
+    /// <summary>
+    /// Gives a created entity the input its <c>InputDevice</c> asks for.
+    /// </summary>
+    /// <remarks>
+    /// Both behaviours get the same movement input — an entity is one or the other, and the unused
+    /// behaviour is never updated. Skipped without an engine, since a test can build an entity with
+    /// no input manager behind it.
+    /// </remarks>
+    private static void BindInput(GlueEntity entity, EntitySave save, Screen screen)
+    {
+        var input = screen.Engine?.Input;
+
+        if (input is null)
+            return;
+
+        var bound = GlueInputBinder.Bind(save, input);
+
+        if (bound.MovementInput is null)
+            return;
+
+        entity.Platformer.MovementInput = bound.MovementInput;
+        entity.Platformer.JumpInput = bound.JumpInput;
+        entity.TopDown.MovementInput = bound.MovementInput;
     }
 
     private void Track(string glueName, GlueEntity entity)
@@ -156,6 +233,25 @@ public sealed class GlueProject
             _instances[glueName] = list = new List<GlueEntity>();
 
         list.Add(entity);
+    }
+
+    /// <summary>
+    /// Drops a destroyed instance from the live list, and keeps its shell if the element is pooled.
+    /// </summary>
+    private void Release(GlueEntity entity)
+    {
+        Forget(entity);
+
+        if (entity.GlueName is null || entity.Save?.PooledByFactory != true)
+            return;
+
+        if (!_pool.TryGetValue(entity.GlueName, out var free))
+            _pool[entity.GlueName] = free = new List<GlueEntity>();
+
+        // Guarded because Destroy on an already-destroyed entity would otherwise pool it twice and
+        // hand the same instance to two callers.
+        if (!free.Contains(entity))
+            free.Add(entity);
     }
 
     /// <summary>Forgets a destroyed instance, so a relationship does not keep collecting corpses.</summary>
@@ -170,6 +266,14 @@ public sealed class GlueProject
     /// removes the likeliest thing a hand-typed name gets wrong.
     /// </summary>
     private static string Normalize(string glueName) => glueName.Replace('/', '\\');
+
+    /// <summary>The same "no screen named that" error <see cref="CreateScreen"/> raises.</summary>
+    /// <remarks>
+    /// Exposed so <see cref="Screen.MoveToScreen(string, Action{GlueScreen})"/> can fail at the call
+    /// site with the identical message, rather than a frame later inside the deferred change.
+    /// </remarks>
+    internal static ArgumentException UnknownScreenName(GlueProject project, string requested) =>
+        UnknownName(requested, "screen", project._screens.Keys);
 
     private static ArgumentException UnknownName(
         string requested, string kind, IEnumerable<string> known)

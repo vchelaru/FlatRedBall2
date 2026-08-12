@@ -118,4 +118,29 @@ public class GlueProjectTests
 
         screen.BuildDiagnostics.ShouldNotContain(d => d.Message.Contains(@"Entities\PlayerBall"));
     }
+
+    [Fact]
+    public void BuildObjects_EntityInstanceDirectlyOnAScreen_RegistersItOnce()
+    {
+        // Glue lets an entity sit straight on the screen, not only inside a list. That instance is
+        // created through CreateEntity, which already registers it and builds its contents — so the
+        // add step must not register it a second time. Doing so put it in the entity list twice and
+        // re-added its children to the render list, drawing one authored bear as two.
+        var project = Load("Beefball");
+        var save = System.Text.Json.JsonSerializer.Deserialize(@"{
+            ""Name"": ""Screens\\OneBall"",
+            ""NamedObjects"": [ {
+                ""InstanceName"": ""PlayerBallInstance"",
+                ""SourceClassType"": ""Entities\\PlayerBall"",
+                ""SourceType"": 1
+            } ]
+        }", GlueJsonContext.Default.ScreenSave)!;
+        var screen = new GlueScreen { Project = project, Save = save };
+
+        screen.BuildObjects();
+
+        screen.Entities.Count.ShouldBe(1);
+        screen.Objects["PlayerBallInstance"].ShouldBeSameAs(screen.Entities[0]);
+        project.InstancesOf(@"Entities\PlayerBall").Count.ShouldBe(1);
+    }
 }

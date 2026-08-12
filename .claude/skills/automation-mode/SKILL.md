@@ -58,6 +58,7 @@ Each command is a JSON object terminated by `\n`. Each response is a JSON object
 | Query all entities | `{"cmd":"query","target":"entities"}` |
 | Query one entity type | `{"cmd":"query","target":"Player"}` |
 | Force a value | `{"cmd":"set","entity":"Player","prop":"X","value":100.0}` |
+| Screenshot next Draw | `{"cmd":"record_next_screenshot","path":"shot.png"}` |
 | Quit | `{"cmd":"quit"}` |
 
 ### Frame stepping
@@ -77,6 +78,23 @@ Key names resolve via `Enum.Parse<Keys>()` — use MonoGame's `Keys` enum names 
 Input commands produce no response — query if you need confirmation. `WasKeyPressed` style inputs require the down state to span at least one stepped frame between the down and up commands; combine `input down:true` → `step` → `input down:false` to register a press.
 
 Cursor injection takes screen pixels by default (origin top-left, Y+ down) or world coords with `"space":"world"`. World-space requires at least one registered camera and back-projects through the first one — split-screen disambiguation isn't supported yet, so for those cases use `"space":"screen"` and compute pixels yourself. `primary` and `secondary` mirror left/right mouse buttons; both default to `false` and are sticky across frames until the next cursor command. Once any cursor injection has occurred, the real mouse and touch input are ignored for the rest of the session — there is no opt-out yet.
+
+### Screenshots
+
+`record_next_screenshot` arms a capture that a later `Draw` fulfills — it responds when the PNG is on disk, not when armed. This is how to check rendered output without a human: capture, then read the PNG back. An armed capture holds off both draw suppression and `quit`, so it cannot be starved or exited out from under.
+
+A whole session can go in one write, `quit` included, with a sleep after it to hold stdin open:
+
+```bash
+(printf '%s\n' '{"cmd":"step","count":3}' \
+   '{"cmd":"record_next_screenshot","path":"shot.png"}' \
+   '{"cmd":"step"}' '{"cmd":"quit"}'; sleep 6) \
+  | timeout 30 ./MyGame.exe --frb-auto > out.log 2>&1
+```
+
+Run the game under `timeout N`, chain the build with `&&` so a failed build cannot fall through to a run, and assert the artifact (`test -f shot.png`) rather than assuming it. Without those, a game that never launched leaves the shell blocked until the tool's own timeout — minutes of wall clock that read as a slow build.
+
+Responses go to stdout and the reader's own log to stderr, so redirect them separately when the log would corrupt your parse.
 
 ## Querying Entities (Zero Config)
 

@@ -15,6 +15,7 @@ using AnimationEditor.Core.Rendering;
 using AnimationEditor.Core.Update;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
+using AnimationEditor.Views.Controls;
 using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -53,10 +54,21 @@ public partial class MainWindow : Window
     private readonly IUndoManager _undoManager;
     private readonly IPendingCutState _pendingCutState;
     private readonly Services.ThumbnailService _thumbnailService;
+    private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
     private readonly IFileAssociationService _fileAssociation;
     private readonly IUpdateChecker _updateChecker;
     private readonly IEditorDialogHost _dialogHost;
     private readonly PngFolderWatcher _pngFolderWatcher = new();
+
+    /// <summary>
+    /// Completes once the most recent <see cref="IAppCommands.EditorProjectModelChanged"/>
+    /// reaction (tab-cache sync + Project-tree thumbnail invalidation) finishes. Test seam --
+    /// production code never awaits this; tests use it to observe the automatic
+    /// save-&gt;invalidate chain deterministically instead of calling the invalidation method
+    /// directly (which would prove the method works but not that the real event wiring reaches
+    /// it with a matching path -- see issue #839's path-normalization bug).
+    /// </summary>
+    internal Task LastEditorProjectModelChangedTask { get; private set; } = Task.CompletedTask;
 
     private AppSettingsModel _appSettings = new();
     private readonly TabManager _tabManager = new();
@@ -101,9 +113,6 @@ public partial class MainWindow : Window
     private int _untitledCounter;
     private bool _suppressPropRefresh;
     private bool _suppressTextureComboChanged;
-    private bool _suppressPreviewScrollSync;
-    private bool _suppressWireframeScrollSync;
-    private bool _suppressPngScrollSync;
 
     // ── PNG Diff (#606) ─────────────────────────────────────────────────
     private readonly Services.PngBlameService _blameService = new();
@@ -154,7 +163,6 @@ public partial class MainWindow : Window
     private bool _suppressInterpolateSync;
     private bool _suppressGuideVisibilitySync;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
-    private System.Threading.CancellationTokenSource? _toastCts;
 
     // The platform application-data root under which settings live. Injected (not read from
     // Environment here) so headless tests can redirect it to a temp dir and never touch the
@@ -178,6 +186,7 @@ public partial class MainWindow : Window
         IUndoManager undoManager,
         IPendingCutState pendingCutState,
         Services.ThumbnailService thumbnailService,
+        ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
         IUpdateChecker updateChecker,
         string applicationDataRoot)
@@ -194,6 +203,7 @@ public partial class MainWindow : Window
         _undoManager = undoManager;
         _pendingCutState = pendingCutState;
         _thumbnailService = thumbnailService;
+        _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
         _updateChecker = updateChecker;
         _dialogHost = new WindowEditorDialogHost(this);
@@ -207,8 +217,6 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsMacOS())
             ApplyMacOSWindowChrome();
 
-        InitToast();
-        InitErrorBanner();
         PropertyChanged += (_, e) => { if (e.Property == OffScreenMarginProperty) Padding = OffScreenMargin; };
 
         WireAppCommands();
@@ -235,6 +243,7 @@ public partial class MainWindow : Window
         PreviewCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _thumbnailService, _pendingCutState, msg => ShowStatusMessage(msg, isError: true));
         FilesPanel.Initialize(_thumbnailService, this,
             msg => ShowStatusMessage(msg, isError: true), OpenPngAsTab);
+        ProjectPanel.Initialize(_projectTreeThumbnailService);
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
@@ -814,7 +823,11 @@ public partial class MainWindow : Window
             await LoadProjectFolderAsync(lastProjectFolder);
 
         RefreshFilesPanel();
-        ShowDefaultHandlerBannerIfAppropriate();
+        // Not auto-shown (issue #849): RegisterAsDefault() doesn't work for the current
+        // dev/portable distribution — no installer yet (#493) — so the banner would just
+        // offer a "Make default" button that does nothing useful. The manual "Set as
+        // default" / "Don't show again" controls in Settings still work for anyone who
+        // wants to try it.
         _ = RunStartupUpdateCheckAsync();
     }
 
@@ -937,10 +950,11 @@ public partial class MainWindow : Window
                 ShowStatusMessage($"⚠ Reload skipped for '{Path.GetFileName(path)}': {reason}", isError: true));
 
         _appCommands.EditorProjectModelChanged += path =>
-            Dispatcher.UIThread.InvokeAsync(() =>
+            LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 ClearPendingCut();
                 SyncTabCacheFromEditor(path);
+                await InvalidateProjectPanelThumbnailIfTrackedAsync(path);
             });
 
         _pendingCutState.Changed += () =>
@@ -989,12 +1003,7 @@ public partial class MainWindow : Window
                     : $"Exported {name} — {string.Join(" ", warnings)}");
             });
 
-        ItemDeletedToastUndoBtn.Click += (_, _) =>
-        {
-            _toastCts?.Cancel();
-            ItemDeletedToastPanel.IsVisible = false;
-            _undoManager.Undo();
-        };
+        Notifications.WireUndo(() => _undoManager.Undo());
 
         // Wire hot reload watcher
         _appCommands.HotReloadWatcher = new HotReloadWatcher();
@@ -1157,80 +1166,19 @@ public partial class MainWindow : Window
         WireframeCtrl.PanChanged             += (_, _) => SaveCompanionFile();
 
         // ── Wireframe scrollbars (#422) ──
-        // Two-way sync between the manual camera pan and the scrollbars, mirroring the Preview
-        // panel (#415). The scroll axis runs opposite the pan axis (PanScrollBar inverts it).
-        WireframeHScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: true);
-        WireframeVScroll.ValueChanged += (_, _) => OnWireframeScrollValueChanged(horizontal: false);
         // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
-        WireframeHScroll.Scroll += OnPreviewScrollEnded;
-        WireframeVScroll.Scroll += OnPreviewScrollEnded;
-        WireframeCtrl.ViewChanged += RefreshWireframeScrollBars;
-    }
-
-    private void OnWireframeScrollValueChanged(bool horizontal)
-    {
-        if (_suppressWireframeScrollSync) return;
-        _suppressWireframeScrollSync = true;
-        if (horizontal)
-            WireframeCtrl.SetPanX((float)WireframeHScroll.Value);
-        else
-            WireframeCtrl.SetPanY((float)WireframeVScroll.Value);
-        _suppressWireframeScrollSync = false;
-    }
-
-    /// <summary>
-    /// Pushes the wireframe's current pan/zoom/texture size into its two scrollbars. Fired by
-    /// <see cref="WireframeControl.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshWireframeScrollBars()
-    {
-        if (_suppressWireframeScrollSync) return;
-        _suppressWireframeScrollSync = true;
-        var (h, v) = WireframeCtrl.GetScrollBarRanges();
-        ApplyScrollRange(WireframeHScroll, h);
-        ApplyScrollRange(WireframeVScroll, v);
-        _suppressWireframeScrollSync = false;
+        PanScrollBinder.Attach(WireframeCtrl, WireframeHScroll, WireframeVScroll, SaveCompanionFile);
     }
 
     // ── PngPreviewControl scrollbar wiring (#604) ─────────────────────────────
 
     private void WirePngViewport()
     {
-        // Two-way sync between the PNG viewer's manual camera pan and its scrollbars, mirroring
-        // the wireframe (#422). No companion-file persistence — a PNG tab carries no editor state.
-        PngHScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: true);
-        PngVScroll.ValueChanged += (_, _) => OnPngScrollValueChanged(horizontal: false);
-        PngPane.ViewChanged += RefreshPngScrollBars;
+        // No companion-file persistence — a PNG tab carries no editor state.
+        PanScrollBinder.Attach(PngPane, PngHScroll, PngVScroll);
         // The PNG bar's zoom widget both shows the live zoom and drives it (type/step to 1:1 for
         // screenshots), sharing the wireframe/preview implementation.
         PngZoom.Attach(PngPane);
-    }
-
-    private void OnPngScrollValueChanged(bool horizontal)
-    {
-        if (_suppressPngScrollSync) return;
-        _suppressPngScrollSync = true;
-        if (horizontal)
-            PngPane.SetPanX((float)PngHScroll.Value);
-        else
-            PngPane.SetPanY((float)PngVScroll.Value);
-        _suppressPngScrollSync = false;
-    }
-
-    /// <summary>
-    /// Pushes the PNG viewer's current pan/zoom/texture size into its two scrollbars. Fired by
-    /// <see cref="TextureViewport.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshPngScrollBars()
-    {
-        if (_suppressPngScrollSync) return;
-        _suppressPngScrollSync = true;
-        var (h, v) = PngPane.GetScrollBarRanges();
-        ApplyScrollRange(PngHScroll, h);
-        ApplyScrollRange(PngVScroll, v);
-        _suppressPngScrollSync = false;
     }
 
     // ── PNG Diff wiring (#606) ──────────────────────────────────────────
@@ -1496,11 +1444,19 @@ public partial class MainWindow : Window
 
     // ── Core event handlers ───────────────────────────────────────────────────
 
+    /// <summary>
+    /// UI-refresh reaction to <see cref="IApplicationEvents.AnimationChainsChanged"/>. The actual
+    /// save is handled by <c>AppCommands</c>'s own subscription to the same event (issue #839
+    /// follow-up: that used to live here, which made "does an edit actually persist" untestable
+    /// without a full Avalonia window). <c>AppCommands</c> is constructed before <see
+    /// cref="MainWindow"/> (see <c>App.axaml.cs</c>'s DI registration order), so its subscription
+    /// fires first — the save has already happened by the time <see cref="UpdateTitle"/> below
+    /// reads <c>SaveState</c>.
+    /// </summary>
     private void HandleAnimationChainsChanged()
     {
         if (!string.IsNullOrEmpty(_projectManager.FileName))
         {
-            _appCommands.SaveCurrentAnimationChainList();
             SaveCompanionFile();
             UpdateTitle();
         }
@@ -2071,6 +2027,42 @@ public partial class MainWindow : Window
             : $"Found {entries.Count} .achx file(s) under \"{rootFolder.Name}\".", isError: false);
     }
 
+    /// <summary>
+    /// Refreshes the Project tab's thumbnail for <paramref name="savedPath"/> if that file is
+    /// also present in the currently-scanned Project tree (issue #839 follow-up: a save wasn't
+    /// reflected there at all before this). No-op for a file outside the scanned folder, or when
+    /// the Project tab has never been populated. Internal (not private) and returns
+    /// <see cref="Task"/> so tests can await the full save-&gt;invalidate-&gt;regenerate pipeline
+    /// deterministically, same seam pattern as <see cref="OpenProjectFolderForTestAsync"/>.
+    /// </summary>
+    internal Task InvalidateProjectPanelThumbnailIfTrackedAsync(string? savedPath)
+    {
+        if (string.IsNullOrEmpty(savedPath)) return Task.CompletedTask;
+
+        var entry = FindProjectPanelEntry(ProjectPanel.TreeRoots, savedPath);
+        return entry is not null ? ProjectPanel.InvalidateThumbnail(entry) : Task.CompletedTask;
+    }
+
+    private static AchxFileEntry? FindProjectPanelEntry(
+        IEnumerable<AchxTreeNodeVm> nodes, string absolutePath)
+    {
+        // FilePath equality, not a raw string compare: ProjectManager.FileName is set from
+        // FilePath.FullPath (forward-slash normalized -- see LoadAnimationChain), but
+        // DiskEditorFile.FullPath comes straight from Directory.EnumerateFiles (raw OS
+        // backslash on Windows). A plain string.Equals never matched, so a real save's
+        // EditorProjectModelChanged silently failed to find its tree entry (issue #839).
+        var target = new FilePath(absolutePath);
+        foreach (var node in nodes)
+        {
+            if (node.Entry?.File is DiskEditorFile diskFile && new FilePath(diskFile.FullPath) == target)
+                return node.Entry;
+
+            var found = FindProjectPanelEntry(node.Children, absolutePath);
+            if (found is not null) return found;
+        }
+        return null;
+    }
+
     private void OnSaveClick(object? sender, RoutedEventArgs e)
     {
         if (_projectManager.AnimationChainListSave is null) return;
@@ -2223,7 +2215,11 @@ public partial class MainWindow : Window
         };
 
     /// <summary>
-    /// Builds the content panel for the About dialog.
+    /// Builds the content panel for the About dialog. <paramref name="updateCheck"/> is <c>null</c>
+    /// when no check has run yet; a non-null result with a populated <see cref="UpdateCheckResult.LatestVersion"/>
+    /// and <see cref="UpdateCheckResult.IsUpdateAvailable"/> <c>false</c> means the check succeeded
+    /// and the running version is already current (issue #845 — this used to be indistinguishable
+    /// from "never checked").
     /// Extracted for testability.
     /// </summary>
     internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
@@ -2231,9 +2227,12 @@ public partial class MainWindow : Window
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
 
-        var updatePromptText = updateCheck?.IsUpdateAvailable == true
-            ? $"Update available: v{updateCheck.LatestVersion}"
-            : "Check here for updates:";
+        var updatePromptText = updateCheck switch
+        {
+            { IsUpdateAvailable: true } => $"Update available: v{updateCheck.LatestVersion}",
+            { LatestVersion: not null } => $"You're up to date (v{updateCheck.LatestVersion})",
+            _ => "Check here for updates:",
+        };
         var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
         var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
 
@@ -2330,15 +2329,8 @@ public partial class MainWindow : Window
         PreviewCtrl.GroupPlaybackTicked += RefreshGroupTimelineScrubbers;
 
         // ── Preview scrollbars (#415) ──
-        // Two-way sync between the manual pan and the scrollbars, using the same suppression-flag
-        // pattern that breaks feedback loops elsewhere. The scroll axis runs
-        // opposite the pan axis (PanScrollBar handles the inversion).
-        PreviewHScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: true);
-        PreviewVScroll.ValueChanged += (_, _) => OnPreviewScrollValueChanged(horizontal: false);
         // Persist on scroll-end only (not per tick), matching the pan-drag save semantics.
-        PreviewHScroll.Scroll += OnPreviewScrollEnded;
-        PreviewVScroll.Scroll += OnPreviewScrollEnded;
-        PreviewCtrl.ViewChanged += RefreshPreviewScrollBars;
+        PanScrollBinder.Attach(PreviewCtrl, PreviewHScroll, PreviewVScroll, SaveCompanionFile);
 
         UpdateGuideToggleVisibility();
     }
@@ -2355,46 +2347,6 @@ public partial class MainWindow : Window
         _suppressGuideVisibilitySync = true;
         ShowUserGuidesCheck.IsChecked = PreviewCtrl.ShowUserGuides;
         _suppressGuideVisibilitySync = false;
-    }
-
-    private void OnPreviewScrollValueChanged(bool horizontal)
-    {
-        if (_suppressPreviewScrollSync) return;
-        _suppressPreviewScrollSync = true;
-        if (horizontal)
-            PreviewCtrl.SetPanX(PanScrollBar.PanFromValue((float)PreviewHScroll.Value));
-        else
-            PreviewCtrl.SetPanY(PanScrollBar.PanFromValue((float)PreviewVScroll.Value));
-        _suppressPreviewScrollSync = false;
-    }
-
-    private void OnPreviewScrollEnded(object? sender, ScrollEventArgs e)
-    {
-        if (e.ScrollEventType == ScrollEventType.EndScroll) SaveCompanionFile();
-    }
-
-    /// <summary>
-    /// Pushes the Preview's current pan/zoom/content extent into the two scrollbars. Fired by
-    /// <see cref="PreviewControl.ViewChanged"/>. The suppression flag stops the resulting
-    /// <c>ValueChanged</c> from looping back into the pan.
-    /// </summary>
-    private void RefreshPreviewScrollBars()
-    {
-        if (_suppressPreviewScrollSync) return;
-        _suppressPreviewScrollSync = true;
-        var (h, v) = PreviewCtrl.GetScrollBarRanges();
-        ApplyScrollRange(PreviewHScroll, h);
-        ApplyScrollRange(PreviewVScroll, v);
-        _suppressPreviewScrollSync = false;
-    }
-
-    // Order matters: set Minimum/Maximum before Value so RangeBase doesn't coerce it.
-    private static void ApplyScrollRange(ScrollBar bar, ScrollBarRange r)
-    {
-        bar.Minimum      = r.Minimum;
-        bar.Maximum      = r.Maximum;
-        bar.ViewportSize = r.ViewportSize;
-        bar.Value        = r.Value;
     }
 
     private void OnPreviewPlaybackFrameIndexChanged(int index)
@@ -4319,6 +4271,36 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Shows <paramref name="names"/>'s shared value in <paramref name="control"/>, or blanks it with
+    /// a "(mixed)" placeholder when the selection disagrees on Name — same convention as
+    /// <see cref="SetValueOrMixed"/>. When <paramref name="disableForCollision"/> is true (two or more
+    /// selected shapes share a frame), the field is disabled instead: applying one literal name to
+    /// shapes in the same frame would collide, since shape names only need to be unique per-frame.
+    /// </summary>
+    private static void SetNameOrMixed(TextBox control, IReadOnlyList<string> names, bool disableForCollision)
+    {
+        if (disableForCollision)
+        {
+            control.IsEnabled = false;
+            control.Text = null;
+            control.PlaceholderText = "(multiple — same frame)";
+            return;
+        }
+
+        control.IsEnabled = true;
+        if (names.Distinct().Count() == 1)
+        {
+            control.Text = names[0];
+            control.PlaceholderText = null;
+        }
+        else
+        {
+            control.Text = null;
+            control.PlaceholderText = "(mixed)";
+        }
+    }
+
     private void RefreshPropertyPanel()
     {
         _suppressPropRefresh = true;
@@ -4424,13 +4406,14 @@ public partial class MainWindow : Window
             {
                 // Multi-selected rects can disagree on a property, same as multi-selected frames
                 // (#571) — show that field blank with a "(mixed)" placeholder instead of one rect's
-                // value; editing it then applies the new value to every selected rect. Name has no
-                // legitimate "mixed" display since it isn't numeric, so it's just disabled instead
-                // (see ApplyRectProps for why a shared literal name isn't applied across a batch).
+                // value; editing it then applies the new value to every selected rect. Name follows
+                // the same pattern: shape names only need to be unique within a frame (not across
+                // frames), so batch-renaming is safe unless two selected rects share a frame — see
+                // SetNameOrMixed and ApplyRectProps.
                 var rects = _selectedState.SelectedRectangles;
-                bool rectsMulti = rects.Count > 1;
-                PropRectName.IsEnabled = !rectsMulti;
-                PropRectName.Text = rectsMulti ? "(multiple)" : (rect.Name ?? "");
+                bool rectsCollide = rects.Count > 1 &&
+                    _appCommands.HasSameFrameNameCollision(rects.Cast<object>().ToList());
+                SetNameOrMixed(PropRectName, rects.Select(r => r.Name ?? "").ToList(), rectsCollide);
                 SetValueOrMixed(PropRectX, rects.Select(r => (decimal)r.X).ToList());
                 SetValueOrMixed(PropRectY, rects.Select(r => (decimal)r.Y).ToList());
                 SetValueOrMixed(PropRectScaleX, rects.Select(r => (decimal)r.ScaleX).ToList());
@@ -4440,9 +4423,9 @@ public partial class MainWindow : Window
             if (circ is not null)
             {
                 var circles = _selectedState.SelectedCircles;
-                bool circlesMulti = circles.Count > 1;
-                PropCircleName.IsEnabled = !circlesMulti;
-                PropCircleName.Text = circlesMulti ? "(multiple)" : (circ.Name ?? "");
+                bool circlesCollide = circles.Count > 1 &&
+                    _appCommands.HasSameFrameNameCollision(circles.Cast<object>().ToList());
+                SetNameOrMixed(PropCircleName, circles.Select(c => c.Name ?? "").ToList(), circlesCollide);
                 SetValueOrMixed(PropCircleX, circles.Select(c => (decimal)c.X).ToList());
                 SetValueOrMixed(PropCircleY, circles.Select(c => (decimal)c.Y).ToList());
                 SetValueOrMixed(PropCircleRadius, circles.Select(c => (decimal)c.Radius).ToList());
@@ -4559,15 +4542,16 @@ public partial class MainWindow : Window
         var rects = _selectedState.SelectedRectangles;
         if (rects.Count == 0) return;
 
-        // A null component here means "still showing (mixed), not edited" — leave that axis alone
-        // per-rect. Name is only applied for a single selected rect: propagating one literal name
-        // to every rect in a multi-selection would clobber their distinct names (PropRectName is
-        // disabled in RefreshPropertyPanel whenever more than one rect is selected).
+        // A null component here means "still showing (mixed)/disabled, not edited" — leave that
+        // field alone per-rect. PropRectName.Text is null exactly when RefreshPropertyPanel just
+        // showed "(mixed)" or disabled the field for a same-frame collision (SetNameOrMixed); once
+        // the user types, Text becomes non-null and applies to every selected rect (safe as long as
+        // no two share a frame — SetNameOrMixed disables the field for that case).
         float? x = PropRectX.Value.HasValue ? (float)PropRectX.Value.Value : null;
         float? y = PropRectY.Value.HasValue ? (float)PropRectY.Value.Value : null;
         float? scaleX = PropRectScaleX.Value.HasValue ? (float)PropRectScaleX.Value.Value : null;
         float? scaleY = PropRectScaleY.Value.HasValue ? (float)PropRectScaleY.Value.Value : null;
-        string? name = rects.Count == 1 ? (PropRectName.Text ?? "") : null;
+        string? name = PropRectName.Text;
 
         _appCommands.SetRectPropsBulk(rects, name, x, y, scaleX, scaleY);
     }
@@ -4578,11 +4562,11 @@ public partial class MainWindow : Window
         var circles = _selectedState.SelectedCircles;
         if (circles.Count == 0) return;
 
-        // See ApplyRectProps for the null-means-"don't touch" / single-selection-only-name semantics.
+        // See ApplyRectProps for the null-means-"don't touch" / same-frame-collision semantics.
         float? x = PropCircleX.Value.HasValue ? (float)PropCircleX.Value.Value : null;
         float? y = PropCircleY.Value.HasValue ? (float)PropCircleY.Value.Value : null;
         float? radius = PropCircleRadius.Value.HasValue ? (float)PropCircleRadius.Value.Value : null;
-        string? name = circles.Count == 1 ? (PropCircleName.Text ?? "") : null;
+        string? name = PropCircleName.Text;
 
         _appCommands.SetCirclePropsBulk(circles, name, x, y, radius);
     }
@@ -5129,72 +5113,18 @@ public partial class MainWindow : Window
         _statusMessageTimer.Start();
     }
 
-    // ── Error banner ──────────────────────────────────────────────────────────
-
-    private DispatcherTimer? _errorBannerTimer;
-
-    private void InitErrorBanner()
-    {
-        ErrorBannerDismissBtn.Click += (_, _) => HideErrorBanner();
-    }
+    // ── Toast / banner notifications ──────────────────────────────────────────
+    // All three surfaces (item-deleted undo toast, generic toast, error banner) live in the
+    // shared EditorNotificationOverlay hosted as "Notifications" — see MainWindow.axaml.
 
     /// <summary>
     /// Shows the prominent top-centre error banner. Auto-dismisses after 8s (longer than the
     /// informational status bar's 5s — errors deserve more dwell time) or on manual dismiss.
     /// </summary>
-    private void ShowErrorBanner(string text)
-    {
-        // The banner draws its own ⚠ icon, so drop a leading warning glyph that callers prepend
-        // (many ShowStatusMessage sites use "⚠ ..."), otherwise the icon shows twice.
-        ErrorBannerText.Text = text.TrimStart('⚠', ' ');
-        ErrorBanner.IsVisible = true;
+    private void ShowErrorBanner(string text) => Notifications.ShowErrorBanner(text);
 
-        _errorBannerTimer?.Stop();
-        _errorBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-        _errorBannerTimer.Tick += (_, _) => HideErrorBanner();
-        _errorBannerTimer.Start();
-    }
-
-    private void HideErrorBanner()
-    {
-        _errorBannerTimer?.Stop();
-        ErrorBanner.IsVisible = false;
-        ErrorBannerText.Text = string.Empty;
-    }
-
-    // ── Toast notification ────────────────────────────────────────────────────
-
-    private DispatcherTimer? _toastTimer;
-    private Action? _toastRetryAction;
-
-    private void InitToast()
-    {
-        ToastDismissBtn.Click += (_, _) => HideToast();
-        ToastRetryBtn.Click   += (_, _) =>
-        {
-            HideToast();
-            _toastRetryAction?.Invoke();
-        };
-    }
-
-    private void ShowToast(string message, Action? retryAction = null)
-    {
-        _toastRetryAction = retryAction;
-        ToastMessage.Text = message;
-        ToastRetryBtn.IsVisible = retryAction is not null;
-        ToastPanel.IsVisible = true;
-
-        _toastTimer?.Stop();
-        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
-        _toastTimer.Tick += (_, _) => HideToast();
-        _toastTimer.Start();
-    }
-
-    private void HideToast()
-    {
-        _toastTimer?.Stop();
-        ToastPanel.IsVisible = false;
-    }
+    private void ShowToast(string message, Action? retryAction = null) =>
+        Notifications.ShowToast(message, retryAction);
 
     // ── Keyboard wiring ───────────────────────────────────────────────────────
 
@@ -5815,22 +5745,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ShowItemDeletedToast(string label)
-    {
-        _toastCts?.Cancel();
-        _toastCts = new System.Threading.CancellationTokenSource();
-        System.Threading.CancellationToken token = _toastCts.Token;
-
-        ItemDeletedToastLabel.Text = $"\"{label}\" deleted";
-        ItemDeletedToastPanel.IsVisible = true;
-
-        try
-        {
-            await System.Threading.Tasks.Task.Delay(4000, token);
-            ItemDeletedToastPanel.IsVisible = false;
-        }
-        catch (System.Threading.Tasks.TaskCanceledException) { }
-    }
+    private void ShowItemDeletedToast(string label) => Notifications.ShowItemDeleted(label);
 
     /// <summary>Test hook — invokes <see cref="HandleDelete"/> as if the Delete key were pressed.</summary>
     internal void HandleDeleteForTest() => HandleDelete();

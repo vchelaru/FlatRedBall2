@@ -38,15 +38,31 @@ internal class AutomationMode
     {
         _engine = engine;
         _output = output ?? Console.Out;
-        _log = log ?? (static message => System.Diagnostics.Debug.WriteLine(message));
+        // stderr, not Debug.WriteLine: this log exists to explain a session that is producing no
+        // responses, and a debugger listener is invisible to whoever is driving the pipe. stdout is
+        // the protocol channel and must stay pure NDJSON.
+        _log = log ?? (static message => Console.Error.WriteLine(message));
     }
 
     internal void Start(System.IO.TextReader? input = null)
     {
-        var reader = input ?? Console.In;
+        var reader = input ?? CreateStandardInputReader();
         var thread = new Thread(() => ReaderLoop(reader)) { IsBackground = true, Name = "AutomationMode.Reader" };
         thread.Start();
     }
+
+    /// <summary>
+    /// Reads stdin as a raw stream rather than through <see cref="Console.In"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Console.In"/> wraps the handle in a console reader that reports EOF immediately
+    /// on a redirected pipe on Windows, even with a writer attached and data pending. The reader
+    /// loop then treats every subsequent read as another EOF and retries forever, so the game gates
+    /// on a step that never arrives: no frames, no Draw, no responses, and nothing on stderr to say
+    /// why. Opening the standard input stream directly bypasses that layer.
+    /// </remarks>
+    internal static System.IO.TextReader CreateStandardInputReader() =>
+        new System.IO.StreamReader(Console.OpenStandardInput());
 
     internal void ProcessLine(string line)
     {
@@ -175,8 +191,12 @@ internal class AutomationMode
             case "set":                    ProcessSetCommand(cmd, frame);                 break;
             case "record_next_screenshot": ProcessRecordNextScreenshotCommand(cmd, frame); break;
             case "quit":
-                try { _engine.Game.Exit(); }
-                catch (InvalidOperationException) { }
+                // A capture armed but not yet drawn would be lost — the back buffer it wants is
+                // only produced by the draw that has not happened. Exit once it has landed.
+                if (HasPendingScreenshot)
+                    _quitAfterScreenshot = true;
+                else
+                    Quit();
                 break;
             default:
                 WriteResponse(new { ok = false, frame, error = $"unknown command: {command}" });
@@ -402,6 +422,23 @@ internal class AutomationMode
     }
 
     /// <summary>
+    /// Whether a capture is armed and still waiting for a draw.
+    /// </summary>
+    /// <remarks>
+    /// The engine suppresses drawing on every tick it does not grant a frame for, which would
+    /// starve an armed screenshot forever: the back buffer it wants is only produced by a draw.
+    /// </remarks>
+    internal bool HasPendingScreenshot => _pendingScreenshotPath != null;
+
+    private bool _quitAfterScreenshot;
+
+    private void Quit()
+    {
+        try { _engine.Game.Exit(); }
+        catch (InvalidOperationException) { }
+    }
+
+    /// <summary>
     /// Pops the armed screenshot request, if any. Pure state-machine logic — no
     /// <see cref="GraphicsDevice"/> dependency — kept separate from <see cref="FulfillPendingScreenshot"/>
     /// so it can be unit tested without a real graphics device.
@@ -436,6 +473,9 @@ internal class AutomationMode
             texture.SaveAsPng(stream, width, height);
 
             WriteResponse(new { ok = true, frame, result = new { path } });
+
+            if (_quitAfterScreenshot)
+                Quit();
         }
         catch (Exception ex)
         {

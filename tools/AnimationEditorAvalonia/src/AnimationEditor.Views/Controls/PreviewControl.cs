@@ -27,7 +27,7 @@ namespace AnimationEditor.App.Controls;
 /// (one frame = FrameLength seconds). When a single frame is selected, shows that
 /// frame statically with optional onion-skin overlay.
 /// </summary>
-public class PreviewControl : Control, IZoomTarget
+public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 {
     // -- Animation state -------------------------------------------------------
     private readonly DispatcherTimer _timer;
@@ -55,27 +55,17 @@ public class PreviewControl : Control, IZoomTarget
     private float _zoom = 1f;
     private float _panX, _panY;
 
-    // -- Smooth (animated) wheel zoom (#451) -----------------------------------
-    // Mirrors WireframeControl's #425 smooth zoom: a wheel notch retargets _zoomTarget and the
-    // timer eases _zoom toward it via ZoomChase, applying each stepped value through the
-    // pivot-preserving ZoomToward. The pivot is held in viewport space and re-used every tick, so
-    // the point under the cursor stays fixed for the whole animation. Rapid notches retarget the
-    // in-flight animation rather than stacking.
-    private DispatcherTimer? _zoomTimer;
-    private bool  _zoomAnimating;
-    private float _zoomTarget;      // destination zoom factor (1.0 = 100 %)
-    private float _zoomPivotVpX;    // cursor pivot, viewport space
-    private float _zoomPivotVpY;
-    private const float ZoomAnimIntervalSeconds = 1f / 60f;
+    // -- Smooth (animated) wheel zoom (#451 / #802) --------------------------------
+    // ZoomAnimator owns target/pivot/timer; this control supplies ApplyZoomTowardPivot and a
+    // settle-tick snap onto the exact target scalar.
+    private readonly ZoomAnimator _zoomAnimator;
 
     // -- Render diagnostics (#514) ---------------------------------------------
     // When enabled, overlays the rolling-average Skia render time (ms/frame + fps) top-left.
     // Measures the compositor-thread render — where the cost actually lands (the UI-thread
     // Render() only builds the snapshot). Toggled at runtime via DiagnosticsEnabled; MainWindow
     // wires F3 and the Help menu item to flip this in lock-step with the wireframe panel.
-    private bool _showDiagnostics;
-    private readonly RollingAverage _drawTimes = new(10);
-    private DispatcherTimer? _diagnosticsTimer;
+    private readonly DiagnosticsOverlayHost _diagnostics;
 
     /// <summary>
     /// Shows/hides the draw-time diagnostics overlay. Toggled at runtime from MainWindow
@@ -83,30 +73,8 @@ public class PreviewControl : Control, IZoomTarget
     /// </summary>
     public bool DiagnosticsEnabled
     {
-        get => _showDiagnostics;
-        set
-        {
-            if (_showDiagnostics == value) return;
-            _showDiagnostics = value;
-            // The panel only repaints on demand (playback/zoom/pan), so an idle overlay would show
-            // a frozen ms/frame. While diagnostics are on, tick a 1 fps repaint so the readout stays
-            // live even when nothing else changes; stop it otherwise to keep the panel idle.
-            if (value)
-            {
-                _diagnosticsTimer ??= CreateDiagnosticsTimer();
-                _diagnosticsTimer.Start();
-            }
-            else
-                _diagnosticsTimer?.Stop();
-            InvalidateVisual();
-        }
-    }
-
-    private DispatcherTimer CreateDiagnosticsTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) => InvalidateVisual();
-        return timer;
+        get => _diagnostics.Enabled;
+        set => _diagnostics.Enabled = value;
     }
 
     // -- Settings --------------------------------------------------------------
@@ -633,6 +601,12 @@ public class PreviewControl : Control, IZoomTarget
     {
         ClipToBounds = true;
         Focusable    = true;
+        _diagnostics = new DiagnosticsOverlayHost(InvalidateVisual);
+        _zoomAnimator = new ZoomAnimator(
+            () => _zoom,
+            (px, py, factor) => ApplyZoomTowardPivot(px, py, factor),
+            z => _zoom = z,
+            () => WheelZoomPresets);
 
         // Right-click (when it doesn't hit a guide — see OnPointerPressed) opens this menu
         // with a "View <filename> in Explorer" item for the currently previewed texture.
@@ -647,7 +621,7 @@ public class PreviewControl : Control, IZoomTarget
         SizeChanged += (_, _) => RaiseViewChanged();
 
         // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
-        DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
+        DetachedFromVisualTree += (_, _) => { _zoomAnimator.StopTimer(); _diagnostics.Stop(); };
 
         // Subscriptions are deferred to InitializeServices (called from MainWindow)
 
@@ -903,7 +877,7 @@ public class PreviewControl : Control, IZoomTarget
     /// </summary>
     public void SimulateWheelZoom(double x, double y, bool zoomIn)
     {
-        BeginAnimatedZoom((float)x, (float)y, zoomIn);
+        _zoomAnimator.Begin((float)x, (float)y, zoomIn);
         SettleZoomAnimation();
     }
 
@@ -915,14 +889,14 @@ public class PreviewControl : Control, IZoomTarget
     /// retargeting. Mirrors the live <see cref="OnPointerWheelChanged"/> path.
     /// </summary>
     public void SimulateWheelZoomBegin(float vpX, float vpY, bool zoomIn) =>
-        BeginAnimatedZoom(vpX, vpY, zoomIn);
+        _zoomAnimator.Begin(vpX, vpY, zoomIn);
 
     /// <summary>True while a smooth wheel-zoom (#451) is easing toward its target. The host gates
     /// companion-file persistence on this so only the settled state is saved, not every tick.</summary>
-    public bool IsZoomAnimating => _zoomAnimating;
+    public bool IsZoomAnimating => _zoomAnimator.IsAnimating;
 
     /// <summary>Test-only: the zoom factor the in-flight animation is easing toward (1.0 = 100 %).</summary>
-    public float TargetZoom => _zoomTarget;
+    public float TargetZoom => _zoomAnimator.Target;
 
     /// <summary>
     /// Advances the in-flight smooth zoom by <paramref name="dtSeconds"/>, easing toward the target
@@ -931,73 +905,16 @@ public class PreviewControl : Control, IZoomTarget
     /// once settled (at which point the timer is stopped). The live 60 fps timer calls this; tests
     /// call it directly for deterministic stepping.
     /// </summary>
-    public bool StepZoomAnimation(float dtSeconds)
-    {
-        if (!_zoomAnimating) return false;
-
-        float next = ZoomChase.Step(_zoom, _zoomTarget, dtSeconds);
-        bool settling = ZoomChase.IsSettled(next, _zoomTarget);
-
-        // Clear the flag BEFORE the apply fires ZoomChanged on the settling tick, so the host sees
-        // IsZoomAnimating == false and persists the companion file exactly once (on settle).
-        if (settling) { _zoomAnimating = false; StopZoomTimer(); }
-
-        // factor is relative to the current zoom; the viewport pivot is constant across ticks, so
-        // the factors compose to the same result as a single notch (the pivot stays anchored).
-        ApplyZoomTowardPivot(_zoomPivotVpX, _zoomPivotVpY, next / _zoom);
-
-        // On the settling tick, snap the zoom scalar exactly onto the target. The per-tick factor
-        // multiplications accumulate float drift (e.g. 1.5000001 instead of 1.5), which would make
-        // a preset-stepping zoom button mis-read the current preset and fail to step (#451).
-        if (settling) _zoom = _zoomTarget;
-        return !settling;
-    }
+    public bool StepZoomAnimation(float dtSeconds) => _zoomAnimator.Step(dtSeconds);
 
     /// <summary>Runs <see cref="StepZoomAnimation"/> to completion synchronously. Used by the
     /// instant <see cref="SimulateWheelZoom"/> overload and any caller that must force settle.</summary>
-    public void SettleZoomAnimation()
-    {
-        // The 1000-iteration cap is a non-convergence backstop; ZoomChase settles far sooner.
-        for (int i = 0; _zoomAnimating && i < 1000; i++)
-            StepZoomAnimation(ZoomAnimIntervalSeconds);
-    }
-
-    /// <summary>
-    /// Retargets the smooth zoom toward the next/previous preset from the given control-space pivot.
-    /// A notch while already animating steps from the in-flight <see cref="_zoomTarget"/>, so rapid
-    /// spins accumulate through the presets rather than re-targeting the same one from the
-    /// mid-animation zoom. Does NOT start the driving timer — the live wheel handler starts it; tests
-    /// drive <see cref="StepZoomAnimation"/> directly for determinism.
-    /// </summary>
-    private void BeginAnimatedZoom(float pivotVpX, float pivotVpY, bool zoomIn)
-    {
-        float basis = _zoomAnimating ? _zoomTarget : _zoom;
-        _zoomTarget   = ComputeTargetZoom(basis, zoomIn);
-        _zoomPivotVpX = pivotVpX;
-        _zoomPivotVpY = pivotVpY;
-        _zoomAnimating = true;
-    }
+    public void SettleZoomAnimation() => _zoomAnimator.Settle();
 
     /// <summary>Stops any in-flight wheel-zoom animation, holding the camera at its current value.
     /// Competing camera actions (pan, combo zoom, centre-on-point) call this so they don't fight the
     /// easing timer.</summary>
-    private void CancelZoomAnimation()
-    {
-        if (!_zoomAnimating) return;
-        _zoomAnimating = false;
-        StopZoomTimer();
-    }
-
-    /// <summary>The zoom factor one wheel notch targets from <paramref name="basisZoom"/>, using
-    /// preset stepping when <see cref="WheelZoomPresets"/> is set, else a ×1.25/×0.8 multiplier.
-    /// Clamped to [<see cref="CanvasTransform.MinZoom"/>, <see cref="CanvasTransform.MaxZoom"/>].</summary>
-    private float ComputeTargetZoom(float basisZoom, bool zoomIn)
-    {
-        float targetPct = WheelZoomPresets is { Length: > 0 } presets
-            ? ZoomPresetStepper.StepToNextPreset(basisZoom * 100f, presets, zoomIn ? +1 : -1)
-            : basisZoom * 100f * (zoomIn ? 1.25f : 0.8f);
-        return Math.Clamp(targetPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-    }
+    private void CancelZoomAnimation() => _zoomAnimator.Cancel();
 
     /// <summary>
     /// Applies a zoom <paramref name="factor"/> relative to the current zoom, holding the
@@ -1025,21 +942,6 @@ public class PreviewControl : Control, IZoomTarget
         RaiseViewChanged();
     }
 
-    private void StartZoomTimer()
-    {
-        _zoomTimer ??= CreateZoomTimer();
-        _zoomTimer.Start();
-    }
-
-    private void StopZoomTimer() => _zoomTimer?.Stop();
-
-    private DispatcherTimer CreateZoomTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ZoomAnimIntervalSeconds) };
-        timer.Tick += (_, _) => StepZoomAnimation(ZoomAnimIntervalSeconds);
-        return timer;
-    }
-
     public void SetPan(float panX, float panY)
     {
         _panX = panX;
@@ -1049,24 +951,26 @@ public class PreviewControl : Control, IZoomTarget
     }
 
     /// <summary>
-    /// Sets the horizontal pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.
+    /// Sets the horizontal pan from a scrollbar value (see <see cref="PanScrollBar"/>) and
+    /// repaints. Clamped defensively to the pan band. The scroll→pan inversion is applied here,
+    /// not by the caller, so both <see cref="IPanScrollTarget"/> implementations agree.
     /// </summary>
-    public void SetPanX(float panX)
+    public void SetPanX(float scrollValue)
     {
-        _panX = panX;
+        _panX = PanScrollBar.PanFromValue(scrollValue);
         ClampPan();
         InvalidateVisual();
         RaiseViewChanged();
     }
 
     /// <summary>
-    /// Sets the vertical pan from a scrollbar-driven value (see <see cref="PanScrollBar"/>)
-    /// and repaints. Clamped defensively to the pan band.
+    /// Sets the vertical pan from a scrollbar value (see <see cref="PanScrollBar"/>) and
+    /// repaints. Clamped defensively to the pan band. The scroll→pan inversion is applied here,
+    /// not by the caller, so both <see cref="IPanScrollTarget"/> implementations agree.
     /// </summary>
-    public void SetPanY(float panY)
+    public void SetPanY(float scrollValue)
     {
-        _panY = panY;
+        _panY = PanScrollBar.PanFromValue(scrollValue);
         ClampPan();
         InvalidateVisual();
         RaiseViewChanged();
@@ -1173,7 +1077,7 @@ public class PreviewControl : Control, IZoomTarget
 
         UpdatePalette();
         ctx.Custom(new DrawOp(
-            snap, _thumbnailService!.ImageCache, _palette, _showDiagnostics ? _drawTimes : null));
+            snap, _thumbnailService!.ImageCache, _palette, _diagnostics.ActiveSampler));
     }
 
     // ActualThemeVariant resolves Default to the concrete platform variant, so a simple
@@ -1438,24 +1342,8 @@ public class PreviewControl : Control, IZoomTarget
     /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
     /// currently previewed texture, or cancels the menu entirely when there's nothing to reveal.
     /// </summary>
-    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
-    {
-        var absPath = ResolveSelectedTexturePath();
-        if (ContextMenu is not { } menu || absPath is null)
-        {
-            e.Cancel = true;
-            return;
-        }
-
-        menu.Items.Clear();
-        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
-        item.Click += (_, _) =>
-        {
-            var error = ShellExplorer.RevealFile(absPath);
-            if (error is not null) _showError?.Invoke(error);
-        };
-        menu.Items.Add(item);
-    }
+    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
+        RevealInExplorerMenu.Populate(ContextMenu, ResolveSelectedTexturePath(), _showError, e);
 
     /// <summary>
     /// Returns the topmost collision shape under the given screen-space point, or
@@ -1761,8 +1649,8 @@ public class PreviewControl : Control, IZoomTarget
         // The control IS the viewport, so e.GetPosition(this) is the control-space pivot.
         // Smooth-zoom retargets and eases toward the next preset (#451), mirroring the Wireframe.
         var pt = e.GetPosition(this);
-        BeginAnimatedZoom((float)pt.X, (float)pt.Y, e.Delta.Y > 0);
-        StartZoomTimer();   // live driver; tests drive StepZoomAnimation directly instead
+        _zoomAnimator.Begin((float)pt.X, (float)pt.Y, e.Delta.Y > 0);
+        _zoomAnimator.StartTimer();   // live driver; tests drive StepZoomAnimation directly instead
         e.Handled = true;
     }
 
@@ -2511,20 +2399,8 @@ public class PreviewControl : Control, IZoomTarget
             if (feature is null) return;
             using var lease = feature.Lease();
 
-            if (_drawTimes is not null)
-            {
-                // Time only the Skia render — it runs on the compositor/render thread, where the
-                // frame cost actually lands (the UI-thread Render() just builds the snapshot).
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
-                sw.Stop();
-                _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
-                DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average);
-            }
-            else
-            {
-                PreviewControl.RenderSkCore(lease.SkCanvas, _snap, _cache, _palette);
-            }
+            DrawTimeOverlay.TimeAndDraw(lease, _drawTimes,
+                canvas => PreviewControl.RenderSkCore(canvas, _snap, _cache, _palette));
         }
     }
 }

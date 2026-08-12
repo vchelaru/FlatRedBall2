@@ -4,6 +4,35 @@ Vendored snapshots of FlatRedBall 1 Glue project files, used to test the `.gluj`
 loader (see `plan/804-glue-project-loader/`). Committed here rather than read from the sibling
 `FlatRedBall` checkout so the tests are self-contained.
 
+## TopDownProject
+
+| | |
+|---|---|
+| Source repo | `FlatRedBall` (sibling checkout, `C:\git\flatredball`) |
+| Source path | `Tests/TestProjectDesktopNet6/TestProjectDesktopNet6/` |
+| Synced | 2026-08-07 |
+| `FileVersion` | 54 |
+
+The only top-down fixture. `Entities/TopDownMovementEntity.glej` and its
+`Content/Entities/TopDownMovementEntity/TopDownValuesStatic.csv` are copied **byte-for-byte**.
+
+**The `.gluj` is the one hand-edited file here**, and only its reference lists: the source project
+references 226 elements, of which one is vendored, so `ScreenReferences` is emptied,
+`EntityReferences` is trimmed to the single entity, and `StartUpScreen` is cleared. Everything else —
+`FileVersion`, display settings, global files — is the real project's.
+
+Chosen deliberately: `TopDownMovementEntity` declares **no `NamedObjects`**, so it sidesteps the
+short-form `SourceClassType` problem (below) entirely while still exercising the real `IsTopDown`
+property, the real CSV shape, and the real referenced-file wiring.
+
+**Why the rest of that project is not vendored.** It is `FileVersion` 54 and writes `SourceClassType`
+unqualified — 110 of its files use a short name, and 7 mix both spellings in the same file, so it is
+not a clean version gate. `GlueTypeMap` now aliases the four short names it can construct
+(`Sprite`, `AxisAlignedRectangle`, `Circle`, `Polygon`), and the tile predicates already accepted both
+forms, so vendoring more of it is now possible — `Screens/TmxScreen.glsj` is the only
+`TileNodeNetwork` in all of FRB1, and `Screens/TiledLevelScreen.glsj` the only screen that really
+spawns entities from tiles.
+
 ## DoorsDemo
 
 | | |
@@ -14,8 +43,20 @@ loader (see `plan/804-glue-project-loader/`). Committed here rather than read fr
 | Synced | 2026-08-01 |
 | `FileVersion` | 60 |
 
-Copied **as-is** — do not re-save or hand-edit. Only the Glue project files are vendored; the
-`.csproj`, content, and generated code are not needed to test the loader.
+Copied **as-is** — do not re-save or hand-edit. Only the Glue project files are vendored, plus the
+content later phases actually read; the `.csproj` and generated code are not needed to test the
+loader.
+
+**Gum content added for Phase 5** (2026-08-05, same source path, `Content/GumProject/`): the
+`.gumx`, its three `.gusx` screens, the `Standards`, and the font cache — 25 files. Deliberately
+excluded: `Libraries/bmfont.exe` (an executable has no place in a test fixture) and `EventExport/`
+(neither is read at load time). This is the fixture the Gum phase uses rather than
+`FormsSampleProject`, because DoorsDemo's `GameScreen` already references a `.gusx` and its `Level1`
+is the inheriting case that has no `.gusx` of its own.
+
+Note that Gum's `FileManager` resolves paths against the *app's* `Content` folder, not the Glue
+project's — so tests stage this folder next to the test binary. A real game needs no equivalent
+step, because its `Content` folder is the Glue project's.
 
 Why this project rather than the two the tracking issue names (ChickenClicker, Beefball): those are
 `FileVersion` 42, which sits *below* three gates that change what lands on disk
@@ -74,7 +115,9 @@ to anyone opening that sample.
 the door and player animation chains, the player texture, the platformer CSV, the level's `.tmx` and
 its two tilesets.
 
-**`Content/Screens/Level1/StandardTilesetIcons.png` is a deliberate duplicate** of the copy at
-`Content/`. It works around an engine bug where an external tileset's image resolves against the map's
-directory rather than the `.tsx`'s — see the entry in `design/TODOS.md`. Delete the duplicate to
-reproduce that bug, and delete it permanently once the bug is fixed.
+**This fixture is the regression test for external-tileset image resolution.** `Level1Map.tmx` sits
+in `Content/Screens/Level1/` and references `../../StandardTileset.tsx`, whose own image reference is
+relative to *the tileset*, in `Content/`. That combination used to fail, and was worked around here by
+duplicating the PNG next to the map; the duplicate is gone and `TileMap` now rewrites a tileset's
+image paths to be map-relative when it serves the `.tsx`. Re-adding a copy of
+`StandardTilesetIcons.png` under `Content/Screens/Level1/` would mask a regression of that fix.

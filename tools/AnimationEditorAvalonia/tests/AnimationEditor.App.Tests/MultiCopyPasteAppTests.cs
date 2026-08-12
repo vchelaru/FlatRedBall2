@@ -117,8 +117,8 @@ public class MultiCopyPasteAppTests
             var clip = await window.Clipboard!.TryGetTextAsync();
             Assert.True(string.IsNullOrWhiteSpace(clip));
 
-            var banner = window.FindControl<Border>("ErrorBanner")!;
-            var bannerText = window.FindControl<TextBlock>("ErrorBannerText")!;
+            var banner = window.Notifications.ErrorBanner;
+            var bannerText = window.Notifications.ErrorBannerText;
             Assert.True(banner.IsVisible);
             Assert.Equal(SelectionCopyContext.MixedSelectionMessage, bannerText.Text);
         }

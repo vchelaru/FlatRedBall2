@@ -33,8 +33,9 @@ public sealed class GlueContentSource
     /// Creates a source that resolves paths under <paramref name="contentRoot"/>.
     /// </summary>
     /// <remarks>
-    /// <paramref name="contentRoot"/> is the directory holding the <c>.gluj</c>; Glue's file names
-    /// are relative to a <c>Content</c> folder inside it.
+    /// <paramref name="contentRoot"/> is the directory holding the <c>.gluj</c>, and Glue's file names
+    /// are relative to it directly. The editor keeps a project and everything it references in one
+    /// self-contained folder, so there is no <c>Content</c> folder in between.
     /// <para><b>It must be relative, and relative to the title location — the executable's folder,
     /// not the working directory.</b> That is what <c>TitleContainer</c> resolves against on every
     /// backend, and it is the same rule the browser target needs. An absolute path throws rather
@@ -67,7 +68,7 @@ public sealed class GlueContentSource
     internal Tiled.TileMap? LoadTileMap(
         string relativePath, string? elementName, List<GlueLoadDiagnostic> diagnostics)
     {
-        string path = Path.Combine(ContentRoot, "Content", relativePath).Replace('\\', '/');
+        string path = Path.Combine(ContentRoot, relativePath).Replace('\\', '/');
 
         if (_maps.TryGetValue(path, out var cached))
             return cached;
@@ -159,8 +160,9 @@ public sealed class GlueContentSource
         if (_assets.ContainsKey(instanceName) || _text.ContainsKey(instanceName))
             return;
 
-        // Glue's names are relative to the project's Content folder.
-        string path = Path.Combine(ContentRoot, "Content", file.Name!).Replace('\\', '/');
+        // Relative to the .gluj itself. The editor keeps a project and everything it references in one
+        // self-contained folder, so there is no fixed "Content" segment in between.
+        string path = Path.Combine(ContentRoot, file.Name!).Replace('\\', '/');
         string extension = Path.GetExtension(file.Name!).ToLowerInvariant();
 
         try
@@ -211,6 +213,29 @@ public sealed class GlueContentSource
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
+
+    /// <summary>
+    /// Whether <paramref name="file"/> is one the owner should add to the engine on its own, with no
+    /// object instantiating it.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors FRB1's <c>ReferencedFileSaveCodeGenerator.GetIfShouldAddToManagers</c>. Adding a tile
+    /// map to a screen in Glue produces a referenced file and no <c>NamedObject</c>, so a screen that
+    /// only honoured its objects drew nothing.
+    /// <para>
+    /// The shared-static carve-out is the subtle half: a shared-static file is a template to clone
+    /// from on an entity, but on a screen it is the screen's own content and is added. Tile maps are
+    /// the only referenced type FRB2 can add today — FRB1 decides this from the type's
+    /// <c>AssetTypeInfo</c>, which has no FRB2 equivalent.
+    /// </para>
+    /// </remarks>
+    internal static bool ShouldAddToManagers(ReferencedFileSave file, bool ownerIsScreen) =>
+        file.LoadedAtRuntime
+        && !file.LoadedOnlyWhenReferenced
+        && file.AddToManagers
+        && (!file.IsSharedStatic || ownerIsScreen)
+        && file.Name is not null
+        && Path.GetExtension(file.Name).Equals(".tmx", StringComparison.OrdinalIgnoreCase);
 
     private static void Warn(List<GlueLoadDiagnostic> diagnostics, string? elementName, string message) =>
         diagnostics.Add(new GlueLoadDiagnostic(GlueDiagnosticSeverity.Warning, message, elementName));

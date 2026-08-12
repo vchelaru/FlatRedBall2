@@ -184,6 +184,10 @@ public partial class App : Application
         sc.AddSingleton<ThumbnailService>(sp =>
             new ThumbnailService(sp.GetRequiredService<IProjectManager>()));
 
+        sc.AddSingleton<ProjectTreeThumbnailService>(sp =>
+            new ProjectTreeThumbnailService(ProjectThumbnailCacheLocation.ForApplicationDataRoot(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))));
+
         // File association is registry-based on Windows; other platforms get the no-op
         // service so the startup prompt simply never appears (IsSupported == false).
         if (OperatingSystem.IsWindows())
@@ -205,6 +209,7 @@ public partial class App : Application
             sp.GetRequiredService<IUndoManager>(),
             sp.GetRequiredService<IPendingCutState>(),
             sp.GetRequiredService<ThumbnailService>(),
+            sp.GetRequiredService<ProjectTreeThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
             sp.GetRequiredService<IUpdateChecker>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));

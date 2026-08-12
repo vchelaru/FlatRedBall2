@@ -39,6 +39,18 @@ public class TextureViewportSnapshot
     /// from the immutable data captured on this snapshot. Null for a plain viewer.
     /// </summary>
     public Action<SKCanvas, TextureViewportSnapshot>? DrawOverlay;
+
+    /// <summary>
+    /// Texture-space rect → screen-space using this snapshot's captured camera (render-thread safe).
+    /// Shared by wireframe and PNG-diff overlays so each control doesn't re-wrap
+    /// <see cref="CanvasTransform.TextureRectToScreen"/>.
+    /// </summary>
+    public SKRect TextureRectToScreen(SKRect r)
+    {
+        var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
+            r.Left, r.Top, r.Right, r.Bottom, PanX, PanY, Zoom);
+        return new SKRect(l, t, rr, b);
+    }
 }
 
 /// <summary>
@@ -58,7 +70,7 @@ public class TextureViewportSnapshot
 /// and the <c>OnEditPointer*</c> hooks — the base handles pan/zoom before any of those fire.
 /// </para>
 /// </summary>
-public class TextureViewport : Control, IZoomTarget
+public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
 {
     // ── Inner types ───────────────────────────────────────────────────────────
 
@@ -99,18 +111,8 @@ public class TextureViewport : Control, IZoomTarget
                 if (lease.GrContext is { } gr && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
                     gr.SetResourceCacheLimit(GpuResourceCacheBytes);
 
-                if (_drawTimes is not null)
-                {
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    RenderSk(lease.SkCanvas, _s, _palette);
-                    sw.Stop();
-                    _drawTimes.Add(sw.Elapsed.TotalMilliseconds);
-                    // GrContext is non-null only on the GPU (ANGLE) backend; null = software raster.
-                    DrawTimeOverlay.Draw(lease.SkCanvas, _drawTimes.Average,
-                        lease.GrContext != null ? "GPU" : "CPU");
-                }
-                else
-                    RenderSk(lease.SkCanvas, _s, _palette);
+                DrawTimeOverlay.TimeAndDraw(lease, _drawTimes,
+                    canvas => RenderSk(canvas, _s, _palette));
             }
         }
 
@@ -251,18 +253,10 @@ public class TextureViewport : Control, IZoomTarget
     // ScrollViewer; the control IS the viewport and two ScrollBars are driven from this pan.
     protected float _panX, _panY;
 
-    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
-    // A wheel notch retargets _zoomTarget; the timer eases _zoom toward it via ZoomChase,
-    // applying each stepped value through the existing pivot-preserving ZoomToward. The pivot
-    // is stored in VIEWPORT space and re-used every tick, so the point under the cursor stays
-    // fixed for the whole animation — the per-tick factors compose to the same result as one
-    // instant notch. Rapid notches retarget the in-flight animation rather than stacking.
-    private DispatcherTimer? _zoomTimer;
-    private bool  _zoomAnimating;
-    private float _zoomTarget;      // destination zoom factor (1.0 = 100 %)
-    private float _zoomPivotVpX;    // cursor pivot, viewport space
-    private float _zoomPivotVpY;
-    private const float ZoomAnimIntervalSeconds = 1f / 60f;
+    // ── Smooth (animated) wheel zoom (#425 / #802) ────────────────────────────
+    // ZoomAnimator owns target/pivot/timer; this control supplies ZoomToward and a settle-tick
+    // snap onto the exact target scalar.
+    private readonly ZoomAnimator _zoomAnimator;
 
     protected bool _showGrid;
     protected int _gridSize = 16;
@@ -276,9 +270,7 @@ public class TextureViewport : Control, IZoomTarget
     // top-left inside the custom draw op) AND a camera-stats panel stacked below it. This is THE
     // panel to watch for the #514 slowdown — panning/zooming a large sheet redraws it (60fps during
     // smooth-zoom). Toggle via DiagnosticsEnabled; MainWindow wires F3 and the Help menu item.
-    private bool _showDiagnostics;
-    private readonly RollingAverage _drawTimes = new(10);
-    private DispatcherTimer? _diagnosticsTimer;
+    private readonly DiagnosticsOverlayHost _diagnostics;
     private static readonly Typeface _dbgTypeface = new("Consolas, Courier New");
     // ImmutableSolidColorBrush has no thread affinity and is safe to use from the compositor thread.
     private static readonly IImmutableBrush _dbgBg = new ImmutableSolidColorBrush(Color.FromArgb(210, 0, 0, 0));
@@ -333,37 +325,15 @@ public class TextureViewport : Control, IZoomTarget
     /// </summary>
     public bool DiagnosticsEnabled
     {
-        get => _showDiagnostics;
-        set
-        {
-            if (_showDiagnostics == value) return;
-            _showDiagnostics = value;
-            // The panel only repaints on demand (pan/zoom/selection), so an idle overlay would show
-            // a frozen ms/frame. While diagnostics are on, tick a 1 fps repaint so the readout stays
-            // live even when nothing else changes; stop it otherwise to keep the panel idle.
-            if (value)
-            {
-                _diagnosticsTimer ??= CreateDiagnosticsTimer();
-                _diagnosticsTimer.Start();
-            }
-            else
-                _diagnosticsTimer?.Stop();
-            InvalidateVisual();
-        }
-    }
-
-    private DispatcherTimer CreateDiagnosticsTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        timer.Tick += (_, _) => InvalidateVisual();
-        return timer;
+        get => _diagnostics.Enabled;
+        set => _diagnostics.Enabled = value;
     }
 
     // Camera-stats panel. Sits below the ms/frame box (drawn by the custom op via DrawTimeOverlay),
     // so it starts at TopOffset to avoid overlapping it — both are left-aligned under one toggle.
     private void DrawDebugOverlay(DrawingContext ctx)
     {
-        if (!_showDiagnostics) return;
+        if (!_diagnostics.Enabled) return;
         int bmpW = _bitmap?.Width  ?? 0;
         int bmpH = _bitmap?.Height ?? 0;
 
@@ -435,6 +405,12 @@ public class TextureViewport : Control, IZoomTarget
     {
         ClipToBounds = true;
         Focusable = true;
+        _diagnostics = new DiagnosticsOverlayHost(InvalidateVisual);
+        _zoomAnimator = new ZoomAnimator(
+            () => _zoom,
+            (px, py, factor) => ZoomToward(px, py, factor),
+            z => _zoom = z,
+            () => WheelZoomPresets);
 
         // Repaint when the app theme variant changes so the canvas/grid/outline colors update.
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
@@ -452,7 +428,7 @@ public class TextureViewport : Control, IZoomTarget
         };
 
         // Stop the smooth-zoom and diagnostics timers if the control leaves the tree.
-        DetachedFromVisualTree += (_, _) => { StopZoomTimer(); _diagnosticsTimer?.Stop(); };
+        DetachedFromVisualTree += (_, _) => { _zoomAnimator.StopTimer(); _diagnostics.Stop(); };
     }
 
     // ── Camera clamping + scrollbar integration ───────────────────────────────
@@ -833,7 +809,7 @@ public class TextureViewport : Control, IZoomTarget
     /// </summary>
     public void SimulateWheelZoom(float vpX, float vpY, bool zoomIn)
     {
-        BeginAnimatedZoom(vpX, vpY, zoomIn);
+        _zoomAnimator.Begin(vpX, vpY, zoomIn);
         SettleZoomAnimation();
     }
 
@@ -843,15 +819,15 @@ public class TextureViewport : Control, IZoomTarget
     /// ease and retargeting. Mirrors the live <see cref="OnPointerWheelChanged"/> path.
     /// </summary>
     public void SimulateWheelZoomBegin(float vpX, float vpY, bool zoomIn) =>
-        BeginAnimatedZoom(vpX, vpY, zoomIn);
+        _zoomAnimator.Begin(vpX, vpY, zoomIn);
 
     /// <summary>True while a smooth wheel-zoom (#425) is easing toward its target. The host gates
     /// per-frame companion-file persistence on this so only the settled state is saved, not every
     /// intermediate tick.</summary>
-    public bool IsZoomAnimating => _zoomAnimating;
+    public bool IsZoomAnimating => _zoomAnimator.IsAnimating;
 
     /// <summary>Test-only: the zoom factor the in-flight animation is easing toward (1.0 = 100 %).</summary>
-    public float TargetZoom => _zoomTarget;
+    public float TargetZoom => _zoomAnimator.Target;
 
     /// <summary>
     /// Advances the in-flight smooth zoom by <paramref name="dtSeconds"/>, easing toward the
@@ -860,31 +836,11 @@ public class TextureViewport : Control, IZoomTarget
     /// settled (at which point the timer is stopped). The live 60 fps timer calls this; tests
     /// call it directly for deterministic stepping.
     /// </summary>
-    public bool StepZoomAnimation(float dtSeconds)
-    {
-        if (!_zoomAnimating) return false;
-
-        float next = ZoomChase.Step(_zoom, _zoomTarget, dtSeconds);
-        bool settling = ZoomChase.IsSettled(next, _zoomTarget);
-
-        // Clear the flag BEFORE ZoomToward fires ZoomChanged on the settling tick, so the host
-        // sees IsZoomAnimating == false and persists the companion file exactly once (on settle).
-        if (settling) { _zoomAnimating = false; StopZoomTimer(); }
-
-        // factor is relative to the current zoom; the viewport pivot is constant across ticks, so
-        // the factors compose to the same result as a single notch (the pivot stays anchored).
-        ZoomToward(_zoomPivotVpX, _zoomPivotVpY, next / _zoom);
-        return !settling;
-    }
+    public bool StepZoomAnimation(float dtSeconds) => _zoomAnimator.Step(dtSeconds);
 
     /// <summary>Runs <see cref="StepZoomAnimation"/> to completion synchronously. Used by the
     /// instant test overloads and available to any caller that must force the settled state.</summary>
-    public void SettleZoomAnimation()
-    {
-        // The 1000-iteration cap is a non-convergence backstop; ZoomChase settles far sooner.
-        for (int i = 0; _zoomAnimating && i < 1000; i++)
-            StepZoomAnimation(ZoomAnimIntervalSeconds);
-    }
+    public void SettleZoomAnimation() => _zoomAnimator.Settle();
 
     /// <summary>Test-only: current camera pan (screen position of texture pixel (0,0)).</summary>
     public (float X, float Y) PanOffset => (_panX, _panY);
@@ -895,7 +851,7 @@ public class TextureViewport : Control, IZoomTarget
     {
         UpdatePalette();
         var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette, _showDiagnostics ? _drawTimes : null));
+        ctx.Custom(new DrawOp(snap, _palette, _diagnostics.ActiveSampler));
         DrawDebugOverlay(ctx);
     }
 
@@ -983,64 +939,15 @@ public class TextureViewport : Control, IZoomTarget
         // The control IS the viewport now (no ScrollViewer), so e.GetPosition(this) is the
         // viewport-space pivot. Smooth-zoom retargets and eases toward the next preset (#425).
         var pivot = e.GetPosition(this);
-        BeginAnimatedZoom((float)pivot.X, (float)pivot.Y, e.Delta.Y > 0);
-        StartZoomTimer();   // live driver; tests drive StepZoomAnimation directly instead
+        _zoomAnimator.Begin((float)pivot.X, (float)pivot.Y, e.Delta.Y > 0);
+        _zoomAnimator.StartTimer();   // live driver; tests drive StepZoomAnimation directly instead
         e.Handled = true;
-    }
-
-    // ── Smooth (animated) wheel zoom (#425) ───────────────────────────────────
-
-    /// <summary>
-    /// Retargets the smooth zoom toward the next/previous preset from the given viewport-space
-    /// pivot. A notch while already animating steps from the in-flight <see cref="_zoomTarget"/>,
-    /// so rapid spins accumulate through the presets rather than re-targeting the same one from the
-    /// mid-animation zoom. Does NOT start the driving timer — the live wheel handler starts it;
-    /// tests drive <see cref="StepZoomAnimation"/> directly for determinism.
-    /// </summary>
-    private void BeginAnimatedZoom(float pivotVpX, float pivotVpY, bool zoomIn)
-    {
-        float basis = _zoomAnimating ? _zoomTarget : _zoom;
-        _zoomTarget   = ComputeTargetZoom(basis, zoomIn);
-        _zoomPivotVpX = pivotVpX;
-        _zoomPivotVpY = pivotVpY;
-        _zoomAnimating = true;
     }
 
     /// <summary>Stops any in-flight wheel-zoom animation, holding the camera at its current value.
     /// Competing camera actions (pan, combo zoom, centre-on-frame, load) call this so they don't
     /// fight the easing timer.</summary>
-    protected void CancelZoomAnimation()
-    {
-        if (!_zoomAnimating) return;
-        _zoomAnimating = false;
-        StopZoomTimer();
-    }
-
-    /// <summary>The zoom factor one wheel notch targets from <paramref name="basisZoom"/>, using
-    /// preset stepping when <see cref="WheelZoomPresets"/> is set, else a 1.25× multiplier. Clamped
-    /// to [<see cref="CanvasTransform.MinZoom"/>, <see cref="CanvasTransform.MaxZoom"/>].</summary>
-    private float ComputeTargetZoom(float basisZoom, bool zoomIn)
-    {
-        float targetPct = WheelZoomPresets is { Length: > 0 } presets
-            ? ZoomPresetStepper.StepToNextPreset(basisZoom * 100f, presets, zoomIn ? +1 : -1)
-            : basisZoom * 100f * (zoomIn ? 1.25f : 1f / 1.25f);
-        return Math.Clamp(targetPct / 100f, CanvasTransform.MinZoom, CanvasTransform.MaxZoom);
-    }
-
-    private void StartZoomTimer()
-    {
-        _zoomTimer ??= CreateZoomTimer();
-        _zoomTimer.Start();
-    }
-
-    private void StopZoomTimer() => _zoomTimer?.Stop();
-
-    private DispatcherTimer CreateZoomTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(ZoomAnimIntervalSeconds) };
-        timer.Tick += (_, _) => StepZoomAnimation(ZoomAnimIntervalSeconds);
-        return timer;
-    }
+    protected void CancelZoomAnimation() => _zoomAnimator.Cancel();
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {

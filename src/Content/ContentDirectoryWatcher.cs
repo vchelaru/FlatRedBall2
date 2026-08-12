@@ -66,6 +66,16 @@ public class ContentDirectoryWatcher : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Directory names (case-insensitive) whose contents are dropped before they ever reach the
+    /// dirty set. Defaults to the build and tool folders — <c>bin</c>, <c>obj</c>, <c>.vs</c>,
+    /// <c>.git</c> — which churn constantly and never hold content. Matching is per path segment,
+    /// so <c>Content/obj/</c> (the MGCB intermediate folder) is covered as well as a top-level
+    /// <c>obj/</c>. Relevant to watchers rooted above <c>Content/</c>; harmless below it.
+    /// </summary>
+    public HashSet<string> IgnoredDirectories { get; } =
+        new(StringComparer.OrdinalIgnoreCase) { "bin", "obj", ".vs", ".git" };
+
+    /// <summary>
     /// Per-path reload step invoked after successful copy but before <c>onChanged</c>, when the
     /// file's extension is in <see cref="AutoReloadExtensions"/>. Returns <c>true</c> if the
     /// change was handled in-place (e.g. live <c>Texture2D.SetData</c> on a same-dimension PNG)
@@ -97,23 +107,28 @@ public class ContentDirectoryWatcher : IDisposable
         _source.Changed += MarkChanged;
     }
 
-    private void MarkChanged(string relativePath)
-    {
-        lock (_lock)
-        {
-            _dirtyPaths.Add(relativePath);
-            _lastActivity = DateTime.UtcNow;
-        }
-    }
+    private void MarkChanged(string relativePath) => MarkChangedAt(relativePath, DateTime.UtcNow);
 
     /// <summary>Test seam: marks a path dirty as if a file event arrived at <paramref name="when"/>.</summary>
     internal void MarkChangedAt(string relativePath, DateTime when)
     {
+        // Filtered here rather than in Tick so a build storm can't grow the dirty set without bound.
+        if (IsUnderIgnoredDirectory(relativePath)) return;
         lock (_lock)
         {
             _dirtyPaths.Add(relativePath);
             _lastActivity = when;
         }
+    }
+
+    private bool IsUnderIgnoredDirectory(string relativePath)
+    {
+        if (IgnoredDirectories.Count == 0) return false;
+        foreach (var segment in relativePath.Split('/', '\\'))
+        {
+            if (IgnoredDirectories.Contains(segment)) return true;
+        }
+        return false;
     }
 
     /// <summary>

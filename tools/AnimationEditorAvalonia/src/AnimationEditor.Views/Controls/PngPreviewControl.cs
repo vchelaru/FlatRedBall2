@@ -1,6 +1,5 @@
 using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.Rendering;
-using Avalonia.Threading;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -33,13 +32,13 @@ public sealed class PngPreviewControl : TextureViewport
     private const float FocusFitFraction = 0.6f;
     private const float FocusMaxZoom = 8f;
 
-    // One-shot reveal bounce (#606). Progress runs 0→1; 1 means settled (no scaling).
-    private DispatcherTimer? _revealTimer;
-    private float _revealProgress = 1f;
+    // One-shot reveal bounce (#606 / #803). RevealHost owns progress + timer.
+    private RevealHost _reveal = null!;
 
     public PngPreviewControl()
     {
-        DetachedFromVisualTree += (_, _) => _revealTimer?.Stop();
+        _reveal = new RevealHost(InvalidateVisual);
+        DetachedFromVisualTree += (_, _) => _reveal.Stop();
     }
 
     /// <summary>
@@ -71,11 +70,26 @@ public sealed class PngPreviewControl : TextureViewport
         if (frame && regions.Count > 0)
         {
             FrameRegions();
-            StartReveal();
+            _reveal.Restart();
         }
 
         InvalidateVisual();
     }
+
+    /// <summary>True while the PNG diff-region reveal (#606) is easing toward rest.</summary>
+    public bool IsDiffRevealAnimating => _reveal.IsAnimating;
+
+    /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
+    public float DiffRevealProgress => _reveal.Progress;
+
+    /// <summary>
+    /// Advances the in-flight diff reveal by <paramref name="dtSeconds"/>. Returns <c>true</c>
+    /// while still animating. Tests drive this for determinism.
+    /// </summary>
+    public bool StepDiffReveal(float dtSeconds) => _reveal.Step(dtSeconds);
+
+    /// <summary>Runs <see cref="StepDiffReveal"/> to completion synchronously.</summary>
+    public void SettleDiffReveal() => _reveal.Settle();
 
     // Fits the combined bounds of all changed regions into the viewport and centers them.
     private void FrameRegions()
@@ -100,29 +114,6 @@ public sealed class PngPreviewControl : TextureViewport
         RaiseViewChanged();
     }
 
-    private void StartReveal()
-    {
-        _revealProgress = 0f;
-        _revealTimer ??= CreateRevealTimer();
-        _revealTimer.Start();
-    }
-
-    private DispatcherTimer CreateRevealTimer()
-    {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(RevealAnimation.DefaultIntervalSeconds) };
-        timer.Tick += (_, _) => StepReveal();
-        return timer;
-    }
-
-    private void StepReveal()
-    {
-        _revealProgress = RevealAnimation.StepProgress(
-            _revealProgress, RevealAnimation.DefaultIntervalSeconds);
-        if (_revealProgress >= 1f)
-            _revealTimer?.Stop();
-        InvalidateVisual();
-    }
-
     private sealed class DiffSnapshot : TextureViewportSnapshot
     {
         // Texture-space rects captured on the UI thread for the render thread to draw.
@@ -133,7 +124,7 @@ public sealed class PngPreviewControl : TextureViewport
     /// <inheritdoc />
     protected override TextureViewportSnapshot BuildSnapshot(double width, double height)
     {
-        var snap = new DiffSnapshot { DrawOverlay = DrawDiffOverlay, RevealProgress = _revealProgress };
+        var snap = new DiffSnapshot { DrawOverlay = DrawDiffOverlay, RevealProgress = _reveal.Progress };
         PopulateBaseSnapshot(snap, width, height);
         foreach (var r in _diffRegions)
             // Inclusive pixel bounds → half-open rect: a 1-pixel region spans one pixel of width.
@@ -158,9 +149,7 @@ public sealed class PngPreviewControl : TextureViewport
         };
         foreach (var box in s.Boxes)
         {
-            var (l, t, r, b) = CanvasTransform.TextureRectToScreen(
-                box.Left, box.Top, box.Right, box.Bottom, s.PanX, s.PanY, s.Zoom);
-            var screen = new SKRect(l, t, r, b);
+            var screen = s.TextureRectToScreen(box);
             // Scale in screen space around the box center so the bounce is visually uniform at any zoom.
             if (scale != 1f)
                 screen = ScaleAround(screen, scale);

@@ -45,7 +45,7 @@ public class TimeManager
     public TimeSpan CurrentScreenTime => _sinceScreenStart;
 
     /// <summary>
-    /// Elapsed wall-clock time since <see cref="FlatRedBallService.Initialize"/> was called.
+    /// Elapsed wall-clock time since <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/> was called.
     /// Unaffected by <see cref="TimeScale"/> and unaffected by screen pause — strictly monotonic.
     /// "Unscaled" specifically means "not multiplied by <see cref="TimeScale"/>." Use this for input
     /// gestures (double-click thresholds, hold timers) and any other timing that should not freeze
@@ -53,7 +53,7 @@ public class TimeManager
     /// </summary>
     public TimeSpan UnscaledTimeSinceStart => _unscaledSinceGameStart;
 
-    /// <summary>Total number of frames that have elapsed since <see cref="FlatRedBallService.Initialize"/> was called.</summary>
+    /// <summary>Total number of frames that have elapsed since <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/> was called.</summary>
     public long CurrentFrame { get; private set; }
 
     // -------------------------------------------------------------------------

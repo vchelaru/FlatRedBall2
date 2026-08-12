@@ -65,8 +65,14 @@ public sealed class GraphicsDeviceFixture : IDisposable
 }
 
 /// <summary>Shares one <see cref="GraphicsDeviceFixture"/> across every test class that opts in.</summary>
+/// <remarks>
+/// Membership also serializes these classes against each other, which matters beyond sharing the
+/// device: a second <c>Game</c> or a second Gum initialization running concurrently in another
+/// collection fails intermittently. Anything that builds a <c>Game</c> belongs in this collection.
+/// </remarks>
 [CollectionDefinition(Name)]
-public sealed class GraphicsDeviceCollection : ICollectionFixture<GraphicsDeviceFixture>
+public sealed class GraphicsDeviceCollection
+    : ICollectionFixture<GraphicsDeviceFixture>
 {
     public const string Name = "GraphicsDevice";
 }

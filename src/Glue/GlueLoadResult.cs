@@ -46,6 +46,7 @@ public sealed class GlueLoadResult
         Project = project;
         Diagnostics = diagnostics;
         StartUpScreen = startUpScreen;
+        GumProjectFile = GlueGumResolver.FindGumProjectFile(project);
     }
 
     /// <summary>The project. Never null — an unreadable file yields an empty project and an error.</summary>
@@ -56,6 +57,13 @@ public sealed class GlueLoadResult
     /// project names none, or names one that could not be found — the latter also raises an error.
     /// </summary>
     public ScreenSave? StartUpScreen { get; }
+
+    /// <summary>
+    /// The project's Gum project, as authored — a path relative to the <c>Content</c> folder, or
+    /// null when the project has no UI. Gum only works when it loaded the project itself, so this is
+    /// what to hand to <c>EngineInitSettings.GumProjectFile</c> before initializing.
+    /// </summary>
+    public string? GumProjectFile { get; }
 
     /// <summary>Everything the loader noticed, in the order it noticed it.</summary>
     public IReadOnlyList<GlueLoadDiagnostic> Diagnostics { get; }

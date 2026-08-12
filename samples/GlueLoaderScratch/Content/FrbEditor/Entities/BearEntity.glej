@@ -1,0 +1,139 @@
+{
+  "Tags": [
+    "GLUE"
+  ],
+  "Source": "GLUE",
+  "CreatedByOtherEntities": true,
+  "Is2D": true,
+  "ReferencedFiles": [
+    {
+      "Name": "Screens/NewScreen/Bear.png",
+      "IsSharedStatic": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Graphics.Texture2D",
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "Entities/BearEntity/TopDownValuesStatic.csv",
+      "IsSharedStatic": true,
+      "HasPublicProperty": true,
+      "CreatesDictionary": true,
+      "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "Entities/BearEntity/a.png",
+      "IsSharedStatic": true,
+      "RuntimeType": "Microsoft.Xna.Framework.Graphics.Texture2D",
+      "ProjectsToExcludeFrom": []
+    }
+  ],
+  "CustomVariables": [
+    {
+      "Properties": [
+        {
+          "Name": "Type",
+          "Value": "float",
+          "Type": "String"
+        }
+      ],
+      "Name": "X",
+      "SetByDerived": true
+    },
+    {
+      "Properties": [
+        {
+          "Name": "Type",
+          "Value": "float",
+          "Type": "String"
+        }
+      ],
+      "Name": "Y",
+      "SetByDerived": true
+    },
+    {
+      "Properties": [
+        {
+          "Name": "Type",
+          "Value": "float",
+          "Type": "String"
+        }
+      ],
+      "Name": "Z",
+      "SetByDerived": true
+    }
+  ],
+  "Properties": [
+    {
+      "Name": "ImplementsICollidable",
+      "Value": true,
+      "Type": "bool"
+    },
+    {
+      "Name": "IsTopDown",
+      "Value": true,
+      "Type": "bool"
+    }
+  ],
+  "NamedObjects": [
+    {
+      "InstanceName": "SpriteInstance",
+      "SourceClassType": "FlatRedBall.Sprite",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "Texture2D",
+          "Member": "Texture",
+          "Value": "Bear",
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "TextureScale",
+          "Value": 1.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 2,
+      "SourceFile": "Sprite",
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    },
+    {
+      "InstanceName": "AxisAlignedRectangleInstance",
+      "SourceClassType": "FlatRedBall.Math.Geometry.AxisAlignedRectangle",
+      "Properties": [
+        {
+          "Name": "AssociateWithFactory",
+          "Value": true,
+          "Type": "bool"
+        }
+      ],
+      "InstructionSaves": [
+        {
+          "Type": "float",
+          "Member": "Height",
+          "Value": 48.0,
+          "Time": 0.0
+        },
+        {
+          "Type": "float",
+          "Member": "Width",
+          "Value": 32.0,
+          "Time": 0.0
+        }
+      ],
+      "SourceType": 2,
+      "SourceFile": "AxisAlignedRectangle",
+      "HasPublicProperty": true,
+      "AttachToContainer": true,
+      "GenerateTimedEmit": true
+    }
+  ],
+  "Name": "Entities\\BearEntity",
+  "CustomClassesForExport": []
+}

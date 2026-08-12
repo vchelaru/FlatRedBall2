@@ -548,4 +548,53 @@ public class AutomationModeScreenshotTests
 
         second.ShouldBeFalse();
     }
+
+    // A stepped frame answers even when no draw follows it. MonoGame coalesces draws under a fixed
+    // timestep, so three stepped Updates can share one Draw — a caller that counts one response per
+    // step then waits forever for the other two.
+    [Fact]
+    public void FlushStepResponse_ThreeStepsAcrossOneDraw_AnswersThreeTimes()
+    {
+        var output = new StringWriter();
+        var mode = new AutomationMode(new FlatRedBallService(), output);
+        mode.ProcessLine("{\"cmd\":\"step\",\"count\":3}");
+
+        for (long frame = 1; frame <= 3; frame++)
+        {
+            mode.TryAdvanceFrame(frame);
+            mode.FlushStepResponse(frame);
+        }
+
+        output.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Length.ShouldBe(3);
+    }
+
+    // The engine reads this to decide whether it may suppress the draw, and quit reads it to decide
+    // whether it may exit yet — an armed capture needs a draw that neither would otherwise allow.
+    [Fact]
+    public void HasPendingScreenshot_ArmedThenConsumed_TracksTheCapture()
+    {
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter());
+        mode.HasPendingScreenshot.ShouldBeFalse();
+
+        mode.ProcessLine("{\"cmd\":\"record_next_screenshot\",\"path\":\"out.png\"}");
+        mode.TryAdvanceFrame(0);
+        mode.HasPendingScreenshot.ShouldBeTrue();
+
+        mode.TryConsumePendingScreenshot(out _);
+        mode.HasPendingScreenshot.ShouldBeFalse();
+    }
+
+    // Console.In wraps stdin in a console reader that reports EOF immediately on a redirected pipe
+    // on Windows, with a writer attached and data pending. The reader loop then retries that same
+    // EOF forever: no command is ever queued, no frame is granted, no Draw runs, and nothing is
+    // written back — a session that looks hung for no visible reason. Every test here injects its
+    // own reader, so this is the one line of the input path tests would otherwise never touch.
+    [Fact]
+    public void CreateStandardInputReader_DoesNotReadThroughTheConsoleReader()
+    {
+        var reader = AutomationMode.CreateStandardInputReader();
+
+        reader.ShouldBeOfType<StreamReader>();
+        reader.ShouldNotBeSameAs(Console.In);
+    }
 }

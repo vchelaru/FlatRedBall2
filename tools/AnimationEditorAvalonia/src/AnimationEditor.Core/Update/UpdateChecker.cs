@@ -5,8 +5,10 @@ namespace AnimationEditor.Core.Update;
 /// Release CI stamps the assembly version as <c>yyyy.M.d</c> (see
 /// build-and-release-animation-editor.yml's <c>-p:Version</c>), so a plain <see cref="Version"/>
 /// comparison against the release's publish date is the whole algorithm — no tag-name parsing
-/// needed. A local <c>dotnet build</c> without that MSBuild property defaults to 1.0.0.0, which
-/// is not comparable, so those builds skip the check entirely rather than risk a false positive.
+/// needed. <c>AnimationEditor.App.csproj</c> falls back to today's date in the same format when
+/// <c>Version</c> isn't passed in, so local builds compare for real too. <see cref="MinReleaseYear"/>
+/// stays as a backstop for any Version below that (e.g. a build that bypasses the csproj default),
+/// which is never comparable, so it skips the check entirely rather than risk a false positive.
 /// </summary>
 public sealed class UpdateChecker : IUpdateChecker
 {

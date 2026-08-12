@@ -296,4 +296,34 @@ public class GumHudTests
         entityVisualsRoot.HasEvents.ShouldBeFalse();
     }
 
+    // Issue #824: OverlayRoot/PopupRoot/ModalRoot are registered as overlay renderables for every
+    // screen regardless of whether the game ever populates them. DrawOverlay used to Begin() every
+    // registered overlay unconditionally, including empty ones — and since the overlay pass always
+    // runs last each frame, an empty overlay's fixed 1:1 Begin() permanently clobbered the correct
+    // zoom that the preceding per-camera pass had set on Gum's shared cursor-hit-test camera.
+    // HasOverlayContent is the guard that lets DrawOverlay skip empty overlay roots.
+
+    [Fact]
+    public void HasOverlayContent_NoChildren_ReturnsFalse()
+    {
+        var screen = new TestScreen();
+        var emptyRoot = new ContainerRuntime();
+        screen.AddOverlayRoot(emptyRoot);
+        var renderable = screen.GumRenderables.First(r => r.Visual == emptyRoot);
+
+        Screen.HasOverlayContent(renderable).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void HasOverlayContent_HasChildren_ReturnsTrue()
+    {
+        var screen = new TestScreen();
+        var root = new ContainerRuntime();
+        root.Children.Add(new ContainerRuntime());
+        screen.AddOverlayRoot(root);
+        var renderable = screen.GumRenderables.First(r => r.Visual == root);
+
+        Screen.HasOverlayContent(renderable).ShouldBeTrue();
+    }
+
 }

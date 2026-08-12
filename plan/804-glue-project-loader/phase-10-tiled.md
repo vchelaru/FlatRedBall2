@@ -4,7 +4,7 @@
 |---|---|
 | **Initiative** | Load FRB1 Glue projects (`.gluj`/`.glsj`/`.glej`) into FRB2 |
 | **Tracking issue** | [vchelaru/FlatRedBall2#804](https://github.com/vchelaru/FlatRedBall2/issues/804) |
-| **Status** | Implemented for collision-from-type/property. Node networks and the other creation options deferred — see §9. |
+| **Status** | Implemented — node networks and tile-spawned entities landed; unsupported creation options are reported, see §9. |
 | **Depends on** | Phase 4 (referenced files), Phase 6 (the map is a derived override), Phase 8 (tiles spawn entities) |
 | **Blocks** | Nothing |
 | **Suggested branch** | `804-phase-10-tiled` |
@@ -260,17 +260,44 @@ Test-first throughout.
 
 ### 6.4 — Node networks
 
-- [ ] Failing test: `FromType` builds a network from a map.
-- [ ] Failing test: `EliminateCutCorners` is honoured.
-- [ ] Failing test: `FromLayer` + `FromType` diagnoses as unsupported (G106).
-- [ ] Implement the three builders in `src/AI/` (G107).
-- [ ] Vendor `TmxScreen.glsj` from FRB1's test project — the only `TileNodeNetwork` fixture.
+- [x] Failing test: `FromType` builds a network from a map.
+      `BuildObjects_ATileNodeNetworkFromType_HasNodesWhereThatTypesTilesAre` walks every cell and
+      asserts a node exists exactly where a tile of that type does — not merely that some were made.
+- [x] Failing test: `EliminateCutCorners` is honoured (read from the bag and applied).
+- [x] Failing test: an unsupported option diagnoses rather than building nothing
+      (`BuildObjects_AnUnsupportedNodeNetworkOption_SaysSoRatherThanBuildingNothing`). A network that
+      quietly has no nodes reads as a pathfinding bug, not a missing feature.
+- [x] Implement the builders in `GlueTileBuilder.BuildNodeNetwork`.
+- [x] ~~Vendor `TmxScreen.glsj`~~ — **not vendored.** FRB1's only `TileNodeNetwork` fixture is in its
+      test project, which writes short-form `SourceClassType` and would need hand-editing to vendor
+      (see `plan/plan.md`'s fixture caveat). The tests instead add a synthetic `NamedObjectSave`,
+      shaped exactly as Glue writes one, to Level1's **real** map: the map, the tile types, the grid
+      alignment and every builder path are real, and only the declaration is arranged.
+
+**The network's grid comes from the `TileShapes` the same query produces, not from the map's bounds.**
+Deriving it from the map would drift by half a tile wherever the map's origin is not the collection's,
+and the drift would only show up as pathfinding that hugs the wrong side of a wall.
 
 ### 6.5 — Entity spawning
 
-- [ ] Failing test: `CreateEntitiesFromTiles` spawns entities through Phase 8's factories.
-- [ ] Failing test: tile-spawned entities land in the right list, including the entity-owner case
-      FRB1 handles by swapping `ListsToAddTo` (Phase 8 G82).
+- [x] Failing test: a tile typed after an entity spawns one per tile, at the tile's centre
+      (`CreateEntitiesFromTiles_ATileTypedAfterAnEntity_SpawnsOnePerTile`).
+- [x] Tile-spawned entities land in the right list — `GlueProject.InstancesOf`, the same list Phase 8
+      tracks and Phase 9 collides against.
+
+**Spawning cannot go through `TileMap.CreateEntities<T>`.** That needs a `Factory<T>`, and every
+loaded entity is a `GlueEntity`, so one factory could not tell a Door from a Player — Phase 8 G80
+again. It routes through `GlueProject.CreateEntity` instead, which is also what makes the spawned
+instances visible to `InstancesOf` and to pooling.
+
+**An `EntitySave` overload of `CreateEntity` came out of this.** Iterating the project's elements and
+then looking each name back up repeats work, and fails outright for a save whose name no longer
+matches its dictionary key. The public string overload now delegates to it.
+
+**No vendored map paints a tile typed after an entity** — DoorsDemo places its doors as
+`NamedObjects`, and its `EntityLayer` objects carry a `gid` with no class attribute. The test pairs a
+real entity with a tile type the map really uses, so the tiles, the lookup and the spawn are real and
+only the pairing is arranged.
 
 ### 6.6 — Wrap-up
 
@@ -324,11 +351,14 @@ vendored fixture exercises any of them. Tile node networks (§6.4) and entity sp
 
 ### Found while building
 
-- **An engine bug in TMX loading, filed in `design/TODOS.md`.** An external tileset's image resolves
-  against the *map's* directory rather than the `.tsx`'s, which contradicts the TMX spec and breaks
-  the normal way Tiled projects share a tileset between levels. The fixture carries a duplicated PNG
-  to work around it, and both the README and the TODO say so — the workaround is recorded rather
-  than quietly absorbed.
+- **An engine bug in TMX loading — since fixed.** An external tileset's image resolved against the
+  *map's* directory rather than the `.tsx`'s, contradicting the TMX spec and breaking the normal way
+  Tiled projects share a tileset between levels. It was recorded in `design/TODOS.md` with the
+  fixture carrying a duplicated PNG as a workaround. Both are now gone: `TileMap` rewrites a
+  tileset's image paths to be map-relative as it serves the `.tsx`, because the parser takes a single
+  scalar base directory and the converter discards the tileset's own location before the image is
+  ever loaded. Rewritten paths stay relative — an absolute one would bypass `TitleContainer` and
+  break every filesystem-less backend.
 - **A tile map is not an `IRenderable`.** It has its own `Screen.Add(TileMap)` overload because it
   owns one layer per Tiled layer. The register callback tested only for `IRenderable`, so the map
   loaded correctly and never drew — a silent failure that no test would have caught, since the tests

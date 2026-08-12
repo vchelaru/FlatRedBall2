@@ -572,6 +572,44 @@ public class Screen : ILifecycleEvents
         => Engine.RequestScreenChange(configure);
 
     /// <summary>
+    /// Moves to a screen of a loaded Glue project by its Glue name (<c>Screens\Level1</c>).
+    /// </summary>
+    /// <remarks>
+    /// Every loaded screen is a <see cref="Glue.GlueScreen"/>, so <see cref="MoveToScreen{T}"/>
+    /// cannot tell two of them apart — the name is what distinguishes them. Either separator is
+    /// accepted and case is ignored, but the <c>Screens\</c> prefix is required: a bare leaf name is
+    /// ambiguous, since an entity and a screen can share one.
+    /// <para>Works in both directions — a hand-written screen can move to a loaded one, and a loaded
+    /// screen can call <see cref="MoveToScreen{T}"/> to reach a hand-written one.</para>
+    /// </remarks>
+    /// <param name="glueName">The screen's Glue name, including its <c>Screens\</c> prefix.</param>
+    /// <param name="configure">Runs after the screen's data is assigned and before its objects are
+    /// built, so it can change what gets built.</param>
+    /// <exception cref="InvalidOperationException">No Glue project is loaded.</exception>
+    /// <exception cref="ArgumentException">The project has no screen with that name.</exception>
+    public void MoveToScreen(string glueName, Action<Glue.GlueScreen>? configure = null)
+    {
+        var project = Engine.GlueProject ?? throw new InvalidOperationException(
+            $"No Glue project is loaded, so '{glueName}' cannot be resolved. Set " +
+            $"{nameof(EngineInitSettings)}.{nameof(EngineInitSettings.GlueProjectFile)} when " +
+            "initializing, or assign FlatRedBallService.GlueProject.");
+
+        // Resolved now so an unknown name throws at the call site rather than a frame later, inside
+        // the deferred change where the stack no longer says who asked.
+        var save = project.FindScreen(glueName) ?? throw Glue.GlueProject.UnknownScreenName(project, glueName);
+
+        // Assignment happens inside the configure callback, not before it: the engine retains this
+        // callback and replays it on RestartScreen. Setting Save outside would leave a restarted
+        // screen with none — a silently empty screen rather than an error.
+        Engine.RequestScreenChange<Glue.GlueScreen>(screen =>
+        {
+            screen.Save = save;
+            screen.Project = project;
+            configure?.Invoke(screen);
+        });
+    }
+
+    /// <summary>
     /// Requests a restart of the current screen at the start of the next frame. The screen is
     /// fully torn down (entities, factories, content, Gum, async tasks) and recreated as a fresh
     /// instance of the same type, replaying the most recently retained configure callback.
@@ -771,17 +809,7 @@ public class Screen : ILifecycleEvents
             watcher ??= w;
             registered = true;
 
-            // Engine-level content watching deliberately filters out Gum file types
-            // (.gumx, .gusx, .gucx, .gutx, .behx, .ganx) because Gum runs its own
-            // hot-reload pipeline. That pipeline is opt-in — without this, callers
-            // would have to follow every WatchContentDirectory with a separate
-            // Engine.Gum.EnableHotReload call. When the watched directory contains
-            // a Gum project, auto-start it.
-            foreach (var gumx in Directory.EnumerateFiles(srcAbs, "*.gumx", SearchOption.AllDirectories))
-            {
-                Engine.EnableGumHotReload(gumx);
-                break; // one project per watched tree is the assumed shape
-            }
+            EnableGumHotReloadIfProjectUnder(srcAbs, w);
         }
 
         if (!registered)
@@ -795,6 +823,60 @@ public class Screen : ILifecycleEvents
         }
 
         return ContentWatchRegistrationStatus.Registered;
+    }
+
+    /// <summary>
+    /// Starts Gum's own hot-reload pipeline when a Gum project sits under a directory this screen
+    /// is watching.
+    /// </summary>
+    /// <remarks>
+    /// Engine-level content watching deliberately leaves Gum file types (<c>.gumx</c>, <c>.gusx</c>,
+    /// <c>.gucx</c>, <c>.gutx</c>, <c>.behx</c>, <c>.ganx</c>) alone, because Gum reloads them in
+    /// place. That pipeline is opt-in, so without this every <c>WatchContentDirectory</c> call would
+    /// have to be followed by a separate <c>Engine.Gum.EnableHotReload</c>.
+    /// <para>
+    /// Skipping the watcher's ignored folders matters once the watched root sits above
+    /// <c>Content/</c> (the Glue project layout): the build output holds a copy of the <c>.gumx</c>,
+    /// and enabling reload on that copy would watch a file the user never edits.
+    /// </para>
+    /// </remarks>
+    private void EnableGumHotReloadIfProjectUnder(string sourceAbsoluteRoot, ContentDirectoryWatcher watcher)
+    {
+        foreach (var gumx in Directory.EnumerateFiles(sourceAbsoluteRoot, "*.gumx", SearchOption.AllDirectories))
+        {
+            if (watcher.IgnoredDirectories.Overlaps(Path.GetRelativePath(sourceAbsoluteRoot, gumx)
+                    .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)))
+                continue;
+            Engine.EnableGumHotReload(gumx);
+            return; // one project per watched tree is the assumed shape
+        }
+    }
+
+    /// <summary>
+    /// Watches the one source root that holds <paramref name="anchorFile"/>, rather than every root
+    /// containing the directory.
+    /// </summary>
+    /// <remarks>
+    /// For a watch rooted at a project directory rather than at <c>Content/</c>, "every root that
+    /// contains this directory" is every root there is — including sibling projects that have
+    /// nothing to do with the file being watched. The anchor picks the one that does.
+    /// </remarks>
+    /// <returns><c>null</c> when no source root holds the anchor (shipping builds included).</returns>
+    internal ContentDirectoryWatcher? WatchContentDirectoryContaining(
+        string anchorFile, string sourceDirectory, Action<string> onChanged)
+    {
+        foreach (var root in Engine.SourceContentRoots)
+        {
+            if (!File.Exists(Path.Combine(root, anchorFile))) continue;
+
+            var srcAbs = Path.Combine(root, sourceDirectory);
+            var watcher = WatchContentDirectory(new FileSystemDirectoryWatcher(srcAbs), onChanged,
+                sourceAbsoluteRoot: srcAbs,
+                destinationAbsoluteRoot: Path.Combine(Engine.OutputContentRoot, sourceDirectory));
+            EnableGumHotReloadIfProjectUnder(srcAbs, watcher);
+            return watcher;
+        }
+        return null;
     }
 
     /// <summary>
@@ -1163,6 +1245,7 @@ public class Screen : ILifecycleEvents
         foreach (var renderable in _gumRenderables)
         {
             if (!renderable.IsOverlay) continue;
+            if (!HasOverlayContent(renderable)) continue;
             var batch = renderable.Batch;
             if (batch != currentBatch)
             {
@@ -1174,6 +1257,13 @@ public class Screen : ILifecycleEvents
         }
         currentBatch?.End(spriteBatch);
     }
+
+    // OverlayRoot/PopupRoot/ModalRoot are registered as overlay renderables for every screen
+    // regardless of whether the game ever populates them. An empty one draws nothing, but Begin()
+    // still runs Gum's shared cursor-hit-test camera to overlayCamera's fixed 1:1 zoom — and since
+    // the overlay pass always runs last each frame, that permanently clobbers whatever zoom the
+    // preceding per-camera pass set (issue #824). Skipping empty overlays avoids the clobber.
+    internal static bool HasOverlayContent(GumRenderable renderable) => renderable.Visual.Children.Count > 0;
 
     // Fire-and-forget timed lifetimes — tracked alongside entities and ticked in Update.
     // Parallel-list (rather than a per-entity field) so the texture-overload helper can attach

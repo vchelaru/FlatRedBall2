@@ -91,6 +91,29 @@ public class GlueCollisionTests
         settings.IsActive.ShouldBeTrue();
     }
 
+    // Glue writes this only when it is unchecked, and unchecking it means "detect and raise events,
+    // but leave the response to me" — not "no physics configured".
+    [Fact]
+    public void Settings_AbsentAutomaticPhysics_MeansPhysicsAreApplied()
+    {
+        var settings = GlueCollisionSettings.From(Relationship("AList", "BList"));
+
+        settings.ArePhysicsAppliedAutomatically.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Settings_UncheckedAutomaticPhysics_IsRead()
+    {
+        var save = Relationship("AList", "BList", collisionType: 1);
+        save.Properties.Add(new PropertySave
+        {
+            Name = "IsAutomaticallyApplyPhysicsChecked",
+            Value = System.Text.Json.JsonDocument.Parse("false").RootElement,
+        });
+
+        GlueCollisionSettings.From(save).ArePhysicsAppliedAutomatically.ShouldBeFalse();
+    }
+
     [Fact]
     public void Settings_AbsentSecondCollisionName_IsAlwaysColliding()
     {

@@ -75,9 +75,10 @@ public class WireframeControl : TextureViewport
         /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
         /// </summary>
         public float SelectionRevealProgress = 1f;
-        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Stays 0 until
-        /// <see cref="SelectionRevealProgress"/> reaches 1, so handles never overlap the
-        /// still-inflated frame outline.</summary>
+        /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Ramps from
+        /// <see cref="RevealAnimation.HandleFadeStartFraction"/> via
+        /// <see cref="RevealAnimation.HandleAlpha"/> so the fade overlaps the tail of the
+        /// selection shrink.</summary>
         public float HandleAlpha = 1f;
     }
 
@@ -106,7 +107,7 @@ public class WireframeControl : TextureViewport
         var screenRects = new List<(SKRect Sr, bool IsSelected)>(s.Frames.Count);
         foreach (var (bounds, isSelected) in s.Frames)
         {
-            var sr = SnapToScreen(bounds, s);
+            var sr = s.TextureRectToScreen(bounds);
             // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the box's
             // own size) so the pop stays visible at any zoom level.
             if (isSelected && revealInflation > 0f)
@@ -127,7 +128,7 @@ public class WireframeControl : TextureViewport
         // the hovered frame. Fixed pixel font size (never multiplied by s.Zoom) so it reads the
         // same size at any zoom level, unlike the frame rects it's attached to.
         if (s.HoverFrameBounds.HasValue && s.HoverLabel != null)
-            DrawHoverLabel(canvas, SnapToScreen(s.HoverFrameBounds.Value, s), s.HoverLabel);
+            DrawHoverLabel(canvas, s.TextureRectToScreen(s.HoverFrameBounds.Value), s.HoverLabel);
 
         // Pending-cut frames: dashed orange overlay (distinct from selection blue).
         if (s.PendingCutFrameBounds.Count > 0)
@@ -140,12 +141,12 @@ public class WireframeControl : TextureViewport
                 PathEffect = SKPathEffect.CreateDash(new float[] { 6f, 4f }, 0f),
             };
             foreach (var bounds in s.PendingCutFrameBounds)
-                canvas.DrawRect(SnapToScreen(bounds, s), cutPaint);
+                canvas.DrawRect(s.TextureRectToScreen(bounds), cutPaint);
         }
 
         // Resize handles on selected frame — faded in (#716), not drawn at all once invisible.
         if (s.SelectedHandleBounds.HasValue && s.HandleAlpha > 0f)
-            DrawHandles(canvas, SnapToScreen(s.SelectedHandleBounds.Value, s), s.HandleAlpha);
+            DrawHandles(canvas, s.TextureRectToScreen(s.SelectedHandleBounds.Value), s.HandleAlpha);
 
         // Magic-wand / grid-snap preview rectangle
         if (s.ShowPreview)
@@ -157,7 +158,7 @@ public class WireframeControl : TextureViewport
                 StrokeWidth = 1.5f,
                 PathEffect = SKPathEffect.CreateDash(new float[] { 4f, 3f }, 0f)
             };
-            canvas.DrawRect(SnapToScreen(s.PreviewRect, s), pvPaint);
+            canvas.DrawRect(s.TextureRectToScreen(s.PreviewRect), pvPaint);
         }
 
         // Origin crosshair — yellow cross at the entity (0,0) origin in texture space
@@ -278,14 +279,7 @@ public class WireframeControl : TextureViewport
         yield return new SKPoint(r.Right + Hs, r.Bottom + Hs);  // BotRight
     }
 
-    // Texture-space rect → screen-space, using the snapshot's captured camera (render-thread safe).
-    // Named distinctly from the inherited instance ToScreen(SKRect) so both can coexist.
-    private static SKRect SnapToScreen(SKRect r, TextureViewportSnapshot s)
-    {
-        var (l, t, rr, b) = CanvasTransform.TextureRectToScreen(
-            r.Left, r.Top, r.Right, r.Bottom, s.PanX, s.PanY, s.Zoom);
-        return new SKRect(l, t, rr, b);
-    }
+    // Texture-space → screen-space for overlays lives on TextureViewportSnapshot.TextureRectToScreen.
 
     // ── Fields ────────────────────────────────────────────────────────────────
 
@@ -358,11 +352,9 @@ public class WireframeControl : TextureViewport
     private bool _showPreview;
     private SKRect _previewRect;
 
-    // ── Selection-outline reveal (#542) ───────────────────────────────────────
-    // Same RevealAnimation shrink-to-rest as PNG diff boxes (#606). Progress 0→1;
-    // live-driven by _selectionRevealTimer; tests call StepSelectionReveal directly.
-    private DispatcherTimer? _selectionRevealTimer;
-    private float _selectionRevealProgress = 1f;
+    // ── Selection-outline reveal (#542 / #803) ────────────────────────────────
+    // RevealHost owns progress + timer; the curve is RevealAnimation in Core.
+    private RevealHost _selectionReveal = null!;
     private List<AnimationFrameSave>? _lastRevealedFrames;
     private object? _lastRevealSelectionKey;
 
@@ -539,14 +531,8 @@ public class WireframeControl : TextureViewport
         return new List<AnimationFrameSave>();
     }
 
-    /// <summary>Resets reveal progress to 0 and starts the timer (mirrors PngPreviewControl).</summary>
-    private void BeginSelectionReveal()
-    {
-        _selectionRevealProgress = 0f;
-        _selectionRevealTimer ??= CreateSelectionRevealTimer();
-        _selectionRevealTimer.Start();
-        InvalidateVisual();
-    }
+    /// <summary>Resets reveal progress to 0 and starts the timer.</summary>
+    private void BeginSelectionReveal() => _selectionReveal.Restart();
 
     /// <summary>
     /// Explicitly restarts the shrink-to-rest reveal (#542), independent of whether the
@@ -559,10 +545,10 @@ public class WireframeControl : TextureViewport
     public void ReplaySelectionReveal() => BeginSelectionReveal();
 
     /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
-    public bool IsSelectionRevealAnimating => _selectionRevealProgress < 1f;
+    public bool IsSelectionRevealAnimating => _selectionReveal.IsAnimating;
 
     /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
-    public float SelectionRevealProgress => _selectionRevealProgress;
+    public float SelectionRevealProgress => _selectionReveal.Progress;
 
     /// <summary>
     /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown), derived from
@@ -570,46 +556,25 @@ public class WireframeControl : TextureViewport
     /// linear ramp over the tail of the same progress timeline (not a separately-timed
     /// animation), so the fade always finishes exactly when the shrink does.
     /// </summary>
-    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionRevealProgress);
+    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionReveal.Progress);
 
     /// <summary>
     /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
     /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
     /// both call this (tests skip the timer for determinism).
     /// </summary>
-    public bool StepSelectionReveal(float dtSeconds)
-    {
-        if (_selectionRevealProgress >= 1f) return false;
-
-        _selectionRevealProgress = RevealAnimation.StepProgress(_selectionRevealProgress, dtSeconds);
-        if (_selectionRevealProgress >= 1f)
-            _selectionRevealTimer?.Stop();
-
-        InvalidateVisual();
-        return _selectionRevealProgress < 1f;
-    }
+    public bool StepSelectionReveal(float dtSeconds) => _selectionReveal.Step(dtSeconds);
 
     /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
-    public void SettleSelectionReveal()
-    {
-        for (int i = 0; _selectionRevealProgress < 1f && i < 1000; i++)
-            StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
-    }
-
-    private DispatcherTimer CreateSelectionRevealTimer()
-    {
-        var timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(RevealAnimation.DefaultIntervalSeconds)
-        };
-        timer.Tick += (_, _) => StepSelectionReveal(RevealAnimation.DefaultIntervalSeconds);
-        return timer;
-    }
+    public void SettleSelectionReveal() => _selectionReveal.Settle();
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public WireframeControl()
     {
+        _selectionReveal = new RevealHost(InvalidateVisual);
+        DetachedFromVisualTree += (_, _) => _selectionReveal.Stop();
+
         // Right-click opens this menu with a "View <filename> in Explorer" item for the
         // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
         var contextMenu = new ContextMenu();
@@ -1183,8 +1148,8 @@ public class WireframeControl : TextureViewport
         }
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
-        snap.SelectionRevealProgress = _selectionRevealProgress;
-        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionRevealProgress);
+        snap.SelectionRevealProgress = _selectionReveal.Progress;
+        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionReveal.Progress);
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
@@ -1911,24 +1876,8 @@ public class WireframeControl : TextureViewport
     /// Rebuilds the ContextMenu with a single "View &lt;filename&gt; in Explorer" item for the
     /// currently loaded texture, or cancels the menu entirely when there's nothing to reveal.
     /// </summary>
-    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
-    {
-        var absPath = DetermineTexturePath();
-        if (ContextMenu is not { } menu || absPath is null)
-        {
-            e.Cancel = true;
-            return;
-        }
-
-        menu.Items.Clear();
-        var item = new MenuItem { Header = $"View {new FilePath(absPath).NoPath} in Explorer" };
-        item.Click += (_, _) =>
-        {
-            var error = ShellExplorer.RevealFile(absPath);
-            if (error is not null) _showError?.Invoke(error);
-        };
-        menu.Items.Add(item);
-    }
+    private void OnContextMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e) =>
+        RevealInExplorerMenu.Populate(ContextMenu, DetermineTexturePath(), _showError, e);
 
     internal string? DetermineTexturePath()
     {

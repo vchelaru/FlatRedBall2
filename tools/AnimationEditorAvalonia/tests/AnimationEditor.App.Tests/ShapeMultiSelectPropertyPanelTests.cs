@@ -91,4 +91,106 @@ public class ShapeMultiSelectPropertyPanelTests
         }
         finally { window.Close(); }
     }
+
+    /// <summary>
+    /// Regression test for issue #844: Name used to be disabled outright for any multi-selection.
+    /// Shape names only need to be unique within a frame, so renaming rects that live on different
+    /// frames to one literal name is safe and should apply to both.
+    /// </summary>
+    [AvaloniaFact]
+    public void ApplyRectProps_TwoRectsAcrossDifferentFrames_RenamingAppliesToBoth()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var f0 = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+            var f1 = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+            var rect0 = new AARectSave { Name = "Box0" };
+            var rect1 = new AARectSave { Name = "Box1" };
+            f0.ShapesSave!.Shapes.Add(rect0);
+            f1.ShapesSave!.Shapes.Add(rect1);
+            chain.Frames.AddRange(new[] { f0, f1 });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            RebuildTree(window);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var chainNode = FirstChainNode(tree);
+            chainNode.IsExpanded = true;
+            FlushUi();
+            var frame0Node = chainNode.Children[0];
+            var frame1Node = chainNode.Children[1];
+            frame0Node.IsExpanded = true;
+            frame1Node.IsExpanded = true;
+            FlushUi();
+            var rect0Node = frame0Node.Children.Single(n => ReferenceEquals(n.Data, rect0));
+            var rect1Node = frame1Node.Children.Single(n => ReferenceEquals(n.Data, rect1));
+
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(rect0Node);
+            tree.SelectedItems.Add(rect1Node);
+            FlushUi();
+
+            var nameInput = window.FindControl<TextBox>("PropRectName")!;
+            var scaleXInput = window.FindControl<NumericUpDown>("PropRectScaleX")!;
+            Assert.True(nameInput.IsEnabled);
+
+            nameInput.Focus();
+            FlushUi();
+            nameInput.Text = "Hitbox";
+            scaleXInput.Focus(); // moves focus away, raising LostFocus on the name field
+            FlushUi();
+
+            Assert.Equal("Hitbox", rect0.Name);
+            Assert.Equal("Hitbox", rect1.Name);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Two selected rects on the SAME frame can't share one literal name — shape names only need
+    /// to be unique within a frame, so applying one name to both would collide. The field is
+    /// disabled instead of silently renaming.
+    /// </summary>
+    [AvaloniaFact]
+    public void RefreshPropertyPanel_TwoRectsSameFrame_NameFieldDisabled()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var f0 = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f, ShapesSave = new ShapesSave() };
+            var rect0 = new AARectSave { Name = "Box0" };
+            var rect1 = new AARectSave { Name = "Box1" };
+            f0.ShapesSave!.Shapes.Add(rect0);
+            f0.ShapesSave!.Shapes.Add(rect1);
+            chain.Frames.Add(f0);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+
+            RebuildTree(window);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var chainNode = FirstChainNode(tree);
+            chainNode.IsExpanded = true;
+            FlushUi();
+            var frame0Node = chainNode.Children[0];
+            frame0Node.IsExpanded = true;
+            FlushUi();
+            var rect0Node = frame0Node.Children.Single(n => ReferenceEquals(n.Data, rect0));
+            var rect1Node = frame0Node.Children.Single(n => ReferenceEquals(n.Data, rect1));
+
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(rect0Node);
+            tree.SelectedItems.Add(rect1Node);
+            FlushUi();
+
+            var nameInput = window.FindControl<TextBox>("PropRectName")!;
+
+            Assert.False(nameInput.IsEnabled);
+            Assert.Equal("Box0", rect0.Name);
+            Assert.Equal("Box1", rect1.Name);
+        }
+        finally { window.Close(); }
+    }
 }

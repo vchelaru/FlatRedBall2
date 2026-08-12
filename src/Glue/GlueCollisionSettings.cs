@@ -74,6 +74,12 @@ public sealed class GlueCollisionSettings
     /// <summary>Whether the relationship runs at all.</summary>
     public bool IsActive { get; private init; }
 
+    /// <summary>
+    /// Glue's "automatically apply physics on collision". Absent means true — Glue omits the
+    /// property until it is unchecked.
+    /// </summary>
+    public bool ArePhysicsAppliedAutomatically { get; private init; }
+
     /// <summary>A shape inside the first entity to collide with, rather than the whole entity.</summary>
     public string? FirstSubCollision { get; private init; }
 
@@ -91,6 +97,9 @@ public sealed class GlueCollisionSettings
         Elasticity = Number(save, "CollisionElasticity", 1f),
         IsActive = !save.Properties.ContainsValue("IsCollisionActive")
                    || save.Properties.GetValue<bool>("IsCollisionActive"),
+        ArePhysicsAppliedAutomatically =
+            !save.Properties.ContainsValue("IsAutomaticallyApplyPhysicsChecked")
+            || save.Properties.GetValue<bool>("IsAutomaticallyApplyPhysicsChecked"),
         FirstSubCollision = SubCollision(save, "FirstSubCollisionSelectedItem"),
         SecondSubCollision = SubCollision(save, "SecondSubCollisionSelectedItem"),
     };

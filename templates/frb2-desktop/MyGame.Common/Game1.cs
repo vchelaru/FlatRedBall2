@@ -16,14 +16,12 @@ public class Game1 : Game
         _graphics.GraphicsProfile = GraphicsProfile.HiDef;
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
-        FlatRedBallService.Default.PrepareWindow<GameScreen>(_graphics);
     }
 
     protected override void Initialize()
     {
         base.Initialize();
-        FlatRedBallService.Default.Initialize(this);
-        FlatRedBallService.Default.Start<GameScreen>();
+        FlatRedBallService.Default.Initialize<GameScreen>(this);
     }
 
     protected override void Update(GameTime gameTime)

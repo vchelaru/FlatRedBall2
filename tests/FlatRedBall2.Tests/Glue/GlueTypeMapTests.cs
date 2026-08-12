@@ -71,6 +71,36 @@ public class GlueTypeMapTests
         result.Diagnostics.Count(d => d.Message.Contains("cannot be built by this build")).ShouldBe(4);
     }
 
+    // FileVersion 54 projects write SourceClassType in short form, and mix both spellings inside one
+    // file. FRB1's own test project has 110 files using a short name and 7 that use both -- so a map
+    // keyed only on the qualified form silently fails to build most of that project's objects.
+    [Theory]
+    [InlineData("Sprite", typeof(FlatRedBall2.Rendering.Sprite))]
+    [InlineData("AxisAlignedRectangle", typeof(FlatRedBall2.Collision.AARect))]
+    [InlineData("Circle", typeof(FlatRedBall2.Collision.Circle))]
+    [InlineData("Polygon", typeof(FlatRedBall2.Collision.Polygon))]
+    public void TryGetType_AShortFormTypeName_ResolvesTheSameAsTheQualifiedOne(
+        string shortName, Type expected)
+    {
+        GlueTypeMap.TryGetType(GlueTypeName.Parse(shortName), out var type).ShouldBeTrue();
+        type.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void TryCreate_AShortFormTypeName_ConstructsTheSameInstance()
+    {
+        GlueTypeMap.TryCreate(GlueTypeName.Parse("Circle"), out object? instance).ShouldBeTrue();
+        instance.ShouldBeOfType<FlatRedBall2.Collision.Circle>();
+    }
+
+    // An element reference is still not a type, whichever spelling is accepted. Element names carry
+    // a backslash, so they are rejected before the alias table is consulted.
+    [Fact]
+    public void TryGetType_AnElementReference_IsStillNotAType()
+    {
+        GlueTypeMap.TryGetType(GlueTypeName.Parse(@"Entities\Sprite"), out _).ShouldBeFalse();
+    }
+
     [Fact]
     public void Load_DoorsDemo_DoesNotReportNestedEntityInstancesAsUnmapped()
     {

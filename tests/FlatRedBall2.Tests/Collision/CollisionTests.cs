@@ -213,6 +213,53 @@ public class CollisionTests
         b.X.ShouldBeGreaterThan(20f);
     }
 
+    // FRB1's ArePhysicsAppliedAutomatically: detection and events are unaffected, only the
+    // separation is withheld, so a game can decide per collision whether to apply it.
+    [Fact]
+    public void ArePhysicsAppliedAutomatically_False_RaisesTheEventWithoutSeparating()
+    {
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
+        rel.MoveFirstOnCollision();
+        rel.ArePhysicsAppliedAutomatically = false;
+        int collisions = 0;
+        rel.CollisionOccurred += (_, _) => collisions++;
+
+        rel.RunCollisions();
+
+        collisions.ShouldBe(1);
+        a.X.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void ApplyPhysics_AfterSuppressedCollision_SeparatesThePair()
+    {
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 20f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
+        rel.MoveFirstOnCollision();
+        rel.ArePhysicsAppliedAutomatically = false;
+        rel.RunCollisions();
+
+        rel.ApplyPhysics(a, b).ShouldBeTrue();
+
+        a.X.ShouldBeLessThan(0f);
+    }
+
+    [Fact]
+    public void ApplyPhysics_APairThatIsNotOverlapping_DoesNothing()
+    {
+        var a = new AARect { Width = 32f, Height = 32f, X = 0f };
+        var b = new AARect { Width = 32f, Height = 32f, X = 200f };
+        var rel = new CollisionRelationship<AARect, AARect>(new[] { a }, new[] { b });
+        rel.MoveFirstOnCollision();
+
+        rel.ApplyPhysics(a, b).ShouldBeFalse();
+
+        a.X.ShouldBe(0f);
+    }
+
     [Fact]
     public void MoveFirstOnCollision_MovesParentEntity()
     {

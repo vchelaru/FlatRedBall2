@@ -59,10 +59,171 @@ public class TileMap
         string basePath = System.IO.Path.GetDirectoryName(tmxPath) ?? string.Empty;
         var parser = new TiledTmxParser(
             baseDirectory: basePath,
-            resourceResolver: ExternalResourceResolvers.OpenTitleContainerStream);
+            resourceResolver: path => ResolveTilesetRelativePaths(path, basePath));
         using var stream = XnaTitleContainer.OpenStream(tmxPath);
         return parser.ParseFromStream(stream, graphicsDevice, basePath);
     }
+
+    /// <summary>
+    /// Opens a file the TMX references, rewriting a <c>.tsx</c>'s image paths so they resolve
+    /// against the tileset rather than against the map.
+    /// </summary>
+    /// <remarks>
+    /// Per the TMX spec a tileset's <c>&lt;image source&gt;</c> is relative to the <c>.tsx</c>, but
+    /// the parser resolves every path against one base directory — the map's. A tileset in a
+    /// different folder, which is the normal way Tiled projects share one between levels, therefore
+    /// looks for its image beside the map and fails.
+    /// <para>The parser exposes no per-tileset base directory (its whole surface takes a single
+    /// scalar), and by the time the image is loaded the tileset's own location has been discarded —
+    /// the converter inlines external tilesets and keeps only the raw <c>source</c> string. So the
+    /// rewrite has to happen here, while the <c>.tsx</c> is still identifiable.</para>
+    /// <para>Rewritten paths stay <em>relative</em>. An absolute path would reach the resolver
+    /// unprefixed and bypass <see cref="XnaTitleContainer"/>, which is the only way content loads on
+    /// backends with no filesystem.</para>
+    /// </remarks>
+    private static System.IO.Stream ResolveTilesetRelativePaths(string path, string mapDirectory)
+    {
+        if (!path.EndsWith(".tsx", StringComparison.OrdinalIgnoreCase))
+            return XnaTitleContainer.OpenStream(path);
+
+        string tilesetDirectory = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
+
+        // Same folder as the map: every path already resolves, and rewriting risks changing a
+        // working project's behaviour for nothing.
+        if (ArePathsEquivalent(tilesetDirectory, mapDirectory))
+            return XnaTitleContainer.OpenStream(path);
+
+        string xml;
+        using (var source = XnaTitleContainer.OpenStream(path))
+        using (var reader = new System.IO.StreamReader(source))
+        {
+            xml = reader.ReadToEnd();
+        }
+
+        string rewritten = RewriteTilesetImageSources(xml, tilesetDirectory, mapDirectory);
+        return new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(rewritten));
+    }
+
+    /// <summary>
+    /// Rewrites every <c>&lt;image source="..."&gt;</c> in a tileset from tileset-relative to
+    /// map-relative.
+    /// </summary>
+    internal static string RewriteTilesetImageSources(
+        string tilesetXml, string tilesetDirectory, string mapDirectory)
+    {
+        const string marker = "<image";
+
+        var result = new System.Text.StringBuilder(tilesetXml.Length);
+        int index = 0;
+
+        while (true)
+        {
+            int imageStart = tilesetXml.IndexOf(marker, index, StringComparison.Ordinal);
+            if (imageStart < 0)
+                break;
+
+            int sourceStart = tilesetXml.IndexOf("source=\"", imageStart, StringComparison.Ordinal);
+            int elementEnd = tilesetXml.IndexOf('>', imageStart);
+
+            // A source attribute belonging to the next element is not this one's.
+            if (sourceStart < 0 || (elementEnd >= 0 && sourceStart > elementEnd))
+            {
+                result.Append(tilesetXml, index, imageStart + marker.Length - index);
+                index = imageStart + marker.Length;
+                continue;
+            }
+
+            int valueStart = sourceStart + "source=\"".Length;
+            int valueEnd = tilesetXml.IndexOf('"', valueStart);
+
+            if (valueEnd < 0)
+                break;
+
+            string original = tilesetXml.Substring(valueStart, valueEnd - valueStart);
+
+            result.Append(tilesetXml, index, valueStart - index);
+            result.Append(MakeRelativeToMap(original, tilesetDirectory, mapDirectory));
+            index = valueEnd;
+        }
+
+        result.Append(tilesetXml, index, tilesetXml.Length - index);
+        return result.ToString();
+    }
+
+    /// <summary>
+    /// Re-expresses a tileset-relative path as map-relative, staying relative throughout.
+    /// </summary>
+    private static string MakeRelativeToMap(
+        string tilesetRelativePath, string tilesetDirectory, string mapDirectory)
+    {
+        // Already rooted, or a URI: leave it alone rather than mangling it.
+        if (tilesetRelativePath.Length == 0 ||
+            System.IO.Path.IsPathRooted(tilesetRelativePath) ||
+            tilesetRelativePath.Contains("://", StringComparison.Ordinal))
+        {
+            return tilesetRelativePath;
+        }
+
+        var mapSegments = SplitPath(mapDirectory);
+        var targetSegments = SplitPath(CombineAndNormalize(tilesetDirectory, tilesetRelativePath));
+
+        int shared = 0;
+        while (shared < mapSegments.Count && shared < targetSegments.Count &&
+               string.Equals(mapSegments[shared], targetSegments[shared], StringComparison.OrdinalIgnoreCase))
+        {
+            shared++;
+        }
+
+        var relative = new List<string>();
+        for (int i = shared; i < mapSegments.Count; i++)
+            relative.Add("..");
+
+        for (int i = shared; i < targetSegments.Count; i++)
+            relative.Add(targetSegments[i]);
+
+        return relative.Count == 0 ? tilesetRelativePath : string.Join("/", relative);
+    }
+
+    /// <summary>Collapses <c>.</c> and <c>..</c> without touching the filesystem.</summary>
+    private static List<string> CombineAndNormalizeSegments(string directory, string relativePath)
+    {
+        var segments = SplitPath(directory);
+
+        foreach (string segment in SplitPath(relativePath))
+        {
+            if (segment == ".")
+                continue;
+
+            if (segment == ".." && segments.Count > 0 && segments[^1] != "..")
+                segments.RemoveAt(segments.Count - 1);
+            else
+                segments.Add(segment);
+        }
+
+        return segments;
+    }
+
+    private static string CombineAndNormalize(string directory, string relativePath) =>
+        string.Join("/", CombineAndNormalizeSegments(directory, relativePath));
+
+    private static List<string> SplitPath(string path)
+    {
+        var segments = new List<string>();
+
+        foreach (string segment in path.Split('/', '\\'))
+        {
+            if (segment.Length > 0 && segment != ".")
+                segments.Add(segment);
+        }
+
+        return segments;
+    }
+
+    private static bool ArePathsEquivalent(string left, string right) =>
+        string.Equals(
+            string.Join("/", SplitPath(left)),
+            string.Join("/", SplitPath(right)),
+            StringComparison.OrdinalIgnoreCase);
 
     // Tracked TSCs registered by GenerateCollisionFromClass / GenerateCollisionFromProperty.
     // On TryReload, each is cleared and rebuilt against the updated tilemap so cell membership

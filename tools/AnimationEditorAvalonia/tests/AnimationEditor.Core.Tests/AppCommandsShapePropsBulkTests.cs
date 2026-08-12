@@ -78,4 +78,64 @@ public class AppCommandsShapePropsBulkTests
         Assert.Equal(15f, circleA.Radius);
         Assert.Equal(15f, circleB.Radius);
     }
+
+    [Fact]
+    public void SetRectPropsBulk_NameGiven_AppliesToEveryRect()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
+        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+
+        ctx.AppCommands.SetRectPropsBulk(
+            new List<AARectSave> { rectA, rectB }, "Hitbox", null, null, null, null);
+
+        Assert.Equal("Hitbox", rectA.Name);
+        Assert.Equal("Hitbox", rectB.Name);
+    }
+
+    [Fact]
+    public void SetCirclePropsBulk_NameGiven_AppliesToEveryCircle()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Jump", 2);
+        var circleA = new CircleSave { Name = "A" };
+        var circleB = new CircleSave { Name = "B" };
+        chain.Frames[0].ShapesSave!.Shapes.Add(circleA);
+        chain.Frames[1].ShapesSave!.Shapes.Add(circleB);
+
+        ctx.AppCommands.SetCirclePropsBulk(
+            new List<CircleSave> { circleA, circleB }, "Hurtbox", null, null, null);
+
+        Assert.Equal("Hurtbox", circleA.Name);
+        Assert.Equal("Hurtbox", circleB.Name);
+    }
+
+    [Fact]
+    public void HasSameFrameNameCollision_RectsAcrossDifferentFrames_ReturnsFalse()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 2);
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
+        chain.Frames[1].ShapesSave!.Shapes.Add(rectB);
+
+        Assert.False(ctx.AppCommands.HasSameFrameNameCollision(new List<object> { rectA, rectB }));
+    }
+
+    [Fact]
+    public void HasSameFrameNameCollision_RectsOnSameFrame_ReturnsTrue()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var rectA = new AARectSave { Name = "A" };
+        var rectB = new AARectSave { Name = "B" };
+        chain.Frames[0].ShapesSave!.Shapes.Add(rectA);
+        chain.Frames[0].ShapesSave!.Shapes.Add(rectB);
+
+        Assert.True(ctx.AppCommands.HasSameFrameNameCollision(new List<object> { rectA, rectB }));
+    }
 }

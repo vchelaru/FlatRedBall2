@@ -33,3 +33,53 @@ public class GumRenderBatchTests
         GumRenderBatch.ScreenSpaceInstance.ResolveZoom(camera).ShouldBe(2f, tolerance: 0.001f);
     }
 }
+
+// Issue #824: Gum's own cursor hit-testing (InteractiveGue.DoUiActivityRecursively) falls back to
+// RenderingLibrary.Camera.ScreenToWorld for FRB2-hosted UI, which reads Zoom AND
+// ClientWidth/ClientHeight/ClientLeft/ClientTop. GumRenderBatch.Begin only ever synced Zoom, so
+// hit-testing drifted from the rendered position whenever window size != design resolution.
+public class GumRenderBatchSyncCursorCameraTests
+{
+    [Fact]
+    public void SyncCursorCamera_WindowLargerThanDesignResolution_SyncsZoomAndClientBounds()
+    {
+        var camera = new Camera();
+        camera.ApplyToHostRect(new Viewport(0, 0, 3840, 2160), orthogonalHeight: 720);
+        var gumCamera = new RenderingLibrary.Camera();
+
+        GumRenderBatch.Instance.SyncCursorCamera(gumCamera, camera);
+
+        gumCamera.Zoom.ShouldBe(3f, tolerance: 0.001f);
+        gumCamera.ClientWidth.ShouldBe(3840);
+        gumCamera.ClientHeight.ShouldBe(2160);
+        gumCamera.ClientLeft.ShouldBe(0);
+        gumCamera.ClientTop.ShouldBe(0);
+    }
+
+    [Fact]
+    public void SyncCursorCamera_NonZeroOriginViewport_SyncsClientLeftAndTop()
+    {
+        var camera = new Camera();
+        camera.ApplyToHostRect(new Viewport(100, 50, 1280, 720), orthogonalHeight: 720);
+        var gumCamera = new RenderingLibrary.Camera();
+
+        GumRenderBatch.Instance.SyncCursorCamera(gumCamera, camera);
+
+        gumCamera.ClientLeft.ShouldBe(100);
+        gumCamera.ClientTop.ShouldBe(50);
+    }
+
+    [Fact]
+    public void SyncCursorCamera_WindowMatchesDesignResolution_ZoomIsOne()
+    {
+        var camera = new Camera();
+        camera.ApplyToHostRect(new Viewport(0, 0, 1280, 720), orthogonalHeight: 720);
+        var gumCamera = new RenderingLibrary.Camera();
+
+        GumRenderBatch.Instance.SyncCursorCamera(gumCamera, camera);
+
+        gumCamera.Zoom.ShouldBe(1f, tolerance: 0.001f);
+        gumCamera.ClientWidth.ShouldBe(1280);
+        gumCamera.ClientHeight.ShouldBe(720);
+    }
+}

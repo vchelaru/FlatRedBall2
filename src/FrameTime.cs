@@ -13,7 +13,7 @@ namespace FlatRedBall2;
 /// <param name="Delta">Time elapsed since the previous frame, multiplied by <see cref="TimeManager.TimeScale"/>.</param>
 /// <param name="UnscaledDelta">Wall-clock time elapsed since the previous frame. Not multiplied by <see cref="TimeManager.TimeScale"/>.</param>
 /// <param name="SinceScreenStart">Time accumulated since the current screen activated; pauses with the screen.</param>
-/// <param name="SinceGameStart">Time accumulated since <see cref="FlatRedBallService.Initialize"/>.</param>
+/// <param name="SinceGameStart">Time accumulated since <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>.</param>
 public readonly record struct FrameTime(TimeSpan Delta, TimeSpan UnscaledDelta, TimeSpan SinceScreenStart, TimeSpan SinceGameStart)
 {
     /// <summary>

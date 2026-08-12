@@ -4,7 +4,7 @@
 |---|---|
 | **Initiative** | Load FRB1 Glue projects (`.gluj`/`.glsj`/`.glej`) into FRB2 |
 | **Tracking issue** | [vchelaru/FlatRedBall2#804](https://github.com/vchelaru/FlatRedBall2/issues/804) |
-| **Status** | Implemented — values reach the behaviour. Input wiring and climbing deferred, see §9. |
+| **Status** | Implemented — values reach the behaviour and input is bound; climbing deferred, see §9. |
 | **Depends on** | Phase 4 (CSV files), Phase 11 (the CSV reader), Phase 3 (the slots are CustomVariables) |
 | **Blocks** | Nothing |
 | **Suggested branch** | `804-phase-12-platformer` |
@@ -327,11 +327,41 @@ Three mappings that are easy to get silently wrong, each with a test:
 - **`UsesAcceleration: False` zeroes both durations**, because FRB2 has no such flag. Ignoring the
   column smooths movement the author wanted to snap — a feel change no assertion would catch.
 
-**Deferred:** input wiring (`JumpInput`, `MovementInput`) and `EntitySave.InputDevice`. FRB2 takes
-input through interfaces a data-driven loader has no way to bind without deciding the game's control
-scheme for it, and no fixture exercises it. Climbing (`CanClimb` → `ClimbingMovement`) is also
-unwired for the same reason — the `Climbing` row parses correctly and nothing selects it.
+**Input is now bound**, and the design decision it was waiting on resolved by reading Glue rather
+than inventing a scheme. `EntitySave.InputDevice` is a three-value enum from Glue's
+`EntityInputMovementPlugin` (`MainViewModel.InputDevice`), and its ordinals are the on-disk format:
 
-So the character has its authored physics but no way to be told to move. That is the honest state:
-the data is loaded and reachable, the last hop is a design decision about input binding rather than
-a mapping.
+| | | What FRB2 binds |
+|---|---|---|
+| `GamepadWithKeyboardFallback` | 0 — **the absent default** | gamepad left stick / A, combined with arrows / Space |
+| `None` | 1 | nothing; the game wires its own |
+| `ZeroInputDevice` | 2 | `I2DInput.Zero` / `IPressableInput.Zero` |
+
+**The default is not "none".** An entity whose file says nothing about input still expects to be
+driven, so treating an absent key as "no input" would leave most real entities motionless.
+
+**FRB2 combines the two devices where Glue picks one.** Glue's generated `InitializeInput` tests
+`Xbox360GamePads[0].IsConnected` once and binds a single device for the entity's life. FRB2's
+`IGamepad` has no connection concept at all — a disconnected pad reads zero — so `Or`-combining
+gamepad and keyboard reproduces the intent and improves on it: a controller plugged in mid-game takes
+over without recreating the entity.
+
+Binding happens in `GlueProject.CreateEntity`, and is skipped when there is no engine behind the
+screen, since a test can build an entity with no input manager.
+
+**Climbing is now wired, and the earlier "needs game logic" verdict was wrong about FRB2.**
+
+FRB1 has no climbing *slot*: `CanClimb` is a per-row bool, and its generated code expects game code
+to swap that row into the ground slot while the character is on a ladder — DoorsDemo's hand-written
+`Player.cs` does exactly that by testing ladder overlap. Reading only FRB1 made this look like game
+logic.
+
+**FRB2 already owns the ladder state**, and more richly than FRB1: `PlatformerBehavior` has `Ladders`,
+`Fences`, `IsClimbing`, `TopOfLadderY`, `ClimbingShape` and a real climb gate/exit state machine, and
+it reads `ClimbingMovement` whenever `IsClimbing`. So the row identified by `CanClimb` simply fills
+that slot — `GlueMovementValues.FindClimbingRow`. Filling it eagerly is safe: the slot is read only
+while climbing, and `Update` throws if it ever climbs *without* one, so assigning it removes a
+failure mode rather than adding behaviour.
+
+What is still the game's call is handing the behaviour its `Ladders` — Glue records no association
+between an entity and a ladder collection, so there is nothing to map.

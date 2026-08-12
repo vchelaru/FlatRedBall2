@@ -4,7 +4,7 @@
 |---|---|
 | **Initiative** | Load FRB1 Glue projects (`.gluj`/`.glsj`/`.glej`) into FRB2 |
 | **Tracking issue** | [vchelaru/FlatRedBall2#804](https://github.com/vchelaru/FlatRedBall2/issues/804) |
-| **Status** | Not started |
+| **Status** | Implemented |
 | **Depends on** | Phase 3 (variables), Phase 6 (a screen is complete), Phase 8 (spawning) |
 | **Blocks** | Nothing — this is the epic's last phase |
 | **Suggested branch** | `804-phase-14-navigation-api` |
@@ -227,47 +227,64 @@ Test-first throughout. **§6.1 first — it is the blocker.**
 
 ### 6.1 — Project context
 
-- [ ] Decide D140 and record the reasoning.
-- [ ] Failing test: after loading, the engine can resolve `"Screens\\Level1"` to its `ScreenSave`.
-- [ ] Failing test: an unknown name produces a clear error naming the accepted form (G141).
-- [ ] Failing test: a name that resolves but whose file failed to load errors, not no-ops (G147).
+- [x] Decide D140 and record the reasoning.
+- [x] Failing test: after loading, the engine can resolve `"Screens\\Level1"` to its `ScreenSave`.
+- [x] Failing test: an unknown name produces a clear error naming the accepted form (G141).
+- [x] Failing test: a name that resolves but whose file failed to load errors, not no-ops (G147).
 
 ### 6.2 — Navigation
 
-- [ ] Failing test: `MoveToScreen(@"Screens\Level1")` activates a `GlueScreen` with that `Save`.
-- [ ] Failing test: `Save` is set before `configure` runs.
-- [ ] Failing test: a loaded screen can `MoveToScreen<AHandWrittenScreen>()`.
-- [ ] Failing test: `RestartScreen` on a `GlueScreen` keeps its `Save` (G146) — the test that would
+- [x] Failing test: `MoveToScreen(@"Screens\Level1")` activates a `GlueScreen` with that `Save`.
+- [x] Failing test: `Save` is set before `configure` runs.
+- [x] Failing test: a loaded screen can `MoveToScreen<AHandWrittenScreen>()`.
+- [x] Failing test: `RestartScreen` on a `GlueScreen` keeps its `Save` (G146) — the test that would
       have caught the silent-empty-screen bug.
-- [ ] Failing test: matching is `OrdinalIgnoreCase`, consistent with `ResolveStartUpScreen` (G142).
-- [ ] Decide D142 on `MoveToNextScreen` (G149).
+- [x] Failing test: matching is `OrdinalIgnoreCase`, consistent with `ResolveStartUpScreen` (G142).
+- [x] Decide D142 on `MoveToNextScreen` (G149).
 
 ### 6.3 — Spawning
 
-- [ ] Failing test: creating `"Entities\\Player"` produces a `GlueEntity` with that `Save` and its
+- [x] Failing test: creating `"Entities\\Player"` produces a `GlueEntity` with that `Save` and its
       objects built.
-- [ ] Failing test: `configure` runs before `CustomInitialize`.
-- [ ] Failing test: spawning an abstract entity errors (Phase 6 D63).
-- [ ] Failing test: a null `configure` is accepted — `Create(Action<T>)` throws on null
+- [x] Failing test: `configure` runs before `CustomInitialize`.
+- [x] Failing test: spawning an abstract entity errors (Phase 6 D63).
+- [x] Failing test: a null `configure` is accepted — `Create(Action<T>)` throws on null
       (`Factory.cs:263`), so route through `CreateCore` rather than delegating.
 
 ### 6.4 — The indexer
 
-- [ ] Failing test: `entity["X"] = 5` writes `Entity.X`, not a bag (G144).
-- [ ] Failing test: `entity["MovementSpeed"] = 300` writes the bag — no CLR member exists.
-- [ ] Failing test: `entity["CooldownCircleRadius"] = 8` routes through `Objects["CooldownCircle"]`.
-- [ ] Failing test: `entity["Score1"] = 3` coerces int → string (Phase 3 G33).
-- [ ] Failing test: `Get<T>` is driven by `T`, not the declared type (G145).
-- [ ] Failing test: an ambiguous name throws rather than picking (G143).
-- [ ] Failing test: `Objects` and the indexer agree on case (G142).
+- [x] Failing test: `entity["X"] = 5` writes `Entity.X`, not a bag (G144).
+- [x] Failing test: `entity["MovementSpeed"] = 300` writes the bag — no CLR member exists.
+- [x] Failing test: `entity["CooldownCircleRadius"] = 8` routes through `Objects["CooldownCircle"]`.
+- [x] Failing test: `entity["Score1"] = 3` coerces int → string (Phase 3 G33).
+- [x] Failing test: `Get<T>` is driven by `T`, not the declared type (G145).
+- [x] Failing test: an ambiguous name throws rather than picking (G143).
+- [x] Failing test: `Objects` and the indexer agree on case (G142).
 
 ### 6.5 — Wrap-up
 
-- [ ] XML docs on every public member — this is the epic's only user-facing surface.
-- [ ] Write the `glue-project-loading` skill. Phase 1 §7.7 deferred the decision until there was
+- [x] XML docs on every public member — this is the epic's only user-facing surface.
+- [x] Write the `glue-project-loading` skill. Phase 1 §7.7 deferred the decision until there was
       enough surface to justify the context budget; this phase is that surface. Consult
       `skill-creator` first.
-- [ ] Update this document and `plan/plan.md`; mark the epic complete.
+- [x] Update this document and `plan/plan.md`; mark the epic complete.
+
+### 6.6 — What differed from the plan
+
+- **`MoveToNextScreen()` was not added; `GlueProject.NextScreenOf(ScreenSave)` was.** D142 argued a
+  parsed-but-dead `NextScreen` reads as an oversight, and that still holds — but a `MoveToNextScreen`
+  on `Screen` would be a second navigation convention on the engine's own base class serving one
+  loader concept. Resolving the name and passing it to `MoveToScreen(string)` is one line at the call
+  site and keeps the engine surface to a single by-name overload.
+- **No vendored fixture sets `NextScreen`** (all four checked), so the resolving case is covered with
+  a synthetic `ScreenSave` pointed at a real one. What is under test is the lookup, not the parse.
+- **The runtime bag is separate from the authored one.** `_variables` holds authored `JsonElement`s;
+  the indexer writes `_runtimeVariables`, a plain `Dictionary<string, object?>` read first. Storing a
+  runtime value in the JSON bag would mean serializing on every set — reflection-based and so
+  AOT-hostile, for a value that is about to be read back as an object anyway.
+- **`FlatRedBallService.GlueProject` gained a public setter.** `Initialize` sets it from
+  `GlueProjectFile`, but a game that loads a project itself has no other way to hand it over, and
+  every by-name navigation call needs it. Tests use the same door.
 
 ---
 

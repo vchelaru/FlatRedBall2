@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -39,4 +40,44 @@ public interface IEditorFolder
 
     /// <summary>Subfolders directly inside this folder — never recurses.</summary>
     IAsyncEnumerable<IEditorFolder> GetSubfoldersAsync();
+
+    /// <summary>
+    /// Resolves a <c>/</c>- or <c>\</c>-separated path relative to this folder (issue #839's
+    /// project-tree thumbnails, which must resolve a frame's <c>TextureName</c> relative to the
+    /// <c>.achx</c>'s own folder without a full <see cref="AnimationEditor.Core.ProjectManager"/> load).
+    /// <para>
+    /// This default implementation only walks <em>downward</em> (same folder or a subfolder) via
+    /// <see cref="GetSubfoldersAsync"/>/<see cref="GetFileAsync"/> — it returns <see langword="null"/>
+    /// for a <c>..</c> segment, a segment that doesn't match any subfolder, or a leaf file that
+    /// doesn't exist. <c>IEditorFolder</c> has no way to reach a parent folder, so a
+    /// cross-folder-up <c>../Shared/x.png</c> texture cannot be resolved generically. Desktop's
+    /// <c>DiskEditorFolder</c> overrides this with real <c>System.IO</c> resolution, which handles
+    /// <c>..</c> correctly.
+    /// </para>
+    /// </summary>
+    async Task<IEditorFile?> ResolveRelativeFileAsync(string relativePath)
+    {
+        var segments = relativePath.Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0) return null;
+        if (Array.IndexOf(segments, "..") >= 0) return null;
+
+        IEditorFolder current = this;
+        for (int i = 0; i < segments.Length - 1; i++)
+        {
+            IEditorFolder? next = null;
+            await foreach (var sub in current.GetSubfoldersAsync())
+            {
+                if (string.Equals(sub.Name, segments[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    next = sub;
+                    break;
+                }
+            }
+            if (next is null) return null;
+            current = next;
+        }
+
+        return await current.GetFileAsync(segments[^1]);
+    }
 }

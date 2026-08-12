@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
 using Xunit;
@@ -46,6 +47,24 @@ public class TemplatePackageReferenceTests
         var csproj = File.ReadAllText(Path.Combine(RepoRoot, relativeCsprojPath));
 
         csproj.ShouldContain("AposShapesPrecompiled.props");
+    }
+
+    // Visual Studio picks the first project in the .slnx as the default startup project, so a
+    // freshly created project that lists the class library first cannot be run without the user
+    // changing that first.
+    [Theory]
+    [InlineData("templates/frb2-desktop/MyGame.slnx")]
+    [InlineData("templates/frb2-multiplatform/MyGame.slnx")]
+    public void TemplateSolution_ListsARunnableProjectFirstAndCommonLast(string relativeSlnxPath)
+    {
+        var projects = Regex.Matches(
+                File.ReadAllText(Path.Combine(RepoRoot, relativeSlnxPath)),
+                @"<Project\s+Path=""([^""]+)""")
+            .Select(match => match.Groups[1].Value)
+            .ToList();
+
+        projects.First().ShouldContain("MyGame.Desktop");
+        projects.Last().ShouldContain("MyGame.Common");
     }
 
     private static string RepoRoot => RepoRootForTests;

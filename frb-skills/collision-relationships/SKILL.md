@@ -84,6 +84,11 @@ AddCollisionRelationship(_balls, _deathZoneFactory)
     };
 ```
 
+To keep a response configured but decide per collision whether it happens, set
+`ArePhysicsAppliedAutomatically = false` and call `ApplyPhysics(a, b)` from the handler for the pairs
+that should separate. Different from omitting the modifier: the masses and move/bounce choice still
+exist, so the response can be applied later rather than never.
+
 ## Enter/Exit Events — `CollisionStarted` / `CollisionEnded`
 
 `CollisionStarted` fires once on the first frame a pair begins overlapping. `CollisionEnded` fires once when a previously-overlapping pair stops overlapping. Use these instead of hand-rolling a per-frame `_wasOverlapping` bool.

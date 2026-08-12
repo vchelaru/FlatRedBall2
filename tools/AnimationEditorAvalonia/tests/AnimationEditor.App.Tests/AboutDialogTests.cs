@@ -125,4 +125,31 @@ public class AboutDialogTests
 
         Assert.NotNull(downloadBtn);
     }
+
+    // Issue #845: a completed, successful check that found no newer release must say so —
+    // it was previously indistinguishable from "never checked" (both showed "Check here for updates").
+    [AvaloniaFact]
+    public void BuildAboutContent_CheckedAndUpToDate_ShowsUpToDateMessage()
+    {
+        var result = new UpdateCheckResult(false, new System.Version(2026, 8, 11), "https://example.com/releases");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
+
+        var upToDateBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("up to date", System.StringComparison.OrdinalIgnoreCase) == true);
+
+        Assert.NotNull(upToDateBlock);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_NotYetChecked_KeepsDefaultReleasesPrompt()
+    {
+        // updateCheck is null: no check has run (never contacted GitHub, no cached version) —
+        // distinct from a completed check that found no update.
+        var panel = (StackPanel)MainWindow.BuildAboutContent(updateCheck: null);
+
+        var promptBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("Check here for updates", System.StringComparison.OrdinalIgnoreCase) == true);
+
+        Assert.NotNull(promptBlock);
+    }
 }

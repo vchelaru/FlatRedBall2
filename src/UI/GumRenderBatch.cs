@@ -33,7 +33,7 @@ public class GumRenderBatch : IRenderBatch
     /// <summary>
     /// Creates the inner <c>RenderingLibrary.Graphics.GumBatch</c>.
     /// Must be called after the engine's <c>GumService</c> has been initialized.
-    /// Called automatically by <see cref="FlatRedBallService.Initialize"/>.
+    /// Called automatically by <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>.
     /// </summary>
     internal void Initialize()
     {
@@ -55,14 +55,31 @@ public class GumRenderBatch : IRenderBatch
     /// <inheritdoc/>
     public void Begin(SpriteBatch spriteBatch, Camera camera)
     {
-        // PixelsPerUnit folds together window-vs-resolution scale AND the FlatRedBall Camera.Zoom.
-        // We drive Gum rendering and Gum hit-testing from a single source — Renderer.Camera.Zoom —
+        // We drive Gum rendering and Gum hit-testing from a single source — Renderer.Camera —
         // which Gum's GetZoomAndMatrix bakes into basicEffect.View, and which
-        // Cursor.XRespectingGumZoomAndBounds reads directly when converting window pixels into
-        // canvas units. Pass null to GumBatch.Begin so we don't double-apply the scale on top
-        // of Camera.Zoom.
-        RenderingLibrary.SystemManagers.Default.Renderer.Camera.Zoom = ResolveZoom(camera);
+        // Cursor.XRespectingGumZoomAndBounds / Camera.ScreenToWorld read directly when converting
+        // window pixels into canvas units (ScreenToWorld is what Gum's own cursor hit-testing
+        // actually uses for FRB2-hosted UI). Pass null to GumBatch.Begin so we don't double-apply
+        // the scale on top of what we just set.
+        SyncCursorCamera(RenderingLibrary.SystemManagers.Default.Renderer.Camera, camera);
         _inner!.Begin(null);
+    }
+
+    /// <summary>
+    /// Syncs <paramref name="gumCamera"/> (Gum's own <c>RenderingLibrary.Camera</c>, a single object
+    /// shared by every <see cref="Begin"/> call in a frame) from this frame's FlatRedBall
+    /// <paramref name="camera"/>. Gum's cursor hit-testing reads <c>Zoom</c> and
+    /// <c>ClientWidth</c>/<c>ClientHeight</c>/<c>ClientLeft</c>/<c>ClientTop</c> off this object, so
+    /// all four must track the real viewport — not just <c>Zoom</c> — or hit-testing drifts from the
+    /// rendered position whenever window size != design resolution (issue #824).
+    /// </summary>
+    internal void SyncCursorCamera(RenderingLibrary.Camera gumCamera, Camera camera)
+    {
+        gumCamera.Zoom = ResolveZoom(camera);
+        gumCamera.ClientWidth = camera.Viewport.Width;
+        gumCamera.ClientHeight = camera.Viewport.Height;
+        gumCamera.ClientLeft = camera.Viewport.X;
+        gumCamera.ClientTop = camera.Viewport.Y;
     }
 
     /// <inheritdoc/>
