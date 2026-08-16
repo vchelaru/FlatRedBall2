@@ -1,6 +1,8 @@
 # AnimationChainSample
 
 Small sample showing `.achx` animation playback with `AnimationPlayer`.
+For draw origin, `RelativeY`, and grounded sprites, see the package README
+at `src/AnimationChain.MonoGame/README.md`.
 
 ## Run locally
 

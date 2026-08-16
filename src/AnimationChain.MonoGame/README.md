@@ -36,6 +36,58 @@ spriteBatch.DrawAnimation(_player, position, Color.White);
 _loader.Dispose();
 ```
 
+Copy the `.achx` and its PNGs next to each other (`CopyToOutputDirectory`).
+`AchxLoader` loads them with `Texture2D.FromStream`, not the MGCB pipeline.
+
+## Drawing
+
+`DrawAnimation` uses MonoGame `SpriteBatch` conventions:
+
+- `position` is the **top-left** of the current frame's source rectangle
+  (before per-frame offset), in screen pixels. Y increases downward.
+- `scale` multiplies the source rectangle. A 16×32 frame at `scale: 3` is
+  48×96 on screen.
+- `AnimationFrame.RelativeX` / `RelativeY` are **unscaled source pixels**
+  from the `.achx`. `DrawAnimation` applies them as `offset * scale`.
+  Positive `RelativeY` moves the sprite down.
+- If the `.achx` was authored in a Y-up world, negate `RelativeY` or flip Y
+  in your camera transform.
+
+To stand a character on a ground point `(x, y)` (feet on `y`):
+
+```csharp
+var frame = player.CurrentFrame;
+int srcW = frame?.SourceRectangle?.Width ?? 0;
+int srcH = frame?.SourceRectangle?.Height ?? 0;
+float width = srcW * scale;
+float height = srcH * scale;
+spriteBatch.DrawAnimation(
+    player,
+    new Vector2(x - width / 2f, y - height),
+    Color.White,
+    scale: scale);
+```
+
+Empty pixels at the bottom of a cell still count in `SourceRectangle.Height`.
+If idle-up/down hover while left/right look planted, set `RelativeY` on those
+frames in the Animation Editor (or crop the source rect) so the shoes sit on
+the last row of the cell.
+
+Use `SamplerState.PointClamp` for pixel art.
+
+## Playback notes
+
+- `Play(name)` is a no-op if that chain is already playing, so it is safe every
+  frame. Unknown names are ignored and the current animation continues.
+- One `AchxLoader` owns and caches textures. Many `AnimationPlayer`s can share
+  one `AnimationChainList`.
+- `DrawAnimation` applies authored multiply color, alpha, and `ColorOperation.Add`
+  (Add ends and restarts the `SpriteBatch` — see the method remarks).
+  Per-frame **shapes** are data only. **`FlipDiagonal`** is authored and not
+  applied (`SpriteEffects` has no diagonal option).
+- This package is not the FlatRedBall2 engine player. `Sprite.PlayAnimation`
+  uses a different origin and Y axis — do not mix the two type systems.
+
 ## Web / Blazor WASM (KNI)
 
 The filesystem is unavailable in browser environments. Pre-fetch bytes and pass streams instead:

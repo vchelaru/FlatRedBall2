@@ -31,19 +31,22 @@ public class AnimationFrame
     /// <summary>When <c>true</c>, the source region is mirrored along the Y axis.</summary>
     public bool FlipVertical;
 
-    /// <summary>When <c>true</c>, the source region is transposed (flipped along the diagonal).</summary>
+    /// <summary>When <c>true</c>, the source region is transposed (flipped along the diagonal).
+    /// Authored and round-tripped by the Animation Editor; <see cref="SpriteBatchExtensions.DrawAnimation"/>
+    /// does <b>not</b> apply it — MonoGame's <see cref="SpriteEffects"/> has no diagonal option.</summary>
     public bool FlipDiagonal;
 
     /// <summary>
-    /// Per-frame X offset applied while this frame is displayed. In screen pixels; positive
-    /// shifts right. Applied by <see cref="SpriteBatchExtensions.DrawAnimation"/>.
+    /// Per-frame X offset applied while this frame is displayed. Unscaled source pixels from
+    /// the .achx; positive shifts right. <see cref="SpriteBatchExtensions.DrawAnimation"/>
+    /// applies this as <c>RelativeX * scale</c>.
     /// </summary>
     public float RelativeX;
 
     /// <summary>
-    /// Per-frame Y offset applied while this frame is displayed. In screen pixels; positive
-    /// shifts down (standard MonoGame screen-space convention).
-    /// Applied by <see cref="SpriteBatchExtensions.DrawAnimation"/>.
+    /// Per-frame Y offset applied while this frame is displayed. Unscaled source pixels from
+    /// the .achx; positive shifts down (standard MonoGame screen-space convention).
+    /// <see cref="SpriteBatchExtensions.DrawAnimation"/> applies this as <c>RelativeY * scale</c>.
     /// </summary>
     public float RelativeY;
 
@@ -73,8 +76,9 @@ public class AnimationFrame
     /// How <see cref="Red"/>/<see cref="Green"/>/<see cref="Blue"/> combine with the texture,
     /// sticky-resolved. <c>null</c> means none. <see cref="FlatRedBall.AnimationChain.ColorOperation.Multiply"/>
     /// is applied automatically by <see cref="SpriteBatchExtensions.DrawAnimation"/>;
-    /// <see cref="FlatRedBall.AnimationChain.ColorOperation.Add"/> is authored data only for now — it needs a
-    /// custom shader, since <see cref="Microsoft.Xna.Framework.Graphics.SpriteBatch"/> can only multiply texture color, not offset it.
+    /// <see cref="FlatRedBall.AnimationChain.ColorOperation.Add"/> is also applied, via a pixel
+    /// shader that ends and restarts the <see cref="Microsoft.Xna.Framework.Graphics.SpriteBatch"/>
+    /// — see the remarks on <see cref="SpriteBatchExtensions.DrawAnimation"/>.
     /// </summary>
     public ColorOperation? ColorOperation;
 

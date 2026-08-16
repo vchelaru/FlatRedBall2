@@ -10,14 +10,18 @@ public static class SpriteBatchExtensions
 {
     /// <summary>
     /// Draws the current frame of <paramref name="player"/> at <paramref name="position"/>.
+    /// <paramref name="position"/> is the <b>top-left</b> of the frame's source rectangle
+    /// in screen pixels (Y down), before per-frame offset.
     /// Per-frame <see cref="AnimationFrame.RelativeX"/> and <see cref="AnimationFrame.RelativeY"/>
-    /// are added to <paramref name="position"/> automatically — these represent authoring-time
-    /// offsets baked into the .achx (e.g. a kick frame that shifts the character forward).
+    /// are unscaled source pixels from the .achx; they are added as <c>offset * scale</c>
+    /// (e.g. a kick frame that shifts the character forward).
     /// <para>
-    /// <b>Coordinate convention:</b> <c>RelativeY</c> is in screen-down space (positive = down),
+    /// <b>Coordinate convention:</b> positive <c>RelativeY</c> moves the sprite down,
     /// matching standard MonoGame <see cref="SpriteBatch"/> coordinates. If your .achx was
     /// authored in a Y-up world, negate <c>RelativeY</c> manually or flip the Y axis in your
-    /// camera transform.
+    /// camera transform. Empty pixels inside <see cref="AnimationFrame.SourceRectangle"/> still
+    /// count toward height — offset those frames in the editor if shoes do not sit on the
+    /// last row of the cell.
     /// </para>
     /// </summary>
     /// <param name="spriteBatch">Must be between <see cref="SpriteBatch.Begin"/> and <see cref="SpriteBatch.End"/>.</param>
