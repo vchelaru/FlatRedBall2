@@ -151,6 +151,8 @@
                         <MenuItem Header="_Keyboard Shortcuts" x:Name="MenuShowShortcuts"
                                   ToggleType="CheckBox" />
                         <MenuItem Header="View _Log"      x:Name="MenuViewLog" />
+                        <Separator />
+                        <MenuItem Header="Chat on _Discord" x:Name="MenuChatOnDiscord" />
                         <MenuItem Header="_About"         x:Name="MenuAbout" />
                     </MenuItem>
                 </Menu>

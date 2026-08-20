@@ -2086,6 +2086,7 @@ public partial class MainWindow : Window
         MenuExportPixiJs.Click += OnExportPixiJsClick;
         MenuAbout.Click  += OnAboutClick;
         MenuViewLog.Click += OnViewLogClick;
+        MenuChatOnDiscord.Click += (_, _) => OpenUrl("https://discord.gg/qBGnE8JwgP");
         // ToggleType="CheckBox" flips IsChecked before Click fires, so just apply the new state.
         // F3 itself is dispatched through the hotkey registry (see WireKeyboard/BuildHotkeyDefinitions).
         MenuShowDiagnostics.Click += (_, _) => ApplyDiagnostics(MenuShowDiagnostics.IsChecked == true);
