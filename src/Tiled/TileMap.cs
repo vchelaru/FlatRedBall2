@@ -51,6 +51,25 @@ public class TileMap
     // backend: the working directory on DesktopGL, an HTTP fetch on Blazor.
     internal static Func<string, GraphicsDevice, Tilemap> TmxLoader { get; set; } = DefaultTmxLoader;
 
+    // Cache for resource streams (textures, TSX files) keyed by resolved path.
+    // Eliminates repeat HTTP fetches on WASM when the same map is loaded multiple times.
+    // Each entry stores the raw bytes — TilemapFactory still creates separate Texture2D
+    // instances, but the network round-trip is skipped entirely.
+    private static readonly Dictionary<string, byte[]> _resourceCache = new();
+
+    /// <summary>
+    /// Clears the resource stream cache. Call on hot-reload to force fresh fetches.
+    /// </summary>
+    public static void InvalidateResourceCache() => _resourceCache.Clear();
+
+    /// <summary>
+    /// Parses a TMX file into a <see cref="Tilemap"/> without constructing a full
+    /// <see cref="TileMap"/> (no renderer, no layers). Useful for caching the parsed
+    /// result so subsequent <see cref="TileMap"/> construction skips the parse pipeline.
+    /// </summary>
+    public static Tilemap ParseTmx(string tmxPath, GraphicsDevice graphicsDevice) =>
+        TmxLoader(tmxPath, graphicsDevice);
+
     private static Tilemap DefaultTmxLoader(string tmxPath, GraphicsDevice graphicsDevice)
     {
         // basePath is what the parser uses to resolve referenced TSX/PNG files. We hand it
@@ -59,9 +78,36 @@ public class TileMap
         string basePath = System.IO.Path.GetDirectoryName(tmxPath) ?? string.Empty;
         var parser = new TiledTmxParser(
             baseDirectory: basePath,
-            resourceResolver: path => ResolveTilesetRelativePaths(path, basePath));
+            resourceResolver: path => CachingResolve(path, basePath));
         using var stream = XnaTitleContainer.OpenStream(tmxPath);
         return parser.ParseFromStream(stream, graphicsDevice, basePath);
+    }
+
+    /// <summary>
+    /// Wraps <see cref="ResolveTilesetRelativePaths"/> with a byte-level cache.
+    /// On cache hit the HTTP round-trip is skipped; on miss the resolved stream is
+    /// read into a byte array and stored for next time.
+    /// </summary>
+    private static System.IO.Stream CachingResolve(string path, string mapDirectory)
+    {
+        if (_resourceCache.TryGetValue(path, out var cached))
+            return new System.IO.MemoryStream(cached, writable: false);
+
+        var stream = ResolveTilesetRelativePaths(path, mapDirectory);
+
+        // Only cache non-seekable streams (HTTP responses on WASM).
+        // Local file streams are already fast and seekable.
+        if (!stream.CanSeek)
+        {
+            using var ms = new System.IO.MemoryStream();
+            stream.CopyTo(ms);
+            stream.Dispose();
+            var bytes = ms.ToArray();
+            _resourceCache[path] = bytes;
+            return new System.IO.MemoryStream(bytes, writable: false);
+        }
+
+        return stream;
     }
 
     /// <summary>
@@ -256,6 +302,46 @@ public class TileMap
     {
         _graphicsDevice = graphicsDevice;
         _tilemap = TmxLoader(tmxPath, graphicsDevice);
+
+        _width = _tilemap.Width * _tilemap.TileWidth;
+        _height = _tilemap.Height * _tilemap.TileHeight;
+        _tileWidth = _tilemap.TileWidth;
+        _tileHeight = _tilemap.TileHeight;
+
+        _renderer = new TilemapSpriteBatchRenderer();
+        _renderer.LoadTilemap(_tilemap);
+
+        _layers = new List<TileMapLayer>();
+        _layersByName = new Dictionary<string, TileMapLayer>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is TilemapTileLayer tileLayer)
+            {
+                var renderable = new TileMapLayerRenderable(_renderer, tileLayer);
+                var mapLayer = new TileMapLayer(tileLayer.Name, renderable, tileLayer, _tilemap.Tilesets);
+                _layers.Add(mapLayer);
+                _layersByName[tileLayer.Name] = mapLayer;
+            }
+        }
+
+        AssignDefaultZ();
+
+        // Set position after layers are created so propagation works.
+        _x = x;
+        _y = y;
+        PropagatePosition();
+    }
+
+    /// <summary>
+    /// Creates a TileMap from an already-parsed <see cref="Tilemap"/>, skipping the
+    /// TMX parse pipeline entirely. Use with <see cref="ParseTmx"/> to cache and reuse
+    /// parsed maps across screen loads.
+    /// </summary>
+    public TileMap(Tilemap tilemap, GraphicsDevice graphicsDevice, float x = 0f, float y = 0f)
+    {
+        _graphicsDevice = graphicsDevice;
+        _tilemap = tilemap;
 
         _width = _tilemap.Width * _tilemap.TileWidth;
         _height = _tilemap.Height * _tilemap.TileHeight;

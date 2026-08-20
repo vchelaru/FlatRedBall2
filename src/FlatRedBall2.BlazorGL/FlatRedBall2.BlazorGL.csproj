@@ -31,4 +31,9 @@
     <ProjectReference Include="..\FlatRedBall2.csproj" />
   </ItemGroup>
 
+  <!-- Ship the targets file so consuming projects auto-import the content manifest target -->
+  <ItemGroup>
+    <None Include="build\FlatRedBall2.BlazorGL.targets" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+
 </Project>
