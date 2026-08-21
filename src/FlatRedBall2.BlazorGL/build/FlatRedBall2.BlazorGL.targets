@@ -13,8 +13,15 @@
       <_ContentFiles Include="$(MSBuildProjectDirectory)\wwwroot\Content\**\*.*"
                      Exclude="$(MSBuildProjectDirectory)\wwwroot\Content\**\content-manifest.json" />
     </ItemGroup>
+    <!-- Build the comma-separated quoted path list as a pure item transform (item lists
+         cannot be embedded next to literal text, hence the two-step property). -->
+    <PropertyGroup>
+      <_ContentManifestJson>@(_ContentFiles -> '&quot;%(RecursiveDir)%(Filename)%(Extension)&quot;', ',')</_ContentManifestJson>
+      <!-- JSON forbids unescaped backslashes; emit browser-style forward slashes. -->
+      <_ContentManifestJson>$(_ContentManifestJson.Replace('\','/'))</_ContentManifestJson>
+    </PropertyGroup>
     <WriteLinesToFile File="$(MSBuildProjectDirectory)\wwwroot\content-manifest.json"
-                     Lines="[%22@( _ContentFiles -> '%(RecursiveDir)%(Filename)%(Extension)' )%22]"
+                     Lines="[$(_ContentManifestJson)]"
                      Overwrite="true" />
   </Target>
 
