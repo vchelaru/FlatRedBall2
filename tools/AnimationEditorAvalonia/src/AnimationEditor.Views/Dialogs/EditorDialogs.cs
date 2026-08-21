@@ -86,6 +86,13 @@ public static class EditorDialogs
         return host.ShowAsync(dialog);
     }
 
+    /// <summary>
+    /// Every field edit applies immediately (so the preview stays in sync while the dialog is
+    /// open) instead of waiting for OK. Cancel — via its button, Escape, or the window's close
+    /// button, all of which resolve to a null choice — discards those live edits with
+    /// <see cref="IAppCommands.DiscardPendingEdits"/>; OK seals them into a normal undo entry
+    /// with <see cref="IAppCommands.SealPendingEdits"/>.
+    /// </summary>
     public static async Task ShowAdjustFrameTimeAsync(
         IEditorDialogHost host, IAppCommands appCommands, AnimationChainSave chain)
     {
@@ -94,6 +101,12 @@ public static class EditorDialogs
         int frameCount = chain.Frames.Count;
         float totalDuration = chain.Frames.Sum(f => f.FrameLength);
         bool canProportional = totalDuration > 0f;
+
+        // Original per-frame lengths, captured once. Live edits always scale from this snapshot
+        // (not from whatever the previous live edit left behind) so switching between "Keep
+        // Proportional" and "Set All Frames Same" mid-dialog can't flatten the original ratios.
+        var originalLengths = chain.Frames.Select(f => f.FrameLength).ToArray();
+        bool didEdit = false;
 
         var durationInput = new NumericUpDown
         {
@@ -125,9 +138,21 @@ public static class EditorDialogs
                 perFrameLabel.Text = $"Each frame: {value / frameCount:F3} seconds";
         }
 
-        durationInput.ValueChanged += (_, _) => UpdateLabel();
-        radioSetAll.IsCheckedChanged += (_, _) => UpdateLabel();
-        radioProportional.IsCheckedChanged += (_, _) => UpdateLabel();
+        void ApplyLive()
+        {
+            for (int i = 0; i < chain.Frames.Count; i++)
+                chain.Frames[i].FrameLength = originalLengths[i];
+            didEdit = true;
+            float value = (float)(durationInput.Value ?? 0m);
+            if (radioProportional.IsChecked == true)
+                appCommands.ScaleFrameTimesProportional(chain, value);
+            else
+                appCommands.ScaleFrameTimesSetAllSame(chain, value);
+        }
+
+        durationInput.ValueChanged += (_, _) => { UpdateLabel(); ApplyLive(); };
+        radioSetAll.IsCheckedChanged += (_, _) => { UpdateLabel(); if (radioSetAll.IsChecked == true) ApplyLive(); };
+        radioProportional.IsCheckedChanged += (_, _) => { UpdateLabel(); if (radioProportional.IsChecked == true) ApplyLive(); };
         UpdateLabel();
 
         var panel = new StackPanel { Margin = new Thickness(12), Spacing = 8 };
@@ -145,11 +170,13 @@ public static class EditorDialogs
         panel.Children.Add(BuildButtonRow(("OK", dialog.Confirm), ("Cancel", dialog.Cancel)));
 
         var choice = await host.ShowAsync(dialog);
-        if (choice is not { } result) return;
-        if (result.KeepProportional)
-            appCommands.ScaleFrameTimesProportional(chain, result.TotalDuration);
-        else
-            appCommands.ScaleFrameTimesSetAllSame(chain, result.TotalDuration);
+        if (choice is null)
+        {
+            if (didEdit)
+                appCommands.DiscardPendingEdits();
+            return;
+        }
+        appCommands.SealPendingEdits();
     }
 
     public static async Task ShowAddMultipleFramesAsync(
