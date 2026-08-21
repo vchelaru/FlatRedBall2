@@ -331,6 +331,15 @@ namespace AnimationEditor.Core.CommandsAndState
         void SealPendingEdits();
 
         /// <summary>
+        /// Reverts the in-progress coalesced edit started since the last <see cref="SealPendingEdits"/>
+        /// boundary — e.g. Cancel on a live-preview dialog like "Adjust All Frame Time" that applies
+        /// each change immediately so the preview stays in sync. No-op if nothing is on the undo
+        /// stack. This is a thin wrapper over <see cref="Commands.IUndoManager.Undo"/>, so the
+        /// discarded edit still lands on the redo stack like any other undo.
+        /// </summary>
+        void DiscardPendingEdits();
+
+        /// <summary>
         /// True when two or more of <paramref name="shapes"/> (AARectSave and/or CircleSave) are
         /// owned by the same frame — batch-applying one literal name to all of them would collide,
         /// since shape names only need to be unique within a frame, not across frames.

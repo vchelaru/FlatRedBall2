@@ -1473,7 +1473,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration),
                 this, _events, refreshWireframe: false,
-                "Scale Frame Times"));
+                "Scale Frame Times", coalesceKind: "ScaleFrameTimes"));
         }
 
         /// <summary>
@@ -1488,7 +1488,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 chain.Frames,
                 () => FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration),
                 this, _events, refreshWireframe: false,
-                "Scale Frame Times"));
+                "Scale Frame Times", coalesceKind: "ScaleFrameTimes"));
         }
 
         // ── F12: Add Multiple Frames ──────────────────────────────────────────
@@ -1773,6 +1773,13 @@ namespace AnimationEditor.Core.CommandsAndState
 
         /// <inheritdoc cref="IAppCommands.SealPendingEdits"/>
         public void SealPendingEdits() => _undoManager.SealCoalescing();
+
+        /// <inheritdoc cref="IAppCommands.DiscardPendingEdits"/>
+        public void DiscardPendingEdits()
+        {
+            if (_undoManager.CanUndo)
+                _undoManager.Undo();
+        }
 
         /// <inheritdoc cref="IAppCommands.HasSameFrameNameCollision"/>
         public bool HasSameFrameNameCollision(IReadOnlyList<object> shapes) =>
