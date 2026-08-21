@@ -102,9 +102,3 @@ This is a meaningful chunk of engine work — likely starts with the simpler spr
 ## Figma → Gum import path
 
 Designers want to author UI in Figma and have it appear in Gum without manual recreation. No existing converter — the open question is whether to (a) write a Figma plugin that emits `.gucx`/`.gusx` directly, (b) export Figma as SVG and rely on an SVG-import path in Gum (which depends on the SVG/Lottie work above), or (c) export Figma to Lottie and lean on the Lottie path. Each has tradeoffs in fidelity (what Figma features survive the round-trip), maintenance burden (the plugin path requires keeping up with Figma's API), and ordering (Lottie/SVG support unblocks paths b and c). Decide the strategy before estimating effort.
-
-## GenerateContentManifest output misses same-build static web asset collection
-
-`GenerateContentManifest` (`src/FlatRedBall2.BlazorGL/build/FlatRedBall2.BlazorGL.targets`) runs `BeforeTargets="GenerateStaticWebAssetsManifest"`, but `wwwroot/**` static web assets are expanded from evaluation-time globs, so a manifest written mid-build is invisible to that build's static web asset collection. Verified empirically: after a clean build of a sample BlazorGL head, no `content-manifest.json` exists under `bin/.../wwwroot`; it only gets collected from the second build onward. Consequence: a fresh-checkout CI publish (`deploy-sample.yml`) deploys without the manifest, so `frb-host.js` prefetch silently does nothing in production even though the generated paths themselves are now correct.
-
-Fix directions to weigh: (a) emit fully-metadated `StaticWebAsset` items inside the target — fragile across SDK versions; (b) move generation pre-evaluation via a `.props`-time mechanism — invasive; (c) accept two-pass and make `deploy-sample.yml` build twice before publishing. Cheapest honest option is (c); decide deliberately.
