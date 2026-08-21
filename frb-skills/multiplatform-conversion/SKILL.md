@@ -169,14 +169,33 @@ Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head ow
   builder.RootComponents.Add<FlatRedBall2.BlazorGL.App>("#app");
   builder.Services.AddSingleton<Func<Game>>(_ => () => new MyNamespace.Game1());
   ```
-- **`wwwroot/index.html`** — the standard Blazor scaffold + two script tags:
+- **`wwwroot/index.html`** — the standard Blazor scaffold + script tags:
   ```html
   <script src="_framework/blazor.webassembly.js"></script>
   <script src="_content/FlatRedBall2.BlazorGL/frb-host.js"></script>
   ```
+  The package's `frb-host.js` defines `tickJS`, `initRenderJS`, optional hooks
+  (`window.frbBeforeTick`, `window.frbAfterInit`), content prefetching via
+  `content-manifest.json`, and keyboard/mouse scroll prevention for itch.io iframes.
 - **`Properties/launchSettings.json`** — pick a unique launch port. AutoEvalKniBlazorSample uses 50470/50471; pick something else. Concurrent debugging across samples breaks if ports collide.
 
 **Do not duplicate** `App.razor`, `MainLayout.razor`, `_Imports.razor`, `Pages/Index.razor`, or the `tickJS`/`initRenderJS` JS block. They ship from `FlatRedBall2.BlazorGL` and are wired by the `RootComponents.Add<App>` and `frb-host.js` reference above. The package's Index resolves `Func<Game>` from DI on the first tick — that's why `Program.cs` must register it.
+
+## Content prefetching (automatic)
+
+The `FlatRedBall2.BlazorGL` NuGet package includes a `.targets` file that auto-imports
+into consuming projects. On every build it enumerates all files under `wwwroot/Content/`
+and writes `wwwroot/content-manifest.json` — a JSON array of relative paths.
+
+At runtime, `frb-host.js` fetches `content-manifest.json` and fires background `fetch()`
+for every listed file during `initRenderJS`. Both `fetch()` and the synchronous
+`XMLHttpRequest` used by `TitleContainer.OpenStream` share the browser HTTP cache, so
+by the time game content loads, the files are served from local cache instead of the
+network. Errors are silently swallowed (fire-and-forget).
+
+**No game author action required.** The manifest is generated automatically from whatever
+files exist in `wwwroot/Content/` at build time. Add or remove content files and the
+manifest stays in sync on the next build.
 
 ## Verification
 
@@ -185,9 +204,8 @@ Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head ow
 3. `dotnet run --project GameName.Desktop/` plays the original game unchanged.
 4. `dotnet run --project GameName.BlazorGL/` serves the dev URL; canvas fills viewport; resizing the window keeps rendering correct (proves `AllowUserResizing` is set).
 
-## Known limitations (as of 2026-07-30)
+## Known limitations (as of 2026-08-20)
 
-- **Tiled external tileset/image resolution on WASM is broken.** `TileMap` itself loads via `TitleContainer.OpenStream`, but `MonoGame.Extended`'s parser still uses `File.IO` for external TSX and image references inside the TMX. Symptom: `External tileset 'Foo.tsx' could not be found`. Tracked in `design/TODOS.md` until upstream exposes a resource-resolution callback or we route around it. A game with no Tiled content (e.g. `samples/ShmupSpace/`) is unaffected.
 - **No gamepad polling guarantee on web.** Browser gamepad APIs require a connected-device gesture before reporting state.
 - **Audio gated by user gesture.** Browsers block audio playback until the user interacts with the page once. Have a "click to start" affordance if music plays on screen entry.
 - **`DynamicSoundEffectInstance` sample rate must match the browser's `AudioContext` rate on Blazor.GL, or `SubmitBuffer` throws** (`Sample rate 44100 does not match AudioContext sample rate 48000`). Desktop OpenAL resamples any source rate for free; Blazor.GL does not, and Kni exposes no public way to read the actual `AudioContext` rate (feature-requested: kniEngine/kni#2690). Until that lands, fall back to a couple of common candidate rates (48000, then 44100) and retry on failure.

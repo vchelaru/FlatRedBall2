@@ -1,0 +1,21 @@
+<!--
+  Auto-imported by any project that references the FlatRedBall2.BlazorGL NuGet package.
+  Generates wwwroot/content-manifest.json — an array of content file paths relative to
+  wwwroot — so frb-host.js can prefetch them into the browser HTTP cache during
+  title/loading screens. No game author action required.
+-->
+<Project>
+
+  <Target Name="GenerateContentManifest"
+          BeforeTargets="GenerateStaticWebAssetsManifest"
+          Condition="Exists('$(MSBuildProjectDirectory)\wwwroot\Content')">
+    <ItemGroup>
+      <_ContentFiles Include="$(MSBuildProjectDirectory)\wwwroot\Content\**\*.*"
+                     Exclude="$(MSBuildProjectDirectory)\wwwroot\Content\**\content-manifest.json" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)\wwwroot\content-manifest.json"
+                     Lines="[%22@( _ContentFiles -> '%(RecursiveDir)%(Filename)%(Extension)' )%22]"
+                     Overwrite="true" />
+  </Target>
+
+</Project>
