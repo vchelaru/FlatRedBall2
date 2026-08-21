@@ -41,6 +41,11 @@
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 
+  <!-- ProjectReference does not auto-import the referenced project's build/*.targets (that is a
+       NuGet-package-only mechanism), so import the content-manifest generator explicitly to get
+       what package consumers receive automatically. -->
+  <Import Project="..\..\..\src\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />
+
   <!--
     Common's Gum project files must land in the project's PHYSICAL wwwroot/Content/ so
     Blazor's static-web-asset manifest serves them. Source of truth lives in Common.

@@ -8,15 +8,19 @@
 
   <Target Name="GenerateContentManifest"
           BeforeTargets="GenerateStaticWebAssetsManifest"
-          Condition="Exists('$(MSBuildProjectDirectory)\wwwroot\Content')">
+          Condition="'$(DesignTimeBuild)' != 'true' AND Exists('$(MSBuildProjectDirectory)\wwwroot\Content')">
     <ItemGroup>
+      <!-- .gitignore is excluded: the deploy workflow deletes it from published output
+           (deploy-sample.yml), so prefetching it would just guarantee a 404. -->
       <_ContentFiles Include="$(MSBuildProjectDirectory)\wwwroot\Content\**\*.*"
-                     Exclude="$(MSBuildProjectDirectory)\wwwroot\Content\**\content-manifest.json" />
+                     Exclude="$(MSBuildProjectDirectory)\wwwroot\Content\**\content-manifest.json;$(MSBuildProjectDirectory)\wwwroot\Content\**\.gitignore" />
     </ItemGroup>
     <!-- Build the comma-separated quoted path list as a pure item transform (item lists
-         cannot be embedded next to literal text, hence the two-step property). -->
+         cannot be embedded next to literal text, hence the two-step property). %(RecursiveDir)
+         only captures what ** matched, i.e. paths relative to wwwroot/Content — the literal
+         "Content/" prefix restores wwwroot-relative paths. -->
     <PropertyGroup>
-      <_ContentManifestJson>@(_ContentFiles -> '&quot;%(RecursiveDir)%(Filename)%(Extension)&quot;', ',')</_ContentManifestJson>
+      <_ContentManifestJson>@(_ContentFiles -> '&quot;Content/%(RecursiveDir)%(Filename)%(Extension)&quot;', ',')</_ContentManifestJson>
       <!-- JSON forbids unescaped backslashes; emit browser-style forward slashes. -->
       <_ContentManifestJson>$(_ContentManifestJson.Replace('\','/'))</_ContentManifestJson>
     </PropertyGroup>
