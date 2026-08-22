@@ -47,7 +47,7 @@
       reference the AspNetCore.Components / JSInterop assemblies. AnimationChain.Common is its own
       MonoGame-free project (see ProjectReference below) for the same reason.
     -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->

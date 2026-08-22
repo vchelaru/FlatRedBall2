@@ -1,5 +1,6 @@
 using System;
 using FlatRedBall2.Math;
+using Path = FlatRedBall2.Math.Path;
 
 namespace FlatRedBall2.Movement;
 

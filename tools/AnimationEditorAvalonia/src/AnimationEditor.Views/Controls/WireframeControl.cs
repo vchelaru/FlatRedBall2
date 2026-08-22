@@ -214,7 +214,7 @@ public class WireframeControl : TextureViewport
     /// of <paramref name="sr"/> (already screen-space), sized purely in fixed pixels so it never
     /// scales with zoom the way the frame rect itself does.
     /// </summary>
-    private static void DrawHoverLabel(SKCanvas canvas, SKRect sr, string label)
+    internal static void DrawHoverLabel(SKCanvas canvas, SKRect sr, string label)
     {
         const float PadX = 5f;
         const float PadY = 3f;
