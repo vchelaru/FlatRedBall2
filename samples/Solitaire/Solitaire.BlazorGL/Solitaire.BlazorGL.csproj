@@ -41,6 +41,11 @@
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 
+  <!-- ProjectReference does not auto-import the referenced project's build/*.targets (that is a
+       NuGet-package-only mechanism), so import the content-manifest generator explicitly to get
+       what package consumers receive automatically. -->
+  <Import Project="..\..\..\src\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />
+
   <!--
     Common's Gum project files must land in the project's PHYSICAL wwwroot/Content/ so
     Blazor's static-web-asset manifest serves them. Source of truth lives in Common.
@@ -50,24 +55,28 @@
   -->
   <Import Project="..\Solitaire.GumPackage.targets" />
 
-  <ItemGroup Condition="'$(UseGumPackage)' != 'true'">
-    <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.*"
-                      Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**;..\Solitaire.Common\Content\**\*.gumpkg" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(UseGumPackage)' == 'true'">
-    <!-- Ship everything outside GumProject/ as-is, plus the single .gumpkg from inside GumProject/. -->
-    <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.*"
-                      Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**;..\Solitaire.Common\Content\GumProject\**\*.*" />
-    <!-- Glob form ensures the CopyCommonRawAssetsToWwwroot target's %(RecursiveDir)
-         resolves to "GumProject\" so the file lands at wwwroot/Content/GumProject/GumProject.gumpkg
-         (sibling of where the .gumj would be in loose mode). -->
-    <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.gumpkg" />
-  </ItemGroup>
+  <!--
+    Items are computed INSIDE the target, not at evaluation time: on a fresh checkout the
+    .gumpkg does not exist until Common's PackGumProject runs during this same build, and an
+    evaluation-time glob misses it — silently shipping an empty wwwroot/Content and an empty
+    content-manifest.json. Recomputing here (after the ProjectReference chain has built)
+    sees it. No Inputs/Outputs up-to-date check: those attributes are evaluated before the
+    target body, so they could not see these items either; SkipUnchangedFiles keeps re-runs cheap.
+  -->
   <Target Name="CopyCommonRawAssetsToWwwroot"
-          BeforeTargets="GenerateStaticWebAssetsManifest;AssignTargetPaths"
-          Inputs="@(_CommonRawAssets)"
-          Outputs="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')">
+          BeforeTargets="GenerateStaticWebAssetsManifest;AssignTargetPaths">
+    <ItemGroup Condition="'$(UseGumPackage)' != 'true'">
+      <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.*"
+                        Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**;..\Solitaire.Common\Content\**\*.gumpkg" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(UseGumPackage)' == 'true'">
+      <!-- Ship everything outside GumProject/ as-is, plus the single .gumpkg from inside GumProject/. -->
+      <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.*"
+                        Exclude="..\Solitaire.Common\Content\**\*.mgcb;..\Solitaire.Common\Content\bin\**;..\Solitaire.Common\Content\obj\**;..\Solitaire.Common\Content\GumProject\**\*.*" />
+      <!-- Glob form ensures %(RecursiveDir) resolves to "GumProject\" so the file lands at
+           wwwroot/Content/GumProject/GumProject.gumpkg (sibling of where the .gumj would be in loose mode). -->
+      <_CommonRawAssets Include="..\Solitaire.Common\Content\**\*.gumpkg" />
+    </ItemGroup>
     <Copy SourceFiles="@(_CommonRawAssets)"
           DestinationFiles="@(_CommonRawAssets -> '$(MSBuildProjectDirectory)\wwwroot\Content\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />

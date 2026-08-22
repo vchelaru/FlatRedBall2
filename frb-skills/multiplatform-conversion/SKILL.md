@@ -185,7 +185,8 @@ Reference: `AutoEvalKniBlazorSample.BlazorGL`. Each sample's `.BlazorGL` head ow
 
 The `FlatRedBall2.BlazorGL` NuGet package includes a `.targets` file that auto-imports
 into consuming projects. On every build it enumerates all files under `wwwroot/Content/`
-and writes `wwwroot/content-manifest.json` — a JSON array of relative paths.
+and writes `wwwroot/content-manifest.json` — a JSON array of paths relative to `wwwroot`,
+each prefixed `Content/`.
 
 At runtime, `frb-host.js` fetches `content-manifest.json` and fires background `fetch()`
 for every listed file during `initRenderJS`. Both `fetch()` and the synchronous
@@ -196,6 +197,12 @@ network. Errors are silently swallowed (fire-and-forget).
 **No game author action required.** The manifest is generated automatically from whatever
 files exist in `wwwroot/Content/` at build time. Add or remove content files and the
 manifest stays in sync on the next build.
+
+**Landmine:** `build/*.targets` auto-import only happens for NuGet `PackageReference`
+consumers — a `ProjectReference` to the host project does **not** import them. That's why
+repo samples carry an explicit
+`<Import Project="...\FlatRedBall2.BlazorGL\build\FlatRedBall2.BlazorGL.targets" />`;
+without it, no manifest is ever generated. NuGet consumers need nothing.
 
 ## Verification
 
