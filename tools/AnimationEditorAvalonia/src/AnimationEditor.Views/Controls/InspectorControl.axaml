@@ -64,6 +64,7 @@
                         <TextBlock Text="Length (s)" VerticalAlignment="Center" Margin="0,0,8,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
                         <NumericUpDown x:Name="FrameLengthInput" x:FieldModifier="Public" Grid.Column="1"
+                                       ShowButtonSpinner="True"
                                        Minimum="0.001" Maximum="60" Increment="0.01" FormatString="0.###" />
                     </Grid>
                 </StackPanel>
