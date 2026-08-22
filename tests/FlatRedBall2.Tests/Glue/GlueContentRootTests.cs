@@ -66,6 +66,30 @@ public class GlueContentRootTests : IDisposable
         service.GlueProject!.Content!.ContentRoot.ShouldBe(Path.Combine("Content", "FrbEditor"));
     }
 
+    private const string GlujWithGumProject = @"{
+        ""FileVersion"": 68,
+        ""GlobalFiles"": [ { ""Name"": ""GumProject/GumProject.gumx"" } ]
+    }";
+
+    [Fact]
+    public void LoadGlueProject_GlujInItsOwnFolder_ResolvesGumProjectRelativeToThatFolder()
+    {
+        var service = new FlatRedBallService { OutputContentRoot = _output };
+        var relativeGluj = "Content/FrbEditor/MyGame.gluj";
+        var full = Path.Combine(_output, relativeGluj);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full, GlujWithGumProject);
+
+        service.LoadGlueProject(relativeGluj);
+
+        // The .gumx is authored relative to the .gluj's own folder (like every other referenced
+        // file), so the resolved path must carry that folder forward - but Gum resolves what it's
+        // handed against Game.Content.RootDirectory itself, so that same "Content/" segment must come
+        // back off rather than being handed to Gum twice.
+        FlatRedBallService.ResolveGlueGumProjectFile(service.GlueProject, "Content")
+            .ShouldBe("FrbEditor/GumProject/GumProject.gumx");
+    }
+
     [Fact]
     public void Load_AReferencedFileBesideTheGluj_ResolvesWithoutAContentSegment()
     {
