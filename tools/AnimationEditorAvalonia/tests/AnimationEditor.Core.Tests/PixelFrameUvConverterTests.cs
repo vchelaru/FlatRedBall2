@@ -36,4 +36,23 @@ public class PixelFrameUvConverterTests
         Assert.True(uv.FlipHorizontal);
         Assert.True(uv.FlipVertical);
     }
+
+    // Issue #953: the PNG usage-overlay scan needs matched frames in pixel coordinates regardless
+    // of the source .achx's on-disk CoordinateType, so a UV-format frame needs the inverse of ToUv.
+    [Fact]
+    public void ToPixel_UvCoordinates_MultipliesByTextureSize()
+    {
+        var frame = new AnimationFrameSave
+        {
+            LeftCoordinate = 0.25f, RightCoordinate = 0.75f,
+            TopCoordinate = 0f, BottomCoordinate = 0.5f,
+        };
+
+        var pixel = PixelFrameUvConverter.ToPixel(frame, textureWidth: 64, textureHeight: 64);
+
+        Assert.Equal(16f, pixel.LeftCoordinate, tolerance: 0.001f);
+        Assert.Equal(48f, pixel.RightCoordinate, tolerance: 0.001f);
+        Assert.Equal(0f, pixel.TopCoordinate, tolerance: 0.001f);
+        Assert.Equal(32f, pixel.BottomCoordinate, tolerance: 0.001f);
+    }
 }

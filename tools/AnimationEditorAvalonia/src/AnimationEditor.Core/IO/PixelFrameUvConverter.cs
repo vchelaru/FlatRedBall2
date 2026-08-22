@@ -21,4 +21,21 @@ public static class PixelFrameUvConverter
         FlipHorizontal = frame.FlipHorizontal,
         FlipVertical = frame.FlipVertical,
     };
+
+    /// <summary>
+    /// Inverse of <see cref="ToUv"/>: converts a frame already in normalized UV (0-1) coordinates to
+    /// raw-pixel (<see cref="TextureCoordinateType.Pixel"/>), given the decoded texture's pixel size.
+    /// Used by the PNG usage-overlay scan (issue #953), which needs every matching frame's rect in
+    /// texture-space pixels regardless of the source .achx's on-disk <c>CoordinateType</c>.
+    /// </summary>
+    public static AnimationFrameSave ToPixel(AnimationFrameSave frame, int textureWidth, int textureHeight) => new()
+    {
+        TextureName = frame.TextureName,
+        LeftCoordinate = frame.LeftCoordinate * textureWidth,
+        RightCoordinate = frame.RightCoordinate * textureWidth,
+        TopCoordinate = frame.TopCoordinate * textureHeight,
+        BottomCoordinate = frame.BottomCoordinate * textureHeight,
+        FlipHorizontal = frame.FlipHorizontal,
+        FlipVertical = frame.FlipVertical,
+    };
 }
