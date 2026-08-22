@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>MusicPitchWebSpike</RootNamespace>

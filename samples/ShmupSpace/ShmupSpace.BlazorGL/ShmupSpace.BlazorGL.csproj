@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>ShmupSpace.BlazorGL</RootNamespace>
@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ShmupSpace.Common\ShmupSpace.Common.csproj" />
+    <ProjectReference Include="..\ShmupSpace.Common\ShmupSpace.Common.Kni.csproj" />
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 

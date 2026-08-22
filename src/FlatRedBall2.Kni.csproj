@@ -14,8 +14,8 @@
 
     <!-- NuGet Metadata -->
     <Authors>Victor Chelaru</Authors>
-    <Description>A modern, lightweight 2D game engine built on MonoGame (DesktopGL).</Description>
-    <PackageId>FlatRedBall2.MonoGame</PackageId>
+    <Description>A modern, lightweight 2D game engine built on KNI (Blazor WebAssembly + future mobile targets).</Description>
+    <PackageId>FlatRedBall2.Kni</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
@@ -26,19 +26,12 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
 
     <!--
-      This is the MonoGame/desktop backend build of the engine. FlatRedBall2.Kni.csproj (same
-      directory) is the KNI/browser backend — a separate single-TFM project file rather than a
-      second slice of this one's TargetFrameworks, because both backends now target net10.0 and
-      a single project can't list the same TFM twice to pick different package sets. Splitting
-      into sibling files sidesteps that entirely: each file just points at a different set of
-      PackageReferences, no property-passing through ProjectReference/NuGet restore needed (that
-      approach was rejected historically because AdditionalProperties on ProjectReference doesn't
-      propagate through NuGet restore). Both files compile the same source in this directory via
-      the SDK's default glob — same pattern already used by AnimationChain.KNI.csproj /
-      AnimationChain.MonoGame.csproj.
+      This is the KNI/browser backend build of the engine — see FlatRedBall2.csproj (same
+      directory) for the MonoGame/desktop backend and why these are two sibling single-TFM
+      files instead of one multi-targeted project.
 
       The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
       this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
@@ -68,14 +61,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Apos.Shapes" />
-    <PackageReference Include="Gum.MonoGame" />
-    <PackageReference Include="Gum.Shapes.MonoGame" />
-    <PackageReference Include="KernSmith.MonoGameGum" />
-    <PackageReference Include="MonoGame.Framework.DesktopGL">
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="MonoGame.Extended" />
+    <PackageReference Include="Apos.Shapes.KNI" />
+    <PackageReference Include="Gum.KNI" />
+    <PackageReference Include="Gum.Shapes.KNI" />
+    <PackageReference Include="KernSmith.KniGum" />
+    <PackageReference Include="KNI.Extended" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
   </ItemGroup>
 
   <ItemGroup>

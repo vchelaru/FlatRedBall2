@@ -16,6 +16,12 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="FlatRedBall2.MonoGame" Version="*-*" />
+    <!-- Kept at 3.8.4.1, NOT bumped to match root — the committed apos-shapes.xnb precompiled
+         shader (see build/AposShapesPrecompiled.props) was compiled by this exact MGCB toolchain
+         version and PrecompiledShaderCompatibilityTests.cs pins it. Bumping requires regenerating
+         that xnb (build a DesktopGL sample with the new MGCB, recopy the output) and updating the
+         test's ExpectedMonoGameVersion in lockstep — do that as part of design/TODOS.md's "Remove
+         templates' precompiled Apos.Shapes shader workaround" item, not as a side effect here. -->
     <PackageVersion Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1" />
     <PackageVersion Include="MonoGame.Content.Builder.Task" Version="3.8.4.1" />
   </ItemGroup>

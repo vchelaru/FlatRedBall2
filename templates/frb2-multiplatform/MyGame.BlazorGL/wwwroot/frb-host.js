@@ -11,7 +11,7 @@
 // The version pin below must match nkast.Kni.Platform.Blazor.GL in MyGame.BlazorGL.csproj.
 
 (function () {
-    var v = '8.0.11';
+    var v = '10.0.3';
     var shims = [
         ['nkast.Wasm.JSInterop', 'JSObject'],
         ['nkast.Wasm.Dom',       'Window'],
