@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!--
+      KNI/browser backend build of Common — see MyGame.Common.csproj (same directory) for the
+      MonoGame/desktop sibling and its comment for why these are two sibling single-TFM files.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MyGame</RootNamespace>
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlatRedBall2.Kni" />
+  </ItemGroup>
+</Project>

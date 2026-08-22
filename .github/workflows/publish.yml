@@ -78,9 +78,9 @@ jobs:
       matrix:
         include:
           - packageId: FlatRedBall2.MonoGame
-            targetFrameworks: net10.0
+            csproj: src/FlatRedBall2.csproj
           - packageId: FlatRedBall2.Kni
-            targetFrameworks: net8.0
+            csproj: src/FlatRedBall2.Kni.csproj
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,21 +112,18 @@ jobs:
           exit 1
 
       - name: Restore dependencies
-        run: dotnet restore src/FlatRedBall2.csproj
+        run: dotnet restore ${{ matrix.csproj }}
 
-      # Use FlatRedBallDependencyPackageId, not the raw PackageId MSBuild property, to rename the
-      # output package. PackageId is a *global* property: passing -p:PackageId=X here would also
-      # override the PackageId of the AnimationChain.Common ProjectReference (global properties
-      # propagate to every project pulled in via ProjectReference), making both projects resolve
-      # to the same PackageId and fail restore with "Ambiguous project name 'X'".
-      # FlatRedBallDependencyPackageId is a project-local indirection (see src/FlatRedBall2.csproj)
-      # that only FlatRedBall2.csproj itself reads, so it can't collide with a sibling project.
+      # FlatRedBall2.csproj and FlatRedBall2.Kni.csproj each hardcode their own PackageId, so
+      # packing them plainly (no -p:PackageId override) can't hit the "Ambiguous project name"
+      # collision that motivated the old FlatRedBallDependencyPackageId indirection: that
+      # indirection existed only because a single multi-targeted FlatRedBall2.csproj needed one
+      # `dotnet pack` invocation per backend, packed via -p:PackageId global overrides that also
+      # propagated (wrongly) to the AnimationChain.Common ProjectReference.
       - name: Build and Pack (${{ matrix.packageId }})
         run: >
-          dotnet pack src/FlatRedBall2.csproj
+          dotnet pack ${{ matrix.csproj }}
           -c Release
-          -p:FlatRedBallDependencyPackageId=${{ matrix.packageId }}
-          -p:TargetFrameworks=${{ matrix.targetFrameworks }}
           -p:PackageVersion=${{ needs.resolve-version.outputs.version }}
           -o out
 

@@ -7,7 +7,7 @@
 // browsers warn only when called from cross-origin parser-blocking scripts (not us).
 
 (function () {
-    var v = '8.0.11';
+    var v = '10.0.3';
     var shims = [
         ['nkast.Wasm.JSInterop', 'JSObject'],
         ['nkast.Wasm.Dom',       'Window'],

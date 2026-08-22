@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>FlatRedBall2.BlazorGL</RootNamespace>
@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlatRedBall2.csproj" />
+    <ProjectReference Include="..\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
 
   <!-- Ship the targets file so consuming projects auto-import the content manifest target -->

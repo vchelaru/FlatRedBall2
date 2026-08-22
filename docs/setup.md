@@ -126,9 +126,9 @@ dotnet new frb2-multiplatform -n YourGameName
 
 This produces three projects sharing one `Common`:
 
-- `YourGameName.Common/` — game code, multi-targets `net8.0` (KNI/web) and `net10.0` (MonoGame/desktop).
+- `YourGameName.Common/` — game code, shipped as two sibling `net10.0` projects: one for the MonoGame/desktop backend, one (`.Kni.csproj`) for the KNI/web backend.
 - `YourGameName.Desktop/` — desktop entry point (MonoGame, `net10.0`).
-- `YourGameName.BlazorGL/` — Blazor WebAssembly entry point (KNI, `net8.0`). Contains its own `App.razor`, `Pages/Index.razor`, `wwwroot/frb-host.js`, etc. — edit them freely; they're yours.
+- `YourGameName.BlazorGL/` — Blazor WebAssembly entry point (KNI, `net10.0`). Contains its own `App.razor`, `Pages/Index.razor`, `wwwroot/frb-host.js`, etc. — edit them freely; they're yours.
 
 Run the desktop head as before. To run the web head:
 
@@ -152,7 +152,7 @@ Inside an existing .NET project directory (one that already contains a `.csproj`
    ```
    dotnet add package FlatRedBall2.MonoGame   # desktop (.NET 10)
    # or
-   dotnet add package FlatRedBall2.Kni        # browser / Blazor WASM (.NET 8)
+   dotnet add package FlatRedBall2.Kni        # browser / Blazor WASM (.NET 10)
    ```
 
    > Running `dotnet add package` outside a project folder fails with `Could not find any project in <directory>` — it needs a `.csproj` in the working directory.
