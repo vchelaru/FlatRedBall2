@@ -2279,6 +2279,7 @@ public partial class MainWindow : Window
         ShowAchxPane();
         RebuildTabStrip();
         ProjectPanel.SyncSelectionToActiveFile(null);
+        ProjectPanel.Clear();
         RefreshTreeView();
         RefreshFilesPanel();
         UpdateTitle();
