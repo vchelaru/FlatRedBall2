@@ -1,4 +1,5 @@
 using AnimationEditor.Core.CommandsAndState;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -108,7 +109,7 @@ public static class EditorDialogs
         var originalLengths = chain.Frames.Select(f => f.FrameLength).ToArray();
         bool didEdit = false;
 
-        var durationInput = new NumericUpDown
+        var durationInput = new FlankerNumericField
         {
             Value = (decimal)totalDuration,
             Minimum = 0m,

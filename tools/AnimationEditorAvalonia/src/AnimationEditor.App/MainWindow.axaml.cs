@@ -1178,9 +1178,8 @@ public partial class MainWindow : Window
         MoveModeToggle.IsCheckedChanged += OnMoveModeToggled;
         MagicWandToggle.IsCheckedChanged += OnMagicWandToggled;
         SnapToGridCheck.IsCheckedChanged += OnSnapToGridChanged;
-        GridSizeInput.LostFocus += OnGridSizeInputLostFocus;
-        GridSizePlusBtn.Click  += OnGridSizePlusBtnClick;
-        GridSizeMinusBtn.Click += OnGridSizeMinusBtnClick;
+        GridSizeInput.Value = 16m;
+        GridSizeInput.ValueChanged += (_, _) => ApplyGridSize();
         WireframeZoom.Attach(WireframeCtrl);
 
         // Default to Move mode
@@ -1253,43 +1252,12 @@ public partial class MainWindow : Window
         SaveCompanionFile();
     }
 
-    private int GetGridSizeFromInput() => NumericToolbarInput.ParseGridSize(GridSizeInput.Text);
-
-    private void OnGridSizeInputLostFocus(object? sender, RoutedEventArgs e) => ApplyGridSize();
-
-    private void OnGridSizeInputKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            ApplyGridSize();
-            e.Handled = true;
-        }
-    }
+    private int GetGridSizeFromInput() => (int)(GridSizeInput.Value ?? 16m);
 
     private void ApplyGridSize()
     {
-        int size = GetGridSizeFromInput();
-        GridSizeInput.Text = size.ToString();
         if (SnapToGridCheck.IsChecked == true)
-            WireframeCtrl.SetGrid(true, size);
-        SaveCompanionFile();
-    }
-
-    private void OnGridSizePlusBtnClick(object? sender, RoutedEventArgs e)
-    {
-        int size = Math.Min(GetGridSizeFromInput() + 1, 512);
-        GridSizeInput.Text = size.ToString();
-        if (SnapToGridCheck.IsChecked == true)
-            WireframeCtrl.SetGrid(true, size);
-        SaveCompanionFile();
-    }
-
-    private void OnGridSizeMinusBtnClick(object? sender, RoutedEventArgs e)
-    {
-        int size = Math.Max(GetGridSizeFromInput() - 1, 1);
-        GridSizeInput.Text = size.ToString();
-        if (SnapToGridCheck.IsChecked == true)
-            WireframeCtrl.SetGrid(true, size);
+            WireframeCtrl.SetGrid(true, GetGridSizeFromInput());
         SaveCompanionFile();
     }
 
@@ -1819,7 +1787,7 @@ public partial class MainWindow : Window
         try
         {
             SnapToGridCheck.IsChecked = settings.SnapToGrid;
-            GridSizeInput.Text        = settings.GridSize.ToString();
+            GridSizeInput.Value       = settings.GridSize;
             WireframeCtrl.SetGrid(settings.SnapToGrid, settings.GridSize);
 
             WireframeCtrl.SetZoomPercent(settings.WireframeZoomPercent);
@@ -4625,7 +4593,7 @@ public partial class MainWindow : Window
             PropCircleX, PropCircleY, PropCircleRadius);
     }
 
-    private void SealOnLostFocus(params NumericUpDown[] inputs)
+    private void SealOnLostFocus(params InputElement[] inputs)
     {
         foreach (var input in inputs)
             input.LostFocus += (_, _) => _appCommands.SealPendingEdits();
@@ -4814,6 +4782,22 @@ public partial class MainWindow : Window
     /// with a "(mixed)" placeholder when the selected frames disagree on that property.
     /// </summary>
     private static void SetValueOrMixed(NumericUpDown control, IReadOnlyList<decimal> values)
+    {
+        if (values.Distinct().Count() == 1)
+        {
+            control.Value = values[0];
+            control.PlaceholderText = string.Empty;
+        }
+        else
+        {
+            control.Value = null;
+            control.PlaceholderText = "(mixed)";
+        }
+    }
+
+    /// <summary>Overload of <see cref="SetValueOrMixed(NumericUpDown, IReadOnlyList{decimal})"/> for
+    /// <see cref="FlankerNumericField"/>-based inspector fields (e.g. PropFrameLen).</summary>
+    private static void SetValueOrMixed(FlankerNumericField control, IReadOnlyList<decimal> values)
     {
         if (values.Distinct().Count() == 1)
         {
@@ -5135,19 +5119,9 @@ public partial class MainWindow : Window
 
     private void WirePlaybackControls()
     {
-        SpeedInput.LostFocus += (_, _) => ApplySpeedFromInput();
-        SpeedUpBtn.Click   += (_, _) =>
-        {
-            double s = Math.Min(Math.Round(GetSpeedFromInput() + 0.1, 1), 10.0);
-            SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
-            PreviewCtrl.SpeedMultiplier = s;
-        };
-        SpeedDownBtn.Click += (_, _) =>
-        {
-            double s = Math.Max(Math.Round(GetSpeedFromInput() - 0.1, 1), 0.1);
-            SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
-            PreviewCtrl.SpeedMultiplier = s;
-        };
+        SpeedInput.Value = 1.0m;
+        SpeedInput.ValueChanged += (_, _) =>
+            PreviewCtrl.SpeedMultiplier = (double)(SpeedInput.Value ?? 1.0m);
     }
 
     // ── Timeline transport: Play/Pause button + click-drag scrubbing (#432) ───
@@ -5226,15 +5200,6 @@ public partial class MainWindow : Window
             double travelWidth = Math.Max(0, _timelineFrames[result.FrameIndex].Width - TimelineFrameVm.PlayheadWidth);
             _timelineFrames[result.FrameIndex].ScrubberOffset = Math.Min(result.LocalX, travelWidth);
         }
-    }
-
-    private double GetSpeedFromInput() => NumericToolbarInput.ParseSpeed(SpeedInput.Text);
-
-    private void ApplySpeedFromInput()
-    {
-        double s = GetSpeedFromInput();
-        SpeedInput.Text = NumericToolbarInput.FormatSpeed(s);
-        PreviewCtrl.SpeedMultiplier = s;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

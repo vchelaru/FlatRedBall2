@@ -919,98 +919,33 @@ public partial class App : Application
         ToolTip.SetTip(snapToGridCheck, "Snap to Grid");
         // Ensure the wireframe starts with grid off (matches desktop's WireframeCtrl.SetGrid(false, 16)).
         wireframe.SetGrid(false, 16);
-        var gridSizeInput = new TextBox
+        // FlankerNumericField (#963) is the canonical "[−][value][+]" pill -- its own template
+        // already carries the border/DynamicResource wiring the old hand-rolled Border+DockPanel
+        // version needed .Bind(..., GetResourceObservable(...)) calls for.
+        var gridSizeInput = new FlankerNumericField
         {
-            Text = "16",
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            Background = Avalonia.Media.Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(4, 0),
-            FontSize = 11,
-            MinWidth = 0,
-            MinHeight = 0,
-            Height = 26,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        // Classes="flanker" (ThemeStyles) zeros MinHeight/Padding and centers content — without
-        // it Fluent's default button chrome top-aligns "−"/"+" inside the 26px pill.
-        var gridSizeMinusBtn = new Button
-        {
-            Classes = { "flanker" },
-            Content = "−",
-            Width = 22,
-            Height = 26,
-            BorderThickness = new Thickness(0, 0, 1, 0),
-        };
-        gridSizeMinusBtn.Bind(Button.BorderBrushProperty, gridSizeMinusBtn.GetResourceObservable("LineBrush"));
-        var gridSizePlusBtn = new Button
-        {
-            Classes = { "flanker" },
-            Content = "+",
-            Width = 22,
-            Height = 26,
-            BorderThickness = new Thickness(1, 0, 0, 0),
-        };
-        gridSizePlusBtn.Bind(Button.BorderBrushProperty, gridSizePlusBtn.GetResourceObservable("LineBrush"));
-
-        int GetGridSizeFromInput() => NumericToolbarInput.ParseGridSize(gridSizeInput.Text);
-
-        void ApplyGrid()
-        {
-            var size = GetGridSizeFromInput();
-            gridSizeInput.Text = size.ToString();
-            wireframe.SetGrid(snapToGridCheck.IsChecked == true, size);
-        }
-
-        var gridSizeDock = new DockPanel();
-        DockPanel.SetDock(gridSizeMinusBtn, Dock.Left);
-        DockPanel.SetDock(gridSizePlusBtn, Dock.Right);
-        gridSizeDock.Children.Add(gridSizeMinusBtn);
-        gridSizeDock.Children.Add(gridSizePlusBtn);
-        gridSizeDock.Children.Add(gridSizeInput);
-        var gridSizePill = new Border
-        {
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4),
-            ClipToBounds = true,
-            Height = 26,
             Margin = new Thickness(0, 0, 2, 0),
             VerticalAlignment = VerticalAlignment.Center,
             IsEnabled = false,
-            Child = gridSizeDock,
+            Minimum = 1m,
+            Maximum = 512m,
+            Increment = 1m,
+            FormatString = "0",
+            Value = 16m,
         };
-        gridSizePill.Bind(Border.BorderBrushProperty, gridSizePill.GetResourceObservable("LineBrush"));
 
         // Click (same as Onion Skin / Guides) — IsCheckedChanged alone was unreliable in the
         // browser Fluent ToggleButton path after the toolbar-placement pass; Click always fires
         // after the toggle flips and is the path the other view toggles already use.
         void OnGridToggle()
         {
-            gridSizePill.IsEnabled = snapToGridCheck.IsChecked == true;
-            ApplyGrid();
+            gridSizeInput.IsEnabled = snapToGridCheck.IsChecked == true;
+            wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16m));
         }
         snapToGridCheck.Click += (_, _) => OnGridToggle();
         snapToGridCheck.IsCheckedChanged += (_, _) => OnGridToggle();
-        gridSizeInput.LostFocus += (_, _) => ApplyGrid();
-        gridSizeInput.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter)
-            {
-                ApplyGrid();
-                e.Handled = true;
-            }
-        };
-        gridSizeMinusBtn.Click += (_, _) =>
-        {
-            gridSizeInput.Text = Math.Max(GetGridSizeFromInput() - 1, 1).ToString();
-            ApplyGrid();
-        };
-        gridSizePlusBtn.Click += (_, _) =>
-        {
-            gridSizeInput.Text = Math.Min(GetGridSizeFromInput() + 1, 512).ToString();
-            ApplyGrid();
-        };
+        gridSizeInput.ValueChanged += (_, _) =>
+            wireframe.SetGrid(snapToGridCheck.IsChecked == true, (int)(gridSizeInput.Value ?? 16m));
 
         // PixiJsSpriteSheetExporter.Export is the same pure, already-tested core desktop's
         // AppCommands.ExportToPixiJsAsync calls -- what differs here is entirely the output path:
@@ -1081,7 +1016,7 @@ public partial class App : Application
                 editModePill,
                 ToolbarDivider(),
                 snapToGridCheck,
-                gridSizePill,
+                gridSizeInput,
                 ToolbarDivider(),
                 wireframeZoomLabel,
                 wireframeZoom,
@@ -1286,80 +1221,19 @@ public partial class App : Application
         playPauseButton.Click += (_, _) => preview.TogglePlayPause();
         preview.IsPlayingChanged += UpdatePlayPauseChrome;
 
-        var speedInput = new TextBox
+        var speedPill = new FlankerNumericField
         {
-            Text = "1.0",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            TextAlignment = Avalonia.Media.TextAlignment.Center,
-            Background = Avalonia.Media.Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(4, 0),
-            FontSize = 11,
-            MinWidth = 0,
-            MinHeight = 0,
-            Height = 26,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        double GetSpeedFromInput() => NumericToolbarInput.ParseSpeed(speedInput.Text);
-        void ApplySpeedFromInput()
-        {
-            double s = GetSpeedFromInput();
-            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
-            preview.SpeedMultiplier = s;
-        }
-        speedInput.LostFocus += (_, _) => ApplySpeedFromInput();
-        var speedDownButton = new Button
-        {
-            Classes = { "flanker" },
-            Content = "−",
-            Width = 22,
-        };
-        speedDownButton.Bind(Button.BorderBrushProperty, speedDownButton.GetResourceObservable("LineBrush"));
-        speedDownButton.Click += (_, _) =>
-        {
-            double s = Math.Max(Math.Round(GetSpeedFromInput() - 0.1, 1), 0.1);
-            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
-            preview.SpeedMultiplier = s;
-        };
-        var speedUpButton = new Button
-        {
-            Classes = { "flanker" },
-            Content = "+",
-            Width = 22,
-        };
-        speedUpButton.Bind(Button.BorderBrushProperty, speedUpButton.GetResourceObservable("LineBrush"));
-        speedUpButton.Click += (_, _) =>
-        {
-            double s = Math.Min(Math.Round(GetSpeedFromInput() + 0.1, 1), 10.0);
-            speedInput.Text = NumericToolbarInput.FormatSpeed(s);
-            preview.SpeedMultiplier = s;
-        };
-        var speedPill = new Border
-        {
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4),
-            ClipToBounds = true,
-            Height = 26,
             Width = 92,
             VerticalAlignment = VerticalAlignment.Center,
-            Child = new DockPanel
-            {
-                Children =
-                {
-                    speedDownButton,
-                    speedUpButton,
-                    speedInput,
-                },
-            },
+            Minimum = 0.1m,
+            Maximum = 10m,
+            Increment = 0.1m,
+            FormatString = "0.0#",
+            Value = 1.0m,
         };
         ToolTip.SetTip(speedPill, "Playback speed (1.0 = runtime speed)");
-        speedPill.Bind(Border.BorderBrushProperty, speedPill.GetResourceObservable("LineBrush"));
-        DockPanel.SetDock(speedDownButton, Dock.Left);
-        speedDownButton.BorderThickness = new Thickness(0, 0, 1, 0);
-        DockPanel.SetDock(speedUpButton, Dock.Right);
-        speedUpButton.BorderThickness = new Thickness(1, 0, 0, 0);
+        speedPill.ValueChanged += (_, _) =>
+            preview.SpeedMultiplier = (double)(speedPill.Value ?? 1.0m);
 
         void RefreshTimelineStrip()
         {

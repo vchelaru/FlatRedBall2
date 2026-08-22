@@ -6,58 +6,42 @@ namespace AnimationEditor.Core.Tests;
 public class NumericToolbarInputTests
 {
     [Fact]
-    public void FormatSpeed_FractionalValue_ReturnsTrimmedDecimal()
+    public void ParseClamp_AboveMax_ClampsToMax()
     {
-        var result = NumericToolbarInput.FormatSpeed(1.25);
+        var result = NumericToolbarInput.ParseClamp("999", min: 0m, max: 60m, fallback: 1m);
 
-        Assert.Equal("1.25", result);
+        Assert.Equal(60m, result);
     }
 
     [Fact]
-    public void ParseGridSize_AboveMax_ClampsTo512()
+    public void ParseClamp_BelowMin_ClampsToMin()
     {
-        var result = NumericToolbarInput.ParseGridSize("9999");
+        var result = NumericToolbarInput.ParseClamp("-5", min: 0.001m, max: 60m, fallback: 1m);
 
-        Assert.Equal(512, result);
+        Assert.Equal(0.001m, result);
     }
 
     [Fact]
-    public void ParseGridSize_NonNumericText_FallsBackTo16()
+    public void ParseClamp_NonNumericText_ReturnsFallback()
     {
-        var result = NumericToolbarInput.ParseGridSize("abc");
+        var result = NumericToolbarInput.ParseClamp("abc", min: 0m, max: 60m, fallback: 0.1m);
 
-        Assert.Equal(16, result);
+        Assert.Equal(0.1m, result);
     }
 
     [Fact]
-    public void ParseGridSize_ValidText_ReturnsParsedValue()
+    public void ParseClamp_NullText_ReturnsFallback()
     {
-        var result = NumericToolbarInput.ParseGridSize("32");
+        var result = NumericToolbarInput.ParseClamp(null, min: 0m, max: 60m, fallback: 0.1m);
 
-        Assert.Equal(32, result);
+        Assert.Equal(0.1m, result);
     }
 
     [Fact]
-    public void ParseSpeed_BelowMin_ClampsToPoint1()
+    public void ParseClamp_ValidText_ReturnsParsedValue()
     {
-        var result = NumericToolbarInput.ParseSpeed("0.01");
+        var result = NumericToolbarInput.ParseClamp("0.15", min: 0m, max: 60m, fallback: 1m);
 
-        Assert.Equal(0.1, result, precision: 6);
-    }
-
-    [Fact]
-    public void ParseSpeed_NonNumericText_FallsBackTo1()
-    {
-        var result = NumericToolbarInput.ParseSpeed("nope");
-
-        Assert.Equal(1.0, result, precision: 6);
-    }
-
-    [Fact]
-    public void ParseSpeed_ValidText_ReturnsParsedValue()
-    {
-        var result = NumericToolbarInput.ParseSpeed("2.5");
-
-        Assert.Equal(2.5, result, precision: 6);
+        Assert.Equal(0.15m, result);
     }
 }

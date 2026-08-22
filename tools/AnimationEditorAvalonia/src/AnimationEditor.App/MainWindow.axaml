@@ -874,8 +874,7 @@
                                                 <Grid ColumnDefinitions="78,*,Auto">
                                                     <TextBlock Text="Length" VerticalAlignment="Center"
                                                                Foreground="{DynamicResource InkMid}" FontSize="11" />
-                                                    <NumericUpDown x:Name="PropFrameLen" Grid.Column="1"
-                                                                   ShowButtonSpinner="True"
+                                                    <viewsControls:FlankerNumericField x:Name="PropFrameLen" Grid.Column="1"
                                                                    Minimum="0.001" Maximum="60"
                                                                    Increment="0.05" FormatString="0.000" />
                                                     <TextBlock Text="s" Grid.Column="2"
@@ -1332,27 +1331,10 @@
                             </StackPanel>
                         </ToggleButton>
 
-                        <Border BorderBrush="{DynamicResource LineBrush}"
-                                BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                Height="26" Margin="0,0,2,0" VerticalAlignment="Center"
-                                IsEnabled="{Binding #SnapToGridCheck.IsChecked}">
-                            <DockPanel>
-                                <Button x:Name="GridSizeMinusBtn" DockPanel.Dock="Left"
-                                        Classes="flanker" Content="−" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" />
-                                <Button x:Name="GridSizePlusBtn" DockPanel.Dock="Right"
-                                        Classes="flanker" Content="+" Width="22"
-                                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0" />
-                                <!-- MinWidth/MinHeight 0 (#501): keep the field from overflowing its
-                                     center slot over the −/+ buttons; Fluent forces a min ~64×32. -->
-                                <TextBox x:Name="GridSizeInput" Text="16"
-                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                         Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
-                                         MinWidth="0" MinHeight="0"
-                                         Height="26" VerticalAlignment="Center"
-                                         KeyDown="OnGridSizeInputKeyDown" />
-                            </DockPanel>
-                        </Border>
+                        <viewsControls:FlankerNumericField x:Name="GridSizeInput"
+                                                            Margin="0,0,2,0" VerticalAlignment="Center"
+                                                            IsEnabled="{Binding #SnapToGridCheck.IsChecked}"
+                                                            Minimum="1" Maximum="512" Increment="1" FormatString="0" />
 
                         <!-- Divider -->
                         <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
@@ -1557,28 +1539,10 @@
                                              CurrentColor="{DynamicResource IconInk}"
                                              VerticalAlignment="Center" HorizontalAlignment="Center" />
                                 </Button>
-                                <Border BorderBrush="{DynamicResource LineBrush}"
-                                        BorderThickness="1" CornerRadius="4" ClipToBounds="True"
-                                        Height="26" Width="92" VerticalAlignment="Center"
-                                        ToolTip.Tip="Playback speed (1.0 = runtime speed)">
-                                    <DockPanel>
-                                        <Button x:Name="SpeedDownBtn" DockPanel.Dock="Left"
-                                                Classes="flanker" Content="−" Width="22"
-                                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" />
-                                        <Button x:Name="SpeedUpBtn" DockPanel.Dock="Right"
-                                                Classes="flanker" Content="+" Width="22"
-                                                BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0" />
-                                        <!-- MinWidth/MinHeight 0 (#501): Fluent forces a TextBox min size
-                                             (~64×32); in this fixed-width pill the center slot is narrower,
-                                             so without this the textbox overflows centered and its focus
-                                             highlight bleeds over the −/+ buttons. -->
-                                        <TextBox x:Name="SpeedInput" Text="1.0"
-                                                 HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                 Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
-                                                 MinWidth="0" MinHeight="0"
-                                                 Height="26" VerticalAlignment="Center" />
-                                    </DockPanel>
-                                </Border>
+                                <viewsControls:FlankerNumericField x:Name="SpeedInput"
+                                                                    Width="92" VerticalAlignment="Center"
+                                                                    ToolTip.Tip="Playback speed (1.0 = runtime speed)"
+                                                                    Minimum="0.1" Maximum="10" Increment="0.1" FormatString="0.0#" />
                             </StackPanel>
                         </Border>
 

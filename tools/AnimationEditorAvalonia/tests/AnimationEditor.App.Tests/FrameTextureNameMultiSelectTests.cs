@@ -1,11 +1,14 @@
 using AnimationEditor.Core.IO;
+using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using SkiaSharp;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -81,8 +84,10 @@ public class FrameTextureNameMultiSelectTests
             propTextureName.Focus();
             FlushUi();
             propTextureName.Text = "b.png";
-            // Move focus away to raise LostFocus, which ApplyTextureName is wired to.
-            window.FindControl<NumericUpDown>("PropFrameLen")!.Focus();
+            // Move focus away to raise LostFocus, which ApplyTextureName is wired to. PropFrameLen
+            // is a FlankerNumericField (#963); focus lands on its inner ValueBox TextBox.
+            window.FindControl<FlankerNumericField>("PropFrameLen")!
+                .GetVisualDescendants().OfType<TextBox>().First().Focus();
             FlushUi();
 
             Assert.Equal("b.png", f0.TextureName);

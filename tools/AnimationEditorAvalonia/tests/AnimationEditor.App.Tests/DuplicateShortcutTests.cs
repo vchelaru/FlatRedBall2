@@ -1,13 +1,16 @@
 using AnimationEditor.Core;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
+using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FlatRedBall2.AnimationEditorCommon;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -179,7 +182,9 @@ public class DuplicateShortcutTests
             ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
             ctx.SelectedState.SelectedFrame = chain.Frames[0];
 
-            var speedInput = window.FindControl<TextBox>("SpeedInput")!;
+            // SpeedInput is a FlankerNumericField (#963); focus lands on its inner ValueBox TextBox.
+            var speedInput = window.FindControl<FlankerNumericField>("SpeedInput")!
+                .GetVisualDescendants().OfType<TextBox>().First();
             speedInput.Focus();
             Dispatcher.UIThread.RunJobs();
             Assert.IsType<TextBox>(window.FocusManager?.GetFocusedElement());

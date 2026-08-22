@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using AnimationEditor.Views.Controls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -49,7 +50,7 @@ public class MultiSelectPropertyPanelTests
             ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 };
             FlushUi();
 
-            var propFrameLen = window.FindControl<NumericUpDown>("PropFrameLen")!;
+            var propFrameLen = window.FindControl<FlankerNumericField>("PropFrameLen")!;
 
             Assert.Null(propFrameLen.Value);
             Assert.Equal("(mixed)", propFrameLen.PlaceholderText);
@@ -73,7 +74,7 @@ public class MultiSelectPropertyPanelTests
             ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 };
             FlushUi();
 
-            var propFrameLen = window.FindControl<NumericUpDown>("PropFrameLen")!;
+            var propFrameLen = window.FindControl<FlankerNumericField>("PropFrameLen")!;
 
             Assert.Equal(0.25m, propFrameLen.Value);
         }

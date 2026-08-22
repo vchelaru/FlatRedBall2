@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:AnimationEditor.Views.Controls"
              x:Class="AnimationEditor.Views.Controls.InspectorControl">
     <!--
         Phase 9 (#649): sectioned headers matching desktop MainWindow's inline inspector naming
@@ -63,7 +64,7 @@
                     <Grid ColumnDefinitions="Auto,*" MinWidth="120">
                         <TextBlock Text="Length (s)" VerticalAlignment="Center" Margin="0,0,8,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
-                        <NumericUpDown x:Name="FrameLengthInput" x:FieldModifier="Public" Grid.Column="1"
+                        <controls:FlankerNumericField x:Name="FrameLengthInput" x:FieldModifier="Public" Grid.Column="1"
                                        Minimum="0.001" Maximum="60" Increment="0.01" FormatString="0.###" />
                     </Grid>
                 </StackPanel>

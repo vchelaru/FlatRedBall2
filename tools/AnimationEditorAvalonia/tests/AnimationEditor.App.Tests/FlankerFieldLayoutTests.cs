@@ -1,4 +1,5 @@
 using AnimationEditor.App.Controls;
+using AnimationEditor.Views.Controls;
 using System;
 using System.Linq;
 using Avalonia;
@@ -6,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FlatRedBall2.AnimationEditorCommon;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -19,13 +21,17 @@ namespace AnimationEditor.App.Tests;
 /// the textbox background/border opaque, at which point the focus highlight bleeds over the buttons.
 /// Each field sets MinWidth/MinHeight 0 so it shrinks to its slot. These tests assert the value field
 /// never horizontally overlaps either flanker button.
+///
+/// GridSizeInput/SpeedInput/PropFrameLen (#963) are all the shared <see cref="FlankerNumericField"/>
+/// control, so their −/+ buttons (MinusBtn/PlusBtn) live inside that control's own template, not the
+/// window's namescope -- resolved the same way as ZoomControl's buttons below.
 /// </summary>
 public class FlankerFieldLayoutTests
 {
     [AvaloniaTheory]
-    [InlineData("GridSizeInput", "GridSizeMinusBtn", "GridSizePlusBtn")]
-    [InlineData("SpeedInput", "SpeedDownBtn", "SpeedUpBtn")]
-    public void FlankerField_StaysBetweenButtons(string fieldName, string minusName, string plusName)
+    [InlineData("GridSizeInput")]
+    [InlineData("SpeedInput")]
+    public void FlankerNumericField_FieldStaysBetweenButtons(string fieldName)
     {
         var ctx = TestHelpers.BuildServices();
         var window = ctx.CreateMainWindow();
@@ -36,22 +42,49 @@ public class FlankerFieldLayoutTests
 
         try
         {
-            var field = window.FindControl<Control>(fieldName)
+            var field = window.FindControl<FlankerNumericField>(fieldName)
                 ?? throw new InvalidOperationException($"{fieldName} not found");
-            var minus = window.FindControl<Button>(minusName)
-                ?? throw new InvalidOperationException($"{minusName} not found");
-            var plus = window.FindControl<Button>(plusName)
-                ?? throw new InvalidOperationException($"{plusName} not found");
 
-            AssertFieldBetweenButtons(fieldName, field, minus, plus);
+            AssertFieldBetweenFlankerButtons(fieldName, field);
         }
         finally { window.Close(); }
     }
 
-    // The shared ZoomControl (wireframe + preview toolbars) has the same flanker layout, but its
-    // −/+ buttons and percent field live in the control's own namescope, so they're resolved by
-    // descending each ZoomControl's subtree rather than by window-level name lookup. PngZoom is
-    // excluded: its pane is collapsed by default so it isn't laid out.
+    // #963: PropFrameLen only lays out once a frame is selected (its containing PropFramePanel
+    // starts IsVisible="False"), so it needs its own scenario rather than joining the theory above.
+    [AvaloniaFact]
+    public void PropFrameLen_FieldStaysBetweenFlankerButtons()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.FileName = null;
+        var window = ctx.CreateMainWindow();
+        window.Width = 1400;
+        window.Height = 900;
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var frame = new AnimationFrameSave { TextureName = "f0.png", ShapesSave = new ShapesSave() };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedFrame = frame;
+            Dispatcher.UIThread.RunJobs();
+
+            var propFrameLen = window.FindControl<FlankerNumericField>("PropFrameLen")
+                ?? throw new InvalidOperationException("PropFrameLen not found");
+
+            AssertFieldBetweenFlankerButtons("PropFrameLen", propFrameLen);
+        }
+        finally { window.Close(); }
+    }
+
+    // The shared ZoomControl (wireframe + preview toolbars) has the same flanker layout but is not
+    // a FlankerNumericField (its percent-preset/dropdown logic is a different domain, #963), so its
+    // −/+ buttons and percent field are resolved separately here. PngZoom is excluded: its pane is
+    // collapsed by default so it isn't laid out.
     [AvaloniaTheory]
     [InlineData("WireframeZoom")]
     [InlineData("PreviewZoom")]
@@ -79,9 +112,18 @@ public class FlankerFieldLayoutTests
         finally { window.Close(); }
     }
 
+    private static void AssertFieldBetweenFlankerButtons(string fieldName, FlankerNumericField field)
+    {
+        var buttons = field.GetVisualDescendants().OfType<Button>().ToList();
+        var minus = buttons.First(b => b.Name == "MinusBtn");
+        var plus = buttons.First(b => b.Name == "PlusBtn");
+
+        AssertFieldBetweenButtons(fieldName, field, minus, plus);
+    }
+
     private static void AssertFieldBetweenButtons(string fieldName, Control field, Button minus, Button plus)
     {
-        // The value field is either a TextBox directly (SpeedInput, GridSizeInput) or the inner
+        // The value field is either a TextBox directly (FlankerNumericField's ValueBox) or the inner
         // TextBox of an AutoCompleteBox (the ZoomControl percent field). The inner TextBox is what
         // carries the focus background/border, so measure its edges — not the outer control's.
         var textBox = field as TextBox
