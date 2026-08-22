@@ -274,6 +274,47 @@ public class FlatRedBallService
     }
 
     /// <summary>
+    /// <see cref="Glue.GlueLoadResult.GumProjectFile"/> rebased onto <paramref name="project"/>'s
+    /// content root and re-expressed relative to <paramref name="contentRootDirectory"/>, or null
+    /// when it names none.
+    /// </summary>
+    /// <remarks>
+    /// <c>GumProjectFile</c> is authored the same as every other <c>ReferencedFileSave.Name</c> —
+    /// relative to the <c>.gluj</c>'s own folder — so it first needs the same rebasing
+    /// <see cref="Glue.GlueContentSource"/> already does for every other reference, giving a path
+    /// relative to the executable folder (what <c>TitleContainer</c> resolves against).
+    /// <para>
+    /// Gum resolves the project path it's handed differently: against <c>Game.Content.RootDirectory</c>
+    /// (<paramref name="contentRootDirectory"/>, normally <c>"Content"</c>), the same as any
+    /// <c>ContentManager.Load</c> call, and it adds that prefix itself. So the executable-relative path
+    /// has that same prefix stripped back off before being handed over — leaving it in would have Gum
+    /// double it and look one <c>Content/</c> folder too deep. A Glue project that does not live under
+    /// the game's <c>Content</c> folder at all falls outside what Gum's single content root can resolve
+    /// — this returns the executable-relative path unchanged in that case, best-effort.
+    /// </para>
+    /// </remarks>
+    internal static string? ResolveGlueGumProjectFile(Glue.GlueProject? project, string contentRootDirectory)
+    {
+        if (project?.Result.GumProjectFile is not string relative)
+            return null;
+
+        string? glueProjectDirectory = project.Content?.ContentRoot;
+        if (string.IsNullOrEmpty(glueProjectDirectory))
+            return relative;
+
+        string combined = Path.Combine(glueProjectDirectory, relative).Replace('\\', '/');
+
+        string prefix = contentRootDirectory.Replace('\\', '/').Trim('/');
+        if (prefix.Length == 0)
+            return combined;
+
+        string prefixWithSlash = prefix + "/";
+        return combined.StartsWith(prefixWithSlash, StringComparison.OrdinalIgnoreCase)
+            ? combined.Substring(prefixWithSlash.Length)
+            : combined;
+    }
+
+    /// <summary>
     /// Reads the <c>.gluj</c> and its element files from <see cref="OutputContentRoot"/> rather than
     /// the process working directory, which is the project folder under <c>dotnet run</c> and the
     /// output folder under a debugger — so the plain-relative read would find a different (stale)
@@ -449,7 +490,8 @@ public class FlatRedBallService
             LoadGlueProject(glueProjectFile);
         }
 
-        if ((settings?.GumProjectFile ?? GlueProject?.Result.GumProjectFile) is string gumProjectFile)
+        if ((settings?.GumProjectFile ?? ResolveGlueGumProjectFile(GlueProject, game.Content.RootDirectory))
+            is string gumProjectFile)
         {
             _gum.Initialize(game, gumProjectFile);
 #pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
