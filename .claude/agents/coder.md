@@ -97,6 +97,12 @@ being asked:
   telling the user to `cd` and `dotnet run`.
 - Do not invent a new gitignore line per project — everything manual-test-only goes in that one
   shared folder.
+- **Never launch the app process yourself (`dotnet run`, starting the exe) — not even when the
+  runnable target is an existing tool (e.g. AnimationEditorAvalonia) rather than a new sample with
+  its own `.sln` to scaffold.** Open the existing solution/project file so the human runs it their
+  own way (VS, `dotnet run`, whatever); if a fixture is needed to reach the test state, build the
+  fixture and say what to open/load, but stop there. Running it yourself pre-empts how the human
+  wants to drive their own manual check.
 
 # High-Level Project Structure
 
