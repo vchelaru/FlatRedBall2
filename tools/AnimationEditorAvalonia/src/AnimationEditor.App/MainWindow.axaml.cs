@@ -246,6 +246,7 @@ public partial class MainWindow : Window
         WireWireframeControl();
         WirePngViewport();
         WirePngBlame();
+        WirePngUsageOverlay();
         WirePreviewControls();
         WireTreeView();
         WireWindowFileDrop();
@@ -612,6 +613,7 @@ public partial class MainWindow : Window
         PngPaneGrid.IsVisible = true;
         PngPane.IsVisible = true;
         SetSidebarForPng(true);
+        ResetPngUsageOverlay();
         // Decode the image off the UI thread so the tab appears immediately even for a large sheet;
         // a "Loading…" overlay shows until it's ready. The history load is likewise async.
         _pngTextureLoadInFlight = LoadPngTextureAsync(tab.Path.FullPath);
@@ -1532,6 +1534,153 @@ public partial class MainWindow : Window
             _pngShowingRevision = true;
         }
         PngPane.SetDiffRegions(regions, frame);
+    }
+
+    // ── PNG Usage Overlay wiring (#953) ────────────────────────────────────────
+
+    private readonly PngUsageScanService _pngUsageScanService = new();
+
+    // Session cache keyed by the PNG's absolute path, so re-toggling the overlay for the same
+    // image doesn't re-run the (potentially expensive) whole-project scan.
+    private readonly Dictionary<string, IReadOnlyList<UsageChainRegions>> _pngUsageCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    // Latest-wins guard: a tab switch or re-toggle while a scan is in flight supersedes it, mirroring
+    // _diffRequestId/_blameLoadId above.
+    private int _pngUsageScanRequestId;
+
+    // Single reused ContextMenu instance for the overlapping-chains disambiguation popup -- see the
+    // #472 comment on the tab context menu for why a fresh instance per click stacks/fails to dismiss.
+    private ContextMenu? _usageChainPickerMenu;
+
+    private void WirePngUsageOverlay()
+    {
+        PngUsageOverlayToggle.IsCheckedChanged += OnPngUsageOverlayToggled;
+        PngPane.UsageRegionsClicked += OnUsageRegionsClicked;
+    }
+
+    /// <summary>Hides the overlay, resets the toggle, and supersedes any in-flight scan -- called
+    /// whenever a (possibly different) PNG tab is shown, so a stale scan for the previous image
+    /// can never paint over the new one.</summary>
+    private void ResetPngUsageOverlay()
+    {
+        _pngUsageScanRequestId++;
+        PngUsageOverlayToggle.IsChecked = false;
+        PngPane.SetUsageRegions(Array.Empty<UsageChainRegions>());
+        PngUsageOverlayStatus.IsVisible = false;
+    }
+
+    private async void OnPngUsageOverlayToggled(object? sender, RoutedEventArgs e)
+    {
+        if (PngUsageOverlayToggle.IsChecked != true)
+        {
+            PngPane.SetUsageRegions(Array.Empty<UsageChainRegions>());
+            PngUsageOverlayStatus.IsVisible = false;
+            return;
+        }
+
+        var pngPath = PngPane.LoadedTexturePathCasePreserved;
+        if (string.IsNullOrEmpty(pngPath)) return;
+
+        if (_pngUsageCache.TryGetValue(pngPath, out var cached))
+        {
+            PngPane.SetUsageRegions(cached);
+            ShowPngUsageStatus(cached);
+            return;
+        }
+
+        int requestId = ++_pngUsageScanRequestId;
+        PngUsageOverlayStatus.Text = "Scanning project for usage…";
+        PngUsageOverlayStatus.IsVisible = true;
+
+        // Same root as the Files panel (#875): the explicitly-opened project folder wins over the
+        // achx-inferred fallback, and this works even with zero .achx tabs open.
+        string? root = _projectManager.ProjectFolderPath ?? _projectManager.ResolveFilesPanelRoot();
+        if (string.IsNullOrEmpty(root))
+        {
+            PngUsageOverlayStatus.Text = "No project folder open to scan.";
+            return;
+        }
+
+        var (width, height) = PngPane.BitmapSize;
+        if (width == 0 || height == 0) return;
+
+        IReadOnlyList<UsageChainRegions> groups;
+        try
+        {
+            groups = await _pngUsageScanService.ScanAsync(new DiskEditorFolder(root), pngPath, width, height);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PngUsage] scan failed: {ex}");
+            if (requestId == _pngUsageScanRequestId)
+                PngUsageOverlayStatus.Text = "Usage scan failed.";
+            return;
+        }
+
+        if (requestId != _pngUsageScanRequestId) return; // superseded by a tab switch / re-toggle
+
+        _pngUsageCache[pngPath] = groups;
+        PngPane.SetUsageRegions(groups);
+        ShowPngUsageStatus(groups);
+    }
+
+    private void ShowPngUsageStatus(IReadOnlyList<UsageChainRegions> groups)
+    {
+        PngUsageOverlayStatus.Text = groups.Count == 0
+            ? "No chains reference this image."
+            : $"{groups.Count} chain(s) reference this image.";
+        PngUsageOverlayStatus.IsVisible = true;
+    }
+
+    /// <summary>
+    /// A single match navigates directly; overlapping chains (more than one candidate under the
+    /// click point) show a small picker popup so the user chooses which one to jump to.
+    /// </summary>
+    private void OnUsageRegionsClicked(IReadOnlyList<UsageChainRegions> candidates)
+    {
+        if (candidates.Count == 1)
+        {
+            _ = NavigateToUsageChainAsync(candidates[0]);
+            return;
+        }
+
+        _usageChainPickerMenu ??= new ContextMenu();
+        _usageChainPickerMenu.Items.Clear();
+        foreach (var candidate in candidates)
+        {
+            _usageChainPickerMenu.Items.Add(new MenuItem
+            {
+                Header = $"{candidate.Chain.Name} — {candidate.Entry.FileName}",
+                Command = new RelayCommand(() => _ = NavigateToUsageChainAsync(candidate)),
+            });
+        }
+        _usageChainPickerMenu.Placement = PlacementMode.Pointer;
+        _usageChainPickerMenu.Open(PngPane);
+    }
+
+    /// <summary>
+    /// Opens (or focuses) the chain's owning .achx as a normal tab and selects the chain, same as
+    /// picking it from the Project tree -- no prior helper in this codebase opened a *different*
+    /// file and selected a specific chain in it, so this sequences the two: load the file, let the
+    /// tree-rebuild dispatch (queued by <see cref="AppCommands.FinishLoadIntoEditor"/>) run, then
+    /// look the chain up by name in the freshly-loaded project and sync the tree selection to it.
+    /// </summary>
+    private async Task NavigateToUsageChainAsync(UsageChainRegions target)
+    {
+        if (target.Entry.File is not DiskEditorFile diskFile) return;
+
+        await OpenFileAsTab(diskFile.FullPath);
+        // The tree rebuild is dispatched (not awaited) by FinishLoadIntoEditor; flush the UI-thread
+        // queue so it has run before we look the chain up in _treeRoots.
+        await Dispatcher.UIThread.InvokeAsync(() => { });
+
+        var reloadedChain = _projectManager.AnimationChainListSave?.AnimationChains
+            .FirstOrDefault(c => c.Name == target.Chain.Name);
+        if (reloadedChain is null) return;
+
+        _selectedState.SelectedChain = reloadedChain;
+        SyncTreeSelection();
     }
 
     private void OnChainRegionChanged(AnimationChainSave chain)
