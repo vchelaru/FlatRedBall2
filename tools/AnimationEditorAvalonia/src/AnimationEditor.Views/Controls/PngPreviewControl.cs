@@ -37,6 +37,10 @@ public sealed class PngPreviewControl : TextureViewport
     private const byte UsageFillAlpha = 60;
     private const byte UsageStrokeAlpha = 220;
 
+    // Rect currently under the mouse, for the "file (N)" hover tag — mirrors WireframeControl's
+    // _hoverFrame (#718). Null when nothing is hovered.
+    private (UsageChainRegions Group, UsageFrameRegion Frame)? _hoverUsageRegion;
+
     // Framing: fit the changed region(s) to this fraction of the viewport (leaving surrounding
     // context), and never magnify past this zoom so a 1-pixel change centers instead of exploding.
     private const float FocusFitFraction = 0.6f;
@@ -141,9 +145,73 @@ public sealed class PngPreviewControl : TextureViewport
     private void HitTestUsageRegions(SKPoint world)
     {
         if (_usageGroups.Count == 0) return;
-        var hits = _usageGroups.Where(g => g.Rects.Any(r => r.Contains(world))).ToList();
+        var hits = _usageGroups.Where(g => g.Rects.Any(fr => fr.Rect.Contains(world))).ToList();
         if (hits.Count > 0)
             UsageRegionsClicked?.Invoke(hits);
+    }
+
+    /// <inheritdoc />
+    protected override void OnEditPointerMoved(PointerEventArgs e)
+    {
+        base.OnEditPointerMoved(e);
+        var pos = e.GetPosition(this);
+        UpdateHoverUsageRegion(ScreenToTexture((float)pos.X, (float)pos.Y));
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        ClearHoverUsageRegion();
+    }
+
+    /// <summary>
+    /// Hit-tests <paramref name="world"/> against every rect across all usage groups (#953) and
+    /// updates <see cref="_hoverUsageRegion"/> for the "file (N)" hover tag. When two rects overlap,
+    /// the first match in iteration order wins — no disambiguation needed for a hover tooltip. Only
+    /// invalidates when the hovered rect identity actually changes.
+    /// </summary>
+    private void UpdateHoverUsageRegion(SKPoint world)
+    {
+        (UsageChainRegions Group, UsageFrameRegion Frame)? hit = null;
+        foreach (var group in _usageGroups)
+        {
+            foreach (var fr in group.Rects)
+            {
+                if (fr.Rect.Contains(world))
+                {
+                    hit = (group, fr);
+                    break;
+                }
+            }
+            if (hit != null) break;
+        }
+
+        bool sameHit = ReferenceEquals(hit?.Group, _hoverUsageRegion?.Group) &&
+            hit?.Frame.FrameIndex == _hoverUsageRegion?.Frame.FrameIndex;
+        if (!sameHit)
+        {
+            _hoverUsageRegion = hit;
+            InvalidateVisual();
+        }
+    }
+
+    private void ClearHoverUsageRegion()
+    {
+        if (_hoverUsageRegion != null)
+        {
+            _hoverUsageRegion = null;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>Test-only: runs the same hover hit-test as <see cref="OnEditPointerMoved"/> for a
+    /// given screen point and returns the resolved <c>"file (N)"</c> label. Null when nothing is
+    /// hovered.</summary>
+    public string? GetUsageHoverLabelForScreenPoint(float screenX, float screenY)
+    {
+        UpdateHoverUsageRegion(ScreenToTexture(screenX, screenY));
+        return _hoverUsageRegion is { } h ? $"{h.Group.Entry.FileName} ({h.Frame.FrameIndex})" : null;
     }
 
     // Fits the combined bounds of all changed regions into the viewport and centers them.
@@ -178,6 +246,13 @@ public sealed class PngPreviewControl : TextureViewport
         // Usage-overlay groups (#953), captured alongside the diff boxes so one DrawOverlay pass
         // draws both without either control state or a second snapshot type.
         public List<UsageChainRegions> UsageGroups = new();
+
+        /// <summary>Texture-space bounds of the usage-overlay rect under the mouse; null when
+        /// nothing is hovered. Paired with <see cref="HoverLabel"/>, resolved on the UI thread in
+        /// <see cref="BuildSnapshot"/> so the render thread never touches <see cref="UsageChainRegions"/>.</summary>
+        public SKRect? HoverFrameBounds;
+        /// <summary>"file (N)" label for <see cref="HoverFrameBounds"/>; null when nothing is hovered.</summary>
+        public string? HoverLabel;
     }
 
     /// <inheritdoc />
@@ -189,6 +264,13 @@ public sealed class PngPreviewControl : TextureViewport
             // Inclusive pixel bounds → half-open rect: a 1-pixel region spans one pixel of width.
             snap.Boxes.Add(new SKRect(r.MinX, r.MinY, r.MaxX + 1, r.MaxY + 1));
         snap.UsageGroups.AddRange(_usageGroups);
+
+        if (_hoverUsageRegion is { } hover)
+        {
+            snap.HoverFrameBounds = hover.Frame.Rect;
+            snap.HoverLabel = $"{hover.Group.Entry.FileName} ({hover.Frame.FrameIndex})";
+        }
+
         return snap;
     }
 
@@ -198,6 +280,11 @@ public sealed class PngPreviewControl : TextureViewport
         var s = (DiffSnapshot)snapshot;
         DrawDiffOverlay(canvas, s);
         DrawUsageOverlay(canvas, s);
+
+        // Hover tag (mirrors WireframeControl's "Frame N" notch, #718): drawn last so it sits on
+        // top of every fill/outline.
+        if (s.HoverFrameBounds.HasValue && s.HoverLabel != null)
+            WireframeControl.DrawHoverLabel(canvas, s.TextureRectToScreen(s.HoverFrameBounds.Value), s.HoverLabel);
     }
 
     private static void DrawDiffOverlay(SKCanvas canvas, DiffSnapshot s)
@@ -237,9 +324,9 @@ public sealed class PngPreviewControl : TextureViewport
                 StrokeWidth = 2f,
                 IsAntialias = true,
             };
-            foreach (var rect in group.Rects)
+            foreach (var fr in group.Rects)
             {
-                var screen = s.TextureRectToScreen(rect);
+                var screen = s.TextureRectToScreen(fr.Rect);
                 canvas.DrawRect(screen, fill);
                 canvas.DrawRect(screen, stroke);
             }

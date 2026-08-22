@@ -83,9 +83,11 @@ public sealed class PngUsageScanService
             var group = groups[i];
             var (r, g, b) = ChainUsageColorPalette.GetColor(i);
             var rects = group
-                .Select(m => new SKRect(
-                    Math.Min(m.Left, m.Right), Math.Min(m.Top, m.Bottom),
-                    Math.Max(m.Left, m.Right), Math.Max(m.Top, m.Bottom)))
+                .Select(m => new UsageFrameRegion(
+                    group.Key.Chain.Frames.IndexOf(m.Frame) + 1,
+                    new SKRect(
+                        Math.Min(m.Left, m.Right), Math.Min(m.Top, m.Bottom),
+                        Math.Max(m.Left, m.Right), Math.Max(m.Top, m.Bottom))))
                 .ToList();
 
             result.Add(new UsageChainRegions(group.Key.Entry, group.Key.Chain, new SKColor(r, g, b), rects));

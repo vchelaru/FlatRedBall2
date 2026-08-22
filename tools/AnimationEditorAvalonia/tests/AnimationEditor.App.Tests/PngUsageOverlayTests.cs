@@ -47,6 +47,28 @@ public class PngUsageOverlayTests
         return path;
     }
 
+    // Writes an achx with one chain containing two frames referencing the same texture, so the
+    // scan's 1-based FrameIndex assignment (frame's position within Chain.Frames) can be verified.
+    private static string WriteAchxTwoFrames(string dir, string fileName, string chainName, string textureName)
+    {
+        var path = Path.Combine(dir, fileName);
+        var acls = new AnimationChainListSave { CoordinateType = TextureCoordinateType.Pixel };
+        var chain = new AnimationChainSave { Name = chainName };
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = textureName, FrameLength = 0.1f,
+            LeftCoordinate = 0, TopCoordinate = 0, RightCoordinate = 16, BottomCoordinate = 16,
+        });
+        chain.Frames.Add(new AnimationFrameSave
+        {
+            TextureName = textureName, FrameLength = 0.1f,
+            LeftCoordinate = 16, TopCoordinate = 0, RightCoordinate = 32, BottomCoordinate = 16,
+        });
+        acls.AnimationChains.Add(chain);
+        acls.Save(path);
+        return path;
+    }
+
     // Pumps the dispatcher until the overlay status text moves off the transient "Scanning…"
     // message, or the bounded attempt count runs out (fails the assertions below, not hangs).
     private static async Task WaitForScanToFinishAsync(TextBlock status)
@@ -85,11 +107,48 @@ public class PngUsageOverlayTests
             var pngPane = window.FindControl<PngPreviewControl>("PngPane")!;
             var group = Assert.Single(pngPane.UsageRegions);
             Assert.Equal("Walk", group.Chain.Name);
-            var rect = Assert.Single(group.Rects);
-            Assert.Equal(0f, rect.Left, precision: 1);
-            Assert.Equal(0f, rect.Top, precision: 1);
-            Assert.Equal(32f, rect.Right, precision: 1);
-            Assert.Equal(16f, rect.Bottom, precision: 1);
+            var frameRegion = Assert.Single(group.Rects);
+            Assert.Equal(1, frameRegion.FrameIndex);
+            Assert.Equal(0f, frameRegion.Rect.Left, precision: 1);
+            Assert.Equal(0f, frameRegion.Rect.Top, precision: 1);
+            Assert.Equal(32f, frameRegion.Rect.Right, precision: 1);
+            Assert.Equal(16f, frameRegion.Rect.Bottom, precision: 1);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task PngUsageOverlayToggle_ChainWithMultipleFrames_AssignsOneBasedFrameIndexPerFrame()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = TestHelpers.BuildServices();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var pngPath = WriteRealPng(dir, "hero.png", 32, 16);
+            WriteAchxTwoFrames(dir, "walk.achx", "Walk", "hero.png");
+            await window.OpenProjectFolderForTestAsync(dir);
+
+            window.OpenPngAsTab(pngPath);
+            Dispatcher.UIThread.RunJobs();
+            await window.WhenPngTabLoaded();
+
+            var toggle = window.FindControl<ToggleButton>("PngUsageOverlayToggle")!;
+            var status = window.FindControl<TextBlock>("PngUsageOverlayStatus")!;
+            toggle.IsChecked = true;
+            await WaitForScanToFinishAsync(status);
+
+            var pngPane = window.FindControl<PngPreviewControl>("PngPane")!;
+            var group = Assert.Single(pngPane.UsageRegions);
+            Assert.Equal(2, group.Rects.Count);
+            Assert.Equal(1, group.Rects[0].FrameIndex);
+            Assert.Equal(2, group.Rects[1].FrameIndex);
         }
         finally
         {
