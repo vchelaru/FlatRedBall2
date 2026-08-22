@@ -1786,6 +1786,31 @@
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
                         <views:ZoomControl x:Name="PngZoom" VerticalAlignment="Center" />
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
+                        <!-- Analyze Image Usage (#953): scans every .achx/.achj under the project
+                             root and overlays color-coded rects for every frame that references
+                             this PNG. Explicit toggle, not automatic, since a whole-project scan
+                             is expensive; the result is cached per-PNG for the session. -->
+                        <ToggleButton x:Name="PngUsageOverlayToggle"
+                                      Classes="toolbarToggle"
+                                      Foreground="{DynamicResource Ink}"
+                                      VerticalAlignment="Center"
+                                      ToolTip.Tip="Highlight which animation chains use this image">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <svg:Svg Width="16" Height="16"
+                                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChain.svg"
+                                         CurrentColor="{DynamicResource IconInk}"
+                                         VerticalAlignment="Center" />
+                                <TextBlock Text="Analyze Image Usage" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+                        <TextBlock x:Name="PngUsageOverlayStatus" FontSize="11" Margin="6,0,0,0"
+                                   VerticalAlignment="Center" Foreground="{DynamicResource InkMid}"
+                                   IsVisible="False" />
                     </WrapPanel>
                 </Border>
 

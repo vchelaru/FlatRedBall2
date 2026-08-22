@@ -1,8 +1,10 @@
 using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.Rendering;
+using Avalonia.Input;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace AnimationEditor.App.Controls;
@@ -26,6 +28,18 @@ public sealed class PngPreviewControl : TextureViewport
 
     // Diff-region outline: a warm red distinct from the wireframe's blue frame boxes.
     private static readonly SKColor RegionOutline = new(230, 74, 60, 235);
+
+    // Usage-overlay chain groups (issue #953), texture-space pixel rects per chain. Empty = hidden.
+    private IReadOnlyList<UsageChainRegions> _usageGroups = Array.Empty<UsageChainRegions>();
+
+    // Transparent fill + hard outline per rect (design decision on #953): overlapping regions from
+    // different chains simply stack their alpha, no special blend handling needed.
+    private const byte UsageFillAlpha = 60;
+    private const byte UsageStrokeAlpha = 220;
+
+    // Rect currently under the mouse, for the "file (N)" hover tag — mirrors WireframeControl's
+    // _hoverFrame (#718). Null when nothing is hovered.
+    private (UsageChainRegions Group, UsageFrameRegion Frame)? _hoverUsageRegion;
 
     // Framing: fit the changed region(s) to this fraction of the viewport (leaving surrounding
     // context), and never magnify past this zoom so a 1-pixel change centers instead of exploding.
@@ -91,6 +105,115 @@ public sealed class PngPreviewControl : TextureViewport
     /// <summary>Runs <see cref="StepDiffReveal"/> to completion synchronously.</summary>
     public void SettleDiffReveal() => _reveal.Settle();
 
+    /// <summary>
+    /// Replaces the "Analyze Image Usage" overlay (issue #953) with <paramref name="groups"/> — one
+    /// entry per animation chain that references the currently-displayed PNG, each in its own
+    /// color — and repaints. An empty list hides the overlay.
+    /// </summary>
+    public void SetUsageRegions(IReadOnlyList<UsageChainRegions> groups)
+    {
+        _usageGroups = groups;
+        InvalidateVisual();
+    }
+
+    /// <summary>Currently-shown usage-overlay groups. Test-only; production code drives this via
+    /// <see cref="SetUsageRegions"/>, not by reading it back.</summary>
+    public IReadOnlyList<UsageChainRegions> UsageRegions => _usageGroups;
+
+    /// <summary>
+    /// Fired when a left-click lands inside one or more usage-overlay rects. Empty click points (no
+    /// overlay shown, or the click missed every rect) never raise this. More than one candidate means
+    /// overlapping chains — the caller decides how to disambiguate (e.g. a candidate-picker popup).
+    /// </summary>
+    public event Action<IReadOnlyList<UsageChainRegions>>? UsageRegionsClicked;
+
+    /// <inheritdoc />
+    protected override void OnEditPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnEditPointerPressed(e);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var pos = e.GetPosition(this);
+        HitTestUsageRegions(ScreenToTexture((float)pos.X, (float)pos.Y));
+    }
+
+    /// <summary>Test-only: simulates a click at a texture-space point, exercising the same hit test
+    /// as a real left-click (<see cref="OnEditPointerPressed"/>) without needing pointer routing.</summary>
+    public void SimulateUsageRegionClick(float textureX, float textureY) =>
+        HitTestUsageRegions(new SKPoint(textureX, textureY));
+
+    private void HitTestUsageRegions(SKPoint world)
+    {
+        if (_usageGroups.Count == 0) return;
+        var hits = _usageGroups.Where(g => g.Rects.Any(fr => fr.Rect.Contains(world))).ToList();
+        if (hits.Count > 0)
+            UsageRegionsClicked?.Invoke(hits);
+    }
+
+    /// <inheritdoc />
+    protected override void OnEditPointerMoved(PointerEventArgs e)
+    {
+        base.OnEditPointerMoved(e);
+        var pos = e.GetPosition(this);
+        UpdateHoverUsageRegion(ScreenToTexture((float)pos.X, (float)pos.Y));
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        ClearHoverUsageRegion();
+    }
+
+    /// <summary>
+    /// Hit-tests <paramref name="world"/> against every rect across all usage groups (#953) and
+    /// updates <see cref="_hoverUsageRegion"/> for the "file (N)" hover tag. When two rects overlap,
+    /// the first match in iteration order wins — no disambiguation needed for a hover tooltip. Only
+    /// invalidates when the hovered rect identity actually changes.
+    /// </summary>
+    private void UpdateHoverUsageRegion(SKPoint world)
+    {
+        (UsageChainRegions Group, UsageFrameRegion Frame)? hit = null;
+        foreach (var group in _usageGroups)
+        {
+            foreach (var fr in group.Rects)
+            {
+                if (fr.Rect.Contains(world))
+                {
+                    hit = (group, fr);
+                    break;
+                }
+            }
+            if (hit != null) break;
+        }
+
+        bool sameHit = ReferenceEquals(hit?.Group, _hoverUsageRegion?.Group) &&
+            hit?.Frame.FrameIndex == _hoverUsageRegion?.Frame.FrameIndex;
+        if (!sameHit)
+        {
+            _hoverUsageRegion = hit;
+            InvalidateVisual();
+        }
+    }
+
+    private void ClearHoverUsageRegion()
+    {
+        if (_hoverUsageRegion != null)
+        {
+            _hoverUsageRegion = null;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>Test-only: runs the same hover hit-test as <see cref="OnEditPointerMoved"/> for a
+    /// given screen point and returns the resolved <c>"file (N)"</c> label. Null when nothing is
+    /// hovered.</summary>
+    public string? GetUsageHoverLabelForScreenPoint(float screenX, float screenY)
+    {
+        UpdateHoverUsageRegion(ScreenToTexture(screenX, screenY));
+        return _hoverUsageRegion is { } h ? $"{h.Group.Entry.FileName} ({h.Frame.FrameIndex})" : null;
+    }
+
     // Fits the combined bounds of all changed regions into the viewport and centers them.
     private void FrameRegions()
     {
@@ -119,23 +242,53 @@ public sealed class PngPreviewControl : TextureViewport
         // Texture-space rects captured on the UI thread for the render thread to draw.
         public List<SKRect> Boxes = new();
         public float RevealProgress = 1f;
+
+        // Usage-overlay groups (#953), captured alongside the diff boxes so one DrawOverlay pass
+        // draws both without either control state or a second snapshot type.
+        public List<UsageChainRegions> UsageGroups = new();
+
+        /// <summary>Texture-space bounds of the usage-overlay rect under the mouse; null when
+        /// nothing is hovered. Paired with <see cref="HoverLabel"/>, resolved on the UI thread in
+        /// <see cref="BuildSnapshot"/> so the render thread never touches <see cref="UsageChainRegions"/>.</summary>
+        public SKRect? HoverFrameBounds;
+        /// <summary>"file (N)" label for <see cref="HoverFrameBounds"/>; null when nothing is hovered.</summary>
+        public string? HoverLabel;
     }
 
     /// <inheritdoc />
     protected override TextureViewportSnapshot BuildSnapshot(double width, double height)
     {
-        var snap = new DiffSnapshot { DrawOverlay = DrawDiffOverlay, RevealProgress = _reveal.Progress };
+        var snap = new DiffSnapshot { DrawOverlay = DrawOverlays, RevealProgress = _reveal.Progress };
         PopulateBaseSnapshot(snap, width, height);
         foreach (var r in _diffRegions)
             // Inclusive pixel bounds → half-open rect: a 1-pixel region spans one pixel of width.
             snap.Boxes.Add(new SKRect(r.MinX, r.MinY, r.MaxX + 1, r.MaxY + 1));
+        snap.UsageGroups.AddRange(_usageGroups);
+
+        if (_hoverUsageRegion is { } hover)
+        {
+            snap.HoverFrameBounds = hover.Frame.Rect;
+            snap.HoverLabel = $"{hover.Group.Entry.FileName} ({hover.Frame.FrameIndex})";
+        }
+
         return snap;
     }
 
     // Runs on the render thread from immutable snapshot data only — never touches live control state.
-    private static void DrawDiffOverlay(SKCanvas canvas, TextureViewportSnapshot snapshot)
+    private static void DrawOverlays(SKCanvas canvas, TextureViewportSnapshot snapshot)
     {
         var s = (DiffSnapshot)snapshot;
+        DrawDiffOverlay(canvas, s);
+        DrawUsageOverlay(canvas, s);
+
+        // Hover tag (mirrors WireframeControl's "Frame N" notch, #718): drawn last so it sits on
+        // top of every fill/outline.
+        if (s.HoverFrameBounds.HasValue && s.HoverLabel != null)
+            WireframeControl.DrawHoverLabel(canvas, s.TextureRectToScreen(s.HoverFrameBounds.Value), s.HoverLabel);
+    }
+
+    private static void DrawDiffOverlay(SKCanvas canvas, DiffSnapshot s)
+    {
         if (s.Boxes.Count == 0) return;
 
         float scale = RevealAnimation.Scale(s.RevealProgress);
@@ -154,6 +307,29 @@ public sealed class PngPreviewControl : TextureViewport
             if (scale != 1f)
                 screen = ScaleAround(screen, scale);
             canvas.DrawRect(screen, stroke);
+        }
+    }
+
+    // Transparent fill + hard outline per rect, one color per chain (#953 design decision) —
+    // overlapping regions from different chains stack their alpha with no special blend logic.
+    private static void DrawUsageOverlay(SKCanvas canvas, DiffSnapshot s)
+    {
+        foreach (var group in s.UsageGroups)
+        {
+            using var fill = new SKPaint { Color = group.Color.WithAlpha(UsageFillAlpha), Style = SKPaintStyle.Fill };
+            using var stroke = new SKPaint
+            {
+                Color = group.Color.WithAlpha(UsageStrokeAlpha),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 2f,
+                IsAntialias = true,
+            };
+            foreach (var fr in group.Rects)
+            {
+                var screen = s.TextureRectToScreen(fr.Rect);
+                canvas.DrawRect(screen, fill);
+                canvas.DrawRect(screen, stroke);
+            }
         }
     }
 
