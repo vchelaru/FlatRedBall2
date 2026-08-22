@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -73,6 +75,32 @@ public class CloseProjectTests
             Assert.Empty(roots);
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task CloseProjectAsync_ProjectFolderOpen_ClearsProjectPanelTree()
+    {
+        var (window, ctx) = CreateWindow();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            new AnimationChainListSave().Save(Path.Combine(dir, "hero.achx"));
+
+            await window.OpenProjectFolderForTestAsync(dir);
+            Dispatcher.UIThread.RunJobs();
+            Assert.NotEmpty(window.ProjectPanel.TreeRoots);
+
+            await window.CloseProjectAsync();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Empty(window.ProjectPanel.TreeRoots);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
     }
 
     [AvaloniaFact]
