@@ -5,11 +5,8 @@
          AnimationEditor.Browser. SVG assets live under AnimationEditor.Views/Assets/icons/svg/;
          see docs/BROWSER_ICON_SYSTEM_DECISION.md. -->
 
-    <!-- Flanking +/- spinner (a "flanker" pill: [−][value][+]) — replaces Fluent's default
-         stacked-chevron spinner for all ButtonSpinner/NumericUpDown. Reuses the Button.flanker
-         style (ThemeStyles.axaml) so it matches the GridSize/Speed pill widgets (#957).
-         Safe because every NumericUpDown except PropFrameLen (desktop MainWindow.axaml) and
-         FrameLengthInput (browser InspectorControl.axaml) has ShowButtonSpinner="False". -->
+    <!-- Compact stacked chevron spinner — replaces Fluent default for all ButtonSpinner/NumericUpDown.
+         Safe because every NumericUpDown except PropFrameLen has ShowButtonSpinner="False". -->
     <ControlTheme x:Key="{x:Type ButtonSpinner}" TargetType="ButtonSpinner">
         <Setter Property="Foreground"   Value="{DynamicResource TextControlForeground}" />
         <Setter Property="Background"   Value="{DynamicResource TextControlBackground}" />
@@ -17,7 +14,7 @@
         <Setter Property="BorderThickness" Value="{DynamicResource TextControlBorderThemeThickness}" />
         <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
         <Setter Property="MinHeight"    Value="0" />
-        <Setter Property="Padding"      Value="4,0" />
+        <Setter Property="Padding"      Value="8,0,4,0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment"   Value="Center" />
         <Setter Property="Template">
@@ -28,22 +25,36 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}">
                         <DockPanel>
-                            <RepeatButton Name="PART_DecreaseButton"
-                                          DockPanel.Dock="Left"
-                                          Classes="flanker"
-                                          Content="−"
-                                          Width="22"
-                                          BorderBrush="{DynamicResource LineBrush}"
-                                          BorderThickness="0,0,1,0"
-                                          IsVisible="{TemplateBinding ShowButtonSpinner}" />
-                            <RepeatButton Name="PART_IncreaseButton"
-                                          DockPanel.Dock="Right"
-                                          Classes="flanker"
-                                          Content="+"
-                                          Width="22"
-                                          BorderBrush="{DynamicResource LineBrush}"
-                                          BorderThickness="1,0,0,0"
-                                          IsVisible="{TemplateBinding ShowButtonSpinner}" />
+                            <StackPanel Name="PART_SpinnerPanel"
+                                        DockPanel.Dock="Right"
+                                        Orientation="Vertical"
+                                        Width="18"
+                                        VerticalAlignment="Center"
+                                        Spacing="1"
+                                        IsVisible="{TemplateBinding ShowButtonSpinner}">
+                                <RepeatButton Name="PART_IncreaseButton"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              MinWidth="0" MinHeight="0" Padding="2">
+                                    <svg:Svg Width="7" Height="7"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChevronUp.svg"
+                                             CurrentColor="{DynamicResource IconInkMuted}" />
+                                </RepeatButton>
+                                <RepeatButton Name="PART_DecreaseButton"
+                                              HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              MinWidth="0" MinHeight="0" Padding="2">
+                                    <svg:Svg Width="7" Height="7"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconChevronDown.svg"
+                                             CurrentColor="{DynamicResource IconInkMuted}" />
+                                </RepeatButton>
+                            </StackPanel>
                             <ContentPresenter Name="PART_ContentPresenter"
                                               Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"

@@ -5,6 +5,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.ViewModels;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -1085,7 +1086,7 @@ public class HeadlessTreeViewTests
             ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
-            var frameLen = window.FindControl<NumericUpDown>("PropFrameLen")
+            var frameLen = window.FindControl<FlankerNumericField>("PropFrameLen")
                 ?? throw new InvalidOperationException("PropFrameLen not found");
             frameLen.Value = 0.55m;
             Dispatcher.UIThread.RunJobs();

@@ -3,6 +3,7 @@ using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Views.Controls;
 using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -84,7 +85,7 @@ public class AdjustFrameTimeLiveEditTests
         var host = new ScriptedDialogHost(
             interact: content =>
             {
-                var durationInput = ((StackPanel)content).Children.OfType<NumericUpDown>().Single();
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
                 durationInput.Value = 0.8m; // was 0.4 total (0.1 + 0.3) -> doubles proportionally
                 Assert.Equal(0.2f, chain.Frames[0].FrameLength, 3);
                 Assert.Equal(0.6f, chain.Frames[1].FrameLength, 3);
@@ -102,7 +103,7 @@ public class AdjustFrameTimeLiveEditTests
         var host = new ScriptedDialogHost(
             interact: content =>
             {
-                var durationInput = ((StackPanel)content).Children.OfType<NumericUpDown>().Single();
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
                 durationInput.Value = 0.8m;
             },
             confirm: false);
@@ -137,7 +138,7 @@ public class AdjustFrameTimeLiveEditTests
         var host = new ScriptedDialogHost(
             interact: content =>
             {
-                var durationInput = ((StackPanel)content).Children.OfType<NumericUpDown>().Single();
+                var durationInput = ((StackPanel)content).Children.OfType<FlankerNumericField>().Single();
                 durationInput.Value = 0.8m;
                 durationInput.Value = 1.2m; // a second live edit; must coalesce, not add a 2nd entry
             },

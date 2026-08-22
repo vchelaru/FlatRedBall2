@@ -1,8 +1,8 @@
 using System.Linq;
 using AnimationEditor.Core;
+using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -14,11 +14,10 @@ using Xunit;
 namespace AnimationEditor.App.Tests;
 
 /// <summary>
-/// #957: PropFrameLen's ButtonSpinner is re-templated to flank the value with +/- buttons
-/// (<c>[−][value][+]</c>) instead of Fluent's stacked chevrons. These tests drive a real click on
-/// the re-templated <c>PART_IncreaseButton</c>/<c>PART_DecreaseButton</c> parts to confirm the
-/// click reaches Avalonia's built-in NumericUpDown increment/decrement/clamp logic, not just that
-/// the template compiles.
+/// #963: PropFrameLen is a <see cref="FlankerNumericField"/> (the reusable "[−][value][+]" pill
+/// GridSize/Speed pioneered) rather than a re-templated NumericUpDown/ButtonSpinner. These tests
+/// drive a real click on its internal MinusBtn/PlusBtn parts to confirm the click reaches
+/// FlankerNumericField's own increment/decrement/clamp logic, not just that the markup compiles.
 /// </summary>
 public class PropFrameLenFlankerButtonTests
 {
@@ -42,11 +41,11 @@ public class PropFrameLenFlankerButtonTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private static RepeatButton FindTemplatePart(NumericUpDown numeric, string partName)
-        => numeric.GetVisualDescendants().OfType<RepeatButton>().First(b => b.Name == partName);
+    private static Button FindPart(FlankerNumericField field, string partName)
+        => field.GetVisualDescendants().OfType<Button>().First(b => b.Name == partName);
 
     [AvaloniaFact]
-    public void PartIncreaseButton_Clicked_IncrementsFrameLengthByIncrement()
+    public void PlusBtn_Clicked_IncrementsFrameLengthByIncrement()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -58,10 +57,10 @@ public class PropFrameLenFlankerButtonTests
             ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
-            var propFrameLen = window.FindControl<NumericUpDown>("PropFrameLen")!;
-            var increaseButton = FindTemplatePart(propFrameLen, "PART_IncreaseButton");
+            var propFrameLen = window.FindControl<FlankerNumericField>("PropFrameLen")!;
+            var plusBtn = FindPart(propFrameLen, "PlusBtn");
 
-            RealClick(window, increaseButton);
+            RealClick(window, plusBtn);
 
             // Increment="0.05" on PropFrameLen (MainWindow.axaml).
             Assert.Equal(0.15f, frame.FrameLength, 3);
@@ -70,7 +69,7 @@ public class PropFrameLenFlankerButtonTests
     }
 
     [AvaloniaFact]
-    public void PartDecreaseButton_ClickedBelowMinimum_ClampsToMinimum()
+    public void MinusBtn_ClickedBelowMinimum_ClampsToMinimum()
     {
         var (window, ctx) = CreateWindow();
         try
@@ -82,11 +81,11 @@ public class PropFrameLenFlankerButtonTests
             ctx.SelectedState.SelectedFrame = frame;
             Dispatcher.UIThread.RunJobs();
 
-            var propFrameLen = window.FindControl<NumericUpDown>("PropFrameLen")!;
-            var decreaseButton = FindTemplatePart(propFrameLen, "PART_DecreaseButton");
+            var propFrameLen = window.FindControl<FlankerNumericField>("PropFrameLen")!;
+            var minusBtn = FindPart(propFrameLen, "MinusBtn");
 
             // Minimum="0.001" on PropFrameLen (MainWindow.axaml); one 0.05 decrement from 0.03 must clamp, not go negative.
-            RealClick(window, decreaseButton);
+            RealClick(window, minusBtn);
 
             Assert.Equal(0.001f, frame.FrameLength, 3);
         }

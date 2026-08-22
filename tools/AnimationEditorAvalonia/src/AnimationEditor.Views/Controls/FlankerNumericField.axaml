@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimationEditor.Views.Controls.FlankerNumericField"
+             x:Name="Root">
+    <!--
+        #963: the canonical "[−][value][+]" numeric field — a plain Border > DockPanel > two
+        flanker Buttons + a TextBox, exactly the structure GridSize/Speed already got right.
+        Deliberately NOT a re-templated NumericUpDown/ButtonSpinner: NumericUpDown draws its own
+        outer border *around* ButtonSpinner, so restyling only the inner ButtonSpinner template
+        (the first cut of #957) nests two borders and looks cramped. No hardcoded Width here —
+        consumers size the root exactly like they already do for NumericUpDown/the raw TextBox
+        versions this replaces.
+    -->
+    <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4"
+            ClipToBounds="True" Height="26">
+        <DockPanel>
+            <Button x:Name="MinusBtn" DockPanel.Dock="Left"
+                    Classes="flanker" Content="−" Width="22"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" />
+            <Button x:Name="PlusBtn" DockPanel.Dock="Right"
+                    Classes="flanker" Content="+" Width="22"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0" />
+            <!-- MinWidth/MinHeight 0 (#501): keep the field from overflowing its center slot over
+                 the −/+ buttons; Fluent forces a min ~64×32. -->
+            <TextBox x:Name="ValueBox"
+                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                     Background="Transparent" BorderThickness="0" Padding="4,0" FontSize="11"
+                     MinWidth="0" MinHeight="0"
+                     Height="26" VerticalAlignment="Center"
+                     PlaceholderText="{Binding #Root.PlaceholderText}" />
+        </DockPanel>
+    </Border>
+</UserControl>

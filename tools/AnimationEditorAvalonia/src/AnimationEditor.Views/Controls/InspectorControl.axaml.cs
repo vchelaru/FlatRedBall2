@@ -104,7 +104,7 @@ public partial class InspectorControl : UserControl
     /// of <paramref name="inputs"/> loses focus, so the next edit to that field starts a fresh
     /// undo entry instead of merging into the one just closed (#897).
     /// </summary>
-    private void SealOnLostFocus(params NumericUpDown[] inputs)
+    private void SealOnLostFocus(params InputElement[] inputs)
     {
         foreach (var input in inputs)
             input.LostFocus += (_, _) => _appCommands?.SealPendingEdits();
