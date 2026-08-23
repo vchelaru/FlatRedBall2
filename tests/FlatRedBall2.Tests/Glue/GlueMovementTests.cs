@@ -123,6 +123,27 @@ public class GlueMovementTests
     }
 
     [Fact]
+    public void BuildObjects_DoorsDemoPlayer_RecordsWhichCsvRowNameFilledEachPlatformerSlot()
+    {
+        // GroundMovement/AirMovement name "Ground"/"Air" in PlatformerValuesStatic.csv — an animation
+        // layer's Movement Name condition needs those names back, not just the values they resolved to.
+        var project = GlueProject.Load(
+            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj"));
+
+        var entity = new GlueEntity
+        {
+            Save = project.FindEntity(@"Entities\Player"),
+            Content = new GlueContentSource(
+                new ContentLoader(), Path.Combine("Glue", "Fixtures", "DoorsDemo", "Content")),
+        };
+
+        entity.BuildObjects();
+
+        // Freshly built and never Updated: IsOnGround defaults false, so the active slot is Air.
+        entity.CurrentPlatformerMovementName().ShouldBe("Air");
+    }
+
+    [Fact]
     public void ReadTopDown_DirectionColumns_AreSetExplicitlyNotLeftToADefault()
     {
         // These two default the opposite way on the two sides, so a CSV that omits them must not

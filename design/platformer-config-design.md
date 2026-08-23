@@ -13,9 +13,9 @@ See also: `TODOS.md` section "PlatformerConfig JSON — Coefficients (Landed)".
 
 ## Settled decisions
 
-### Animation — not engine-managed
+### Animation — not engine-managed (hand-authored projects)
 
-FRB1's `AnimationController` / `PlatformerAnimationController` mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this.** The controller was primarily solving an FRB1/Glue problem (generated code coexisting with custom code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable.
+FRB1's `AnimationController` / `PlatformerAnimationController` mapped behavior states to animation chains via a layered priority system. **FRB2 does not port this as a C# object model.** The controller was primarily solving an FRB1/Glue problem (generated code coexisting with custom code). Without a code generator, the abstraction adds indirection for no benefit — the equivalent if-statement or pattern match is shorter, more readable, and directly debuggable.
 
 The engine focuses on excellent primitives instead:
 - `PlayAnimation` is idempotent (calling with the same chain doesn't restart)
@@ -23,6 +23,15 @@ The engine focuses on excellent primitives instead:
 - `AnimationFinished` event handles non-looping transitions
 
 See the `platformer-movement` skill for the recommended animation pattern.
+
+**This narrows for Glue-imported projects (issue #973).** When a Glue project authors
+`AnimationLayer` data (platformer or top-down), that data already exists — the "no codegen, so a
+pattern match wins" argument above doesn't apply. `FlatRedBall2.Glue.GlueAnimationEvaluator` loads
+the `.PlatformerAnimations.json` / `.TopDownAnimations.json` sidecar FRB1's Editor writes and
+evaluates it generically at runtime (same shape as this file's own JSON-driven approach — data in,
+no codegen), wired automatically into `GlueEntity.CustomActivity`. Custom Condition is out of scope
+(arbitrary pasted C#, no data-driven equivalent) and is parsed-but-ignored with a build diagnostic.
+Hand-authored (non-Glue) projects are unaffected and keep using the pattern below.
 
 ### Schema shape (one file per platformer entity)
 

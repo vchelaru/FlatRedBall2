@@ -427,9 +427,10 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
         _topDownMovements = new Dictionary<string, Movement.TopDownValues>(
             values, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var value in values.Values)
+        foreach (var (name, value) in values)
         {
             TopDown.MovementValues = value;
+            _currentTopDownMovementName = name;
             break;
         }
     }
@@ -448,7 +449,41 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
             _topDownMovements.TryGetValue(movementName, out var values))
         {
             TopDown.MovementValues = values;
+            _currentTopDownMovementName = movementName;
         }
+    }
+
+    // The name of whichever named movement set is currently active, tracked alongside the swap
+    // rather than resolved by comparing TopDownValues instances (they're a struct — no identity to
+    // compare against). Consumed by a "Movement Name" animation-layer condition.
+    private string? _currentTopDownMovementName;
+
+    // One name per platformer slot ("GroundMovement"/"AirMovement"/"AfterDoubleJump"/
+    // "ClimbingMovement" — the CustomVariable name that filled the slot, or the climbing CSV row's
+    // own name), populated as each slot is assigned. Unlike top-down, platformer slots are fixed
+    // rather than swapped at runtime, so this only needs writing once per slot, at load time.
+    private readonly Dictionary<string, string> _platformerMovementSlotNames =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Records which authored name filled a platformer movement slot. Internal — called by
+    /// <see cref="GlueVariableApplier"/> and this type's own climbing-row loader.</summary>
+    internal void SetPlatformerMovementSlotName(string slot, string name) =>
+        _platformerMovementSlotNames[slot] = name;
+
+    /// <summary>
+    /// The authored name of whichever platformer movement slot is active this frame, or null if that
+    /// slot's name was never recorded (e.g. the slot was assigned in code, not from a named Glue CSV
+    /// row). Mirrors <see cref="Movement.PlatformerBehavior.Update"/>'s own slot-selection logic using
+    /// only its public state.
+    /// </summary>
+    internal string? CurrentPlatformerMovementName()
+    {
+        string slot = Platformer.IsClimbing ? "ClimbingMovement"
+            : Platformer.IsOnGround ? "GroundMovement"
+            : Platformer.IsUsingAfterDoubleJumpSlot ? "AfterDoubleJump"
+            : "AirMovement";
+
+        return _platformerMovementSlotNames.TryGetValue(slot, out var name) ? name : null;
     }
 
     private readonly Dictionary<string, object> _objects = new();
@@ -553,10 +588,44 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
     public override void CustomActivity(FrameTime time)
     {
         if (_isTopDown)
+        {
             TopDown.Update(this, time);
+            EvaluateTopDownAnimation();
+        }
 
         if (_isPlatformer)
+        {
             Platformer.Update(this, time);
+            EvaluatePlatformerAnimation();
+        }
+    }
+
+    private List<GluePlatformerAnimationLayer>? _platformerAnimationLayers;
+    private List<GlueTopDownAnimationLayer>? _topDownAnimationLayers;
+    private Rendering.Sprite? _animatedSprite;
+
+    private void EvaluatePlatformerAnimation()
+    {
+        if (_platformerAnimationLayers is not { Count: > 0 } || _animatedSprite is null)
+            return;
+
+        string? chainName = GlueAnimationEvaluator.EvaluatePlatformer(
+            this, Platformer, _animatedSprite, _platformerAnimationLayers, CurrentPlatformerMovementName());
+
+        if (chainName is not null)
+            _animatedSprite.PlayAnimation(chainName);
+    }
+
+    private void EvaluateTopDownAnimation()
+    {
+        if (_topDownAnimationLayers is not { Count: > 0 } || _animatedSprite is null)
+            return;
+
+        string? chainName = GlueAnimationEvaluator.EvaluateTopDown(
+            this, TopDown, _animatedSprite, _topDownAnimationLayers, _currentTopDownMovementName);
+
+        if (chainName is not null)
+            _animatedSprite.PlayAnimation(chainName);
     }
 
     /// <summary>
@@ -599,6 +668,59 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
 
         LoadTopDownValues();
         LoadClimbingMovement();
+        LoadAnimationLayers();
+    }
+
+    /// <summary>
+    /// Loads this entity's <c>.PlatformerAnimations.json</c> / <c>.TopDownAnimations.json</c> sidecar,
+    /// if one exists next to its <c>.glej</c>, and caches the object <see cref="Sprite"/> layers get
+    /// applied to. Absence of either file is normal — most Glue entities author no animation layers
+    /// at all — so nothing is warned when there simply is no file.
+    /// </summary>
+    private void LoadAnimationLayers()
+    {
+        _platformerAnimationLayers = null;
+        _topDownAnimationLayers = null;
+        _animatedSprite = null;
+
+        if (Save?.Name is not { Length: > 0 } elementName || Content is null)
+            return;
+
+        if (!_isPlatformer && !_isTopDown)
+            return;
+
+        string? platformerJson = _isPlatformer
+            ? Content.TryReadRelativeText(GlueAnimationLayerLoader.PlatformerSidecarPath(elementName))
+            : null;
+        string? topDownJson = _isTopDown
+            ? Content.TryReadRelativeText(GlueAnimationLayerLoader.TopDownSidecarPath(elementName))
+            : null;
+
+        if (platformerJson is null && topDownJson is null)
+            return;
+
+        if (platformerJson is not null)
+            _platformerAnimationLayers = GlueAnimationLayerLoader.ParsePlatformer(platformerJson, elementName, _buildDiagnostics);
+
+        if (topDownJson is not null)
+            _topDownAnimationLayers = GlueAnimationLayerLoader.ParseTopDown(topDownJson, elementName, _buildDiagnostics);
+
+        foreach (var built in _objects.Values)
+        {
+            if (built is Rendering.Sprite sprite)
+            {
+                _animatedSprite = sprite;
+                break;
+            }
+        }
+
+        if (_animatedSprite is null)
+        {
+            _buildDiagnostics.Add(new GlueLoadDiagnostic(
+                GlueDiagnosticSeverity.Warning,
+                "This entity has authored animation layers but no Sprite object was found to play " +
+                "them on.", elementName));
+        }
     }
 
     /// <summary>
@@ -671,7 +793,9 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
         if (csv is null)
             return;
 
-        Platformer.ClimbingMovement = GlueMovementValues.FindClimbingRow(csv);
+        Platformer.ClimbingMovement = GlueMovementValues.FindClimbingRow(csv, out string? name);
+        if (name is not null)
+            SetPlatformerMovementSlotName("ClimbingMovement", name);
     }
 
     /// <summary>The screen a nested entity should be registered on — the one this entity lives on.</summary>

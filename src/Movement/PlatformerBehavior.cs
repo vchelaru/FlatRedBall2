@@ -217,6 +217,16 @@ public class PlatformerBehavior
     public bool IsOnGround { get; private set; }
 
     /// <summary>
+    /// True when the most recent <see cref="Update"/> selected <see cref="AfterDoubleJump"/> (falling
+    /// back to <see cref="AirMovement"/> when null) as the active airborne slot, rather than
+    /// <see cref="AirMovement"/> directly. Always false while grounded or climbing. Exposed so callers
+    /// that need to know which named slot is driving movement — e.g. a data-driven animation
+    /// evaluator matching against a slot's authored name — do not have to duplicate this behavior's
+    /// internal slot-selection logic.
+    /// </summary>
+    public bool IsUsingAfterDoubleJumpSlot { get; private set; }
+
+    /// <summary>
     /// Signed slope angle (degrees, -90 to 90) of the surface the entity is currently standing
     /// on. Positive values indicate a surface that rises in the +X direction, negative values
     /// indicate a surface that rises in the -X direction. <c>0</c> when on flat ground or
@@ -403,6 +413,8 @@ public class PlatformerBehavior
             DirectionFacing = HorizontalDirection.Right;
         else if (inputX < 0f)
             DirectionFacing = HorizontalDirection.Left;
+
+        IsUsingAfterDoubleJumpSlot = !IsClimbing && !IsOnGround && _usedAirJumpSlot;
 
         var current = IsClimbing
             ? ClimbingMovement!

@@ -1,0 +1,13 @@
+{
+  "Values": [
+    {
+      "AnimationName": "CharacterIdle",
+      "HasLeftAndRight": true
+    },
+    {
+      "AnimationName": "CharacterRun",
+      "HasLeftAndRight": true,
+      "MinXVelocityAbsolute": 140.0
+    }
+  ]
+}

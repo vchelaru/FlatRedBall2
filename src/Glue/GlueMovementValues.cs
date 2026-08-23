@@ -93,23 +93,30 @@ public static class GlueMovementValues
     }
 
     /// <summary>
-    /// The platformer row that opts into climbing, or null when no row does.
+    /// The platformer row that opts into climbing, or null when no row does. <paramref name="name"/>
+    /// is the row's own name (for matching a "Movement Name" animation-layer condition against it),
+    /// or null alongside a null return.
     /// </summary>
     /// <remarks>
     /// <c>CanClimb</c> is a per-row bool rather than a named slot, which is how FRB1 models climbing:
     /// game code swaps the climbing row into the ground slot while the character is on a ladder.
     /// FRB2 has a climbing slot of its own, so the row it identifies is what fills it.
     /// </remarks>
-    public static PlatformerValues? FindClimbingRow(string csv)
+    public static PlatformerValues? FindClimbingRow(string csv, out string? name)
     {
         var table = CsvTable.Parse(csv);
+        var key = table.KeyHeader?.Name ?? "Name";
 
         foreach (var row in table.Rows)
         {
             if (table.Bool(row, "CanClimb"))
+            {
+                name = table.Value(row, key);
                 return ReadPlatformerRow(table, row);
+            }
         }
 
+        name = null;
         return null;
     }
 
