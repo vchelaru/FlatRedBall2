@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace AnimationEditor.Core.IO;
@@ -11,7 +12,7 @@ public sealed class NullFileDialogService : IFileDialogService
 {
     public static readonly NullFileDialogService Instance = new();
 
-    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, string fileTypeDescription)
+    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices)
         => Task.FromResult<string?>(null);
 
     public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription)

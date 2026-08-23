@@ -379,7 +379,7 @@ internal sealed class MenuFlowStubFileDialogService : IFileDialogService
 
     public MenuFlowStubFileDialogService(string? path) => _path = path;
 
-    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, string fileTypeDescription)
+    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices)
         => Task.FromResult(_path);
 
     public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription)
