@@ -59,15 +59,17 @@ public sealed class GlueGumFixture : IDisposable
         Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo");
 
     /// <summary>
-    /// Stages the fixture's Gum project next to the test binary, because Gum's FileManager resolves
-    /// every path against the app's own Content folder rather than the Glue project's. A real game
-    /// needs no equivalent: its Content folder *is* the Glue project's.
+    /// Stages the fixture's Gum project under the test binary's own <c>Content/</c> folder, at the
+    /// same path the Glue project's directory occupies relative to the executable - because Gum
+    /// resolves whatever path it is handed against <c>Game.Content.RootDirectory</c>, unlike the rest
+    /// of a Glue project's references, which resolve directly against the executable folder. A real
+    /// game needs no equivalent: its Glue project already lives inside its own <c>Content/</c> folder.
     /// </summary>
     private static void StageFixtureContent()
     {
         CopyDirectory(
             Path.Combine(FixtureDirectory, "Content", "GumProject"),
-            Path.Combine(AppContext.BaseDirectory, "Content", "GumProject"));
+            Path.Combine(AppContext.BaseDirectory, "Content", "Glue", "Fixtures", "DoorsDemo", "GumProject"));
     }
 
     private static void CopyDirectory(string source, string destination)
