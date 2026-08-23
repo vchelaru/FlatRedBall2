@@ -1,6 +1,6 @@
 ---
 name: animation
-description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
+description: "Sprite animation in FlatRedBall2. Use for AnimationChain, AnimationChainList, AnimationPlayer, AchxLoader, .achx/.achj files, Aseprite/.ase loading, Sprite.PlayAnimation, frame-based texture flipping, looping/non-looping animations, AnimationFinished events, and per-frame collision shapes (hitboxes/hurtboxes, static object collision)."
 ---
 
 # Sprite Animation in FlatRedBall2
@@ -21,6 +21,15 @@ Sprites animate via `AnimationChain` / `AnimationChainList`, driven automaticall
 - `AnimationFrame` — texture + source rectangle (pixel coords) + flip flags + `FrameLength` (TimeSpan) + per-frame `RelativeX/Y` offsets + optional `Shapes` collection
 - `AnimationChain : List<AnimationFrame>` — named sequence; `TotalLength` = sum of `FrameLength`s
 - `AnimationChainList : List<AnimationChain>` — string indexer for lookup by name; the unit of "ownership" for per-frame shapes (see Topics)
+
+## Standalone AnimationChain.MonoGame/.Common Package
+
+The types above live in `FlatRedBall2.Animation` and back `Sprite.PlayAnimation`. A separate
+generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.AnimationEditorCommon`) —
+`AnimationChainList<TFrame>`, `AnimationPlayer<TFrame>`, `AchxLoader`
+(`src/AnimationChain.MonoGame/AchxLoader.cs`) — is for raw MonoGame projects with no FRB2
+`Screen`/`Sprite`. Same names, different (generic) shape — don't conflate the two; see
+`samples/AnimationChainSample`.
 
 ## Sprite Playback API
 
@@ -66,6 +75,7 @@ When you want an AI assistant to wire animation selection to gameplay state, des
 
 - **Never pause animation to express "still" state.** Animation runs continuously. If a state should look motionless (idle, hanging on a ladder, holding a charge), the **content author** authors a chain that looks still — a 1-frame chain, or a multi-frame chain with subtle motion (breath, blinking). Game code that flips `_sprite.Animate = false` bakes a content decision into engine-driving code and forecloses author choices the artist may want later. Only `PlayAnimation` (sets true) and the non-looping end-of-chain hook (sets false) should write `Animate`. If you reach for `_sprite.Animate = …`, you want a different chain.
 - **`AnimationChains` must be set before `PlayAnimation`** — otherwise silent no-op.
+- **Standalone package: `TryReloadFrom` and `TryReload` are different methods, not synonyms.** `AnimationChainList<AnimationFrame>.TryReloadFrom` (instance) wants a frame-factory `Func<AnimationFrameSave, AnimationFrame>`; the `TryReload` extension in `AnimationChainListSaveExtensions` wants a texture-loader `Func<string, Texture2D?>`. Passing a texture-loader lambda to `TryReloadFrom` won't compile — use `TryReload`.
 - **Non-looping animation stops on the last frame** — `Animate` flips false; call `PlayAnimation` again to restart.
 - **Animation is paused when the screen is paused** — `AnimateSelf` runs inside the `!IsPaused` block in `Screen.Update`.
 - **`Sprite.X` and `Sprite.Y` are overwritten on every frame switch.** Each `AnimationFrame` carries `RelativeX`/`RelativeY` (default `0`), and advancing assigns those unconditionally. Code like `_booster.Y = -10` in `CustomInitialize` works for exactly one frame, then snaps to `0`. To offset an animated sprite relative to its parent entity, bake the offset into each frame's `RelativeX`/`RelativeY` (in the `.achx` or in code), or attach the sprite to a child entity whose own `X`/`Y` carries the offset.
