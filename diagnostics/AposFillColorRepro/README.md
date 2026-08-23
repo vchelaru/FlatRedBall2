@@ -12,16 +12,16 @@ step and a color byte that should be `0` decodes as `~255`. Blue is paired with 
 filled shape with blue `= 0` rendered with the blue channel forced to `1.0` (black→blue, red→magenta,
 `Color.Green` (0,128,0)→light blue). Correct on Windows because x86 `sqrt` is correctly rounded.
 
-The fix nudges the root back up when `(f1+1)^2` still fits within `n`. It lives in Apos's `Unpair()`
-and ships through FlatRedBall2's precompiled `apos-shapes.xnb`. Until it lands in a released
-Apos.Shapes version, FRB2 carries it as a local patch — see
-`src/PrecompiledShaders/apos-shapes-663.patch` and the note in `src/PrecompiledShaders/AposShapes.props`.
+The fix nudges the root back up when `(f1+1)^2` still fits within `n`. It landed upstream in Apos's
+`Unpair()` (folded into the 0.7.8 release) — FRB2 no longer carries a local patch or a precompiled
+shader for it; the fix ships in whatever `$(AposShapesVersion)` (see `Directory.Packages.props`)
+resolves.
 
 ## Why pure MonoGame
 
 No FlatRedBall2 — just MonoGame + Apos.Shapes — so it isolates the bug to Apos.Shapes × the GL driver.
-It consumes FRB2's precompiled `apos-shapes.xnb` (via `AposShapesPrecompiled.props`), which carries the
-fix, so no Wine is needed.
+Apos.Shapes 0.7.2+ embeds its shader directly in the package assembly, so no content pipeline
+compile and no Wine dependency either way.
 
 ## Run
 

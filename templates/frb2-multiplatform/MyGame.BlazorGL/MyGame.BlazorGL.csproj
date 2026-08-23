@@ -11,10 +11,6 @@
     <BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
 
-  <!-- Must be after KniPlatform is set so the allowlist in AposShapesPrecompiled.props can
-       match. Transitional — see the comment atop build/AposShapesPrecompiled.props. -->
-  <Import Project="..\build\AposShapesPrecompiled.props" />
-
   <!-- KNI XNA + Blazor host packages. The version pin must match the JS shim version
        in wwwroot/frb-host.js (`v = '10.0.3'`). -->
   <ItemGroup>

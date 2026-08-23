@@ -673,8 +673,8 @@ public class GlueEntity : Entity, Movement.IPlatformerEntity
 
     /// <summary>
     /// Loads this entity's <c>.PlatformerAnimations.json</c> / <c>.TopDownAnimations.json</c> sidecar,
-    /// if one exists next to its <c>.glej</c>, and caches the object <see cref="Sprite"/> layers get
-    /// applied to. Absence of either file is normal — most Glue entities author no animation layers
+    /// if one exists next to its <c>.glej</c>, and caches the object <see cref="Rendering.Sprite"/>
+    /// layers get applied to. Absence of either file is normal — most Glue entities author no animation layers
     /// at all — so nothing is warned when there simply is no file.
     /// </summary>
     private void LoadAnimationLayers()
