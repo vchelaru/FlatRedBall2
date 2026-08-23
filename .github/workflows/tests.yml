@@ -58,6 +58,11 @@ jobs:
           dotnet build templates/frb2-desktop/MyGame.slnx --verbosity minimal
           dotnet build templates/frb2-multiplatform/MyGame.slnx --verbosity minimal
 
+      # Issue #970: this sample references AnimationChain.MonoGame/.Common directly and had
+      # drifted out of sync with their API with nothing catching it, since no CI step built it.
+      - name: Build AnimationChainSample
+        run: dotnet build samples/AnimationChainSample/AnimationChainSample.csproj --verbosity minimal
+
       - name: Test AnimationEditor.Core
         run: dotnet test tools/AnimationEditorAvalonia/tests/AnimationEditor.Core.Tests/AnimationEditor.Core.Tests.csproj --verbosity minimal --logger "console;verbosity=minimal"
 

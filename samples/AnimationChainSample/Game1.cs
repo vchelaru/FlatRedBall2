@@ -1,5 +1,5 @@
 using FlatRedBall.AnimationChain;
-using FlatRedBall.AnimationChain.Content;
+using FlatRedBall2.AnimationEditorCommon;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -25,8 +25,8 @@ public class Game1 : Game
     // Real spritesheet loaded from AnimatedSpritesheet.png
     private Texture2D _spriteSheet = null!;
 
-    private AnimationChainList _animations = null!;
-    private AnimationPlayer _player = null!;
+    private AnimationChainList<AnimationFrame> _animations = null!;
+    private AnimationPlayer<AnimationFrame> _player = null!;
     private string[] _chainOrder = null!;
     private int _chainIndex;
 
@@ -58,7 +58,7 @@ public class Game1 : Game
 
         if (_chainOrder.Length > 0)
         {
-            _player = new AnimationPlayer(_animations);
+            _player = new AnimationPlayer<AnimationFrame>(_animations);
             _player.Play(_chainOrder[_chainIndex]);
         }
 
@@ -118,7 +118,7 @@ public class Game1 : Game
     private bool IsPressed(KeyboardState cur, Keys key) =>
         cur.IsKeyDown(key) && !_prevKeys.IsKeyDown(key);
 
-    private AnimationChainList LoadAnimations()
+    private AnimationChainList<AnimationFrame> LoadAnimations()
     {
         using var achxStream = TitleContainer.OpenStream(AchxPath);
         var save = AnimationChainListSave.FromStream(achxStream);
@@ -130,7 +130,7 @@ public class Game1 : Game
         try
         {
             using var achxStream = TitleContainer.OpenStream(AchxPath);
-            return _animations.TryReloadFrom(achxStream, _ => _spriteSheet);
+            return _animations.TryReload(achxStream, _ => _spriteSheet);
         }
         catch (IOException)
         {
