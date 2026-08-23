@@ -118,6 +118,11 @@ internal static class GlueVariableApplier
             case "AfterDoubleJump": entity.Platformer.AfterDoubleJump = movement; break;
         }
 
+        // Slot key matches PlatformerMovement's variable name minus "Movement"/"Jump" isn't
+        // consistent, so use the variable name directly — GlueEntity's slot lookup keys off the
+        // same three strings ("GroundMovement"/"AirMovement"/"AfterDoubleJump").
+        entity.SetPlatformerMovementSlotName(variable.Name, row);
+
         return true;
     }
 

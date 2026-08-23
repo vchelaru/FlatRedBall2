@@ -408,11 +408,17 @@ If the built-in triggers don't fit (e.g. a "climb only on button press" scheme, 
 
 ## Platformer Animations (User Code, Not Engine-Managed)
 
+**This section is for hand-authored (non-Glue) projects.** An entity imported from a Glue project
+that authors platformer/top-down `AnimationLayer`s in the FlatRedBall Editor gets those evaluated
+automatically at runtime — no game code needed. See `FlatRedBall2.Glue.GlueAnimationEvaluator`. For
+everything else — a project built directly in C#, with no Glue animation layers — animation stays a
+user-code pattern, described below.
+
 **Always use the template animations for platformer characters** — copy `PlatformerAnimations.achx` and `AnimatedSpritesheet.png` from `.claude/templates/AnimationChains/` into the project's `Content/Animations/` directory and load via `.achx`. Do not fall back to a shape placeholder for the player character.
 
 The template chain names follow the pattern `Character<State><Direction>` — e.g. `CharacterIdleRight`, `CharacterWalkLeft`, `CharacterRunJumpRight`. There is no separate Fall chain; use `CharacterRunJump` for both jump and fall.
 
-FRB2 does not provide an animation controller. Animation state selection is straightforward game code — a pattern match on `PlatformerBehavior` state, plus a facing suffix:
+For a hand-authored project, animation state selection is straightforward game code — a pattern match on `PlatformerBehavior` state, plus a facing suffix:
 
 ```csharp
 private void UpdateAnimation()

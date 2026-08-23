@@ -100,6 +100,30 @@ public sealed class GlueContentSource
         _text.TryGetValue(instanceName, out string? text) ? text : null;
 
     /// <summary>
+    /// Reads a text file at <paramref name="relativePath"/> (relative to <see cref="ContentRoot"/>)
+    /// that is not a <see cref="ReferencedFileSave"/> — e.g. a sidecar file discovered by naming
+    /// convention rather than named in an instruction. Returns null when nothing exists there; that
+    /// is the common case (most elements have no sidecar), so it is silent rather than a diagnostic.
+    /// A file that exists but fails to <em>parse</em> is the caller's diagnostic to raise, not this
+    /// method's — it only reports read failures.
+    /// </summary>
+    internal string? TryReadRelativeText(string relativePath)
+    {
+        string path = Path.Combine(ContentRoot, relativePath).Replace('\\', '/');
+
+        try
+        {
+            using var stream = _content.StreamProvider(path);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// The member name Glue would address a file by: extension dropped, spaces and parentheses
     /// removed, hyphens underscored, path stripped, and a leading digit prefixed.
     /// </summary>

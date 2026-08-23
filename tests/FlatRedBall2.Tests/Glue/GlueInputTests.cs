@@ -328,7 +328,21 @@ public class GlueInputTests
             Air,False,0
             """;
 
-        GlueMovementValues.FindClimbingRow(csv).ShouldBeNull();
+        GlueMovementValues.FindClimbingRow(csv, out string? name).ShouldBeNull();
+        name.ShouldBeNull();
+    }
+
+    [Fact]
+    public void FindClimbingRow_ACsvWithAClimbingRow_ReturnsItsName()
+    {
+        const string csv = """
+            "Name (string, required)",CanClimb (System.Boolean),MaxClimbingSpeed (System.Single)
+            Ground,False,0
+            Ladder,True,80
+            """;
+
+        GlueMovementValues.FindClimbingRow(csv, out string? name).ShouldNotBeNull();
+        name.ShouldBe("Ladder");
     }
 
     [Fact]

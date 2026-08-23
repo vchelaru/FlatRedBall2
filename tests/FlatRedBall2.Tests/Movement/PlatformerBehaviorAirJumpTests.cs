@@ -242,6 +242,50 @@ public class PlatformerBehaviorAirJumpTests
         entity.VelocityY.ShouldBe(-50f);
     }
 
+    // ── IsUsingAfterDoubleJumpSlot ───────────────────────────────────────────
+
+    [Fact]
+    public void IsUsingAfterDoubleJumpSlot_BeforeAnyAirJump_IsFalse()
+    {
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(jump, afterDoubleJump: new PlatformerValues { JumpVelocity = 0f });
+        var (entity, _) = MakeAirborneEntity();
+
+        platformer.Update(entity, Frame());
+
+        platformer.IsUsingAfterDoubleJumpSlot.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsUsingAfterDoubleJumpSlot_AfterFirstAirJump_IsTrue()
+    {
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(jump, afterDoubleJump: new PlatformerValues { JumpVelocity = 0f });
+        var (entity, _) = MakeAirborneEntity();
+
+        platformer.Update(entity, Frame());
+        jump.Press();
+        platformer.Update(entity, Frame()); // first air jump fires, sets _usedAirJumpSlot
+
+        // The slot flag reflects the value read at the START of Update (last frame's state),
+        // so it flips to true on the frame AFTER the air jump fires.
+        platformer.Update(entity, Frame());
+
+        platformer.IsUsingAfterDoubleJumpSlot.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void IsUsingAfterDoubleJumpSlot_OnGround_IsFalse()
+    {
+        var jump = new PressableInput();
+        var platformer = MakePlatformer(jump, afterDoubleJump: new PlatformerValues { JumpVelocity = 0f });
+        var (entity, _) = MakeGroundedEntity();
+
+        platformer.Update(entity, Frame());
+
+        platformer.IsUsingAfterDoubleJumpSlot.ShouldBeFalse();
+    }
+
     // ── Fell off ground ──────────────────────────────────────────────────────
 
     [Fact]
