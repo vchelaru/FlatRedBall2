@@ -7,13 +7,11 @@ description: "Converting a single-target FlatRedBall2 desktop sample into a dual
 
 > Reference samples: `samples/auto/AutoEvalKniBlazorSample/` (minimal — one XNB, no real content) and `samples/PlatformKing/` (content-rich — TMX, JSON, PNG animations). Read PlatformKing first when porting any non-trivial game; AutoEval only proves the wiring, not the content story.
 
-## Backend selection is by TFM
+## Backend selection is by which project file you reference
 
-`src/FlatRedBall2.csproj` multi-targets `net8.0;net10.0` and conditions the backend:
-- `net8.0` → KNI (`nkast.Xna.Framework.*`) — used by browser/Blazor
-- `net10.0` → MonoGame (`MonoGame.Framework.DesktopGL`) — used by desktop
+`src/FlatRedBall2.csproj` (MonoGame/desktop) and `src/Kni/FlatRedBall2.Kni.csproj` (KNI/browser) are single-TFM (`net10.0`) project files, not one multi-targeted project — see the comment atop either file for why. Consumers pick a backend by which file they `ProjectReference`/which NuGet package (`FlatRedBall2.MonoGame` vs `FlatRedBall2.Kni`) they install, not by TFM. This is the linchpin — every gotcha below comes from wiring the wrong file/package to the wrong head.
 
-Consumers do not pick the backend. They pick a TFM. The engine's transitive references then drag in the matching XNA packages. This is the linchpin — every gotcha below comes from violating it.
+The KNI file lives in its own `Kni\` subfolder, not next to the MonoGame one: two SDK projects globbing the same physical directory hit a real MSBuild parallel-build race (confirmed — `-m:1` always succeeds, default parallel builds fail intermittently depending on the solution's project-graph shape). Physical separation removes the race at its root; see the comment atop `FlatRedBall2.Kni.csproj` for the full story.
 
 ## Project layout
 
@@ -21,9 +19,10 @@ Three projects, mirroring `AutoEvalKniBlazorSample`:
 
 ```
 GameName/
-  GameName.Common/     net8.0;net10.0   game code + Content/
-  GameName.Desktop/    net10.0          Program.cs, MonoGame
-  GameName.BlazorGL/   net8.0           Blazor WASM host
+  GameName.Common/            net10.0   game code + Content/ — MonoGame build (see below)
+  GameName.Common/Kni/        net10.0   KNI build, same source, own subfolder
+  GameName.Desktop/           net10.0   Program.cs, MonoGame
+  GameName.BlazorGL/          net10.0   Blazor WASM host
   GameName.slnx
 ```
 
@@ -33,24 +32,15 @@ The `Game` subclass (Game1) lives in `Common` so both heads instantiate the same
 
 Assets belong in `Common/Content/` by default. Only move to platform-specific folders if they won't work elsewhere (e.g., platform-specific UI sizes, backend-incompatible shader variants). Most art, audio, and data stay in `Common/` so both Desktop and BlazorGL draw from a single source — no duplication.
 
-## Common csproj — must multi-target
+## Common — two single-TFM csproj files, KNI in its own subfolder
 
-When the heads sit on different TFMs (Desktop net10.0, BlazorGL net8.0), `Common` must multi-target both. A single-TFM Common forces the transitive engine reference to one backend, and the wrong-TFM head loads an assembly built against the other backend's XNA. Symptom: `MissingMethodException` on the first engine call.
+Desktop and BlazorGL both now target `net10.0`, so a single Common project can no longer pick the backend by `Condition="'$(TargetFramework)' == ..."` — both heads would match the same condition. Splitting into two files that share a directory isn't safe either (the MSBuild parallel-build race above). Instead:
 
-```xml
-<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
-```
+- `GameName.Common.csproj` (MonoGame) stays where it is, default compile items, references `FlatRedBall2.csproj`/`FlatRedBall2.MonoGame`. Add `<DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>` so its own glob never reaches into the subfolder below.
+- `GameName.Common\Kni\GameName.Common.Kni.csproj` (KNI) sets `<EnableDefaultCompileItems>false</EnableDefaultCompileItems>` and explicitly compiles the parent's source: `<Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />`. References `..\..\..\src\Kni\FlatRedBall2.Kni.csproj`/`FlatRedBall2.Kni`.
+- `GameName.Desktop.csproj` references the plain file; `GameName.BlazorGL.csproj` references the one in `Kni\`.
 
-XNA framework packages must be conditioned per TFM — the engine's transitive flow is not always reliable through `ProjectReference` at compile time:
-
-```xml
-<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-  <PackageReference Include="nkast.Xna.Framework.Game" />
-</ItemGroup>
-<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-  <PackageReference Include="MonoGame.Framework.DesktopGL" />
-</ItemGroup>
-```
+See `samples/Solitaire/Solitaire.Common/` for a working example, including how its Gum content-copy `<Content Include>` items pick up `Link` metadata once the source path (`..\Content\...`) no longer matches the project's own directory.
 
 No `Version` attribute — the repo uses NuGet Central Package Management, so versions are pinned once in `Directory.Packages.props`, not per `PackageReference`.
 
@@ -58,12 +48,10 @@ Common must NOT add `MonoGame.Content.Builder.Task` — that belongs on the head
 
 ## Backend-conditional code
 
-The engine sets `KNI` / `MONOGAME` defines in its own csproj, but `DefineConstants` does not flow through `ProjectReference`. To use `#if KNI` in Common, redefine per TFM in Common's csproj:
+Each file sets its own `KNI` / `MONOGAME` define unconditionally (no `Condition` needed — the file itself is the condition):
 
 ```xml
-<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-  <DefineConstants>$(DefineConstants);KNI</DefineConstants>
-</PropertyGroup>
+<DefineConstants>$(DefineConstants);KNI</DefineConstants>
 ```
 
 The two known places `#if KNI` is needed today:

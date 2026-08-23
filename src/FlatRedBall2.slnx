@@ -7,5 +7,5 @@
   <Project Path="AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
   <Project Path="AnimationChain.MonoGame/AnimationChain.MonoGame.csproj" />
-  <Project Path="AnimationChain.MonoGame/AnimationChain.KNI.csproj" />
+  <Project Path="AnimationChain.MonoGame/Kni/AnimationChain.KNI.csproj" />
 </Solution>

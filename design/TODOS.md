@@ -20,11 +20,9 @@ options/parameter passed to the `TileMap` constructor (matching what #804 does, 
 internal signature and every call site), or leave it and accept the test-isolation hazard. Worth
 deciding deliberately rather than letting the next seam copy it a third time.
 
-## Kni Blazor.GL Pitch support unreleased — blocks #799 web-side verification
+## Confirm Kni Blazor.GL Pitch is audible — resumes #799 web-side work
 
-Kni merged `Pitch` support for `SoundEffectInstance` on Blazor.GL in [kniEngine/kni#2614](https://github.com/kniEngine/kni/pull/2614) (2026-07-26) and for `DynamicSoundEffectInstance` in [#2615](https://github.com/kniEngine/kni/pull/2615) (2026-07-28), but neither is in a published NuGet release yet — latest `nkast.Kni.Platform.Blazor.GL` (4.2.9001.2) is pinned to a commit from 2025-11-16. Until Kni publishes a release containing both PRs, Pitch does not work on Kni's web backend for any sound type, one-shot or streaming — confirmed via `diagnostics/MusicPitchWebSpike` throwing `DynamicSoundEffectInstance does not support Pitch` at runtime.
-
-Once a release lands, bump `nkast.Kni.Platform.Blazor.GL` (and matching `nkast.Xna.Framework.*`) in `Directory.Packages.props` and re-run `MusicPitchWebSpike` to confirm Pitch is audible before resuming the #799 `IMusicBackend` design work on the web side.
+`nkast.Kni.Platform.Blazor.GL` was bumped to 4.3.9001 (#966), which contains the `Pitch` support for `SoundEffectInstance`/`DynamicSoundEffectInstance` that was previously unreleased (kniEngine/kni#2614, #2615). `diagnostics/MusicPitchWebSpike` now builds clean against it, but nobody has run it in a browser yet to confirm `Pitch` is actually audible (not just non-throwing) on this backend — `dotnet run --project diagnostics/MusicPitchWebSpike/MusicPitchWebSpike.BlazorGL`, open the dev URL, press 1/2/3, confirm three distinct pitches. Do that before resuming the #799 `IMusicBackend` design work on the web side.
 
 ## Wire templates' Program.cs to LinuxVideoDriver.ApplyWaylandFallback()
 

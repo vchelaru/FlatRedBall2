@@ -62,7 +62,7 @@ Define `GUM_BUNDLE` from the same MSBuild property that flips deployment (see th
 
 ## .NET version requirement
 
-The bundle loader requires **.NET 7+** (pure-managed brotli + tar). FRB2 targets net8.0+, so this is always satisfied.
+The bundle loader requires **.NET 7+** (pure-managed brotli + tar). FRB2 targets net10.0+, so this is always satisfied.
 
 ## Blazor / KNI WASM target
 

@@ -77,23 +77,23 @@ Content (do not modify versions):
   "isRoot": true,
   "tools": {
     "dotnet-mgcb": {
-      "version": "3.8.4.1",
+      "version": "3.8.5.1",
       "commands": ["mgcb"]
     },
     "dotnet-mgcb-editor": {
-      "version": "3.8.4.1",
+      "version": "3.8.5.1",
       "commands": ["mgcb-editor"]
     },
     "dotnet-mgcb-editor-linux": {
-      "version": "3.8.4.1",
+      "version": "3.8.5.1",
       "commands": ["mgcb-editor-linux"]
     },
     "dotnet-mgcb-editor-windows": {
-      "version": "3.8.4.1",
+      "version": "3.8.5.1",
       "commands": ["mgcb-editor-windows"]
     },
     "dotnet-mgcb-editor-mac": {
-      "version": "3.8.4.1",
+      "version": "3.8.5.1",
       "commands": ["mgcb-editor-mac"]
     }
   }

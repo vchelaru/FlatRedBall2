@@ -1,0 +1,107 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    This is the KNI/browser backend build of the engine — see ..\FlatRedBall2.csproj for the
+    MonoGame/desktop backend and why these are two sibling single-TFM files instead of one
+    multi-targeted project.
+
+    This file lives in its own Kni\ subfolder rather than next to FlatRedBall2.csproj: two SDK
+    projects sharing one physical directory (globbing the same .cs files under different
+    DefineConstants/references) hits a real MSBuild parallel-build race — concurrent build nodes
+    can cross-contaminate which backend's types end up in which compiled assembly, even with
+    distinct BaseOutputPath/BaseIntermediateOutputPath. Confirmed via `dotnet build
+    src/FlatRedBall2.slnx` and templates/frb2-multiplatform's MyGame.slnx: `-m:1` (no
+    parallelism) always succeeds, default parallel builds fail intermittently depending on the
+    solution's project-graph shape (#966). Physical separation removes the race at its root
+    instead of trying to out-configure it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!--
+      Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
+      of the eventual NuGet package. CS1591 ("missing XML comment for publicly visible type
+      or member") is intentionally left as a warning — visible in build output as a tracked
+      metric so the doc-coverage gap is obvious, but not failing the build during preview.
+      Promote to error before the first stable (non-preview) NuGet ships.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- NuGet Metadata -->
+    <Authors>Victor Chelaru</Authors>
+    <Description>A modern, lightweight 2D game engine built on KNI (Blazor WebAssembly + future mobile targets).</Description>
+    <PackageId>FlatRedBall2.Kni</PackageId>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <!-- SourceLink and Symbols (for debugging inside the NuGet package) -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Compiles the parent directory's source (the shared engine code) instead of this project's
+    own — EnableDefaultCompileItems is off above, so this is the only source list. Excludes
+    mirror ..\FlatRedBall2.csproj's own DefaultItemExcludes, plus the sibling backend's own
+    bin/obj (a plain **/*.cs from here would otherwise reach into them) and this folder itself.
+  -->
+  <ItemGroup>
+    <Compile Include="..\**\*.cs"
+             Exclude="..\obj\**;..\bin\**;..\Kni\**;..\FlatRedBall2.BlazorGL\**;..\AnimationChain.MonoGame\**;..\AnimationChain.Common\**;..\Animation.Content\**;..\AnimationEditorCommon\**" />
+  </ItemGroup>
+
+  <!-- Backend-agnostic packages -->
+  <ItemGroup>
+    <PackageReference Include="AsepriteDotNet" />
+    <PackageReference Include="FlatRedBall.InterpolationCore" />
+    <!-- Pure managed OGG decoder for the pitchable streaming music path (StreamingOggMusicBackend). -->
+    <PackageReference Include="NVorbis" />
+  </ItemGroup>
+
+  <!--
+    The .achx data model (AnimationChainListSave, AnimationFrameSave, ShapesSave, ColorOperation,
+    etc.) has no MonoGame dependency, so it lives in its own project. This lets tooling like the
+    Animation Editor (Avalonia, not MonoGame) reference the .achx format without pulling in
+    MonoGame.Framework.DesktopGL at all; see tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Apos.Shapes.KNI" />
+    <PackageReference Include="Gum.KNI" />
+    <PackageReference Include="Gum.Shapes.KNI" />
+    <PackageReference Include="KernSmith.KniGum" />
+    <PackageReference Include="KNI.Extended" />
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Content" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Audio" />
+    <PackageReference Include="nkast.Xna.Framework.Media" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>FlatRedBall2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <!--
+    Precompiled ColorOperation.Add pixel shader (see src/Shaders/AddColor.fx for HLSL source).
+    Compiled once via ShadowDusk.Compiler (Target=OpenGL, Mgfx v10 container - see the
+    `shadowdusk` skill) since this library has no content pipeline of its own; the same bytes
+    load on both the MonoGame and KNI backends via `new Effect(graphicsDevice, bytes)`.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
+  </ItemGroup>
+</Project>

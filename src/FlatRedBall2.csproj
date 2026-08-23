@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <!--
       Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
@@ -14,40 +14,42 @@
 
     <!-- NuGet Metadata -->
     <Authors>Victor Chelaru</Authors>
-    <Description>A modern, lightweight 2D game engine built on MonoGame and KNI.</Description>
-    <PackageId Condition="'$(FlatRedBallDependencyPackageId)' != ''">$(FlatRedBallDependencyPackageId)</PackageId>
-    <PackageVersion Condition="'$(FlatRedBallDependencyVersion)' != ''">$(FlatRedBallDependencyVersion)</PackageVersion>
+    <Description>A modern, lightweight 2D game engine built on MonoGame (DesktopGL).</Description>
+    <PackageId>FlatRedBall2.MonoGame</PackageId>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vchelaru/FlatRedBall2</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vchelaru/FlatRedBall2</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    
+
     <!-- SourceLink and Symbols (for debugging inside the NuGet package) -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <!--
-      Backend is selected by TargetFramework (so NuGet restore picks the right packages):
-        net8.0  -> Kni      (browser via Blazor WASM, plus future KNI mobile targets)
-        net10.0 -> MonoGame (desktop)
-      We tie Backend to TFM rather than expose it as a free property because
-      AdditionalProperties on ProjectReference doesn't propagate through NuGet restore,
-      so a free property silently gets the wrong package set.
-    -->
-    <Backend Condition="'$(TargetFramework)' == 'net8.0'">Kni</Backend>
-    <Backend Condition="'$(TargetFramework)' == 'net10.0'">MonoGame</Backend>
-    <DefineConstants Condition="'$(Backend)' == 'Kni'">$(DefineConstants);KNI</DefineConstants>
-    <DefineConstants Condition="'$(Backend)' == 'MonoGame'">$(DefineConstants);MONOGAME</DefineConstants>
+    <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
 
     <!--
+      This is the MonoGame/desktop backend build of the engine. Kni\FlatRedBall2.Kni.csproj is
+      the KNI/browser backend — a separate single-TFM project file rather than a second slice of
+      this one's TargetFrameworks, because both backends now target net10.0 and a single project
+      can't list the same TFM twice to pick different package sets. Splitting into sibling files
+      sidesteps that entirely: each file just points at a different set of PackageReferences, no
+      property-passing through ProjectReference/NuGet restore needed (that approach was rejected
+      historically because AdditionalProperties on ProjectReference doesn't propagate through
+      NuGet restore). Kni\FlatRedBall2.Kni.csproj compiles this directory's source explicitly
+      (its own EnableDefaultCompileItems is off) rather than sharing this project's own default
+      glob — two SDK projects globbing the same physical directory hits a real MSBuild
+      parallel-build race (#966), which is why the KNI backend lives in its own subfolder instead
+      of right next to this file.
+
       The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
       this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
       compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
       reference the AspNetCore.Components / JSInterop assemblies. AnimationChain.Common is its own
-      MonoGame-free project (see ProjectReference below) for the same reason.
+      MonoGame-free project (see ProjectReference below) for the same reason. Kni\ is excluded
+      for the same reason — it holds only Kni.csproj, but keeps globbing from ever reaching in.
     -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**;Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->
@@ -68,8 +70,7 @@
     <ProjectReference Include="AnimationChain.Common/AnimationChain.Common.csproj" />
   </ItemGroup>
 
-  <!-- MonoGame backend -->
-  <ItemGroup Condition="'$(Backend)' == 'MonoGame'">
+  <ItemGroup>
     <PackageReference Include="Apos.Shapes" />
     <PackageReference Include="Gum.MonoGame" />
     <PackageReference Include="Gum.Shapes.MonoGame" />
@@ -78,22 +79,6 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="MonoGame.Extended" />
-  </ItemGroup>
-
-  <!-- KNI backend (Blazor WebAssembly + future mobile targets) -->
-  <ItemGroup Condition="'$(Backend)' == 'Kni'">
-    <PackageReference Include="Apos.Shapes.KNI" />
-    <PackageReference Include="Gum.KNI" />
-    <PackageReference Include="Gum.Shapes.KNI" />
-    <PackageReference Include="KernSmith.KniGum" />
-    <PackageReference Include="KNI.Extended" />
-    <PackageReference Include="nkast.Xna.Framework" />
-    <PackageReference Include="nkast.Xna.Framework.Content" />
-    <PackageReference Include="nkast.Xna.Framework.Graphics" />
-    <PackageReference Include="nkast.Xna.Framework.Audio" />
-    <PackageReference Include="nkast.Xna.Framework.Media" />
-    <PackageReference Include="nkast.Xna.Framework.Input" />
-    <PackageReference Include="nkast.Xna.Framework.Game" />
   </ItemGroup>
 
   <ItemGroup>

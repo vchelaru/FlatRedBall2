@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>MyGame.BlazorGL</RootNamespace>
@@ -16,7 +16,7 @@
   <Import Project="..\build\AposShapesPrecompiled.props" />
 
   <!-- KNI XNA + Blazor host packages. The version pin must match the JS shim version
-       in wwwroot/frb-host.js (`v = '8.0.11'`). -->
+       in wwwroot/frb-host.js (`v = '10.0.3'`). -->
   <ItemGroup>
     <PackageReference Include="nkast.Xna.Framework" />
     <PackageReference Include="nkast.Xna.Framework.Content" />
@@ -39,7 +39,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MyGame.Common\MyGame.Common.csproj" />
+    <ProjectReference Include="..\MyGame.Common\Kni\MyGame.Common.Kni.csproj" />
   </ItemGroup>
 
   <!--
