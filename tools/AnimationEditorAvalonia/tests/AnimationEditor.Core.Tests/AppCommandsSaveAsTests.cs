@@ -1,7 +1,9 @@
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using FlatRedBall2.AnimationEditorCommon;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -171,6 +173,37 @@ public class AppCommandsSaveAsTests : IDisposable
         Assert.Equal("achj", dialog.RequestedDefaultExtension);
     }
 
+    // ── File-type dropdown offers both formats (#973) ──────────────────────────
+
+    [Fact]
+    public async Task SaveCurrentAnimationChainListAsync_AchxFileAlreadyLoaded_OffersBothAchjAndAchxChoices()
+    {
+        var loadedPath = Path.Combine(_dir.Path, "loaded.achx");
+        var dialog = new CapturingFileDialogService(Path.Combine(_dir.Path, "out.achx"));
+        ctx.AppCommands.FileDialogService = dialog;
+        ctx.ProjectManager.FileName = loadedPath;
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        Assert.Equal(
+            new[] { "achj", "achx" },
+            dialog.RequestedFileTypeChoices!.Select(c => c.Extension).OrderBy(e => e));
+    }
+
+    [Fact]
+    public async Task SaveCurrentAnimationChainListAsync_NewFile_OffersBothAchjAndAchxChoices()
+    {
+        var dialog = new CapturingFileDialogService(Path.Combine(_dir.Path, "out.achj"));
+        ctx.AppCommands.FileDialogService = dialog;
+        ctx.ProjectManager.FileName = null;
+
+        await ctx.AppCommands.SaveCurrentAnimationChainListAsync();
+
+        Assert.Equal(
+            new[] { "achj", "achx" },
+            dialog.RequestedFileTypeChoices!.Select(c => c.Extension).OrderBy(e => e));
+    }
+
     [Fact]
     public async Task SaveCurrentAnimationChainListAsync_SavedFile_ContainsChainData()
     {
@@ -196,14 +229,14 @@ internal sealed class StubFileDialogService : IFileDialogService
 
     public StubFileDialogService(string? path) => _path = path;
 
-    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, string fileTypeDescription)
+    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices)
         => Task.FromResult(_path);
 
     public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription)
         => Task.FromResult(_path);
 }
 
-/// <summary>Test double that records the requested default extension and returns a fixed path.</summary>
+/// <summary>Test double that records the requested default extension/file-type choices and returns a fixed path.</summary>
 internal sealed class CapturingFileDialogService : IFileDialogService
 {
     private readonly string? _path;
@@ -211,10 +244,12 @@ internal sealed class CapturingFileDialogService : IFileDialogService
     public CapturingFileDialogService(string? path) => _path = path;
 
     public string? RequestedDefaultExtension { get; private set; }
+    public IReadOnlyList<FileTypeChoice>? RequestedFileTypeChoices { get; private set; }
 
-    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, string fileTypeDescription)
+    public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices)
     {
         RequestedDefaultExtension = defaultExtension;
+        RequestedFileTypeChoices = fileTypeChoices;
         return Task.FromResult(_path);
     }
 

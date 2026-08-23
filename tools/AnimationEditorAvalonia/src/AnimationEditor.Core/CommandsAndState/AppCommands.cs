@@ -414,7 +414,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// for a brand-new, never-saved file (#872 -- .achj is the default going forward), or
         /// whatever extension the loaded file already has (typically <c>achx</c>, preserving the
         /// on-disk format of an opened legacy file). The user can still pick the other format
-        /// from the dialog's file-type filter.
+        /// from the dialog's file-type dropdown (#973).
         /// </remarks>
         public async Task SaveCurrentAnimationChainListAsync()
         {
@@ -424,7 +424,12 @@ namespace AnimationEditor.Core.CommandsAndState
             var defaultExtension = string.IsNullOrEmpty(currentExtension) ? "achj" : currentExtension;
 
             var path = await FileDialogService.PickSaveFileAsync(
-                "Save Animation Chain", defaultExtension, $"Animation Chain (*.{defaultExtension})");
+                "Save Animation Chain", defaultExtension,
+                new[]
+                {
+                    new FileTypeChoice("achj", "Animation Chain JSON (*.achj)"),
+                    new FileTypeChoice("achx", "Animation Chain XML (*.achx)")
+                });
 
             if (string.IsNullOrEmpty(path)) return;
 
@@ -448,7 +453,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (acls == null) return;
 
             var path = await FileDialogService.PickSaveFileAsync(
-                "Export to PixiJS", "json", "PixiJS Spritesheet (*.json)");
+                "Export to PixiJS", "json", new[] { new FileTypeChoice("json", "PixiJS Spritesheet (*.json)") });
             if (string.IsNullOrEmpty(path)) return;
 
             var result = Export.PixiJsSpriteSheetExporter.Export(acls, _pm.GetTextureSizeInPixels);

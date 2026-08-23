@@ -25,7 +25,7 @@ public class UntitledTabCloseSavePromptTests
 {
     private sealed class StubFileDialogService(string? path) : IFileDialogService
     {
-        public Task<string?> PickSaveFileAsync(string title, string defaultExtension, string fileTypeDescription) =>
+        public Task<string?> PickSaveFileAsync(string title, string defaultExtension, IReadOnlyList<FileTypeChoice> fileTypeChoices) =>
             Task.FromResult(path);
 
         public Task<string?> PickOpenFileAsync(string title, string defaultExtension, string fileTypeDescription) =>
