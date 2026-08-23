@@ -29,24 +29,27 @@
     <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
 
     <!--
-      This is the MonoGame/desktop backend build of the engine. FlatRedBall2.Kni.csproj (same
-      directory) is the KNI/browser backend — a separate single-TFM project file rather than a
-      second slice of this one's TargetFrameworks, because both backends now target net10.0 and
-      a single project can't list the same TFM twice to pick different package sets. Splitting
-      into sibling files sidesteps that entirely: each file just points at a different set of
-      PackageReferences, no property-passing through ProjectReference/NuGet restore needed (that
-      approach was rejected historically because AdditionalProperties on ProjectReference doesn't
-      propagate through NuGet restore). Both files compile the same source in this directory via
-      the SDK's default glob — same pattern already used by AnimationChain.KNI.csproj /
-      AnimationChain.MonoGame.csproj.
+      This is the MonoGame/desktop backend build of the engine. Kni\FlatRedBall2.Kni.csproj is
+      the KNI/browser backend — a separate single-TFM project file rather than a second slice of
+      this one's TargetFrameworks, because both backends now target net10.0 and a single project
+      can't list the same TFM twice to pick different package sets. Splitting into sibling files
+      sidesteps that entirely: each file just points at a different set of PackageReferences, no
+      property-passing through ProjectReference/NuGet restore needed (that approach was rejected
+      historically because AdditionalProperties on ProjectReference doesn't propagate through
+      NuGet restore). Kni\FlatRedBall2.Kni.csproj compiles this directory's source explicitly
+      (its own EnableDefaultCompileItems is off) rather than sharing this project's own default
+      glob — two SDK projects globbing the same physical directory hits a real MSBuild
+      parallel-build race (#966), which is why the KNI backend lives in its own subfolder instead
+      of right next to this file.
 
       The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
       this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
       compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
       reference the AspNetCore.Components / JSInterop assemblies. AnimationChain.Common is its own
-      MonoGame-free project (see ProjectReference below) for the same reason.
+      MonoGame-free project (see ProjectReference below) for the same reason. Kni\ is excluded
+      for the same reason — it holds only Kni.csproj, but keeps globbing from ever reaching in.
     -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**;Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Backend-agnostic packages -->

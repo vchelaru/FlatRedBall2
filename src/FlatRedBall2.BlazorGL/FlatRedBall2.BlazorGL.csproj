@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FlatRedBall2.Kni.csproj" />
+    <ProjectReference Include="..\Kni\FlatRedBall2.Kni.csproj" />
   </ItemGroup>
 
   <!-- Ship the targets file so consuming projects auto-import the content manifest target -->

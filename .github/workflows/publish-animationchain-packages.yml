@@ -77,7 +77,7 @@ jobs:
         include:
           - project: src/AnimationChain.MonoGame/AnimationChain.MonoGame.csproj
             label: MonoGame
-          - project: src/AnimationChain.MonoGame/AnimationChain.KNI.csproj
+          - project: src/AnimationChain.MonoGame/Kni/AnimationChain.KNI.csproj
             label: KNI
     steps:
       - name: Checkout

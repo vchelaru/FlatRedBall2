@@ -9,7 +9,9 @@ description: "Converting a single-target FlatRedBall2 desktop sample into a dual
 
 ## Backend selection is by which project file you reference
 
-`src/FlatRedBall2.csproj` (MonoGame/desktop) and `src/FlatRedBall2.Kni.csproj` (KNI/browser) are sibling single-TFM (`net10.0`) project files, not one multi-targeted project — see the comment atop either file for why. Consumers pick a backend by which file they `ProjectReference`/which NuGet package (`FlatRedBall2.MonoGame` vs `FlatRedBall2.Kni`) they install, not by TFM. This is the linchpin — every gotcha below comes from wiring the wrong file/package to the wrong head.
+`src/FlatRedBall2.csproj` (MonoGame/desktop) and `src/Kni/FlatRedBall2.Kni.csproj` (KNI/browser) are single-TFM (`net10.0`) project files, not one multi-targeted project — see the comment atop either file for why. Consumers pick a backend by which file they `ProjectReference`/which NuGet package (`FlatRedBall2.MonoGame` vs `FlatRedBall2.Kni`) they install, not by TFM. This is the linchpin — every gotcha below comes from wiring the wrong file/package to the wrong head.
+
+The KNI file lives in its own `Kni\` subfolder, not next to the MonoGame one: two SDK projects globbing the same physical directory hit a real MSBuild parallel-build race (confirmed — `-m:1` always succeeds, default parallel builds fail intermittently depending on the solution's project-graph shape). Physical separation removes the race at its root; see the comment atop `FlatRedBall2.Kni.csproj` for the full story.
 
 ## Project layout
 
@@ -17,9 +19,10 @@ Three projects, mirroring `AutoEvalKniBlazorSample`:
 
 ```
 GameName/
-  GameName.Common/     net10.0 x2   game code + Content/ — MonoGame + Kni sibling files (see below)
-  GameName.Desktop/    net10.0      Program.cs, MonoGame
-  GameName.BlazorGL/   net10.0      Blazor WASM host
+  GameName.Common/            net10.0   game code + Content/ — MonoGame build (see below)
+  GameName.Common/Kni/        net10.0   KNI build, same source, own subfolder
+  GameName.Desktop/           net10.0   Program.cs, MonoGame
+  GameName.BlazorGL/          net10.0   Blazor WASM host
   GameName.slnx
 ```
 
@@ -29,9 +32,15 @@ The `Game` subclass (Game1) lives in `Common` so both heads instantiate the same
 
 Assets belong in `Common/Content/` by default. Only move to platform-specific folders if they won't work elsewhere (e.g., platform-specific UI sizes, backend-incompatible shader variants). Most art, audio, and data stay in `Common/` so both Desktop and BlazorGL draw from a single source — no duplication.
 
-## Common — two sibling single-TFM csproj files, not one multi-targeted project
+## Common — two single-TFM csproj files, KNI in its own subfolder
 
-Desktop and BlazorGL both now target `net10.0`, so a single Common project can no longer pick the backend by `Condition="'$(TargetFramework)' == ..."` — both heads would match the same condition. Instead, ship two sibling files in `Common/`, e.g. `GameName.Common.csproj` (MonoGame, references `FlatRedBall2.csproj`/`FlatRedBall2.MonoGame`) and `GameName.Common.Kni.csproj` (KNI, references `FlatRedBall2.Kni.csproj`/`FlatRedBall2.Kni`) — both `net10.0`, both compiling the same source via the SDK's default glob (same directory). `GameName.Desktop.csproj` references the plain file; `GameName.BlazorGL.csproj` references the `.Kni` file. See `samples/Solitaire/Solitaire.Common/` for a working example.
+Desktop and BlazorGL both now target `net10.0`, so a single Common project can no longer pick the backend by `Condition="'$(TargetFramework)' == ..."` — both heads would match the same condition. Splitting into two files that share a directory isn't safe either (the MSBuild parallel-build race above). Instead:
+
+- `GameName.Common.csproj` (MonoGame) stays where it is, default compile items, references `FlatRedBall2.csproj`/`FlatRedBall2.MonoGame`. Add `<DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>` so its own glob never reaches into the subfolder below.
+- `GameName.Common\Kni\GameName.Common.Kni.csproj` (KNI) sets `<EnableDefaultCompileItems>false</EnableDefaultCompileItems>` and explicitly compiles the parent's source: `<Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />`. References `..\..\..\src\Kni\FlatRedBall2.Kni.csproj`/`FlatRedBall2.Kni`.
+- `GameName.Desktop.csproj` references the plain file; `GameName.BlazorGL.csproj` references the one in `Kni\`.
+
+See `samples/Solitaire/Solitaire.Common/` for a working example, including how its Gum content-copy `<Content Include>` items pick up `Link` metadata once the source path (`..\Content\...`) no longer matches the project's own directory.
 
 No `Version` attribute — the repo uses NuGet Central Package Management, so versions are pinned once in `Directory.Packages.props`, not per `PackageReference`.
 
@@ -39,7 +48,7 @@ Common must NOT add `MonoGame.Content.Builder.Task` — that belongs on the head
 
 ## Backend-conditional code
 
-Each sibling file sets its own `KNI` / `MONOGAME` define unconditionally (no `Condition` needed — the file itself is the condition):
+Each file sets its own `KNI` / `MONOGAME` define unconditionally (no `Condition` needed — the file itself is the condition):
 
 ```xml
 <DefineConstants>$(DefineConstants);KNI</DefineConstants>

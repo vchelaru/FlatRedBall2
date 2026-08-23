@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Solitaire.Common\Solitaire.Common.Kni.csproj" />
+    <ProjectReference Include="..\Solitaire.Common\Kni\Solitaire.Common.Kni.csproj" />
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 

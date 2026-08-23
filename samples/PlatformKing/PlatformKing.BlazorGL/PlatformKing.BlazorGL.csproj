@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PlatformKing.Common\PlatformKing.Common.Kni.csproj" />
+    <ProjectReference Include="..\PlatformKing.Common\Kni\PlatformKing.Common.Kni.csproj" />
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 

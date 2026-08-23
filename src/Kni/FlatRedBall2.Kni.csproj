@@ -1,7 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    This is the KNI/browser backend build of the engine — see ..\FlatRedBall2.csproj for the
+    MonoGame/desktop backend and why these are two sibling single-TFM files instead of one
+    multi-targeted project.
+
+    This file lives in its own Kni\ subfolder rather than next to FlatRedBall2.csproj: two SDK
+    projects sharing one physical directory (globbing the same .cs files under different
+    DefineConstants/references) hits a real MSBuild parallel-build race — concurrent build nodes
+    can cross-contaminate which backend's types end up in which compiled assembly, even with
+    distinct BaseOutputPath/BaseIntermediateOutputPath. Confirmed via `dotnet build
+    src/FlatRedBall2.slnx` and templates/frb2-multiplatform's MyGame.slnx: `-m:1` (no
+    parallelism) always succeeds, default parallel builds fail intermittently depending on the
+    solution's project-graph shape (#966). Physical separation removes the race at its root
+    instead of trying to out-configure it.
+  -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <!--
       Generate the XML doc file alongside the .dll so IntelliSense lights up for consumers
       of the eventual NuGet package. CS1591 ("missing XML comment for publicly visible type
@@ -27,20 +43,18 @@
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <DefineConstants>$(DefineConstants);KNI</DefineConstants>
-
-    <!--
-      This is the KNI/browser backend build of the engine — see FlatRedBall2.csproj (same
-      directory) for the MonoGame/desktop backend and why these are two sibling single-TFM
-      files instead of one multi-targeted project.
-
-      The sibling project FlatRedBall2.BlazorGL lives at src/FlatRedBall2.BlazorGL/. Without
-      this exclude, the SDK's default compile glob (**/*.cs) picks up its files and tries to
-      compile them as part of FlatRedBall2 itself, which fails because the engine doesn't
-      reference the AspNetCore.Components / JSInterop assemblies. AnimationChain.Common is its own
-      MonoGame-free project (see ProjectReference below) for the same reason.
-    -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);FlatRedBall2.BlazorGL\**;AnimationChain.MonoGame\**;AnimationChain.Common\**;Animation.Content\**;AnimationEditorCommon\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <!--
+    Compiles the parent directory's source (the shared engine code) instead of this project's
+    own — EnableDefaultCompileItems is off above, so this is the only source list. Excludes
+    mirror ..\FlatRedBall2.csproj's own DefaultItemExcludes, plus the sibling backend's own
+    bin/obj (a plain **/*.cs from here would otherwise reach into them) and this folder itself.
+  -->
+  <ItemGroup>
+    <Compile Include="..\**\*.cs"
+             Exclude="..\obj\**;..\bin\**;..\Kni\**;..\FlatRedBall2.BlazorGL\**;..\AnimationChain.MonoGame\**;..\AnimationChain.Common\**;..\Animation.Content\**;..\AnimationEditorCommon\**" />
+  </ItemGroup>
 
   <!-- Backend-agnostic packages -->
   <ItemGroup>
@@ -57,7 +71,7 @@
     MonoGame.Framework.DesktopGL at all; see tools/AnimationEditorAvalonia/docs/BROWSER_SPIKE_FINDINGS.md.
   -->
   <ItemGroup>
-    <ProjectReference Include="AnimationChain.Common/AnimationChain.Common.csproj" />
+    <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -88,6 +102,6 @@
     load on both the MonoGame and KNI backends via `new Effect(graphicsDevice, bytes)`.
   -->
   <ItemGroup>
-    <EmbeddedResource Include="Rendering/Shaders/AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
+    <EmbeddedResource Include="..\Rendering\Shaders\AddColor.mgfx" LogicalName="FlatRedBall2.Rendering.Shaders.AddColor.mgfx" />
   </ItemGroup>
 </Project>

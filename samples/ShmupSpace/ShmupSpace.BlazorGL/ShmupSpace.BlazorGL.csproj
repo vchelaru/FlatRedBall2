@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ShmupSpace.Common\ShmupSpace.Common.Kni.csproj" />
+    <ProjectReference Include="..\ShmupSpace.Common\Kni\ShmupSpace.Common.Kni.csproj" />
     <ProjectReference Include="..\..\..\src\FlatRedBall2.BlazorGL\FlatRedBall2.BlazorGL.csproj" />
   </ItemGroup>
 

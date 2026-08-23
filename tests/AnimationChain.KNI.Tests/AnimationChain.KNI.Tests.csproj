@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\AnimationChain.MonoGame\AnimationChain.KNI.csproj" />
+    <ProjectReference Include="..\..\src\AnimationChain.MonoGame\Kni\AnimationChain.KNI.csproj" />
   </ItemGroup>
 
   <!-- Link to the shared test sources rather than duplicate them. -->

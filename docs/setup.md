@@ -126,7 +126,7 @@ dotnet new frb2-multiplatform -n YourGameName
 
 This produces three projects sharing one `Common`:
 
-- `YourGameName.Common/` — game code, shipped as two sibling `net10.0` projects: one for the MonoGame/desktop backend, one (`.Kni.csproj`) for the KNI/web backend.
+- `YourGameName.Common/` — game code, shipped as two `net10.0` projects: one for the MonoGame/desktop backend, and one for the KNI/web backend in a `Kni/` subfolder (`YourGameName.Common/Kni/YourGameName.Common.Kni.csproj`) that compiles the same source.
 - `YourGameName.Desktop/` — desktop entry point (MonoGame, `net10.0`).
 - `YourGameName.BlazorGL/` — Blazor WebAssembly entry point (KNI, `net10.0`). Contains its own `App.razor`, `Pages/Index.razor`, `wwwroot/frb-host.js`, etc. — edit them freely; they're yours.
 

@@ -1,9 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    KNI backend build of AnimationChain — see ..\AnimationChain.MonoGame.csproj for the MonoGame
+    sibling. This file lives in its own Kni\ subfolder rather than next to it: two SDK projects
+    sharing one physical directory (globbing the same .cs files under different references) hits
+    a real MSBuild parallel-build race — see the comment atop src/Kni/FlatRedBall2.Kni.csproj for
+    the full explanation and how it was confirmed (#966).
+  -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 
     <!-- NuGet Metadata -->
     <PackageId>FlatRedBall.AnimationChain.KNI</PackageId>
@@ -21,8 +29,14 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
+  <!-- Compiles the parent directory's source instead of this project's own — see
+       src/Kni/FlatRedBall2.Kni.csproj for why. -->
   <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="/" />
+    <Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,7 +57,7 @@
     FlatRedBall.AnimationChain.Common version — see .github/workflows/publish-animationchain-packages.yml.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
+    <ProjectReference Include="..\..\AnimationChain.Common\AnimationChain.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -58,6 +72,6 @@
     content pipeline of its own; the same bytes load on MonoGame and KNI via new Effect(device, bytes).
   -->
   <ItemGroup>
-    <EmbeddedResource Include="Shaders/AddColor.mgfx" LogicalName="FlatRedBall.AnimationChain.Shaders.AddColor.mgfx" />
+    <EmbeddedResource Include="..\Shaders\AddColor.mgfx" LogicalName="FlatRedBall.AnimationChain.Shaders.AddColor.mgfx" />
   </ItemGroup>
 </Project>

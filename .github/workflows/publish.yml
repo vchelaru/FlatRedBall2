@@ -80,7 +80,7 @@ jobs:
           - packageId: FlatRedBall2.MonoGame
             csproj: src/FlatRedBall2.csproj
           - packageId: FlatRedBall2.Kni
-            csproj: src/FlatRedBall2.Kni.csproj
+            csproj: src/Kni/FlatRedBall2.Kni.csproj
     steps:
       - name: Checkout
         uses: actions/checkout@v4

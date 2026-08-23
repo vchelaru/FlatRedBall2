@@ -5,12 +5,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Solitaire</RootNamespace>
     <DefineConstants>$(DefineConstants);MONOGAME</DefineConstants>
+    <!-- Kni\Solitaire.Common.Kni.csproj compiles this directory's source explicitly rather
+         than sharing this project's own default glob — see the comment atop
+         src/Kni/FlatRedBall2.Kni.csproj for why they can't share a folder. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Kni\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!--
-    MonoGame/desktop backend build of Common. Solitaire.Common.Kni.csproj (same directory) is
-    the KNI/browser sibling — see src/FlatRedBall2.csproj for why these are two sibling
-    single-TFM files instead of one multi-targeted project.
+    MonoGame/desktop backend build of Common. Kni\Solitaire.Common.Kni.csproj is the
+    KNI/browser sibling — see src/FlatRedBall2.csproj for why these are two sibling single-TFM
+    files instead of one multi-targeted project.
   -->
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" />

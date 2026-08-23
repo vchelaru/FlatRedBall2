@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    KNI/browser backend build of Common — see ..\MyGame.Common.csproj for the MonoGame/desktop
+    sibling. This file lives in its own Kni\ subfolder rather than next to it: two SDK projects
+    sharing one physical directory (globbing the same .cs files under different
+    DefineConstants/references) hits a real MSBuild parallel-build race — see the comment atop
+    FlatRedBall2's own src/Kni/FlatRedBall2.Kni.csproj for the full explanation and how it was
+    confirmed.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MyGame</RootNamespace>
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlatRedBall2.Kni" />
+  </ItemGroup>
+</Project>

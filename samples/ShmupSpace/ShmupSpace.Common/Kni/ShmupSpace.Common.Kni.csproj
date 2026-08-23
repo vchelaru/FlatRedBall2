@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    KNI/browser backend build of Common — see ..\ShmupSpace.Common.csproj for the
+    MonoGame/desktop sibling. This file lives in its own Kni\ subfolder rather than next to it —
+    see the comment atop src/Kni/FlatRedBall2.Kni.csproj for why two SDK projects can't share one
+    physical directory here (a real MSBuild parallel-build race, #966).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ShmupSpace</RootNamespace>
+    <DefineConstants>$(DefineConstants);KNI</DefineConstants>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\**\*.cs" Exclude="..\obj\**;..\bin\**;..\Kni\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="nkast.Xna.Framework" />
+    <PackageReference Include="nkast.Xna.Framework.Graphics" />
+    <PackageReference Include="nkast.Xna.Framework.Game" />
+    <PackageReference Include="nkast.Xna.Framework.Input" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Kni\FlatRedBall2.Kni.csproj" />
+  </ItemGroup>
+</Project>
