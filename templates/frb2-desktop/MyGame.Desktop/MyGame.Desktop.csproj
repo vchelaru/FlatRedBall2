@@ -12,15 +12,12 @@
   </PropertyGroup>
 
   <!-- Apos.Shapes is intentionally NOT pinned here. Its version flows transitively from
-       FlatRedBall2.MonoGame's published NuGet dependency (not this repo's source), which
-       still depends on a pre-0.7.2 Apos.Shapes that needs the content-pipeline workaround
-       below. See the comment atop build/AposShapesPrecompiled.props. -->
+       FlatRedBall2.MonoGame; its shader is embedded in the assembly, so it needs no
+       content-pipeline wiring. -->
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" />
     <PackageReference Include="MonoGame.Content.Builder.Task" />
   </ItemGroup>
-
-  <Import Project="..\build\AposShapesPrecompiled.props" />
 
   <ItemGroup>
     <ProjectReference Include="..\MyGame.Common\MyGame.Common.csproj" />

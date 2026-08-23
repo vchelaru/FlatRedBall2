@@ -7,9 +7,7 @@ description: "Custom shaders in FlatRedBall2. Use when adding .fx shader files o
 
 ## Apos.Shapes
 
-FlatRedBall2's built-in shape rendering (`ShapesBatch`) uses Apos.Shapes, whose shader is embedded directly in the package assembly (0.7.2+) — no content pipeline, no `.xnb`, no Wine dependency. The version is centralized in `$(AposShapesVersion)` in the repo's `Directory.Packages.props`; sample projects inherit it transitively via `ProjectReference` to `src/FlatRedBall2.csproj` and must not pin it themselves (see issue #495).
-
-The `dotnet new` templates (`templates/frb2-desktop`, `templates/frb2-multiplatform`) are different: they resolve `FlatRedBall2.MonoGame`/`FlatRedBall2.Kni` as a floating NuGet package from nuget.org, not from this repo's source, so they still get whatever Apos.Shapes version the latest **published** release depends on. Until a release depending on Apos.Shapes >=0.7.2 ships, the templates keep a precompiled-shader workaround (`templates/*/build/AposShapesPrecompiled.props`) to avoid the Wine dependency — see that file's header comment before touching it.
+FlatRedBall2's built-in shape rendering (`ShapesBatch`) uses Apos.Shapes, whose shader is embedded directly in the package assembly (0.7.2+) — no content pipeline, no `.xnb`, no Wine dependency. The version is centralized in `$(AposShapesVersion)` in the repo's `Directory.Packages.props`; sample and template projects inherit it transitively and must not pin it themselves (see issue #495).
 
 ## Custom Shaders
 
