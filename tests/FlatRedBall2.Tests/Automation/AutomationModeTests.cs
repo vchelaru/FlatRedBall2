@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using FlatRedBall2.Automation;
 using FlatRedBall2.Input;
 using FlatRedBall2.Rendering;
@@ -546,6 +547,41 @@ public class AutomationModeReaderLoopTests
         }
     }
 
+    // Always at EOF, and counts how many times it was asked. Models a FIFO that no writer has
+    // attached to yet — the case the retry loop exists for.
+    private class AlwaysNullReader : System.IO.TextReader
+    {
+        private int _readCount;
+        public int ReadCount => Volatile.Read(ref _readCount);
+        public override string? ReadLine()
+        {
+            Interlocked.Increment(ref _readCount);
+            return null;
+        }
+    }
+
+    // Pins the reconnectable-FIFO contract from issue #773: a null from ReadLine() means "no writer
+    // attached right now," not "closed for good," so the loop must keep polling however many nulls
+    // it sees. Issue #985 proposed capping this at 5 consecutive nulls — at the loop's 25ms retry
+    // delay that abandons stdin after ~125ms, well inside normal harness startup latency. This test
+    // fails if such a cap is ever added.
+    [Fact]
+    public void ReaderLoop_PersistentNull_KeepsRetryingUntilStopped()
+    {
+        var reader = new AlwaysNullReader();
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter(), log: _ => { });
+        var thread = new Thread(() => mode.ReaderLoop(reader)) { IsBackground = true };
+
+        thread.Start();
+        // 10 reads is double any cap the issue proposed, so surviving them rules one out.
+        SpinWait.SpinUntil(() => reader.ReadCount >= 10, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+        thread.IsAlive.ShouldBeTrue();
+
+        mode.Stop();
+
+        thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue();
+    }
+
     [Fact]
     public void ReaderLoop_ReadThrows_LogsAndReturns()
     {
@@ -567,6 +603,40 @@ public class AutomationModeReaderLoopTests
         mode.ReaderLoop(reader);
 
         mode.TryAdvanceFrame(0).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Shutdown_WithAutomationModeActive_StopsReaderThread()
+    {
+        var reader = new AlwaysNullReader();
+        var engine = new FlatRedBallService();
+        engine.StartAutomationMode(seed: 0, input: reader, output: new StringWriter());
+        SpinWait.SpinUntil(() => reader.ReadCount >= 2, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+
+        engine.Shutdown();
+
+        // 150ms is 6x the loop's 25ms retry delay, so an in-flight retry has drained well before
+        // the first sample and a still-running loop would add several reads between the two.
+        Thread.Sleep(150);
+        var settled = reader.ReadCount;
+        Thread.Sleep(150);
+        reader.ReadCount.ShouldBe(settled);
+    }
+
+    // The reader loop is intentionally endless (see ReaderLoop_PersistentNull_KeepsRetryingUntilStopped),
+    // so IsBackground is the only thing keeping it from holding the process open: the CLR tears
+    // background threads down at exit instead of waiting on them. Issue #985 assumed the opposite
+    // and attributed a nonzero test-host exit code to this thread.
+    [Fact]
+    public void Start_ReaderThread_IsBackground()
+    {
+        var mode = new AutomationMode(new FlatRedBallService(), new StringWriter(), log: _ => { });
+
+        mode.Start(new StringReader(string.Empty));
+
+        mode.ReaderThread.ShouldNotBeNull();
+        mode.ReaderThread!.IsBackground.ShouldBeTrue();
+        mode.Stop();
     }
 }
 
