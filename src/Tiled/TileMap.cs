@@ -775,10 +775,19 @@ public class TileMap
 
     /// <summary>
     /// Creates entities from tiles whose class matches <paramref name="className"/>. Scans
-    /// both object layers (for precisely-placed tile objects) and regular tile layers (for
+    /// both object layers (for precisely-placed markers) and regular tile layers (for
     /// painted grid cells). Both sources feed into the same factory call.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// On object layers every Tiled shape can act as a spawn marker: tile-insert objects,
+    /// rectangles, ellipses, and unsized shapes such as points and polygons. Tile-insert
+    /// objects anchor at their bottom-left corner; rectangle and ellipse objects anchor at
+    /// their top-left corner; unsized shapes spawn exactly at their position regardless of
+    /// <paramref name="origin"/>. Non-tile objects have no tileset tile behind them — their
+    /// class must be set on the object itself, only instance-level properties apply, and a
+    /// declared <c>TiledGid</c> entity property receives 0.
+    /// </para>
     /// <para>
     /// Tiled custom properties are automatically applied to matching public instance properties
     /// on the entity via reflection (case-insensitive name match). Supported property types:
@@ -800,8 +809,9 @@ public class TileMap
     /// </para>
     /// </remarks>
     /// <param name="className">
-    /// The tile class to match (case-insensitive). Checked on the object first, then on the
-    /// tile definition in the tileset.
+    /// The tile class to match (case-insensitive). For tile-insert objects this is checked on
+    /// the object first, then on the tile definition in the tileset; for every other object
+    /// shape only the object's own Class is checked.
     /// </param>
     /// <param name="factory">The factory to create entities with.</param>
     /// <param name="origin">
@@ -809,8 +819,8 @@ public class TileMap
     /// </param>
     /// <param name="removeSourceTiles">
     /// When <c>true</c> (default), each source tile is cleared after the entity spawns — the
-    /// painted cell is set to empty and the tile-object is removed from its object layer — so
-    /// the tile visual does not double-draw under the spawned entity. Contrast with
+    /// painted cell is set to empty and the matched object is removed from its object layer —
+    /// so the tile visual does not double-draw under the spawned entity. Contrast with
     /// <see cref="GenerateCollisionFromClass"/>, which leaves source tiles visible because the
     /// tile itself is the visual. In-memory only; the on-disk TMX is never modified and a fresh
     /// load re-applies the removal. Pass <c>false</c> to keep the source tile visible (e.g.,
@@ -876,25 +886,14 @@ public class TileMap
         Action<T>? configure) where T : Entity, new()
     {
         // Collect matches first so we can mutate the layer's object list after iteration.
-        List<TilemapTileObject>? toRemove = null;
+        List<TilemapObject>? toRemove = null;
         bool lazy = factory.LazySpawn != LazySpawnMode.Disabled;
 
         foreach (var obj in objectLayer.Objects)
         {
-            if (obj is not TilemapTileObject tileObj)
+            if (!TryResolveSpawn(obj, className, origin,
+                    out var worldX, out var worldY, out var mergedProps, out var gid))
                 continue;
-
-            if (!MatchesClass(tileObj, className))
-                continue;
-
-            var (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
-
-            // Snapshot the merged property bag now — the live TilemapProperties on the tile
-            // object is about to be dropped by removeSourceTiles, so both the eager and lazy
-            // paths use the same self-contained merged dictionary.
-            var classProps = tileObj.Tile.GetTileData(_tilemap!.Tilesets)?.Properties;
-            var mergedProps = BuildMergedPropertySnapshot(classProps, tileObj.Properties);
-            int gid = tileObj.Tile.GlobalId;
 
             if (lazy)
             {
@@ -915,12 +914,91 @@ public class TileMap
             }
 
             if (removeSourceTiles)
-                (toRemove ??= new List<TilemapTileObject>()).Add(tileObj);
+                (toRemove ??= new List<TilemapObject>()).Add(obj);
         }
 
         if (toRemove != null)
             foreach (var obj in toRemove)
                 objectLayer.RemoveObject(obj);
+    }
+
+    /// <summary>
+    /// Resolves an object-layer entry into an entity spawn point. Handles every Tiled shape:
+    /// tile-insert objects (bottom-left anchor + tileset class/property merge), rectangle and
+    /// ellipse objects (top-left anchor), and unsized shapes — point, polygon, polyline, text,
+    /// plain — whose position is the spawn point itself. Non-tile objects have no tileset tile
+    /// behind them, so only instance-level properties apply and <c>TiledGid</c> resolves to 0.
+    /// Returns <c>false</c> when the object doesn't match <paramref name="className"/>. The
+    /// returned property bag is a self-contained snapshot (never the live TilemapProperties),
+    /// safe to close over for lazy-spawn replay after the source objects are removed.
+    /// </summary>
+    private bool TryResolveSpawn(
+        TilemapObject obj,
+        string className,
+        Origin origin,
+        out float worldX,
+        out float worldY,
+        out Dictionary<string, TilemapPropertyValue> mergedProps,
+        out int gid)
+    {
+        switch (obj)
+        {
+            case TilemapTileObject tileObj when MatchesClass(tileObj, className):
+            {
+                (worldX, worldY) = ConvertToWorldSpace(tileObj, origin);
+
+                // Class-level properties come from the placed tile's definition in the tileset.
+                var classProps = tileObj.Tile.GetTileData(_tilemap!.Tilesets)?.Properties;
+                mergedProps = BuildMergedPropertySnapshot(classProps, tileObj.Properties);
+                gid = tileObj.Tile.GlobalId;
+                return true;
+            }
+
+            case TilemapRectangleObject rectObj when MatchesClassName(rectObj.Class, className):
+            {
+                // Rectangle objects anchor at their top-left corner in Tiled (Y-down).
+                float left = _x + rectObj.Position.X;
+                float top = _y - rectObj.Position.Y;
+                float w = rectObj.Size.X;
+                float h = rectObj.Size.Y;
+                (worldX, worldY) = OriginOffsetFromCenter(left + w / 2f, top - h / 2f, w, h, origin);
+                mergedProps = BuildMergedPropertySnapshot(classProps: null, rectObj.Properties);
+                gid = 0;
+                return true;
+            }
+
+            case TilemapEllipseObject ellipseObj when MatchesClassName(ellipseObj.Class, className):
+            {
+                float cx = _x + ellipseObj.Center.X;
+                float cy = _y - ellipseObj.Center.Y;
+                float w = ellipseObj.Size.X;
+                float h = ellipseObj.Size.Y;
+                (worldX, worldY) = OriginOffsetFromCenter(cx, cy, w, h, origin);
+                mergedProps = BuildMergedPropertySnapshot(classProps: null, ellipseObj.Properties);
+                gid = 0;
+                return true;
+            }
+
+            default:
+            {
+                // Unsized shapes: the position IS the marker location, so every Origin
+                // resolves to it (width/height are zero).
+                if (!MatchesClassName(obj.Class, className))
+                    break;
+
+                (worldX, worldY) = OriginOffsetFromCenter(
+                    _x + obj.Position.X, _y - obj.Position.Y, 0f, 0f, origin);
+                mergedProps = BuildMergedPropertySnapshot(classProps: null, obj.Properties);
+                gid = 0;
+                return true;
+            }
+        }
+
+        worldX = 0f;
+        worldY = 0f;
+        mergedProps = new Dictionary<string, TilemapPropertyValue>();
+        gid = 0;
+        return false;
     }
 
     private void ScanTileLayer<T>(
@@ -985,13 +1063,15 @@ public class TileMap
     /// <summary>
     /// Merges class-level tile properties (from the tile's type in the tileset) with
     /// instance-level properties (set on an individual object-layer tile-object), instance
-    /// values winning on key collisions. Returns a plain snapshot dictionary — not a live view —
+    /// values winning on key collisions. Keys are compared case-insensitively — Tiled authors
+    /// freely mix <c>pos</c> and <c>Pos</c>, and <see cref="ApplyProperties{T}"/> looks entries
+    /// up by C# property name. Returns a plain snapshot dictionary — not a live view —
     /// so it's safe to close over for lazy-spawn replay after the source objects are mutated.
     /// </summary>
     private static Dictionary<string, TilemapPropertyValue> BuildMergedPropertySnapshot(
         TilemapProperties? classProps, TilemapProperties? instanceProps)
     {
-        var merged = new Dictionary<string, TilemapPropertyValue>();
+        var merged = new Dictionary<string, TilemapPropertyValue>(StringComparer.OrdinalIgnoreCase);
         if (classProps != null)
             foreach (var kvp in classProps)
                 merged[kvp.Key] = kvp.Value;
@@ -1061,12 +1141,17 @@ public class TileMap
     {
         // Check the object's own Class first (inherits from tile class in Tiled).
         if (!string.IsNullOrEmpty(tileObj.Class))
-            return string.Equals(tileObj.Class, className, StringComparison.OrdinalIgnoreCase);
+            return MatchesClassName(tileObj.Class, className);
 
         // Fall back to the tile definition's Class in the tileset.
         var tileData = tileObj.Tile.GetTileData(_tilemap!.Tilesets);
-        return tileData != null &&
-               string.Equals(tileData.Class, className, StringComparison.OrdinalIgnoreCase);
+        return tileData != null && MatchesClassName(tileData.Class, className);
+    }
+
+    private static bool MatchesClassName(string? objectClass, string className)
+    {
+        return !string.IsNullOrEmpty(objectClass) &&
+               string.Equals(objectClass, className, StringComparison.OrdinalIgnoreCase);
     }
 
     private (float x, float y) ConvertToWorldSpace(TilemapTileObject tileObj, Origin origin)

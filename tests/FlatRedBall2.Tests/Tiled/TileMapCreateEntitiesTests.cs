@@ -433,6 +433,7 @@ public class TileMapCreateEntitiesTests
     private class PropertyEntity : Entity
     {
         public int Worth { get; set; }
+        public string? Label { get; set; }
         public int TiledGid { get; set; }
     }
 
@@ -621,5 +622,178 @@ public class TileMapCreateEntitiesTests
         var created = tileMap.CreateEntities("Coin", factory);
 
         created[0].TiledGid.ShouldBe(1ul); // FirstGlobalId (1) + localId (0)
+    }
+
+    // ============================================================================================
+    // Non-tile object shapes — point / rectangle markers spawn too
+    // ============================================================================================
+
+    [Theory]
+    [InlineData(Origin.Center)]
+    [InlineData(Origin.BottomLeft)]
+    [InlineData(Origin.TopRight)]
+    public void CreateEntities_PointObject_SpawnsAtPointRegardlessOfOrigin(Origin origin)
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, origin);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(32f);
+        created[0].Y.ShouldBe(-48f);
+    }
+
+    [Fact]
+    public void CreateEntities_PointObject_DefaultRemovesSourceObject()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        tileMap.CreateEntities("Coin", factory);
+
+        var objectLayer = (TilemapObjectLayer)tilemap.Layers[1];
+        objectLayer.Objects.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void CreateEntities_PointObject_InstancePropertyAppliesAndTiledGidIsZero()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var pointObj = new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+        };
+        pointObj.Properties.SetInt("Worth", 99);
+        objLayer.AddObject(pointObj);
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(99);
+        created[0].TiledGid.ShouldBe(0); // point objects carry no gid
+    }
+
+    [Fact]
+    public void CreateEntities_InstancePropertyKeyCasingDifference_AppliesCaseInsensitively()
+    {
+        // Tiled authors freely mix property casing (e.g. "pos" vs the C# "Pos"); matching
+        // must be case-insensitive or the value silently never reaches the entity.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var pointObj = new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+        };
+        pointObj.Properties.SetString("label", "gold");
+        objLayer.AddObject(pointObj);
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Label.ShouldBe("gold");
+    }
+
+    [Fact]
+    public void CreateEntities_NonMatchingPointObject_IsSkippedAndLeftIntact()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Solid",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created.Count.ShouldBe(0); // "Solid" point doesn't match "Coin"
+        ((TilemapObjectLayer)tilemap.Layers[1]).Objects.Count.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(Origin.Center, 24f, -56f)]
+    [InlineData(Origin.BottomLeft, 16f, -64f)]
+    [InlineData(Origin.TopRight, 32f, -48f)]
+    public void CreateEntities_RectangleObject_OriginPlacesEntityAtExpectedCorner(Origin origin, float expectedX, float expectedY)
+    {
+        // Rectangle objects anchor at their top-left corner in Tiled: pos (16, 48), size 16
+        // → world top-left (16, -48), center (24, -56).
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            size: new XnaVec2(16f, 16f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, origin);
+
+        created[0].X.ShouldBe(expectedX);
+        created[0].Y.ShouldBe(expectedY);
+    }
+
+    [Fact]
+    public void CreateEntities_LazyMode_PointObjectSpawnsAtRecordedPosition()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+        factory.LazySpawn = LazySpawnMode.OneShot;
+
+        tileMap.CreateEntities("Coin", factory);
+        tileMap.LazySpawner.Update(left: 0f, right: 100f, bottom: -100f, top: 100f);
+
+        factory.Count.ShouldBe(1);
+        factory[0].X.ShouldBe(32f);
+        factory[0].Y.ShouldBe(-48f);
     }
 }
