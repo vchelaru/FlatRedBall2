@@ -684,7 +684,7 @@ public class TileMap
 
     private static Dictionary<string, string> StringifyProperties(Dictionary<string, TilemapPropertyValue> merged)
     {
-        var result = new Dictionary<string, string>(merged.Count);
+        var result = new Dictionary<string, string>(merged.Count, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in merged)
         {
             var s = value.AsString();

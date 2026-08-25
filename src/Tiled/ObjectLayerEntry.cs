@@ -24,7 +24,10 @@ namespace FlatRedBall2.Tiled;
 /// zero for objects not tied to a tile.
 /// </param>
 /// <param name="Properties">
-/// Custom properties as strings, keyed by name. For tile-insert objects this merges the tile's
+/// Custom properties as strings, keyed by name. Lookups are case-insensitive, because Tiled
+/// authors mix casing freely and nothing validates it — a case-sensitive miss here would be
+/// silent. For the same reason keys that differ only by case collapse into one entry, so this
+/// can hold fewer keys than the TMX declares. For tile-insert objects this merges the tile's
 /// class-level properties (defined on the tile's type in the tileset) with instance-level
 /// properties, instance values winning on collision — the same merge
 /// <see cref="TileMap.CreateEntities{T}"/> performs. Empty if the object has no properties.
