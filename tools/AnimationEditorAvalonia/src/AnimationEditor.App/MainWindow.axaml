@@ -1340,6 +1340,20 @@
                         <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
                                 Margin="4,0" VerticalAlignment="Center" />
 
+                        <ToggleButton x:Name="FillFramesCheck"
+                                      Classes="toolbarToggle"
+                                      Foreground="{DynamicResource Ink}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,4,0"
+                                      IsChecked="True"
+                                      ToolTip.Tip="Fill selected/unselected frame rectangles (uncheck for outline only)">
+                            <TextBlock Text="Fill" VerticalAlignment="Center" />
+                        </ToggleButton>
+
+                        <!-- Divider -->
+                        <Border Width="1" Height="18" Background="{DynamicResource LineBrush}"
+                                Margin="4,0" VerticalAlignment="Center" />
+
                         <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="0,0,4,0"
                                    Foreground="{DynamicResource InkMid}" FontSize="11" />
                         <views:ZoomControl x:Name="WireframeZoom"

@@ -1180,6 +1180,8 @@ public partial class MainWindow : Window
         SnapToGridCheck.IsCheckedChanged += OnSnapToGridChanged;
         GridSizeInput.Value = 16m;
         GridSizeInput.ValueChanged += (_, _) => ApplyGridSize();
+        FillFramesCheck.IsCheckedChanged += (_, _) =>
+            WireframeCtrl.FillFrames = FillFramesCheck.IsChecked == true;
         WireframeZoom.Attach(WireframeCtrl);
 
         // Default to Move mode
