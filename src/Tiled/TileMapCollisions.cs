@@ -359,7 +359,7 @@ public static class TileMapCollisions
     // transforms instead of using sin/cos — this keeps axis-alignment detection
     // (TryGetAxisAlignedBounds) from being defeated by trig floating-point noise at exactly the
     // angles (0/90/180/270) that matter most for staying a plain AARect.
-    private static (float x, float y) RotateAroundOrigin(float x, float y, float rotationRadians)
+    internal static (float x, float y) RotateAroundOrigin(float x, float y, float rotationRadians)
     {
         const float snapEps = 1e-4f;
         float quarterTurns = rotationRadians / (MathF.PI / 2f);

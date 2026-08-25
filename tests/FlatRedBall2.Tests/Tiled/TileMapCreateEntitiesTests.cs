@@ -796,4 +796,124 @@ public class TileMapCreateEntitiesTests
         factory[0].X.ShouldBe(32f);
         factory[0].Y.ShouldBe(-48f);
     }
+
+    // ============================================================================================
+    // Rotated object markers
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_RectangleObjectRotated180Degrees_SpawnsAtRotatedCenter()
+    {
+        // Same geometry as TileMapCollisionsTests'
+        // GenerateFromClass_ObjectLayerRect180DegreesRotated_PivotsAroundPositionNotCenter, so the
+        // two paths can be compared directly. Tiled rotates clockwise around the object's own
+        // (x,y), NOT its bounding-box center: position (16,0) size (16,8) rotated 180 deg lands on
+        // the opposite side of the pivot, occupying world X:[0,16] Y:[0,8] — center (8,4). Ignoring
+        // Rotation puts the entity at (24,-4), which is outside the marker entirely.
+        var tilemap = BuildTilemap(2, 2, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1,
+            position: new XnaVec2(16f, 0f),
+            size: new XnaVec2(16f, 8f))
+        {
+            Class = "Coin",
+            Rotation = System.MathF.PI,
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(8f);
+        created[0].Y.ShouldBe(4f);
+    }
+
+    [Fact]
+    public void CreateEntities_TileObjectRotated90Degrees_SpawnsAtRotatedCenter()
+    {
+        // Tile objects anchor at their bottom-left, so the tile sits ABOVE its own (x,y) in
+        // Tiled's Y-down space: position (16,32) size 16 occupies Tiled X:[16,32] Y:[16,32],
+        // center offset (8,-8) from the pivot. Rotating 90 deg clockwise about the pivot maps
+        // that offset to (8,8), i.e. Tiled center (24,40) -> world (24,-40). Unrotated the same
+        // marker centers at world (24,-24), so this fails if Rotation is dropped.
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData },
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 32f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16f, 16f))
+        {
+            Rotation = System.MathF.PI / 2f,
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(24f);
+        created[0].Y.ShouldBe(-40f);
+    }
+
+    [Fact]
+    public void CreateEntities_EllipseObjectRotated180Degrees_SpawnsAtRotatedCenter()
+    {
+        // Ellipses anchor at their bounding rect's top-left, same as rectangles: position (16,0)
+        // size (16,8) puts the center 8 right and 4 down of the pivot. Rotated 180 deg that
+        // offset flips to (-8,-4) -> Tiled center (8,-4) -> world (8,4).
+        var tilemap = BuildTilemap(2, 2, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapEllipseObject(
+            id: 1,
+            position: new XnaVec2(16f, 0f),
+            size: new XnaVec2(16f, 8f))
+        {
+            Class = "Coin",
+            Rotation = System.MathF.PI,
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(8f);
+        created[0].Y.ShouldBe(4f);
+    }
+
+    [Fact]
+    public void CreateEntities_PointObjectRotated_IgnoresRotation()
+    {
+        // A point has no extent, so there is nothing for rotation to swing around its own pivot.
+        // Guards the shared rotation path from moving zero-size markers.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPointObject(id: 1, position: new XnaVec2(32f, 48f))
+        {
+            Class = "Coin",
+            Rotation = System.MathF.PI / 4f,
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created[0].X.ShouldBe(32f);
+        created[0].Y.ShouldBe(-48f);
+    }
 }
