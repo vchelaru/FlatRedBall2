@@ -2636,6 +2636,7 @@ public partial class MainWindow : Window
                 ThemeDefaultBackgroundArgb = ToArgb(themedPalette.Background),
                 GuideLineArgb = _appSettings.GuideLineArgb,
                 ThemeDefaultGuideLineArgb = ToArgb(themedPalette.GuideLine),
+                FillFrameRectangles = _appSettings.FillFrameRectangles,
             },
             new Settings.SettingsWindowCallbacks
             {
@@ -2650,6 +2651,7 @@ public partial class MainWindow : Window
                 OnPickCustomCanvasBackground = PickCustomCanvasBackgroundAsync,
                 OnGuideLineChanged = SetGuideLineColor,
                 OnPickCustomGuideLine = PickCustomGuideLineColorAsync,
+                OnFillFrameRectanglesChanged = SetFillFrameRectangles,
             });
         _ = dialog.ShowDialog(this);
     }
@@ -5407,8 +5409,8 @@ public partial class MainWindow : Window
         MenuThemeSystem.IsChecked = _appSettings.Theme == AppTheme.System;
     }
 
-    // ── Canvas colors (background + guide line) ────────────────────────────────
-    // Both live in the Settings → Canvas Colors section; see SettingsWindowBuilder.
+    // ── Canvas colors (background + guide line + frame fill) ───────────────────
+    // All three live in the Settings → Colors section; see SettingsWindowBuilder.
 
     /// <summary>Pushes the persisted canvas-color overrides onto the canvases affected by each.</summary>
     private void ApplyPersistedCanvasColors()
@@ -5416,6 +5418,7 @@ public partial class MainWindow : Window
         WireframeCtrl.CanvasBackgroundOverride = _appSettings.CanvasBackgroundArgb;
         PreviewCtrl.CanvasBackgroundOverride   = _appSettings.CanvasBackgroundArgb;
         PreviewCtrl.GuideLineOverride          = _appSettings.GuideLineArgb;
+        WireframeCtrl.FillFrames               = _appSettings.FillFrameRectangles;
     }
 
     private void SetCanvasBackground(uint? argb)
@@ -5430,6 +5433,13 @@ public partial class MainWindow : Window
     {
         _appSettings.GuideLineArgb = argb;
         PreviewCtrl.GuideLineOverride = argb;
+        SaveSettingsFile();
+    }
+
+    private void SetFillFrameRectangles(bool value)
+    {
+        _appSettings.FillFrameRectangles = value;
+        WireframeCtrl.FillFrames = value;
         SaveSettingsFile();
     }
 

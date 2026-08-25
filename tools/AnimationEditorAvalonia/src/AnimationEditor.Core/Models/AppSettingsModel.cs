@@ -41,6 +41,13 @@ namespace AnimationEditor.Core.Models
         public uint? GuideLineArgb { get; set; }
 
         /// <summary>
+        /// When <c>true</c> (default), frame region rectangles in the wireframe panel are drawn
+        /// with a semi-transparent fill in addition to the stroke outline (#976). <c>false</c>
+        /// draws the outline only — a per-user viewing preference, alongside the canvas colors.
+        /// </summary>
+        public bool FillFrameRectangles { get; set; } = true;
+
+        /// <summary>
         /// When <c>true</c>, the editor never offers to register itself as the default
         /// application for <c>.achx</c> files. Set when the user clicks "Don't show again"
         /// on the file-association prompt. Defaults to <c>false</c> so the prompt can appear

@@ -52,6 +52,8 @@ public class WireframeControl : TextureViewport
     private sealed class WireframeSnapshot : TextureViewportSnapshot
     {
         public List<(SKRect Bounds, bool IsSelected)> Frames = new();
+        /// <summary>Mirrors <see cref="WireframeControl.FillFrames"/> (#976).</summary>
+        public bool FillFrames = true;
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
         public bool ShowPreview;
         public SKRect PreviewRect;
@@ -115,8 +117,11 @@ public class WireframeControl : TextureViewport
             screenRects.Add((sr, isSelected));
         }
 
-        DrawFillLayer(canvas, screenRects, solidFill, isSelected: true, alpha: 45);
-        DrawFillLayer(canvas, screenRects, solidFill, isSelected: false, alpha: 18);
+        if (s.FillFrames)
+        {
+            DrawFillLayer(canvas, screenRects, solidFill, isSelected: true, alpha: 45);
+            DrawFillLayer(canvas, screenRects, solidFill, isSelected: false, alpha: 18);
+        }
 
         foreach (var (sr, isSelected) in screenRects)
         {
@@ -412,6 +417,18 @@ public class WireframeControl : TextureViewport
     /// a drop is simply ignored.
     /// </summary>
     public Func<AnimationChainSave?, AnimationFrameSave?, string, bool, Task<bool>>? HandlePngDrop { get; set; }
+
+    private bool _fillFrames = true;
+    /// <summary>
+    /// Toggles the semi-transparent fill drawn inside frame region rectangles (#976). When
+    /// <c>false</c>, only the stroke outline is drawn — useful when a fill obscures the
+    /// underlying texture (e.g. a mostly-transparent sprite sheet at low zoom).
+    /// </summary>
+    public bool FillFrames
+    {
+        get => _fillFrames;
+        set { _fillFrames = value; InvalidateVisual(); }
+    }
 
     // ── Injected services ─────────────────────────────────────────────────────
 
@@ -1143,6 +1160,7 @@ public class WireframeControl : TextureViewport
     {
         var snap = new WireframeSnapshot { DrawOverlay = DrawWireframeOverlay };
         PopulateBaseSnapshot(snap, width, height);
+        snap.FillFrames = _fillFrames;
         snap.ShowPreview = _showPreview;
         snap.PreviewRect = _previewRect;
 
