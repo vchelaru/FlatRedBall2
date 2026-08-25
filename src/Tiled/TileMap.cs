@@ -818,13 +818,15 @@ public class TileMap
     /// Which point on the tile becomes the entity's position. Default is <see cref="Origin.Center"/>.
     /// </param>
     /// <param name="removeSourceTiles">
-    /// When <c>true</c> (default), each source tile is cleared after the entity spawns — the
-    /// painted cell is set to empty and the matched object is removed from its object layer —
-    /// so the tile visual does not double-draw under the spawned entity. Contrast with
-    /// <see cref="GenerateCollisionFromClass"/>, which leaves source tiles visible because the
-    /// tile itself is the visual. In-memory only; the on-disk TMX is never modified and a fresh
-    /// load re-applies the removal. Pass <c>false</c> to keep the source tile visible (e.g.,
-    /// the tile is both a spawn marker and intentional background art).
+    /// When <c>true</c> (default), each matched source is consumed — the painted cell is set
+    /// to empty and the matched object is removed from its object layer — so one Tiled source
+    /// produces exactly one runtime object. Without it a visible tile double-draws under the
+    /// spawned entity, and a rectangle or polygon is also picked up as a collision shape by
+    /// <see cref="GenerateCollisionFromClass"/>. That method consumes nothing, so when the same
+    /// class feeds both, call <c>CreateEntities</c> <b>first</b> — generating collision first
+    /// builds the shape before the removal happens, leaving you with both. In-memory only; the
+    /// on-disk TMX is never modified and a fresh load re-applies the removal. Pass <c>false</c>
+    /// to keep the source (e.g., the tile is both a spawn marker and intentional background art).
     /// </param>
     /// <param name="configure">
     /// Optional callback invoked on each spawned entity after position assignment and Tiled

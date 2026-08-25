@@ -51,8 +51,8 @@ This covers `.tmx`, `.tsx`, and `.png` files in the `Content/Tiled/` directory.
 Read `.claude/templates/Tiled/StandardTileset.tsx` for the full list of tile IDs and their Classes. The tileset's `firstgid` is 1, so **GID in CSV = tile id + 1**. GID 0 means empty (no tile). GID 1 is `SolidCollision` — used in virtually every game as the primary wall/floor/ceiling tile.
 
 Tiles fall into two categories:
-- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`. Hand-drawn rectangle/polygon `<object>`s on an object layer with a matching Class are consumed too (see "Collision from an object layer" below) — useful for a boundary shape that doesn't align to the stamp grid.
-- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`, `BreakableCollision`) — place on object layers for precise per-entity placement, or paint them on regular tile layers for grid-aligned bulk spawns (e.g., rows of breakable bricks). Either way, `map.CreateEntities()` finds both and by default removes the source tile after spawning so it doesn't double-draw under the entity (opt out with `removeSourceTiles: false`). See the `levels` skill for the API.
+- **Collision tiles** (e.g., `SolidCollision`, `JumpThroughCollision`) — place on tile layers, consumed by `GenerateCollisionFromClass`. Hand-drawn rectangle/polygon `<object>`s on an object layer with a matching Class are matched too (see "Collision from an object layer" below) — useful for a boundary shape that doesn't align to the stamp grid.
+- **Entity marker tiles** (e.g., `Coin`, `PlayerSpawn`, `Boss`, `BreakableCollision`) — place on object layers for precise per-entity placement, or paint them on regular tile layers for grid-aligned bulk spawns (e.g., rows of breakable bricks). Either way, `map.CreateEntities()` finds both and by default removes the source after spawning, so one Tiled source becomes exactly one runtime object (opt out with `removeSourceTiles: false`). Any object shape can be a marker, not just tile objects — a bare `<point>` or rectangle with a matching Class spawns too. See the `levels` skill for the API and the call-order rule.
 
 ## Layer Conventions
 
@@ -159,7 +159,7 @@ Adjacent sub-cell rects participate in `SolidSides` seam suppression: if two sub
 
 ### Add an object layer for entity spawns
 
-Object layers hold tile objects that represent entity spawn positions. Each tile object references a tile from the tileset via its GID. The tile's Class determines the entity type. Add an `<objectgroup>` after the tile layers:
+Object layers hold spawn markers. A tile object references a tile from the tileset via its GID and inherits that tile's Class; any other shape (`<point>`, `<ellipse>`, a bare rectangle, a `<polygon>`) needs the `class` attribute set on the `<object>` itself. Add an `<objectgroup>` after the tile layers:
 
 ```xml
 <objectgroup id="2" name="Entities">
