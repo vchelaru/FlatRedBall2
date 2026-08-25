@@ -85,4 +85,33 @@ public class SettingsWindowBuilderTests
         // Swatch + "Theme Default" + "Custom…" only — no Black/White/Mid Gray presets.
         Assert.Equal(3, buttonsRow.Children.Count);
     }
+
+    [Fact]
+    public void BuildTabs_FillFrameRectanglesCheckBox_ReflectsModelValue()
+    {
+        var tabs = SettingsWindowBuilder.BuildTabs(
+            new SettingsWindowModel { FillFrameRectangles = false },
+            new SettingsWindowCallbacks());
+
+        var colorsSection = SectionOf((TabItem)tabs.Items[0]!);
+        var fillCheck = Assert.IsType<CheckBox>(colorsSection.Children[2]);
+
+        Assert.Equal(false, fillCheck.IsChecked);
+    }
+
+    [AvaloniaFact]
+    public void BuildTabs_FillFrameRectanglesCheckBox_ToggleInvokesCallback()
+    {
+        bool? received = null;
+        var tabs = SettingsWindowBuilder.BuildTabs(
+            new SettingsWindowModel { FillFrameRectangles = true },
+            new SettingsWindowCallbacks { OnFillFrameRectanglesChanged = v => received = v });
+
+        var colorsSection = SectionOf((TabItem)tabs.Items[0]!);
+        var fillCheck = (CheckBox)colorsSection.Children[2];
+
+        fillCheck.IsChecked = false;
+
+        Assert.Equal(false, received);
+    }
 }

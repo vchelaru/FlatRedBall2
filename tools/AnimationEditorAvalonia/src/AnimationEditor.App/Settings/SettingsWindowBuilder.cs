@@ -29,6 +29,9 @@ public sealed class SettingsWindowModel
 
     /// <summary>The active theme's default guide-line color (packed <c>0xAARRGGBB</c>), shown when no override is set.</summary>
     public uint ThemeDefaultGuideLineArgb { get; init; }
+
+    /// <summary>Whether wireframe frame rectangles are drawn with a fill in addition to the stroke outline (#976).</summary>
+    public bool FillFrameRectangles { get; init; }
 }
 
 /// <summary>Callbacks from the settings dialog back to <see cref="MainWindow"/>.</summary>
@@ -49,6 +52,9 @@ public sealed class SettingsWindowCallbacks
 
     /// <summary>Opens a custom-color picker seeded with the current guide-line color; returns the chosen packed ARGB, or <c>null</c> if cancelled.</summary>
     public Func<Task<uint?>>? OnPickCustomGuideLine { get; init; }
+
+    /// <summary>Invoked with the new value when the "Fill frame rectangles" checkbox changes.</summary>
+    public Action<bool>? OnFillFrameRectanglesChanged { get; init; }
 }
 
 /// <summary>Builds the editor settings window. New sections belong here as the dialog grows.</summary>
@@ -130,6 +136,17 @@ public static class SettingsWindowBuilder
 
     private static Control BuildCanvasColorsSection(SettingsWindowModel model, SettingsWindowCallbacks callbacks)
     {
+        var fillCheck = new CheckBox
+        {
+            Content = "Fill Selection",
+            IsChecked = model.FillFrameRectangles,
+        };
+        fillCheck.IsCheckedChanged += (_, _) =>
+        {
+            if (fillCheck.IsChecked is bool value)
+                callbacks.OnFillFrameRectanglesChanged?.Invoke(value);
+        };
+
         return new StackPanel
         {
             Spacing = 14,
@@ -149,6 +166,7 @@ public static class SettingsWindowBuilder
                     Array.Empty<(string, uint)>(),
                     callbacks.OnGuideLineChanged,
                     callbacks.OnPickCustomGuideLine),
+                fillCheck,
             },
         };
     }
