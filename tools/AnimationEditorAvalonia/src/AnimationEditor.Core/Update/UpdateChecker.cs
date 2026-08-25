@@ -3,7 +3,7 @@ namespace AnimationEditor.Core.Update;
 /// <summary>
 /// Compares the running assembly version against the latest published GitHub release.
 /// Release CI stamps the assembly version as <c>yyyy.M.d</c> (see
-/// build-and-release-animation-editor.yml's <c>-p:Version</c>), so a plain <see cref="Version"/>
+/// animation-editor.yml's <c>-p:Version</c>), so a plain <see cref="Version"/>
 /// comparison against the release's publish date is the whole algorithm — no tag-name parsing
 /// needed. <c>AnimationEditor.App.csproj</c> falls back to today's date in the same format when
 /// <c>Version</c> isn't passed in, so local builds compare for real too. <see cref="MinReleaseYear"/>

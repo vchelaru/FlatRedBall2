@@ -1,4 +1,4 @@
-name: Deploy Sample to GitHub Pages
+name: Samples
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: Publish AnimationChain Packages
+name: AnimationChain Nugets
 
 on:
   workflow_dispatch:
