@@ -1280,13 +1280,16 @@ public class FlatRedBallService
     /// </remarks>
     public void Shutdown()
     {
+        // Released before the _game guard: the reader thread does not depend on _game, and an
+        // engine that only ever had automation started on it (tests) must still get it back.
+        _automationMode?.Stop();
+        _automationMode = null;
+
         if (_game is null)
             return;
 
         TeardownCurrentScreen();
         CurrentScreen = new Screen();
-
-        _automationMode = null;
 
         _gum.Uninitialize();
 

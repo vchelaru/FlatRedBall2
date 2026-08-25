@@ -16,6 +16,10 @@ internal class AutomationMode
     // currently connected doesn't spin the reader thread in a tight loop.
     private const int EofRetryDelayMs = 25;
 
+    // Signalled by Stop(). Doubles as the EOF wait handle so a stop is observed immediately
+    // instead of after the remainder of a Sleep.
+    private readonly ManualResetEventSlim _stopSignal = new(false);
+
     private readonly FlatRedBallService _engine;
     private readonly System.IO.TextWriter _output;
     private readonly Action<string> _log;
@@ -48,9 +52,29 @@ internal class AutomationMode
     internal void Start(System.IO.TextReader? input = null)
     {
         var reader = input ?? CreateStandardInputReader();
-        var thread = new Thread(() => ReaderLoop(reader)) { IsBackground = true, Name = "AutomationMode.Reader" };
-        thread.Start();
+        ReaderThread = new Thread(() => ReaderLoop(reader)) { IsBackground = true, Name = "AutomationMode.Reader" };
+        ReaderThread.Start();
     }
+
+    /// <summary>
+    /// The thread running <see cref="ReaderLoop"/>, or null before <see cref="Start"/>.
+    /// </summary>
+    /// <remarks>
+    /// Background by design: <see cref="ReaderLoop"/> has no natural end (see its remarks), so the
+    /// only thing keeping it from holding the process open at exit is the CLR tearing background
+    /// threads down rather than joining them.
+    /// </remarks>
+    internal Thread? ReaderThread { get; private set; }
+
+    /// <summary>
+    /// Ends <see cref="ReaderLoop"/> at its next EOF retry. Idempotent; safe from any thread.
+    /// </summary>
+    /// <remarks>
+    /// A loop currently blocked inside <c>ReadLine()</c> on a real stdin handle stays blocked until
+    /// that read returns — the stop is observed on the next pass, not the instant it is signalled.
+    /// That is acceptable precisely because the thread is background: nothing waits on it.
+    /// </remarks>
+    internal void Stop() => _stopSignal.Set();
 
     /// <summary>
     /// Reads stdin as a raw stream rather than through <see cref="Console.In"/>.
@@ -136,12 +160,13 @@ internal class AutomationMode
 
     // A null from ReadLine() means "no data right now," not "stream closed for good" — a
     // named-pipe stdin reports EOF whenever no writer is currently connected, then resumes
-    // delivering data once a new writer reopens it. Only a read exception is treated as
-    // terminal. See issue #773.
+    // delivering data once a new writer reopens it. So nulls are retried without limit; capping
+    // them would abandon stdin during any writer gap longer than the cap. Only a read exception
+    // or an explicit Stop() is terminal. See issues #773 and #985.
     internal void ReaderLoop(System.IO.TextReader reader)
     {
         bool waitingForData = false;
-        while (true)
+        while (!_stopSignal.IsSet)
         {
             string? line;
             try
@@ -161,7 +186,7 @@ internal class AutomationMode
                     waitingForData = true;
                     _log("[AutomationMode] ReaderLoop: input stream reported EOF; retrying.");
                 }
-                Thread.Sleep(EofRetryDelayMs);
+                _stopSignal.Wait(EofRetryDelayMs);
                 continue;
             }
 
