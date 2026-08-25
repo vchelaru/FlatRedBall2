@@ -37,6 +37,9 @@ public class Screen : ILifecycleEvents
     /// <summary>All entities currently managed by this screen (registered via Factory or <see cref="Register"/>).</summary>
     public IReadOnlyList<Entity> Entities => _entityManager.Entities;
 
+    /// <summary>This screen's collision relationships. Used by <see cref="Diagnostics.PerformanceMonitor"/>.</summary>
+    internal CollisionSystem CollisionSystem => _collisionSystem;
+
     internal readonly CancellationTokenSource _cts = new();
 
     /// <summary>

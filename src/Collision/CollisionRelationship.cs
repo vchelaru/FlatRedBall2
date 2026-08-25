@@ -164,6 +164,23 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// </summary>
     public int DeepCollisionCount { get; private set; }
 
+    // Mirrors the partitioning gate in RunCollisions — true only when the broad phase actually
+    // engaged sweep-and-prune, not merely when a Factory has PartitionAxis set on one side.
+    bool ICollisionRelationship.IsPartitioned
+    {
+        get
+        {
+            if (ReferenceEquals(_listA, _listB))
+                return (_listA is IFactory fa) && fa.PartitionAxis != null;
+
+            Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
+            Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
+            return axisA != null && axisA == axisB;
+        }
+    }
+
+    string ICollisionRelationship.DisplayName => $"{typeof(A).Name} vs {typeof(B).Name}";
+
     /// <summary>
     /// Fired once per colliding pair per frame, after any physics response configured via
     /// <see cref="BounceOnCollision"/>, <see cref="MoveFirstOnCollision"/>, etc.

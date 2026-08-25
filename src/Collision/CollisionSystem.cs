@@ -9,6 +9,9 @@ internal sealed class CollisionSystem
 {
     private readonly List<ICollisionRelationship> _relationships = new();
 
+    /// <summary>Every registered relationship, for diagnostics/reporting. Read-only view.</summary>
+    internal IReadOnlyList<ICollisionRelationship> Relationships => _relationships;
+
     /// <summary>Adds a collision relationship to be run each frame.</summary>
     internal void Add(ICollisionRelationship relationship) => _relationships.Add(relationship);
 

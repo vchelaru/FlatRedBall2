@@ -11,6 +11,8 @@ public class CollisionSystemTests
     {
         public int CallCount { get; private set; }
         public int DeepCollisionCount => 0;
+        public bool IsPartitioned => false;
+        public string DisplayName => "CallCountRelationship";
         public void RunCollisions() => CallCount++;
     }
 

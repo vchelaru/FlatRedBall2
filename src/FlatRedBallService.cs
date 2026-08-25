@@ -1163,6 +1163,9 @@ public class FlatRedBallService
     /// <summary>Per-frame draw-call instrumentation. Off by default — see <see cref="Diagnostics.RenderDiagnostics.IsEnabled"/>.</summary>
     public RenderDiagnostics RenderDiagnostics { get; } = new RenderDiagnostics();
 
+    /// <summary>Rolling FPS/timing/collision instrumentation. Off by default — see <see cref="Diagnostics.PerformanceMonitor.IsEnabled"/>.</summary>
+    public PerformanceMonitor Performance { get; } = new PerformanceMonitor();
+
     /// <summary>
     /// The Gum UI service owned by this engine instance. Use this to access the root element,
     /// load Gum projects, or configure themes.
@@ -1509,5 +1512,8 @@ public class FlatRedBallService
         // Commit the in-progress profile — this is the only point where every field is populated
         // and consistent. Reads of LastFrame during the next frame see this coherent snapshot.
         _lastFrame = _frameProfile;
+        // Feed the rolling window here (outside every timed phase above) so recording itself is
+        // never counted against the frame it's recording.
+        Performance.Record(_frameProfile, CurrentScreen.CollisionSystem.Relationships);
     }
 }
