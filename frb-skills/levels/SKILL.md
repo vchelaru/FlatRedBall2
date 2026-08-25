@@ -89,7 +89,7 @@ For a collision boundary that doesn't match the tile grid (an irregular wall, a 
 
 `CreateEntities` scans both **object layers** (for precisely-placed tile objects) and **regular tile layers** (for tiles painted with Tiled's brush). Any tile whose Class matches the requested name becomes one entity — use whichever authoring path fits the designer's workflow. Painted tile layers support class-level (tileset type) custom properties but not instance-level overrides — Tiled has no per-cell property mechanism for painted tiles.
 
-The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapes` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. The two methods never fight over the same tile — pick one per Class.
+The Class-name convention disambiguates intent via *which method you call*: `GenerateCollisionFromClass("SolidCollision")` turns matching tiles into static `TileShapes` geometry; `CreateEntities("Coin", factory)` turns matching tiles into factory-spawned entities. Pick one method per Class. If a Class must feed both, call `CreateEntities` **first**: it consumes what it matches (clears the tile, removes the object), while `GenerateCollisionFromClass` consumes nothing — so collision-first builds the shape before the removal and you get a shape *and* an entity.
 
 Place tile objects on Tiled object layers (using tiles with a Class set in the tileset). Game code spawns entities from them with `CreateEntities`:
 

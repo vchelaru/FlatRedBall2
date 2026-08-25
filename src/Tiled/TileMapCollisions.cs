@@ -29,7 +29,10 @@ namespace FlatRedBall2.Tiled;
 /// <para>
 /// Object matching checks <see cref="TilemapRectangleObject"/> and <see cref="TilemapPolygonObject"/>
 /// entries directly — tile objects (Tiled's "Insert Tile" tool) are not matched; use
-/// <see cref="TileMap.CreateEntities"/> for those.
+/// <see cref="TileMap.CreateEntities"/> for those. Note that <c>CreateEntities</c> matches
+/// rectangles and polygons too, so one shape can feed either system. Nothing here consumes what
+/// it matches, so if the same class feeds both, run <c>CreateEntities</c> first and let it remove
+/// the object — otherwise the shape is built before the removal and you get a shape and an entity.
 /// </para>
 /// <para>
 /// Rectangle objects support any position, size, and rotation that's an exact multiple of 90
@@ -282,7 +285,9 @@ public static class TileMapCollisions
     /// per cell (axis-aligned rectangles) or registered as a free-floating shape (polygons) so it's
     /// still found regardless of which cell the querying shape occupies.
     /// Tile objects (placed with Tiled's "Insert Tile" tool) are not matched here — use
-    /// <see cref="TileMap.CreateEntities"/> for those.
+    /// <see cref="TileMap.CreateEntities"/> for those. Matched objects stay on the layer: this
+    /// method consumes nothing, so a rectangle or polygon whose class <c>CreateEntities</c> also
+    /// asks for yields both a shape and an entity unless <c>CreateEntities</c> ran first.
     /// </summary>
     private static void AddMatchingObjects(
         TilemapObjectLayer layer,
@@ -354,7 +359,7 @@ public static class TileMapCollisions
     // transforms instead of using sin/cos — this keeps axis-alignment detection
     // (TryGetAxisAlignedBounds) from being defeated by trig floating-point noise at exactly the
     // angles (0/90/180/270) that matter most for staying a plain AARect.
-    private static (float x, float y) RotateAroundOrigin(float x, float y, float rotationRadians)
+    internal static (float x, float y) RotateAroundOrigin(float x, float y, float rotationRadians)
     {
         const float snapEps = 1e-4f;
         float quarterTurns = rotationRadians / (MathF.PI / 2f);
