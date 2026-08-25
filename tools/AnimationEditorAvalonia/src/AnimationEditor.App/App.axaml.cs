@@ -197,6 +197,7 @@ public partial class App : Application
 
         sc.AddSingleton<IGitHubReleaseClient, HttpGitHubReleaseClient>();
         sc.AddSingleton<IUpdateChecker, UpdateChecker>();
+        sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
 
         sc.AddTransient<MainWindow>(sp => new MainWindow(
             sp.GetRequiredService<IProjectManager>(),
@@ -212,7 +213,8 @@ public partial class App : Application
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
             sp.GetRequiredService<IUpdateChecker>(),
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)));
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            sp.GetRequiredService<IApplicationUpdater>()));
 
         return sc.BuildServiceProvider();
     }

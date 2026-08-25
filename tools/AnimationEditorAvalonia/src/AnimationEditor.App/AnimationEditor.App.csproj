@@ -18,10 +18,10 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- MainWindow is DI-only; runtime XAML instantiation is intentionally not supported -->
     <NoWarn>$(NoWarn);AVLN3001</NoWarn>
-    <!-- Release CI stamps -p:Version=yyyy.M.d (animation-editor.yml), which wins
-         here as an MSBuild global property. Local builds fall back to today's date in the same
-         format so UpdateChecker's version comparison (Update/UpdateChecker.cs) runs for real
-         instead of being skipped as an incomparable dev build. -->
+    <!-- Release CI stamps -p:Version=yyyy.M.d (animation-editor.yml), which wins here as an
+         MSBuild global property. Local builds keep a zero-padded display date; both formats are
+         valid System.Version values, so UpdateChecker's comparison runs for real instead of
+         being skipped as an incomparable dev build. -->
     <Version Condition="'$(Version)' == ''">$([System.DateTime]::Now.ToString('yyyy.MM.dd'))</Version>
   </PropertyGroup>
 
@@ -54,6 +54,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Svg.Controls.Skia.Avalonia" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
 
   <!--
