@@ -916,4 +916,283 @@ public class TileMapCreateEntitiesTests
         created[0].X.ShouldBe(32f);
         created[0].Y.ShouldBe(-48f);
     }
+
+    // ============================================================================================
+    // Object shapes with no usable extent — polygon, polyline, text
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_PolygonObject_SpawnsAtObjectPosition()
+    {
+        // A polygon's Position is its origin vertex, not a centroid or a bounding-box corner —
+        // the marker point is the position itself, so Origin has nothing to offset against.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPolygonObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            points: new[] { new XnaVec2(0f, 0f), new XnaVec2(16f, 16f), new XnaVec2(0f, 16f) })
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(16f);
+        created[0].Y.ShouldBe(-48f);
+    }
+
+    [Fact]
+    public void CreateEntities_PolylineObject_SpawnsAtObjectPosition()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapPolylineObject(
+            id: 1,
+            position: new XnaVec2(48f, 16f),
+            points: new[] { new XnaVec2(0f, 0f), new XnaVec2(32f, 0f) })
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(48f);
+        created[0].Y.ShouldBe(-16f);
+    }
+
+    [Fact]
+    public void CreateEntities_TextObject_IgnoresBoundingSizeAndSpawnsAtPosition()
+    {
+        // TilemapTextObject carries a Size (the text's wrap box), but that box is a typesetting
+        // hint, not a marker body — treating it as extent would put Origin.Center in the middle of
+        // the text block instead of on the authored point. Expected (16,-32), not (48,-40).
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapTextObject(
+            id: 1,
+            position: new XnaVec2(16f, 32f),
+            size: new XnaVec2(64f, 16f),
+            text: "spawn here")
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created.Count.ShouldBe(1);
+        created[0].X.ShouldBe(16f);
+        created[0].Y.ShouldBe(-32f);
+    }
+
+    // ============================================================================================
+    // Map offset folded into non-tile object placement
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_RectangleObjectOnOffsetMap_FoldsMapPositionIntoSpawnPoint()
+    {
+        // Map top-left at (100,200); rect at Tiled (16,48) size 16 -> world top-left (116,152),
+        // center (124,144). Proves the map's own offset reaches the rectangle path.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(16f, 48f), size: new XnaVec2(16f, 16f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap, x: 100f, y: 200f);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created[0].X.ShouldBe(124f);
+        created[0].Y.ShouldBe(144f);
+    }
+
+    [Fact]
+    public void CreateEntities_EllipseObjectOnOffsetMap_FoldsMapPositionIntoSpawnPoint()
+    {
+        // Map top-left at (100,200); ellipse bounding rect at Tiled (16,48) size (16,8) -> center
+        // offset (8,4) from the anchor -> world (124,148).
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapEllipseObject(
+            id: 1, position: new XnaVec2(16f, 48f), size: new XnaVec2(16f, 8f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap, x: 100f, y: 200f);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Coin", factory, Origin.Center);
+
+        created[0].X.ShouldBe(124f);
+        created[0].Y.ShouldBe(148f);
+    }
+
+    [Fact]
+    public void CreateEntities_RectangleObject_DefaultRemovesSourceObject()
+    {
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(16f, 48f), size: new XnaVec2(16f, 16f))
+        {
+            Class = "Coin",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        tileMap.CreateEntities("Coin", factory);
+
+        ((TilemapObjectLayer)tilemap.Layers[1]).Objects.Count.ShouldBe(0);
+    }
+
+    // ============================================================================================
+    // Property key casing across every property source
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_PaintedCell_ClassPropertyKeyCasingDiffers_StillApplies()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData }, new[] { (1, 2, 0) });
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(50);
+    }
+
+    [Fact]
+    public void CreateEntities_TileObject_ClassPropertyKeyCasingDiffers_StillApplies()
+    {
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData },
+            placements: System.Array.Empty<(int, int, int)>());
+        tilemap.Layers.Add(BuildObjectLayer("Entities", new[]
+        {
+            (id: 1, localId: 0, x: 16f, y: 48f, size: 16),
+        }));
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(50);
+    }
+
+    [Fact]
+    public void CreateEntities_InstanceAndClassPropertyKeysDifferOnlyByCase_InstanceStillWins()
+    {
+        // The tileset declares "Worth" and the placed instance overrides "worth". Merged with an
+        // ordinal comparer both keys survive and the class-level one wins the lookup, so the
+        // instance override silently does nothing. Instance must win regardless of casing.
+        var tileData = new TilemapTileData(0) { Class = "Coin" };
+        tileData.Properties.SetInt("Worth", 50);
+        var tilemap = BuildTilemap(4, 4, 16, new[] { tileData },
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        var tileObj = new TilemapTileObject(
+            id: 1,
+            position: new XnaVec2(16f, 48f),
+            tile: new TilemapTile(globalId: 1),
+            size: new XnaVec2(16, 16));
+        tileObj.Properties.SetInt("worth", 99);
+        objLayer.AddObject(tileObj);
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var screen = new TestScreen { Engine = new FlatRedBallService() };
+        var factory = new Factory<PropertyEntity>(screen);
+
+        var created = tileMap.CreateEntities("Coin", factory);
+
+        created[0].Worth.ShouldBe(99);
+    }
+
+    // ============================================================================================
+    // Consume-once contract with GenerateCollisionFromClass
+    // ============================================================================================
+
+    [Fact]
+    public void CreateEntities_RectangleObjectThenGenerateCollision_ObjectIsAlreadyConsumed()
+    {
+        // CreateEntities removes what it matches, so a class feeding both systems must run
+        // CreateEntities first — the later collision pass finds nothing left to build from.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0f, 0f), size: new XnaVec2(16f, 16f))
+        {
+            Class = "Door",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var created = tileMap.CreateEntities("Door", factory);
+        var collision = tileMap.GenerateCollisionFromClass("Door");
+
+        created.Count.ShouldBe(1);
+        collision.AllTiles.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void CreateEntities_GenerateCollisionFirst_ShapeAndEntityBothExist()
+    {
+        // The mirror of the above: collision generation consumes nothing, so running it first
+        // leaves the object in place for CreateEntities and one marker yields two runtime objects.
+        var tilemap = BuildTilemap(4, 4, 16,
+            tileDataEntries: System.Array.Empty<TilemapTileData>(),
+            placements: System.Array.Empty<(int, int, int)>());
+        var objLayer = new TilemapObjectLayer("Entities");
+        objLayer.AddObject(new TilemapRectangleObject(
+            id: 1, position: new XnaVec2(0f, 0f), size: new XnaVec2(16f, 16f))
+        {
+            Class = "Door",
+        });
+        tilemap.Layers.Add(objLayer);
+        var tileMap = new TileMap(tilemap);
+        var (_, factory) = NewFactory();
+
+        var collision = tileMap.GenerateCollisionFromClass("Door");
+        var created = tileMap.CreateEntities("Door", factory);
+
+        collision.AllTiles.ShouldHaveSingleItem();
+        created.Count.ShouldBe(1);
+    }
 }
