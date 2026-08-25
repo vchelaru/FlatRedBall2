@@ -45,6 +45,18 @@ Relationship to the other markdown folders:
 
 ## Initiatives
 
+### [AnimationEditor automatic updates](982-animation-editor-auto-update/)
+
+Tracking issue: [vchelaru/FlatRedBall2#982](https://github.com/vchelaru/FlatRedBall2/issues/982)
+
+Replace the current release-page notification with a safe, cross-platform flow that downloads the
+matching published package, applies it after the running editor exits, and makes the restart action
+unambiguous. The work is staged so the replacement mechanism is proven before the UI starts it.
+
+| Phase | Document | Status |
+|---|---|---|
+| 1 | [Release package discovery and safe staged replacement](982-animation-editor-auto-update/phase-01-staged-replacement.md) | In progress |
+
 ### [AnimationEditorCommon: renderer-agnostic .achx runtime](934-animationeditorcommon/)
 
 Tracking issue: [vchelaru/FlatRedBall2#934](https://github.com/vchelaru/FlatRedBall2/issues/934)
