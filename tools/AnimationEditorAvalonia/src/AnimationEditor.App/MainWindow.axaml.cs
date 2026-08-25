@@ -58,6 +58,7 @@ public partial class MainWindow : Window
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
     private readonly IFileAssociationService _fileAssociation;
     private readonly IUpdateChecker _updateChecker;
+    private readonly IApplicationUpdater _applicationUpdater;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
 
@@ -192,7 +193,7 @@ public partial class MainWindow : Window
     private FilePath SettingsFilePath =>
         AppSettingsLocation.ForApplicationDataRoot(_applicationDataRoot);
 
-    public MainWindow(
+    internal MainWindow(
         IProjectManager projectManager,
         ISelectedState selectedState,
         IAppCommands appCommands,
@@ -206,7 +207,8 @@ public partial class MainWindow : Window
         ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
         IUpdateChecker updateChecker,
-        string applicationDataRoot)
+        string applicationDataRoot,
+        IApplicationUpdater? applicationUpdater = null)
     {
         _applicationDataRoot = applicationDataRoot;
 
@@ -223,6 +225,7 @@ public partial class MainWindow : Window
         _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
         _updateChecker = updateChecker;
+        _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
         _dialogHost = new WindowEditorDialogHost(this);
         // Desktop renders the tree with its own _treeRoots collection, so the controller
         // reads expand state from there (browser reads its AnimationTreeControl instead).
@@ -979,7 +982,7 @@ public partial class MainWindow : Window
         // offer a "Make default" button that does nothing useful. The manual "Set as
         // default" / "Don't show again" controls in Settings still work for anyone who
         // wants to try it.
-        _ = RunStartupUpdateCheckAsync();
+        _ = RunStartupUpdateDownloadAsync();
     }
 
     /// <summary>
@@ -1050,30 +1053,45 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Update-available banner (issue #681) ──────────────────────────────────
+    // ── Automatic-update banner (issue #982) ──────────────────────────────────
 
-    // Session-only (not persisted): dismissing just quiets the current run. The check
-    // re-runs (and can re-show the banner) on the next launch until the user actually updates.
-    private bool _updateBannerDismissed;
+    private bool _isDownloadingUpdate;
 
     private void WireUpdateAvailableBanner()
     {
-        DownloadUpdateBtn.Click += (_, _) => OpenUrl((string)DownloadUpdateBtn.Tag!);
-
-        DismissUpdateBannerBtn.Click += (_, _) =>
+        RestartForUpdateBtn.Click += (_, _) =>
         {
-            _updateBannerDismissed = true;
-            UpdateAvailableBanner.IsVisible = false;
+            try
+            {
+                SaveTabsToSettings();
+                _applicationUpdater.ApplyUpdateAndRestart();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Animation Editor update restart failed: {ex}");
+                ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
+            }
         };
+
+        RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
     }
 
-    private void ShowUpdateAvailableBannerIfAppropriate(UpdateCheckResult result)
+    private void ShowUpdateDownloadFailure(string message)
     {
-        if (!result.IsUpdateAvailable || _updateBannerDismissed)
+        UpdateAvailableBannerText.Text = message;
+        RestartForUpdateBtn.IsVisible = false;
+        RetryUpdateBtn.IsVisible = true;
+        UpdateAvailableBanner.IsVisible = true;
+    }
+
+    private void ShowUpdateDownloadProgress(int percent)
+    {
+        if (!_isDownloadingUpdate)
             return;
 
-        UpdateAvailableBannerText.Text = $"Animation Editor v{result.LatestVersion} is available — you're on v{typeof(MainWindow).Assembly.GetName().Version}.";
-        DownloadUpdateBtn.Tag = result.ReleaseUrl ?? ReleasesUrl;
+        UpdateAvailableBannerText.Text = $"Downloading Animation Editor update ({percent}%)…";
+        RestartForUpdateBtn.IsVisible = false;
+        RetryUpdateBtn.IsVisible = false;
         UpdateAvailableBanner.IsVisible = true;
     }
 
@@ -2587,16 +2605,38 @@ public partial class MainWindow : Window
         await BuildAboutWindow(result).ShowDialog(this);
     }
 
-    /// <summary>
-    /// Silent startup check (issue #681) — respects <see cref="UpdateCheckPolicy"/>'s cache
-    /// window so re-launching the same day doesn't re-hit the GitHub API. Shows the persistent
-    /// <see cref="UpdateAvailableBanner"/> only when an update is actually available; never
-    /// blocks or errors visibly on failure.
-    /// </summary>
-    private async Task RunStartupUpdateCheckAsync()
+    private async Task RunStartupUpdateDownloadAsync()
     {
-        var result = await GetUpdateCheckResultAsync(forceRefresh: false);
-        ShowUpdateAvailableBannerIfAppropriate(result);
+        if (_isDownloadingUpdate)
+            return;
+
+        _isDownloadingUpdate = true;
+        ApplicationUpdateResult result;
+        try
+        {
+            result = await _applicationUpdater.DownloadUpdateAsync(percent =>
+                Dispatcher.UIThread.Post(() => ShowUpdateDownloadProgress(percent)));
+        }
+        finally
+        {
+            _isDownloadingUpdate = false;
+        }
+
+        switch (result.Status)
+        {
+            case ApplicationUpdateStatus.NoUpdate:
+                UpdateAvailableBanner.IsVisible = false;
+                break;
+            case ApplicationUpdateStatus.ReadyToRestart:
+                UpdateAvailableBannerText.Text = $"Animation Editor v{result.Version} is ready. Restart to install it.";
+                RestartForUpdateBtn.IsVisible = true;
+                RetryUpdateBtn.IsVisible = false;
+                UpdateAvailableBanner.IsVisible = true;
+                break;
+            case ApplicationUpdateStatus.Failed:
+                ShowUpdateDownloadFailure(result.FailureMessage!);
+                break;
+        }
     }
 
     /// <summary>

@@ -24,7 +24,7 @@
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.0.1" />
     <PackageVersion Include="Avalonia.Skia" Version="12.0.1" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.0.1" />
-    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
+    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="9.*" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.*" />
@@ -32,6 +32,7 @@
     <PackageVersion Include="NJsonSchema" Version="11.*" />
     <PackageVersion Include="SkiaSharp" Version="3.119.3-preview.1.1" />
     <PackageVersion Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.7" />
+    <PackageVersion Include="Velopack" Version="1.2.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />

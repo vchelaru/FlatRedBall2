@@ -8,12 +8,31 @@ using AnimationEditor.Core.Update;
 
 namespace AnimationEditor.App.Tests;
 
-/// <summary>
-/// No-op <see cref="IUpdateChecker"/> for tests that don't care about the update check — never
-/// hits the network. Tests exercising the update-check wiring itself set
-/// <see cref="TestServices.UpdateChecker"/> to a fake with a canned <see cref="UpdateCheckResult"/>
-/// before calling <see cref="TestServices.CreateMainWindow"/>.
-/// </summary>
+internal sealed class FakeApplicationUpdater : IApplicationUpdater
+{
+    public ApplicationUpdateResult Result { get; set; } = ApplicationUpdateResult.NoUpdate;
+    public int DownloadCount { get; private set; }
+    public int RestartCount { get; private set; }
+    public int? ProgressToReport { get; set; }
+    public TaskCompletionSource<ApplicationUpdateResult>? PendingResult { get; set; }
+
+    public Task<ApplicationUpdateResult> DownloadUpdateAsync(
+        Action<int>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        DownloadCount++;
+        if (ProgressToReport is not null)
+            progress?.Invoke(ProgressToReport.Value);
+
+        if (PendingResult is not null)
+            return PendingResult.Task;
+
+        return Task.FromResult(Result);
+    }
+
+    public void ApplyUpdateAndRestart() => RestartCount++;
+}
+
 internal sealed class FakeUpdateChecker : IUpdateChecker
 {
     public UpdateCheckResult Result { get; set; } = UpdateCheckResult.NoUpdate;
@@ -48,6 +67,7 @@ internal sealed class TestServices
     public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
     public IFileAssociationService FileAssociationService { get; set; } = new NullFileAssociationService();
     public IUpdateChecker UpdateChecker { get; set; } = new FakeUpdateChecker();
+    public IApplicationUpdater ApplicationUpdater { get; set; } = new FakeApplicationUpdater();
 
     /// <summary>
     /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
@@ -81,7 +101,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot);
+            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot, ApplicationUpdater);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

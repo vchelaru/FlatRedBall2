@@ -271,9 +271,8 @@
             </DockPanel>
         </Border>
 
-        <!-- ── Update-available banner (issue #681) ── same "actionable info" tier as
-             DefaultHandlerBanner above; stays until dismissed or the app is updated,
-             so it doesn't get missed the way an auto-dismissing toast would. ── -->
+        <!-- ── Automatic-update banner (issue #982) ── only shown while a managed install
+             downloads an update, waits for an explicit restart, or needs a safe retry. ── -->
         <Border x:Name="UpdateAvailableBanner"
                 DockPanel.Dock="Top"
                 IsVisible="False"
@@ -289,14 +288,16 @@
                                 Orientation="Horizontal"
                                 Spacing="8"
                                 VerticalAlignment="Center">
-                        <Button x:Name="DownloadUpdateBtn"
-                                Content="Get Update"
-                                Padding="10,3"
-                                FontSize="12" />
-                        <Button x:Name="DismissUpdateBannerBtn"
-                                Content="Dismiss"
+                        <Button x:Name="RestartForUpdateBtn"
+                                Content="Restart to Update"
                                 Padding="10,3"
                                 FontSize="12"
+                                IsVisible="False" />
+                        <Button x:Name="RetryUpdateBtn"
+                                Content="Retry"
+                                Padding="10,3"
+                                FontSize="12"
+                                IsVisible="False"
                                 Background="Transparent"
                                 Foreground="{DynamicResource InkMid}" />
                     </StackPanel>
