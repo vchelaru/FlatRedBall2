@@ -138,7 +138,7 @@ public static class SettingsWindowBuilder
     {
         var fillCheck = new CheckBox
         {
-            Content = "Fill selected/unselected frame rectangles",
+            Content = "Fill Selection",
             IsChecked = model.FillFrameRectangles,
         };
         fillCheck.IsCheckedChanged += (_, _) =>
