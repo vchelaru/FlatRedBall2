@@ -1,4 +1,4 @@
-name: Deploy Animation Editor (Web) to GitHub Pages
+name: AnimationEditor Web
 
 # #535 M4: publish the Avalonia.Browser build of the Animation Editor (tools/AnimationEditorAvalonia/
 # src/AnimationEditor.Browser) as a static site under this repo's GitHub Pages, at /FlatRedBall2/AnimationEditor/.

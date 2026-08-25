@@ -1,4 +1,4 @@
-name: Build and Release Animation Editor
+name: AnimationEditor
 
 on:
   workflow_dispatch:
