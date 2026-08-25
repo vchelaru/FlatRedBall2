@@ -37,18 +37,53 @@ internal enum ApplicationUpdateStatus
     Failed,
 }
 
+internal static class ApplicationUpdateSource
+{
+    internal const string Production = "https://github.com/vchelaru/FlatRedBall2";
+
+    private const string TestUpdateSourceEnvironmentVariable = "ANIMATION_EDITOR_TEST_UPDATE_SOURCE";
+
+    internal static string ForCurrentBuild()
+    {
+        // A local feed can validate the installed-app path without publishing a release. This is
+        // deliberately compiled out of Release builds so a shipped app has one trusted source.
+#if DEBUG
+        return Resolve(Environment.GetEnvironmentVariable(TestUpdateSourceEnvironmentVariable), isTestBuild: true);
+#else
+        return Resolve(testSource: null, isTestBuild: false);
+#endif
+    }
+
+    internal static string Resolve(string? testSource, bool isTestBuild)
+    {
+        if (isTestBuild && !string.IsNullOrWhiteSpace(testSource))
+            return testSource;
+
+        return Production;
+    }
+}
+
 internal sealed class VelopackApplicationUpdater : IApplicationUpdater
 {
-    private const string RepositoryUrl = "https://github.com/vchelaru/FlatRedBall2";
-
+    private readonly string _updateSource;
     private UpdateManager? _updateManager;
     private UpdateInfo? _downloadedUpdate;
+
+    public VelopackApplicationUpdater()
+        : this(ApplicationUpdateSource.ForCurrentBuild())
+    {
+    }
+
+    internal VelopackApplicationUpdater(string updateSource)
+    {
+        _updateSource = updateSource;
+    }
 
     public async Task<ApplicationUpdateResult> DownloadUpdateAsync(
         Action<int>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var updateManager = new UpdateManager(new GithubSource(RepositoryUrl, accessToken: null, prerelease: false));
+        var updateManager = CreateUpdateManager();
 
         // Local development builds and the legacy archive distribution are not managed installs.
         // Their normal behavior is unchanged: they never attempt to overwrite themselves.
@@ -73,6 +108,14 @@ internal sealed class VelopackApplicationUpdater : IApplicationUpdater
             Debug.WriteLine($"Animation Editor update download failed: {ex}");
             return ApplicationUpdateResult.Failed("The update could not be downloaded. Please try again.");
         }
+    }
+
+    private UpdateManager CreateUpdateManager()
+    {
+        if (_updateSource.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase))
+            return new UpdateManager(new GithubSource(_updateSource, accessToken: null, prerelease: false));
+
+        return new UpdateManager(_updateSource);
     }
 
     public void ApplyUpdateAndRestart()
