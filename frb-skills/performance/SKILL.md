@@ -16,7 +16,7 @@ FlatRedBallService.Default.Performance.IsEnabled = true;
 var perf = FlatRedBallService.Default.Performance;
 Console.WriteLine(perf.GenerateReport());   // FPS + phase timing + collision severity, as a string
 var fps = perf.Fps;                         // .Current / .Average / .Min / .Max
-var worst = perf.GetCollisionReport();      // ordered most-expensive first, flags unpartitioned relationships
+var worst = perf.GetCollisionReport();      // ordered most-expensive first, with a PartitionStatus each
 ```
 
 `GenerateReport()` only builds a string — it does no I/O itself, so printing/logging/writing it is on the caller.
@@ -29,4 +29,6 @@ var worst = perf.GetCollisionReport();      // ordered most-expensive first, fla
 
 Set `PlatformLabel` from the host — the engine targets `net10.0` and cannot read `navigator.userAgent` itself.
 
-See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct, and `Factory<T>.PartitionAxis` for what "unpartitioned" in the collision report means.
+Each row carries a `PartitionStatus`: only `Unpartitioned` is worth acting on (set a matching `Factory<T>.PartitionAxis` on both sides). `NotApplicable` means a non-factory side — `TileShapes`, a single entity, a plain `List<T>` — where no axis setting applies; see the `collision-relationships` skill.
+
+See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct.

@@ -132,7 +132,7 @@ public class PerformanceMonitor
             {
                 Name = r.DisplayName,
                 DeepCollisionCount = r.DeepCollisionCount,
-                IsPartitioned = r.IsPartitioned
+                PartitionStatus = r.PartitionStatus
             });
         }
         report.Sort((a, b) => b.DeepCollisionCount.CompareTo(a.DeepCollisionCount));
@@ -169,7 +169,12 @@ public class PerformanceMonitor
             sb.AppendLine("Collision relationships (most expensive first):");
             foreach (var r in collisionReport)
             {
-                var partitionNote = r.IsPartitioned ? "partitioned" : "NOT PARTITIONED";
+                var partitionNote = r.PartitionStatus switch
+                {
+                    PartitionStatus.Partitioned => "partitioned",
+                    PartitionStatus.Unpartitioned => "NOT PARTITIONED — set a matching PartitionAxis on both factories",
+                    _ => "partitioning n/a — non-factory side",
+                };
                 sb.AppendLine(FormattableString.Invariant(
                     $"  {r.Name}: {r.DeepCollisionCount} deep checks [{partitionNote}]"));
             }

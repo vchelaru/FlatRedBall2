@@ -1,3 +1,5 @@
+using FlatRedBall2.Collision;
+
 namespace FlatRedBall2.Diagnostics;
 
 /// <summary>
@@ -14,9 +16,9 @@ public readonly struct CollisionRelationshipReport
     public int DeepCollisionCount { get; init; }
 
     /// <summary>
-    /// <c>false</c> when this relationship is not benefiting from the sweep-and-prune broad phase
-    /// — its lists don't share a matching <c>Factory&lt;T&gt;.PartitionAxis</c> — so every check
-    /// runs the full O(n×m) pass. Mirrors FRB1's "NOT PARTITIONED" collision debugger warning.
+    /// Whether the sweep-and-prune broad phase engaged. Only
+    /// <see cref="Collision.PartitionStatus.Unpartitioned"/> is worth acting on — see that enum
+    /// for why <see cref="Collision.PartitionStatus.NotApplicable"/> is not a defect.
     /// </summary>
-    public bool IsPartitioned { get; init; }
+    public PartitionStatus PartitionStatus { get; init; }
 }
