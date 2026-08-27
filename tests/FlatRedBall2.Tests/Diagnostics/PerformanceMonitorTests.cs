@@ -10,17 +10,17 @@ public class PerformanceMonitorTests
 {
     private sealed class FakeRelationship : ICollisionRelationship
     {
-        public FakeRelationship(string name, int deepCollisionCount, bool isPartitioned, bool isEnabled = true)
+        public FakeRelationship(string name, int deepCollisionCount, PartitionStatus partitionStatus, bool isEnabled = true)
         {
             DisplayName = name;
             DeepCollisionCount = deepCollisionCount;
-            IsPartitioned = isPartitioned;
+            PartitionStatus = partitionStatus;
             IsEnabled = isEnabled;
         }
 
         public string DisplayName { get; }
         public int DeepCollisionCount { get; }
-        public bool IsPartitioned { get; }
+        public PartitionStatus PartitionStatus { get; }
         public bool IsEnabled { get; set; }
         public void RunCollisions() { }
     }
@@ -61,13 +61,15 @@ public class PerformanceMonitorTests
     }
 
     [Fact]
-    public void GenerateReport_CollisionRelationships_OrdersBySeverityAndFlagsUnpartitioned()
+    public void GenerateReport_CollisionRelationships_OrdersBySeverityAndWarnsOnlyOnTheFixableRow()
     {
         var monitor = new PerformanceMonitor { IsEnabled = true };
         var relationships = new List<ICollisionRelationship>
         {
-            new FakeRelationship("Player vs TileShapes", deepCollisionCount: 5, isPartitioned: false),
-            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, isPartitioned: true)
+            // NotApplicable — a non-factory side, so no PartitionAxis can ever engage the sweep.
+            new FakeRelationship("Player vs TileShapes", deepCollisionCount: 5, partitionStatus: PartitionStatus.NotApplicable),
+            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, partitionStatus: PartitionStatus.Partitioned),
+            new FakeRelationship("Enemy vs Pickup", deepCollisionCount: 20, partitionStatus: PartitionStatus.Unpartitioned)
         };
 
         monitor.Record(new FrameProfile { FrameTotalMs = 16 }, relationships);
@@ -75,13 +77,14 @@ public class PerformanceMonitorTests
         var report = monitor.GetCollisionReport();
         report[0].Name.ShouldBe("Enemy vs Bullet");
         report[0].DeepCollisionCount.ShouldBe(50);
-        report[1].Name.ShouldBe("Player vs TileShapes");
-        report[1].IsPartitioned.ShouldBeFalse();
+        report[2].Name.ShouldBe("Player vs TileShapes");
+        report[2].PartitionStatus.ShouldBe(PartitionStatus.NotApplicable);
 
         var text = monitor.GenerateReport();
         text.ShouldContain("Enemy vs Bullet: 50 deep checks [partitioned]");
-        text.ShouldContain("Player vs TileShapes: 5 deep checks [NOT PARTITIONED]");
-        text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Player vs TileShapes"));
+        text.ShouldContain("Enemy vs Pickup: 20 deep checks [NOT PARTITIONED");
+        text.ShouldContain("Player vs TileShapes: 5 deep checks [partitioning n/a");
+        text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Enemy vs Pickup"));
     }
 
     [Fact]
@@ -90,8 +93,8 @@ public class PerformanceMonitorTests
         var monitor = new PerformanceMonitor { IsEnabled = true };
         var relationships = new List<ICollisionRelationship>
         {
-            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, isPartitioned: true),
-            new FakeRelationship("Player vs Door", deepCollisionCount: 5, isPartitioned: false, isEnabled: false)
+            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, partitionStatus: PartitionStatus.Partitioned),
+            new FakeRelationship("Player vs Door", deepCollisionCount: 5, partitionStatus: PartitionStatus.Unpartitioned, isEnabled: false)
         };
 
         monitor.Record(new FrameProfile { FrameTotalMs = 16 }, relationships);

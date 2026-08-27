@@ -165,18 +165,25 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// </summary>
     public int DeepCollisionCount { get; private set; }
 
-    // Mirrors the partitioning gate in RunCollisions — true only when the broad phase actually
-    // engaged sweep-and-prune, not merely when a Factory has PartitionAxis set on one side.
-    bool ICollisionRelationship.IsPartitioned
+    // Mirrors the partitioning gate in RunCollisions. Distinguishes "could partition but doesn't"
+    // (both sides are factories — actionable) from "can't partition at all" (a non-factory side,
+    // where no PartitionAxis setting would change anything).
+    PartitionStatus ICollisionRelationship.PartitionStatus
     {
         get
         {
             if (ReferenceEquals(_listA, _listB))
-                return (_listA is IFactory fa) && fa.PartitionAxis != null;
+            {
+                if (_listA is not IFactory self) return PartitionStatus.NotApplicable;
+                return self.PartitionAxis != null ? PartitionStatus.Partitioned : PartitionStatus.Unpartitioned;
+            }
 
-            Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
-            Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
-            return axisA != null && axisA == axisB;
+            if (_listA is not IFactory fa || _listB is not IFactory fb)
+                return PartitionStatus.NotApplicable;
+
+            return fa.PartitionAxis != null && fa.PartitionAxis == fb.PartitionAxis
+                ? PartitionStatus.Partitioned
+                : PartitionStatus.Unpartitioned;
         }
     }
 
