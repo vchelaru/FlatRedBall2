@@ -6,7 +6,7 @@ namespace AnimationEditor.Core.Tests;
 /// <summary>
 /// Tests for <see cref="UpdateChecker"/> against a fake <see cref="IGitHubReleaseClient"/> —
 /// no real network traffic. Release CI stamps the assembly version as yyyy.M.d (see
-/// build-and-release-animation-editor.yml), so a plain <see cref="Version"/> comparison against
+/// animation-editor.yml), so a plain <see cref="Version"/> comparison against
 /// the release's publish date is the whole algorithm.
 /// </summary>
 public class UpdateCheckerTests

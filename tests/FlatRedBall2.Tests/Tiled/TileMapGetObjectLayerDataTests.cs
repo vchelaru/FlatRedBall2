@@ -275,4 +275,45 @@ public class TileMapGetObjectLayerDataTests
         entries[0].Properties["Terrain"].ShouldBe("sand");
         entries[0].Properties["Side"].ShouldBe("top");
     }
+
+    [Fact]
+    public void GetObjectLayerData_PropertyKeyCasingDiffers_StillFound()
+    {
+        // Tiled authors mix casing freely, and CreateEntities already matches property names
+        // case-insensitively. A caller reading the same object through this method must not have
+        // to guess the author's capitalization — a miss here is silent, not an exception.
+        var rectObj = new TilemapRectangleObject(id: 1, position: new XnaVec2(0, 0), size: new XnaVec2(16, 16));
+        rectObj.Properties.SetString("zone", "Water");
+        var layer = new TilemapObjectLayer("Water");
+        layer.AddObject(rectObj);
+        var tileMap = new TileMap(BuildObjectOnlyTilemap(2, 2, 16, layer));
+
+        var entries = tileMap.GetObjectLayerData("Water");
+
+        entries[0].Properties["Zone"].ShouldBe("Water");
+    }
+
+    [Fact]
+    public void GetObjectLayerData_TileObjectInstanceKeyDiffersInCaseFromClassKey_InstanceWins()
+    {
+        // The tileset declares "Terrain" and the placed instance overrides "terrain". The two
+        // collapse to a single entry, and the instance value wins — matching the merge
+        // CreateEntities performs, so both readers report the same value for the same object.
+        var tileData = new TilemapTileData(0) { Class = "Coast" };
+        tileData.Properties.SetString("Terrain", "grass");
+        var tileset = new TilemapTileset(name: "ts", texture: null!, tileWidth: 16, tileHeight: 16, tileCount: 1, columns: 1);
+        tileset.FirstGlobalId = 1;
+        tileset.AddTileData(tileData);
+        var tileObj = new TilemapTileObject(
+            id: 1, position: new XnaVec2(16, 48), tile: new TilemapTile(globalId: 1), size: new XnaVec2(16, 16));
+        tileObj.Properties.SetString("terrain", "sand");
+        var layer = new TilemapObjectLayer("Water");
+        layer.AddObject(tileObj);
+        var tileMap = new TileMap(BuildObjectOnlyTilemap(2, 2, 16, layer, tileset));
+
+        var entries = tileMap.GetObjectLayerData("Water");
+
+        entries[0].Properties.Count.ShouldBe(1);
+        entries[0].Properties["Terrain"].ShouldBe("sand");
+    }
 }

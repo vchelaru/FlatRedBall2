@@ -1,4 +1,4 @@
-name: Publish FlatRedBall2
+name: FlatRedBall2 Nugets
 
 on:
   workflow_dispatch:

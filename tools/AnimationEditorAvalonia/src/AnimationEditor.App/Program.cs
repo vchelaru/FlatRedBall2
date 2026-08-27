@@ -2,6 +2,7 @@
 using Avalonia;
 using System;
 using System.IO;
+using Velopack;
 
 namespace AnimationEditor.App;
 
@@ -13,6 +14,11 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Managed installs must initialize Velopack before any app code so an already-applied
+        // update can complete its bootstrap work. Local builds and legacy archive downloads
+        // pass through without changing their launch behavior.
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+
         // Install crash logging first so even a failure during startup gets recorded.
         CrashLogging.Install(AppContext.BaseDirectory,
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));

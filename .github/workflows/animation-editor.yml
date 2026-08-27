@@ -1,4 +1,4 @@
-name: Build and Release Animation Editor
+name: AnimationEditor
 
 on:
   workflow_dispatch:
@@ -27,7 +27,9 @@ jobs:
         id: meta
         shell: pwsh
         run: |
-          $version = (Get-Date).ToString('yyyy.MM.dd')
+          # Velopack package versions use SemVer, whose numeric components cannot have leading
+          # zeroes. The assembly version receives this same three-part date value.
+          $version = (Get-Date).ToString('yyyy.M.d')
           $kind = "${{ github.event.inputs.release_kind }}"
           switch ($kind) {
             'release'    { $prefix='Release';    $prerelease='false'; $draft='false' }
@@ -167,8 +169,60 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The legacy archives above remain available for manual/portable use. This separate,
+  # per-user Windows installer is the only managed-install channel in the first rollout.
+  # macOS and Linux stay on their existing artifacts until their signing/distribution paths are
+  # ready for the same treatment.
+  windows-updater:
+    needs: [meta, test]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish Windows updater build
+        run: >
+          dotnet publish
+          tools/AnimationEditorAvalonia/src/AnimationEditor.App/AnimationEditor.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained
+          -p:PublishSingleFile=false
+          -p:Version=${{ needs.meta.outputs.version }}
+          -o dist/velopack/publish
+
+      - name: Install Velopack CLI
+        shell: pwsh
+        run: dotnet tool install --tool-path dist/velopack/tools vpk --version 1.2.0
+
+      - name: Package per-user Windows installer and update feed
+        shell: pwsh
+        run: >
+          dist/velopack/tools/vpk.exe pack
+          --packId FlatRedBall2.AnimationEditor
+          --packVersion ${{ needs.meta.outputs.version }}
+          --packDir dist/velopack/publish
+          --mainExe AnimationEditor.exe
+          --packTitle "Animation Editor"
+          --packAuthors "FlatRedBall Contributors"
+          --icon tools/AnimationEditorAvalonia/src/AnimationEditor.App/Assets/icons/AppIcon.ico
+          --outputDir dist/velopack/release
+
+      - name: Upload updater artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimationEditor-velopack-win-x64
+          path: dist/velopack/release/*
+          if-no-files-found: error
+          retention-days: 7
+
   release:
-    needs: [meta, build]
+    needs: [meta, build, windows-updater]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -207,6 +261,10 @@ jobs:
             dist/AnimationEditor-linux-x64.tar.gz
             dist/AnimationEditor-osx-x64.zip
             dist/AnimationEditor-osx-arm64.zip
+            dist/FlatRedBall2.AnimationEditor-win-Setup.exe
+            dist/FlatRedBall2.AnimationEditor-win-Portable.zip
+            dist/FlatRedBall2.AnimationEditor-*-full.nupkg
+            dist/releases.win.json
 
       # Moves a floating tag so /releases/tag/animationeditor-latest always resolves to the
       # newest release/prerelease build. Skipped for 'test' (draft) runs so the public link
@@ -237,3 +295,7 @@ jobs:
             dist/AnimationEditor-linux-x64.tar.gz
             dist/AnimationEditor-osx-x64.zip
             dist/AnimationEditor-osx-arm64.zip
+            dist/FlatRedBall2.AnimationEditor-win-Setup.exe
+            dist/FlatRedBall2.AnimationEditor-win-Portable.zip
+            dist/FlatRedBall2.AnimationEditor-*-full.nupkg
+            dist/releases.win.json

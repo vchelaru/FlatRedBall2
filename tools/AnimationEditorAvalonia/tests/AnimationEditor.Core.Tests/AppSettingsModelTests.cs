@@ -169,6 +169,25 @@ public class AppSettingsModelTests
     }
 
     [Fact]
+    public void FillFrameRectangles_DefaultsToTrue()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.True(model.FillFrameRectangles);
+    }
+
+    [Fact]
+    public void FillFrameRectangles_SurvivesJsonRoundTrip()
+    {
+        var model = new AppSettingsModel { FillFrameRectangles = false };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.False(restored!.FillFrameRectangles);
+    }
+
+    [Fact]
     public void SuppressDefaultHandlerPrompt_DefaultsToFalse()
     {
         var model = new AppSettingsModel();
