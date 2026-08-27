@@ -21,4 +21,12 @@ var worst = perf.GetCollisionReport();      // ordered most-expensive first, fla
 
 `GenerateReport()` only builds a string — it does no I/O itself, so printing/logging/writing it is on the caller.
 
+## Timer resolution (web)
+
+`GenerateReport()` opens with a `Platform:` line and the measured clock step (`TimerResolutionMs`, probed once via `ProfileClock.MeasureResolutionMs`).
+
+**Landmine:** browsers coarsen their clock as a Spectre mitigation — ~1ms on Firefox/Safari, ~0.1ms on Chrome — and `Stopwatch.Frequency` does not reflect it. Whole-pass totals stay accurate (start/end errors cancel), but any per-phase number smaller than one step reads as 0 or one full step and nothing between. The report warns automatically above 0.5ms.
+
+Set `PlatformLabel` from the host — the engine targets `net10.0` and cannot read `navigator.userAgent` itself.
+
 See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct, and `Factory<T>.PartitionAxis` for what "unpartitioned" in the collision report means.

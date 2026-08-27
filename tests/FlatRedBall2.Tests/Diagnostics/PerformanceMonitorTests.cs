@@ -43,6 +43,22 @@ public class PerformanceMonitorTests
     }
 
     [Fact]
+    public void GenerateReport_CoarseTimerResolution_WarnsAndNamesPlatform()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true, PlatformLabel = "Firefox" };
+        monitor.TimerResolutionMs = 1.0;
+
+        monitor.Record(new FrameProfile { FrameTotalMs = 16 }, NoRelationships);
+
+        var text = monitor.GenerateReport();
+        text.ShouldContain("Platform: Firefox");
+        text.ShouldContain("timer resolution 1.00ms");
+        text.ShouldContain("per-phase timings below are unreliable");
+        // Firefox is the coarsest common target, so the report names the specific remedy.
+        text.ShouldContain("cross-origin isolated");
+    }
+
+    [Fact]
     public void GenerateReport_CollisionRelationships_OrdersBySeverityAndFlagsUnpartitioned()
     {
         var monitor = new PerformanceMonitor { IsEnabled = true };
@@ -64,6 +80,19 @@ public class PerformanceMonitorTests
         text.ShouldContain("Enemy vs Bullet: 50 deep checks [partitioned]");
         text.ShouldContain("Player vs TileShapes: 5 deep checks [NOT PARTITIONED]");
         text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Player vs TileShapes"));
+    }
+
+    [Fact]
+    public void GenerateReport_FineTimerResolution_OmitsWarning()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true, PlatformLabel = "Chrome" };
+        monitor.TimerResolutionMs = 0.1;
+
+        monitor.Record(new FrameProfile { FrameTotalMs = 16 }, NoRelationships);
+
+        var text = monitor.GenerateReport();
+        text.ShouldContain("Platform: Chrome");
+        text.ShouldNotContain("unreliable");
     }
 
     [Fact]
