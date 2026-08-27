@@ -297,15 +297,22 @@ Concave `Polygon` shapes are fully supported: the engine automatically decompose
 ## Broad-Phase Partitioning (Performance)
 
 Set `Factory<T>.PartitionAxis = Axis.X` (or `Axis.Y`) to replace the default O(n×m) pairwise
-check with sweep-and-prune broad-phase culling. It engages automatically for any relationship
-built from partitioned factories — nothing to opt into on the relationship itself.
+check with sweep-and-prune broad-phase culling. It engages automatically — nothing to opt into
+on the relationship itself.
+
+**Eligibility**: both sides must be a `Factory<T>` with the *same* non-null `PartitionAxis`. A
+plain `List<T>`, a single entity, or a `TileShapes` is not a factory and never partitions.
+
+```csharp
+_bulletFactory.PartitionAxis = Axis.X;
+_enemyFactory.PartitionAxis  = Axis.X;   // mismatched or null silently falls back to O(n×m)
+AddCollisionRelationship<Bullet, Enemy>(_bulletFactory, _enemyFactory);
+```
 
 - **Self-collision**: only that one factory needs `PartitionAxis` set.
-- **Two-list relationship**: both factories must share the *same* axis. One set to `X` and the
-  other `Y` (or left `null`) silently falls back to O(n×m) — no warning.
-- Verify it actually engaged via `relationship.DeepCollisionCount` (should sit well below n×m),
-  or `PerformanceMonitor.GetCollisionReport()` (see `performance` skill), which flags
-  unpartitioned relationships.
+- Verify via `relationship.DeepCollisionCount` (should sit well below n×m), or
+  `PerformanceMonitor.GetCollisionReport()` (see `performance` skill), whose `PartitionStatus`
+  flags only the fixable `Unpartitioned` case — a non-factory side reports `NotApplicable`.
 - Pick the axis your entities spread out along most — e.g. `Axis.X` for a wide side-scroller level.
 
 ### Object Size (`BroadPhaseRadius`)
