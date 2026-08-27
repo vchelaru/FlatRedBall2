@@ -21,10 +21,16 @@ internal sealed class CollisionSystem
     /// <summary>Clears all collision relationships.</summary>
     internal void Clear() => _relationships.Clear();
 
-    /// <summary>Runs all registered collision relationships. Called once per frame after physics.</summary>
+    /// <summary>
+    /// Runs every enabled collision relationship. Called once per frame after physics; relationships
+    /// with <see cref="ICollisionRelationship.IsEnabled"/> set to <c>false</c> are skipped.
+    /// </summary>
     internal void RunAllCollisions()
     {
         for (int i = 0; i < _relationships.Count; i++)
-            _relationships[i].RunCollisions();
+        {
+            if (_relationships[i].IsEnabled)
+                _relationships[i].RunCollisions();
+        }
     }
 }

@@ -10,16 +10,18 @@ public class PerformanceMonitorTests
 {
     private sealed class FakeRelationship : ICollisionRelationship
     {
-        public FakeRelationship(string name, int deepCollisionCount, bool isPartitioned)
+        public FakeRelationship(string name, int deepCollisionCount, bool isPartitioned, bool isEnabled = true)
         {
             DisplayName = name;
             DeepCollisionCount = deepCollisionCount;
             IsPartitioned = isPartitioned;
+            IsEnabled = isEnabled;
         }
 
         public string DisplayName { get; }
         public int DeepCollisionCount { get; }
         public bool IsPartitioned { get; }
+        public bool IsEnabled { get; set; }
         public void RunCollisions() { }
     }
 
@@ -80,6 +82,24 @@ public class PerformanceMonitorTests
         text.ShouldContain("Enemy vs Bullet: 50 deep checks [partitioned]");
         text.ShouldContain("Player vs TileShapes: 5 deep checks [NOT PARTITIONED]");
         text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Player vs TileShapes"));
+    }
+
+    [Fact]
+    public void GenerateReport_DisabledRelationship_IsOmittedFromCollisionReport()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true };
+        var relationships = new List<ICollisionRelationship>
+        {
+            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, isPartitioned: true),
+            new FakeRelationship("Player vs Door", deepCollisionCount: 5, isPartitioned: false, isEnabled: false)
+        };
+
+        monitor.Record(new FrameProfile { FrameTotalMs = 16 }, relationships);
+
+        var report = monitor.GetCollisionReport();
+        report.Count.ShouldBe(1);
+        report[0].Name.ShouldBe("Enemy vs Bullet");
+        monitor.GenerateReport().ShouldNotContain("Player vs Door");
     }
 
     [Fact]
