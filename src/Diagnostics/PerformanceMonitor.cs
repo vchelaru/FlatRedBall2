@@ -127,6 +127,7 @@ public class PerformanceMonitor
         var report = new List<CollisionRelationshipReport>(_relationships.Count);
         foreach (var r in _relationships)
         {
+            if (!r.IsEnabled) continue;    // costs nothing to run, so flagging it as expensive is noise
             report.Add(new CollisionRelationshipReport
             {
                 Name = r.DisplayName,

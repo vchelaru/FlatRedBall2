@@ -13,6 +13,7 @@ public class CollisionSystemTests
         public int DeepCollisionCount => 0;
         public bool IsPartitioned => false;
         public string DisplayName => "CallCountRelationship";
+        public bool IsEnabled { get; set; } = true;
         public void RunCollisions() => CallCount++;
     }
 
@@ -26,6 +27,18 @@ public class CollisionSystemTests
         system.RunAllCollisions();
 
         rel.CallCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void RunAllCollisions_WithDisabledRelationship_DoesNotInvokeRunCollisions()
+    {
+        var system = new CollisionSystem();
+        var rel = new CallCountRelationship { IsEnabled = false };
+        system.Add(rel);
+
+        system.RunAllCollisions();
+
+        rel.CallCount.ShouldBe(0);
     }
 
     [Fact]

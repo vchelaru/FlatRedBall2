@@ -105,6 +105,15 @@ rel.CollisionEnded   += (_, _)    => _player.ResetMovementProfile();
 - **Tunneling:** if an entity moves so fast it overlaps for zero frames, neither event fires. Same limitation as `CollisionOccurred`.
 - **Zero-overhead when unused** — no tracking runs if neither event has a subscriber.
 
+## Turning a Relationship Off — `IsEnabled`
+
+`rel.IsEnabled = false` stops the automatic per-frame run. `rel.RunCollisions()` is public and
+still works while disabled, so game code can drive collision on its own schedule.
+
+**Landmine**: disabling fires `CollisionEnded` immediately for every pair overlapping at that
+moment, and re-enabling refires `CollisionStarted` for pairs still overlapping — an enter/exit
+counter sees one extra pair of events per toggle.
+
 ## Execution Order
 
 Collision runs after physics and before `CustomActivity` — by the time game logic runs, entities are already separated from any overlapping collision partner. See `engine-overview` for the full frame loop.
