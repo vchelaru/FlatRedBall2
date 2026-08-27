@@ -26,6 +26,25 @@ public class EntityTests
     }
 
     [Fact]
+    public void AbsolutePosition_ParentRotated_OffsetOrbitsAroundParent()
+    {
+        // Parent rotated 90 degrees CCW: a child offset directly along the parent's local
+        // +X axis should swing to point along world +Y, not stay at its unrotated world offset.
+        var parentRotation = Angle.FromDegrees(90f);
+        float parentX = 0f, parentY = 0f;
+        float childX = 10f, childY = 0f;
+        float expectedAbsoluteX = 0f;
+        float expectedAbsoluteY = 10f;
+
+        var parent = new Entity { X = parentX, Y = parentY, Rotation = parentRotation };
+        var child = new Entity { X = childX, Y = childY };
+        parent.Add(child);
+
+        child.AbsoluteX.ShouldBe(expectedAbsoluteX, tolerance: 0.001f);
+        child.AbsoluteY.ShouldBe(expectedAbsoluteY, tolerance: 0.001f);
+    }
+
+    [Fact]
     public void PauseMode_NewEntity_DefaultsToPausable()
     {
         var entity = new Entity();

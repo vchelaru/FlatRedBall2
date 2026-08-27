@@ -141,9 +141,9 @@ public class Polygon : IAttachable, IRenderable, ICollidable
     /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
     /// <inheritdoc/>
-    public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    public float AbsoluteX => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).X : X;
     /// <inheritdoc/>
-    public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    public float AbsoluteY => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).Y : Y;
     /// <summary>Final Z after walking the parent chain.</summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
 
