@@ -481,18 +481,21 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
 
         if (ReferenceEquals(_listA, _listB))
         {
-            var axis = (_listA is IFactory fa) ? fa.PartitionAxis : null;
+            var fa = _listA as IFactory;
+            var axis = fa?.PartitionAxis;
             if (axis != null)
-                RunSameListCollisionsSweep(axis.Value, forward);
+                RunSameListCollisionsSweep(axis.Value, forward, fa!.PartitionMaxRadius);
             else
                 RunSameListCollisions(forward);
         }
         else
         {
-            Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
-            Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
+            var fa2 = _listA as IFactory;
+            var fb = _listB as IFactory;
+            Axis? axisA = fa2?.PartitionAxis;
+            Axis? axisB = fb?.PartitionAxis;
             if (axisA != null && axisA == axisB)
-                RunCrossListCollisionsSweep(axisA.Value);
+                RunCrossListCollisionsSweep(axisA.Value, fa2!.PartitionMaxRadius, fb!.PartitionMaxRadius);
             else
             {
                 for (int i = 0; i < _listA.Count; i++)
@@ -631,8 +634,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         TryOfferGroundSnap(a, b);
     }
 
-    // Both lists are already sorted by their respective factories.
-    private void RunCrossListCollisionsSweep(Axis axis)
+    // Both lists are already sorted by their respective factories. radiusA/radiusB are each
+    // factory's shared IFactory.PartitionMaxRadius — a single bound per side, not each entity's
+    // own BroadPhaseRadius, so the sweep edges stay monotonic in sort order regardless of
+    // per-instance radius variance (see #992).
+    private void RunCrossListCollisionsSweep(Axis axis, float radiusA, float radiusB)
     {
         var listA = _listA;
         var listB = _listB;
@@ -644,16 +650,15 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
             var a = listA[i];
             var effectiveA = GetEffectiveA(a);
             float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
-            float aR = effectiveA.BroadPhaseRadius;
-            float aLeft = aPos - aR;
-            float aRight = aPos + aR;
+            float aLeft = aPos - radiusA;
+            float aRight = aPos + radiusA;
 
             // Advance startB past items whose far edge is behind aLeft
             while (startB < listB.Count)
             {
                 var testB = GetEffectiveB(listB[startB]);
                 float testPos = axis == Axis.X ? testB.AbsoluteX : testB.AbsoluteY;
-                if (testPos + testB.BroadPhaseRadius >= aLeft) break;
+                if (testPos + radiusB >= aLeft) break;
                 startB++;
             }
 
@@ -662,7 +667,7 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var b = listB[j];
                 var effectiveB = GetEffectiveB(b);
                 float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
-                float bLeft = bPos - effectiveB.BroadPhaseRadius;
+                float bLeft = bPos - radiusB;
                 if (bLeft > aRight) break; // too far; all remaining are also too far
 
                 DeepCollisionCount++;
@@ -690,8 +695,10 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     }
 
     // List is already sorted ascending by factory. Alternates sweep direction each frame
-    // to cancel the bias where the leftmost entity is always pushed left first.
-    private void RunSameListCollisionsSweep(Axis axis, bool forward)
+    // to cancel the bias where the leftmost entity is always pushed left first. radius is the
+    // factory's shared IFactory.PartitionMaxRadius — see RunCrossListCollisionsSweep for why a
+    // single per-factory bound (not each entity's own BroadPhaseRadius) is required here.
+    private void RunSameListCollisionsSweep(Axis axis, bool forward, float radius)
     {
         var list = _listA;
 
@@ -702,14 +709,14 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var a = list[i];
                 var effectiveA = GetEffectiveA(a);
                 float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
-                float aRight = aPos + effectiveA.BroadPhaseRadius;
+                float aRight = aPos + radius;
 
                 for (int j = i + 1; j < list.Count; j++)
                 {
                     var b = list[j];
                     var effectiveB = GetEffectiveB((B)(object)b);
                     float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
-                    float bLeft = bPos - effectiveB.BroadPhaseRadius;
+                    float bLeft = bPos - radius;
                     if (bLeft > aRight) break;
 
                     RunSameListPair(a, b);
@@ -723,14 +730,14 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
                 var a = list[i];
                 var effectiveA = GetEffectiveA(a);
                 float aPos = axis == Axis.X ? effectiveA.AbsoluteX : effectiveA.AbsoluteY;
-                float aLeft = aPos - effectiveA.BroadPhaseRadius;
+                float aLeft = aPos - radius;
 
                 for (int j = i - 1; j >= 0; j--)
                 {
                     var b = list[j];
                     var effectiveB = GetEffectiveB((B)(object)b);
                     float bPos = axis == Axis.X ? effectiveB.AbsoluteX : effectiveB.AbsoluteY;
-                    float bRight = bPos + effectiveB.BroadPhaseRadius;
+                    float bRight = bPos + radius;
                     if (bRight < aLeft) break;
 
                     RunSameListPair(a, b);

@@ -14,22 +14,38 @@ namespace FlatRedBall2.Collision;
 /// </summary>
 public class Circle : IAttachable, IRenderable, ICollidable
 {
+    private float _radius = 16f;
+    private float _x;
+    private float _y;
+    private Entity? _parent;
+
     /// <summary>Radius in world units. Defaults to 16. Used for both rendering and collision.</summary>
-    public float Radius { get; set; } = 16f;
+    public float Radius { get => _radius; set { _radius = value; _parent?.InvalidateBroadPhaseRadius(); } }
 
     // IAttachable
     /// <inheritdoc/>
-    public Entity? Parent { get; set; }
+    public Entity? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (ReferenceEquals(_parent, value)) return;
+            var old = _parent;
+            _parent = value;
+            old?.InvalidateBroadPhaseRadius();
+            value?.InvalidateBroadPhaseRadius();
+        }
+    }
     /// <summary>X position. Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float X { get; set; }
+    public float X { get => _x; set { _x = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Y position (Y+ up). Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float Y { get; set; }
+    public float Y { get => _y; set { _y = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
     /// <inheritdoc/>
-    public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    public float AbsoluteX => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).X : X;
     /// <inheritdoc/>
-    public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    public float AbsoluteY => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).Y : Y;
     /// <summary>Final Z after walking the parent chain.</summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;
     /// <inheritdoc/>

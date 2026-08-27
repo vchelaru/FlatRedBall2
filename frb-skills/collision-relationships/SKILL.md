@@ -1,6 +1,6 @@
 ---
 name: collision-relationships
-description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred / CollisionStarted / CollisionEnded events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, static geometry, sensor shapes, awareness radius, trigger zones, or zone-enter/zone-exit detection. Trigger on any collision-related question."
+description: "Collision Relationships in FlatRedBall2. Use when working with AddCollisionRelationship, MoveFirstOnCollision, BounceOnCollision, MoveBothOnCollision, CollisionOccurred / CollisionStarted / CollisionEnded events, collision response, collision setup, mass/elasticity, entity-vs-entity collision, screen boundaries, keeping entities in bounds, walls, floors, ceilings, static geometry, sensor shapes, awareness radius, trigger zones, zone-enter/zone-exit detection, or broad-phase partitioning (Factory<T>.PartitionAxis, DeepCollisionCount). Trigger on any collision-related question."
 ---
 
 # Collision Relationships in FlatRedBall2
@@ -293,3 +293,33 @@ Prefer the named methods; they expand into the mass numbers for you:
 Collision between any two entity types just works — the engine inspects the shape children of each entity at runtime and resolves the overlap automatically. What shapes the entities contain doesn't matter; you don't need to know or specify them at the call site.
 
 Concave `Polygon` shapes are fully supported: the engine automatically decomposes them into convex parts internally. No manual decomposition is needed and reading `CollisionDispatcher.cs` is never necessary.
+
+## Broad-Phase Partitioning (Performance)
+
+Set `Factory<T>.PartitionAxis = Axis.X` (or `Axis.Y`) to replace the default O(n×m) pairwise
+check with sweep-and-prune broad-phase culling. It engages automatically for any relationship
+built from partitioned factories — nothing to opt into on the relationship itself.
+
+- **Self-collision**: only that one factory needs `PartitionAxis` set.
+- **Two-list relationship**: both factories must share the *same* axis. One set to `X` and the
+  other `Y` (or left `null`) silently falls back to O(n×m) — no warning.
+- Verify it actually engaged via `relationship.DeepCollisionCount` (should sit well below n×m),
+  or `PerformanceMonitor.GetCollisionReport()` (see `performance` skill), which flags
+  unpartitioned relationships.
+- Pick the axis your entities spread out along most — e.g. `Axis.X` for a wide side-scroller level.
+
+### Object Size (`BroadPhaseRadius`)
+
+Each entity's own `BroadPhaseRadius` (farthest shape edge from center, aggregated across attached
+shapes) grows and shrinks automatically as shapes are added, removed, resized, moved, or
+reparented — no manual invalidation needed. `ICollidable.BroadPhaseRadius` has no default body;
+`Entity` supplies the aggregation itself, so every game entity gets it for free.
+
+The sweep itself never reads an individual entity's radius — it uses one shared upper bound per
+factory (`Factory<T>.PartitionMaxRadius`, internal), the largest `BroadPhaseRadius` any entity in
+that factory has ever reached. A single per-factory bound keeps the sweep's edge order valid even
+when entities in the same factory have very different sizes; the tradeoff is a slightly wider (but
+still correct) candidate window when sizes vary a lot.
+
+See `Factory<T>.PartitionAxis`/`SortForPartition` in `src/Factory.cs` and the broad-phase gate in
+`src/Collision/CollisionRelationship.cs`.
