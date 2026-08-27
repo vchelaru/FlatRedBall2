@@ -296,24 +296,30 @@ Concave `Polygon` shapes are fully supported: the engine automatically decompose
 
 ## Broad-Phase Partitioning (Performance)
 
-Set `Factory<T>.PartitionAxis = Axis.X` (or `Axis.Y`) to replace the default O(n×m) pairwise
-check with sweep-and-prune broad-phase culling. It engages automatically — nothing to opt into
-on the relationship itself.
+Setting `Factory<T>.PartitionAxis` to either `Axis.X` or `Axis.Y` enables axis-based partitioning,
+which reduces the deep collision count. Once the `PartitionAxis` is set, partitioning happens
+automatically.
 
-**Eligibility**: both sides must be a `Factory<T>` with the *same* non-null `PartitionAxis`. A
-plain `List<T>`, a single entity, or a `TileShapes` is not a factory and never partitions.
+Partitioning requires a `Factory<T>` on both sides of the relationship, and both factories must use
+the same axis. A relationship built from a plain `List<T>`, a single entity, or a `TileShapes`
+always checks every pair, because none of those is a factory and none has a `PartitionAxis` to set.
 
 ```csharp
 _bulletFactory.PartitionAxis = Axis.X;
-_enemyFactory.PartitionAxis  = Axis.X;   // mismatched or null silently falls back to O(n×m)
+_enemyFactory.PartitionAxis = Axis.X;
 AddCollisionRelationship<Bullet, Enemy>(_bulletFactory, _enemyFactory);
 ```
 
-- **Self-collision**: only that one factory needs `PartitionAxis` set.
-- Verify via `relationship.DeepCollisionCount` (should sit well below n×m), or
-  `PerformanceMonitor.GetCollisionReport()` (see `performance` skill), whose `PartitionStatus`
-  flags only the fixable `Unpartitioned` case — a non-factory side reports `NotApplicable`.
-- Pick the axis your entities spread out along most — e.g. `Axis.X` for a wide side-scroller level.
+If the two axes differ, or either one is left null, the relationship silently falls back to checking
+every pair.
+
+- A self-collision relationship uses a single factory, so only that factory needs a `PartitionAxis`.
+- To confirm partitioning is working, read `relationship.DeepCollisionCount`. It drops well below
+  n×m once the sweep engages. `PerformanceMonitor.GetCollisionReport()` (see the `performance`
+  skill) also reports a `PartitionStatus` for every relationship, and `Unpartitioned` is the only
+  value that means something you can fix.
+- Choose the axis your entities spread out along most. A wide side-scrolling level partitions best
+  on `Axis.X`.
 
 ### Object Size (`BroadPhaseRadius`)
 
