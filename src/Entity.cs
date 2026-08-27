@@ -43,6 +43,7 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     private float _cachedBroadPhaseRadius;
     private bool _broadPhaseRadiusDirty = true;
     private readonly List<GraphicalUiElement> _gumChildren = new();
+    private Entity? _parent;
 
     /// <summary>
     /// Optional logical name for diagnostics, snapshots, and game-specific lookup.
@@ -132,7 +133,9 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     /// <summary>
     /// Maximum distance from <see cref="AbsoluteX"/>/<see cref="AbsoluteY"/> to the far edge of
     /// any attached collision shape, used by the broad phase to cull entity pairs before
-    /// per-shape collision checks. Cached and invalidated when shapes are added or removed.
+    /// per-shape collision checks. Cached and invalidated whenever a shape is added, removed,
+    /// resized, moved (local offset), or reparented — including nested entities attached as
+    /// another entity's shape.
     /// </summary>
     public float BroadPhaseRadius
     {
@@ -154,6 +157,28 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
             }
             return _cachedBroadPhaseRadius;
         }
+    }
+
+    // Set by Factory<T>.CreateCore on the entities it creates — mirrors the _onDestroy closure
+    // convention (no stored back-reference to the generic Factory<T>). Invoked with this entity's
+    // freshly recomputed BroadPhaseRadius whenever it may have grown, so the factory's shared
+    // partitioning bound (Factory<T>.PartitionMaxRadius) can grow with it.
+    internal Action<float>? _onBroadPhaseRadiusGrew;
+
+    // Marks the cached BroadPhaseRadius dirty and eagerly recomputes it — this only runs on the
+    // rare write path (shape add/remove/resize/reparent), never per-frame movement, so eager
+    // recompute here is cheap. If the recompute grew the radius, notifies the owning factory (if
+    // any) and propagates up the Parent chain, since a nested entity's growth can grow its
+    // parent's aggregate too. Shrinking never needs to propagate — a stale-too-large bound stays
+    // safe, only a stale-too-small one is a correctness bug.
+    internal void InvalidateBroadPhaseRadius()
+    {
+        float previous = _cachedBroadPhaseRadius;
+        _broadPhaseRadiusDirty = true;
+        float current = BroadPhaseRadius;
+        if (current > previous)
+            _onBroadPhaseRadiusGrew?.Invoke(current);
+        Parent?.InvalidateBroadPhaseRadius();
     }
 
     /// <summary>
@@ -225,7 +250,22 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
     /// automatically by <see cref="Add(IAttachable, Layer?)"/> / <see cref="Remove(IAttachable)"/>; manual
     /// assignment is permitted but bypasses child-list bookkeeping and is rarely correct.
     /// </summary>
-    public Entity? Parent { get; set; }
+    public Entity? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (ReferenceEquals(_parent, value)) return;
+            // Invalidate both sides *after* the pointer changes — this entity may be attached as
+            // another entity's shape (Entity implements ICollidable), so reparenting can change
+            // either side's aggregate, and the old side must recompute using this entity's new
+            // (post-reassignment) AbsoluteX/Y, not its pre-reassignment position.
+            var old = _parent;
+            _parent = value;
+            old?.InvalidateBroadPhaseRadius();
+            value?.InvalidateBroadPhaseRadius();
+        }
+    }
 
     /// <summary>
     /// All attached children (shapes, sprites, Gum visuals, sub-entities). Populated by
@@ -352,7 +392,7 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
         if (child is ICollidable collidable)
         {
             _shapes.Add(collidable);
-            _broadPhaseRadiusDirty = true;
+            InvalidateBroadPhaseRadius();
         }
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
@@ -381,7 +421,7 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
         if (isDefaultCollision)
         {
             _shapes.Add(child);
-            _broadPhaseRadiusDirty = true;
+            InvalidateBroadPhaseRadius();
         }
 
         if (child is IRenderable renderable && _engine?.CurrentScreen != null)
@@ -418,13 +458,13 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
             if (!_shapes.Contains(shape))
             {
                 _shapes.Add(shape);
-                _broadPhaseRadiusDirty = true;
+                InvalidateBroadPhaseRadius();
             }
         }
         else
         {
             if (_shapes.Remove(shape))
-                _broadPhaseRadiusDirty = true;
+                InvalidateBroadPhaseRadius();
         }
     }
 
@@ -439,7 +479,7 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
         child.Parent = null;
 
         if (child is ICollidable collidable && _shapes.Remove(collidable))
-            _broadPhaseRadiusDirty = true;
+            InvalidateBroadPhaseRadius();
 
         if (child is IRenderable renderable)
             _engine?.CurrentScreen?.Remove(renderable);

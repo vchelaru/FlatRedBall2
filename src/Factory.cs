@@ -14,6 +14,15 @@ internal interface IFactory
     void SortForPartition();
     System.Type EntityType { get; }
     System.Collections.Generic.IReadOnlyList<Entity> EntityInstances { get; }
+
+    /// <summary>
+    /// Upper bound on <see cref="Entity.BroadPhaseRadius"/> across every entity this factory has
+    /// ever created. Used as a single shared sweep-edge bound by the broad-phase partitioner
+    /// instead of each entity's own radius, so the sweep's monotonic-edge assumption holds
+    /// regardless of per-instance radius variance. Grows as entities are created or grow; never
+    /// shrinks (a stale-too-large bound is safe, just less tight).
+    /// </summary>
+    float PartitionMaxRadius { get; }
 }
 
 /// <summary>
@@ -43,6 +52,7 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
 {
     private readonly Screen _screen;
     private readonly List<T> _instances = new();
+    private float _partitionMaxRadius;
 
     // Pooling state — only populated while pooling is enabled.
     private bool _poolingEnabled;
@@ -188,6 +198,8 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
     /// </summary>
     public Axis? PartitionAxis { get; set; }
 
+    float IFactory.PartitionMaxRadius => _partitionMaxRadius;
+
     /// <summary>
     /// Controls SNES-style lazy-spawn behavior when this factory is the target of
     /// <see cref="Tiled.TileMap.CreateEntities{T}"/>. Default <see cref="LazySpawnMode.Disabled"/>
@@ -292,6 +304,11 @@ public class Factory<T> : IEnumerable<T>, IReadOnlyList<T>, IFactory where T : E
             entity._isPooled = true;
         _screen.AddEntity(entity);
         _instances.Add(entity);
+        entity._onBroadPhaseRadiusGrew = r =>
+        {
+            if (r > _partitionMaxRadius)
+                _partitionMaxRadius = r;
+        };
         entity._onDestroy = () =>
         {
             _instances.Remove(entity);

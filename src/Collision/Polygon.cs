@@ -29,6 +29,9 @@ public class Polygon : IAttachable, IRenderable, ICollidable
 {
     private readonly List<Vector2> _points = new();
     private List<IReadOnlyList<Vector2>> _convexParts = new();
+    private float _x;
+    private float _y;
+    private Entity? _parent;
 
     /// <summary>
     /// The polygon's vertices in local (unrotated, unpositioned) space. Read-only — call
@@ -114,15 +117,27 @@ public class Polygon : IAttachable, IRenderable, ICollidable
         _points.Clear();
         _points.AddRange(points);
         BuildConvexParts();
+        _parent?.InvalidateBroadPhaseRadius();
     }
 
     // IAttachable
     /// <inheritdoc/>
-    public Entity? Parent { get; set; }
+    public Entity? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (ReferenceEquals(_parent, value)) return;
+            var old = _parent;
+            _parent = value;
+            old?.InvalidateBroadPhaseRadius();
+            value?.InvalidateBroadPhaseRadius();
+        }
+    }
     /// <summary>X position. Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float X { get; set; }
+    public float X { get => _x; set { _x = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Y position (Y+ up). Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float Y { get; set; }
+    public float Y { get => _y; set { _y = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
     /// <inheritdoc/>

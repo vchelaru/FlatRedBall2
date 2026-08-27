@@ -19,10 +19,16 @@ namespace FlatRedBall2.Collision;
 /// </remarks>
 public class AARect : IAttachable, IRenderable, ICollidable
 {
+    private float _width = 32f;
+    private float _height = 32f;
+    private float _x;
+    private float _y;
+    private Entity? _parent;
+
     /// <summary>Width in world units. Defaults to 32. Centered on <see cref="X"/>.</summary>
-    public float Width { get; set; } = 32f;
+    public float Width { get => _width; set { _width = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Height in world units. Defaults to 32. Centered on <see cref="Y"/>.</summary>
-    public float Height { get; set; } = 32f;
+    public float Height { get => _height; set { _height = value; _parent?.InvalidateBroadPhaseRadius(); } }
 
     /// <summary>
     /// Controls which directions this rectangle may reposition overlapping objects.
@@ -47,11 +53,22 @@ public class AARect : IAttachable, IRenderable, ICollidable
 
     // IAttachable
     /// <inheritdoc/>
-    public Entity? Parent { get; set; }
+    public Entity? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (ReferenceEquals(_parent, value)) return;
+            var old = _parent;
+            _parent = value;
+            old?.InvalidateBroadPhaseRadius();
+            value?.InvalidateBroadPhaseRadius();
+        }
+    }
     /// <summary>Center X. Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float X { get; set; }
+    public float X { get => _x; set { _x = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Center Y (Y+ up). Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float Y { get; set; }
+    public float Y { get => _y; set { _y = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
     /// <inheritdoc/>
