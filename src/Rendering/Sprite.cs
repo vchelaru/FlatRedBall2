@@ -72,11 +72,16 @@ public class Sprite : IRenderable, IAttachable
     /// <summary>Per-sprite draw order within its <see cref="Layer"/>. See <see cref="IRenderable.Z"/> for sorting semantics.</summary>
     public float Z { get; set; }
 
-    /// <summary>Final world-space X after walking the parent chain.</summary>
-    public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    /// <summary>
+    /// Final world-space X after walking the parent chain. When attached, <see cref="X"/>/<see cref="Y"/>
+    /// are rotated by the parent's <see cref="AbsoluteRotation"/> before being added to the
+    /// parent's absolute position — an attached sprite orbits its parent's origin as the parent
+    /// rotates (lever-arm), it does not keep a fixed world offset.
+    /// </summary>
+    public float AbsoluteX => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).X : X;
 
-    /// <summary>Final world-space Y after walking the parent chain.</summary>
-    public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    /// <summary>Final world-space Y after walking the parent chain. See <see cref="AbsoluteX"/> for the rotation-composed formula.</summary>
+    public float AbsoluteY => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).Y : Y;
 
     /// <summary>Final Z after walking the parent chain. Used for sort order; see <see cref="Z"/>.</summary>
     public float AbsoluteZ => Parent != null ? Parent.AbsoluteZ + Z : Z;

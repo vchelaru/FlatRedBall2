@@ -39,6 +39,24 @@ public class SpriteRotationTests
         return XVec2.Transform(preMatrix, camera.GetTransformMatrix()).Y;
     }
 
+    // Issue #991: a sprite's local offset must rotate with the parent's AbsoluteRotation
+    // (lever-arm orbit), not stay at a fixed world offset.
+    [Fact]
+    public void AbsoluteX_ParentRotated_OrbitsAroundParent()
+    {
+        var parentRotation = Angle.FromDegrees(90f);
+        float childX = 10f, childY = 0f;
+        float expectedAbsoluteX = 0f;
+        float expectedAbsoluteY = 10f;
+
+        var parent = new Entity { Rotation = parentRotation };
+        var sprite = new Sprite { X = childX, Y = childY };
+        parent.Add(sprite);
+
+        sprite.AbsoluteX.ShouldBe(expectedAbsoluteX, tolerance: 0.001f);
+        sprite.AbsoluteY.ShouldBe(expectedAbsoluteY, tolerance: 0.001f);
+    }
+
     [Fact]
     public void Sprite_PositiveRotation_RotatesCounterclockwise_LikePolygon()
     {

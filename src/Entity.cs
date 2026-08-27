@@ -113,15 +113,18 @@ public class Entity : ICollidable, IAttachable, ILifecycleEvents
 
     /// <summary>
     /// Final world-space X after walking the parent chain. Equal to <see cref="X"/> when this
-    /// entity is a root; otherwise <c>Parent.AbsoluteX + X</c>.
+    /// entity is a root; otherwise <see cref="X"/>/<see cref="Y"/> rotated by
+    /// <c>Parent.AbsoluteRotation</c> and added to <c>Parent.AbsoluteX</c> — an attached child
+    /// orbits its parent's origin as the parent rotates (lever-arm), it does not keep a fixed
+    /// world offset.
     /// </summary>
-    public float AbsoluteX => Parent != null ? Parent.AbsoluteX + X : X;
+    public float AbsoluteX => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).X : X;
 
     /// <summary>
     /// Final world-space Y after walking the parent chain. Equal to <see cref="Y"/> when this
-    /// entity is a root; otherwise <c>Parent.AbsoluteY + Y</c>.
+    /// entity is a root; otherwise see <see cref="AbsoluteX"/> for the rotation-composed formula.
     /// </summary>
-    public float AbsoluteY => Parent != null ? Parent.AbsoluteY + Y : Y;
+    public float AbsoluteY => Parent != null ? AttachmentMath.ComposeAbsolute(Parent, X, Y).Y : Y;
 
     /// <summary>
     /// Final Z after walking the parent chain. Equal to <see cref="Z"/> when this entity is a
