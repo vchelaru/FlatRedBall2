@@ -302,13 +302,15 @@ built from partitioned factories — nothing to opt into on the relationship its
 ### Object Size (`BroadPhaseRadius`)
 
 Each entity's own `BroadPhaseRadius` (farthest shape edge from center, aggregated across attached
-shapes, cached) is used as its sweep edge — no manual size configuration needed, mixed sizes in
-one factory partition correctly automatically. `ICollidable.BroadPhaseRadius` has no default body;
+shapes) grows and shrinks automatically as shapes are added, removed, resized, moved, or
+reparented — no manual invalidation needed. `ICollidable.BroadPhaseRadius` has no default body;
 `Entity` supplies the aggregation itself, so every game entity gets it for free.
 
-**Landmine**: the cache is only invalidated on `Add`/`Remove`/`SetDefaultCollision` — resizing a
-shape's `Width`/`Height`/`Radius` after attaching it does not update it, so a growing entity can
-silently miss collisions under partitioning. Tracked in issue #989.
+The sweep itself never reads an individual entity's radius — it uses one shared upper bound per
+factory (`Factory<T>.PartitionMaxRadius`, internal), the largest `BroadPhaseRadius` any entity in
+that factory has ever reached. A single per-factory bound keeps the sweep's edge order valid even
+when entities in the same factory have very different sizes; the tradeoff is a slightly wider (but
+still correct) candidate window when sizes vary a lot.
 
 See `Factory<T>.PartitionAxis`/`SortForPartition` in `src/Factory.cs` and the broad-phase gate in
 `src/Collision/CollisionRelationship.cs`.

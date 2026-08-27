@@ -231,6 +231,57 @@ public class SweepAndPruneTests
     }
 
     [Fact]
+    public void PartitionMaxRadius_GrowsWhenEntityRadiusGrowsAfterCreation()
+    {
+        // #992 — the factory-level bound must track growth, not just the radius at creation.
+        var (factory, _) = CreateFactory();
+        var a = factory.Create(); // default Circle radius 16
+        ((IFactory)factory).PartitionMaxRadius.ShouldBe(16f);
+
+        a.Circle.Radius = 60f;
+
+        ((IFactory)factory).PartitionMaxRadius.ShouldBe(60f);
+    }
+
+    [Fact]
+    public void PartitionAxis_EntityGrowsAfterCreation_SweepStillDetectsCollisionAgainstOtherFactory()
+    {
+        // Regression for #992: Factory<T>.SortForPartition() sorts by center position, and the
+        // sweep's two-pointer "startB" only ever advances forward across the outer loop. That's
+        // only safe if the per-entity radius is uniform — if a *later* entity in sort order has
+        // a much larger radius than an *earlier* one, the earlier entity's (smaller) radius can
+        // advance startB past a B-side candidate that the later entity actually overlaps, and
+        // that candidate is never tested again. The fix is a single shared per-factory bound
+        // (Factory<T>.PartitionMaxRadius) used for every entity's edge test, restoring the
+        // sweep's monotonic-edge invariant regardless of per-instance radius variance.
+        var screenA = new TestScreen();
+        screenA.Engine = new FlatRedBallService();
+        var screenB = new TestScreen();
+        screenB.Engine = new FlatRedBallService();
+        var factoryA = new Factory<BallEntity>(screenA);
+        var factoryB = new Factory<BallEntity>(screenB);
+        factoryA.PartitionAxis = Axis.X;
+        factoryB.PartitionAxis = Axis.X;
+
+        var a0 = factoryA.Create(); a0.X = 100f; a0.Name = "a0"; // default radius 16
+        var a1 = factoryA.Create(); a1.X = 110f; a1.Name = "a1";
+        a1.Circle.Radius = 60f; // grows well after creation — sorted after a0, much larger radius
+
+        var b0 = factoryB.Create(); b0.X = 65f; b0.Name = "b0"; // default radius 16 — overlaps only a1
+
+        ((IFactory)factoryA).SortForPartition();
+        ((IFactory)factoryB).SortForPartition();
+
+        var rel = new CollisionRelationship<BallEntity, BallEntity>(factoryA, factoryB);
+        (string, string)? firedPair = null;
+        rel.CollisionOccurred += (x, y) => firedPair = (x.Name!, y.Name!);
+
+        rel.RunCollisions();
+
+        firedPair.ShouldBe(("a1", "b0"));
+    }
+
+    [Fact]
     public void RunSameListCollisionsSweep_AlternatesSweepDirection_PairOrderReversesOnSecondFrame()
     {
         // Three overlapping balls in a line. On the first frame the sweep processes pairs

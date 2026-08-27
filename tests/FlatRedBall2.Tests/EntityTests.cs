@@ -278,6 +278,113 @@ public class EntityTests
         entity.BroadPhaseRadius.ShouldBe(0f);
     }
 
+    // #989 — BroadPhaseRadius goes stale when a shape resizes after Add.
+    [Fact]
+    public void BroadPhaseRadius_AfterCircleRadiusGrows_ReflectsNewRadius()
+    {
+        var entity = new Entity();
+        var circle = new Circle { Radius = 8f };
+        entity.Add(circle);
+        entity.BroadPhaseRadius.ShouldBe(8f);
+
+        circle.Radius = 64f;
+
+        entity.BroadPhaseRadius.ShouldBe(64f);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterAARectWidthGrows_ReflectsNewRadius()
+    {
+        var entity = new Entity();
+        var rect = new AARect { Width = 10f, Height = 10f };
+        entity.Add(rect);
+        entity.BroadPhaseRadius.ShouldBe(5f);
+
+        rect.Width = 200f;
+
+        entity.BroadPhaseRadius.ShouldBe(100f);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterPolygonSetPointsGrows_ReflectsNewRadius()
+    {
+        var entity = new Entity();
+        var poly = Polygon.CreateRectangle(10f, 10f);
+        entity.Add(poly);
+        var smallRadius = entity.BroadPhaseRadius;
+
+        poly.SetPoints(new System.Numerics.Vector2[]
+        {
+            new(-100f, -100f), new(100f, -100f), new(100f, 100f), new(-100f, 100f)
+        });
+
+        entity.BroadPhaseRadius.ShouldBeGreaterThan(smallRadius);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterLineEndPointGrows_ReflectsNewRadius()
+    {
+        var entity = new Entity();
+        var line = new Line { EndPoint = new System.Numerics.Vector2(4f, 0f) };
+        entity.Add(line);
+        entity.BroadPhaseRadius.ShouldBe(4f);
+
+        line.EndPoint = new System.Numerics.Vector2(100f, 0f);
+
+        entity.BroadPhaseRadius.ShouldBe(100f);
+    }
+
+    [Fact]
+    public void BroadPhaseRadius_AfterShapeLocalOffsetGrows_ReflectsNewOffset()
+    {
+        var entity = new Entity();
+        var circle = new Circle { Radius = 4f, X = 0f };
+        entity.Add(circle);
+        entity.BroadPhaseRadius.ShouldBe(4f);
+
+        circle.X = 50f;
+
+        entity.BroadPhaseRadius.ShouldBe(54f);
+    }
+
+    // #989 — direct Parent reassignment bypasses Add()/Remove() shape-list bookkeeping
+    // entirely (a pre-existing, documented limitation of manual Parent assignment — it does
+    // not move the shape between _shapes lists). What must not happen is the *cache* going
+    // stale: oldParent still nominally owns the shape, so once the shape's absolute position
+    // jumps because its Parent changed, oldParent's cached BroadPhaseRadius must grow to
+    // match — a stale-small cache here is the actual bug (broad-phase would wrongly cull a
+    // real overlap).
+    [Fact]
+    public void BroadPhaseRadius_DirectParentReassignment_InvalidatesOldOwnersCache()
+    {
+        var oldParent = new Entity { X = 0f };
+        var farParent = new Entity { X = 1000f };
+        var circle = new Circle { Radius = 5f };
+        oldParent.Add(circle);
+        oldParent.BroadPhaseRadius.ShouldBe(5f);
+
+        circle.Parent = farParent; // bypasses Remove()/Add() — oldParent._shapes still has circle
+
+        oldParent.BroadPhaseRadius.ShouldBe(1005f);
+    }
+
+    // #989 — a nested Entity attached as another entity's shape must propagate growth up
+    // through the Parent chain, since the outer entity's cache aggregates the inner one's.
+    [Fact]
+    public void BroadPhaseRadius_NestedEntityShapeGrows_PropagatesToGrandparent()
+    {
+        var outer = new Entity();
+        var inner = new Entity();
+        var circle = new Circle { Radius = 4f };
+        inner.Add(circle);
+        outer.Add(inner);
+        var smallRadius = outer.BroadPhaseRadius;
+
+        circle.Radius = 100f;
+
+        outer.BroadPhaseRadius.ShouldBeGreaterThan(smallRadius);
+    }
+
     private class DestroyTrackingEntity : Entity
     {
         public bool WasDestroyed { get; private set; }

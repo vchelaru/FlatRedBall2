@@ -19,19 +19,35 @@ namespace FlatRedBall2.Collision;
 /// </remarks>
 public class Line : IAttachable, IRenderable, ICollidable
 {
+    private Vector2 _endPoint = new Vector2(32f, 0f);
+    private float _x;
+    private float _y;
+    private Entity? _parent;
+
     /// <summary>
     /// Offset from the first endpoint to the second, in world units.
     /// Added to <see cref="AbsolutePoint1"/> to produce <see cref="AbsolutePoint2"/>.
     /// </summary>
-    public Vector2 EndPoint { get; set; } = new Vector2(32f, 0f);
+    public Vector2 EndPoint { get => _endPoint; set { _endPoint = value; _parent?.InvalidateBroadPhaseRadius(); } }
 
     // IAttachable
     /// <inheritdoc/>
-    public Entity? Parent { get; set; }
+    public Entity? Parent
+    {
+        get => _parent;
+        set
+        {
+            if (ReferenceEquals(_parent, value)) return;
+            var old = _parent;
+            _parent = value;
+            old?.InvalidateBroadPhaseRadius();
+            value?.InvalidateBroadPhaseRadius();
+        }
+    }
     /// <summary>X of the first endpoint. Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float X { get; set; }
+    public float X { get => _x; set { _x = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Y of the first endpoint (Y+ up). Relative to <see cref="Parent"/> when attached, world when root.</summary>
-    public float Y { get; set; }
+    public float Y { get => _y; set { _y = value; _parent?.InvalidateBroadPhaseRadius(); } }
     /// <summary>Z value. See <see cref="Entity.Z"/> for draw-order semantics.</summary>
     public float Z { get; set; }
     /// <inheritdoc/>
