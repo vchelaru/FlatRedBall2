@@ -15,6 +15,12 @@ public class PerformanceMonitor
 {
     private const int DefaultWindowSize = 120;
 
+    // Above this step, per-phase numbers are dominated by clock quantization rather than real
+    // work: a typical phase costs a few ms, so a half-millisecond step already swamps it.
+    private const double CoarseTimerResolutionMs = 0.5;
+
+    private double? _timerResolutionMs;
+
     private FrameProfile[] _window = new FrameProfile[DefaultWindowSize];
     private int _windowSize = DefaultWindowSize;
     private int _next;
@@ -46,6 +52,32 @@ public class PerformanceMonitor
             _next = 0;
             _count = 0;
         }
+    }
+
+    /// <summary>
+    /// Optional human-readable name for the host platform — set this to the browser name on web
+    /// builds. The engine targets plain <c>net10.0</c> and so cannot read <c>navigator.userAgent</c>
+    /// itself; the game supplies it via JS interop. Shown by <see cref="GenerateReport"/>, and used
+    /// to tailor the advice when <see cref="TimerResolutionMs"/> is too coarse to trust.
+    /// Null means "unknown", which suppresses only the platform-specific advice, not the warning.
+    /// </summary>
+    public string? PlatformLabel { get; set; }
+
+    /// <summary>
+    /// Smallest observable step of the clock behind every <see cref="FrameProfile"/> measurement,
+    /// in milliseconds. Probed on first read (a brief busy-wait, bounded to roughly one clock step
+    /// per sample), then cached.
+    /// <para>
+    /// Check this before trusting a per-phase breakdown. Browsers coarsen their clock as a Spectre
+    /// mitigation, and a phase costing well under one step reads as either 0 or one full step and
+    /// nothing in between. Whole-pass totals stay accurate regardless — their start and end errors
+    /// cancel — so it is only the small per-phase numbers that degrade.
+    /// </para>
+    /// </summary>
+    public double TimerResolutionMs
+    {
+        get => _timerResolutionMs ??= ProfileClock.MeasureResolutionMs();
+        internal set => _timerResolutionMs = value;
     }
 
     /// <summary>Rolling stats for the full Update+Draw frame time.</summary>
@@ -117,6 +149,7 @@ public class PerformanceMonitor
     public string GenerateReport()
     {
         var sb = new StringBuilder();
+        AppendPlatformAndTimerResolution(sb);
         var fps = Fps;
         sb.AppendLine(FormattableString.Invariant(
             $"FPS: {fps.Current:F1} (avg {fps.Average:F1}, min {fps.Min:F1}, max {fps.Max:F1})"));
@@ -142,6 +175,32 @@ public class PerformanceMonitor
         }
 
         return sb.ToString();
+    }
+
+    private void AppendPlatformAndTimerResolution(StringBuilder sb)
+    {
+        var resolution = TimerResolutionMs;
+        sb.AppendLine(FormattableString.Invariant(
+            $"Platform: {PlatformLabel ?? "unknown"} — timer resolution {resolution:F2}ms"));
+
+        if (resolution < CoarseTimerResolutionMs)
+        {
+            sb.AppendLine();
+            return;
+        }
+
+        sb.AppendLine("[!] Clock is too coarse — per-phase timings below are unreliable. Totals");
+        sb.AppendLine("    (FrameTotal / UpdateTotal / DrawTotal) are still accurate; only the");
+        sb.AppendLine("    small per-phase numbers are dominated by quantization error.");
+
+        if (PlatformLabel != null && PlatformLabel.Contains("Firefox", StringComparison.OrdinalIgnoreCase))
+        {
+            sb.AppendLine("    Firefox rounds its clock to 1ms unless the page is cross-origin isolated");
+            sb.AppendLine("    (Cross-Origin-Opener-Policy: same-origin plus Cross-Origin-Embedder-Policy:");
+            sb.AppendLine("    require-corp). Profiling in Chrome (~0.1ms) is the quicker fix.");
+        }
+
+        sb.AppendLine();
     }
 
     private static void AppendPhase(StringBuilder sb, string name, PerformanceStat stat)
