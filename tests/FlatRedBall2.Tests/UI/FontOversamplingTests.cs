@@ -1,5 +1,6 @@
 using System;
 using Gum.GueDeriving;
+using KernSmith;
 using Microsoft.Xna.Framework;
 using RenderingLibrary;
 using Shouldly;
@@ -49,5 +50,13 @@ public class FontOversamplingTests
         engine.Initialize(game);
 
         TextRuntime.UseFontOversampling.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, RasterizerBackend.StbTrueType)]
+    public void ResolveFontRasterizerBackend_SelectsStbTrueTypeOnlyOnBrowser(bool isBrowser, RasterizerBackend? expected)
+    {
+        FlatRedBallService.ResolveFontRasterizerBackend(isBrowser).ShouldBe(expected);
     }
 }
