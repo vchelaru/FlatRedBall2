@@ -291,6 +291,7 @@ The API differs by type:
 - **`AddToRoot()` is NOT the FRB2 pattern**. Use `screen.Add(element)` instead.
 - **No persistence across screen transitions** — Gum elements are fully cleaned up. Add them fresh in each screen's `CustomInitialize`.
 - **World-space Gum**: Do not manually set `Visual.X/Y` on an entity-attached Gum element — it will be overwritten each frame.
+- **For Gum behavior/API questions, check `Gum/docs/` in the sibling `Gum` repo checkout before grepping Gum source.** `Gum.MonoGame` ships as a compiled NuGet package with no source; the sibling repo (usually cloned alongside `FlatRedBall2` under the same GitHub root) has both `docs/` and source, and the docs usually answer it faster. Fall back to source only when the docs don't cover the specific mechanism.
 - **A system font family name (`Font = "Arial"`) is a portability trap** — present on your Windows dev machine, absent on Linux/macOS/mobile, and always absent on BlazorGL/WASM. A missing font fails silently, falling back to KernSmith's embedded 18px placeholder. Ship a project-relative `.ttf` instead — set `Font` to a path ending in `.ttf` (e.g. `"Fonts/MyFont.ttf"`) and it's read directly, no `RegisterFont` call needed; see `gum-packaging` for bundling it.
 
 For headed screenshot diagnostics (zoom sweeps, overlays, full-frame vs smart-crop capture), use the `render-diagnostics` skill.
