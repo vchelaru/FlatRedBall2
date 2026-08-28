@@ -14,6 +14,7 @@ using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
 using FlatRedBall2.Utilities;
 using Gum.Forms;
+using Gum.GueDeriving;
 using Gum.Wireframe;
 using KernSmith.Gum;
 using Gum;
@@ -512,6 +513,13 @@ public class FlatRedBallService
         // cascade as IInMemoryFontCreator. Same wiring for both MonoGame and KNI.
         CustomSetPropertyOnRenderable.InMemoryFontCreator =
             new KernSmithFontCreator(game.GraphicsDevice);
+        // Rebuilds each visible TextRuntime's font at its zoomed size instead of stretching the
+        // baked bitmap, fixing blur under Camera.Zoom and window resize (issue #1000). Safe to turn
+        // on unconditionally because it only acts on the Gum Camera.Zoom GumRenderBatch already
+        // drives from Camera.PixelsPerUnit — screen-space layers (Zoom == 1, e.g. AddOverlay) never
+        // trigger a rebuild — and the KernSmithFontCreator above is always present as the
+        // IInMemoryFontCreator oversampling needs to rasterize the new size.
+        TextRuntime.UseFontOversampling = true;
         GumRenderBatch.Instance.Initialize();
         GumRenderBatch.ScreenSpaceInstance.Initialize();
         // Guarded because ShapeRenderer is a Gum-side singleton that throws on a second Initialize,
