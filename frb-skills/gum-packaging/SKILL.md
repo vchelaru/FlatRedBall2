@@ -35,7 +35,7 @@ Default is `core,fontcache,external` — everything. Trim if your build pipeline
 
 - `core` — the project + element files (`.gumx`+`.gusx`/`.gucx`/`.gutx`/`.behx`, or the JSON equivalents)
 - `fontcache` — generated `.fnt`/`.png` under `FontCache/`
-- `external` — sprite-source `.png`s and custom fonts referenced by the project but living outside Core/FontCache
+- `external` — sprite-source `.png`s and custom fonts referenced by the project but living outside Core/FontCache. This includes a `Font` value that's a project-relative `.ttf` path (not just `CustomFontFile`) — Gum detects it from the `.ttf` extension alone, no registration needed. **Requires Gum/KernSmith 2026.8.28.1-preview.1+** — on an older Gum, pack still writes the file into the bundle but the runtime can't read it back out, so text silently falls back to KernSmith's embedded placeholder font instead of erroring.
 
 ```bash
 "$GUMCLI" pack Content/GumProject/GumProject.gumx --include core,external
