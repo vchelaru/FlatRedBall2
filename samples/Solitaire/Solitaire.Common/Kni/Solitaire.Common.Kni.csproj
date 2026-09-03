@@ -51,6 +51,11 @@
     <Content Include="..\Content\GumProject\GumProject.gumpkg"
              Link="Content\GumProject\GumProject.gumpkg"
              CopyToOutputDirectory="PreserveNewest" />
+    <!-- SIL OFL 1.1 license, mirroring the MonoGame sibling. See that project for why bundle mode
+         has to name it explicitly. -->
+    <Content Include="..\Content\GumProject\Fonts\LiberationSans-LICENSE.txt"
+             Link="Content\GumProject\Fonts\LiberationSans-LICENSE.txt"
+             CopyToOutputDirectory="PreserveNewest" />
     <None Remove="..\Content\GumProject\**\*.*" />
   </ItemGroup>
 </Project>
