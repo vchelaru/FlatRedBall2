@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
   <Project Path="../../src/FlatRedBall2.csproj" />
+  <Project Path="../../../Gum/MonoGameGum/MonoGameGum.csproj" />
   <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="Solitaire.BlazorGL/Solitaire.BlazorGL.csproj" />
   <Project Path="Solitaire.Common/Solitaire.Common.csproj" />

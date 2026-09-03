@@ -17,6 +17,8 @@ public class CardEntity : Entity
     public const float Height = 112f;
 
     private CardGum _gum = null!;
+    // TEMP diagnostic (batching investigation) - remove once done.
+    internal CardGum DiagnosticGum => _gum;
     private Card? _model;
     private Tweener? _moveTween;
     private CancellationTokenSource? _pendingHideCts;

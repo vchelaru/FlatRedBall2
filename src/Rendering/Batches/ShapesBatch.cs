@@ -33,6 +33,9 @@ public class ShapesBatch : IRenderBatch
     /// <inheritdoc/>
     public bool FlipsY => false; // Shapes convert world→screen via camera.WorldToScreen() themselves
 
+    // Does not override IRenderBatch.InternalDrawCallCount: Apos.Shapes' ShapeBatch (checked up
+    // to 0.8.1) exposes no draw-call/state-change counter to read. Revisit if a future version adds one.
+
     // Apos.Shapes manages its own pixel-space projection internally.
     // Shape Draw() methods convert world coordinates to screen pixels via camera.WorldToScreen()
     // before submitting to Apos.Shapes, so no view matrix is needed here.

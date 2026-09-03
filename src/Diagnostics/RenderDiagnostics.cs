@@ -29,7 +29,31 @@ public class RenderDiagnostics
     /// </summary>
     public IReadOnlyList<BatchBreakInfo> BatchBreaks => _breaks;
 
-    internal void BeginFrame() => _breaks.Clear();
+    private int _internalDrawCallCount;
+
+    /// <summary>
+    /// Latest <see cref="Rendering.IRenderBatch.InternalDrawCallCount"/> reported this frame —
+    /// GPU draw calls issued by a batch that wraps a foreign renderer (Gum, Apos.Shapes) FRB's own
+    /// <see cref="BatchBreakCount"/> tracking above can't see into. Zero unless a batch in the
+    /// scene overrides the default. Reset every frame, same as <see cref="BatchBreaks"/>.
+    /// </summary>
+    public int InternalDrawCallCount => _internalDrawCallCount;
+
+    internal void BeginFrame()
+    {
+        _breaks.Clear();
+        _internalDrawCallCount = 0;
+    }
+
+    /// <summary>
+    /// Records this frame's <see cref="InternalDrawCallCount"/>. Called by the engine after every
+    /// <c>IRenderBatch.End</c>. Overwrites rather than accumulates: a batch's own reported count is
+    /// already a running total for the whole host frame (e.g. GumRenderBatch reads Gum's internal
+    /// counter, which Gum resets once per frame, not once per Begin/End cycle — and Gum's Begin/End
+    /// runs multiple times per frame, once per camera plus the overlay pass), so summing successive
+    /// reports would double-count every earlier cycle.
+    /// </summary>
+    internal void RecordInternalDrawCalls(int count) => _internalDrawCallCount = count;
 
     internal void RecordBreak(IRenderBatch previous, IRenderBatch next, Layer? layer, float z,
         string previousName, string nextName)

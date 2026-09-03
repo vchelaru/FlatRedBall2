@@ -27,7 +27,7 @@ The only relevant question is "is this the right design?" — never "will this b
 
 ## Multi-Phase Plans (`plan/`)
 
-Work too large for a single PR gets a **plan** rather than a long-running branch or a TODO entry.
+Create a **plan** only when the user explicitly asks for one. `Start work on <issue>` means implement, test, push, and open a PR; do not stop at a plan or plan-only commit.
 
 - **`plan/plan.md` is the table of contents.** One row per phase, linking to that phase's document,
   with a status. It never holds phase content itself. Read it first when picking up large work.
