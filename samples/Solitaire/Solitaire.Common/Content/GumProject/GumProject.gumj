@@ -47,6 +47,8 @@
   "TextureFilter": "Point",
   "ConvertVariablesOnUnitTypeChange": false,
   "RestrictToUnitValues": true,
+  "SnapToGrid": false,
+  "GridSize": 0,
   "RestrictFileNamesForAndroid": false,
   "Guides": [],
   "FavoriteComponents": [],

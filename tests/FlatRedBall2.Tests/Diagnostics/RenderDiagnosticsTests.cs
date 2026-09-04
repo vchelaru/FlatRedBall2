@@ -100,7 +100,7 @@ public class RenderDiagnosticsTests
     }
 
     [Fact]
-    public void RecordInternalDrawCalls_CalledTwiceInOneFrame_TakesLatestValueInsteadOfSumming()
+    public void RecordInternalDrawCalls_CalledTwiceInOneFrame_KeepsLargestReportInsteadOfSumming()
     {
         // GumRenderBatch.InternalDrawCallCount reads Gum's own cumulative-for-the-host-frame
         // counter (reset once per frame by Gum, not once per Begin/End cycle), and Gum's Begin/End
@@ -127,11 +127,11 @@ public class RenderDiagnosticsTests
     }
 
     [Fact]
-    public void Screen_Draw_TwoBatchesInTheFrame_InternalDrawCallCountIsTheLastOneRecorded()
+    public void Screen_Draw_TwoBatchesInTheFrame_InternalDrawCallCountIsTheLargestReported()
     {
         // In practice only GumRenderBatch overrides InternalDrawCallCount, and it reports a
         // cumulative-for-the-host-frame value (see RecordInternalDrawCalls_CalledTwiceInOneFrame_
-        // TakesLatestValueInsteadOfSumming), so the last Begin/End cycle's report already reflects
+        // KeepsLargestReportInsteadOfSumming), so the last Begin/End cycle's report already reflects
         // every draw call so far this frame — Screen must not sum successive cycles' reports.
         var screen = new TestScreen();
         var layer = new Layer("Test");
@@ -145,6 +145,32 @@ public class RenderDiagnosticsTests
         // Two different batches back-to-back force two separate Begin/End pairs.
         screen.Add(new StubRenderable { Z = 0f, Layer = layer, Name = "gum", Batch = gumLikeBatch });
         screen.Add(new StubRenderable { Z = 1f, Layer = layer, Name = "shapes", Batch = shapesLikeBatch });
+
+        diagnostics.BeginFrame();
+        screen.Draw(null!, diagnostics, camera);
+
+        diagnostics.InternalDrawCallCount.ShouldBe(46);
+    }
+
+    [Fact]
+    public void Screen_Draw_NonReportingBatchEndsTheFrame_DoesNotWipeAnEarlierGumReport()
+    {
+        // Only a batch wrapping a foreign renderer overrides InternalDrawCallCount; every other
+        // batch returns the interface default of 0. Screen.EndBatch records whatever each batch it
+        // ends reports, so a plain world-space batch closing out the frame must not overwrite the
+        // Gum count with its own 0. Each report is a running total for the whole frame, so the
+        // frame's answer is the largest report, not the last one to arrive.
+        var screen = new TestScreen();
+        var layer = new Layer("Test");
+        screen.Layers.Add(layer);
+        var diagnostics = new RenderDiagnostics { IsEnabled = true };
+        var camera = new Camera();
+
+        var gumLikeBatch = new StubBatch { InternalDrawCallCountToReport = 46 };
+        var worldSpaceLikeBatch = new DefaultOnlyBatch();
+
+        screen.Add(new StubRenderable { Z = 0f, Layer = layer, Name = "gum", Batch = gumLikeBatch });
+        screen.Add(new StubRenderable { Z = 1f, Layer = layer, Name = "sprite", Batch = worldSpaceLikeBatch });
 
         diagnostics.BeginFrame();
         screen.Draw(null!, diagnostics, camera);

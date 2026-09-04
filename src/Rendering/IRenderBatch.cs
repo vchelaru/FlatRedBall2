@@ -35,8 +35,8 @@ public interface IRenderBatch
     /// override only when this batch wraps a foreign renderer (Gum, Apos.Shapes, a tilemap
     /// library) that does its own internal sub-batching FlatRedBall2 can't see into. Read by the
     /// engine right after <see cref="End"/> and written into
-    /// <see cref="FlatRedBall2.Diagnostics.RenderDiagnostics.InternalDrawCallCount"/> (overwriting,
-    /// not adding — this value is already a running total for the frame, not a per-cycle delta)
+    /// <see cref="FlatRedBall2.Diagnostics.RenderDiagnostics.InternalDrawCallCount"/> (which keeps
+    /// the largest of the frame's reports, since each is already a running total, not a delta)
     /// when <see cref="FlatRedBall2.Diagnostics.RenderDiagnostics.IsEnabled"/> is <c>true</c>.
     /// </summary>
     int InternalDrawCallCount => 0;

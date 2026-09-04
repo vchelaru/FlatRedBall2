@@ -64,13 +64,6 @@ public class GameScreen : Screen
     private Layer _topUiLayer = null!;
     private Solitaire.Components.WinOverlayGum _winOverlay = null!;
 
-#if DEBUG
-    // Diagnostic overlay for the render-state-thrashing investigation (draw calls, batch
-    // breaks). Remove once that investigation wraps up.
-    private Gum.GueDeriving.TextRuntime? _perfText;
-    private double _perfTextTimer;
-#endif
-
     public override void CustomInitialize()
     {
         _gum = new GameScreenGum();
@@ -105,10 +98,6 @@ public class GameScreen : Screen
 
         BuildWinOverlay();
 
-#if DEBUG
-        BuildPerfOverlay();
-#endif
-
         // Iteration aid: any change under Content/ restarts the screen so updated
         // textures, animations, and tilemaps pick up immediately. Same-dimension PNG
         // edits patch the live Texture2D in-place via Engine.Content.TryReload and skip
@@ -128,61 +117,6 @@ public class GameScreen : Screen
         // a meaningful chunk of Gum work, deferred for now.
         Engine.GumHotReloadCompleted += HandleGumHotReloadCompleted;
     }
-
-#if DEBUG
-    private void BuildPerfOverlay()
-    {
-        Engine.Performance.IsEnabled = true;
-        Engine.RenderDiagnostics.IsEnabled = true;
-
-        _perfText = new Gum.GueDeriving.TextRuntime
-        {
-            FontSize = 13,
-            Color = Microsoft.Xna.Framework.Color.Yellow,
-        };
-        _perfText.X = 6;
-        _perfText.Y = 6;
-        AddOverlay(_perfText);
-    }
-
-    private void UpdatePerfOverlay(FrameTime time)
-    {
-        var diag = Engine.RenderDiagnostics;
-
-        _perfTextTimer += time.DeltaSeconds;
-        if (_perfTextTimer < 0.25) return;
-        _perfTextTimer = 0;
-
-        //Engine.RenderDiagnostics.
-
-        //var drawCount = GumService.Default.Renderer.RenderStateChangeStatistics.DrawCallCount;
-
-        var perf = Engine.Performance;
-        string text =
-            $"FPS: {perf.Fps.Current:F0}\n" +
-            $"GPU draw calls: {perf.DrawCallCount.Current:F0}\n" +
-            $"FRB batch breaks: {diag.BatchBreakCount}\n" +
-            $"Gum draw calls: {diag.InternalDrawCallCount}";
-
-        // TEMPORARY diagnostic (Deferred-mode batching investigation) - remove once done.
-        // GetBreakGroups() (not GetBreakGroupsByType()) so this names the actual textures
-        // involved, not just "Sprite->Sprite" with no way to tell which ones.
-        if (RenderingLibrary.Graphics.Renderer.SiblingOrdering is RenderingLibrary.Graphics.BatchKeyGroupedOrderer orderer)
-        {
-            text += "\nTop batch breaks:";
-            foreach (var group in orderer.GetBreakGroups().Take(5))
-            {
-                string fromType = group.FromRenderableType.Name;
-                string toType = group.ToRenderableType.Name;
-                string from = FlatRedBall2.UI.GumRenderBatch.DescribeSortKey(group.FromSortKey);
-                string to = FlatRedBall2.UI.GumRenderBatch.DescribeSortKey(group.ToSortKey);
-                text += $"\n  {group.Count}x: {fromType}({from}) -> {toType}({to})";
-            }
-        }
-
-        _perfText!.Text = text;
-    }
-#endif
 
     private void BuildWinOverlay()
     {
@@ -229,10 +163,6 @@ public class GameScreen : Screen
 
     public override void CustomActivity(FrameTime time)
     {
-#if DEBUG
-        UpdatePerfOverlay(time);
-#endif
-
         // The win overlay's New Game button is processed by Forms input
         // independently of CustomActivity; suspending gameplay input while
         // it's visible prevents the underlying cards from picking up clicks

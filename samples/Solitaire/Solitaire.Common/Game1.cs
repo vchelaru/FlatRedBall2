@@ -48,8 +48,7 @@ public class Game1 : Game
             GumProjectFile = "GumProject/GumProject.gumj"
 #endif
         });
-        //FlatRedBallService.Default.Start<GameScreen>();
-        FlatRedBallService.Default.Start<TestScreenFrb>();
+        FlatRedBallService.Default.Start<GameScreen>();
     }
 
     protected override void Update(GameTime gameTime)

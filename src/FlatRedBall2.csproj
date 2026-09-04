@@ -70,24 +70,11 @@
     <ProjectReference Include="AnimationChain.Common/AnimationChain.Common.csproj" />
   </ItemGroup>
 
-  <!--
-    TEMPORARY — local Gum source instead of the NuGet packages, for live-testing in-progress Gum
-    fixes (immediate-mode RenderStateChangeStatistics.DrawCallCount). Revert to the three
-    PackageReference lines below once done; assumes a sibling ../../Gum checkout.
-  -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\Gum\MonoGameGum\MonoGameGum.csproj" />
-    <ProjectReference Include="..\..\Gum\Runtimes\GumShapes\MonoGameGumShapes.csproj" />
-    <ProjectReference Include="..\..\Gum\Integrations\KernSmith\KernSmith.MonoGameGum\KernSmith.MonoGameGum.csproj" />
-  </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Apos.Shapes" />
-    <!--
     <PackageReference Include="Gum.MonoGame" />
     <PackageReference Include="Gum.Shapes.MonoGame" />
     <PackageReference Include="KernSmith.MonoGameGum" />
-    -->
     <PackageReference Include="MonoGame.Framework.DesktopGL">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
