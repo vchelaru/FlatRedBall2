@@ -48,11 +48,17 @@ public partial class App : Application
             desktop.MainWindow = window;
             RegisterNativeMenu(window);
 
-            // Wire single-instance IPC: file paths received from a second process open as tabs.
+            // Wire single-instance IPC: file paths received from a second process open as tabs
+            // and bring the window forward (#1009) -- otherwise it opens behind whatever else
+            // currently has focus.
             if (SingleInstance != null)
             {
                 SingleInstance.FileOpenRequested += path =>
-                    Dispatcher.UIThread.InvokeAsync(() => window.OpenFileAsTab(path));
+                    Dispatcher.UIThread.InvokeAsync(async () =>
+                    {
+                        await window.OpenFileAsTab(path);
+                        window.BringToForeground();
+                    });
             }
 
             // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
