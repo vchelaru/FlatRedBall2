@@ -794,6 +794,19 @@ public partial class MainWindow : Window
     public async Task OpenFileAsTab(string filePath) => await LoadAnimationFileAsync(filePath);
 
     /// <summary>
+    /// Restores the window if minimized and requests OS focus. Called from <see cref="App"/>
+    /// alongside <see cref="OpenFileAsTab"/> when a second process hands off a file path over
+    /// the single-instance pipe (issue #1009) -- without this, the file opens as a new tab but
+    /// the window stays behind whatever else has focus.
+    /// </summary>
+    public void BringToForeground()
+    {
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    /// <summary>
     /// Closes <paramref name="tab"/>, prompting to save first when it is an untitled tab that
     /// has actual content (issue #928) -- an untitled tab that was never edited (or was edited
     /// back to empty) closes silently, same as before. "Save" runs the normal Save-As flow;
