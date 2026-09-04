@@ -1548,6 +1548,13 @@ public class FlatRedBallService
 
         _automationMode?.FulfillPendingScreenshot(gd, Time.CurrentFrame);
 
+        // Read after every draw call this frame but before Present (which resets Metrics).
+        var metrics = gd.Metrics;
+        _frameProfile.DrawCallCount = metrics.DrawCount;
+        _frameProfile.SpriteCount = metrics.SpriteCount;
+        _frameProfile.PrimitiveCount = metrics.PrimitiveCount;
+        _frameProfile.TextureCount = metrics.TextureCount;
+
         _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
         _frameProfile.RenderMs = _frameProfile.DrawTotalMs;
         _frameProfile.FrameTotalMs = _frameProfile.UpdateTotalMs + _frameProfile.DrawTotalMs;
