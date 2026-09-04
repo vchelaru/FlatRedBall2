@@ -99,16 +99,16 @@ jobs:
           VERSION="${{ needs.resolve-version.outputs.version }}"
           VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
           URL="https://api.nuget.org/v3-flatcontainer/flatredball.animationchain.common/$VERSION_LOWER/flatredball.animationchain.common.$VERSION_LOWER.nupkg"
-          for i in $(seq 1 20); do
+          for i in $(seq 1 40); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
             if [ "$STATUS" = "200" ]; then
               echo "FlatRedBall.AnimationChain.Common $VERSION is resolvable on NuGet."
               exit 0
             fi
-            echo "Attempt $i/20: got HTTP $STATUS for $URL, waiting 15s..."
+            echo "Attempt $i/40: got HTTP $STATUS for $URL, waiting 15s..."
             sleep 15
           done
-          echo "::error::FlatRedBall.AnimationChain.Common $VERSION never became resolvable on NuGet after 5 minutes."
+          echo "::error::FlatRedBall.AnimationChain.Common $VERSION never became resolvable on NuGet after 10 minutes."
           exit 1
 
       - name: Restore dependencies
