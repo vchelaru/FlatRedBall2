@@ -5,8 +5,7 @@
       "Screens/TestScreen",
       "Components",
       "Components/CardGum",
-      "Components/WinOverlayGum",
-      "Standard"
+      "Components/WinOverlayGum"
     ]
   }
 }

@@ -18,7 +18,8 @@ namespace FlatRedBall2.Collision;
 /// Created by
 /// <see cref="Screen.AddCollisionRelationship{A,B}(System.Collections.Generic.IReadOnlyList{A}, System.Collections.Generic.IReadOnlyList{B})"/>
 /// — game code does not construct these directly. Once added, the screen calls
-/// <c>RunCollisions</c> on each registered relationship every frame.
+/// <see cref="RunCollisions"/> on each registered relationship every frame, unless
+/// <see cref="IsEnabled"/> has been set to <c>false</c>.
 /// </para>
 /// <para>
 /// Performance: when both lists come from a <see cref="Factory{T}"/> sharing the same
@@ -164,18 +165,25 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     /// </summary>
     public int DeepCollisionCount { get; private set; }
 
-    // Mirrors the partitioning gate in RunCollisions — true only when the broad phase actually
-    // engaged sweep-and-prune, not merely when a Factory has PartitionAxis set on one side.
-    bool ICollisionRelationship.IsPartitioned
+    // Mirrors the partitioning gate in RunCollisions. Distinguishes "could partition but doesn't"
+    // (both sides are factories — actionable) from "can't partition at all" (a non-factory side,
+    // where no PartitionAxis setting would change anything).
+    PartitionStatus ICollisionRelationship.PartitionStatus
     {
         get
         {
             if (ReferenceEquals(_listA, _listB))
-                return (_listA is IFactory fa) && fa.PartitionAxis != null;
+            {
+                if (_listA is not IFactory self) return PartitionStatus.NotApplicable;
+                return self.PartitionAxis != null ? PartitionStatus.Partitioned : PartitionStatus.Unpartitioned;
+            }
 
-            Axis? axisA = (_listA is IFactory fa2) ? fa2.PartitionAxis : null;
-            Axis? axisB = (_listB is IFactory fb) ? fb.PartitionAxis : null;
-            return axisA != null && axisA == axisB;
+            if (_listA is not IFactory fa || _listB is not IFactory fb)
+                return PartitionStatus.NotApplicable;
+
+            return fa.PartitionAxis != null && fa.PartitionAxis == fb.PartitionAxis
+                ? PartitionStatus.Partitioned
+                : PartitionStatus.Unpartitioned;
         }
     }
 
@@ -240,9 +248,11 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
     // Tracked in a set to avoid double-subscribing across frames. HashSet<object> because A or B
     // may be Entity, shape, or TileShapes; only Entity has _onDestroy.
     private HashSet<object>? _hookedEntities;
-    // Reused scratch set when a destroy hook fires, to dedupe pairs across current+previous before
-    // firing Ended once per unique pair.
-    private HashSet<(A, B)>? _scratchDestroyedPairs;
+    // Reused scratch set when a destroy hook fires or the relationship is disabled, to dedupe pairs
+    // across current+previous before firing Ended once per unique pair.
+    private HashSet<(A, B)>? _scratchUniqueEndedPairs;
+
+    private bool _isEnabled = true;
 
     internal CollisionRelationship(IReadOnlyList<A> listA, IReadOnlyList<B> listB)
     {
@@ -395,19 +405,19 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         // Fire CollisionEnded exactly once for each unique pair that referenced the destroyed
         // entity — whether the pair was in _current, _previous, or both. Removing from both sets
         // prevents the end-of-frame diff from double-firing.
-        _scratchDestroyedPairs ??= new HashSet<(A, B)>();
-        _scratchDestroyedPairs.Clear();
+        _scratchUniqueEndedPairs ??= new HashSet<(A, B)>();
+        _scratchUniqueEndedPairs.Clear();
 
         if (_currentContacts != null)
             foreach (var p in _currentContacts)
                 if (ReferenceEquals(p.Item1, destroyed) || ReferenceEquals(p.Item2, destroyed))
-                    _scratchDestroyedPairs.Add(p);
+                    _scratchUniqueEndedPairs.Add(p);
         if (_previousContacts != null)
             foreach (var p in _previousContacts)
                 if (ReferenceEquals(p.Item1, destroyed) || ReferenceEquals(p.Item2, destroyed))
-                    _scratchDestroyedPairs.Add(p);
+                    _scratchUniqueEndedPairs.Add(p);
 
-        foreach (var p in _scratchDestroyedPairs)
+        foreach (var p in _scratchUniqueEndedPairs)
         {
             _currentContacts?.Remove(p);
             _previousContacts?.Remove(p);
@@ -416,9 +426,61 @@ public class CollisionRelationship<A, B> : ICollisionRelationship
         _hookedEntities?.Remove(destroyed);
     }
 
-    void ICollisionRelationship.RunCollisions() => RunCollisions();
+    // Fires CollisionEnded once per unique tracked pair, then drops all tracking. Called when the
+    // relationship is disabled so no pair is left dangling in the "started" state.
+    private void FireEndedForAllContacts()
+    {
+        if (!IsTrackingContacts) return;
+        _scratchUniqueEndedPairs ??= new HashSet<(A, B)>();
+        _scratchUniqueEndedPairs.Clear();
 
-    internal void RunCollisions()
+        if (_currentContacts != null)
+            foreach (var p in _currentContacts) _scratchUniqueEndedPairs.Add(p);
+        if (_previousContacts != null)
+            foreach (var p in _previousContacts) _scratchUniqueEndedPairs.Add(p);
+
+        // Clear before invoking so a handler that re-enables the relationship starts from a clean
+        // slate rather than seeing pairs that are about to be reported as ended.
+        _currentContacts?.Clear();
+        _previousContacts?.Clear();
+
+        foreach (var p in _scratchUniqueEndedPairs)
+            CollisionEnded?.Invoke(p.Item1, p.Item2);
+    }
+
+    /// <summary>
+    /// When <c>false</c>, the screen stops running this relationship each frame. Defaults to <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    /// Setting this to <c>false</c> fires <see cref="CollisionEnded"/> immediately for every pair
+    /// currently overlapping, so a disable mid-overlap never strands a pair in the "started" state.
+    /// Re-enabling refires <see cref="CollisionStarted"/> for pairs that are still overlapping.
+    /// <para>
+    /// Disabling only opts out of the automatic per-frame call. <see cref="RunCollisions"/> still
+    /// works while disabled, so game code can drive collision on its own schedule.
+    /// </para>
+    /// </remarks>
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (_isEnabled == value) return;
+            _isEnabled = value;
+            if (!value)
+            {
+                DeepCollisionCount = 0;
+                FireEndedForAllContacts();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs this relationship's collision detection and response once. The screen calls this every
+    /// frame while <see cref="IsEnabled"/> is <c>true</c>; call it yourself to drive collision on a
+    /// custom schedule — it works whether or not the relationship is enabled.
+    /// </summary>
+    public void RunCollisions()
     {
         DeepCollisionCount = 0;
         bool forward = _sweepForward;

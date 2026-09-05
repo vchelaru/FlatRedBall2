@@ -42,6 +42,11 @@
   <ItemGroup Condition="'$(UseGumPackage)' == 'true'">
     <Content Include="Content\GumProject\GumProject.gumpkg"
              CopyToOutputDirectory="PreserveNewest" />
+    <!-- Liberation Sans is SIL OFL 1.1, which requires the license to travel with the font. Loose
+         mode's glob above already copies it; bundle mode has to name it, since `gumcli pack` only
+         bundles files the Gum project references and nothing references a license. -->
+    <Content Include="Content\GumProject\Fonts\LiberationSans-LICENSE.txt"
+             CopyToOutputDirectory="PreserveNewest" />
     <None Remove="Content\GumProject\**\*.*" />
   </ItemGroup>
 </Project>

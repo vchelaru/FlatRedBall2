@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -14,8 +15,13 @@ using FlatRedBall2.Rendering;
 using FlatRedBall2.Rendering.Batches;
 using FlatRedBall2.Utilities;
 using Gum.Forms;
+using Gum.GueDeriving;
 using Gum.Wireframe;
+using KernSmith;
 using KernSmith.Gum;
+#if KNI
+using KernSmith.Rasterizers.StbTrueType;
+#endif
 using Gum;
 using MonoGameAndGum.Renderables;
 using Microsoft.Xna.Framework.Content;
@@ -315,6 +321,16 @@ public class FlatRedBallService
     }
 
     /// <summary>
+    /// Selects the KernSmith rasterizer backend for in-memory font generation. Browser-wasm needs
+    /// <see cref="RasterizerBackend.StbTrueType"/> passed explicitly — it is the only pure-managed
+    /// backend, since <c>KernSmithFontCreator</c>'s default (FreeType) is native code that cannot
+    /// run in a browser. Extracted as a pure function so the selection logic is testable without a
+    /// real <c>GraphicsDevice</c> or browser environment.
+    /// </summary>
+    internal static RasterizerBackend? ResolveFontRasterizerBackend(bool isBrowser) =>
+        isBrowser ? RasterizerBackend.StbTrueType : null;
+
+    /// <summary>
     /// Reads the <c>.gluj</c> and its element files from <see cref="OutputContentRoot"/> rather than
     /// the process working directory, which is the project folder under <c>dotnet run</c> and the
     /// output folder under a debugger — so the plain-relative read would find a different (stale)
@@ -490,6 +506,36 @@ public class FlatRedBallService
             LoadGlueProject(glueProjectFile);
         }
 
+        // KernSmith generates BitmapFonts in memory for any (family, size, style)
+        // combination — TextRuntime / DrawString resolve fonts without requiring
+        // pre-baked .fnt files in Content/FontCache/. Slots into Gum's font lookup
+        // cascade as IInMemoryFontCreator. Same wiring for both MonoGame and KNI.
+        //
+        // Must run BEFORE _gum.Initialize below: TextRuntime's constructor eagerly resolves
+        // Font/FontSize, so any TextRuntime Gum constructs while loading the project needs
+        // InMemoryFontCreator already registered, or it falls through to the on-disk FontCache
+        // lookup and fails (issue #1000 follow-up).
+        var fontRasterizerBackend = ResolveFontRasterizerBackend(OperatingSystem.IsBrowser());
+#if KNI
+        if (fontRasterizerBackend == RasterizerBackend.StbTrueType)
+        {
+            // StbTrueType's reflection-based backend auto-discovery is trimmed away under
+            // wasm/AOT publish, so it must be warmed up explicitly before first use, or font
+            // generation fails silently with "backend is not registered" (see Gum's
+            // gum-kernsmith-integrations skill, "Rasterizer backend gotcha (wasm/AOT)").
+            RuntimeHelpers.RunClassConstructor(typeof(StbTrueTypeRasterizer).TypeHandle);
+        }
+#endif
+        CustomSetPropertyOnRenderable.InMemoryFontCreator =
+            new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend);
+        // Rebuilds each visible TextRuntime's font at its zoomed size instead of stretching the
+        // baked bitmap, fixing blur under Camera.Zoom and window resize (issue #1000). Safe to turn
+        // on unconditionally because it only acts on the Gum Camera.Zoom GumRenderBatch already
+        // drives from Camera.PixelsPerUnit — screen-space layers (Zoom == 1, e.g. AddOverlay) never
+        // trigger a rebuild — and the KernSmithFontCreator above is always present as the
+        // IInMemoryFontCreator oversampling needs to rasterize the new size.
+        TextRuntime.UseFontOversampling = true;
+
         if ((settings?.GumProjectFile ?? ResolveGlueGumProjectFile(GlueProject, game.Content.RootDirectory))
             is string gumProjectFile)
         {
@@ -506,12 +552,6 @@ public class FlatRedBallService
         if (settings is not null)
             ValidateConfiguredGumFontFiles(settings);
 
-        // KernSmith generates BitmapFonts in memory for any (family, size, style)
-        // combination — TextRuntime / DrawString resolve fonts without requiring
-        // pre-baked .fnt files in Content/FontCache/. Slots into Gum's font lookup
-        // cascade as IInMemoryFontCreator. Same wiring for both MonoGame and KNI.
-        CustomSetPropertyOnRenderable.InMemoryFontCreator =
-            new KernSmithFontCreator(game.GraphicsDevice);
         GumRenderBatch.Instance.Initialize();
         GumRenderBatch.ScreenSpaceInstance.Initialize();
         // Guarded because ShapeRenderer is a Gum-side singleton that throws on a second Initialize,
@@ -1507,6 +1547,13 @@ public class FlatRedBallService
         }
 
         _automationMode?.FulfillPendingScreenshot(gd, Time.CurrentFrame);
+
+        // Read after every draw call this frame but before Present (which resets Metrics).
+        var metrics = gd.Metrics;
+        _frameProfile.DrawCallCount = metrics.DrawCount;
+        _frameProfile.SpriteCount = metrics.SpriteCount;
+        _frameProfile.PrimitiveCount = metrics.PrimitiveCount;
+        _frameProfile.TextureCount = metrics.TextureCount;
 
         _frameProfile.DrawTotalMs = ProfileClock.Ms(drawStart, System.Diagnostics.Stopwatch.GetTimestamp());
         _frameProfile.RenderMs = _frameProfile.DrawTotalMs;

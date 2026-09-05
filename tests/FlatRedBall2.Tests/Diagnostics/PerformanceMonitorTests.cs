@@ -10,16 +10,18 @@ public class PerformanceMonitorTests
 {
     private sealed class FakeRelationship : ICollisionRelationship
     {
-        public FakeRelationship(string name, int deepCollisionCount, bool isPartitioned)
+        public FakeRelationship(string name, int deepCollisionCount, PartitionStatus partitionStatus, bool isEnabled = true)
         {
             DisplayName = name;
             DeepCollisionCount = deepCollisionCount;
-            IsPartitioned = isPartitioned;
+            PartitionStatus = partitionStatus;
+            IsEnabled = isEnabled;
         }
 
         public string DisplayName { get; }
         public int DeepCollisionCount { get; }
-        public bool IsPartitioned { get; }
+        public PartitionStatus PartitionStatus { get; }
+        public bool IsEnabled { get; set; }
         public void RunCollisions() { }
     }
 
@@ -59,13 +61,15 @@ public class PerformanceMonitorTests
     }
 
     [Fact]
-    public void GenerateReport_CollisionRelationships_OrdersBySeverityAndFlagsUnpartitioned()
+    public void GenerateReport_CollisionRelationships_OrdersBySeverityAndWarnsOnlyOnTheFixableRow()
     {
         var monitor = new PerformanceMonitor { IsEnabled = true };
         var relationships = new List<ICollisionRelationship>
         {
-            new FakeRelationship("Player vs TileShapes", deepCollisionCount: 5, isPartitioned: false),
-            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, isPartitioned: true)
+            // NotApplicable — a non-factory side, so no PartitionAxis can ever engage the sweep.
+            new FakeRelationship("Player vs TileShapes", deepCollisionCount: 5, partitionStatus: PartitionStatus.NotApplicable),
+            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, partitionStatus: PartitionStatus.Partitioned),
+            new FakeRelationship("Enemy vs Pickup", deepCollisionCount: 20, partitionStatus: PartitionStatus.Unpartitioned)
         };
 
         monitor.Record(new FrameProfile { FrameTotalMs = 16 }, relationships);
@@ -73,13 +77,32 @@ public class PerformanceMonitorTests
         var report = monitor.GetCollisionReport();
         report[0].Name.ShouldBe("Enemy vs Bullet");
         report[0].DeepCollisionCount.ShouldBe(50);
-        report[1].Name.ShouldBe("Player vs TileShapes");
-        report[1].IsPartitioned.ShouldBeFalse();
+        report[2].Name.ShouldBe("Player vs TileShapes");
+        report[2].PartitionStatus.ShouldBe(PartitionStatus.NotApplicable);
 
         var text = monitor.GenerateReport();
         text.ShouldContain("Enemy vs Bullet: 50 deep checks [partitioned]");
-        text.ShouldContain("Player vs TileShapes: 5 deep checks [NOT PARTITIONED]");
-        text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Player vs TileShapes"));
+        text.ShouldContain("Enemy vs Pickup: 20 deep checks [NOT PARTITIONED");
+        text.ShouldContain("Player vs TileShapes: 5 deep checks [partitioning n/a");
+        text.IndexOf("Enemy vs Bullet").ShouldBeLessThan(text.IndexOf("Enemy vs Pickup"));
+    }
+
+    [Fact]
+    public void GenerateReport_DisabledRelationship_IsOmittedFromCollisionReport()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true };
+        var relationships = new List<ICollisionRelationship>
+        {
+            new FakeRelationship("Enemy vs Bullet", deepCollisionCount: 50, partitionStatus: PartitionStatus.Partitioned),
+            new FakeRelationship("Player vs Door", deepCollisionCount: 5, partitionStatus: PartitionStatus.Unpartitioned, isEnabled: false)
+        };
+
+        monitor.Record(new FrameProfile { FrameTotalMs = 16 }, relationships);
+
+        var report = monitor.GetCollisionReport();
+        report.Count.ShouldBe(1);
+        report[0].Name.ShouldBe("Enemy vs Bullet");
+        monitor.GenerateReport().ShouldNotContain("Player vs Door");
     }
 
     [Fact]
@@ -104,6 +127,35 @@ public class PerformanceMonitorTests
 
         monitor.FrameTotalMs.Current.ShouldBe(0);
         monitor.GetCollisionReport().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GpuStats_KnownFrameProfileValues_ComputesCurrentMinAverageMax()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true, WindowSize = 2 };
+
+        monitor.Record(new FrameProfile { DrawCallCount = 50, SpriteCount = 40, PrimitiveCount = 200, TextureCount = 10 }, NoRelationships);
+        monitor.Record(new FrameProfile { DrawCallCount = 90, SpriteCount = 60, PrimitiveCount = 300, TextureCount = 12 }, NoRelationships);
+
+        monitor.DrawCallCount.Current.ShouldBe(90);
+        monitor.DrawCallCount.Min.ShouldBe(50);
+        monitor.DrawCallCount.Max.ShouldBe(90);
+        monitor.DrawCallCount.Average.ShouldBe(70);
+
+        monitor.SpriteCount.Current.ShouldBe(60);
+        monitor.PrimitiveCount.Current.ShouldBe(300);
+        monitor.TextureCount.Current.ShouldBe(12);
+    }
+
+    [Fact]
+    public void GenerateReport_IncludesGpuDrawCallStats()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true };
+        monitor.Record(new FrameProfile { FrameTotalMs = 16, DrawCallCount = 98, SpriteCount = 106, PrimitiveCount = 608, TextureCount = 132 }, NoRelationships);
+
+        var text = monitor.GenerateReport();
+        text.ShouldContain("DrawCalls");
+        text.ShouldContain("98");
     }
 
     [Fact]

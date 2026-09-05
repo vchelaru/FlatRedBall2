@@ -4,6 +4,8 @@
 
 Open work only. When an item ships, delete it — don't leave a "landed" breadcrumb. Design decisions and historical context that outlive a TODO belong in skill files, XML docs, or commit messages, not here.
 
+**An entry here is not a work order.** This file is a capture/triage list, not a task queue — nothing in it gets implemented until it is also filed as a GitHub issue.
+
 ## `TileMap.TmxLoader` is mutable static state, which the architecture rules forbid
 
 `src/Tiled/TileMap.cs:52` declares `internal static Func<string, GraphicsDevice, Tilemap> TmxLoader { get; set; }`
@@ -29,12 +31,6 @@ deciding deliberately rather than letting the next seam copy it a third time.
 `FlatRedBall2.Utilities.LinuxVideoDriver.ApplyWaylandFallback()` (added in `src/Utilities/LinuxVideoDriver.cs`) sets `SDL_VIDEODRIVER=wayland,x11` on Linux so games run on native Wayland with an automatic X11 fallback, instead of always going through XWayland. The templates' `MyGame.Desktop/Program.cs` (`frb2-desktop` and `frb2-multiplatform`) should call it as the first line before `new MyGame.Game1()`, but can't yet: the templates resolve `FlatRedBall2.MonoGame`/`FlatRedBall2.Kni` as a floating NuGet package from nuget.org, and the latest published release predates this API. Once a release containing `LinuxVideoDriver` is published, add the call to both templates' `Program.cs`.
 
 Known caveats to flag in that follow-up, not solved by the helper itself: SDL2 on Wayland needs `libdecor` for window borders/titlebar, or the window comes up borderless (the `wayland,x11` fallback won't catch this since Wayland itself still succeeds); and fractional-scaling compositors can rescale the window, since MonoGame/SDL2 HiDPI support on Wayland is imperfect.
-
-## Font rendering quality on web at non-native resolutions
-
-Gum renders text from pre-baked bitmap font (`.fnt`) atlases sized for a fixed design resolution. On the BlazorGL/KNI WASM target the browser viewport changes constantly — user resizes, devicePixelRatio differences, mobile rotations — so the atlas gets sampled at fractional scales and text turns blurry / aliased. Solitaire is the obvious repro: at most browser sizes the card-rank/suit labels and any HUD text look noticeably worse than on desktop.
-
-Open questions before designing a fix: (a) bake atlases at multiple resolutions and pick the closest, (b) switch web text to SDF / MSDF fonts (one atlas, scales cleanly — but requires a different shader and Gum-side support), (c) re-rasterize atlases on the fly when the canvas size changes (cheap to author, costly per resize), or (d) switch to vector text rendering on web only (Skia/HarfBuzz path, much heavier dependency). Need to confirm whether the right layer for the fix is FRB2, Gum, or the runtime that ships the `.fnt` consumer — and whether desktop has the same problem at high-DPI displays even though it's less obvious.
 
 ## Render-state thrashing when Apos.Shapes, fonts, and sprites interleave
 

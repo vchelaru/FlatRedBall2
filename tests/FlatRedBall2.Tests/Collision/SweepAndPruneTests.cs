@@ -316,4 +316,45 @@ public class SweepAndPruneTests
         var firstPairFrame2 = frame2Pairs.First();
         firstPairFrame1.ShouldNotBe(firstPairFrame2);
     }
+
+    [Fact]
+    public void PartitionStatus_FactoriesWithMatchingAxis_ReturnsPartitioned()
+    {
+        var (factory, _) = CreateFactory();
+        factory.PartitionAxis = Axis.X;
+        var rel = new CollisionRelationship<BallEntity, BallEntity>(factory, factory);
+
+        ((ICollisionRelationship)rel).PartitionStatus.ShouldBe(PartitionStatus.Partitioned);
+    }
+
+    [Fact]
+    public void PartitionStatus_FactoriesWithMismatchedAxis_ReturnsUnpartitioned()
+    {
+        // Both sides are factories, so a matching axis WOULD engage the sweep — the one case a
+        // perf report should actually flag.
+        var screenA = new TestScreen();
+        screenA.Engine = new FlatRedBallService();
+        var screenB = new TestScreen();
+        screenB.Engine = new FlatRedBallService();
+        var factoryA = new Factory<BallEntity>(screenA) { PartitionAxis = Axis.X };
+        var factoryB = new Factory<BallEntity>(screenB) { PartitionAxis = Axis.Y };
+
+        var rel = new CollisionRelationship<BallEntity, BallEntity>(factoryA, factoryB);
+
+        ((ICollisionRelationship)rel).PartitionStatus.ShouldBe(PartitionStatus.Unpartitioned);
+    }
+
+    [Fact]
+    public void PartitionStatus_TileShapesSide_ReturnsNotApplicable()
+    {
+        // TileShapes is not a Factory<T> and is wrapped in a one-element array, so sweep-and-prune
+        // can never apply — reporting it as unpartitioned is a false alarm with no remedy.
+        var (factory, _) = CreateFactory();
+        factory.PartitionAxis = Axis.X;
+        var tiles = new TileShapes { GridSize = 16f };
+
+        var rel = new CollisionRelationship<BallEntity, TileShapes>(factory, new[] { tiles });
+
+        ((ICollisionRelationship)rel).PartitionStatus.ShouldBe(PartitionStatus.NotApplicable);
+    }
 }

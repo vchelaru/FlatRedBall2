@@ -74,6 +74,14 @@
     <ProjectReference Include="..\AnimationChain.Common\AnimationChain.Common.csproj" />
   </ItemGroup>
 
+  <!-- StbTrueType is the only pure-managed KernSmith rasterizer backend, so it's the only one that
+       works on BlazorGL/wasm (KernSmith.KniGum only brings in the native FreeType backend). Not
+       needed by desktop-KNI, but the KNI backend is a single shared assembly across both, so it
+       ships here unconditionally rather than trying to split by RuntimeIdentifier. -->
+  <ItemGroup>
+    <PackageReference Include="KernSmith.Rasterizers.StbTrueType" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Apos.Shapes.KNI" />
     <PackageReference Include="Gum.KNI" />
