@@ -575,6 +575,39 @@ public class ProjectPanelControlTests
         finally { window.Close(); }
     }
 
+    // The inline editor must fit the 24px tree row (see the TreeViewItem MinHeight setter in the
+    // XAML). Fluent's default TextBox is far taller than that, which left the box overflowing the
+    // row with its text stranded at the top.
+    [AvaloniaFact]
+    public void PendingRowEditor_FitsWithinTreeRowHeight()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]);
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            var textBox = control.ProjectTree.GetVisualDescendants().OfType<TextBox>()
+                .First(t => ReferenceEquals(t.DataContext, pending));
+
+            Assert.True(textBox.Bounds.Height <= 24, $"editor is {textBox.Bounds.Height}px tall");
+            // The height above comes from the TextBox's own setters, but the border/background
+            // setters target PART_BorderElement inside the template -- a rename there is a silent
+            // no-op, so confirm that selector actually matched something.
+            var border = textBox.GetVisualDescendants().OfType<Border>()
+                .Single(b => b.Name == "PART_BorderElement");
+            Assert.Equal(new Thickness(1), border.BorderThickness);
+        }
+        finally { window.Close(); }
+    }
+
     private static MenuItem NewAnimationFileMenuItem(Controls.ProjectPanelControl control) =>
         control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
             .Single(i => (string)i.Header! == "New Animation File");

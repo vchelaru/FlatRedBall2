@@ -46,6 +46,28 @@
                             Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
                     <Setter Property="MinHeight" Value="24" />
                 </Style>
+                <!-- FluentTheme's TextBox is 32px tall with a 2px accent underline on focus, both
+                     of which overflow a 24px tree row. Size it to the row and give it a quiet
+                     border so it reads as the row being edited, not as an error. -->
+                <Style Selector="TextBox.inline-rename">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Height" Value="20" />
+                    <Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Padding" Value="4,0" />
+                    <Setter Property="FontSize" Value="11" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                </Style>
+                <Style Selector="TextBox.inline-rename /template/ Border#PART_BorderElement">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="CornerRadius" Value="2" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                    <Setter Property="Background" Value="{DynamicResource BgApp}" />
+                </Style>
+                <Style Selector="TextBox.inline-rename:focus /template/ Border#PART_BorderElement">
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentCool}" />
+                </Style>
             </TreeView.Styles>
             <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="controls:AchxTreeNodeVm"
@@ -71,11 +93,10 @@
                                    TextTrimming="CharacterEllipsis" />
                         <!-- Inline rename for a not-yet-created file (#1018). The extension is
                              neither shown nor edited here; the project's convention picks it. -->
-                        <TextBox Text="{Binding EditText, Mode=TwoWay}"
+                        <TextBox Classes="inline-rename"
+                                 Text="{Binding EditText, Mode=TwoWay}"
                                  IsVisible="{Binding IsEditing}"
-                                 MinWidth="120"
-                                 FontSize="11"
-                                 Padding="2,0"
+                                 Width="140"
                                  VerticalAlignment="Center"
                                  AttachedToVisualTree="OnPendingNameAttached"
                                  KeyDown="OnPendingNameKeyDown"
