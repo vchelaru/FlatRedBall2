@@ -193,19 +193,66 @@ public class AboutDialogTests
     }
 
     [AvaloniaFact]
-    public void BuildAboutWindowWithLiveRefresh_RefreshButtonClicked_ReplacesContentWithNewResult()
+    public void BuildAboutContent_IsChecking_HidesButtonAndShowsSpinner()
     {
+        var panel = (StackPanel)MainWindow.BuildAboutContent(onRefresh: () => Task.CompletedTask, isChecking: true);
+
+        var refreshBtn = panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn");
+        var spinner = panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner");
+
+        Assert.Null(refreshBtn);
+        Assert.NotNull(spinner);
+    }
+
+    // ── Auto-check + spinner on open (issue #1033) ──────────────────────────────
+    // Opening About behaves as if its "Check for Updates" button were already clicked: the
+    // check starts immediately and the button is replaced by a spinner until it resolves.
+
+    [AvaloniaFact]
+    public void BuildAboutWindowWithLiveRefresh_OnOpen_StartsCheckingImmediately()
+    {
+        var pending = new TaskCompletionSource<UpdateCheckResult>();
+
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task);
+
+        var panel = (StackPanel)window.Content!;
+        Assert.Null(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
+        Assert.NotNull(panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner"));
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutWindowWithLiveRefresh_CheckCompletes_ShowsResultAndReenablesButton()
+    {
+        var pending = new TaskCompletionSource<UpdateCheckResult>();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task);
+
         var refreshedResult = new UpdateCheckResult(true, new System.Version(2026, 9, 6), "https://example.com/latest");
-        var window = MainWindow.BuildAboutWindowWithLiveRefresh(
-            initial: UpdateCheckResult.NoUpdate,
-            refresh: () => Task.FromResult(refreshedResult));
+        pending.SetResult(refreshedResult);
+        Dispatcher.UIThread.RunJobs();
+
+        var panel = (StackPanel)window.Content!;
+        Assert.NotNull(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
+        Assert.Null(panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner"));
+        Assert.NotNull(panel.Children.OfType<TextBlock>().FirstOrDefault(tb => tb.Text?.Contains("2026.9.6") == true));
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutWindowWithLiveRefresh_RefreshButtonClickedAfterCheck_ReturnsToCheckingState()
+    {
+        var firstCheck = new TaskCompletionSource<UpdateCheckResult>();
+        var secondCheck = new TaskCompletionSource<UpdateCheckResult>();
+        var callCount = 0;
+        Func<Task<UpdateCheckResult>> refresh = () => ++callCount == 1 ? firstCheck.Task : secondCheck.Task;
+
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh);
+        firstCheck.SetResult(UpdateCheckResult.NoUpdate);
+        Dispatcher.UIThread.RunJobs();
 
         var refreshBtn = ((StackPanel)window.Content!).Children.OfType<Button>().First(b => b.Name == "AboutRefreshBtn");
         refreshBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        Dispatcher.UIThread.RunJobs();
 
-        var updateBlock = ((StackPanel)window.Content!).Children.OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("2026.9.6") == true);
-        Assert.NotNull(updateBlock);
+        var panel = (StackPanel)window.Content!;
+        Assert.Null(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
+        Assert.NotNull(panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner"));
     }
 }

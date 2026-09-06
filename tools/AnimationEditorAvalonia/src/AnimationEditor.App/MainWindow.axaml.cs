@@ -2661,33 +2661,47 @@ public partial class MainWindow : Window
         => _ = ShowAboutDialogAsync();
 
     /// <summary>
-    /// Opening the About dialog always forces a fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s
-    /// cache). The dialog also carries a "Check for Updates" button (issue #1033) so a check that
-    /// failed silently (offline, GitHub rate limit) can be retried without closing and reopening it.
+    /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
+    /// it starts checking immediately (bypassing <see cref="UpdateCheckPolicy"/>'s cache) and shows
+    /// a spinner until the result is in. The same button re-runs the check on demand afterward, so a
+    /// check that failed silently (offline, GitHub rate limit) can be retried without closing and
+    /// reopening the dialog (issue #1033).
     /// </summary>
     private async Task ShowAboutDialogAsync()
     {
-        var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        var window = BuildAboutWindowWithLiveRefresh(result, () => GetUpdateCheckResultAsync(forceRefresh: true));
+        var window = BuildAboutWindowWithLiveRefresh(() => GetUpdateCheckResultAsync(forceRefresh: true));
         await window.ShowDialog(this);
     }
 
     /// <summary>
-    /// Builds the About window wired so its "Check for Updates" button re-runs <paramref name="refresh"/>
-    /// and swaps the window's content in place with the new result. Extracted from
-    /// <see cref="ShowAboutDialogAsync"/> for testability without invoking <see cref="Window.ShowDialog"/>.
+    /// Builds the About window and immediately starts a check, rendering the spinner state before
+    /// returning. <paramref name="refresh"/> is invoked both for that initial check and every later
+    /// click of the "Check for Updates" button that replaces the spinner once it resolves — one
+    /// code path drives both, rather than a separate pre-fetch-before-show and a separate in-place
+    /// refresh. Extracted from <see cref="ShowAboutDialogAsync"/> for testability without invoking
+    /// <see cref="Window.ShowDialog"/>.
     /// </summary>
-    internal static Window BuildAboutWindowWithLiveRefresh(UpdateCheckResult initial, Func<Task<UpdateCheckResult>> refresh)
+    internal static Window BuildAboutWindowWithLiveRefresh(Func<Task<UpdateCheckResult>> refresh)
     {
-        Window window = null!;
-
-        async Task OnRefreshAsync()
+        var window = new Window
         {
-            var refreshed = await refresh();
-            window.Content = BuildAboutContent(refreshed, OnRefreshAsync);
+            Title = "About AnimationEditor",
+            Width = 420,
+            Height = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+
+        UpdateCheckResult? current = null;
+
+        async Task RunCheckAsync()
+        {
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: true);
+            current = await refresh();
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: false);
         }
 
-        window = BuildAboutWindow(initial, OnRefreshAsync);
+        _ = RunCheckAsync();
         return window;
     }
 
@@ -2820,7 +2834,7 @@ public partial class MainWindow : Window
     /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null, Func<Task>? onRefresh = null) =>
+    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2828,7 +2842,7 @@ public partial class MainWindow : Window
             Height = 240,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Content = BuildAboutContent(updateCheck, onRefresh),
+            Content = BuildAboutContent(updateCheck),
         };
 
     /// <summary>
@@ -2838,10 +2852,11 @@ public partial class MainWindow : Window
     /// and the running version is already current (issue #845 — this used to be indistinguishable
     /// from "never checked"). <paramref name="onRefresh"/>, when given, adds a "Check for Updates"
     /// button (issue #1033) that lets the user retry a check that failed silently without closing
-    /// the dialog; omitted entirely when null.
+    /// the dialog — replaced by a spinner while <paramref name="isChecking"/> is true. Omitted
+    /// entirely when <paramref name="onRefresh"/> is null.
     /// Extracted for testability.
     /// </summary>
-    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null, Func<Task>? onRefresh = null)
+    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null, Func<Task>? onRefresh = null, bool isChecking = false)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -2869,7 +2884,7 @@ public partial class MainWindow : Window
             }
         };
         if (onRefresh is not null)
-            panel.Children.Add(BuildRefreshButton(onRefresh));
+            panel.Children.Add(isChecking ? BuildCheckingIndicator() : BuildRefreshButton(onRefresh));
 
         return panel;
     }
@@ -2881,6 +2896,20 @@ public partial class MainWindow : Window
         button.Click += (_, _) => _ = onRefresh();
         return button;
     }
+
+    /// <summary>Replaces the "Check for Updates" button while a check is in flight (issue #1033).</summary>
+    private static Control BuildCheckingIndicator() =>
+        new StackPanel
+        {
+            Name = "AboutRefreshSpinner",
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new ProgressBar { IsIndeterminate = true, Width = 16, Height = 16 },
+                new TextBlock { Text = "Checking for updates…" },
+            }
+        };
 
     /// <summary>
     /// Opens a URL in the user's default browser. Network/shell failures are swallowed —
