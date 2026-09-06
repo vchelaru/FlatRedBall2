@@ -2661,14 +2661,34 @@ public partial class MainWindow : Window
         => _ = ShowAboutDialogAsync();
 
     /// <summary>
-    /// Opening the About dialog is the manual "check for updates" action — it always forces a
-    /// fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s cache) rather than adding a
-    /// separate button, since opening this dialog is already an infrequent, explicit user action.
+    /// Opening the About dialog always forces a fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s
+    /// cache). The dialog also carries a "Check for Updates" button (issue #1033) so a check that
+    /// failed silently (offline, GitHub rate limit) can be retried without closing and reopening it.
     /// </summary>
     private async Task ShowAboutDialogAsync()
     {
         var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        await BuildAboutWindow(result).ShowDialog(this);
+        var window = BuildAboutWindowWithLiveRefresh(result, () => GetUpdateCheckResultAsync(forceRefresh: true));
+        await window.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Builds the About window wired so its "Check for Updates" button re-runs <paramref name="refresh"/>
+    /// and swaps the window's content in place with the new result. Extracted from
+    /// <see cref="ShowAboutDialogAsync"/> for testability without invoking <see cref="Window.ShowDialog"/>.
+    /// </summary>
+    internal static Window BuildAboutWindowWithLiveRefresh(UpdateCheckResult initial, Func<Task<UpdateCheckResult>> refresh)
+    {
+        Window window = null!;
+
+        async Task OnRefreshAsync()
+        {
+            var refreshed = await refresh();
+            window.Content = BuildAboutContent(refreshed, OnRefreshAsync);
+        }
+
+        window = BuildAboutWindow(initial, OnRefreshAsync);
+        return window;
     }
 
     private async Task RunStartupUpdateDownloadAsync()
@@ -2800,7 +2820,7 @@ public partial class MainWindow : Window
     /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
+    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null, Func<Task>? onRefresh = null) =>
         new Window
         {
             Title = "About AnimationEditor",
@@ -2808,7 +2828,7 @@ public partial class MainWindow : Window
             Height = 240,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Content = BuildAboutContent(updateCheck),
+            Content = BuildAboutContent(updateCheck, onRefresh),
         };
 
     /// <summary>
@@ -2816,10 +2836,12 @@ public partial class MainWindow : Window
     /// when no check has run yet; a non-null result with a populated <see cref="UpdateCheckResult.LatestVersion"/>
     /// and <see cref="UpdateCheckResult.IsUpdateAvailable"/> <c>false</c> means the check succeeded
     /// and the running version is already current (issue #845 — this used to be indistinguishable
-    /// from "never checked").
+    /// from "never checked"). <paramref name="onRefresh"/>, when given, adds a "Check for Updates"
+    /// button (issue #1033) that lets the user retry a check that failed silently without closing
+    /// the dialog; omitted entirely when null.
     /// Extracted for testability.
     /// </summary>
-    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
+    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null, Func<Task>? onRefresh = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -2833,7 +2855,7 @@ public partial class MainWindow : Window
         var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
         var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
 
-        return new StackPanel
+        var panel = new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
             Spacing = 8,
@@ -2846,6 +2868,18 @@ public partial class MainWindow : Window
                 BuildOpenUrlButton(releaseUrl, buttonLabel),
             }
         };
+        if (onRefresh is not null)
+            panel.Children.Add(BuildRefreshButton(onRefresh));
+
+        return panel;
+    }
+
+    /// <summary>Builds the About dialog's "Check for Updates" button (issue #1033).</summary>
+    private static Button BuildRefreshButton(Func<Task> onRefresh)
+    {
+        var button = new Button { Name = "AboutRefreshBtn", Content = "Check for Updates" };
+        button.Click += (_, _) => _ = onRefresh();
+        return button;
     }
 
     /// <summary>

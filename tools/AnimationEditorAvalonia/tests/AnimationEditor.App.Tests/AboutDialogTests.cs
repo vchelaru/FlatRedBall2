@@ -1,8 +1,10 @@
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using AnimationEditor.Core.Update;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Xunit;
 
 namespace AnimationEditor.App.Tests;
@@ -151,5 +153,59 @@ public class AboutDialogTests
             .FirstOrDefault(tb => tb.Text?.Contains("Check here for updates", System.StringComparison.OrdinalIgnoreCase) == true);
 
         Assert.NotNull(promptBlock);
+    }
+
+    // ── Manual refresh (issue #1033) ────────────────────────────────────────────
+    // Opening About already forces a fresh check (issue #681), but a check that fails
+    // silently (offline, GitHub rate limit) leaves the dialog showing a stale result until
+    // the user closes and reopens it. A visible refresh button lets them retry in place.
+
+    [AvaloniaFact]
+    public void BuildAboutContent_NoRefreshCallback_HasNoRefreshButton()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent();
+
+        var refreshBtn = panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn");
+
+        Assert.Null(refreshBtn);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_WithRefreshCallback_ContainsRefreshButton()
+    {
+        var panel = (StackPanel)MainWindow.BuildAboutContent(onRefresh: () => Task.CompletedTask);
+
+        var refreshBtn = panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn");
+
+        Assert.NotNull(refreshBtn);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_RefreshButtonClicked_InvokesCallback()
+    {
+        var callCount = 0;
+        var panel = (StackPanel)MainWindow.BuildAboutContent(onRefresh: () => { callCount++; return Task.CompletedTask; });
+        var refreshBtn = panel.Children.OfType<Button>().First(b => b.Name == "AboutRefreshBtn");
+
+        refreshBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(1, callCount);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutWindowWithLiveRefresh_RefreshButtonClicked_ReplacesContentWithNewResult()
+    {
+        var refreshedResult = new UpdateCheckResult(true, new System.Version(2026, 9, 6), "https://example.com/latest");
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(
+            initial: UpdateCheckResult.NoUpdate,
+            refresh: () => Task.FromResult(refreshedResult));
+
+        var refreshBtn = ((StackPanel)window.Content!).Children.OfType<Button>().First(b => b.Name == "AboutRefreshBtn");
+        refreshBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        var updateBlock = ((StackPanel)window.Content!).Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("2026.9.6") == true);
+        Assert.NotNull(updateBlock);
     }
 }
