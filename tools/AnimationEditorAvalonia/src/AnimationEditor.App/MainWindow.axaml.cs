@@ -3281,8 +3281,7 @@ public partial class MainWindow : Window
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
-        if (!string.IsNullOrEmpty(achxFolder) &&
-            TextureCopyDecider.ShouldPromptToCopy(droppedFilePath, achxFolder, _appState.ProjectFolder))
+        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, droppedFilePath))
         {
             var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
             if (choice == TextureCopyChoice.Cancel) return false;
@@ -4743,38 +4742,35 @@ public partial class MainWindow : Window
         // resolvedAbsPath tracks the actual file we will use (may change if user copies it)
         string resolvedAbsPath = pickedPath;
 
-        if (!string.IsNullOrEmpty(achxFolder))
+        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, pickedPath))
         {
-            if (TextureCopyDecider.ShouldPromptToCopy(pickedPath, achxFolder, _appState.ProjectFolder))
-            {
-                var choice = await ShowTextureCopyDialogAsync(pickedPath);
-                if (choice == TextureCopyChoice.Cancel) return;
+            var choice = await ShowTextureCopyDialogAsync(pickedPath);
+            if (choice == TextureCopyChoice.Cancel) return;
 
-                if (choice == TextureCopyChoice.Copy)
+            if (choice == TextureCopyChoice.Copy)
+            {
+                string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
+                try
                 {
-                    string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
-                    try
+                    File.Copy(pickedPath, destination, overwrite: true);
+                    resolvedAbsPath = destination;
+                }
+                catch (Exception ex)
+                {
+                    var capturedSource = pickedPath;
+                    var capturedDest   = destination;
+                    ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
                     {
-                        File.Copy(pickedPath, destination, overwrite: true);
-                        resolvedAbsPath = destination;
-                    }
-                    catch (Exception ex)
-                    {
-                        var capturedSource = pickedPath;
-                        var capturedDest   = destination;
-                        ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+                        try
                         {
-                            try
-                            {
-                                File.Copy(capturedSource, capturedDest, overwrite: true);
-                                CommitFrameTexture(new[] { frame }, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
-                            }
-                            catch (Exception retryEx)
-                            {
-                                ShowToast($"Retry failed: {retryEx.Message}");
-                            }
-                        });
-                    }
+                            File.Copy(capturedSource, capturedDest, overwrite: true);
+                            CommitFrameTexture(new[] { frame }, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
+                        }
+                        catch (Exception retryEx)
+                        {
+                            ShowToast($"Retry failed: {retryEx.Message}");
+                        }
+                    });
                 }
             }
         }

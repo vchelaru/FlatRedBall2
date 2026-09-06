@@ -112,4 +112,45 @@ public class TextureCopyDeciderTests
     [Fact]
     public void ShouldPromptToCopy_TwoFolders_TextureNullOrEmpty_ReturnsFalse()
         => Assert.False(TextureCopyDecider.ShouldPromptToCopy(null, Folder, Folder));
+
+    [Fact]
+    public void ShouldPromptToCopy_TwoFolders_AchxOutsideProjectFolder_ReturnsTrue()
+    {
+        // The texture is in the project but the .achx is not, so the stored path would be a
+        // "../.." climb out of the .achx's folder, which is what the prompt exists to avoid.
+        string projectFolder   = TestPaths.Abs("project");
+        string looseAchxFolder = TestPaths.AltAbs("scratch");
+        Assert.True(TextureCopyDecider.ShouldPromptToCopy(Inside, looseAchxFolder, projectFolder));
+    }
+
+    // ── ShouldPromptToCopyForProject (what the call sites actually use) ──────
+
+    [Fact]
+    public void ShouldPromptToCopyForProject_AchxAndTextureInOpenProjectFolder_ReturnsFalse()
+    {
+        var projectManager = new ProjectManager
+        {
+            FileName          = TestPaths.Abs("project", "Animations", "hero.achx"),
+            ProjectFolderPath = TestPaths.Abs("project")
+        };
+        Assert.False(TextureCopyDecider.ShouldPromptToCopyForProject(projectManager, Inside));
+    }
+
+    [Fact]
+    public void ShouldPromptToCopyForProject_NoProjectFolderOpen_ReturnsTrue()
+    {
+        var projectManager = new ProjectManager
+        {
+            FileName = TestPaths.Abs("project", "Animations", "hero.achx")
+        };
+        Assert.True(TextureCopyDecider.ShouldPromptToCopyForProject(projectManager, Inside));
+    }
+
+    [Fact]
+    public void ShouldPromptToCopyForProject_UnsavedAchx_ReturnsFalse()
+    {
+        // Nowhere to copy the texture to until the .achx has a folder of its own.
+        var projectManager = new ProjectManager { ProjectFolderPath = TestPaths.Abs("project") };
+        Assert.False(TextureCopyDecider.ShouldPromptToCopyForProject(projectManager, Outside));
+    }
 }

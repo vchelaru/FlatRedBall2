@@ -123,7 +123,7 @@
 | AS02 | Wireframe zoom level | `WireframeZoomValue` (default 100); changing fires `AfterZoomChange` |
 | AS03 | Snap-to-grid toggle | `IsSnapToGridChecked` boolean |
 | AS04 | Grid size setting | `GridSize` integer (default 16) |
-| AS05 | Project folder | `ProjectFolder` string used to suppress file-copy prompts |
+| AS05 | Project folder | `ProjectManager.ProjectFolderPath` used to suppress file-copy prompts |
 | AS06 | `CurrentFrame` alias | Delegates to `SelectedState.Self.SelectedFrame` |
 
 ### 1.8 Application Events
