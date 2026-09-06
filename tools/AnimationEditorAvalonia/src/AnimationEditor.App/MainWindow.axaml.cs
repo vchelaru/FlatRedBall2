@@ -277,6 +277,7 @@ public partial class MainWindow : Window
         // Right-clicking blank space in the tree offers "New Animation" (#908) -- same flow as
         // File > New.
         ProjectPanel.NewAnimationRequested += () => OnNewClick(null, null!);
+        ProjectPanel.NewAnimationFileRequested += request => _ = CreateNewAnimationFileAsync(request);
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
@@ -2189,6 +2190,35 @@ public partial class MainWindow : Window
     /// about it.
     /// </summary>
     internal Func<string, string?> DeleteToRecycleBin { get; set; } = RecycleBin.Delete;
+
+    /// <summary>
+    /// Issue #1018: right-click "New Animation File" on a Project-tree folder row, after the user
+    /// named it inline. The panel has already rejected a name colliding with anything it can see,
+    /// but the scan behind the tree can be stale (an external <c>git pull</c>, another editor), so
+    /// this writes with <see cref="FileMode.CreateNew"/> and reports rather than overwriting. No
+    /// explicit tree refresh -- the project folder watcher rescans on any create under the watched
+    /// folder, same as <see cref="DeleteProjectFileAsync"/> relies on for a delete. Internal
+    /// (not private) so tests can drive it without a real context menu.
+    /// </summary>
+    internal async Task CreateNewAnimationFileAsync(NewAnimationFileRequest request)
+    {
+        var folder = ResolveProjectFolderAbsolutePath(request.FolderRelativePath);
+        if (folder is null) return;
+
+        var absolutePath = Path.Combine(folder, request.FileName);
+        try
+        {
+            using (var stream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write))
+                NewAnimationFileWriter.WriteEmpty(stream, request.FileName);
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ Could not create {request.FileName}: {ex.Message}", isError: true);
+            return;
+        }
+
+        await LoadAnimationFileAsync(absolutePath);
+    }
 
     private void OnTitleFileCopyPathClick(object? sender, RoutedEventArgs e)
     {

@@ -1597,6 +1597,10 @@ public partial class App : Application
         // Set by openButton.Click, read by a later Project-tree click -- see its assignment site.
         string lastOpenFolderWriteState = "";
 
+        // The picked project folder's own handle, kept so "New Animation File" (#1018) can walk
+        // down to the right subfolder later; a Project-tree node carries only a relative path.
+        JSObject? lastOpenFolderNativeDir = null;
+
         // #763 fallback: directory enumeration (dirHandle.entries(), used by
         // folder.GetItemsAsync() below) can throw NotFoundError on some environments even though
         // named lookups (getFileHandle) on the identical handle keep working -- confirmed live on
@@ -1763,6 +1767,7 @@ public partial class App : Application
             // populated) can finish the load with the same write-permission suffix in the status
             // text, without re-running EnsureReadWriteAsync.
             lastOpenFolderWriteState = writeState;
+            lastOpenFolderNativeDir = nativeDir;
 
             // Directory reads (enumeration, file access) can fail for reasons outside this app's
             // control -- confirmed live: a valid, correctly-permissioned handle can still throw
@@ -1786,6 +1791,48 @@ public partial class App : Application
         };
 
         projectPanel.FileSelected += entry => _ = LoadAchxEntryAsync(entry, lastOpenFolderWriteState);
+
+        // #1018: right-click a Project-tree folder -> "New Animation File". Works here as well as
+        // on desktop -- the picked folder handle is writable (EnsureReadWriteAsync ran at pick
+        // time), it just can't be revealed in an OS shell.
+        async Task CreateNewAnimationFileAsync(NewAnimationFileRequest request)
+        {
+            if (lastOpenFolderNativeDir is null) return;
+
+            var relativePath = request.FolderRelativePath.Length == 0
+                ? request.FileName
+                : request.FolderRelativePath + "/" + request.FileName;
+            try
+            {
+                var dirHandle = lastOpenFolderNativeDir;
+                foreach (var segment in request.FolderRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
+                    dirHandle = await NativeFolderInterop.GetDirectoryHandleAsync(dirHandle, segment);
+
+                // The tree's scan can be stale, so re-check before writing -- there's no
+                // create-only mode here to lean on the way desktop's FileMode.CreateNew does.
+                var folder = new NativeReadWriteFolder(dirHandle);
+                if (await folder.GetFileAsync(request.FileName) is not null)
+                {
+                    notifications.ShowErrorBanner($"\"{request.FileName}\" already exists in that folder.");
+                    return;
+                }
+
+                await using (var stream = await new NativeReadWriteFile(dirHandle, request.FileName).OpenWriteAsync())
+                    NewAnimationFileWriter.WriteEmpty(stream, request.FileName);
+
+                var entries = await AchxFolderScanner.ScanAsync(new NativeReadWriteFolder(lastOpenFolderNativeDir));
+                projectPanel.SetEntries(entries);
+
+                if (entries.FirstOrDefault(e => e.RelativePath == relativePath) is { } created)
+                    await LoadAchxEntryAsync(created, lastOpenFolderWriteState);
+            }
+            catch (JSException ex)
+            {
+                notifications.ShowErrorBanner($"Could not create {relativePath}: {ex.Message}");
+            }
+        }
+
+        projectPanel.NewAnimationFileRequested += request => _ = CreateNewAnimationFileAsync(request);
 
         // Prompts for a new save location (the OS-level save dialog) and writes there --
         // shared by Save As (always) and Save's first-time fallback (no known location yet).

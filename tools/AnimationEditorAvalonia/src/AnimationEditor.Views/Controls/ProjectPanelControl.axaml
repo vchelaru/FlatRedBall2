@@ -65,9 +65,26 @@
                                Stretch="Uniform"
                                VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Name}"
+                                   IsVisible="{Binding IsNotEditing}"
                                    FontSize="11"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
+                        <!-- Inline rename for a not-yet-created file (#1018). The extension is
+                             neither shown nor edited here; the project's convention picks it. -->
+                        <TextBox Text="{Binding EditText, Mode=TwoWay}"
+                                 IsVisible="{Binding IsEditing}"
+                                 MinWidth="120"
+                                 FontSize="11"
+                                 Padding="2,0"
+                                 VerticalAlignment="Center"
+                                 AttachedToVisualTree="OnPendingNameAttached"
+                                 KeyDown="OnPendingNameKeyDown"
+                                 LostFocus="OnPendingNameLostFocus" />
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   IsVisible="{Binding HasError}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Accent}" />
                     </StackPanel>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>
