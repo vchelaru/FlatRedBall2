@@ -564,6 +564,28 @@ public static class TreeBuilder
     // ── Node search ───────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Flattens <paramref name="roots"/> into the same row order the tree currently renders:
+    /// a node is included when <see cref="TreeNodeVm.PinnedVisible"/>, and its children are
+    /// walked only when it is also <see cref="TreeNodeVm.IsExpanded"/>. Used to compute
+    /// "next/previous visible row" for keyboard range-select (Shift+Up/Down).
+    /// </summary>
+    public static List<TreeNodeVm> FlattenVisible(IEnumerable<TreeNodeVm> roots)
+    {
+        var result = new List<TreeNodeVm>();
+        void Walk(TreeNodeVm node)
+        {
+            if (!node.PinnedVisible) return;
+            result.Add(node);
+            if (node.IsExpanded)
+                foreach (var child in node.Children)
+                    Walk(child);
+        }
+        foreach (var root in roots)
+            Walk(root);
+        return result;
+    }
+
+    /// <summary>
     /// Recursively searches <paramref name="roots"/> and returns the first node
     /// whose <see cref="TreeNodeVm.Data"/> is the same reference as
     /// <paramref name="target"/>.  Returns <c>null</c> when not found.

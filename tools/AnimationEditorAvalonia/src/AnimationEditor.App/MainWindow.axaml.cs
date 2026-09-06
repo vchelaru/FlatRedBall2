@@ -180,6 +180,13 @@ public partial class MainWindow : Window
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
     private bool _suppressGuideVisibilitySync;
+
+    // Shift+Up/Down range-select (#1023): the row a range grows from. Reset to whatever
+    // OnTreeSelectionChanged sees as the plain (non-shift-range) selection so a stale anchor
+    // never causes a surprising jump on the next Shift+Arrow. _isApplyingShiftRangeSelection
+    // guards the handler's own AnimTree.SelectedItems mutation from resetting the anchor.
+    private TreeNodeVm? _treeSelectionAnchor;
+    private bool _isApplyingShiftRangeSelection;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
 
     // The platform application-data root under which settings live. Injected (not read from
@@ -3059,6 +3066,15 @@ public partial class MainWindow : Window
             OnInlineRenameKeyDown,
             RoutingStrategies.Tunnel);
 
+        // Tunnel-phase Shift+Up/Down (#1023): intercept before TreeViewItem's own arrow-key
+        // handling, which otherwise just moves the single selection to the next/previous row
+        // and discards the rest. Registered after OnInlineRenameKeyDown so a rename in progress
+        // (which already swallows Up/Down via e.Handled) takes precedence.
+        AnimTree.AddHandler(
+            InputElement.KeyDownEvent,
+            OnAnimTreeShiftArrowKeyDown,
+            RoutingStrategies.Tunnel);
+
         // Bubble-phase LostFocus from the inline TextBox: commit
         AnimTree.AddHandler(
             InputElement.LostFocusEvent,
@@ -3849,6 +3865,12 @@ public partial class MainWindow : Window
     {
         if (_suppressTreeSelectionHandling) return;
         if (AnimTree.SelectedItem is not TreeNodeVm vm) return;
+
+        // Any selection change that isn't our own Shift+Arrow range mutation re-anchors
+        // range-select at the row Avalonia now reports as SelectedItem (matches Explorer:
+        // a plain click, Ctrl+click, or native arrow-key move all become the new anchor).
+        if (!_isApplyingShiftRangeSelection)
+            _treeSelectionAnchor = vm;
 
         // Sync multi-select into SelectedState
         _selectedState.SelectedNodes = AnimTree.SelectedItems
@@ -6687,6 +6709,59 @@ public partial class MainWindow : Window
             // TreeViewItem doesn't navigate to a sibling row and end the rename via focus loss.
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Shift+Up/Down range-select (#1023): extends the selection by one visible row from a
+    /// fixed anchor (<see cref="_treeSelectionAnchor"/>), the far end moving with each key
+    /// press — the same semantics as Shift+Click range-select. Plain Up/Down (no Shift) is
+    /// untouched and falls through to Avalonia's native single-selection navigation.
+    /// </summary>
+    private void OnAnimTreeShiftArrowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) return;
+        if (e.Key is not (Key.Up or Key.Down)) return;
+        if (e.Source is TextBox) return; // inline rename owns Up/Down; see OnInlineRenameKeyDown
+
+        var visible = TreeBuilder.FlattenVisible(_treeRoots);
+        if (visible.Count == 0) return;
+
+        var anchor = _treeSelectionAnchor ?? AnimTree.SelectedItem as TreeNodeVm;
+        if (anchor is null) return;
+        int anchorIndex = visible.IndexOf(anchor);
+        if (anchorIndex < 0) return;
+
+        // The current selection's far end is whichever bound of its index range isn't the
+        // anchor — this lets the range's growth direction be read back from AnimTree.SelectedItems
+        // itself rather than tracking a second piece of state.
+        var selectedIndices = AnimTree.SelectedItems!.OfType<TreeNodeVm>()
+            .Select(n => visible.IndexOf(n))
+            .Where(i => i >= 0)
+            .ToList();
+        int lo = selectedIndices.Count > 0 ? selectedIndices.Min() : anchorIndex;
+        int hi = selectedIndices.Count > 0 ? selectedIndices.Max() : anchorIndex;
+        int farIndex = lo == anchorIndex ? hi : lo;
+
+        int newFarIndex = e.Key == Key.Down
+            ? Math.Min(visible.Count - 1, farIndex + 1)
+            : Math.Max(0, farIndex - 1);
+
+        int rangeLo = Math.Min(anchorIndex, newFarIndex);
+        int rangeHi = Math.Max(anchorIndex, newFarIndex);
+
+        _isApplyingShiftRangeSelection = true;
+        try
+        {
+            AnimTree.SelectedItems!.Clear();
+            for (int i = rangeLo; i <= rangeHi; i++)
+                AnimTree.SelectedItems.Add(visible[i]);
+        }
+        finally
+        {
+            _isApplyingShiftRangeSelection = false;
+        }
+
+        e.Handled = true;
     }
 
     // AnimTree (the TreeView itself) has Focusable=false — only its TreeViewItem containers
