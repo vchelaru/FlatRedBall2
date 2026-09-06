@@ -729,7 +729,9 @@ public partial class MainWindow : Window
     {
         if (tab == _tabManager.ActiveTab) return;
 
-        ClearPendingCut();
+        // A pending cut deliberately survives a tab switch (#1026) -- paste on a different tab
+        // completes it as a cross-tab move; ResolveCompletion decides staleness lazily at paste
+        // time, so this is no longer a "just tidy up the highlight" clear.
 
         // Save the leaving tab's undo history and in-memory model before the editor switches.
         // PNG tabs carry no model or undo stack, so only capture when leaving the achx editor.
@@ -773,7 +775,7 @@ public partial class MainWindow : Window
 
     private void ActivateUntitledTabContent(TabEntry tab)
     {
-        ClearPendingCut();
+        // See the comment in ActivateTabAsync (#1026) -- a pending cut survives this switch too.
         _projectManager.AnimationChainListSave =
             tab.CachedEditorModel ?? new AnimationChainListSave();
         _projectManager.FileName = null;
@@ -1144,7 +1146,7 @@ public partial class MainWindow : Window
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                ClearPendingCut();
+                // A pending cut deliberately survives this (#1026) -- see ActivateTabAsync.
                 SyncTabCacheFromEditor(path);
                 await InvalidateProjectPanelThumbnailIfTrackedAsync(path);
             });
@@ -6117,6 +6119,16 @@ public partial class MainWindow : Window
     private Task HandleCutAsync()   => RunGuardedAsync(HandleCutCoreAsync,   "Cut");
     private Task HandlePasteAsync() => RunGuardedAsync(HandlePasteCoreAsync, "Paste");
 
+    /// <summary>
+    /// The directory of the currently active <c>.achx</c>, or empty for an unsaved document.
+    /// Used to make copied/cut frame texture references self-contained (#1026) so a paste into
+    /// a document in a different folder still finds the same physical texture.
+    /// </summary>
+    private string CurrentAchxFolder =>
+        string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : new FilePath(_projectManager.FileName).GetDirectoryContainingThis().FullPath;
+
     private async Task HandleCopyCoreAsync()
     {
         if (IsTextInputFocused()) return;
@@ -6135,7 +6147,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
         _pendingCutState.Clear();
         SyncPendingCutHighlights();
     }
@@ -6158,8 +6170,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
-        _pendingCutState.Set(payload);
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
+        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!);
         SyncPendingCutHighlights();
     }
 
@@ -6180,19 +6192,25 @@ public partial class MainWindow : Window
         if (acls is null) return;
 
         var selectedData = SelectedData;
-        bool completingCut = _pendingCutState.IsActive;
-        if (completingCut && !_pendingCutState.SourcesBelongToProject(acls, _objectFinder))
+        var cutCompletion = _pendingCutState.ResolveCompletion(acls);
+        bool completingCut = cutCompletion is CutCompletion.SameDocument or CutCompletion.CrossDocument;
+        bool completingCutAcrossDocuments = cutCompletion == CutCompletion.CrossDocument;
+        if (cutCompletion == CutCompletion.Stale)
         {
             _pendingCutState.Clear();
             SyncPendingCutHighlights();
-            completingCut = false;
         }
 
         if (chains is { Count: > 0 })
         {
             if (completingCut && _pendingCutState.Kind != CopySelectionKind.Chain) return;
             QueuePastedChainExpandFromSources(chains, chains);
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteChains(chains);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
                 _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
             else
                 _appCommands.PasteChains(chains);
@@ -6204,7 +6222,12 @@ public partial class MainWindow : Window
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
 
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteFrames(targetChain, frames, insertIndex);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
                 _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
             else
                 _appCommands.PasteFrames(targetChain, frames, insertIndex);
@@ -6218,7 +6241,12 @@ public partial class MainWindow : Window
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
 
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteShapes(frame, rectangles ?? [], circles ?? []);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
             {
                 var sourceFrame = _pendingCutState.Shapes[0] switch
                 {
@@ -6257,13 +6285,6 @@ public partial class MainWindow : Window
             Walk(root);
         WireframeCtrl.InvalidateVisual();
         PreviewCtrl.InvalidateVisual();
-    }
-
-    private void ClearPendingCut()
-    {
-        if (!_pendingCutState.IsActive) return;
-        _pendingCutState.Clear();
-        SyncPendingCutHighlights();
     }
 
     private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)

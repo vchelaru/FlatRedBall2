@@ -18,6 +18,7 @@ public class CutPasteTests
     public void PendingCutState_SetClearAndContains()
     {
         var cut = new PendingCutState();
+        var acls = new AnimationChainListSave();
         var chain = new AnimationChainSave { Name = "Walk" };
         var payload = new CopySelectionPayload
         {
@@ -25,14 +26,16 @@ public class CutPasteTests
             Chains = new[] { chain },
         };
 
-        cut.Set(payload);
+        cut.Set(payload, acls);
         Assert.True(cut.IsActive);
         Assert.Equal(CopySelectionKind.Chain, cut.Kind);
+        Assert.Same(acls, cut.SourceDocument);
         Assert.True(cut.Contains(chain));
         Assert.False(cut.Contains(new AnimationChainSave { Name = "Other" }));
 
         cut.Clear();
         Assert.False(cut.IsActive);
+        Assert.Null(cut.SourceDocument);
         Assert.False(cut.Contains(chain));
     }
 
@@ -40,10 +43,11 @@ public class CutPasteTests
     public void PendingCutState_NewCutReplacesPrevious()
     {
         var cut = new PendingCutState();
+        var acls = new AnimationChainListSave();
         var c1 = new AnimationChainSave { Name = "A" };
         var c2 = new AnimationChainSave { Name = "B" };
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c1 } });
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c2 } });
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c1 } }, acls);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { c2 } }, acls);
 
         Assert.False(cut.Contains(c1));
         Assert.True(cut.Contains(c2));
@@ -53,8 +57,9 @@ public class CutPasteTests
     public void PendingCutState_WireframeFrames_IncludesChainChildren()
     {
         var cut = new PendingCutState();
-        var chain = TestHelpers.MakeChain(new AnimationChainListSave(), "Walk", 2);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } });
+        var acls = new AnimationChainListSave();
+        var chain = TestHelpers.MakeChain(acls, "Walk", 2);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, acls);
 
         Assert.Equal(2, cut.WireframeFrames.Count);
         Assert.Contains(chain.Frames[0], cut.WireframeFrames);
@@ -155,15 +160,92 @@ public class CutPasteTests
     }
 
     [Fact]
+    public void ResolveCompletion_SourceInDifferentOpenDocument_ReturnsCrossDocument()
+    {
+        // Cut happened while tab A was active; the user then switched to tab B and pastes there.
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var ctxB = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+
+        Assert.Equal(CutCompletion.CrossDocument, cut.ResolveCompletion(ctxB.Acls));
+    }
+
+    [Fact]
+    public void ResolveCompletion_SourceInActiveDocument_ReturnsSameDocument()
+    {
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+
+        Assert.Equal(CutCompletion.SameDocument, cut.ResolveCompletion(ctxA.Acls));
+    }
+
+    [Fact]
+    public void ResolveCompletion_SourceGoneFromBothDocuments_ReturnsStale()
+    {
+        // Simulates the source tab having been closed (and its document discarded) since the cut.
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var ctxB = TestHelpers.SetupFreshAcls();
+        var chain = new AnimationChainSave { Name = "Walk" }; // never added to any acls
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+
+        Assert.Equal(CutCompletion.Stale, cut.ResolveCompletion(ctxB.Acls));
+    }
+
+    [Fact]
+    public void ResolveCompletion_NoCutPending_ReturnsNone()
+    {
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+
+        Assert.Equal(CutCompletion.None, cut.ResolveCompletion(ctxA.Acls));
+    }
+
+    [Fact]
+    public void RemoveSourcesFrom_Chain_RemovesFromGivenDocumentEvenWhenNotActive()
+    {
+        // Simulates a cut made in tab A while tab B is now the active document (#1026):
+        // the source chain lives in A's document, not the currently active one.
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
+
+        bool removed = cut.RemoveSourcesFrom(cut.SourceDocument!);
+
+        Assert.True(removed);
+        Assert.DoesNotContain(chain, ctxA.Acls.AnimationChains);
+    }
+
+    [Fact]
+    public void RemoveSourcesFrom_Frame_RemovesFromChainInGivenDocument()
+    {
+        var cut = new PendingCutState();
+        var ctxA = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 2);
+        var frame = chain.Frames[0];
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Frame, Frames = new[] { frame } }, ctxA.Acls);
+
+        bool removed = cut.RemoveSourcesFrom(cut.SourceDocument!);
+
+        Assert.True(removed);
+        Assert.DoesNotContain(frame, chain.Frames);
+    }
+
+    [Fact]
     public void SourcesBelongToProject_FalseWhenSourceFromOtherAcls()
     {
         var cut = new PendingCutState();
         var ctxA = TestHelpers.SetupFreshAcls();
         var ctxB = TestHelpers.SetupFreshAcls();
         var chain = TestHelpers.MakeChain(ctxA.Acls, "Walk", 1);
-        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } });
+        cut.Set(new CopySelectionPayload { Kind = CopySelectionKind.Chain, Chains = new[] { chain } }, ctxA.Acls);
 
-        Assert.True(cut.SourcesBelongToProject(ctxA.Acls, ctxA.ObjectFinder));
-        Assert.False(cut.SourcesBelongToProject(ctxB.Acls, ctxB.ObjectFinder));
+        Assert.True(cut.SourcesBelongToProject(ctxA.Acls));
+        Assert.False(cut.SourcesBelongToProject(ctxB.Acls));
     }
 }
