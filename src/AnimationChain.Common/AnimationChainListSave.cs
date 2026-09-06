@@ -209,7 +209,8 @@ public class AnimationChainListSave
         {
             var chain = new AnimationChainSave
             {
-                Name = (string?)chainEl.Element("Name") ?? string.Empty
+                Name = (string?)chainEl.Element("Name") ?? string.Empty,
+                IsLocked = BoolEl(chainEl, "Locked"),
             };
 
             foreach (var frameEl in chainEl.Elements("Frame"))
@@ -352,11 +353,14 @@ public class AnimationChainListSave
             foreach (var frame in chain.Frames)
                 framesArray.Add((JsonNode)WriteFrameJson(frame));
 
-            chainsArray.Add((JsonNode)new JsonObject
+            var chainObj = new JsonObject
             {
                 ["name"] = chain.Name,
                 ["frames"] = framesArray,
-            });
+            };
+            if (chain.IsLocked)
+                chainObj["locked"] = true;
+            chainsArray.Add((JsonNode)chainObj);
         }
         root["animationChains"] = chainsArray;
 
@@ -445,6 +449,10 @@ public class AnimationChainListSave
         {
             var chainEl = new XElement("AnimationChain",
                 new XElement("Name", chain.Name));
+            // Tooling-only, written only when true so an unlocked/legacy chain round-trips
+            // byte-identical (same convention as the frame writer's optional fields below).
+            if (chain.IsLocked)
+                chainEl.Add(new XElement("Locked", "true"));
             foreach (var frame in chain.Frames)
                 chainEl.Add(WriteFrame(frame));
             root.Add(chainEl);
@@ -774,7 +782,8 @@ public class AnimationChainListSave
                 var chainObj = chainNode!.AsObject();
                 var chain = new AnimationChainSave
                 {
-                    Name = chainObj["name"]?.GetValue<string>() ?? string.Empty
+                    Name = chainObj["name"]?.GetValue<string>() ?? string.Empty,
+                    IsLocked = BoolProp(chainObj, "locked"),
                 };
 
                 if (chainObj["frames"] is JsonArray framesArray)

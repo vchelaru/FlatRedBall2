@@ -82,6 +82,7 @@ public static class TreeBuilder
             IsChainNode = true,
             Kind = NodeKind.Chain,
             Meta = BuildChainMeta(chain),
+            IsLocked = chain.IsLocked,
         };
         for (int i = 0; i < chain.Frames.Count; i++)
             node.Children.Add(BuildFrameNode(chain.Frames[i], i));
@@ -323,6 +324,7 @@ public static class TreeBuilder
             }
             roots[i].Header = target.Name;
             roots[i].Meta   = BuildChainMeta(target);
+            roots[i].IsLocked = target.IsLocked;
             SyncFramesInto(roots[i], target.Frames);
         }
 

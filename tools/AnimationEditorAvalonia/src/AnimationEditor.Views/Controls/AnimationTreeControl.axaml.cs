@@ -297,6 +297,15 @@ public partial class AnimationTreeControl : UserControl
 
     private void OnAddFrameBtnDoubleTapped(object? sender, TappedEventArgs e) => e.Handled = true;
 
+    private void OnLockBtnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        _appCommands?.SetChainLocked(chain, !chain.IsLocked);
+        e.Handled = true;
+    }
+
     /// <summary>Test seam for the inline add-frame button without simulating hover/pointer.</summary>
     internal void RaiseAddFrameForTest(TreeNodeVm chainNode)
     {

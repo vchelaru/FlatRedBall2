@@ -21,6 +21,24 @@
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
             </Style>
+            <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked, but always
+                 visible (via the .locked class, bound to TreeNodeVm.IsLocked) so a locked chain is
+                 recognizable at a glance without hovering. -->
+            <Style Selector="Button.lock-btn">
+                <Setter Property="Opacity" Value="0" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Focusable" Value="False" />
+            </Style>
+            <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+                <Setter Property="Opacity" Value="1" />
+                <Setter Property="IsHitTestVisible" Value="True" />
+                <Setter Property="Focusable" Value="True" />
+            </Style>
+            <Style Selector="Button.lock-btn.locked">
+                <Setter Property="Opacity" Value="1" />
+                <Setter Property="IsHitTestVisible" Value="True" />
+                <Setter Property="Focusable" Value="True" />
+            </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="models:TreeNodeVm" ItemsSource="{Binding Children}">
@@ -61,6 +79,18 @@
                             VerticalContentAlignment="Center"
                             Click="OnAddFrameBtnClick"
                             DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                    <Button Classes="lock-btn lock-icon"
+                            Classes.locked="{Binding IsLocked}"
+                            IsVisible="{Binding IsChainNode}"
+                            AutomationProperties.AutomationId="chain-lock-btn"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Width="22" Height="22"
+                            Padding="0"
+                            Margin="0,0,30,0"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Click="OnLockBtnClick" />
                 </Grid>
             </TreeDataTemplate>
         </TreeView.ItemTemplate>

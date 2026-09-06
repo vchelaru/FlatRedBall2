@@ -609,6 +609,47 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
 
+    // -- Chain lock (#1032) -----------------------------------------------------
+    // A locked chain must be inert to drag gestures: it can be displayed (e.g. as a multi-
+    // selected "background reference" alongside an unlocked chain being edited) but must never
+    // move. Gated at drag-start (both here and in the Simulate* test hooks) rather than only at
+    // commit, so a locked target never starts following the pointer in the first place.
+
+    /// <summary>
+    /// Resolves <paramref name="frame"/>'s owning chain. Prefers <see cref="ISelectedState.SelectedChain"/>
+    /// when it actually contains the frame (covers callers/tests that never added the chain to
+    /// <see cref="IProjectManager.AnimationChainListSave"/>), falling back to a full ACLS search
+    /// (covers a multi-frame selection spanning chains other than the one pinned as SelectedChain).
+    /// </summary>
+    private AnimationChainSave? FindOwningChain(AnimationFrameSave? frame)
+    {
+        if (frame is null) return null;
+        var selectedChain = _selectedState?.SelectedChain;
+        if (selectedChain is not null && selectedChain.Frames.Contains(frame))
+            return selectedChain;
+        return _projectManager?.AnimationChainListSave?.AnimationChains
+            .FirstOrDefault(c => c.Frames.Contains(frame));
+    }
+
+    private AnimationFrameSave? FindOwningFrame(object? shape)
+    {
+        if (shape is null) return null;
+        var selectedFrame = _selectedState?.SelectedFrame;
+        if (selectedFrame?.ShapesSave?.Shapes.Contains(shape) == true) return selectedFrame;
+
+        var chains = _projectManager?.AnimationChainListSave?.AnimationChains;
+        if (chains is null) return null;
+        foreach (var chain in chains)
+            foreach (var frame in chain.Frames)
+                if (frame.ShapesSave?.Shapes.Contains(shape) == true)
+                    return frame;
+        return null;
+    }
+
+    private bool IsFrameLocked(AnimationFrameSave? frame) => FindOwningChain(frame)?.IsLocked == true;
+
+    private bool IsShapeLocked(object? shape) => IsFrameLocked(FindOwningFrame(shape));
+
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
@@ -864,8 +905,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     internal void SimulateShapeDrag(float worldDx, float worldDy)
     {
-        _draggingShape = _selectedState!.SelectedShape;
-        if (_draggingShape is null) return;
+        var shape = _selectedState!.SelectedShape;
+        if (shape is null || IsShapeLocked(shape)) return;
+        _draggingShape = shape;
 
         if (_draggingShape is AARectSave r)
         {
@@ -892,8 +934,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     internal void SimulateShapeResize(HandleKind handle, float newParam1, float newParam2 = 0f)
     {
-        _draggingShape = _selectedState!.SelectedShape;
-        if (_draggingShape is null) return;
+        var shape = _selectedState!.SelectedShape;
+        if (shape is null || IsShapeLocked(shape)) return;
+        _draggingShape = shape;
 
         _shapeResizeHandle = handle;
 
@@ -930,7 +973,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     internal void SimulateFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame is null || _selectedState!.SelectedFrames.Count > 1) return;
+        if (frame is null || _selectedState!.SelectedFrames.Count > 1 || IsFrameLocked(frame)) return;
 
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
@@ -959,6 +1002,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
         var chain = _selectedState!.SelectedChain!;
+        if (chain.IsLocked) return;
+
         _draggingChainFrames = chain.Frames.ToArray();
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
@@ -987,7 +1032,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
         (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
-        _draggingChainFrames = _selectedState!.SelectedFrames.ToArray();
+        // A locked chain in the selection keeps its frames still: drag only the unlocked
+        // subset rather than aborting the whole gesture (mirrors the bulk skip-locked-entries
+        // pattern used elsewhere for a selection spanning multiple chains).
+        _draggingChainFrames = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
+        if (_draggingChainFrames.Length == 0) { _draggingChainFrames = null; return; }
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
@@ -1567,7 +1616,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (MathF.Abs(newX - _shapeDragStartX) > eps || MathF.Abs(newY - _shapeDragStartY) > eps)
         {
             var frame = _selectedState!.SelectedFrame;
-            if (frame is not null)
+            // Defense-in-depth: OnPointerPressed/Simulate* already refuse to start a drag on a
+            // locked chain's shape, so this should never fire for one — kept in case a future
+            // code path sets _draggingShape without going through those gates.
+            if (frame is not null && !IsFrameLocked(frame))
                 _undoManager!.Record(new MoveShapeCommand(
                     frame, _draggingShape, _shapeDragStartX, _shapeDragStartY, newX, newY,
                     _appCommands!, _events!));
@@ -1594,7 +1646,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         float newY = _draggingFrame.RelativeY;
 
         const float eps = 1e-4f;
-        if (MathF.Abs(newX - _frameDragStartX) > eps || MathF.Abs(newY - _frameDragStartY) > eps)
+        // Defense-in-depth: see the comment in CommitShapeDrag.
+        if ((MathF.Abs(newX - _frameDragStartX) > eps || MathF.Abs(newY - _frameDragStartY) > eps)
+            && !IsFrameLocked(_draggingFrame))
         {
             _undoManager!.Record(new MoveFrameOffsetCommand(
                 _draggingFrame, _frameDragStartX, _frameDragStartY, newX, newY,
@@ -1621,6 +1675,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         for (int i = 0; i < _draggingChainFrames.Length; i++)
         {
             var frame = _draggingChainFrames[i];
+            // Defense-in-depth: see the comment in CommitShapeDrag.
+            if (IsFrameLocked(frame)) continue;
             float newX = frame.RelativeX;
             float newY = frame.RelativeY;
             if (MathF.Abs(newX - _chainFrameStartX![i]) > eps || MathF.Abs(newY - _chainFrameStartY![i]) > eps)
@@ -1780,7 +1836,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (changed)
         {
             var frame = _selectedState!.SelectedFrame;
-            if (frame is not null)
+            // Defense-in-depth: see the comment in CommitShapeDrag.
+            if (frame is not null && !IsFrameLocked(frame))
                 _undoManager!.Record(new ResizeShapeCommand(
                     frame, _draggingShape,
                     _shapeDragStartX, _shapeDragStartY, _shapeDragStartScaleX, _shapeDragStartScaleY,
@@ -2025,24 +2082,27 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (handleKind != HandleKind.None)
         {
             var sel = _selectedState!.SelectedShape!;
-            _draggingShape   = sel;
-            _shapeDragAnchor = pos;
-            if (sel is AARectSave dhr)
+            if (!IsShapeLocked(sel))
             {
-                _shapeDragStartX      = dhr.X;
-                _shapeDragStartY      = dhr.Y;
-                _shapeDragStartScaleX = dhr.ScaleX;
-                _shapeDragStartScaleY = dhr.ScaleY;
+                _draggingShape   = sel;
+                _shapeDragAnchor = pos;
+                if (sel is AARectSave dhr)
+                {
+                    _shapeDragStartX      = dhr.X;
+                    _shapeDragStartY      = dhr.Y;
+                    _shapeDragStartScaleX = dhr.ScaleX;
+                    _shapeDragStartScaleY = dhr.ScaleY;
+                }
+                else if (sel is CircleSave dhc)
+                {
+                    _shapeDragStartX      = dhc.X;
+                    _shapeDragStartY      = dhc.Y;
+                    _shapeDragStartScaleX = dhc.Radius;
+                    _shapeDragStartScaleY = 0f;
+                }
+                _shapeResizeHandle = handleKind;
+                e.Pointer.Capture(this);
             }
-            else if (sel is CircleSave dhc)
-            {
-                _shapeDragStartX      = dhc.X;
-                _shapeDragStartY      = dhc.Y;
-                _shapeDragStartScaleX = dhc.Radius;
-                _shapeDragStartScaleY = 0f;
-            }
-            _shapeResizeHandle = handleKind;
-            e.Pointer.Capture(this);
             return;
         }
         var hitShape = HitTestShape(px, py);
@@ -2051,11 +2111,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
             if (hitShape is AARectSave hr) _selectedState!.SelectedRectangle = hr;
             else if (hitShape is CircleSave hc)          _selectedState!.SelectedCircle    = hc;
-            _draggingShape   = hitShape;
-            _shapeDragAnchor = pos;
-            if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
-            else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
-            e.Pointer.Capture(this);
+            if (!IsShapeLocked(hitShape))
+            {
+                _draggingShape   = hitShape;
+                _shapeDragAnchor = pos;
+                if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
+                else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
+                e.Pointer.Capture(this);
+            }
             return;
         }
 
@@ -2070,6 +2133,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             if (IsWholeChainDragTarget)
             {
                 var chain = _selectedState!.SelectedChain!;
+                if (chain.IsLocked) return;
                 _draggingChainFrames = chain.Frames.ToArray();
                 _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
                 _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
@@ -2077,14 +2141,19 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             }
             else if (IsMultiFrameDragTarget)
             {
-                _draggingChainFrames = _selectedState!.SelectedFrames.ToArray();
-                _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
-                _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
+                // A locked chain in the selection keeps its frames still: drag only the
+                // unlocked subset rather than aborting the whole gesture.
+                var draggable = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
+                if (draggable.Length == 0) return;
+                _draggingChainFrames = draggable;
+                _chainFrameStartX    = draggable.Select(f => f.RelativeX).ToArray();
+                _chainFrameStartY    = draggable.Select(f => f.RelativeY).ToArray();
                 _frameDragAnchor     = pos;
             }
             else
             {
                 var frame = _selectedState!.SelectedFrame!;
+                if (IsFrameLocked(frame)) return;
                 _draggingFrame   = frame;
                 _frameDragAnchor = pos;
                 _frameDragStartX = frame.RelativeX;

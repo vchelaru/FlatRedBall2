@@ -627,6 +627,25 @@
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
                         </Style>
+                        <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked,
+                             but always visible (via the .locked class, bound to
+                             TreeNodeVm.IsLocked) so a locked chain is recognizable at a glance
+                             without hovering. -->
+                        <Style Selector="Button.lock-btn">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                        <Style Selector="Button.lock-btn.locked">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
                         <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
                         <Style Selector="Border.cut-pending">
                             <Setter Property="Background" Value="#28E07030" />
@@ -735,6 +754,19 @@
                                         ToolTip.Tip="Add Frame"
                                         Click="OnAddFrameBtnClick"
                                         DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                                <Button Classes="lock-btn lock-icon"
+                                        Classes.locked="{Binding IsLocked}"
+                                        IsVisible="{Binding IsChainNode}"
+                                        AutomationProperties.AutomationId="chain-lock-btn"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Width="22" Height="22"
+                                        Padding="0"
+                                        Margin="0,0,30,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Lock Animation"
+                                        Click="OnLockBtnClick" />
                             </Grid>
                             </Border>
                         </TreeDataTemplate>
@@ -851,6 +883,25 @@
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
                                                Margin="0,12,0,0" />
+
+                                    <!-- ── Chain properties (#1032) ── shown when a chain is
+                                         selected but no frame/shape is (replacing PropNoneLabel's
+                                         "Select a frame or shape..." placeholder). -->
+                                    <StackPanel x:Name="PropChainPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="ANIMATION"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <CheckBox x:Name="PropChainLocked"
+                                                          Content="Locked"
+                                                          AutomationProperties.AutomationId="prop-chain-locked" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
 
                                     <!-- ── Frame properties ── -->
                                     <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">
