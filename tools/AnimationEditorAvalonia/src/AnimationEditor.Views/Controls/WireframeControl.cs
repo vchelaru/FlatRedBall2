@@ -51,7 +51,12 @@ public class WireframeControl : TextureViewport
     /// </summary>
     private sealed class WireframeSnapshot : TextureViewportSnapshot
     {
-        public List<(SKRect Bounds, bool IsSelected)> Frames = new();
+        /// <summary>
+        /// Per-frame reveal progress (#1027): each frame owns its own shrink-to-rest timeline
+        /// (0 = full bump, 1 = settled) instead of one shared value, so extending a selection
+        /// only replays the newly-added frame(s) — an already-settled sibling keeps its 1f.
+        /// </summary>
+        public List<(SKRect Bounds, bool IsSelected, float RevealProgress)> Frames = new();
         /// <summary>Mirrors <see cref="WireframeControl.FillFrames"/> (#976).</summary>
         public bool FillFrames = true;
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
@@ -72,11 +77,6 @@ public class WireframeControl : TextureViewport
         public SKRect? HoverFrameBounds;
         /// <summary>"Frame N" label for <see cref="HoverFrameBounds"/>; null when nothing is hovered.</summary>
         public string? HoverLabel;
-        /// <summary>
-        /// Selection-outline reveal progress (#542): 0 = full bump, 1 = settled.
-        /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
-        /// </summary>
-        public float SelectionRevealProgress = 1f;
         /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Ramps from
         /// <see cref="RevealAnimation.HandleFadeStartFraction"/> via
         /// <see cref="RevealAnimation.HandleAlpha"/> so the fade overlaps the tail of the
@@ -104,14 +104,13 @@ public class WireframeControl : TextureViewport
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
         using var solidFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(80, 160, 255, 255) };
 
-        float revealInflation = RevealAnimation.InflationPixels(s.SelectionRevealProgress);
-
         var screenRects = new List<(SKRect Sr, bool IsSelected)>(s.Frames.Count);
-        foreach (var (bounds, isSelected) in s.Frames)
+        foreach (var (bounds, isSelected, revealProgress) in s.Frames)
         {
             var sr = s.TextureRectToScreen(bounds);
-            // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the box's
-            // own size) so the pop stays visible at any zoom level.
+            // One-shot reveal (#542), timed per-frame (#1027): fixed screen-space pixels (not a
+            // multiplier of the box's own size) so the pop stays visible at any zoom level.
+            float revealInflation = RevealAnimation.InflationPixels(revealProgress);
             if (isSelected && revealInflation > 0f)
                 sr = InflateBy(sr, revealInflation);
             screenRects.Add((sr, isSelected));
@@ -357,11 +356,11 @@ public class WireframeControl : TextureViewport
     private bool _showPreview;
     private SKRect _previewRect;
 
-    // ── Selection-outline reveal (#542 / #803) ────────────────────────────────
-    // RevealHost owns progress + timer; the curve is RevealAnimation in Core.
-    private RevealHost _selectionReveal = null!;
-    private List<AnimationFrameSave>? _lastRevealedFrames;
-    private object? _lastRevealSelectionKey;
+    // ── Selection-outline reveal (#542 / #803 / #1027) ────────────────────────
+    // Each currently-highlighted frame owns its own RevealHost (progress + timer; the curve is
+    // RevealAnimation in Core), keyed by frame identity, so extending a selection only replays
+    // the newly-added frame(s) instead of restarting every highlighted frame in lockstep.
+    private readonly Dictionary<AnimationFrameSave, RevealHost> _frameReveals = new();
 
     // Lazily-created "add frame" cursor (arrow + "+" badge) shown when Ctrl is held and a
     // click would add a frame.
@@ -497,41 +496,40 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// SelectionChanged handler: starts the one-shot outline reveal (#542) only when the
-    /// selected-frame identity actually changed, then refreshes the texture/frames.
-    /// Unrelated refreshes (grid toggle, refresh-wireframe requests) do not go through
-    /// here, so they cannot restart the reveal.
+    /// SelectionChanged handler: diffs the highlighted-frame set and starts the reveal only on
+    /// frames newly added to it (#1027), then refreshes the texture/frames. Unrelated refreshes
+    /// (grid toggle, refresh-wireframe requests) do not go through here, so they cannot restart
+    /// any frame's reveal.
     /// </summary>
     private void OnSelectionChanged()
     {
-        if (SelectedFramesIdentityChanged())
-            BeginSelectionReveal();
+        UpdateSelectionReveals();
         RefreshAll();
     }
 
     /// <summary>
-    /// True when either <see cref="ComputeHighlightedFrames"/>'s *content* differs from last time,
-    /// or the *click target* (the specific selected frame, or the selected chain when no frame is
-    /// selected) differs — checked separately because a chain with exactly one frame makes
-    /// selecting the whole chain and selecting that lone frame compute to the identical
-    /// one-frame highlighted set. A content-only diff would then see "no change" and skip the
-    /// reveal even though the user genuinely clicked a different tree node (#716). Updates both
-    /// remembered values when either changed.
+    /// Diffs <see cref="ComputeHighlightedFrames"/> against the frames currently tracked in
+    /// <see cref="_frameReveals"/> (#1027): a frame newly present starts its own reveal at
+    /// progress 0; a frame still present keeps its existing (possibly already-settled) host
+    /// untouched, so extending a selection never replays an already-revealed sibling; a frame no
+    /// longer present is dropped, stopping its timer.
     /// </summary>
-    private bool SelectedFramesIdentityChanged()
+    private void UpdateSelectionReveals()
     {
         var current = ComputeHighlightedFrames();
-        bool contentChanged = _lastRevealedFrames is null
-            || _lastRevealedFrames.Count != current.Count
-            || !_lastRevealedFrames.SequenceEqual(current);
+        var currentSet = new HashSet<AnimationFrameSave>(current);
 
-        object? selectionKey = (object?)_selectedState?.SelectedFrame ?? _selectedState?.SelectedChain;
-        bool targetChanged = !ReferenceEquals(_lastRevealSelectionKey, selectionKey);
+        foreach (var stale in _frameReveals.Keys.Where(f => !currentSet.Contains(f)).ToList())
+        {
+            _frameReveals[stale].Stop();
+            _frameReveals.Remove(stale);
+        }
 
-        _lastRevealedFrames = current;
-        _lastRevealSelectionKey = selectionKey;
-
-        return contentChanged || targetChanged;
+        foreach (var frame in current)
+        {
+            if (!_frameReveals.ContainsKey(frame))
+                GetOrCreateReveal(frame).Restart();
+        }
     }
 
     /// <summary>
@@ -556,49 +554,101 @@ public class WireframeControl : TextureViewport
         return new List<AnimationFrameSave>();
     }
 
-    /// <summary>Resets reveal progress to 0 and starts the timer.</summary>
-    private void BeginSelectionReveal() => _selectionReveal.Restart();
+    /// <summary>Returns <paramref name="frame"/>'s reveal host, creating one (at rest) if absent.</summary>
+    private RevealHost GetOrCreateReveal(AnimationFrameSave frame)
+    {
+        if (!_frameReveals.TryGetValue(frame, out var host))
+        {
+            host = new RevealHost(InvalidateVisual);
+            _frameReveals[frame] = host;
+        }
+        return host;
+    }
 
     /// <summary>
-    /// Explicitly restarts the shrink-to-rest reveal (#542), independent of whether the
-    /// highlighted frame set actually changed. <see cref="SelectedFramesIdentityChanged"/> only
-    /// fires <see cref="BeginSelectionReveal"/> when the *set* differs from last time, so
-    /// re-clicking an already-selected chain or frame — which reproduces the identical set —
-    /// would otherwise never replay (#716). Call this from the click site itself (a click always
-    /// means "play it again"), not from selection-change plumbing.
+    /// Explicitly restarts the shrink-to-rest reveal (#542) for every currently highlighted
+    /// frame, independent of whether the highlighted set actually changed. <see cref="UpdateSelectionReveals"/>
+    /// only starts a frame's reveal the first time it becomes highlighted, so re-clicking an
+    /// already-selected chain or frame — which reproduces the identical set — would otherwise
+    /// never replay (#716). Call this from the click site itself (a click always means "play it
+    /// again"), not from selection-change plumbing.
     /// </summary>
-    public void ReplaySelectionReveal() => BeginSelectionReveal();
-
-    /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
-    public bool IsSelectionRevealAnimating => _selectionReveal.IsAnimating;
-
-    /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
-    public float SelectionRevealProgress => _selectionReveal.Progress;
+    public void ReplaySelectionReveal()
+    {
+        foreach (var frame in ComputeHighlightedFrames())
+            GetOrCreateReveal(frame).Restart();
+    }
 
     /// <summary>
-    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown), derived from
-    /// <see cref="SelectionRevealProgress"/> via <see cref="RevealAnimation.HandleAlpha"/> — a
-    /// linear ramp over the tail of the same progress timeline (not a separately-timed
-    /// animation), so the fade always finishes exactly when the shrink does.
+    /// True when <paramref name="frame"/> is currently the *only* highlighted frame (#1027) —
+    /// used by click sites to detect a click that will reproduce the exact same highlighted-frame
+    /// set it found (re-clicking the selected frame, or clicking the lone frame of an
+    /// already-selected single-frame chain), so they can explicitly call
+    /// <see cref="ReplaySelectionReveal"/>: <see cref="UpdateSelectionReveals"/> only starts a
+    /// frame's reveal the first time it becomes highlighted, so a click that reproduces an
+    /// already-highlighted set would otherwise silently no-op (#716).
     /// </summary>
-    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionReveal.Progress);
+    public bool IsSoleHighlightedFrame(AnimationFrameSave frame)
+    {
+        var current = ComputeHighlightedFrames();
+        return current.Count == 1 && current[0] == frame;
+    }
+
+    /// <summary>True while any highlighted frame's selection-outline reveal (#542) is easing toward rest.</summary>
+    public bool IsSelectionRevealAnimating => _frameReveals.Values.Any(h => h.IsAnimating);
 
     /// <summary>
-    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
-    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
-    /// both call this (tests skip the timer for determinism).
+    /// Test-only: a specific frame's reveal progress (0 = full bump, 1 = settled). A frame with
+    /// no tracked reveal state (never highlighted, or since dropped) reads as settled (1f).
     /// </summary>
-    public bool StepSelectionReveal(float dtSeconds) => _selectionReveal.Step(dtSeconds);
+    public float GetSelectionRevealProgress(AnimationFrameSave frame) =>
+        _frameReveals.TryGetValue(frame, out var host) ? host.Progress : 1f;
 
-    /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
-    public void SettleSelectionReveal() => _selectionReveal.Settle();
+    /// <summary>
+    /// Test-only: reveal progress (0 = full bump, 1 = settled) of the primary selected frame
+    /// (<see cref="ISelectedState.SelectedFrame"/>). 1f when no single frame is selected.
+    /// </summary>
+    public float SelectionRevealProgress =>
+        _selectedState?.SelectedFrame is { } f ? GetSelectionRevealProgress(f) : 1f;
+
+    /// <summary>
+    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown) for the primary
+    /// selected frame, derived from <see cref="SelectionRevealProgress"/> via
+    /// <see cref="RevealAnimation.HandleAlpha"/> — a linear ramp over the tail of that frame's
+    /// own progress timeline (not a separately-timed animation), so the fade always finishes
+    /// exactly when that frame's shrink does.
+    /// </summary>
+    public float HandleFadeProgress => RevealAnimation.HandleAlpha(SelectionRevealProgress);
+
+    /// <summary>
+    /// Advances every in-flight frame reveal by <paramref name="dtSeconds"/>. Returns
+    /// <c>true</c> while any frame is still animating, <c>false</c> once all are settled. Live
+    /// timers and tests both call this per-host (tests skip the timer for determinism).
+    /// </summary>
+    public bool StepSelectionReveal(float dtSeconds)
+    {
+        bool anyAnimating = false;
+        foreach (var host in _frameReveals.Values)
+            if (host.Step(dtSeconds)) anyAnimating = true;
+        return anyAnimating;
+    }
+
+    /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously for every tracked frame.</summary>
+    public void SettleSelectionReveal()
+    {
+        foreach (var host in _frameReveals.Values)
+            host.Settle();
+    }
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public WireframeControl()
     {
-        _selectionReveal = new RevealHost(InvalidateVisual);
-        DetachedFromVisualTree += (_, _) => _selectionReveal.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            foreach (var host in _frameReveals.Values)
+                host.Stop();
+        };
 
         // Right-click opens this menu with a "View <filename> in Explorer" item for the
         // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
@@ -1165,7 +1215,7 @@ public class WireframeControl : TextureViewport
         snap.PreviewRect = _previewRect;
 
         foreach (var fr in _frameRects)
-            snap.Frames.Add((fr.Bounds, fr.IsSelected));
+            snap.Frames.Add((fr.Bounds, fr.IsSelected, GetSelectionRevealProgress(fr.Frame)));
 
         if (_hoverFrame != null)
         {
@@ -1174,8 +1224,7 @@ public class WireframeControl : TextureViewport
         }
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
-        snap.SelectionRevealProgress = _selectionReveal.Progress;
-        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionReveal.Progress);
+        snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();
         if (sel != null && !_isMagicWandMode)
@@ -1371,7 +1420,7 @@ public class WireframeControl : TextureViewport
     /// Hit-tests <paramref name="pos"/> against <see cref="_frameRects"/> (#718) and updates
     /// <see cref="_hoverFrame"/> for the "Frame N" hover notch. Only invalidates when the hovered
     /// frame identity actually changes, mirroring the reveal's identity-diffing (see
-    /// <see cref="SelectedFramesIdentityChanged"/>) so a move within the same frame's bounds
+    /// <see cref="UpdateSelectionReveals"/>) so a move within the same frame's bounds
     /// doesn't repaint every tick.
     /// </summary>
     private void UpdateHoverFrame(Point pos)

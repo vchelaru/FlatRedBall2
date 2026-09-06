@@ -924,11 +924,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// commits. Bypasses coordinate conversion, so results are independent of zoom/pan/
     /// OffsetMultiplier. No-op unless exactly one frame is selected, mirroring the gate
     /// <see cref="OnPointerPressed"/> applies before starting a live frame drag.
+    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
+    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateFrameDrag(float worldDx, float worldDy)
+    internal void SimulateFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         var frame = _selectedState!.SelectedFrame;
         if (frame is null || _selectedState!.SelectedFrames.Count > 1) return;
+
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
         _draggingFrame   = frame;
         _frameDragStartX = frame.RelativeX;
@@ -945,10 +949,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op
     /// unless <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate
     /// <see cref="OnPointerPressed"/> applies before starting a live whole-animation drag.
+    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
+    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateChainDrag(float worldDx, float worldDy)
+    internal void SimulateChainDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         if (!IsWholeChainDragTarget) return;
+
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
         var chain = _selectedState!.SelectedChain!;
         _draggingChainFrames = chain.Frames.ToArray();
@@ -970,10 +978,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// No-op unless <see cref="IsMultiFrameDragTarget"/> holds, mirroring the gate
     /// <see cref="OnPointerPressed"/> applies before starting a live multi-frame drag. Mirrors
     /// <see cref="SimulateChainDrag"/>, scoped to the multi-selection instead of the whole chain.
+    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
+    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateMultiFrameDrag(float worldDx, float worldDy)
+    internal void SimulateMultiFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         if (!IsMultiFrameDragTarget) return;
+
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
         _draggingChainFrames = _selectedState!.SelectedFrames.ToArray();
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
@@ -2124,6 +2136,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
+            (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _draggingFrame.RelativeX = SnapToPixel(_frameDragStartX + dx);
             _draggingFrame.RelativeY = SnapToPixel(_frameDragStartY + dy);
             InvalidateVisual();
@@ -2136,6 +2149,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
+            (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             for (int i = 0; i < _draggingChainFrames.Length; i++)
             {
                 _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX![i] + dx);
