@@ -405,14 +405,33 @@ public sealed class ThumbnailService : IDisposable
             canvas.Scale(flipScaleX, flipScaleY, finalW / 2f, finalH / 2f);
         }
 
-        // Nearest-neighbour ("point") sampling: keeps sprite-sheet art crisp/pixellated
-        // instead of the blurry smear linear filtering produces on game art.
         canvas.DrawImage(region,
             SKRect.Create(0, 0, finalW, finalH),
-            new SKSamplingOptions(SKFilterMode.Nearest),
+            SelectSampling(scale),
             paint);
 
         if (anyFlip) canvas.Restore();
         return thumb;
     }
+
+    /// <summary>
+    /// Picks the sampler from the scale the crop is drawn at (issue #1013).
+    /// <para>
+    /// Magnifying keeps nearest-neighbour ("point") sampling, so a small sprite blown up to icon
+    /// size stays crisp and pixellated instead of the blurry smear filtering produces on game art.
+    /// </para>
+    /// <para>
+    /// Minifying must filter. Nearest keeps one texel per destination pixel and discards every
+    /// other one it stepped over, so a large frame squashed into a small icon aliases into noise —
+    /// a 1px checkerboard drawn at 1/8 scale comes back solid black, because every destination
+    /// pixel lands on the same phase. Skia's linear minification averages the discarded texels
+    /// (measured: the same checkerboard comes back mid-grey), so plain <see cref="SKFilterMode.Linear"/>
+    /// is enough here; a cubic resampler measured identically and mipmaps changed nothing. This also
+    /// matches what <see cref="GetFullImageThumbnail"/> already uses for the Files panel.
+    /// </para>
+    /// </summary>
+    private static SKSamplingOptions SelectSampling(float scale) =>
+        scale < 1f
+            ? new SKSamplingOptions(SKFilterMode.Linear)
+            : new SKSamplingOptions(SKFilterMode.Nearest);
 }
