@@ -18,12 +18,6 @@ namespace AnimationEditor.Core.CommandsAndState
             _events = events;
             _selectedState = selectedState;
         }
-        /// <summary>
-        /// The absolute path of the project (.gluj/.glux) that this .achx belongs to.
-        /// When set, the tool won't prompt the user to copy files that are part of the project.
-        /// </summary>
-        public string? ProjectFolder { get; set; }
-
         private int _wireframeZoomValue = 100;
         public int WireframeZoomValue
         {

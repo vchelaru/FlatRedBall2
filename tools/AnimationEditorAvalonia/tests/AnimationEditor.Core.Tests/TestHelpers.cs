@@ -58,7 +58,6 @@ internal sealed class TestServices
         AppState.GridSize           = 16;
         AppState.IsSnapToGridChecked = false;
         AppState.WireframeZoomValue = 100;
-        AppState.ProjectFolder      = null;
     }
 }
 
