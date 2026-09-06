@@ -4,6 +4,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
+using AnimationEditor.Core.Paths;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Dialogs;
 using Avalonia.Controls;
@@ -490,6 +491,12 @@ public partial class AnimationTreeControl : UserControl
     // (#757), SelectedNodes is kept in sync so SelectedChains/SelectedFrames/etc. cover the
     // whole multi-selection (singular Selected* remains the fallback when the bag is empty).
 
+    /// <summary>Mirrors <c>MainWindow.CurrentAchxFolder</c> -- see #1026.</summary>
+    private string CurrentAchxFolder =>
+        string.IsNullOrEmpty(_projectManager!.FileName)
+            ? string.Empty
+            : new FilePath(_projectManager.FileName).GetDirectoryContainingThis().FullPath;
+
     private async Task HandleCopyAsync()
     {
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
@@ -497,7 +504,7 @@ public partial class AnimationTreeControl : UserControl
         if (!SelectionCopyContext.TryGet(_selectedState!, _objectFinder!, _projectManager!.AnimationChainListSave, out var payload, out _))
             return;
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
         _pendingCutState!.Clear();
     }
 
@@ -508,8 +515,8 @@ public partial class AnimationTreeControl : UserControl
         if (!SelectionCopyContext.TryGet(_selectedState!, _objectFinder!, _projectManager!.AnimationChainListSave, out var payload, out _))
             return;
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
-        _pendingCutState!.Set(payload);
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
+        _pendingCutState!.Set(payload, _projectManager!.AnimationChainListSave!);
     }
 
     private async Task HandlePasteAsync(object? nodeData)
@@ -526,17 +533,21 @@ public partial class AnimationTreeControl : UserControl
         if (acls is null) return;
 
         var pendingCut = _pendingCutState!;
-        bool completingCut = pendingCut.IsActive;
-        if (completingCut && !pendingCut.SourcesBelongToProject(acls, _objectFinder!))
-        {
+        var cutCompletion = pendingCut.ResolveCompletion(acls);
+        bool completingCut = cutCompletion is CutCompletion.SameDocument or CutCompletion.CrossDocument;
+        bool completingCutAcrossDocuments = cutCompletion == CutCompletion.CrossDocument;
+        if (cutCompletion == CutCompletion.Stale)
             pendingCut.Clear();
-            completingCut = false;
-        }
 
         if (chains is { Count: > 0 })
         {
             if (completingCut && pendingCut.Kind != CopySelectionKind.Chain) return;
-            if (completingCut) _appCommands!.PasteChainsCut(chains, pendingCut.Chains);
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands!.PasteChains(chains);
+                pendingCut.RemoveSourcesFrom(pendingCut.SourceDocument!);
+            }
+            else if (completingCut) _appCommands!.PasteChainsCut(chains, pendingCut.Chains);
             else _appCommands!.PasteChains(chains);
         }
         else if (frames is { Count: > 0 })
@@ -546,7 +557,12 @@ public partial class AnimationTreeControl : UserControl
                 PastePlacementLogic.ResolveFramePasteTarget(acls, nodeData, _objectFinder!, _selectedState);
             if (targetChain is null) return;
 
-            if (completingCut) _appCommands!.PasteFramesCut(targetChain, frames, insertIndex, pendingCut.Frames);
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands!.PasteFrames(targetChain, frames, insertIndex);
+                pendingCut.RemoveSourcesFrom(pendingCut.SourceDocument!);
+            }
+            else if (completingCut) _appCommands!.PasteFramesCut(targetChain, frames, insertIndex, pendingCut.Frames);
             else _appCommands!.PasteFrames(targetChain, frames, insertIndex);
         }
         else if (rectangles is { Count: > 0 } || circles is { Count: > 0 })
@@ -555,7 +571,12 @@ public partial class AnimationTreeControl : UserControl
             var frame = _selectedState!.SelectedFrame;
             if (frame is null) return;
 
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands!.PasteShapes(frame, rectangles ?? new List<AARectSave>(), circles ?? new List<CircleSave>());
+                pendingCut.RemoveSourcesFrom(pendingCut.SourceDocument!);
+            }
+            else if (completingCut)
             {
                 var sourceFrame = pendingCut.Shapes[0] switch
                 {
