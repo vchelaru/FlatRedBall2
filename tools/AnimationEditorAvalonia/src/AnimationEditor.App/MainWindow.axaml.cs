@@ -259,6 +259,7 @@ public partial class MainWindow : Window
         WireKeyboard();
         WireTabBar();
         WireDefaultHandlerBanner();
+        WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
@@ -959,22 +960,31 @@ public partial class MainWindow : Window
 
     private async Task HandleStartupAsync()
     {
-        if (!await TryRestoreRecoveryFileAsync())
+        // Consume any crash-recovery file up front, but open it *after* the normal startup
+        // branches below (#1020). Restoring it used to early-out of this whole block, so
+        // accepting the old Restore/Delete prompt silently dropped every other open tab.
+        var recovered = TakeRecoveryFileContent();
+
+        var args = Environment.GetCommandLineArgs();
+        if (args.Length >= 2 && File.Exists(args[1]))
         {
-            var args = Environment.GetCommandLineArgs();
-            if (args.Length >= 2 && File.Exists(args[1]))
-            {
-                _ = LoadAnimationFileAsync(args[1]);
-            }
-            else if (_appSettings.OpenTabPaths.Count > 0)
-            {
-                _ = RestoreTabsAsync();
-            }
-            else
-            {
-                _projectManager.AnimationChainListSave =
-                    new AnimationChainListSave();
-            }
+            await LoadAnimationFileAsync(args[1]);
+        }
+        else if (_appSettings.OpenTabPaths.Count > 0)
+        {
+            await RestoreTabsAsync();
+        }
+        else if (recovered is null)
+        {
+            _projectManager.AnimationChainListSave =
+                new AnimationChainListSave();
+        }
+
+        if (recovered is not null)
+        {
+            // Awaited above, so nothing is still in flight to clobber the restored document.
+            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
+            RecoveredDocumentBanner.IsVisible = true;
         }
 
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
@@ -982,11 +992,10 @@ public partial class MainWindow : Window
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
             await LoadProjectFolderAsync(lastProjectFolder);
 
-        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, or
-        // neither) did so directly rather than through ActivateTabAsync, so it never synced the
-        // Project list's own selection (#910 follow-up) -- do it once here, now the tree is
-        // populated. TabManager.ActiveTab is set synchronously by those paths even though their
-        // content load may still be in flight, so this doesn't need to wait on them.
+        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
+        // recovered document, or none of them) did so directly rather than through
+        // ActivateTabAsync, so it never synced the Project list's own selection (#910
+        // follow-up) -- do it once here, now the tree is populated.
         if (_tabManager.ActiveTab is { } activeTab)
             SyncProjectPanelSelectionTo(activeTab);
 
@@ -1000,45 +1009,43 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Checks for a crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/> after
-    /// an unclean shutdown of an unsaved document (see <see cref="AppCommands.SaveCurrentAnimationChainList"/>).
-    /// When found, asks the user via <see cref="IAppCommands.ConfirmAsync"/> whether to restore it.
-    /// Returns <c>true</c> when recovered content was loaded as the active document (still
-    /// unsaved — <see cref="ProjectManager.FileName"/> stays null, matching the pre-crash state),
-    /// so the caller should skip its normal open-file / restore-tabs / blank-document startup.
-    /// Returns <c>false</c> when there was nothing to restore, the user declined, or the file
-    /// could not be parsed — in the latter two cases the stale recovery file is deleted first.
+    /// Reads and deletes any crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/>
+    /// after an unclean shutdown of an unsaved document (see
+    /// <see cref="AppCommands.SaveCurrentAnimationChainList"/>), returning its content for the
+    /// caller to open as an unsaved document. Returns null when there was nothing to recover or
+    /// the file could not be parsed; the unparseable file is deleted rather than re-offered on
+    /// every subsequent launch.
     /// </summary>
-    private async Task<bool> TryRestoreRecoveryFileAsync()
+    /// <remarks>
+    /// Deleting on read is safe because the content lives in the restored tab from here on, and
+    /// closing that tab is what the user does to discard it (<see cref="CloseTabCore"/>). There is
+    /// deliberately no "delete permanently?" prompt: the old modal made that call from memory,
+    /// before the user could see what was in the file (#1020).
+    /// </remarks>
+    private AnimationChainListSave? TakeRecoveryFileContent()
     {
-        if (!_ioManager.RecoveryFileExists()) return false;
-
-        bool restore = await ShowTwoButtonDialogAsync(
-            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or delete them permanently?",
-            "Restore Recovery File", "Restore", "Delete");
-
-        if (!restore)
-        {
-            _ioManager.DeleteRecoveryFile();
-            return false;
-        }
+        if (!_ioManager.RecoveryFileExists()) return null;
 
         var recovered = _ioManager.TryReadRecoveryFile();
-        if (recovered is null)
-        {
-            _ioManager.DeleteRecoveryFile();
-            return false;
-        }
-
         _ioManager.DeleteRecoveryFile();
-        OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-        return true;
+        return recovered;
     }
+
+    // ── Recovered-document banner ─────────────────────────────────────────────
+
+    /// <summary>
+    /// The banner is informational only, so dismissing it just hides it (#1020). It carries no
+    /// "don't show again" setting: it appears exactly when a document was recovered, which is
+    /// never routine noise the user would want suppressed permanently.
+    /// </summary>
+    private void WireRecoveredDocumentBanner() =>
+        DismissRecoveredDocumentBtn.Click += (_, _) => RecoveredDocumentBanner.IsVisible = false;
 
     // ── Default-handler prompt banner ─────────────────────────────────────────
 
     private void WireDefaultHandlerBanner()
     {
+
         MakeDefaultBtn.Click += (_, _) => RegisterAsDefaultAchxHandler(hideBanner: true);
 
         DismissDefaultHandlerBtn.Click += (_, _) =>
@@ -1116,7 +1123,6 @@ public partial class MainWindow : Window
         _appCommands.DoOnUiThread = action => Dispatcher.UIThread.InvokeAsync(action);
         _appCommands.ConfirmAsync = ShowConfirmDialogAsync;
         _appCommands.PromptStringAsync = ShowStringInputDialogAsync;
-        ShowTwoButtonDialogAsync = ShowTwoButtonDialogAsyncCore;
         ShowSaveDiscardCancelDialogAsync = ShowSaveDiscardCancelDialogAsyncCore;
 
         // File dialog service
@@ -1147,23 +1153,31 @@ public partial class MainWindow : Window
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
         // RefreshWireframeRequested is handled by WireframeControl directly
 
-        _events.CurrentFileChanged     += path => Dispatcher.UIThread.InvokeAsync(() =>
+        _events.CurrentFileChanged     += path =>
         {
-            _appSettings.AddFile(new FilePath(path));
-            SaveSettingsFile();
-            RefreshRecentFiles();
-            UpdateTitle();
-            UpdateStatusBar();
-            RefreshFilesPanel();
-
-            // If the active tab was an Untitled sentinel, promote it to the real file path.
-            var active = _tabManager.ActiveTab;
-            if (active != null && IsUntitledTab(active))
+            // Capture the promotion candidate synchronously, at raise time. The continuation
+            // below is queued, and whichever tab is active by the time it runs is not
+            // necessarily the one this file was loaded into -- startup opens a crash-recovered
+            // document immediately after a restored tab's load raises this, and the queued
+            // continuation would otherwise rename the recovered tab to the restored file.
+            var toPromote = _tabManager.ActiveTab;
+            Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _tabManager.Rename(active.Path, new FilePath(path));
-                RebuildTabStrip();
-            }
-        });
+                _appSettings.AddFile(new FilePath(path));
+                SaveSettingsFile();
+                RefreshRecentFiles();
+                UpdateTitle();
+                UpdateStatusBar();
+                RefreshFilesPanel();
+
+                // If that tab was an Untitled sentinel, promote it to the real file path.
+                if (toPromote != null && IsUntitledTab(toPromote))
+                {
+                    _tabManager.Rename(toPromote.Path, new FilePath(path));
+                    RebuildTabStrip();
+                }
+            });
+        };
         _events.AvailableTexturesChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshTextureCombo);
 
         _undoManager.StackChanged         += () => Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
@@ -2384,7 +2398,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Replaces the in-memory document with <paramref name="content"/> as a new, unsaved
     /// (Untitled) document, resets selection/undo/tree state, and opens/activates a tab for it.
-    /// Shared by <see cref="OnNewClick"/> and <see cref="TryRestoreRecoveryFileAsync"/> so both
+    /// Shared by <see cref="OnNewClick"/> and the startup crash-recovery path so both
     /// "start editing from a fresh in-memory document" paths can't drift apart again — #892 was
     /// exactly that: the recovery path duplicated everything except the tab-opening step.
     /// </summary>
@@ -5657,28 +5671,10 @@ public partial class MainWindow : Window
         EditorDialogs.ConfirmAsync(_dialogHost, message, title);
 
     /// <summary>
-    /// Test seam for <see cref="ShowTwoButtonDialogAsyncCore"/> -- assigned to the real dialog in
-    /// <see cref="WireAppCommands"/>, mirroring <c>IAppCommands.ConfirmAsync</c>'s pattern. Not a
-    /// property on <c>IAppCommands</c> itself: that delegate is shared by ~20 test stubs across
-    /// unrelated tests, and this is UI-layer-only (used by exactly one caller,
-    /// <see cref="TryRestoreRecoveryFileAsync"/>) so it doesn't need that shared indirection.
-    /// </summary>
-    internal Func<string, string, string, string, Task<bool>> ShowTwoButtonDialogAsync { get; set; } = null!;
-
-    /// <summary>
-    /// Same as <see cref="ShowConfirmDialogAsync"/> but with caller-chosen button text instead of
-    /// generic Yes/No, for prompts where "Yes"/"No" would force the user to mentally map a named
-    /// choice (e.g. Restore/Delete) back onto Yes/No.
-    /// </summary>
-    private Task<bool> ShowTwoButtonDialogAsyncCore(
-        string message, string title, string confirmLabel, string cancelLabel) =>
-        EditorDialogs.ConfirmAsync(_dialogHost, message, title, confirmLabel, cancelLabel);
-
-    /// <summary>
     /// Test seam for the Save / Don't Save / Cancel prompt shown by
-    /// <see cref="CloseTabAsync"/> when closing an untitled tab that has content. Same
-    /// reasoning as <see cref="ShowTwoButtonDialogAsync"/> for living here instead of on the
-    /// shared <c>IAppCommands</c> delegate surface.
+    /// <see cref="CloseTabAsync"/> when closing an untitled tab that has content. Lives here
+    /// rather than on the shared <c>IAppCommands</c> delegate surface: that delegate is stubbed
+    /// by ~20 tests across unrelated fixtures, and this prompt is UI-layer-only.
     /// </summary>
     internal Func<string, string, Task<SaveDiscardCancelChoice>> ShowSaveDiscardCancelDialogAsync { get; set; } = null!;
 
