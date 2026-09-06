@@ -1579,6 +1579,18 @@
                                              CurrentColor="{DynamicResource IconInk}"
                                              VerticalAlignment="Center" HorizontalAlignment="Center" />
                                 </Button>
+                                <ToggleButton x:Name="LoopToggle"
+                                              Classes="toolbarToggle"
+                                              Height="26" Width="32"
+                                              Foreground="{DynamicResource Ink}"
+                                              VerticalAlignment="Center"
+                                              IsChecked="True"
+                                              ToolTip.Tip="Loop playback (not persisted)">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </ToggleButton>
                                 <viewsControls:FlankerNumericField x:Name="SpeedInput"
                                                                     Width="92" VerticalAlignment="Center"
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"

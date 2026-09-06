@@ -253,6 +253,20 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
     }
 
+    /// <summary>
+    /// Whether the preview loops back to the start when a chain finishes, or freezes/pauses on
+    /// the last frame instead. Applies to the singular preview and every active group track.
+    /// </summary>
+    public bool Loop
+    {
+        get => _playback.Loop;
+        set
+        {
+            _playback.Loop = value;
+            foreach (var c in _groupPlayback.Values) c.Loop = value;
+        }
+    }
+
     public void Play()
     {
         _playback.Play();
@@ -348,7 +362,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         foreach (var chain in toRemove) _groupPlayback.Remove(chain);
         foreach (var chain in toAdd)
         {
-            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier };
+            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier, Loop = _playback.Loop };
             controller.SetChain(chain);
             _groupPlayback[chain] = controller;
         }
