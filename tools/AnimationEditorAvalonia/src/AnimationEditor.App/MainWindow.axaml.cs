@@ -4455,16 +4455,19 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
-                // Re-clicking an already-selected frame must still replay the reveal (#716) —
-                // WireframeControl.OnSelectionChanged only restarts it when the highlighted
-                // frame *set* changes, and re-selecting the same frame reproduces the identical
-                // set, so it would otherwise silently no-op. Only fire this when the frame is
-                // *already* the selection: this call runs synchronously at Tunnel-phase, before
-                // AnimTree's own selection update and the async SelectionChanged→RefreshFrames
-                // catch-up, so calling it for a switch to a *different* frame would restart the
-                // reveal while WireframeControl still shows the previous frame's rects — a
-                // visible flash of the wrong frame growing before the highlight moves.
-                if (ReferenceEquals(_selectedState.SelectedFrame, frame))
+                // A click that will reproduce the exact same one-frame highlight it found must
+                // still replay the reveal (#716) — WireframeControl's per-frame diffing (#1027)
+                // only starts a frame's reveal the first time it becomes highlighted, and both
+                // re-clicking the already-selected frame AND clicking the lone frame of an
+                // already-selected single-frame chain reproduce an identical highlighted set, so
+                // either would otherwise silently no-op. Only fire this when the *pre-click*
+                // highlighted set is already just this frame: this call runs synchronously at
+                // Tunnel-phase, before AnimTree's own selection update and the async
+                // SelectionChanged→RefreshFrames catch-up, so calling it for a switch to a
+                // *different* frame would restart the reveal while WireframeControl still shows
+                // the previous frame's rects — a visible flash of the wrong frame growing before
+                // the highlight moves.
+                if (WireframeCtrl.IsSoleHighlightedFrame(frame))
                     WireframeCtrl.ReplaySelectionReveal();
 
                 ClearChainDragCandidate();
