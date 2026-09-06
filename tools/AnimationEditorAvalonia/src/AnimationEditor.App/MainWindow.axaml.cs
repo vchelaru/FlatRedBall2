@@ -2898,6 +2898,9 @@ public partial class MainWindow : Window
             _suppressInterpolateSync = false;
         };
 
+        LoopToggle.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.Loop = LoopToggle.IsChecked == true;
+
         TimelineStrip.ItemsSource = _timelineFrames;
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
 
