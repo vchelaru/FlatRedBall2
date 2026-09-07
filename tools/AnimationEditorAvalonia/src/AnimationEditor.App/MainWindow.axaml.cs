@@ -1332,7 +1332,7 @@ public partial class MainWindow : Window
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
         // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
-        // currently showing when the document has nothing else to offer (#1011).
+        // currently showing when the document has nothing else to offer.
         _appCommands.CanvasDefaultTexturePath = () =>
         {
             var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;

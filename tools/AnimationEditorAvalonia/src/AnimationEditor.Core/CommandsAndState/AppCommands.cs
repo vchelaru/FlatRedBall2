@@ -804,8 +804,8 @@ namespace AnimationEditor.Core.CommandsAndState
                 : null;
 
             // Nothing in the document to inherit from (a brand-new document, or a chain-less
-            // selection) -- fall back to whatever the wireframe canvas is already showing (#1011)
-            // rather than leaving the new frame textureless.
+            // selection) -- fall back to whatever the wireframe canvas is already showing rather
+            // than leaving the new frame textureless.
             var resolvedTextureName = textureName ?? source?.TextureName;
             if (string.IsNullOrEmpty(resolvedTextureName))
                 resolvedTextureName = CanvasDefaultTexturePath?.Invoke();

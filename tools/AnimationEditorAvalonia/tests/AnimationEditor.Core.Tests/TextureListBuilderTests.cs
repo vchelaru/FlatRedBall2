@@ -161,7 +161,7 @@ public class TextureListBuilderTests
     }
 
     // ── FindFirstTexturedFrame (shared primitive behind GetFirstTextureName and
-    //    AppCommands.ResolveInheritedFrame's cross-chain borrow — #1011) ──────
+    //    AppCommands.ResolveInheritedFrame's cross-chain borrow) ──────────────
 
     [Fact]
     public void FindFirstTexturedFrame_NullAcls_ReturnsNull()

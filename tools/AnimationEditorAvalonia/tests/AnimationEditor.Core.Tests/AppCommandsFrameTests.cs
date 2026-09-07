@@ -74,10 +74,10 @@ public class AppCommandsFrameTests
         Assert.Equal(string.Empty, chain.Frames[0].TextureName);
     }
 
-    // #1011: a brand-new document has nothing in its ACLS to inherit from, but the wireframe
-    // canvas may already be showing a "default" texture (borrowed from a previous document, or
-    // kept alive when an empty chain is selected -- see WireframeControl.RefreshAll). AddFrame
-    // must fall through to that canvas default rather than leaving the new frame textureless.
+    // A brand-new document has nothing in its ACLS to inherit from, but the wireframe canvas may
+    // already be showing a "default" texture (borrowed from a previous document, or kept alive
+    // when an empty chain is selected -- see WireframeControl.RefreshAll). AddFrame must fall
+    // through to that canvas default rather than leaving the new frame textureless.
     [Fact]
     public void AddFrame_NothingToInherit_FallsBackToCanvasDefaultTexturePath()
     {

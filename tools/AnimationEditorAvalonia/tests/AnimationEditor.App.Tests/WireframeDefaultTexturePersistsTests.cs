@@ -120,9 +120,9 @@ public class WireframeDefaultTexturePersistsTests
     /// <summary>
     /// The tree's "Add Frame" menu/button (<c>AppCommands.AddFrame</c>, no explicit texture) is a
     /// second, independent entry point from Ctrl+click -- it resolves its own texture from the
-    /// document instead of reading the wireframe canvas directly. #1011's manual repro used this
-    /// path (right-click the chain -> Add Frame) and still got a textureless frame after the
-    /// RefreshAll fix, because AddFrame never consulted the canvas at all.
+    /// document instead of reading the wireframe canvas directly. The manual repro that surfaced
+    /// this used this exact path (right-click the chain -> Add Frame) and still got a textureless
+    /// frame after the RefreshAll fix, because AddFrame never consulted the canvas at all.
     /// </summary>
     [AvaloniaFact]
     public void AddFrameButton_OnEmptyChainWithDefaultTextureShowing_UsesTheDefaultTexture()

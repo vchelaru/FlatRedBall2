@@ -42,7 +42,7 @@ public static class TextureListBuilder
     /// truth behind both <see cref="GetFirstTextureName"/> (the wireframe/combo fallback) and
     /// <c>AppCommands.ResolveInheritedFrame</c>'s cross-chain borrow (which also needs the frame's
     /// region, not just its texture name) — kept as one scan so "first available texture in this
-    /// document" can't drift between the two call sites (#1011).
+    /// document" can't drift between the two call sites.
     /// </summary>
     /// <param name="acls">The animation chain list; may be <c>null</c>.</param>
     public static AnimationFrameSave? FindFirstTexturedFrame(AnimationChainListSave? acls) =>
