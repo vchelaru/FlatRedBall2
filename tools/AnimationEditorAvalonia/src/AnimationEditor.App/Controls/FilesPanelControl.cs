@@ -159,7 +159,7 @@ public partial class FilesPanelControl : UserControl
         }
 
         SetEmptyMessage(null, visible: false);
-        foreach (var node in PngFolderTreeBuilder.Build(files))
+        foreach (var node in PngFolderTreeBuilder.Build(files, _filesRoot))
             TreeRoots.Add(PngFilesTreeNodeVm.FromNode(node, _thumbnailService, ThumbnailSize));
     }
 
@@ -194,11 +194,13 @@ public partial class FilesPanelControl : UserControl
 
         FilesTree.ContextMenu.Items.Clear();
 
-        if (_contextNode is not { IsFile: true, AbsolutePath: { } path })
+        // Issue #1059: folder rows carry an AbsolutePath too now, so they get "View in Explorer"
+        // the same as file rows -- just opening the folder rather than selecting a file in it.
+        if (_contextNode is not { AbsolutePath: { } path } node)
             return;
 
         var revealItem = new MenuItem { Header = "View in Explorer" };
-        revealItem.Click += (_, _) => RevealInExplorer(path);
+        revealItem.Click += (_, _) => RevealInExplorer(path, node.IsFolder);
         FilesTree.ContextMenu.Items.Add(revealItem);
     }
 
@@ -301,9 +303,9 @@ public partial class FilesPanelControl : UserControl
         _dragPath = null;
     }
 
-    private void RevealInExplorer(string absolutePath)
+    private void RevealInExplorer(string absolutePath, bool isFolder)
     {
-        var error = ShellExplorer.RevealFile(absolutePath);
+        var error = isFolder ? ShellExplorer.OpenFolder(absolutePath) : ShellExplorer.RevealFile(absolutePath);
         if (error is not null)
             _showError?.Invoke(error);
     }
@@ -315,11 +317,11 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
     private bool _isDragging;
 
     public string Name { get; }
+    public bool IsFolder { get; }
+    public bool IsFile => !IsFolder;
     public string? AbsolutePath { get; }
     public string? PathHint { get; }
     public bool ShowPathHint => !string.IsNullOrEmpty(PathHint);
-    public bool IsFolder => AbsolutePath is null;
-    public bool IsFile => AbsolutePath is not null;
     public Bitmap? Thumbnail { get; }
     public ObservableCollection<PngFilesTreeNodeVm> Children { get; } = new();
 
@@ -348,9 +350,10 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
         }
     }
 
-    private PngFilesTreeNodeVm(string name, string? absolutePath, string? pathHint, Bitmap? thumbnail)
+    private PngFilesTreeNodeVm(string name, bool isFolder, string? absolutePath, string? pathHint, Bitmap? thumbnail)
     {
         Name = name;
+        IsFolder = isFolder;
         AbsolutePath = absolutePath;
         PathHint = pathHint;
         Thumbnail = thumbnail;
@@ -370,7 +373,7 @@ public sealed class PngFilesTreeNodeVm : INotifyPropertyChanged
                 pathHint = node.RelativePath[..slash].Replace("/", " › ");
         }
 
-        var vm = new PngFilesTreeNodeVm(node.Name, node.AbsolutePath, pathHint, bitmap);
+        var vm = new PngFilesTreeNodeVm(node.Name, node.IsFolder, node.AbsolutePath, pathHint, bitmap);
         foreach (var child in node.Children)
             vm.Children.Add(FromNode(child, thumbnails, thumbSize));
 
