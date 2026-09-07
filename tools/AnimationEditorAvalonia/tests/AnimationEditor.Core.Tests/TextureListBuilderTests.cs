@@ -159,4 +159,68 @@ public class TextureListBuilderTests
 
         Assert.Equal("hero.png", TextureListBuilder.GetFirstTextureName(acls));
     }
+
+    // ── FindFirstTexturedFrame (shared primitive behind GetFirstTextureName and
+    //    AppCommands.ResolveInheritedFrame's cross-chain borrow — #1011) ──────
+
+    [Fact]
+    public void FindFirstTexturedFrame_NullAcls_ReturnsNull()
+    {
+        Assert.Null(TextureListBuilder.FindFirstTexturedFrame(null));
+    }
+
+    [Fact]
+    public void FindFirstTexturedFrame_NoTexturedFrames_ReturnsNull()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Empty" });
+        acls.AnimationChains.Add(AclsWithTextures("", " ").AnimationChains[0]);
+
+        Assert.Null(TextureListBuilder.FindFirstTexturedFrame(acls));
+    }
+
+    [Fact]
+    public void FindFirstTexturedFrame_ReturnsTheFrameItself_NotJustItsTextureName()
+    {
+        // Callers that need the region too (AppCommands.ResolveInheritedFrame) rely on
+        // getting the actual frame back, not a re-derived name.
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        var frame = new AnimationFrameSave
+        {
+            TextureName = "hero.png",
+            LeftCoordinate = 0.25f, RightCoordinate = 0.5f,
+        };
+        chain.Frames.Add(frame);
+        acls.AnimationChains.Add(chain);
+
+        Assert.Same(frame, TextureListBuilder.FindFirstTexturedFrame(acls));
+    }
+
+    [Fact]
+    public void FindFirstTexturedFrame_ScansChainsInListOrder()
+    {
+        var acls = new AnimationChainListSave();
+        acls.AnimationChains.Add(new AnimationChainSave { Name = "Empty" });
+        var textured = new AnimationChainSave { Name = "Walk" };
+        var first = new AnimationFrameSave { TextureName = "hero.png" };
+        textured.Frames.Add(first);
+        textured.Frames.Add(new AnimationFrameSave { TextureName = "later.png" });
+        acls.AnimationChains.Add(textured);
+
+        Assert.Same(first, TextureListBuilder.FindFirstTexturedFrame(acls));
+    }
+
+    [Fact]
+    public void GetFirstTextureName_IsConsistentWithFindFirstTexturedFrame()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "hero.png" });
+        acls.AnimationChains.Add(chain);
+
+        Assert.Equal(
+            TextureListBuilder.FindFirstTexturedFrame(acls)?.TextureName,
+            TextureListBuilder.GetFirstTextureName(acls));
+    }
 }

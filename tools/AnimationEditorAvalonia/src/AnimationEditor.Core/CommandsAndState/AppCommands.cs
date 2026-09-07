@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -835,15 +836,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (chain.Frames.Count > 0)
                 return chain.Frames[^1];
 
-            if (chainList is not null)
-            {
-                foreach (var otherChain in chainList.AnimationChains)
-                    foreach (var frame in otherChain.Frames)
-                        if (!string.IsNullOrEmpty(frame.TextureName))
-                            return frame;
-            }
-
-            return null;
+            return TextureListBuilder.FindFirstTexturedFrame(chainList);
         }
 
         /// <summary>

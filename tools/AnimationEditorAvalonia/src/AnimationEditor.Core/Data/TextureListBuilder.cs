@@ -37,16 +37,26 @@ public static class TextureListBuilder
     }
 
     /// <summary>
-    /// Returns the <c>TextureName</c> of the first frame — in chain-then-frame list order —
-    /// that references a non-empty texture, or <c>null</c> when nothing in
-    /// <paramref name="acls"/> does. Used to borrow a texture for a chain that has no frames
-    /// of its own, so the wireframe shows something the user can Ctrl+click to seed the first
-    /// frame, and so the +Add button can inherit a texture (issues #618 / #617).
+    /// Returns the first frame — in chain-then-frame list order — that references a non-empty
+    /// texture, or <c>null</c> when nothing in <paramref name="acls"/> does. The single source of
+    /// truth behind both <see cref="GetFirstTextureName"/> (the wireframe/combo fallback) and
+    /// <c>AppCommands.ResolveInheritedFrame</c>'s cross-chain borrow (which also needs the frame's
+    /// region, not just its texture name) — kept as one scan so "first available texture in this
+    /// document" can't drift between the two call sites (#1011).
+    /// </summary>
+    /// <param name="acls">The animation chain list; may be <c>null</c>.</param>
+    public static AnimationFrameSave? FindFirstTexturedFrame(AnimationChainListSave? acls) =>
+        acls?.AnimationChains
+            .SelectMany(c => c.Frames)
+            .FirstOrDefault(f => !string.IsNullOrWhiteSpace(f.TextureName));
+
+    /// <summary>
+    /// Returns the <c>TextureName</c> of <see cref="FindFirstTexturedFrame"/>, or <c>null</c> when
+    /// nothing in <paramref name="acls"/> has one. Used to borrow a texture for a chain that has no
+    /// frames of its own, so the wireframe shows something the user can Ctrl+click to seed the
+    /// first frame, and so the +Add button can inherit a texture (issues #618 / #617).
     /// </summary>
     /// <param name="acls">The animation chain list; may be <c>null</c>.</param>
     public static string? GetFirstTextureName(AnimationChainListSave? acls) =>
-        acls?.AnimationChains
-            .SelectMany(c => c.Frames)
-            .Select(f => f.TextureName)
-            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+        FindFirstTexturedFrame(acls)?.TextureName;
 }
