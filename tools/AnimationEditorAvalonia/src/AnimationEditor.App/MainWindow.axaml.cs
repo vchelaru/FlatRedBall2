@@ -5038,6 +5038,18 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>True when <paramref name="frame"/>'s owning chain is locked (#1032 follow-up).</summary>
+    private bool IsFrameLocked(AnimationFrameSave? frame) =>
+        frame is not null && _objectFinder.GetAnimationChainContaining(frame)?.IsLocked == true;
+
+    /// <summary>True when the shape's owning frame's chain is locked (#1032 follow-up).</summary>
+    private bool IsShapeLocked(object? shape) => shape switch
+    {
+        AARectSave r => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(r)),
+        CircleSave c => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(c)),
+        _ => false,
+    };
+
     private void RefreshPropertyPanel()
     {
         // Deliberately does NOT call SealPendingEdits here -- this method also runs after every
@@ -5065,6 +5077,15 @@ public partial class MainWindow : Window
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;
+
+            // Disable (not just visually leave typeable) whichever panel is showing when its
+            // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled
+            // panel would silently discard input with no indication why (#1032 follow-up).
+            // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
+            // only way to unlock a chain from the inspector.
+            PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
+            PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
+            PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
 
             if (frame is not null && !hasShapeSelection)
             {
