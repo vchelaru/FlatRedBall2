@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -788,6 +789,8 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
+        public Func<string?>? CanvasDefaultTexturePath { get; set; }
+
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             if (IsChainLocked(chain)) return;
@@ -800,9 +803,16 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? ResolveInheritedFrame(chain, _pm.AnimationChainListSave)
                 : null;
 
+            // Nothing in the document to inherit from (a brand-new document, or a chain-less
+            // selection) -- fall back to whatever the wireframe canvas is already showing rather
+            // than leaving the new frame textureless.
+            var resolvedTextureName = textureName ?? source?.TextureName;
+            if (string.IsNullOrEmpty(resolvedTextureName))
+                resolvedTextureName = CanvasDefaultTexturePath?.Invoke();
+
             var frame = new AnimationFrameSave
             {
-                TextureName  = textureName ?? source?.TextureName ?? string.Empty,
+                TextureName  = resolvedTextureName ?? string.Empty,
                 LeftCoordinate   = source?.LeftCoordinate   ?? 0f,
                 RightCoordinate  = source?.RightCoordinate  ?? 1f,
                 TopCoordinate    = source?.TopCoordinate    ?? 0f,
@@ -826,15 +836,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (chain.Frames.Count > 0)
                 return chain.Frames[^1];
 
-            if (chainList is not null)
-            {
-                foreach (var otherChain in chainList.AnimationChains)
-                    foreach (var frame in otherChain.Frames)
-                        if (!string.IsNullOrEmpty(frame.TextureName))
-                            return frame;
-            }
-
-            return null;
+            return TextureListBuilder.FindFirstTexturedFrame(chainList);
         }
 
         /// <summary>

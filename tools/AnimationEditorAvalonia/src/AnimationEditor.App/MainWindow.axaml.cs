@@ -1331,6 +1331,13 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
+        // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
+        // currently showing when the document has nothing else to offer.
+        _appCommands.CanvasDefaultTexturePath = () =>
+        {
+            var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
+            return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
+        };
         // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
         // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
         // animating (IsZoomAnimating == false), not on every frame.
@@ -1746,11 +1753,7 @@ public partial class MainWindow : Window
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
 
-        string relPath = !string.IsNullOrEmpty(_projectManager.FileName)
-            ? Path.GetRelativePath(
-                Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
-                texPath).Replace('\\', '/')
-            : texPath;
+        string relPath = RelativizeTexturePath(texPath);
 
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
@@ -1768,6 +1771,14 @@ public partial class MainWindow : Window
             _selectedState.SelectedFrame = priorFrame;
         }
     }
+
+    /// <summary>Converts an absolute texture path to .achx-relative form (unsaved project: verbatim).</summary>
+    private string RelativizeTexturePath(string absolutePath) =>
+        !string.IsNullOrEmpty(_projectManager.FileName)
+            ? Path.GetRelativePath(
+                Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
+                absolutePath).Replace('\\', '/')
+            : absolutePath;
 
     // ── Core event handlers ───────────────────────────────────────────────────
 

@@ -775,6 +775,16 @@ public class WireframeControl : TextureViewport
     {
         var path = DetermineTexturePath();
 
+        // Nothing to show for the current selection: no frame selected, and nothing anywhere in
+        // this document to borrow (an empty chain, or a chain-less document). Keep whatever
+        // texture is already loaded instead of blanking it, so the #618 "seed the first frame"
+        // texture survives selecting a brand-new empty chain instead of vanishing the instant it's
+        // created. A frame that IS selected but has no texture is a different case -- that must
+        // still blank so the canvas doesn't imply a texture the frame doesn't have (#616) -- so
+        // this substitution only applies when no frame is selected at all.
+        if (path is null && _selectedState?.SelectedFrame is null)
+            path = LoadedTexturePathCasePreserved;
+
         SKBitmap? known = null;
         if (_thumbnailService != null)
         {
