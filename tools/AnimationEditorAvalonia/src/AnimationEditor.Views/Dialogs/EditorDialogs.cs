@@ -32,7 +32,7 @@ public static class EditorDialogs
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
 
         var dialog = new EditorDialog<bool>(
-            new EditorDialogOptions(title, 420, 160), panel, cancelResult: false);
+            new EditorDialogOptions(title, 420, SizeToContentHeight: true), panel, cancelResult: false);
         dialog.Confirm = () => dialog.Complete(true);
         dialog.Cancel = () => dialog.Complete(false);
         panel.Children.Add(BuildButtonRow(
@@ -53,7 +53,7 @@ public static class EditorDialogs
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
 
         var dialog = new EditorDialog<SaveDiscardCancelChoice>(
-            new EditorDialogOptions(title, 420, 160), panel, cancelResult: SaveDiscardCancelChoice.Cancel);
+            new EditorDialogOptions(title, 420, SizeToContentHeight: true), panel, cancelResult: SaveDiscardCancelChoice.Cancel);
         dialog.Confirm = () => dialog.Complete(SaveDiscardCancelChoice.Save);
         dialog.Cancel = () => dialog.Complete(SaveDiscardCancelChoice.Cancel);
         panel.Children.Add(BuildButtonRow(
@@ -72,7 +72,7 @@ public static class EditorDialogs
         panel.Children.Add(input);
 
         var dialog = new EditorDialog<string?>(
-            new EditorDialogOptions(title, 380, 155), panel, cancelResult: null);
+            new EditorDialogOptions(title, 380, SizeToContentHeight: true), panel, cancelResult: null);
         dialog.Confirm = () => dialog.Complete(input.Text);
         dialog.Cancel = () => dialog.Complete(null);
         panel.Children.Add(BuildButtonRow(
@@ -200,7 +200,7 @@ public static class EditorDialogs
         panel.Children.Add(incrementToggle);
 
         var dialog = new EditorDialog<AddFramesChoice?>(
-            new EditorDialogOptions("Add Multiple Frames", 320, 200), panel, cancelResult: null);
+            new EditorDialogOptions("Add Multiple Frames", 320, SizeToContentHeight: true), panel, cancelResult: null);
         dialog.Confirm = () => dialog.Complete(new AddFramesChoice(
             (int)(countInput.Value ?? 0), incrementToggle.IsChecked == true));
         dialog.Cancel = () => dialog.Complete(null);
@@ -259,7 +259,7 @@ public static class EditorDialogs
         panel.Children.Add(offsetModeRow);
 
         var dialog = new EditorDialog<OffsetChoice?>(
-            new EditorDialogOptions("Adjust Offsets", 340, 265), panel, cancelResult: null);
+            new EditorDialogOptions("Adjust Offsets", 340, SizeToContentHeight: true), panel, cancelResult: null);
         dialog.Confirm = () => dialog.Complete(new OffsetChoice(
             justifyBottom.IsChecked == true,
             (float)(xInput.Value ?? 0),
