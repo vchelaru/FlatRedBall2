@@ -988,12 +988,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// <summary>
     /// Test-only: applies a world-space drag delta to every frame in the selected chain's
     /// <see cref="AnimationFrameSave.RelativeX"/>/<see cref="AnimationFrameSave.RelativeY"/>,
-    /// each frame keeping its own starting offset, and commits as one undo step. Bypasses
-    /// coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op
-    /// unless <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate
-    /// <see cref="OnPointerPressed"/> applies before starting a live whole-animation drag.
-    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
-    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
+    /// each frame keeping its own starting offset, and commits as one undo step. When 2+ chains
+    /// are selected (<see cref="ISelectedState.SelectedChains"/>), every unlocked one moves
+    /// together — see <see cref="ResolveWholeChainDragFrames"/> (issue #1052). Bypasses coordinate
+    /// conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op unless
+    /// <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate <see cref="OnPointerPressed"/>
+    /// applies before starting a live whole-animation drag. <paramref name="shiftHeld"/> mirrors the
+    /// live Shift-axis-lock (#1022) applied in <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
     internal void SimulateChainDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
@@ -1004,7 +1005,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         var chain = _selectedState!.SelectedChain!;
         if (chain.IsLocked) return;
 
-        _draggingChainFrames = chain.Frames.ToArray();
+        _draggingChainFrames = ResolveWholeChainDragFrames(chain);
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
@@ -1944,11 +1945,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// <see cref="ISelectedState.SelectedFrame"/> is null and nothing more specific is
     /// multi-selected. Mirrors <see cref="AnimationEditor.App.Controls.WireframeControl"/>'s
     /// <c>PrimaryFrameRect</c>-returns-null fallback into "drag the whole chain" (issue #912).
+    /// When <see cref="ISelectedState.SelectedChains"/> holds 2+ chains (group preview, #576),
+    /// <see cref="ResolveWholeChainDragFrames"/> extends this into a bulk drag of every unlocked
+    /// selected chain together (issue #1052 follow-up to #917) — not just the one under the cursor.
     /// </summary>
     private bool IsWholeChainDragTarget =>
         _selectedState!.SelectedFrame is null &&
         _selectedState!.SelectedFrames.Count == 0 &&
         _selectedState!.SelectedChain is not null;
+
+    /// <summary>
+    /// Frames to move for a whole-chain drag once <paramref name="hitChain"/> — the chain actually
+    /// under the cursor, from <see cref="ResolveWholeChainDragTarget"/> or the pinned
+    /// <see cref="ISelectedState.SelectedChain"/> — is known. A single selected chain keeps the
+    /// original single-chain behavior; 2+ selected chains (<see cref="ISelectedState.SelectedChains"/>)
+    /// drag every unlocked one together, mirroring how <see cref="IsMultiFrameDragTarget"/> drags
+    /// the whole multi-selection when the user grabs any one of its members (issue #1052).
+    /// </summary>
+    private AnimationFrameSave[] ResolveWholeChainDragFrames(AnimationChainSave hitChain)
+    {
+        if (_selectedState!.SelectedChains.Count <= 1) return hitChain.Frames.ToArray();
+        return _selectedState!.SelectedChains.Where(c => !c.IsLocked).SelectMany(c => c.Frames).ToArray();
+    }
 
     /// <summary>
     /// <c>true</c> when 2+ individual frames are multi-selected via
@@ -2212,7 +2230,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 // follow-up). HitTestFrameSprite above already required a non-null result.
                 var chain = ResolveWholeChainDragTarget(px, py);
                 if (chain is null) return;
-                _draggingChainFrames = chain.Frames.ToArray();
+                _draggingChainFrames = ResolveWholeChainDragFrames(chain);
                 _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
                 _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
                 _frameDragAnchor     = pos;
