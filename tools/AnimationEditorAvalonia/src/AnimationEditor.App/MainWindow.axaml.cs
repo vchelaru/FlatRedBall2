@@ -789,7 +789,13 @@ public partial class MainWindow : Window
         TabEntry? tab = path != null
             ? _tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(path))
             : _tabManager.ActiveTab;
-        if (tab != null)
+        // EditorProjectModelChanged is handled via Dispatcher.UIThread.InvokeAsync (#1038), so by
+        // the time this runs the live document may have already moved on to a different tab (e.g.
+        // two documents loaded back-to-back during startup, before the dispatcher catches up).
+        // CaptureTabEditorState always captures whatever is *currently* live -- only safe when
+        // `tab` is still the active one, or it silently poisons `tab`'s cache with someone else's
+        // content, which a later cache-hit reactivation then serves back as if it were `tab`'s own.
+        if (tab != null && tab == _tabManager.ActiveTab)
             _appCommands.CaptureTabEditorState(tab);
     }
 
