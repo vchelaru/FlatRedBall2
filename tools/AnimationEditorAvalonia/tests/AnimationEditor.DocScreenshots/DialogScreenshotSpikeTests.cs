@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using AnimationEditor.App;
+using AnimationEditor.App.Services;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using SkiaSharp;
@@ -26,7 +28,8 @@ public class DialogScreenshotSpikeTests
         Dispatcher.UIThread.RunJobs();
         try
         {
-            var dialog = MainWindow.BuildAboutWindow();
+            var dialog = MainWindow.BuildAboutWindowWithLiveRefresh(
+                refresh: () => Task.FromResult(ApplicationUpdateResult.NoUpdate), onRestart: () => { });
             var shownTask = dialog.ShowDialog(owner);
             Dispatcher.UIThread.RunJobs();
 

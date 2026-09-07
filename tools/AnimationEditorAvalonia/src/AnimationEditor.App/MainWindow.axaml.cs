@@ -13,7 +13,6 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Layout;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
-using AnimationEditor.Core.Update;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
@@ -57,7 +56,6 @@ public partial class MainWindow : Window
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
     private readonly IFileAssociationService _fileAssociation;
-    private readonly IUpdateChecker _updateChecker;
     private readonly IApplicationUpdater _applicationUpdater;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
@@ -213,7 +211,6 @@ public partial class MainWindow : Window
         Services.ThumbnailService thumbnailService,
         ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
-        IUpdateChecker updateChecker,
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null)
     {
@@ -231,7 +228,6 @@ public partial class MainWindow : Window
         _thumbnailService = thumbnailService;
         _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
-        _updateChecker = updateChecker;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
         _dialogHost = new WindowEditorDialogHost(this);
         // Desktop renders the tree with its own _treeRoots collection, so the controller
@@ -1085,25 +1081,28 @@ public partial class MainWindow : Window
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────
 
-    private bool _isDownloadingUpdate;
-
     private void WireUpdateAvailableBanner()
     {
-        RestartForUpdateBtn.Click += (_, _) =>
-        {
-            try
-            {
-                SaveTabsToSettings();
-                _applicationUpdater.ApplyUpdateAndRestart();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Animation Editor update restart failed: {ex}");
-                ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
-            }
-        };
-
+        RestartForUpdateBtn.Click += (_, _) => RestartToApplyUpdate();
         RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
+    }
+
+    /// <summary>
+    /// Applies a downloaded update and restarts. Shared by the persistent banner's Restart
+    /// button and the About dialog's (issue #1033) — one restart action, not a copy per surface.
+    /// </summary>
+    private void RestartToApplyUpdate()
+    {
+        try
+        {
+            SaveTabsToSettings();
+            _applicationUpdater.ApplyUpdateAndRestart();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Animation Editor update restart failed: {ex}");
+            ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
+        }
     }
 
     private void ShowUpdateDownloadFailure(string message)
@@ -1116,7 +1115,7 @@ public partial class MainWindow : Window
 
     private void ShowUpdateDownloadProgress(int percent)
     {
-        if (!_isDownloadingUpdate)
+        if (_updateCheckInFlight is null)
             return;
 
         UpdateAvailableBannerText.Text = $"Downloading Animation Editor update ({percent}%)…";
@@ -2661,32 +2660,88 @@ public partial class MainWindow : Window
         => _ = ShowAboutDialogAsync();
 
     /// <summary>
-    /// Opening the About dialog is the manual "check for updates" action — it always forces a
-    /// fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s cache) rather than adding a
-    /// separate button, since opening this dialog is already an infrequent, explicit user action.
+    /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
+    /// it starts the real update check-and-download immediately and shows a spinner until the
+    /// result is in. This is the exact same mechanism (<see cref="RunApplicationUpdateCheckAsync"/>)
+    /// and restart action (<see cref="RestartToApplyUpdate"/>) the persistent startup banner uses —
+    /// About previously ran its own separate GitHub-release comparison whose "Get Update" button
+    /// only opened a browser tab, so it never actually fetched anything (issue #1033).
     /// </summary>
     private async Task ShowAboutDialogAsync()
     {
-        var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        await BuildAboutWindow(result).ShowDialog(this);
+        var window = BuildAboutWindowWithLiveRefresh(
+            refresh: () => RunApplicationUpdateCheckAsync(),
+            onRestart: RestartToApplyUpdate);
+        await window.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Builds the About window and immediately starts a check, rendering the spinner state before
+    /// returning. <paramref name="refresh"/> is invoked both for that initial check and every later
+    /// click of the "Check for Updates"/"Retry" button that replaces the spinner once it resolves —
+    /// one code path drives both, rather than a separate pre-fetch-before-show and a separate
+    /// in-place refresh. Extracted from <see cref="ShowAboutDialogAsync"/> for testability without
+    /// invoking <see cref="Window.ShowDialog"/>.
+    /// </summary>
+    internal static Window BuildAboutWindowWithLiveRefresh(Func<Task<ApplicationUpdateResult>> refresh, Action onRestart)
+    {
+        var window = new Window
+        {
+            Title = "About AnimationEditor",
+            Width = 420,
+            Height = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+
+        ApplicationUpdateResult? current = null;
+
+        async Task RunCheckAsync()
+        {
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: true, onRestart);
+            current = await refresh();
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: false, onRestart);
+        }
+
+        _ = RunCheckAsync();
+        return window;
+    }
+
+    private Task<ApplicationUpdateResult>? _updateCheckInFlight;
+
+    /// <summary>
+    /// Runs the real update check + download via <see cref="_applicationUpdater"/> — the single
+    /// mechanism shared by the startup banner (<see cref="RunStartupUpdateDownloadAsync"/>) and the
+    /// About dialog (issue #1033). A caller that arrives while a check is already running (e.g.
+    /// About opened during the startup check) shares that same in-flight task instead of racing a
+    /// second concurrent download.
+    /// </summary>
+    private Task<ApplicationUpdateResult> RunApplicationUpdateCheckAsync(Action<int>? onProgress = null)
+    {
+        if (_updateCheckInFlight is { IsCompleted: false } running)
+            return running;
+
+        async Task<ApplicationUpdateResult> RunAsync()
+        {
+            try
+            {
+                return await _applicationUpdater.DownloadUpdateAsync(percent =>
+                    Dispatcher.UIThread.Post(() => onProgress?.Invoke(percent)));
+            }
+            finally
+            {
+                _updateCheckInFlight = null;
+            }
+        }
+
+        var task = RunAsync();
+        _updateCheckInFlight = task;
+        return task;
     }
 
     private async Task RunStartupUpdateDownloadAsync()
     {
-        if (_isDownloadingUpdate)
-            return;
-
-        _isDownloadingUpdate = true;
-        ApplicationUpdateResult result;
-        try
-        {
-            result = await _applicationUpdater.DownloadUpdateAsync(percent =>
-                Dispatcher.UIThread.Post(() => ShowUpdateDownloadProgress(percent)));
-        }
-        finally
-        {
-            _isDownloadingUpdate = false;
-        }
+        var result = await RunApplicationUpdateCheckAsync(ShowUpdateDownloadProgress);
 
         switch (result.Status)
         {
@@ -2694,7 +2749,7 @@ public partial class MainWindow : Window
                 UpdateAvailableBanner.IsVisible = false;
                 break;
             case ApplicationUpdateStatus.ReadyToRestart:
-                UpdateAvailableBannerText.Text = $"Animation Editor v{result.Version} is ready. Restart to install it.";
+                UpdateAvailableBannerText.Text = DescribeUpdateStatus(result);
                 RestartForUpdateBtn.IsVisible = true;
                 RetryUpdateBtn.IsVisible = false;
                 UpdateAvailableBanner.IsVisible = true;
@@ -2705,29 +2760,13 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// Runs the update check (or reuses the cached result if <see cref="UpdateCheckPolicy"/>
-    /// says it's still fresh and <paramref name="forceRefresh"/> is false), persisting the
-    /// outcome to <see cref="AppSettingsModel"/> so it survives restarts.
-    /// </summary>
-    private async Task<UpdateCheckResult> GetUpdateCheckResultAsync(bool forceRefresh)
+    /// <summary>Status text shared by the startup banner and the About dialog (issue #1033).</summary>
+    private static string DescribeUpdateStatus(ApplicationUpdateResult result) => result.Status switch
     {
-        var currentVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);
-        var now = DateTime.UtcNow;
-
-        if (!forceRefresh && !UpdateCheckPolicy.ShouldCheck(_appSettings.LastUpdateCheckUtc, now))
-        {
-            return UpdateCheckResult.FromCached(
-                _appSettings.LatestKnownUpdateVersion, _appSettings.LatestKnownUpdateUrl, currentVersion);
-        }
-
-        var result = await _updateChecker.CheckAsync(currentVersion);
-        _appSettings.LastUpdateCheckUtc = now;
-        _appSettings.LatestKnownUpdateVersion = result.LatestVersion?.ToString();
-        _appSettings.LatestKnownUpdateUrl = result.ReleaseUrl;
-        SaveSettingsFile();
-        return result;
-    }
+        ApplicationUpdateStatus.ReadyToRestart => $"Animation Editor v{result.Version} is ready. Restart to install it.",
+        ApplicationUpdateStatus.Failed => result.FailureMessage!,
+        _ => "You're up to date.",
+    };
 
     private void OnSettingsClick(object? sender, RoutedEventArgs e)
     {
@@ -2796,44 +2835,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Returns a fully-configured About window centered on its owner. <paramref name="updateCheck"/>
-    /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
+    /// Builds the content panel for the About dialog. <paramref name="updateStatus"/> is <c>null</c>
+    /// when no check has run yet (default text: "Check for updates:"). <paramref name="onRefresh"/>,
+    /// when given, drives a "Check for Updates"/"Retry" button (issue #1033) that reruns the real
+    /// update check without closing the dialog — replaced by a spinner while
+    /// <paramref name="isChecking"/> is true, or by a "Restart Now" button (via
+    /// <paramref name="onRestart"/>) once a download is <see cref="ApplicationUpdateStatus.ReadyToRestart"/>.
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
-        new Window
-        {
-            Title = "About AnimationEditor",
-            Width = 420,
-            Height = 240,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Content = BuildAboutContent(updateCheck),
-        };
-
-    /// <summary>
-    /// Builds the content panel for the About dialog. <paramref name="updateCheck"/> is <c>null</c>
-    /// when no check has run yet; a non-null result with a populated <see cref="UpdateCheckResult.LatestVersion"/>
-    /// and <see cref="UpdateCheckResult.IsUpdateAvailable"/> <c>false</c> means the check succeeded
-    /// and the running version is already current (issue #845 — this used to be indistinguishable
-    /// from "never checked").
-    /// Extracted for testability.
-    /// </summary>
-    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
+    internal static Control BuildAboutContent(
+        ApplicationUpdateResult? updateStatus = null,
+        Func<Task>? onRefresh = null,
+        bool isChecking = false,
+        Action? onRestart = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+        var statusText = updateStatus is null ? "Check for updates:" : DescribeUpdateStatus(updateStatus);
 
-        var updatePromptText = updateCheck switch
-        {
-            { IsUpdateAvailable: true } => $"Update available: v{updateCheck.LatestVersion}",
-            { LatestVersion: not null } => $"You're up to date (v{updateCheck.LatestVersion})",
-            _ => "Check here for updates:",
-        };
-        var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
-        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
-
-        return new StackPanel
+        var panel = new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
             Spacing = 8,
@@ -2842,11 +2862,52 @@ public partial class MainWindow : Window
                 new TextBlock { Text = "AnimationEditor", FontSize = 16 },
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
-                new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildOpenUrlButton(releaseUrl, buttonLabel),
+                new TextBlock { Text = statusText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
+                BuildOpenUrlButton(ReleasesUrl, "View Releases on GitHub"),
             }
         };
+
+        if (isChecking)
+            panel.Children.Add(BuildCheckingIndicator());
+        else if (updateStatus?.Status == ApplicationUpdateStatus.ReadyToRestart && onRestart is not null)
+            panel.Children.Add(BuildRestartButton(onRestart));
+        else if (onRefresh is not null)
+            panel.Children.Add(BuildRefreshButton(onRefresh,
+                updateStatus?.Status == ApplicationUpdateStatus.Failed ? "Retry" : "Check for Updates"));
+
+        return panel;
     }
+
+    /// <summary>Builds the About dialog's "Check for Updates"/"Retry" button (issue #1033).</summary>
+    private static Button BuildRefreshButton(Func<Task> onRefresh, string label)
+    {
+        var button = new Button { Name = "AboutRefreshBtn", Content = label };
+        button.Click += (_, _) => _ = onRefresh();
+        return button;
+    }
+
+    /// <summary>Builds the About dialog's "Restart Now" button once a download is ready — calls the
+    /// exact same <see cref="RestartToApplyUpdate"/> the persistent banner's button does (issue #1033).</summary>
+    private static Button BuildRestartButton(Action onRestart)
+    {
+        var button = new Button { Name = "AboutRestartBtn", Content = "Restart Now" };
+        button.Click += (_, _) => onRestart();
+        return button;
+    }
+
+    /// <summary>Replaces the "Check for Updates" button while a check is in flight (issue #1033).</summary>
+    private static Control BuildCheckingIndicator() =>
+        new StackPanel
+        {
+            Name = "AboutRefreshSpinner",
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new ProgressBar { IsIndeterminate = true, Width = 16, Height = 16 },
+                new TextBlock { Text = "Checking for updates…" },
+            }
+        };
 
     /// <summary>
     /// Opens a URL in the user's default browser. Network/shell failures are swallowed —
