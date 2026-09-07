@@ -101,4 +101,24 @@
             </DataTemplate>
         </Setter>
     </Style>
+    <!-- #1042 follow-up: the neutral IconInk color made a locked chain's lock icon and an
+         unlocked chain's hover-revealed lock icon indistinguishable while hovering, both
+         showed the same grey glyph, so a user couldn't tell a row was already locked until
+         moving the pointer away. Tint the icon with the app's red accent only while
+         Button.lock-icon carries the .locked class (bound to TreeNodeVm.IsLocked), so locked
+         reads as a distinct color regardless of hover state. Two-class selector beats the
+         single-class rule above on specificity. Svg.CurrentColor is a Color, not a Brush, and
+         SystemAccentColor (the plain-Color token behind the "Accent" SolidColorBrush) is the
+         right resource here; DynamicResource-ing "Accent" itself throws an InvalidCastException
+         (SolidColorBrush -> Color?) that silently aborts the style application, including the
+         .locked class add that triggered it. -->
+    <Style Selector="Button.lock-icon.locked">
+        <Setter Property="ContentTemplate">
+            <DataTemplate>
+                <svg:Svg Width="11" Height="11"
+                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLock.svg"
+                         CurrentColor="{DynamicResource SystemAccentColor}" />
+            </DataTemplate>
+        </Setter>
+    </Style>
 </Styles>

@@ -186,6 +186,34 @@ public class ChainLockTests
         finally { window.Close(); }
     }
 
+    /// <summary>
+    /// #1042 follow-up: hovering revealed the lock icon at full opacity for BOTH a locked and an
+    /// unlocked chain, and the icon used the same neutral color either way -- so while hovering,
+    /// a user could not tell a chain was already locked until moving the pointer off the row.
+    /// The icon's color must differ once <see cref="AnimationChainSave.IsLocked"/> is true.
+    /// </summary>
+    [AvaloniaFact]
+    public void LockIconColor_DiffersOnceChainIsLocked()
+    {
+        var (window, ctx, chain) = CreateWindowWithChain();
+        try
+        {
+            var lockBtn = GetLockButtonForChainRow(window, chain);
+            var unlockedColor = GetLockIconCurrentColor(lockBtn);
+
+            ctx.AppCommands.SetChainLocked(chain, true);
+            Dispatcher.UIThread.RunJobs();
+
+            var lockedColor = GetLockIconCurrentColor(lockBtn);
+
+            Assert.NotEqual(unlockedColor, lockedColor);
+        }
+        finally { window.Close(); }
+    }
+
+    private static Avalonia.Media.Color? GetLockIconCurrentColor(Button lockBtn) =>
+        lockBtn.GetVisualDescendants().OfType<Avalonia.Svg.Skia.Svg>().Single().CurrentColor;
+
     [AvaloniaFact]
     public void LockButtonClasses_ReflectLockedState()
     {
