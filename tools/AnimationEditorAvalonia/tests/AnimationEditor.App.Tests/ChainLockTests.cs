@@ -187,32 +187,39 @@ public class ChainLockTests
     }
 
     /// <summary>
-    /// #1042 follow-up: hovering revealed the lock icon at full opacity for BOTH a locked and an
-    /// unlocked chain, and the icon used the same neutral color either way -- so while hovering,
-    /// a user could not tell a chain was already locked until moving the pointer off the row.
-    /// The icon's color must differ once <see cref="AnimationChainSave.IsLocked"/> is true.
+    /// #1042 follow-up: hovering revealed the lock icon at full opacity for both a locked and an
+    /// unlocked chain, and the icon used the same outline glyph either way, so while hovering a
+    /// user could not tell a chain was already locked until moving the pointer off the row. A red
+    /// tint was tried first and rejected: red already means "selected" elsewhere in the tree, so
+    /// tinting the lock icon red made it read as less visible, not more informative. The glyph
+    /// itself (outline vs. solid-body silhouette) must differ once
+    /// <see cref="AnimationChainSave.IsLocked"/> is true, while staying the same neutral color.
     /// </summary>
     [AvaloniaFact]
-    public void LockIconColor_DiffersOnceChainIsLocked()
+    public void LockIconGlyph_DiffersOnceChainIsLocked_ButColorStaysNeutral()
     {
         var (window, ctx, chain) = CreateWindowWithChain();
         try
         {
             var lockBtn = GetLockButtonForChainRow(window, chain);
-            var unlockedColor = GetLockIconCurrentColor(lockBtn);
+            var (unlockedPath, unlockedColor) = GetLockIconPathAndColor(lockBtn);
 
             ctx.AppCommands.SetChainLocked(chain, true);
             Dispatcher.UIThread.RunJobs();
 
-            var lockedColor = GetLockIconCurrentColor(lockBtn);
+            var (lockedPath, lockedColor) = GetLockIconPathAndColor(lockBtn);
 
-            Assert.NotEqual(unlockedColor, lockedColor);
+            Assert.NotEqual(unlockedPath, lockedPath);
+            Assert.Equal(unlockedColor, lockedColor);
         }
         finally { window.Close(); }
     }
 
-    private static Avalonia.Media.Color? GetLockIconCurrentColor(Button lockBtn) =>
-        lockBtn.GetVisualDescendants().OfType<Avalonia.Svg.Skia.Svg>().Single().CurrentColor;
+    private static (string? Path, Avalonia.Media.Color? Color) GetLockIconPathAndColor(Button lockBtn)
+    {
+        var svg = lockBtn.GetVisualDescendants().OfType<Avalonia.Svg.Skia.Svg>().Single();
+        return (svg.Path, svg.CurrentColor);
+    }
 
     [AvaloniaFact]
     public void LockButtonClasses_ReflectLockedState()
