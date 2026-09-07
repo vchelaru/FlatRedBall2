@@ -161,4 +161,48 @@ public class WireframeLockedChainDragTests
         }
         finally { System.IO.Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// Composite whole-chain move (click-drag inside a frame body, not a resize handle) with two
+    /// chains selected: dragging must move only the unlocked chain's frames even though the
+    /// locked chain is also visible/selected -- mirrors the bulk skip-locked-entries pattern
+    /// already applied to <see cref="SimulateBulkHandleDrag_OneOfTwoChainsLocked_OnlyUnlockedChainFrameChanges"/>.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateChainDrag_TwoChainsSelected_OtherChainLocked_OnlyUnlockedChainFrameMoves()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, unlockedFrame, dir) = BuildCtrlWithSelectedFrame(ctx, locked: false);
+        try
+        {
+            var lockedChain = new AnimationChainSave { Name = "Locked", IsLocked = true };
+            var lockedFrame = new AnimationFrameSave
+            {
+                TextureName      = "sprite.png",
+                FrameLength      = 0.1f,
+                LeftCoordinate   = 0.5f, TopCoordinate    = 0f,
+                RightCoordinate  = 1.0f, BottomCoordinate = 0.5f,
+                ShapesSave       = new ShapesSave(),
+            };
+            lockedChain.Frames.Add(lockedFrame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(lockedChain);
+            ctx.SelectedState.SelectedNodes = new System.Collections.Generic.List<object>
+            {
+                ctx.SelectedState.SelectedChain!, lockedChain,
+            };
+            // Clear the single-frame pin so RefreshFrames shows every frame of every
+            // selected chain (composite multi-chain view), not just SelectedFrame alone.
+            ctx.SelectedState.SelectedFrame = null;
+            ctrl.RefreshFrames();
+
+            ctrl.SimulateChainDrag(
+                startScreenX: 0f, startScreenY: 0f,
+                endScreenX:   8f, endScreenY:   8f);
+
+            Assert.NotEqual(0f, unlockedFrame.LeftCoordinate); // unlocked chain's frame moved
+            Assert.Equal(0.5f, lockedFrame.LeftCoordinate, precision: 4); // locked chain's frame untouched
+            Assert.Equal(0f, lockedFrame.TopCoordinate, precision: 4);
+        }
+        finally { System.IO.Directory.Delete(dir, true); }
+    }
 }

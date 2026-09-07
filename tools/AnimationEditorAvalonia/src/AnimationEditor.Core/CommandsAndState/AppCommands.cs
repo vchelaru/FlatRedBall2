@@ -687,20 +687,31 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
         {
-            var chain = _selectedState.SelectedChain;
-            if (IsChainLocked(chain)) return;
+            // The incoming frames can span multiple chains (a cross-chain tree multi-select,
+            // MainWindow.HandleDelete). A locked chain among them keeps its own frames --
+            // group by owning chain and skip only the locked groups, rather than vetoing the
+            // whole delete when any one chain involved is locked (bulk skip-locked-entries
+            // pattern, matching PasteFramesCut).
+            var groups = frames
+                .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
+                .Where(x => x.Chain is not null && x.Chain.Frames.Contains(x.Frame) && !IsChainLocked(x.Chain))
+                .GroupBy(x => x.Chain!)
+                .ToList();
+            if (groups.Count == 0) return;
 
-            if (chain != null)
-            {
-                var validFrames = frames.Where(f => chain.Frames.Contains(f)).ToList();
-                string label = validFrames.Count == 1
-                    ? $"Frame {chain.Frames.IndexOf(validFrames[0]) + 1}"
-                    : $"{validFrames.Count} frames";
-                _undoManager.Execute(new DeleteFramesCommand(frames, chain, this, _events, _selectedState));
-                if (validFrames.Count > 0)
-                    ItemsDeleted?.Invoke(label);
-            }
+            var validFrames = groups.SelectMany(g => g).Select(x => x.Frame).ToList();
+            string label = validFrames.Count == 1
+                ? $"Frame {groups[0].Key.Frames.IndexOf(validFrames[0]) + 1}"
+                : $"{validFrames.Count} frames";
 
+            var commands = groups
+                .Select(g => (IUndoableCommand)new DeleteFramesCommand(
+                    g.Select(x => x.Frame).ToList(), g.Key, this, _events, _selectedState))
+                .ToList();
+            string desc = commands.Count == 1 ? commands[0].Description : $"Delete {validFrames.Count} Frames";
+            _undoManager.Execute(new CompositeCommand(commands, desc));
+
+            ItemsDeleted?.Invoke(label);
             RefreshWireframeRequested?.Invoke();
             _events.RaiseAnimationChainsChanged();
         }

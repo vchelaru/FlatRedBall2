@@ -973,10 +973,15 @@ public class WireframeControl : TextureViewport
 
         _draggingChain = true;
         _chainDragStarts.Clear();
+        // A locked chain among the visible frames keeps its own frames still (bulk
+        // skip-locked-entries pattern, matching SimulateBulkHandleDrag).
         foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
             _chainDragStarts.Add((fr, fr.Bounds,
                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
         _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
 
         ApplyChainDrag(new Point(endScreenX, endScreenY));
@@ -1339,10 +1344,15 @@ public class WireframeControl : TextureViewport
 
                     _draggingChain = true;
                     _chainDragStarts.Clear();
+                    // A locked chain among the visible frames keeps its own frames still (bulk
+                    // skip-locked-entries pattern, matching the resize-handle branch above).
                     foreach (var fr in _frameRects)
+                    {
+                        if (IsFrameLocked(fr.Frame)) continue;
                         _chainDragStarts.Add((fr, fr.Bounds,
                             fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                             fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                    }
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 _lastPointerPos = pos;
@@ -1745,6 +1755,9 @@ public class WireframeControl : TextureViewport
 
         foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
+            // Defense-in-depth: population above already skips locked frames.
+            if (IsFrameLocked(fr.Frame)) continue;
+
             float newL = startBounds.Left   + dx;
             float newT = startBounds.Top    + dy;
             float newR = startBounds.Right  + dx;
