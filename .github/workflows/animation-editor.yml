@@ -28,8 +28,11 @@ jobs:
         shell: pwsh
         run: |
           # Velopack package versions use SemVer, whose numeric components cannot have leading
-          # zeroes. The assembly version receives this same three-part date value.
-          $version = (Get-Date).ToString('yyyy.M.d')
+          # zeroes. The assembly version receives this same value. The 4th component is the
+          # workflow run number, not the date, so two releases cut on the same day still get
+          # strictly increasing versions - otherwise the second same-day release is invisible to
+          # the Velopack updater on clients already on the first one.
+          $version = (Get-Date).ToString('yyyy.M.d') + ".$($env:GITHUB_RUN_NUMBER)"
           $kind = "${{ github.event.inputs.release_kind }}"
           switch ($kind) {
             'release'    { $prefix='Release';    $prerelease='false'; $draft='false' }
