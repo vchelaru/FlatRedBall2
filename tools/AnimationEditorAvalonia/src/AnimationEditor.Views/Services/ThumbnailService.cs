@@ -414,11 +414,25 @@ public sealed class ThumbnailService : IDisposable
         return thumb;
     }
 
+    /// <summary>Lower/upper bounds of the fractional-magnification band that gets filtered
+    /// (issue #1014). Chosen with margin around 1x and 2x so near-integer scales (e.g. 1.98x)
+    /// stay on crisp <see cref="SKFilterMode.Nearest"/> instead of picking up a needless blur.</summary>
+    private const float MagnificationFilterBandLow  = 1.1f;
+    private const float MagnificationFilterBandHigh = 1.9f;
+
     /// <summary>
-    /// Picks the sampler from the scale the crop is drawn at (issue #1013).
+    /// Picks the sampler from the scale the crop is drawn at (issue #1013, extended by #1014).
     /// <para>
     /// Magnifying keeps nearest-neighbour ("point") sampling, so a small sprite blown up to icon
     /// size stays crisp and pixellated instead of the blurry smear filtering produces on game art.
+    /// </para>
+    /// <para>
+    /// Except a fractional scale between <see cref="MagnificationFilterBandLow"/> and
+    /// <see cref="MagnificationFilterBandHigh"/> (issue #1014): nearest-neighbour there gives source
+    /// pixels uneven destination widths (e.g. at 1.3x some pixels are 1px wide, some are 2px — a 100%
+    /// size difference between neighbours), which reads as visible unevenness. The artifact shrinks as
+    /// scale grows, so only this narrow band — not every non-integer scale — is worth filtering; exact
+    /// or near-integer scale (1x, 2x, 3x, ...) stays <see cref="SKFilterMode.Nearest"/>.
     /// </para>
     /// <para>
     /// Minifying must filter. Nearest keeps one texel per destination pixel and discards every
@@ -430,8 +444,12 @@ public sealed class ThumbnailService : IDisposable
     /// matches what <see cref="GetFullImageThumbnail"/> already uses for the Files panel.
     /// </para>
     /// </summary>
-    private static SKSamplingOptions SelectSampling(float scale) =>
-        scale < 1f
+    private static SKSamplingOptions SelectSampling(float scale)
+    {
+        bool filter = scale < 1f
+            || (scale >= MagnificationFilterBandLow && scale <= MagnificationFilterBandHigh);
+        return filter
             ? new SKSamplingOptions(SKFilterMode.Linear)
             : new SKSamplingOptions(SKFilterMode.Nearest);
+    }
 }
