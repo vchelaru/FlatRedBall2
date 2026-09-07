@@ -91,10 +91,17 @@ public sealed class SingleInstanceServer : IDisposable
     }
 
     /// <summary>
-    /// Sends <paramref name="filePath"/> to the running instance via the named pipe.
-    /// Called by the second process before it exits.
+    /// Attempts to reach the running instance via the named pipe and, if <paramref name="filePath"/>
+    /// is non-null, forwards it to be opened as a tab. Called by the second process before it exits.
+    ///
+    /// <para>Returns whether the pipe connection itself succeeded. This is a reachability signal
+    /// only, not proof the primary's UI is responsive: <see cref="ListenLoopAsync"/> runs on a
+    /// background thread independent of the UI thread, so a wedged UI thread can still leave the
+    /// pipe listener accepting connections fine. A caller that gets <c>false</c> back needs a
+    /// second, OS-level signal (see <c>PrimaryInstanceHangChecker</c> in the App layer) before
+    /// concluding the primary is actually hung.</para>
     /// </summary>
-    public static async Task SendToRunningInstanceAsync(string filePath)
+    public static async Task<bool> SendToRunningInstanceAsync(string? filePath)
     {
         try
         {
@@ -104,12 +111,18 @@ public sealed class SingleInstanceServer : IDisposable
             // 2-second timeout — if the server isn't listening yet, give up gracefully.
             await client.ConnectAsync(2000);
 
-            using var writer = new StreamWriter(client) { AutoFlush = true };
-            await writer.WriteLineAsync(filePath);
+            if (filePath != null)
+            {
+                using var writer = new StreamWriter(client) { AutoFlush = true };
+                await writer.WriteLineAsync(filePath);
+            }
+
+            return true;
         }
         catch
         {
-            // Could not reach the running instance — silently ignore.
+            // Could not reach the running instance.
+            return false;
         }
     }
 
