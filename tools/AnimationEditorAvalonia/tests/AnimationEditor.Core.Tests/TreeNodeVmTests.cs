@@ -90,6 +90,41 @@ public class TreeNodeVmTests
         Assert.Equal(nameof(TreeNodeVm.EditingText), changed);
     }
 
+    // ── CanAddFrame ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CanAddFrame_ChainNodeUnlocked_ReturnsTrue()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true, IsLocked = false };
+        Assert.True(vm.CanAddFrame);
+    }
+
+    [Fact]
+    public void CanAddFrame_ChainNodeLocked_ReturnsFalse()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true, IsLocked = true };
+        Assert.False(vm.CanAddFrame);
+    }
+
+    [Fact]
+    public void CanAddFrame_NonChainNode_ReturnsFalse()
+    {
+        var vm = new TreeNodeVm { IsFrameNode = true, IsLocked = false };
+        Assert.False(vm.CanAddFrame);
+    }
+
+    [Fact]
+    public void CanAddFrame_FiresPropertyChangedWhenIsLockedChanges()
+    {
+        var vm = new TreeNodeVm { IsChainNode = true };
+        var fired = new System.Collections.Generic.List<string?>();
+        vm.PropertyChanged += (_, e) => fired.Add(e.PropertyName);
+
+        vm.IsLocked = true;
+
+        Assert.Contains(nameof(TreeNodeVm.CanAddFrame), fired);
+    }
+
     // ── BeginEdit ─────────────────────────────────────────────────────────────
 
     [Fact]

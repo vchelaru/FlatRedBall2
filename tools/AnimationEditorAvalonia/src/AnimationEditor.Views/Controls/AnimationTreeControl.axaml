@@ -39,6 +39,23 @@
                 <Setter Property="IsHitTestVisible" Value="True" />
                 <Setter Property="Focusable" Value="True" />
             </Style>
+            <!-- #1035: the meta text's right margin must clear whichever icon lane(s) are
+                 actually visible, not always assume one. Locking a chain hides the add-frame
+                 button (CanAddFrame) and always shows the lock icon, so only two cases exist: no
+                 icon lane visible (tight), or the lock icon's lane visible (locked, or hovered
+                 while unlocked, since hover reveals both add-frame and lock together). The lock
+                 lane sits further from the edge than add-frame's, so clearing it clears both. The
+                 ":not(.locked)" on the hover rule keeps a locked+hovered row on the locked margin
+                 rather than depending on style declaration order. -->
+            <Style Selector="TextBlock.meta">
+                <Setter Property="Margin" Value="8,0,8,0" />
+            </Style>
+            <Style Selector="TextBlock.meta.locked">
+                <Setter Property="Margin" Value="8,0,56,0" />
+            </Style>
+            <Style Selector="TreeViewItem:pointerover TextBlock.meta:not(.locked)">
+                <Setter Property="Margin" Value="8,0,56,0" />
+            </Style>
         </TreeView.Styles>
         <TreeView.ItemTemplate>
             <TreeDataTemplate x:DataType="models:TreeNodeVm" ItemsSource="{Binding Children}">
@@ -58,18 +75,20 @@
                                      LostFocus="OnRenameLostFocus" />
                         </Panel>
                         <!-- Frame count + total playtime (chain nodes) or frame length (frame
-                             nodes), matching desktop's MainWindow tree (#623). Margin reserves
-                             the Add-Frame button's lane so it never overlaps this text. -->
+                             nodes), matching desktop's MainWindow tree (#623). Margin clears
+                             whichever icon lane(s) are visible (see TextBlock.meta styles above,
+                             #1035) so it never overlaps the add-frame/lock buttons. -->
                         <TextBlock Grid.Column="1"
+                                   Classes="meta"
+                                   Classes.locked="{Binding IsLocked}"
                                    Text="{Binding Meta}"
                                    Foreground="{DynamicResource AccentCool}"
                                    FontSize="11"
-                                   Margin="8,0,30,0"
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>
                     <Button Classes="add-frame-btn plus"
-                            IsVisible="{Binding IsChainNode}"
+                            IsVisible="{Binding CanAddFrame}"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Width="22" Height="22"
