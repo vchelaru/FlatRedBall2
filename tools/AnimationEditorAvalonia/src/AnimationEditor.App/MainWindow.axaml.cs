@@ -247,6 +247,7 @@ public partial class MainWindow : Window
         ApplyPersistedTheme();
         ApplyPersistedCanvasColors();
         ApplyPersistedPreviewPaneHeight();
+        ApplyPersistedWindowState();
         WireMenuEvents();
         WireWireframeToolbar();
         WireWireframeControl();
@@ -323,6 +324,7 @@ public partial class MainWindow : Window
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
             _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value;
+            _appSettings.WindowMaximized = WindowState == WindowState.Maximized;
             SaveTabsToSettings();
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
@@ -5710,6 +5712,13 @@ public partial class MainWindow : Window
         var resolved = PreviewPaneHeightValidator.Resolve(
             _appSettings.PreviewPaneHeight, MinPreviewPaneHeight, MaxPreviewPaneHeight, DefaultPreviewPaneHeight);
         AchxEditorPane.RowDefinitions[3].Height = new GridLength(resolved, GridUnitType.Pixel);
+    }
+
+    /// <summary>Restores the maximized/restored window state from the last session (#1045).</summary>
+    private void ApplyPersistedWindowState()
+    {
+        if (_appSettings.WindowMaximized)
+            WindowState = WindowState.Maximized;
     }
 
     private static uint ToArgb(SKColor color) =>
