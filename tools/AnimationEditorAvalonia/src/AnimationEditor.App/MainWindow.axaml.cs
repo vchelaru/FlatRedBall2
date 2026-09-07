@@ -4538,6 +4538,15 @@ public partial class MainWindow : Window
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 1)
         {
+            // A press on a button embedded in the row template (lock-btn, add-frame-btn) is that
+            // button's own click, not a press on the row -- let it flow through untouched.
+            // Otherwise this handler treats it as a row press: when the row is already part of a
+            // multi-selection, the branches below capture the pointer and mark the event Handled
+            // to defer to a single-select-on-release, which both suppresses the button's Click
+            // and collapses the multi-selection down to just this row on release (#1042).
+            if (e.Source is Control btnSrc && btnSrc.FindAncestorOfType<Button>(includeSelf: true) is not null)
+                return;
+
             // Arm a frame-drag candidate. Snapshot the selection BEFORE the TreeView mutates
             // it on press, so dragging a frame that is part of a multi-selection can move the
             // whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
