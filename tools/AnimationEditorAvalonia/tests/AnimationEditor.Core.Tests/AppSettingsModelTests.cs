@@ -205,4 +205,23 @@ public class AppSettingsModelTests
 
         Assert.True(restored!.SuppressDefaultHandlerPrompt);
     }
+
+    [Fact]
+    public void WindowMaximized_DefaultsToFalse()
+    {
+        var model = new AppSettingsModel();
+
+        Assert.False(model.WindowMaximized);
+    }
+
+    [Fact]
+    public void WindowMaximized_SurvivesJsonRoundTrip()
+    {
+        var model = new AppSettingsModel { WindowMaximized = true };
+
+        var json = JsonSerializer.Serialize(model);
+        var restored = JsonSerializer.Deserialize<AppSettingsModel>(json);
+
+        Assert.True(restored!.WindowMaximized);
+    }
 }

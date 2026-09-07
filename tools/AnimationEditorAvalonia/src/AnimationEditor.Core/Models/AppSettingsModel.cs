@@ -71,6 +71,12 @@ namespace AnimationEditor.Core.Models
         /// </summary>
         public double? PreviewPaneHeight { get; set; }
 
+        /// <summary>
+        /// Whether the window was maximized when the editor last closed (#1045). Applied on the
+        /// next launch so the window reopens in the same maximized/restored state it was left in.
+        /// </summary>
+        public bool WindowMaximized { get; set; }
+
         public void AddFile(FilePath filePath)
         {
             RecentFiles.RemoveAll(item => new FilePath(item) == filePath);
