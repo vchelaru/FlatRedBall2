@@ -1,7 +1,8 @@
+using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using AnimationEditor.Core.Update;
+using AnimationEditor.App.Services;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -53,112 +54,99 @@ public class AboutDialogTests
     }
 
     [AvaloniaFact]
-    public void BuildAboutContent_ContainsUpdatesPrompt()
+    public void BuildAboutContent_NotYetChecked_ShowsCheckForUpdatesPrompt()
     {
-        var panel = (StackPanel)MainWindow.BuildAboutContent();
+        var panel = (StackPanel)MainWindow.BuildAboutContent(updateStatus: null);
 
-        var promptBlock = panel.Children
-            .OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("updates", System.StringComparison.OrdinalIgnoreCase) == true);
+        var promptBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text == "Check for updates:");
 
         Assert.NotNull(promptBlock);
     }
 
     [AvaloniaFact]
-    public void BuildAboutWindow_HasCenterOwnerStartupLocation()
+    public void BuildAboutWindowWithLiveRefresh_HasCenterOwnerStartupLocation()
     {
-        var window = MainWindow.BuildAboutWindow();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(NeverCompletingRefresh, NoOpRestart);
 
         Assert.Equal(WindowStartupLocation.CenterOwner, window.WindowStartupLocation);
     }
 
     [AvaloniaFact]
-    public void BuildAboutWindow_IsNotResizable()
+    public void BuildAboutWindowWithLiveRefresh_IsNotResizable()
     {
-        var window = MainWindow.BuildAboutWindow();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(NeverCompletingRefresh, NoOpRestart);
 
         Assert.False(window.CanResize);
     }
 
     [AvaloniaFact]
-    public void BuildAboutWindow_HasCorrectTitle()
+    public void BuildAboutWindowWithLiveRefresh_HasCorrectTitle()
     {
-        var window = MainWindow.BuildAboutWindow();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(NeverCompletingRefresh, NoOpRestart);
 
         Assert.Equal("About AnimationEditor", window.Title);
     }
 
-    // ── Update-check surface (issue #681) ─────────────────────────────────────
+    // ── Real update mechanism, shared with the startup banner (issue #1033) ────────────────────
+    // About used to run its own separate GitHub-release comparison whose "Get Update" button only
+    // opened a browser tab. It now drives the exact same ApplicationUpdateResult/IApplicationUpdater
+    // flow (and the exact same restart action) the persistent startup banner uses.
 
     [AvaloniaFact]
-    public void BuildAboutContent_NoUpdateAvailable_KeepsDefaultReleasesPromptAndButton()
+    public void BuildAboutContent_NoUpdate_ShowsUpToDateMessage()
     {
-        var panel = (StackPanel)MainWindow.BuildAboutContent(UpdateCheckResult.NoUpdate);
-
-        var promptBlock = panel.Children.OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("updates", System.StringComparison.OrdinalIgnoreCase) == true);
-        var releasesBtn = panel.Children.OfType<Button>()
-            .FirstOrDefault(b => b.Tag?.ToString() == "https://github.com/vchelaru/FlatRedBall2/releases");
-
-        Assert.NotNull(promptBlock);
-        Assert.NotNull(releasesBtn);
-    }
-
-    [AvaloniaFact]
-    public void BuildAboutContent_UpdateAvailable_ShowsLatestVersionText()
-    {
-        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest");
-        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
-
-        var updateBlock = panel.Children.OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("2026.7.17") == true);
-
-        Assert.NotNull(updateBlock);
-    }
-
-    [AvaloniaFact]
-    public void BuildAboutContent_UpdateAvailable_ButtonPointsAtReleaseUrl()
-    {
-        var result = new UpdateCheckResult(true, new System.Version(2026, 7, 17), "https://example.com/latest");
-        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
-
-        var downloadBtn = panel.Children.OfType<Button>()
-            .FirstOrDefault(b => b.Tag?.ToString() == "https://example.com/latest");
-
-        Assert.NotNull(downloadBtn);
-    }
-
-    // Issue #845: a completed, successful check that found no newer release must say so —
-    // it was previously indistinguishable from "never checked" (both showed "Check here for updates").
-    [AvaloniaFact]
-    public void BuildAboutContent_CheckedAndUpToDate_ShowsUpToDateMessage()
-    {
-        var result = new UpdateCheckResult(false, new System.Version(2026, 8, 11), "https://example.com/releases");
-        var panel = (StackPanel)MainWindow.BuildAboutContent(result);
+        var panel = (StackPanel)MainWindow.BuildAboutContent(ApplicationUpdateResult.NoUpdate);
 
         var upToDateBlock = panel.Children.OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("up to date", System.StringComparison.OrdinalIgnoreCase) == true);
+            .FirstOrDefault(tb => tb.Text == "You're up to date.");
 
         Assert.NotNull(upToDateBlock);
     }
 
     [AvaloniaFact]
-    public void BuildAboutContent_NotYetChecked_KeepsDefaultReleasesPrompt()
+    public void BuildAboutContent_ReadyToRestart_ShowsVersionAndRestartButton()
     {
-        // updateCheck is null: no check has run (never contacted GitHub, no cached version) —
-        // distinct from a completed check that found no update.
-        var panel = (StackPanel)MainWindow.BuildAboutContent(updateCheck: null);
+        var result = ApplicationUpdateResult.ReadyToRestart(new Version(2026, 9, 6));
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, onRestart: () => { });
 
-        var promptBlock = panel.Children.OfType<TextBlock>()
-            .FirstOrDefault(tb => tb.Text?.Contains("Check here for updates", System.StringComparison.OrdinalIgnoreCase) == true);
+        var statusBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text?.Contains("2026.9.6") == true);
+        var restartBtn = panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRestartBtn");
 
-        Assert.NotNull(promptBlock);
+        Assert.NotNull(statusBlock);
+        Assert.NotNull(restartBtn);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_ReadyToRestart_RestartButtonClicked_InvokesOnRestart()
+    {
+        var restartCount = 0;
+        var result = ApplicationUpdateResult.ReadyToRestart(new Version(2026, 9, 6));
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, onRestart: () => restartCount++);
+        var restartBtn = panel.Children.OfType<Button>().First(b => b.Name == "AboutRestartBtn");
+
+        restartBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(1, restartCount);
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutContent_Failed_ShowsFailureMessageAndRetryButton()
+    {
+        var result = ApplicationUpdateResult.Failed("The update could not be downloaded.");
+        var panel = (StackPanel)MainWindow.BuildAboutContent(result, onRefresh: () => Task.CompletedTask);
+
+        var failureBlock = panel.Children.OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text == "The update could not be downloaded.");
+        var retryBtn = panel.Children.OfType<Button>()
+            .FirstOrDefault(b => b.Name == "AboutRefreshBtn" && b.Content as string == "Retry");
+
+        Assert.NotNull(failureBlock);
+        Assert.NotNull(retryBtn);
     }
 
     // ── Manual refresh (issue #1033) ────────────────────────────────────────────
-    // Opening About already forces a fresh check (issue #681), but a check that fails
-    // silently (offline, GitHub rate limit) leaves the dialog showing a stale result until
-    // the user closes and reopens it. A visible refresh button lets them retry in place.
 
     [AvaloniaFact]
     public void BuildAboutContent_NoRefreshCallback_HasNoRefreshButton()
@@ -211,9 +199,9 @@ public class AboutDialogTests
     [AvaloniaFact]
     public void BuildAboutWindowWithLiveRefresh_OnOpen_StartsCheckingImmediately()
     {
-        var pending = new TaskCompletionSource<UpdateCheckResult>();
+        var pending = new TaskCompletionSource<ApplicationUpdateResult>();
 
-        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task);
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task, onRestart: NoOpRestart);
 
         var panel = (StackPanel)window.Content!;
         Assert.Null(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
@@ -221,31 +209,45 @@ public class AboutDialogTests
     }
 
     [AvaloniaFact]
-    public void BuildAboutWindowWithLiveRefresh_CheckCompletes_ShowsResultAndReenablesButton()
+    public void BuildAboutWindowWithLiveRefresh_CheckCompletesReadyToRestart_ShowsRestartButton()
     {
-        var pending = new TaskCompletionSource<UpdateCheckResult>();
-        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task);
+        var pending = new TaskCompletionSource<ApplicationUpdateResult>();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task, onRestart: NoOpRestart);
 
-        var refreshedResult = new UpdateCheckResult(true, new System.Version(2026, 9, 6), "https://example.com/latest");
-        pending.SetResult(refreshedResult);
+        pending.SetResult(ApplicationUpdateResult.ReadyToRestart(new Version(2026, 9, 6)));
         Dispatcher.UIThread.RunJobs();
 
         var panel = (StackPanel)window.Content!;
-        Assert.NotNull(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
         Assert.Null(panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner"));
+        Assert.NotNull(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRestartBtn"));
         Assert.NotNull(panel.Children.OfType<TextBlock>().FirstOrDefault(tb => tb.Text?.Contains("2026.9.6") == true));
+    }
+
+    [AvaloniaFact]
+    public void BuildAboutWindowWithLiveRefresh_RestartButtonClicked_InvokesOnRestart()
+    {
+        var restartCount = 0;
+        var pending = new TaskCompletionSource<ApplicationUpdateResult>();
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh: () => pending.Task, onRestart: () => restartCount++);
+        pending.SetResult(ApplicationUpdateResult.ReadyToRestart(new Version(2026, 9, 6)));
+        Dispatcher.UIThread.RunJobs();
+
+        var restartBtn = ((StackPanel)window.Content!).Children.OfType<Button>().First(b => b.Name == "AboutRestartBtn");
+        restartBtn.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+        Assert.Equal(1, restartCount);
     }
 
     [AvaloniaFact]
     public void BuildAboutWindowWithLiveRefresh_RefreshButtonClickedAfterCheck_ReturnsToCheckingState()
     {
-        var firstCheck = new TaskCompletionSource<UpdateCheckResult>();
-        var secondCheck = new TaskCompletionSource<UpdateCheckResult>();
+        var firstCheck = new TaskCompletionSource<ApplicationUpdateResult>();
+        var secondCheck = new TaskCompletionSource<ApplicationUpdateResult>();
         var callCount = 0;
-        Func<Task<UpdateCheckResult>> refresh = () => ++callCount == 1 ? firstCheck.Task : secondCheck.Task;
+        Func<Task<ApplicationUpdateResult>> refresh = () => ++callCount == 1 ? firstCheck.Task : secondCheck.Task;
 
-        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh);
-        firstCheck.SetResult(UpdateCheckResult.NoUpdate);
+        var window = MainWindow.BuildAboutWindowWithLiveRefresh(refresh, NoOpRestart);
+        firstCheck.SetResult(ApplicationUpdateResult.NoUpdate);
         Dispatcher.UIThread.RunJobs();
 
         var refreshBtn = ((StackPanel)window.Content!).Children.OfType<Button>().First(b => b.Name == "AboutRefreshBtn");
@@ -255,4 +257,7 @@ public class AboutDialogTests
         Assert.Null(panel.Children.OfType<Button>().FirstOrDefault(b => b.Name == "AboutRefreshBtn"));
         Assert.NotNull(panel.Children.OfType<Control>().FirstOrDefault(c => c.Name == "AboutRefreshSpinner"));
     }
+
+    private static Task<ApplicationUpdateResult> NeverCompletingRefresh() => new TaskCompletionSource<ApplicationUpdateResult>().Task;
+    private static void NoOpRestart() { }
 }
