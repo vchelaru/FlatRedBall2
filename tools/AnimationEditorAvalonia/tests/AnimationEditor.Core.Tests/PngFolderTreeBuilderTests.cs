@@ -41,6 +41,22 @@ public class PngFolderTreeBuilderTests
         Assert.Equal("root.png", tree[1].Name);
     }
 
+    // Issue #1059: a folder row needs its own AbsolutePath so "View in Explorer" can open it --
+    // previously only file nodes carried one.
+    [Fact]
+    public void Build_WithFilesRoot_GivesFolderNodesAbsolutePaths()
+    {
+        var files = new[]
+        {
+            new PngFileEntry(@"C:\proj\Sprites\Enemies\goblin.png", "Sprites/Enemies/goblin.png"),
+        };
+
+        var tree = PngFolderTreeBuilder.Build(files, @"C:\proj");
+
+        Assert.Equal(@"C:\proj\Sprites", tree[0].AbsolutePath);
+        Assert.Equal(@"C:\proj\Sprites\Enemies", tree[0].Children[0].AbsolutePath);
+    }
+
     [Fact]
     public void Build_EmptyInput_ReturnsEmpty()
     {

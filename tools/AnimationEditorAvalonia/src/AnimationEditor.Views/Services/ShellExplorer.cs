@@ -65,6 +65,30 @@ public static class ShellExplorer
     }
 
     /// <summary>
+    /// Opens <paramref name="absolutePath"/> (a directory) in the system file manager -- no
+    /// selection, unlike <see cref="RevealFile"/>. Returns <c>null</c> on success, or an error
+    /// message when the folder is missing or the shell command fails.
+    /// </summary>
+    public static string? OpenFolder(string absolutePath)
+    {
+        if (string.IsNullOrEmpty(absolutePath))
+            return "No folder path was provided.";
+
+        if (!Directory.Exists(absolutePath))
+            return $"Folder not found: {absolutePath}";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = absolutePath, UseShellExecute = true });
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return $"Could not open file manager: {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// explorer.exe's <c>/select,</c> switch mis-parses forward slashes as extra switch
     /// separators, silently ignoring the target and opening a default folder instead of
     /// selecting the file. Callers may pass either separator (e.g. a path built from
