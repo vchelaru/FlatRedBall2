@@ -12,4 +12,11 @@ public class AnimationChainSave
 
     /// <summary>The list of frames in this chain.</summary>
     public List<AnimationFrameSave> Frames = new();
+
+    /// <summary>
+    /// Tooling-only flag (Animation Editor): when <c>true</c>, the chain's frames and shapes
+    /// should not be edited. Not consumed by any runtime (see the "editor authors, runtimes
+    /// interpret" rule in the Animation Editor's own docs).
+    /// </summary>
+    public bool IsLocked;
 }

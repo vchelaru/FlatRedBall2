@@ -92,4 +92,13 @@
             </DataTemplate>
         </Setter>
     </Style>
+    <Style Selector="Button.lock-icon">
+        <Setter Property="ContentTemplate">
+            <DataTemplate>
+                <svg:Svg Width="11" Height="11"
+                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLock.svg"
+                         CurrentColor="{DynamicResource IconInk}" />
+            </DataTemplate>
+        </Setter>
+    </Style>
 </Styles>

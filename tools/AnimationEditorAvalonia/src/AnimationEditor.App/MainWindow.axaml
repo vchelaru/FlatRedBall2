@@ -627,6 +627,43 @@
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
                         </Style>
+                        <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked,
+                             but always visible (via the .locked class, bound to
+                             TreeNodeVm.IsLocked) so a locked chain is recognizable at a glance
+                             without hovering. -->
+                        <Style Selector="Button.lock-btn">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                        <Style Selector="Button.lock-btn.locked">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                        <!-- #1035: the meta text's right margin must clear whichever icon lane(s)
+                             are actually visible, not always assume one. Locking a chain hides
+                             the add-frame button (CanAddFrame) and always shows the lock icon, so
+                             only two cases exist: no icon lane visible (tight), or the lock
+                             icon's lane visible (locked, or hovered while unlocked, since hover
+                             reveals both add-frame and lock together). The lock lane sits further
+                             from the edge than add-frame's, so clearing it clears both. The
+                             ":not(.locked)" on the hover rule keeps a locked+hovered row on the
+                             locked margin rather than depending on style declaration order. -->
+                        <Style Selector="TextBlock.meta">
+                            <Setter Property="Margin" Value="8,0,8,0" />
+                        </Style>
+                        <Style Selector="TextBlock.meta.locked">
+                            <Setter Property="Margin" Value="8,0,56,0" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover TextBlock.meta:not(.locked)">
+                            <Setter Property="Margin" Value="8,0,56,0" />
+                        </Style>
                         <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
                         <Style Selector="Border.cut-pending">
                             <Setter Property="Background" Value="#28E07030" />
@@ -707,13 +744,15 @@
                                                  VerticalContentAlignment="Center"
                                                  HorizontalAlignment="Stretch" />
                                     </Panel>
-                                <!-- Meta reserves a right margin the width of the Add-Frame button lane so
-                                     chain and frame rows align on the same right edge (#623). -->
+                                <!-- Meta's right margin clears whichever icon lane(s) are visible
+                                     (see the TextBlock.meta styles above, #1035) so it never
+                                     overlaps the add-frame/lock buttons floated on top. -->
                                 <TextBlock Grid.Column="2"
+                                           Classes="meta"
+                                           Classes.locked="{Binding IsLocked}"
                                            Text="{Binding Meta}"
                                            Foreground="{DynamicResource AccentCool}"
                                            FontSize="11"
-                                           Margin="8,0,30,0"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center"
                                            IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -724,7 +763,7 @@
                                      layout on hover. 22px pointer target (Fitts's Law); zero vertical margin
                                      keeps it under the 32px Fluent row height (TreeViewItemMinHeight). -->
                                 <Button Classes="add-frame-btn plus"
-                                        IsVisible="{Binding IsChainNode}"
+                                        IsVisible="{Binding CanAddFrame}"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
                                         Width="22" Height="22"
@@ -735,6 +774,19 @@
                                         ToolTip.Tip="Add Frame"
                                         Click="OnAddFrameBtnClick"
                                         DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                                <Button Classes="lock-btn lock-icon"
+                                        Classes.locked="{Binding IsLocked}"
+                                        IsVisible="{Binding IsChainNode}"
+                                        AutomationProperties.AutomationId="chain-lock-btn"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Width="22" Height="22"
+                                        Padding="0"
+                                        Margin="0,0,30,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Lock Animation"
+                                        Click="OnLockBtnClick" />
                             </Grid>
                             </Border>
                         </TreeDataTemplate>
@@ -851,6 +903,25 @@
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
                                                Margin="0,12,0,0" />
+
+                                    <!-- ── Chain properties (#1032) ── shown when a chain is
+                                         selected but no frame/shape is (replacing PropNoneLabel's
+                                         "Select a frame or shape..." placeholder). -->
+                                    <StackPanel x:Name="PropChainPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="ANIMATION"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <CheckBox x:Name="PropChainLocked"
+                                                          Content="Locked"
+                                                          AutomationProperties.AutomationId="prop-chain-locked" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
 
                                     <!-- ── Frame properties ── -->
                                     <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">

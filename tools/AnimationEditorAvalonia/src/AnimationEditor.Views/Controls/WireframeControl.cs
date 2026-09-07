@@ -443,6 +443,14 @@ public class WireframeControl : TextureViewport
     private ThumbnailService? _thumbnailService;
 
     /// <summary>
+    /// True when <paramref name="frame"/>'s owning chain is locked (#1032). A locked chain must
+    /// be inert to drag gestures — gated at drag-start (both here and in the Simulate* test
+    /// hooks) so a locked target never starts following the pointer.
+    /// </summary>
+    private bool IsFrameLocked(AnimationFrameSave frame) =>
+        _objectFinder?.GetAnimationChainContaining(frame)?.IsLocked == true;
+
+    /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
@@ -860,7 +868,7 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var sel = PrimaryFrameRect();
-        if (sel is null || _bitmap is null) return;
+        if (sel is null || _bitmap is null || IsFrameLocked(sel.Frame)) return;
 
         _draggingRect    = sel;
         _draggingHandle  = handle;
@@ -902,7 +910,7 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var primary = _frameRects.FirstOrDefault(fr => fr.Frame == targetFrame);
-        if (primary is null || _bitmap is null) return;
+        if (primary is null || _bitmap is null || IsFrameLocked(primary.Frame)) return;
 
         _draggingRect    = primary;
         _draggingHandle  = handle;
@@ -913,11 +921,16 @@ public class WireframeControl : TextureViewport
         _dragBeforeR = primary.Frame.RightCoordinate;
         _dragBeforeB = primary.Frame.BottomCoordinate;
 
+        // A locked chain among the visible frames keeps its own frames still (bulk
+        // skip-locked-entries pattern).
         _bulkHandleDragStarts.Clear();
         foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
             _bulkHandleDragStarts.Add((fr, fr.Bounds,
                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
@@ -956,14 +969,19 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
 
         _draggingChain = true;
         _chainDragStarts.Clear();
+        // A locked chain among the visible frames keeps its own frames still (bulk
+        // skip-locked-entries pattern, matching SimulateBulkHandleDrag).
         foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
             _chainDragStarts.Add((fr, fr.Bounds,
                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
         _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
 
         ApplyChainDrag(new Point(endScreenX, endScreenY));
@@ -996,7 +1014,7 @@ public class WireframeControl : TextureViewport
     public void SimulateHandleDragBegin(HandleKind handle, float startScreenX, float startScreenY)
     {
         var sel = PrimaryFrameRect();
-        if (sel is null || _bitmap is null) return;
+        if (sel is null || _bitmap is null || IsFrameLocked(sel.Frame)) return;
 
         _draggingRect    = sel;
         _draggingHandle  = handle;
@@ -1018,7 +1036,7 @@ public class WireframeControl : TextureViewport
     public void SimulateChainDragBegin(float startScreenX, float startScreenY)
     {
         var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
 
         _draggingChain = true;
         _chainDragStarts.Clear();
@@ -1227,7 +1245,7 @@ public class WireframeControl : TextureViewport
         snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();
-        if (sel != null && !_isMagicWandMode)
+        if (sel != null && !_isMagicWandMode && !IsFrameLocked(sel.Frame))
         {
             snap.SelectedHandleBounds = sel.Bounds;
 
@@ -1290,6 +1308,9 @@ public class WireframeControl : TextureViewport
             {
                 if (hitFrame != null)
                 {
+                    // A locked chain's frame is inert to the handle drag: refuse to start it.
+                    if (IsFrameLocked(hitFrame.Frame)) return;
+
                     // Single-frame drag (or bulk handle drag when multi-chain selected)
                     _draggingRect = hitFrame;
                     _draggingHandle = hitHandle;
@@ -1300,26 +1321,38 @@ public class WireframeControl : TextureViewport
                     _dragBeforeR = hitFrame.Frame.RightCoordinate;
                     _dragBeforeB = hitFrame.Frame.BottomCoordinate;
 
-                    // In multi-chain mode, capture before-state of ALL visible frames for
-                    // bulk apply and a single atomic undo command.
+                    // In multi-chain mode, capture before-state of every visible UNLOCKED frame
+                    // for bulk apply and a single atomic undo command -- a locked chain among the
+                    // selection keeps its own frames still (bulk skip-locked-entries pattern).
                     _bulkHandleDragStarts.Clear();
                     if ((_selectedState?.SelectedChains?.Count ?? 0) > 1)
                     {
                         foreach (var fr in _frameRects)
+                        {
+                            if (IsFrameLocked(fr.Frame)) continue;
                             _bulkHandleDragStarts.Add((fr, fr.Bounds,
                                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                        }
                     }
                 }
                 else
                 {
-                    // Chain drag: move all chain frames together
+                    // Chain drag: move all chain frames together. A locked selected chain is
+                    // inert to the drag: refuse to start it.
+                    if (_selectedState?.SelectedChain?.IsLocked == true) return;
+
                     _draggingChain = true;
                     _chainDragStarts.Clear();
+                    // A locked chain among the visible frames keeps its own frames still (bulk
+                    // skip-locked-entries pattern, matching the resize-handle branch above).
                     foreach (var fr in _frameRects)
+                    {
+                        if (IsFrameLocked(fr.Frame)) continue;
                         _chainDragStarts.Add((fr, fr.Bounds,
                             fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                             fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                    }
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 _lastPointerPos = pos;
@@ -1472,20 +1505,56 @@ public class WireframeControl : TextureViewport
 
     private void UpdateHoverCursor(Point pos, bool isCtrl = false)
     {
-        // When Ctrl is held and a bitmap is loaded, any click will create a new frame.
-        IsShowingAddFrameCursor = isCtrl && _bitmap != null;
+        // When Ctrl is held and a bitmap is loaded, any click will create a new frame in the
+        // chain the click would target -- suppressed when that chain is locked (#1032 follow-up),
+        // mirroring MainWindow.OnFrameCreatedFromRegion's own chain resolution.
+        IsShowingAddFrameCursor = isCtrl && _bitmap != null && !IsAddFrameTargetLocked();
         if (IsShowingAddFrameCursor)
         {
             Cursor = AddFrameCursor;
             return;
         }
 
-        var (_, hitHandle) = HitTestHandle(pos);
-        var cursorType = HandleCursorMapper.CursorTypeFor(hitHandle);
+        var cursorType = ResolveHandleCursorType(pos);
         Cursor = cursorType is null
             ? Cursor.Default
             : new Cursor(cursorType.Value);
     }
+
+    /// <summary>
+    /// Pure cursor-type decision behind <see cref="UpdateHoverCursor"/>'s handle branch --
+    /// extracted so tests can assert the plain <see cref="StandardCursorType"/> instead of the
+    /// Avalonia <see cref="Control.Cursor"/> property, which exposes no equality on it. Returns
+    /// <c>null</c> (default arrow) when the hit target's chain is locked (#1032 follow-up): a
+    /// locked frame/chain is inert to the drag <see cref="HitTestHandle"/> would start, so no
+    /// resize/move affordance should imply otherwise.
+    /// </summary>
+    private StandardCursorType? ResolveHandleCursorType(Point pos)
+    {
+        var (hitFrame, hitHandle) = HitTestHandle(pos);
+        bool isLockedHit = hitFrame != null
+            ? IsFrameLocked(hitFrame.Frame)
+            : hitHandle != HandleKind.None && _selectedState?.SelectedChain?.IsLocked == true;
+        return isLockedHit ? null : HandleCursorMapper.CursorTypeFor(hitHandle);
+    }
+
+    /// <summary>
+    /// True when a Ctrl+click's add-frame target is locked. Resolved the same way MainWindow's
+    /// <c>OnFrameCreatedFromRegion</c> picks the target chain: the first of
+    /// <see cref="ISelectedState.SelectedChains"/>, falling back to <see cref="ISelectedState.SelectedChain"/>.
+    /// </summary>
+    private bool IsAddFrameTargetLocked()
+    {
+        var chains = _selectedState?.SelectedChains;
+        var target = chains is { Count: > 0 } ? chains[0] : _selectedState?.SelectedChain;
+        return target?.IsLocked == true;
+    }
+
+    /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/>'s handle branch would
+    /// resolve to at the given screen point, without touching the Avalonia <see cref="Control.Cursor"/>
+    /// property. Does not account for the Ctrl add-frame branch -- see <see cref="IsShowingAddFrameCursor"/>.</summary>
+    internal StandardCursorType? GetHoverCursorTypeForTest(float screenX, float screenY)
+        => ResolveHandleCursorType(new Point(screenX, screenY));
 
     /// <summary>
     /// Test-only: true when the add-frame cursor (Ctrl held over a loaded bitmap) is currently
@@ -1558,7 +1627,10 @@ public class WireframeControl : TextureViewport
                 float aT = _draggingRect.Frame.TopCoordinate;
                 float aR = _draggingRect.Frame.RightCoordinate;
                 float aB = _draggingRect.Frame.BottomCoordinate;
-                if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+                // Defense-in-depth: OnEditPointerPressed/Simulate* already refuse to start a
+                // drag on a locked chain's frame, so this should never fire for one.
+                if (!IsFrameLocked(_draggingRect.Frame) &&
+                    RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
                 {
                     FrameRegionChanged?.Invoke(_draggingRect.Frame);
                     _undoManager!.Record(new FrameRegionChangedCommand(
@@ -1576,7 +1648,8 @@ public class WireframeControl : TextureViewport
         if (_draggingChain)
         {
             var chain = _selectedState!.SelectedChain;
-            if (chain != null)
+            // Defense-in-depth: see the comment above for the single/bulk-frame drag case.
+            if (chain != null && !chain.IsLocked)
             {
                 if (_chainDragStarts.Count > 0)
                 {
@@ -1682,6 +1755,9 @@ public class WireframeControl : TextureViewport
 
         foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
+            // Defense-in-depth: population above already skips locked frames.
+            if (IsFrameLocked(fr.Frame)) continue;
+
             float newL = startBounds.Left   + dx;
             float newT = startBounds.Top    + dy;
             float newR = startBounds.Right  + dx;

@@ -138,6 +138,13 @@ namespace AnimationEditor.Core.CommandsAndState
         AnimationChainSave? AddAnimationChainWithName(string name);
         AnimationChainSave? AddNewAnimationChain();
         bool RenameChain(AnimationChainSave chain, string newName);
+
+        /// <summary>
+        /// Locks or unlocks <paramref name="chain"/> against frame/shape content edits (issue
+        /// #1032). Chain-level container operations (rename, delete, reorder, duplicate) are not
+        /// affected by the lock. Undoable, same as any other mutating command.
+        /// </summary>
+        void SetChainLocked(AnimationChainSave chain, bool locked);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
         void MoveChain(AnimationChainSave chain, int delta);
 

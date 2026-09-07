@@ -52,6 +52,40 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
+    public void BuildChainNode_ChainIsLockedTrue_SetsNodeIsLocked()
+    {
+        var chain = new AnimationChainSave { Name = "Walk", IsLocked = true };
+
+        var node = TreeBuilder.BuildChainNode(chain);
+
+        Assert.True(node.IsLocked);
+    }
+
+    [Fact]
+    public void BuildChainNode_ChainIsLockedFalse_NodeIsLockedFalse()
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+
+        var node = TreeBuilder.BuildChainNode(chain);
+
+        Assert.False(node.IsLocked);
+    }
+
+    [Fact]
+    public void SyncChainsInto_ChainLockToggled_RefreshesNodeIsLocked()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        acls.AnimationChains.Add(chain);
+        var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(acls));
+
+        chain.IsLocked = true;
+        TreeBuilder.SyncChainsInto(roots, acls.AnimationChains);
+
+        Assert.True(roots[0].IsLocked);
+    }
+
+    [Fact]
     public void BuildTree_WithNullExpandedNames_AllNodesDefaultExpanded()
     {
         var acls = new AnimationChainListSave();

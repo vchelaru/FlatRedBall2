@@ -3289,6 +3289,15 @@ public partial class MainWindow : Window
     // Marking handled here mirrors how the header TextBlock suppresses the fallback handler.
     private void OnAddFrameBtnDoubleTapped(object? _, TappedEventArgs e) => e.Handled = true;
 
+    private void OnLockBtnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        _appCommands.SetChainLocked(chain, !chain.IsLocked);
+        e.Handled = true;
+    }
+
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
         // Internal frame reorder drag — distinct from the external .png file drag below.
@@ -4086,6 +4095,7 @@ public partial class MainWindow : Window
             {
                 node.Header = chain.Name;
                 node.Meta   = TreeBuilder.BuildChainMeta(chain);
+                node.IsLocked = chain.IsLocked;
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
                 // Grow-only: keep it visible if it already was, or if it now matches.
                 node.PinnedVisible = node.PinnedVisible
@@ -4743,6 +4753,7 @@ public partial class MainWindow : Window
 
     private void WirePropertyPanel()
     {
+        PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -5033,6 +5044,18 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>True when <paramref name="frame"/>'s owning chain is locked (#1032 follow-up).</summary>
+    private bool IsFrameLocked(AnimationFrameSave? frame) =>
+        frame is not null && _objectFinder.GetAnimationChainContaining(frame)?.IsLocked == true;
+
+    /// <summary>True when the shape's owning frame's chain is locked (#1032 follow-up).</summary>
+    private bool IsShapeLocked(object? shape) => shape switch
+    {
+        AARectSave r => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(r)),
+        CircleSave c => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(c)),
+        _ => false,
+    };
+
     private void RefreshPropertyPanel()
     {
         // Deliberately does NOT call SealPendingEdits here -- this method also runs after every
@@ -5046,17 +5069,29 @@ public partial class MainWindow : Window
             var circ  = _selectedState.SelectedCircle;
             var hasShapeSelection = rect is not null || circ is not null;
 
-            bool noneVisible = frame is null && rect is null && circ is null;
-            PropNoneLabel.IsVisible = noneVisible;
-            if (noneVisible)
-            {
-                PropNoneLabel.Text = _selectedState.SelectedChain is not null
-                    ? "Select a frame or shape to edit its properties."
-                    : "No selection";
-            }
+            bool noneSelected = frame is null && rect is null && circ is null;
+            var selectedChain = _selectedState.SelectedChain;
+            // A chain selected with no frame/shape shows PropChainPanel (its own Locked
+            // checkbox) instead of PropNoneLabel's generic placeholder (#1032).
+            bool chainOnly = noneSelected && selectedChain is not null;
+            PropNoneLabel.IsVisible = noneSelected && !chainOnly;
+            if (PropNoneLabel.IsVisible)
+                PropNoneLabel.Text = "No selection";
+            PropChainPanel.IsVisible = chainOnly;
+            if (chainOnly)
+                PropChainLocked.IsChecked = selectedChain!.IsLocked;
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;
+
+            // Disable (not just visually leave typeable) whichever panel is showing when its
+            // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled
+            // panel would silently discard input with no indication why (#1032 follow-up).
+            // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
+            // only way to unlock a chain from the inspector.
+            PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
+            PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
+            PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
 
             if (frame is not null && !hasShapeSelection)
             {
@@ -5174,6 +5209,14 @@ public partial class MainWindow : Window
     }
 
     // ── Property apply methods ────────────────────────────────────────────────
+
+    private void ApplyChainLocked()
+    {
+        if (_suppressPropRefresh) return;
+        var chain = _selectedState.SelectedChain;
+        if (chain is null || PropChainLocked.IsChecked is not { } locked) return;
+        _appCommands.SetChainLocked(chain, locked);
+    }
 
     private void ApplyFrameFlip()
     {
