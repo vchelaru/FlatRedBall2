@@ -1240,7 +1240,7 @@ public class WireframeControl : TextureViewport
         snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();
-        if (sel != null && !_isMagicWandMode)
+        if (sel != null && !_isMagicWandMode && !IsFrameLocked(sel.Frame))
         {
             snap.SelectedHandleBounds = sel.Bounds;
 
@@ -1495,20 +1495,56 @@ public class WireframeControl : TextureViewport
 
     private void UpdateHoverCursor(Point pos, bool isCtrl = false)
     {
-        // When Ctrl is held and a bitmap is loaded, any click will create a new frame.
-        IsShowingAddFrameCursor = isCtrl && _bitmap != null;
+        // When Ctrl is held and a bitmap is loaded, any click will create a new frame in the
+        // chain the click would target -- suppressed when that chain is locked (#1032 follow-up),
+        // mirroring MainWindow.OnFrameCreatedFromRegion's own chain resolution.
+        IsShowingAddFrameCursor = isCtrl && _bitmap != null && !IsAddFrameTargetLocked();
         if (IsShowingAddFrameCursor)
         {
             Cursor = AddFrameCursor;
             return;
         }
 
-        var (_, hitHandle) = HitTestHandle(pos);
-        var cursorType = HandleCursorMapper.CursorTypeFor(hitHandle);
+        var cursorType = ResolveHandleCursorType(pos);
         Cursor = cursorType is null
             ? Cursor.Default
             : new Cursor(cursorType.Value);
     }
+
+    /// <summary>
+    /// Pure cursor-type decision behind <see cref="UpdateHoverCursor"/>'s handle branch --
+    /// extracted so tests can assert the plain <see cref="StandardCursorType"/> instead of the
+    /// Avalonia <see cref="Control.Cursor"/> property, which exposes no equality on it. Returns
+    /// <c>null</c> (default arrow) when the hit target's chain is locked (#1032 follow-up): a
+    /// locked frame/chain is inert to the drag <see cref="HitTestHandle"/> would start, so no
+    /// resize/move affordance should imply otherwise.
+    /// </summary>
+    private StandardCursorType? ResolveHandleCursorType(Point pos)
+    {
+        var (hitFrame, hitHandle) = HitTestHandle(pos);
+        bool isLockedHit = hitFrame != null
+            ? IsFrameLocked(hitFrame.Frame)
+            : hitHandle != HandleKind.None && _selectedState?.SelectedChain?.IsLocked == true;
+        return isLockedHit ? null : HandleCursorMapper.CursorTypeFor(hitHandle);
+    }
+
+    /// <summary>
+    /// True when a Ctrl+click's add-frame target is locked. Resolved the same way MainWindow's
+    /// <c>OnFrameCreatedFromRegion</c> picks the target chain: the first of
+    /// <see cref="ISelectedState.SelectedChains"/>, falling back to <see cref="ISelectedState.SelectedChain"/>.
+    /// </summary>
+    private bool IsAddFrameTargetLocked()
+    {
+        var chains = _selectedState?.SelectedChains;
+        var target = chains is { Count: > 0 } ? chains[0] : _selectedState?.SelectedChain;
+        return target?.IsLocked == true;
+    }
+
+    /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/>'s handle branch would
+    /// resolve to at the given screen point, without touching the Avalonia <see cref="Control.Cursor"/>
+    /// property. Does not account for the Ctrl add-frame branch -- see <see cref="IsShowingAddFrameCursor"/>.</summary>
+    internal StandardCursorType? GetHoverCursorTypeForTest(float screenX, float screenY)
+        => ResolveHandleCursorType(new Point(screenX, screenY));
 
     /// <summary>
     /// Test-only: true when the add-frame cursor (Ctrl held over a loaded bitmap) is currently

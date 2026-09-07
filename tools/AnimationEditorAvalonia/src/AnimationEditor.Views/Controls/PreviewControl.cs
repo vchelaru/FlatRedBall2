@@ -1405,18 +1405,38 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (_draggingFrame is not null || _draggingChainFrames is not null)
             return StandardCursorType.SizeAll;
 
+        // A locked chain is inert to every drag gesture below (OnPointerPressed's ~2081-2161
+        // guards via IsShapeLocked/IsFrameLocked) -- the hover cursor must not imply otherwise
+        // (#1032 follow-up).
         var handle = HitTestShapeHandle((float)pos.X, (float)pos.Y);
-        if (handle != HandleKind.None)
+        if (handle != HandleKind.None && !IsShapeLocked(_selectedState!.SelectedShape))
             return GetResizeCursor(handle);
 
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
             ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
             : GetGuideCursorAt((float)pos.X, (float)pos.Y);
-        if (cursorType is null && HitTestShape((float)pos.X, (float)pos.Y) is not null)
+        var hitShape = HitTestShape((float)pos.X, (float)pos.Y);
+        if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
             cursorType = StandardCursorType.SizeAll;
-        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
+        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y) && !IsHoverFrameSpriteFullyLocked())
             cursorType = StandardCursorType.SizeAll;
         return cursorType;
+    }
+
+    /// <summary>
+    /// True when the frame-sprite drag <see cref="HitTestFrameSprite"/> resolved to would be a
+    /// complete no-op due to locking -- mirrors <see cref="OnPointerPressed"/>'s frame-sprite
+    /// branch exactly, so the hover cursor and the real drag-start guard agree on what's
+    /// draggable. A multi-frame selection with at least one unlocked frame still drags (the
+    /// unlocked subset), so only "every candidate frame is locked" suppresses the cursor.
+    /// </summary>
+    private bool IsHoverFrameSpriteFullyLocked()
+    {
+        if (IsWholeChainDragTarget)
+            return _selectedState!.SelectedChain?.IsLocked == true;
+        if (IsMultiFrameDragTarget)
+            return _selectedState!.SelectedFrames.All(IsFrameLocked);
+        return IsFrameLocked(_selectedState!.SelectedFrame);
     }
 
     /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/> would apply at the
@@ -1456,14 +1476,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             if (_selectedState!.SelectedCircle is { } sc) selectedCircles.Add(sc);
         }
 
+        bool frameLocked = IsFrameLocked(frame);
         var list = new List<PreviewShapeInfo>();
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
-                selectedRects.Contains(r), pendingShapes.Contains(r)));
+                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked));
         foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
-                selectedCircles.Contains(c), pendingShapes.Contains(c)));
+                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked));
         return list.ToArray();
     }
 
@@ -2328,7 +2349,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         float X, float Y,
         float Param1, float Param2,
         bool IsSelected,
-        bool IsPendingCut = false);
+        bool IsPendingCut = false,
+        // A locked chain's shape still shows the gold "selected" highlight via IsSelected --
+        // only the resize handles (implying it can be dragged) are suppressed (#1032 follow-up).
+        bool IsLocked = false);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2481,7 +2505,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 {
                     float hw = sh.Param1 * om;
                     float hh = sh.Param2 * om;
-                    if (sh.IsSelected)
+                    if (sh.IsSelected && !sh.IsLocked)
                         DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
                     canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
                 }
@@ -2498,7 +2522,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                             StrokeWidth = 1f,
                             PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
                         };
-                        DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
+                        if (!sh.IsLocked)
+                            DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
                         canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
                     }
                     canvas.DrawCircle(sx, sy, sh.Param1 * om, paint);
