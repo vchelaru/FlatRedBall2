@@ -1428,12 +1428,13 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// complete no-op due to locking -- mirrors <see cref="OnPointerPressed"/>'s frame-sprite
     /// branch exactly, so the hover cursor and the real drag-start guard agree on what's
     /// draggable. A multi-frame selection with at least one unlocked frame still drags (the
-    /// unlocked subset), so only "every candidate frame is locked" suppresses the cursor.
+    /// unlocked subset), so only "every candidate frame is locked" suppresses the cursor. The
+    /// whole-chain case needs no branch here: <see cref="ResolveWholeChainDragTarget"/> already
+    /// only lets <see cref="HitTestFrameSprite"/> hit on an unlocked chain, so by the time this
+    /// runs it can never be "fully locked" (#1032 follow-up).
     /// </summary>
     private bool IsHoverFrameSpriteFullyLocked()
     {
-        if (IsWholeChainDragTarget)
-            return _selectedState!.SelectedChain?.IsLocked == true;
         if (IsMultiFrameDragTarget)
             return _selectedState!.SelectedFrames.All(IsFrameLocked);
         return IsFrameLocked(_selectedState!.SelectedFrame);
@@ -1490,10 +1491,22 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
 
     /// <summary>Returns the frame in <see cref="ISelectedState.SelectedChain"/> at the current playback index.</summary>
     private AnimationFrameSave? GetCurrentPlaybackFrame()
+        => _selectedState!.SelectedChain is { } chain ? GetCurrentPlaybackFrame(chain) : null;
+
+    /// <summary>
+    /// Returns <paramref name="chain"/>'s current playback frame: the shared single-chain
+    /// controller when <paramref name="chain"/> is the pinned <see cref="ISelectedState.SelectedChain"/>,
+    /// or that chain's own group-playback controller (see <see cref="GroupTracks"/>) for any other
+    /// selected-and-shown chain. Null when the chain has no frames or isn't currently playing.
+    /// </summary>
+    private AnimationFrameSave? GetCurrentPlaybackFrame(AnimationChainSave chain)
     {
-        var chain = _selectedState!.SelectedChain;
-        if (chain is null || chain.Frames.Count == 0) return null;
-        int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+        if (chain.Frames.Count == 0) return null;
+        var controller = ReferenceEquals(chain, _selectedState!.SelectedChain)
+            ? _playback
+            : _groupPlayback.GetValueOrDefault(chain);
+        if (controller is null) return null;
+        int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
         return chain.Frames[idx];
     }
 
@@ -1954,11 +1967,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// footprint of the drag target's sprite, in screen space. Gates the frame-offset drag
     /// fallback in <see cref="OnPointerPressed"/>. The target is the pinned <see cref="ISelectedState.SelectedFrame"/>
     /// when one is set (whether alone or as part of a multi-selection — see
-    /// <see cref="IsMultiFrameDragTarget"/>); when none is pinned, it falls back to the
-    /// currently-playing frame, gated by <see cref="IsWholeChainDragTarget"/> (drag the whole
-    /// chain) or <see cref="IsMultiFrameDragTarget"/> (drag just the multi-selection — only if the
-    /// playing frame is actually one of <see cref="ISelectedState.SelectedFrames"/>). Requires the
-    /// target frame's texture to already be decoded (mirrors <see cref="ComputeContentExtentScreenPx"/>'s
+    /// <see cref="IsMultiFrameDragTarget"/>); when none is pinned, it falls back to
+    /// <see cref="ResolveWholeChainDragTarget"/> (drag the whole chain — only an unlocked
+    /// candidate counts as a hit) or the currently-playing frame gated by
+    /// <see cref="IsMultiFrameDragTarget"/> (drag just the multi-selection — only if the playing
+    /// frame is actually one of <see cref="ISelectedState.SelectedFrames"/>). Requires the target
+    /// frame's texture to already be decoded (mirrors <see cref="ComputeContentExtentScreenPx"/>'s
     /// own frame-footprint math).
     /// </summary>
     private bool HitTestFrameSprite(float px, float py)
@@ -1968,7 +1982,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             if (IsWholeChainDragTarget)
             {
-                frame = GetCurrentPlaybackFrame();
+                return ResolveWholeChainDragTarget(px, py) is not null;
             }
             else if (IsMultiFrameDragTarget)
             {
@@ -1984,7 +1998,46 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             return false;
         }
-        if (frame is null) return false;
+        return HitTestFrameFootprint(frame, px, py);
+    }
+
+    /// <summary>
+    /// Resolves which whole selected-and-shown chain a hover/drag at (<paramref name="px"/>,
+    /// <paramref name="py"/>) should target: the pinned <see cref="ISelectedState.SelectedChain"/>
+    /// when it is unlocked and its current-playback frame's sprite is under the cursor, else the
+    /// first other chain in <see cref="ISelectedState.SelectedChains"/> (e.g. a group-preview
+    /// multi-selection, see <see cref="IsGroupPreviewActive"/>) that is unlocked and hits. A locked
+    /// chain shown alongside an unlocked one at the same screen position must never swallow the
+    /// unlocked chain's hit (#1032 follow-up). Only meaningful when
+    /// <see cref="IsWholeChainDragTarget"/> holds; returns null when nothing unlocked is under the
+    /// cursor.
+    /// </summary>
+    private AnimationChainSave? ResolveWholeChainDragTarget(float px, float py)
+    {
+        var pinned = _selectedState!.SelectedChain;
+        if (pinned is not null && !pinned.IsLocked &&
+            GetCurrentPlaybackFrame(pinned) is { } pinnedFrame &&
+            HitTestFrameFootprint(pinnedFrame, px, py))
+        {
+            return pinned;
+        }
+
+        foreach (var chain in _selectedState!.SelectedChains)
+        {
+            if (ReferenceEquals(chain, pinned) || chain.IsLocked) continue;
+            if (GetCurrentPlaybackFrame(chain) is { } frame && HitTestFrameFootprint(frame, px, py))
+                return chain;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if (<paramref name="px"/>, <paramref name="py"/>) lands on
+    /// <paramref name="frame"/>'s rendered sprite footprint, in screen space. Pure geometry — does
+    /// not consider whether the frame or its owning chain is locked.
+    /// </summary>
+    private bool HitTestFrameFootprint(AnimationFrameSave frame, float px, float py)
+    {
         if (px < RulerSize || py < RulerSize) return false;
 
         string? texPath = _thumbnailService!.ResolveTexturePath(frame);
@@ -2153,8 +2206,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             if (IsWholeChainDragTarget)
             {
-                var chain = _selectedState!.SelectedChain!;
-                if (chain.IsLocked) return;
+                // ResolveWholeChainDragTarget considers every chain in SelectedChains, not just
+                // the pinned SelectedChain, so a locked chain shown alongside an unlocked one at
+                // this same screen position doesn't swallow the unlocked chain's drag (#1032
+                // follow-up). HitTestFrameSprite above already required a non-null result.
+                var chain = ResolveWholeChainDragTarget(px, py);
+                if (chain is null) return;
                 _draggingChainFrames = chain.Frames.ToArray();
                 _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
                 _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();

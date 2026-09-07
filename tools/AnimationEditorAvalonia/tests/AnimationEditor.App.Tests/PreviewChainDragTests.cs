@@ -220,4 +220,72 @@ public class PreviewChainDragTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    /// <summary>
+    /// The reported multi-chain gap (#1032 follow-up): chain A (locked) is the pinned
+    /// SelectedChain, but chain B (unlocked) is also selected and shown at the same screen
+    /// position (group preview, #576). Dragging at that shared position must move only B, not
+    /// silently no-op just because the pinned chain happens to be locked.
+    /// </summary>
+    [AvaloniaFact]
+    public void RealDrag_TwoChainsSelectedOverlapping_PinnedChainLocked_DragsOnlyUnlockedChain()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir);
+            // RelativeY offsets both frames up off the canvas's vertical center: group-preview
+            // mode overlays a taller scrub-track dock over the bottom of the Preview canvas
+            // (RefreshTimelineStrip's GroupTimelineScrubHost), which would otherwise swallow a
+            // click at world (0, 0).
+            var lockedFrame = MakeFrame(relativeX: 0f, relativeY: 40f);
+            lockedFrame.TextureName = texPath;
+            var lockedChain = new AnimationChainSave { Name = "A", IsLocked = true };
+            lockedChain.Frames.Add(lockedFrame);
+
+            // Same RelativeX/Y as the locked chain's frame — their sprites coincide on screen.
+            var unlockedFrame = MakeFrame(relativeX: 0f, relativeY: 40f);
+            unlockedFrame.TextureName = texPath;
+            var unlockedChain = new AnimationChainSave { Name = "B" };
+            unlockedChain.Frames.Add(unlockedFrame);
+
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(lockedChain);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(unlockedChain);
+            ctx.ThumbnailService.GetBitmap(texPath);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            // Both chains multi-selected (group preview) with the locked chain pinned as
+            // SelectedChain -- e.g. A was the last one clicked in the tree.
+            ctx.SelectedState.SelectedNodes = new List<object> { unlockedChain, lockedChain };
+            ctx.SelectedState.SelectedChain = lockedChain;
+            Dispatcher.UIThread.RunJobs();
+
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            float centerX = (float)((preview.Bounds.Width - 20) / 2 + 20);
+            float centerY = (float)((preview.Bounds.Height - 20) / 2 + 20) - 40f;
+            var localPoint  = new Point(centerX, centerY);
+            var windowPoint = preview.TranslatePoint(localPoint, window)!.Value;
+
+            Assert.Equal(Avalonia.Input.StandardCursorType.SizeAll, preview.GetHoverCursorTypeForTest(centerX, centerY));
+
+            window.MouseDown(windowPoint, MouseButton.Left);
+            var movedPoint = windowPoint + new Point(5, 5);
+            window.MouseMove(movedPoint);
+            window.MouseUp(movedPoint, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(0f, lockedFrame.RelativeX, precision: 3);
+            Assert.Equal(40f, lockedFrame.RelativeY, precision: 3);
+            Assert.NotEqual(0f, unlockedFrame.RelativeX);
+            Assert.NotEqual(40f, unlockedFrame.RelativeY);
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
