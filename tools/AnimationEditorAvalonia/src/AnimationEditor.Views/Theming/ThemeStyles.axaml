@@ -101,4 +101,21 @@
             </DataTemplate>
         </Setter>
     </Style>
+    <!-- #1042 follow-up: an unlocked chain's hover-revealed lock icon and a locked chain's lock
+         icon looked identical while hovering (both a plain outline glyph), so a user couldn't
+         tell a row was already locked until moving the pointer away. A red tint was tried first
+         and rejected: red already means "selected," so a red lock icon read as less visible/more
+         alarming, not more informative. Swap the glyph itself instead, keeping the same neutral
+         IconInk color for both: outline (IconLock.svg) unlocked, solid-body silhouette
+         (IconLockFilled.svg) locked. Two-class selector beats the single-class rule above on
+         specificity. -->
+    <Style Selector="Button.lock-icon.locked">
+        <Setter Property="ContentTemplate">
+            <DataTemplate>
+                <svg:Svg Width="11" Height="11"
+                         Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLockFilled.svg"
+                         CurrentColor="{DynamicResource IconInk}" />
+            </DataTemplate>
+        </Setter>
+    </Style>
 </Styles>

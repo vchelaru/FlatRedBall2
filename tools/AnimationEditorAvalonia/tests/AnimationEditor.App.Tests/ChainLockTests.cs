@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
@@ -7,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -115,6 +117,108 @@ public class ChainLockTests
             Assert.False(chain.IsLocked);
         }
         finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// Issue #1042: multi-selecting chains A and B, then clicking B's lock icon, must keep both
+    /// selected and lock B. Previously, <c>OnTreePointerPressed</c>'s Tunnel-phase press handling
+    /// treated the press as a row press (armed via the chain-drag-candidate branch) because it
+    /// never checked whether the press actually originated on a button embedded in the row
+    /// template. Since B was already part of a multi-selection, that branch captured the pointer
+    /// and marked the event Handled to defer to a single-select-on-release -- which both
+    /// suppressed the lock button's own Click (so the lock never applied) and collapsed the
+    /// selection down to just B on release.
+    /// </summary>
+    [AvaloniaFact]
+    public void LockButtonClick_WhenChainPartOfMultiSelection_KeepsSelectionAndLocks()
+    {
+        var ctx = TestHelpers.BuildServices();
+        ctx.ProjectManager.FileName = null;
+        ctx.AppCommands.DoOnUiThread = a => a();
+        ctx.AppCommands.FileDialogService = NullFileDialogService.Instance;
+
+        var chainA = new AnimationChainSave { Name = "Walk" };
+        var chainB = new AnimationChainSave { Name = "Run" };
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        ctx.ProjectManager.AnimationChainListSave = new AnimationChainListSave();
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chainA);
+        ctx.ProjectManager.AnimationChainListSave.AnimationChains.Add(chainB);
+
+        typeof(MainWindow)
+            .GetMethod("RefreshTreeView", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(window, null);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Measure(new Avalonia.Size(1600, 900));
+        window.Arrange(new Avalonia.Rect(0, 0, 1600, 900));
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            // Multi-select both chains (lands in SelectedState the same way a real ctrl/shift
+            // multi-select in the tree does; MainWindow's SelectionChanged→SyncTreeSelection then
+            // pushes it into AnimTree.SelectedItems).
+            ctx.SelectedState.SelectedNodes = new List<object> { chainA, chainB };
+            Dispatcher.UIThread.RunJobs();
+
+            var lockBtnB = GetLockButtonForChainRow(window, chainB);
+            var local = new Point(lockBtnB.Bounds.Width / 2, lockBtnB.Bounds.Height / 2);
+            var p = lockBtnB.TranslatePoint(local, window)!.Value;
+
+            // Hover first so the lock button's hover-reveal styles make it hit-test-visible --
+            // matches how a real user reaches it (Button.lock-btn is IsHitTestVisible=False until
+            // TreeViewItem:pointerover or already locked).
+            window.MouseMove(p);
+            Dispatcher.UIThread.RunJobs();
+            window.MouseDown(p, MouseButton.Left);
+            window.MouseUp(p, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(chainB.IsLocked);
+            Assert.Equal(2, ctx.SelectedState.SelectedNodes.Count);
+            Assert.Contains(chainA, ctx.SelectedState.SelectedNodes);
+            Assert.Contains(chainB, ctx.SelectedState.SelectedNodes);
+        }
+        finally { window.Close(); }
+    }
+
+    /// <summary>
+    /// #1042 follow-up: hovering revealed the lock icon at full opacity for both a locked and an
+    /// unlocked chain, and the icon used the same outline glyph either way, so while hovering a
+    /// user could not tell a chain was already locked until moving the pointer off the row. A red
+    /// tint was tried first and rejected: red already means "selected" elsewhere in the tree, so
+    /// tinting the lock icon red made it read as less visible, not more informative. The glyph
+    /// itself (outline vs. solid-body silhouette) must differ once
+    /// <see cref="AnimationChainSave.IsLocked"/> is true, while staying the same neutral color.
+    /// </summary>
+    [AvaloniaFact]
+    public void LockIconGlyph_DiffersOnceChainIsLocked_ButColorStaysNeutral()
+    {
+        var (window, ctx, chain) = CreateWindowWithChain();
+        try
+        {
+            var lockBtn = GetLockButtonForChainRow(window, chain);
+            var (unlockedPath, unlockedColor) = GetLockIconPathAndColor(lockBtn);
+
+            ctx.AppCommands.SetChainLocked(chain, true);
+            Dispatcher.UIThread.RunJobs();
+
+            var (lockedPath, lockedColor) = GetLockIconPathAndColor(lockBtn);
+
+            Assert.NotEqual(unlockedPath, lockedPath);
+            Assert.Equal(unlockedColor, lockedColor);
+        }
+        finally { window.Close(); }
+    }
+
+    private static (string? Path, Avalonia.Media.Color? Color) GetLockIconPathAndColor(Button lockBtn)
+    {
+        var svg = lockBtn.GetVisualDescendants().OfType<Avalonia.Svg.Skia.Svg>().Single();
+        return (svg.Path, svg.CurrentColor);
     }
 
     [AvaloniaFact]
