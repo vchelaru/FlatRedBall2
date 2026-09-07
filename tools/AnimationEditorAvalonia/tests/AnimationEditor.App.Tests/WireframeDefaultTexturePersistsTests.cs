@@ -116,4 +116,47 @@ public class WireframeDefaultTexturePersistsTests
             Directory.Delete(dir, true);
         }
     }
+
+    /// <summary>
+    /// The tree's "Add Frame" menu/button (<c>AppCommands.AddFrame</c>, no explicit texture) is a
+    /// second, independent entry point from Ctrl+click -- it resolves its own texture from the
+    /// document instead of reading the wireframe canvas directly. #1011's manual repro used this
+    /// path (right-click the chain -> Add Frame) and still got a textureless frame after the
+    /// RefreshAll fix, because AddFrame never consulted the canvas at all.
+    /// </summary>
+    [AvaloniaFact]
+    public void AddFrameButton_OnEmptyChainWithDefaultTextureShowing_UsesTheDefaultTexture()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var ctx = ResetSingletons();
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        try
+        {
+            var png = WriteSolidPng(dir, "Items.png");
+            ctx.ProjectManager.FileName = Path.Combine(dir, "test.achx");
+
+            var wireframe = window.FindControl<WireframeControl>("WireframeCtrl")
+                ?? throw new InvalidOperationException("WireframeCtrl not found");
+            wireframe.LoadTexture(png);
+
+            var chain = new AnimationChainSave { Name = "NewAnimation" };
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal((64, 64), wireframe.BitmapSize);   // default survived selecting the empty chain
+
+            ctx.AppCommands.AddFrame(chain);   // the "Add Frame" tree menu item's exact call
+
+            Assert.Single(chain.Frames);
+            Assert.EndsWith("Items.png", chain.Frames[0].TextureName);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
 }

@@ -788,6 +788,8 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
+        public Func<string?>? CanvasDefaultTexturePath { get; set; }
+
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
             if (IsChainLocked(chain)) return;
@@ -800,9 +802,16 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? ResolveInheritedFrame(chain, _pm.AnimationChainListSave)
                 : null;
 
+            // Nothing in the document to inherit from (a brand-new document, or a chain-less
+            // selection) -- fall back to whatever the wireframe canvas is already showing (#1011)
+            // rather than leaving the new frame textureless.
+            var resolvedTextureName = textureName ?? source?.TextureName;
+            if (string.IsNullOrEmpty(resolvedTextureName))
+                resolvedTextureName = CanvasDefaultTexturePath?.Invoke();
+
             var frame = new AnimationFrameSave
             {
-                TextureName  = textureName ?? source?.TextureName ?? string.Empty,
+                TextureName  = resolvedTextureName ?? string.Empty,
                 LeftCoordinate   = source?.LeftCoordinate   ?? 0f,
                 RightCoordinate  = source?.RightCoordinate  ?? 1f,
                 TopCoordinate    = source?.TopCoordinate    ?? 0f,
