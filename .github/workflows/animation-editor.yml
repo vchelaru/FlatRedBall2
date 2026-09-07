@@ -274,9 +274,7 @@ jobs:
 
       # Moves a floating tag so /releases/tag/animationeditor-latest always resolves to the
       # newest release/prerelease build. Skipped for 'test' (draft) runs so the public link
-      # never points at a draft. Tag is force-moved (not created fresh each time) since
-      # softprops/action-gh-release updates the existing "latest" release in place rather
-      # than creating a new one when the tag already has a release.
+      # never points at a draft.
       - name: Move animationeditor-latest tag
         if: github.event.inputs.release_kind != 'test'
         shell: pwsh
@@ -285,6 +283,19 @@ jobs:
           git config user.email "actions@github.com"
           git tag -f animationeditor-latest
           git push origin animationeditor-latest --force
+
+      # Delete the previous "latest" release object (not the tag) before recreating it below.
+      # softprops/action-gh-release updates an existing release in place, which (a) leaves
+      # GitHub's published_at stuck at the release's original creation date, so the listing
+      # shows it as "released N weeks ago" even right after a same-day update, and (b) merges
+      # new asset files in alongside old ones instead of replacing them, leaving stale nupkgs
+      # from prior versions attached. Deleting first forces a fresh release object with a
+      # current published_at and only this run's assets.
+      - name: Delete previous animationeditor-latest release
+        if: github.event.inputs.release_kind != 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete animationeditor-latest --yes || true
 
       - name: Update animationeditor-latest release
         if: github.event.inputs.release_kind != 'test'
