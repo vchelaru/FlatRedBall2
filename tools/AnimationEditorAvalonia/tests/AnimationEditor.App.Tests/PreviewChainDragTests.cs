@@ -137,6 +137,68 @@ public class PreviewChainDragTests
         Assert.False(ctx.UndoManager.CanUndo);
     }
 
+    // ── Multi-chain drag (issue #1052) ──────────────────────────────────────
+
+    /// <summary>
+    /// <see cref="PreviewControl.SimulateChainDrag"/>-level proof of the #1052 fix: 2+ whole
+    /// chains selected shift together, each frame preserving its own starting offset, mirroring
+    /// <see cref="PreviewMultiFrameDragTests"/>'s frame-level equivalent.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateChainDrag_TwoChainsSelected_ShiftsBothChainsFramesByDelta_PreservingOwnOffsets()
+    {
+        var ctx    = TestHelpers.BuildServices();
+        var frameA = MakeFrame(relativeX: 0f, relativeY: 0f);
+        var chainA = new AnimationChainSave { Name = "A" };
+        chainA.Frames.Add(frameA);
+
+        var frameB = MakeFrame(relativeX: 20f, relativeY: -5f);
+        var chainB = new AnimationChainSave { Name = "B" };
+        chainB.Frames.Add(frameB);
+
+        ctx.SelectedState.SelectedNodes = new List<object> { chainB, chainA };
+        ctx.SelectedState.SelectedChain = chainA;
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.SimulateChainDrag(3f, 2f);
+
+        Assert.Equal(3f, frameA.RelativeX, precision: 3);
+        Assert.Equal(2f, frameA.RelativeY, precision: 3);
+        Assert.Equal(23f, frameB.RelativeX, precision: 3);
+        Assert.Equal(-3f, frameB.RelativeY, precision: 3);
+    }
+
+    /// <summary>
+    /// The exact scenario requested alongside #1052: Shift-axis-locking (#1022) a multi-chain drag
+    /// must apply the *same* locked delta to every selected chain's frames, even though chain A and
+    /// chain B start at different X/Y offsets. Locking is computed once from the raw drag delta —
+    /// it must not be re-derived per chain from each chain's own starting position.
+    /// </summary>
+    [AvaloniaFact]
+    public void SimulateChainDrag_ShiftHeld_TwoChainsWithDifferentStartingOffsets_LocksBothToSameAxisBySameDelta()
+    {
+        var ctx    = TestHelpers.BuildServices();
+        var frameA = MakeFrame(relativeX: 0f, relativeY: 0f);
+        var chainA = new AnimationChainSave { Name = "A" };
+        chainA.Frames.Add(frameA);
+
+        var frameB = MakeFrame(relativeX: 20f, relativeY: 5f); // different starting X and Y than A
+        var chainB = new AnimationChainSave { Name = "B" };
+        chainB.Frames.Add(frameB);
+
+        ctx.SelectedState.SelectedNodes = new List<object> { chainB, chainA };
+        ctx.SelectedState.SelectedChain = chainA;
+
+        var ctrl = ctx.CreatePreviewControl();
+        // Larger horizontal than vertical delta -> locks to horizontal-only movement.
+        ctrl.SimulateChainDrag(9f, 3f, shiftHeld: true);
+
+        Assert.Equal(9f, frameA.RelativeX, precision: 3);
+        Assert.Equal(0f, frameA.RelativeY, precision: 3);
+        Assert.Equal(29f, frameB.RelativeX, precision: 3);
+        Assert.Equal(5f, frameB.RelativeY, precision: 3);
+    }
+
     // ── Priority / real pointer routing ─────────────────────────────────────
 
     private static TestServices ResetSingletons()
@@ -283,6 +345,74 @@ public class PreviewChainDragTests
             Assert.Equal(40f, lockedFrame.RelativeY, precision: 3);
             Assert.NotEqual(0f, unlockedFrame.RelativeX);
             Assert.NotEqual(40f, unlockedFrame.RelativeY);
+
+            window.Close();
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// The reported gap (issue #1052): 2+ whole
+    /// <see cref="AnimationChainSave"/>s multi-selected (group preview, #576) at *different* screen
+    /// positions, none locked. #917 gave individual multi-selected frames within one chain a bulk
+    /// drag scope (<see cref="PreviewControl.SimulateMultiFrameDrag"/>); whole-chain multi-select
+    /// never got the equivalent. <see cref="PreviewControl.ResolveWholeChainDragTarget"/> resolves a
+    /// drag to a single chain (the pinned one if it hits, else the first other hit in
+    /// <c>SelectedChains</c>) and only that chain's frames populate <c>_draggingChainFrames</c> — so
+    /// dragging the pinned chain's sprite leaves every other selected-but-not-hit chain untouched.
+    /// This currently FAILS, confirming only the grabbed chain moves.
+    /// </summary>
+    [AvaloniaFact]
+    public void RealDrag_TwoUnlockedChainsSelectedAtDifferentPositions_BothMoveTogether()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var texPath = WriteSolidPng(dir);
+            // RelativeY offsets both frames up off the canvas's vertical center: group-preview
+            // mode overlays a taller scrub-track dock over the bottom of the Preview canvas
+            // (RefreshTimelineStrip's GroupTimelineScrubHost), which would otherwise swallow a
+            // click at world (_, 0) — see the sibling overlapping-chains test above.
+            var frameA = MakeFrame(relativeX: 0f, relativeY: 40f);
+            frameA.TextureName = texPath;
+            var chainA = new AnimationChainSave { Name = "A" };
+            chainA.Frames.Add(frameA);
+
+            var frameB = MakeFrame(relativeX: 50f, relativeY: 40f);
+            frameB.TextureName = texPath;
+            var chainB = new AnimationChainSave { Name = "B" };
+            chainB.Frames.Add(frameB);
+
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainA);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chainB);
+            ctx.ThumbnailService.GetBitmap(texPath);
+
+            var window = ctx.CreateMainWindow();
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            // Both chains multi-selected (group preview), A pinned as the last-clicked SelectedChain.
+            ctx.SelectedState.SelectedNodes = new List<object> { chainB, chainA };
+            ctx.SelectedState.SelectedChain = chainA;
+            Dispatcher.UIThread.RunJobs();
+
+            var preview = window.FindControl<PreviewControl>("PreviewCtrl")!;
+            float centerX = (float)((preview.Bounds.Width - 20) / 2 + 20);
+            float centerY = (float)((preview.Bounds.Height - 20) / 2 + 20) - 40f;
+            var localPoint  = new Point(centerX, centerY); // frameA sits at world (0,40)
+            var windowPoint = preview.TranslatePoint(localPoint, window)!.Value;
+
+            window.MouseDown(windowPoint, MouseButton.Left);
+            var movedPoint = windowPoint + new Point(5, 5);
+            window.MouseMove(movedPoint);
+            Dispatcher.UIThread.RunJobs();
+            window.MouseUp(movedPoint, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.NotEqual(0f, frameA.RelativeX);
+            Assert.NotEqual(50f, frameB.RelativeX); // chain B, also selected, should have shifted too
 
             window.Close();
         }
