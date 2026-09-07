@@ -4399,9 +4399,14 @@ public partial class MainWindow : Window
     {
         _groupTimelineTracks.Clear();
 
+        // Shared across every row (#1056) so a frame of equal duration renders at equal width in
+        // every chain's row, instead of each chain scaling independently to its own shortest frame.
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
+            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+
         foreach (var (chain, _) in PreviewCtrl.GroupTracks)
         {
-            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain));
+            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain, sharedPps));
             if (chain.Frames.Count > 0)
             {
                 var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
@@ -4421,6 +4426,11 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshGroupTimelineScrubbers()
     {
+        // Must match the shared pps RefreshGroupTimelineTracks built the frame widths with (#1056) —
+        // recomputing per-chain here would desync the sub-frame playhead offset from those widths.
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
+            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+
         foreach (var (chain, playback) in PreviewCtrl.GroupTracks)
         {
             var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
@@ -4430,9 +4440,8 @@ public partial class MainWindow : Window
             for (int i = 0; i < track.Frames.Count; i++)
                 track.Frames[i].IsCurrent = i == idx;
 
-            double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
             double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
-            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * pps, travelWidth);
+            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * sharedPps, travelWidth);
         }
     }
 
