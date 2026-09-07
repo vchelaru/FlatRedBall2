@@ -36,6 +36,11 @@ public class TabCloseTreeRefreshTests
             .GetMethod("CloseTabAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(window, [tab])!;
 
+    private static async Task ActivateTabAsync(MainWindow window, TabEntry tab) =>
+        await (Task)typeof(MainWindow)
+            .GetMethod("ActivateTabAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(window, [tab])!;
+
     private static TreeView GetTree(MainWindow w) =>
         w.FindControl<TreeView>("AnimTree")
         ?? throw new InvalidOperationException("AnimTree control not found");
@@ -209,6 +214,63 @@ public class TabCloseTreeRefreshTests
             Assert.Single(tabManager.Tabs);
             Assert.Equal(new AnimationEditor.Core.Paths.FilePath(savedPath), tabManager.ActiveTab!.Path);
 
+            var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)
+                tree.ItemsSource!;
+            Assert.Contains(roots, n => n.Header == "Idle");
+            Assert.DoesNotContain(roots, n => n.Header == "Walk");
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    // The user found the minimal repro doesn't even need a close: after the startup sequence
+    // above poisons the saved tab's cache, simply clicking back to it (no closing at all) also
+    // serves the poisoned "Walk" content instead of the saved tab's own "Idle" chain.
+    [AvaloniaFact]
+    public async Task StartupRestoresSavedTabPlusRecoveredUnsavedTab_ClickingSavedTab_ShowsItsOwnContent()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var savedPath = Path.Combine(dir, "saved.achx");
+        WriteAchx(savedPath, "Idle");
+
+        var ctx = TestHelpers.BuildServices();
+
+        var settingsFile = AppSettingsLocation.ForApplicationDataRoot(ctx.SettingsRoot);
+        Directory.CreateDirectory(settingsFile.GetDirectoryContainingThis().FullPath);
+        File.WriteAllText(settingsFile.FullPath, JsonSerializer.Serialize(new AppSettingsModel
+        {
+            OpenTabPaths = new() { savedPath },
+            ActiveTabPath = savedPath,
+        }));
+
+        var recovered = new FlatRedBall2.AnimationEditorCommon.AnimationChainListSave
+        {
+            CoordinateType = FlatRedBall2.AnimationEditorCommon.TextureCoordinateType.Pixel,
+        };
+        recovered.AnimationChains.Add(new FlatRedBall2.AnimationEditorCommon.AnimationChainSave { Name = "Walk" });
+        ctx.IoManager.WriteRecoveryFile(recovered);
+
+        var window = ctx.CreateMainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        try
+        {
+            var tabManager = GetTabManager(window);
+            Assert.Equal(2, tabManager.Tabs.Count);
+            var savedTab = tabManager.Tabs.Single(t => t.Path == new AnimationEditor.Core.Paths.FilePath(savedPath));
+
+            // Click the saved tab (no close involved) -- must show its own "Idle" content, not
+            // whatever the recovered tab left poisoned in its cache.
+            await ActivateTabAsync(window, savedTab);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(new AnimationEditor.Core.Paths.FilePath(savedPath), tabManager.ActiveTab!.Path);
+
+            var tree = GetTree(window);
             var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)
                 tree.ItemsSource!;
             Assert.Contains(roots, n => n.Header == "Idle");
