@@ -114,6 +114,95 @@ public class ThumbnailServiceTests
             }
     }
 
+    // -- Fractional-magnification band tests (Issue #1014) -------------------
+    //
+    // Between roughly 1.1x and 1.9x, nearest-neighbour gives source pixels uneven destination
+    // widths (some 1px, some 2px), which reads as visible unevenness. SelectSampling filters in
+    // that band while keeping exact/near-integer magnification (1x, 2x, ...) crisp.
+
+    [Fact]
+    public void RenderFrameThumbnail_FractionalMagnificationInBand_BlendsAcrossTheSeam()
+    {
+        // 40px red|blue source magnified to 60px (scale = 1.5x, inside the 1.1-1.9 band) must
+        // blend at the seam instead of leaving a hard red/blue edge like point sampling would.
+        using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 60, 1000);
+
+        Assert.NotNull(thumb);
+        var middle = thumb!.GetPixel(thumb.Width / 2, 0);
+        Assert.True(middle.Red > 40 && middle.Blue > 40,
+            $"Seam pixel {middle} at 1.5x magnification should be a red/blue blend, not a hard edge.");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_MagnificationJustBelowBand_StaysCrisp()
+    {
+        // 40px source magnified to 42px (scale = 1.05x) sits below the 1.1x band floor and must
+        // stay point-sampled — no blending near 1x.
+        using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 42, 1000);
+
+        Assert.NotNull(thumb);
+        AssertNoBlendedPixels(thumb!, "1.05x magnification");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_MagnificationJustAboveBand_StaysCrisp()
+    {
+        // 40px source magnified to 78px (scale = 1.95x) sits above the 1.9x band ceiling and must
+        // stay point-sampled — no needless blur just because 2x is close.
+        using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 78, 1000);
+
+        Assert.NotNull(thumb);
+        AssertNoBlendedPixels(thumb!, "1.95x magnification");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_ExactDoubleMagnification_StaysCrisp()
+    {
+        // Exactly 2x is an integer magnification and must stay point-sampled even though it
+        // borders the filtered band.
+        using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 80, 1000);
+
+        Assert.NotNull(thumb);
+        AssertNoBlendedPixels(thumb!, "exact 2x magnification");
+    }
+
+    [Fact]
+    public void RenderFrameThumbnail_FractionalMagnificationAboveBand_StaysCrisp()
+    {
+        // 2.3x is a non-integer magnification but outside the 1x-2x band the issue scopes this
+        // fix to (the unevenness artifact shrinks as scale grows past 2x) — must stay crisp.
+        using var source = SplitSheet(40, 2, SKColors.Red, SKColors.Blue);
+
+        using var thumb = ThumbnailService.RenderFrameThumbnail(source, Frame(), default, 92, 1000);
+
+        Assert.NotNull(thumb);
+        AssertNoBlendedPixels(thumb!, "2.3x magnification");
+    }
+
+    /// <summary>Every pixel must be purely one side's colour (Red>200/Blue&lt;55 or vice versa) —
+    /// the point-sampling hard-seam signature used by <see cref="RenderFrameThumbnail_UsesPointSampling_SoUpscaledArtStaysCrisp"/>.</summary>
+    private static void AssertNoBlendedPixels(SKBitmap thumb, string scenario)
+    {
+        for (int y = 0; y < thumb.Height; y++)
+            for (int x = 0; x < thumb.Width; x++)
+            {
+                var p = thumb.GetPixel(x, y);
+                if (p.Alpha == 0) continue;
+                bool pureRed  = p is { Red: > 200, Blue: < 55 };
+                bool pureBlue = p is { Blue: > 200, Red: < 55 };
+                Assert.True(pureRed || pureBlue,
+                    $"Pixel ({x},{y}) = {p} at {scenario} should be a hard seam, not a blended pixel.");
+            }
+    }
+
     [Fact]
     public void RenderFrameThumbnail_DownscalingALargeFrame_FiltersInsteadOfAliasing()
     {
