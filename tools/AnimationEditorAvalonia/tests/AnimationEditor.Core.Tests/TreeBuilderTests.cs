@@ -52,6 +52,40 @@ public class TreeBuilderPureTests
     }
 
     [Fact]
+    public void BuildChainNode_ChainIsLockedTrue_SetsNodeIsLocked()
+    {
+        var chain = new AnimationChainSave { Name = "Walk", IsLocked = true };
+
+        var node = TreeBuilder.BuildChainNode(chain);
+
+        Assert.True(node.IsLocked);
+    }
+
+    [Fact]
+    public void BuildChainNode_ChainIsLockedFalse_NodeIsLockedFalse()
+    {
+        var chain = new AnimationChainSave { Name = "Walk" };
+
+        var node = TreeBuilder.BuildChainNode(chain);
+
+        Assert.False(node.IsLocked);
+    }
+
+    [Fact]
+    public void SyncChainsInto_ChainLockToggled_RefreshesNodeIsLocked()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        acls.AnimationChains.Add(chain);
+        var roots = new ObservableCollection<TreeNodeVm>(TreeBuilder.BuildTree(acls));
+
+        chain.IsLocked = true;
+        TreeBuilder.SyncChainsInto(roots, acls.AnimationChains);
+
+        Assert.True(roots[0].IsLocked);
+    }
+
+    [Fact]
     public void BuildTree_WithNullExpandedNames_AllNodesDefaultExpanded()
     {
         var acls = new AnimationChainListSave();
@@ -596,6 +630,62 @@ public class TreeBuilderPureTests
 
         Assert.True(roots[0].IsExpanded);                 // chain
         Assert.True(roots[0].Children[0].IsExpanded);     // parent frame
+    }
+
+    // ── FlattenVisible ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FlattenVisible_ExpandedChainWithFrames_ReturnsChainThenFramesInOrder()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "b.png" });
+        acls.AnimationChains.Add(chain);
+
+        var roots = TreeBuilder.BuildTree(acls); // defaults to expanded
+
+        var flat = TreeBuilder.FlattenVisible(roots);
+
+        Assert.Equal(3, flat.Count);
+        Assert.Same(roots[0], flat[0]);
+        Assert.Same(roots[0].Children[0], flat[1]);
+        Assert.Same(roots[0].Children[1], flat[2]);
+    }
+
+    [Fact]
+    public void FlattenVisible_CollapsedChain_ExcludesItsFrames()
+    {
+        var acls = new AnimationChainListSave();
+        var chain = new AnimationChainSave { Name = "Walk" };
+        chain.Frames.Add(new AnimationFrameSave { TextureName = "a.png" });
+        acls.AnimationChains.Add(chain);
+
+        var roots = TreeBuilder.BuildTree(acls);
+        roots[0].IsExpanded = false;
+
+        var flat = TreeBuilder.FlattenVisible(roots);
+
+        Assert.Single(flat);
+        Assert.Same(roots[0], flat[0]);
+    }
+
+    [Fact]
+    public void FlattenVisible_ChainNotPinnedVisible_IsExcluded()
+    {
+        var acls = new AnimationChainListSave();
+        var walk = new AnimationChainSave { Name = "Walk" };
+        var idle = new AnimationChainSave { Name = "Idle" };
+        acls.AnimationChains.Add(walk);
+        acls.AnimationChains.Add(idle);
+
+        var roots = TreeBuilder.BuildTree(acls);
+        roots[1].PinnedVisible = false; // e.g. filtered out by search
+
+        var flat = TreeBuilder.FlattenVisible(roots);
+
+        Assert.Single(flat);
+        Assert.Same(roots[0], flat[0]);
     }
 }
 

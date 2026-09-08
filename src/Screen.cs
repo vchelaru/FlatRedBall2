@@ -1219,6 +1219,13 @@ public class Screen : ILifecycleEvents
             if (renderable is GumRenderable gum && !gum.ShouldDrawForCamera(activeCamera))
                 continue;
 
+            // Skip entirely — not just the Draw() call — so an invisible renderable (e.g. a
+            // collision-only shape with IsVisible=false by default) never forces a batch
+            // transition against its visible neighbors. Checking visibility only inside Draw()
+            // is too late: the Begin/End decision above already happened by then.
+            if (!renderable.IsVisible)
+                continue;
+
             var batch = renderable.Batch;
             if (batch != currentBatch)
             {
@@ -1227,7 +1234,7 @@ public class Screen : ILifecycleEvents
                     diagnostics.RecordBreak(currentBatch, batch, renderable.Layer, renderable.Z,
                         previousRenderable?.Name ?? string.Empty, renderable.Name ?? string.Empty);
                 }
-                currentBatch?.End(spriteBatch);
+                EndBatch(currentBatch, spriteBatch, diagnostics);
                 batch.Begin(spriteBatch, activeCamera);
                 currentBatch = batch;
             }
@@ -1236,7 +1243,19 @@ public class Screen : ILifecycleEvents
             previousRenderable = renderable;
         }
 
-        currentBatch?.End(spriteBatch);
+        EndBatch(currentBatch, spriteBatch, diagnostics);
+    }
+
+    // Ends the active batch and, when diagnostics are enabled, records its self-reported
+    // IRenderBatch.InternalDrawCallCount as this frame's RenderDiagnostics total — GPU draw
+    // calls issued by a foreign renderer (Gum, Apos.Shapes) that FRB's own batch-break tracking
+    // above can't see into. RecordInternalDrawCalls overwrites rather than sums, since the
+    // reported value is already a running total for the frame (see its doc comment).
+    private static void EndBatch(IRenderBatch? batch, SpriteBatch spriteBatch, RenderDiagnostics diagnostics)
+    {
+        batch?.End(spriteBatch);
+        if (diagnostics.IsEnabled && batch != null)
+            diagnostics.RecordInternalDrawCalls(batch.InternalDrawCallCount);
     }
 
     // Internal overlay draw — invoked once per frame by FlatRedBallService AFTER the per-camera
@@ -1249,16 +1268,17 @@ public class Screen : ILifecycleEvents
         {
             if (!renderable.IsOverlay) continue;
             if (!HasOverlayContent(renderable)) continue;
+            if (!renderable.IsVisible) continue;
             var batch = renderable.Batch;
             if (batch != currentBatch)
             {
-                currentBatch?.End(spriteBatch);
+                EndBatch(currentBatch, spriteBatch, diagnostics);
                 batch.Begin(spriteBatch, overlayCamera);
                 currentBatch = batch;
             }
             renderable.Draw(spriteBatch, overlayCamera);
         }
-        currentBatch?.End(spriteBatch);
+        EndBatch(currentBatch, spriteBatch, diagnostics);
     }
 
     // OverlayRoot/PopupRoot/ModalRoot are registered as overlay renderables for every screen

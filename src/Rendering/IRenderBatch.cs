@@ -28,4 +28,16 @@ public interface IRenderBatch
     /// call <c>spriteBatch.End()</c>.
     /// </summary>
     void End(SpriteBatch spriteBatch);
+
+    /// <summary>
+    /// GPU draw calls this batch's own internal machinery has issued so far this host frame,
+    /// beyond what FlatRedBall2's own <c>SpriteBatch</c> usage already accounts for. Default 0 —
+    /// override only when this batch wraps a foreign renderer (Gum, Apos.Shapes, a tilemap
+    /// library) that does its own internal sub-batching FlatRedBall2 can't see into. Read by the
+    /// engine right after <see cref="End"/> and written into
+    /// <see cref="FlatRedBall2.Diagnostics.RenderDiagnostics.InternalDrawCallCount"/> (which keeps
+    /// the largest of the frame's reports, since each is already a running total, not a delta)
+    /// when <see cref="FlatRedBall2.Diagnostics.RenderDiagnostics.IsEnabled"/> is <c>true</c>.
+    /// </summary>
+    int InternalDrawCallCount => 0;
 }

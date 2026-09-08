@@ -638,6 +638,30 @@ public class AutomationModeReaderLoopTests
         mode.ReaderThread!.IsBackground.ShouldBeTrue();
         mode.Stop();
     }
+
+    // Issue #1054: every call site treats Stop() as "the reader thread is gone now" (tests skip
+    // straight to asserting side effects, production's Shutdown() does nothing further), but Stop()
+    // only sets a signal — the thread can still be alive, mid retry-sleep, for up to one
+    // EofRetryDelayMs cycle after Stop() returns. With enough of these transient windows open at
+    // once across a full test run, one can coincide with the test host's own process-exit teardown
+    // and corrupt the native heap (observed as an intermittent malloc_consolidate crash in CI,
+    // always after every test already reported passing). Stop() must not return until the reader
+    // thread has actually exited.
+    [Fact]
+    public void Stop_ReturnsOnlyAfterReaderThreadHasActuallyExited()
+    {
+        for (int i = 0; i < 50; i++)
+        {
+            var reader = new AlwaysNullReader();
+            var mode = new AutomationMode(new FlatRedBallService(), new StringWriter(), log: _ => { });
+            mode.Start(reader);
+            SpinWait.SpinUntil(() => reader.ReadCount >= 2, TimeSpan.FromSeconds(5)).ShouldBeTrue();
+
+            mode.Stop();
+
+            mode.ReaderThread!.IsAlive.ShouldBeFalse();
+        }
+    }
 }
 
 // --- AutomationMode screenshot ---

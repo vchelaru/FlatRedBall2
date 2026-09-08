@@ -130,6 +130,35 @@ public class PerformanceMonitorTests
     }
 
     [Fact]
+    public void GpuStats_KnownFrameProfileValues_ComputesCurrentMinAverageMax()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true, WindowSize = 2 };
+
+        monitor.Record(new FrameProfile { DrawCallCount = 50, SpriteCount = 40, PrimitiveCount = 200, TextureCount = 10 }, NoRelationships);
+        monitor.Record(new FrameProfile { DrawCallCount = 90, SpriteCount = 60, PrimitiveCount = 300, TextureCount = 12 }, NoRelationships);
+
+        monitor.DrawCallCount.Current.ShouldBe(90);
+        monitor.DrawCallCount.Min.ShouldBe(50);
+        monitor.DrawCallCount.Max.ShouldBe(90);
+        monitor.DrawCallCount.Average.ShouldBe(70);
+
+        monitor.SpriteCount.Current.ShouldBe(60);
+        monitor.PrimitiveCount.Current.ShouldBe(300);
+        monitor.TextureCount.Current.ShouldBe(12);
+    }
+
+    [Fact]
+    public void GenerateReport_IncludesGpuDrawCallStats()
+    {
+        var monitor = new PerformanceMonitor { IsEnabled = true };
+        monitor.Record(new FrameProfile { FrameTotalMs = 16, DrawCallCount = 98, SpriteCount = 106, PrimitiveCount = 608, TextureCount = 132 }, NoRelationships);
+
+        var text = monitor.GenerateReport();
+        text.ShouldContain("DrawCalls");
+        text.ShouldContain("98");
+    }
+
+    [Fact]
     public void Record_MoreFramesThanWindowSize_RingBufferRetainsOnlyMostRecent()
     {
         var monitor = new PerformanceMonitor { IsEnabled = true, WindowSize = 3 };

@@ -80,6 +80,9 @@ public class GumRenderable : IRenderable, IAttachable
     public string? Name { get; set; }
 
     /// <inheritdoc/>
+    public bool IsVisible => Visual.Visible;
+
+    /// <inheritdoc/>
     public void Draw(SpriteBatch spriteBatch, Camera camera)
     {
         if (!Visual.Visible) return;

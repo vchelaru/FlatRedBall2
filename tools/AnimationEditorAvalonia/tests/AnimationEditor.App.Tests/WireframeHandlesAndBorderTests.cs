@@ -244,6 +244,48 @@ public class WireframeHandlesAndBorderTests
         finally { Directory.Delete(dir, recursive: true); }
     }
 
+    /// <summary>
+    /// A locked chain's selected frame must show no resize handles at all (#1032 follow-up) —
+    /// the drag itself is already guarded, but the handle squares must not imply the frame is
+    /// draggable. Same geometry as <see cref="WireframeHandles_SelectedFrame_TopLeftHandleIsOutsideFrame"/>.
+    /// </summary>
+    [AvaloniaFact]
+    public void WireframeHandles_SelectedFrame_ChainLocked_NoHandlesRendered()
+    {
+        var ctx = ResetSingletons();
+        var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var png = WriteSolidPng(dir, SKColors.Black);
+
+            var frame = new AnimationFrameSave
+            {
+                TextureName = png, FrameLength = 0.1f,
+                LeftCoordinate = 0.125f, TopCoordinate = 0.125f,
+                RightCoordinate = 0.875f, BottomCoordinate = 0.875f,
+                ShapesSave = new ShapesSave()
+            };
+            var chain = new AnimationChainSave { Name = "Test", IsLocked = true };
+            chain.Frames.Add(frame);
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            ctx.SelectedState.SelectedChain = chain;
+            ctx.SelectedState.SelectedFrame = frame;
+
+            var ctrl = ctx.CreateWireframeControl();
+            ctrl.LoadTexture(png);
+            ctrl.RefreshFrames();
+            ctrl.SetCamera(0, 0, 1);  // screen rect = (8,8,56,56); TL handle would be at (3,3)
+
+            using var bm = ctrl.RenderToBitmap(64, 64);
+
+            var px = bm.GetPixel(3, 3);
+            Assert.True(px.Red < 100 && px.Green < 100 && px.Blue < 100,
+                $"Locked chain's selected frame should render no handle; R={px.Red} G={px.Green} B={px.Blue}");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
     // ── Wireframe texture outline ─────────────────────────────────────────────
 
     /// <summary>

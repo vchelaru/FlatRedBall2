@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "gumcli": {
-      "version": "2026.8.28.1-preview.1",
+      "version": "2026.9.3.2-preview.1",
       "commands": ["gumcli"]
     }
   }

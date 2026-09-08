@@ -17,10 +17,7 @@ partial class CardGum : global::Gum.Forms.Controls.FrameworkElement
         var template = new global::Gum.Forms.VisualTemplate((vm, createForms) =>
         {
             var visual = new global::MonoGameGum.GueDeriving.ContainerRuntime();
-            var element = ObjectFinder.Self.GetElementSave("CardGum");
-#if DEBUG
-if(element == null) throw new System.InvalidOperationException("Could not find an element named CardGum - did you forget to load a Gum project?");
-#endif
+            var element = ObjectFinder.Self.GetElementSave("CardGum") ?? throw new System.InvalidOperationException("Could not find an element named CardGum - did you forget to load a Gum project?");
             element.SetGraphicalUiElement(visual, RenderingLibrary.SystemManagers.Default);
             if(createForms) visual.FormsControlAsObject = new CardGum(visual);
             return visual;

@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Rendering;
 using Gum.Wireframe;
 using NativeGumBatch = RenderingLibrary.Graphics.GumBatch;
+using NativeRenderer = RenderingLibrary.Graphics.Renderer;
 
 namespace FlatRedBall2.UI;
 
@@ -38,6 +39,13 @@ public class GumRenderBatch : IRenderBatch
     internal void Initialize()
     {
         _inner = new NativeGumBatch();
+
+        // Static, process-wide — set once. Pairs with GumBatchDrawMode.Deferred in Begin() below:
+        // Deferred accumulates this cycle's Draw() calls and, at End, Z-sorts them and runs them
+        // through whichever SiblingOrdering is active before submitting once. Without swapping in
+        // the grouped orderer, that submit still walks in Z order (same as HierarchicalOrderer) and
+        // gets none of the same-texture batching Deferred mode exists to enable.
+        NativeRenderer.SiblingOrdering = RenderingLibrary.Graphics.BatchKeyGroupedOrderer.Instance;
     }
 
     /// <inheritdoc/>
@@ -62,7 +70,16 @@ public class GumRenderBatch : IRenderBatch
         // actually uses for FRB2-hosted UI). Pass null to GumBatch.Begin so we don't double-apply
         // the scale on top of what we just set.
         SyncCursorCamera(RenderingLibrary.SystemManagers.Default.Renderer.Camera, camera);
-        _inner!.Begin(null);
+
+        // Deferred: Draw(element) calls in this cycle accumulate instead of submitting one at a
+        // time, and get Z-sorted + run through SiblingOrdering (set in Initialize above) as one
+        // batch at End(). Gum resets its own RenderStateChangeStatistics/LastFrameDrawStates once
+        // per host frame internally (Renderer.TryResetPerformanceStatsForHostFrame, keyed off
+        // GumService.Update's Activity tick) — FRB2 must NOT reset them here itself, since this
+        // Begin runs multiple times per host frame (once per camera, plus the overlay pass), and
+        // resetting on each cycle would wipe out the earlier cycles' counts instead of letting
+        // them accumulate across the frame.
+        _inner!.Begin(null, mode: NativeRenderer.GumBatchDrawMode.Deferred);
     }
 
     /// <summary>
@@ -87,6 +104,15 @@ public class GumRenderBatch : IRenderBatch
     {
         _inner!.End();
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Reads <c>Renderer.Self.RenderStateChangeStatistics.DrawCallCount</c> — Gum's own
+    /// backend-neutral GPU draw-call count, covering both its <c>SpriteBatch</c> and
+    /// Apos.Shapes work, reset once per host frame (see <see cref="Begin"/>) and accumulated
+    /// across every camera/overlay cycle in that frame.
+    /// </remarks>
+    public int InternalDrawCallCount => NativeRenderer.Self.RenderStateChangeStatistics.DrawCallCount;
 
     /// <summary>Draws a Gum element within an active Begin/End block.</summary>
     internal void DrawElement(GraphicalUiElement element)

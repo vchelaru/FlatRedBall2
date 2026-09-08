@@ -67,14 +67,30 @@ internal class AutomationMode
     internal Thread? ReaderThread { get; private set; }
 
     /// <summary>
-    /// Ends <see cref="ReaderLoop"/> at its next EOF retry. Idempotent; safe from any thread.
+    /// Ends <see cref="ReaderLoop"/> and blocks until the reader thread has actually exited (bounded
+    /// — see remarks). Idempotent; safe from any thread.
     /// </summary>
     /// <remarks>
-    /// A loop currently blocked inside <c>ReadLine()</c> on a real stdin handle stays blocked until
-    /// that read returns — the stop is observed on the next pass, not the instant it is signalled.
-    /// That is acceptable precisely because the thread is background: nothing waits on it.
+    /// Setting the signal alone leaves a window, up to one <see cref="EofRetryDelayMs"/> retry
+    /// cycle wide, where the reader thread is still alive after <see cref="Stop"/> returns. That is
+    /// fine for the one reader thread a real running game has, torn down with the whole process at
+    /// exit — but a test host runs hundreds of these across a single process, each leaving its own
+    /// transient window; if the process's own exit teardown lands inside one, it can corrupt the
+    /// native heap (issue #1054, seen as an intermittent <c>malloc_consolidate</c> crash in CI,
+    /// always after every test had already reported passing). Joining here closes that window for
+    /// every caller at once instead of relying on each one to wait it out separately.
+    ///
+    /// The bounded timeout preserves the one case where the loop legitimately can't respond
+    /// promptly: a loop blocked inside <c>ReadLine()</c> on a real stdin handle stays blocked until
+    /// that read returns, however long that takes. <see cref="Stop"/> gives up waiting after that
+    /// timeout rather than hanging the caller — the thread is still background, so the CLR tears it
+    /// down at process exit exactly as before.
     /// </remarks>
-    internal void Stop() => _stopSignal.Set();
+    internal void Stop()
+    {
+        _stopSignal.Set();
+        ReaderThread?.Join(TimeSpan.FromMilliseconds(EofRetryDelayMs * 8));
+    }
 
     /// <summary>
     /// Reads stdin as a raw stream rather than through <see cref="Console.In"/>.

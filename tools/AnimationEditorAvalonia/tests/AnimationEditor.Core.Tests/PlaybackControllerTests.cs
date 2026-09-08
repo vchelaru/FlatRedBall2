@@ -286,6 +286,107 @@ public class PlaybackControllerTests
         Assert.Equal(0, ctrl.CurrentFrameIndex);
     }
 
+    // ── Loop toggle ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Loop_DefaultsToTrue()
+    {
+        var ctrl = new PlaybackController();
+        Assert.True(ctrl.Loop);
+    }
+
+    [Fact]
+    public void Advance_StopsOnLastFrame_WhenLoopIsFalse()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.Loop = false;
+
+        ctrl.Advance(0.35); // would wrap to frame 0 if looping
+
+        Assert.Equal(2, ctrl.CurrentFrameIndex);
+    }
+
+    [Fact]
+    public void Advance_PausesAtEnd_WhenLoopIsFalse()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Loop = false;
+
+        ctrl.Advance(0.35);
+
+        Assert.False(ctrl.IsPlaying);
+    }
+
+    [Fact]
+    public void Advance_DoesNotPause_WhenLoopIsTrueAndAnimationWraps()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+
+        ctrl.Advance(0.35); // wraps, Loop defaults to true
+
+        Assert.True(ctrl.IsPlaying);
+    }
+
+    [Fact]
+    public void Advance_FreezesAnimTimeAtTotalDuration_WhenLoopFalseAndOverrun()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.Loop = false;
+
+        ctrl.Advance(999.0); // way past the end
+
+        Assert.Equal(0.3, ctrl.AnimTime, precision: 6);
+        Assert.Equal(2, ctrl.CurrentFrameIndex);
+    }
+
+    [Fact]
+    public void Play_RestartsFromBeginning_WhenNotLoopingAndAnimationFinished()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f)); // total = 0.3 s
+        ctrl.Loop = false;
+        ctrl.Advance(0.35); // finishes and auto-pauses on the last frame
+
+        ctrl.Play();
+
+        Assert.Equal(0, ctrl.CurrentFrameIndex);
+        Assert.Equal(0.0, ctrl.AnimTime);
+        Assert.True(ctrl.IsPlaying);
+    }
+
+    [Fact]
+    public void Play_ResumesInPlace_WhenNotLoopingButNotYetFinished()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Loop = false;
+        ctrl.Advance(0.15); // mid-animation, frame 1
+        ctrl.Pause();
+
+        ctrl.Play();
+
+        Assert.Equal(1, ctrl.CurrentFrameIndex);
+    }
+
+    [Fact]
+    public void Play_FiresFrameIndexChanged_WhenRestartingFromEnd()
+    {
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(MakeChain(3, 0.1f));
+        ctrl.Loop = false;
+        ctrl.Advance(0.35); // ends on frame 2
+
+        int fired = -1;
+        ctrl.FrameIndexChanged += i => fired = i;
+        ctrl.Play();
+
+        Assert.Equal(0, fired);
+    }
+
     // ── FrameElapsed ──────────────────────────────────────────────────────────
 
     [Fact]

@@ -1,6 +1,6 @@
 ---
 name: entities-and-factories
-description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, Factory<T>, spawning/creating/destroying entities, entity lifecycle, Add, shape children, CustomInitialize/CustomActivity, or Engine.GetFactory<T>(). Trigger on any entity creation, destruction, or factory question."
+description: "Entities and Factories in FlatRedBall2. Use when working with Entity subclasses, generic Factory types, spawning/creating/destroying entities, entity lifecycle, Add, shape children, CustomInitialize/CustomActivity, or Engine.GetFactory. Trigger on any entity creation, destruction, or factory question."
 ---
 
 # Entities and Factories in FlatRedBall2

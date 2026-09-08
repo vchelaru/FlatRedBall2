@@ -36,6 +36,18 @@ public interface IRenderable
     string? Name { get; }
 
     /// <summary>
+    /// When <c>false</c>, the engine skips this renderable entirely — no <see cref="Draw"/> call,
+    /// and critically, it does not participate in batch-transition detection either. Default
+    /// <c>true</c>. Collision-only shapes (<c>AARect</c>, <c>Circle</c>, <c>Line</c>, <c>Polygon</c>)
+    /// default their own <c>IsVisible</c> to <c>false</c>, and every existing <see cref="Draw"/>
+    /// implementation already early-returns on it — so before this member existed, an invisible
+    /// shape sitting between two same-batch renderables still forced a real (wasted) batch
+    /// Begin/End pair, because the engine only checked visibility inside <see cref="Draw"/>,
+    /// after the batch-transition decision had already been made.
+    /// </summary>
+    bool IsVisible => true;
+
+    /// <summary>
     /// Issues draw calls into <paramref name="spriteBatch"/>. Called by the engine inside
     /// the <see cref="Batch"/>'s <c>Begin</c>/<c>End</c> pair — implementations must not
     /// call <c>Begin</c>/<c>End</c> themselves.

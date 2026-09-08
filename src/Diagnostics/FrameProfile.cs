@@ -1,9 +1,11 @@
 namespace FlatRedBall2.Diagnostics;
 
 /// <summary>
-/// Per-frame timing breakdown captured by the engine and exposed as
-/// <see cref="FlatRedBallService.LastFrame"/>. All fields are wall-clock milliseconds for the
-/// most recently completed frame. A snapshot, not a running average — caller smooths if desired.
+/// Per-frame timing and GPU-metrics breakdown captured by the engine and exposed as
+/// <see cref="FlatRedBallService.LastFrame"/>. Timing fields are wall-clock milliseconds; the
+/// <c>*Count</c> fields are raw GPU counters from <c>GraphicsDevice.Metrics</c>. All values are
+/// for the most recently completed frame — a snapshot, not a running average — caller smooths
+/// if desired.
 /// </summary>
 /// <remarks>
 /// Phase fields are end-to-end wall-clock for that pass: <see cref="PhysicsMs"/> covers entity
@@ -58,4 +60,28 @@ public struct FrameProfile
 
     /// <summary>End-to-end wall-clock for the most recent Update + Draw pair.</summary>
     public double FrameTotalMs;
+
+    /// <summary>
+    /// GPU draw calls issued this frame (<c>GraphicsDevice.Metrics.DrawCount</c>), captured just
+    /// before <c>Present</c>. Each render-state change forces a batch flush, so a spike here with
+    /// no change in on-screen content usually means state thrashing, not more content.
+    /// </summary>
+    public long DrawCallCount;
+
+    /// <summary>
+    /// Sprites/quads submitted this frame (<c>GraphicsMetrics.SpriteCount</c>). Contrast with
+    /// <see cref="DrawCallCount"/> to gauge batching efficiency — a low ratio (few sprites per
+    /// draw call) means batches are being flushed early, e.g. by texture or effect switches.
+    /// </summary>
+    public long SpriteCount;
+
+    /// <summary>Triangles rendered this frame (<c>GraphicsMetrics.PrimitiveCount</c>).</summary>
+    public long PrimitiveCount;
+
+    /// <summary>
+    /// Distinct textures bound this frame (<c>GraphicsMetrics.TextureCount</c>). Texture-atlas
+    /// fragmentation — e.g. many small per-glyph font textures instead of one shared atlas —
+    /// inflates this and drives up <see cref="DrawCallCount"/> via texture-swap flushes.
+    /// </summary>
+    public long TextureCount;
 }

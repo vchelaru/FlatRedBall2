@@ -51,7 +51,12 @@ public class WireframeControl : TextureViewport
     /// </summary>
     private sealed class WireframeSnapshot : TextureViewportSnapshot
     {
-        public List<(SKRect Bounds, bool IsSelected)> Frames = new();
+        /// <summary>
+        /// Per-frame reveal progress (#1027): each frame owns its own shrink-to-rest timeline
+        /// (0 = full bump, 1 = settled) instead of one shared value, so extending a selection
+        /// only replays the newly-added frame(s) — an already-settled sibling keeps its 1f.
+        /// </summary>
+        public List<(SKRect Bounds, bool IsSelected, float RevealProgress)> Frames = new();
         /// <summary>Mirrors <see cref="WireframeControl.FillFrames"/> (#976).</summary>
         public bool FillFrames = true;
         public SKRect? SelectedHandleBounds;    // null → no handles drawn
@@ -72,11 +77,6 @@ public class WireframeControl : TextureViewport
         public SKRect? HoverFrameBounds;
         /// <summary>"Frame N" label for <see cref="HoverFrameBounds"/>; null when nothing is hovered.</summary>
         public string? HoverLabel;
-        /// <summary>
-        /// Selection-outline reveal progress (#542): 0 = full bump, 1 = settled.
-        /// Same curve as the PNG diff boxes via <see cref="RevealAnimation"/>.
-        /// </summary>
-        public float SelectionRevealProgress = 1f;
         /// <summary>Resize-handle fade-in alpha (0 = invisible, 1 = fully shown). Ramps from
         /// <see cref="RevealAnimation.HandleFadeStartFraction"/> via
         /// <see cref="RevealAnimation.HandleAlpha"/> so the fade overlaps the tail of the
@@ -104,14 +104,13 @@ public class WireframeControl : TextureViewport
         using var frameStroke = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1f };
         using var solidFill = new SKPaint { Style = SKPaintStyle.Fill, Color = new SKColor(80, 160, 255, 255) };
 
-        float revealInflation = RevealAnimation.InflationPixels(s.SelectionRevealProgress);
-
         var screenRects = new List<(SKRect Sr, bool IsSelected)>(s.Frames.Count);
-        foreach (var (bounds, isSelected) in s.Frames)
+        foreach (var (bounds, isSelected, revealProgress) in s.Frames)
         {
             var sr = s.TextureRectToScreen(bounds);
-            // One-shot reveal (#542): fixed screen-space pixels (not a multiplier of the box's
-            // own size) so the pop stays visible at any zoom level.
+            // One-shot reveal (#542), timed per-frame (#1027): fixed screen-space pixels (not a
+            // multiplier of the box's own size) so the pop stays visible at any zoom level.
+            float revealInflation = RevealAnimation.InflationPixels(revealProgress);
             if (isSelected && revealInflation > 0f)
                 sr = InflateBy(sr, revealInflation);
             screenRects.Add((sr, isSelected));
@@ -357,11 +356,11 @@ public class WireframeControl : TextureViewport
     private bool _showPreview;
     private SKRect _previewRect;
 
-    // ── Selection-outline reveal (#542 / #803) ────────────────────────────────
-    // RevealHost owns progress + timer; the curve is RevealAnimation in Core.
-    private RevealHost _selectionReveal = null!;
-    private List<AnimationFrameSave>? _lastRevealedFrames;
-    private object? _lastRevealSelectionKey;
+    // ── Selection-outline reveal (#542 / #803 / #1027) ────────────────────────
+    // Each currently-highlighted frame owns its own RevealHost (progress + timer; the curve is
+    // RevealAnimation in Core), keyed by frame identity, so extending a selection only replays
+    // the newly-added frame(s) instead of restarting every highlighted frame in lockstep.
+    private readonly Dictionary<AnimationFrameSave, RevealHost> _frameReveals = new();
 
     // Lazily-created "add frame" cursor (arrow + "+" badge) shown when Ctrl is held and a
     // click would add a frame.
@@ -444,6 +443,14 @@ public class WireframeControl : TextureViewport
     private ThumbnailService? _thumbnailService;
 
     /// <summary>
+    /// True when <paramref name="frame"/>'s owning chain is locked (#1032). A locked chain must
+    /// be inert to drag gestures — gated at drag-start (both here and in the Simulate* test
+    /// hooks) so a locked target never starts following the pointer.
+    /// </summary>
+    private bool IsFrameLocked(AnimationFrameSave frame) =>
+        _objectFinder?.GetAnimationChainContaining(frame)?.IsLocked == true;
+
+    /// <summary>
     /// Called from MainWindow after DI container wires all services.
     /// Moves subscriptions out of the constructor so services are available.
     /// </summary>
@@ -497,41 +504,40 @@ public class WireframeControl : TextureViewport
     }
 
     /// <summary>
-    /// SelectionChanged handler: starts the one-shot outline reveal (#542) only when the
-    /// selected-frame identity actually changed, then refreshes the texture/frames.
-    /// Unrelated refreshes (grid toggle, refresh-wireframe requests) do not go through
-    /// here, so they cannot restart the reveal.
+    /// SelectionChanged handler: diffs the highlighted-frame set and starts the reveal only on
+    /// frames newly added to it (#1027), then refreshes the texture/frames. Unrelated refreshes
+    /// (grid toggle, refresh-wireframe requests) do not go through here, so they cannot restart
+    /// any frame's reveal.
     /// </summary>
     private void OnSelectionChanged()
     {
-        if (SelectedFramesIdentityChanged())
-            BeginSelectionReveal();
+        UpdateSelectionReveals();
         RefreshAll();
     }
 
     /// <summary>
-    /// True when either <see cref="ComputeHighlightedFrames"/>'s *content* differs from last time,
-    /// or the *click target* (the specific selected frame, or the selected chain when no frame is
-    /// selected) differs — checked separately because a chain with exactly one frame makes
-    /// selecting the whole chain and selecting that lone frame compute to the identical
-    /// one-frame highlighted set. A content-only diff would then see "no change" and skip the
-    /// reveal even though the user genuinely clicked a different tree node (#716). Updates both
-    /// remembered values when either changed.
+    /// Diffs <see cref="ComputeHighlightedFrames"/> against the frames currently tracked in
+    /// <see cref="_frameReveals"/> (#1027): a frame newly present starts its own reveal at
+    /// progress 0; a frame still present keeps its existing (possibly already-settled) host
+    /// untouched, so extending a selection never replays an already-revealed sibling; a frame no
+    /// longer present is dropped, stopping its timer.
     /// </summary>
-    private bool SelectedFramesIdentityChanged()
+    private void UpdateSelectionReveals()
     {
         var current = ComputeHighlightedFrames();
-        bool contentChanged = _lastRevealedFrames is null
-            || _lastRevealedFrames.Count != current.Count
-            || !_lastRevealedFrames.SequenceEqual(current);
+        var currentSet = new HashSet<AnimationFrameSave>(current);
 
-        object? selectionKey = (object?)_selectedState?.SelectedFrame ?? _selectedState?.SelectedChain;
-        bool targetChanged = !ReferenceEquals(_lastRevealSelectionKey, selectionKey);
+        foreach (var stale in _frameReveals.Keys.Where(f => !currentSet.Contains(f)).ToList())
+        {
+            _frameReveals[stale].Stop();
+            _frameReveals.Remove(stale);
+        }
 
-        _lastRevealedFrames = current;
-        _lastRevealSelectionKey = selectionKey;
-
-        return contentChanged || targetChanged;
+        foreach (var frame in current)
+        {
+            if (!_frameReveals.ContainsKey(frame))
+                GetOrCreateReveal(frame).Restart();
+        }
     }
 
     /// <summary>
@@ -556,49 +562,101 @@ public class WireframeControl : TextureViewport
         return new List<AnimationFrameSave>();
     }
 
-    /// <summary>Resets reveal progress to 0 and starts the timer.</summary>
-    private void BeginSelectionReveal() => _selectionReveal.Restart();
+    /// <summary>Returns <paramref name="frame"/>'s reveal host, creating one (at rest) if absent.</summary>
+    private RevealHost GetOrCreateReveal(AnimationFrameSave frame)
+    {
+        if (!_frameReveals.TryGetValue(frame, out var host))
+        {
+            host = new RevealHost(InvalidateVisual);
+            _frameReveals[frame] = host;
+        }
+        return host;
+    }
 
     /// <summary>
-    /// Explicitly restarts the shrink-to-rest reveal (#542), independent of whether the
-    /// highlighted frame set actually changed. <see cref="SelectedFramesIdentityChanged"/> only
-    /// fires <see cref="BeginSelectionReveal"/> when the *set* differs from last time, so
-    /// re-clicking an already-selected chain or frame — which reproduces the identical set —
-    /// would otherwise never replay (#716). Call this from the click site itself (a click always
-    /// means "play it again"), not from selection-change plumbing.
+    /// Explicitly restarts the shrink-to-rest reveal (#542) for every currently highlighted
+    /// frame, independent of whether the highlighted set actually changed. <see cref="UpdateSelectionReveals"/>
+    /// only starts a frame's reveal the first time it becomes highlighted, so re-clicking an
+    /// already-selected chain or frame — which reproduces the identical set — would otherwise
+    /// never replay (#716). Call this from the click site itself (a click always means "play it
+    /// again"), not from selection-change plumbing.
     /// </summary>
-    public void ReplaySelectionReveal() => BeginSelectionReveal();
-
-    /// <summary>True while the selection-outline reveal (#542) is easing toward rest.</summary>
-    public bool IsSelectionRevealAnimating => _selectionReveal.IsAnimating;
-
-    /// <summary>Test-only: reveal progress (0 = full bump, 1 = settled).</summary>
-    public float SelectionRevealProgress => _selectionReveal.Progress;
+    public void ReplaySelectionReveal()
+    {
+        foreach (var frame in ComputeHighlightedFrames())
+            GetOrCreateReveal(frame).Restart();
+    }
 
     /// <summary>
-    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown), derived from
-    /// <see cref="SelectionRevealProgress"/> via <see cref="RevealAnimation.HandleAlpha"/> — a
-    /// linear ramp over the tail of the same progress timeline (not a separately-timed
-    /// animation), so the fade always finishes exactly when the shrink does.
+    /// True when <paramref name="frame"/> is currently the *only* highlighted frame (#1027) —
+    /// used by click sites to detect a click that will reproduce the exact same highlighted-frame
+    /// set it found (re-clicking the selected frame, or clicking the lone frame of an
+    /// already-selected single-frame chain), so they can explicitly call
+    /// <see cref="ReplaySelectionReveal"/>: <see cref="UpdateSelectionReveals"/> only starts a
+    /// frame's reveal the first time it becomes highlighted, so a click that reproduces an
+    /// already-highlighted set would otherwise silently no-op (#716).
     /// </summary>
-    public float HandleFadeProgress => RevealAnimation.HandleAlpha(_selectionReveal.Progress);
+    public bool IsSoleHighlightedFrame(AnimationFrameSave frame)
+    {
+        var current = ComputeHighlightedFrames();
+        return current.Count == 1 && current[0] == frame;
+    }
+
+    /// <summary>True while any highlighted frame's selection-outline reveal (#542) is easing toward rest.</summary>
+    public bool IsSelectionRevealAnimating => _frameReveals.Values.Any(h => h.IsAnimating);
 
     /// <summary>
-    /// Advances the in-flight selection reveal by <paramref name="dtSeconds"/>. Returns
-    /// <c>true</c> while still animating, <c>false</c> once settled. Live timer and tests
-    /// both call this (tests skip the timer for determinism).
+    /// Test-only: a specific frame's reveal progress (0 = full bump, 1 = settled). A frame with
+    /// no tracked reveal state (never highlighted, or since dropped) reads as settled (1f).
     /// </summary>
-    public bool StepSelectionReveal(float dtSeconds) => _selectionReveal.Step(dtSeconds);
+    public float GetSelectionRevealProgress(AnimationFrameSave frame) =>
+        _frameReveals.TryGetValue(frame, out var host) ? host.Progress : 1f;
 
-    /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously.</summary>
-    public void SettleSelectionReveal() => _selectionReveal.Settle();
+    /// <summary>
+    /// Test-only: reveal progress (0 = full bump, 1 = settled) of the primary selected frame
+    /// (<see cref="ISelectedState.SelectedFrame"/>). 1f when no single frame is selected.
+    /// </summary>
+    public float SelectionRevealProgress =>
+        _selectedState?.SelectedFrame is { } f ? GetSelectionRevealProgress(f) : 1f;
+
+    /// <summary>
+    /// Test-only: resize-handle fade-in opacity (0 = invisible, 1 = fully shown) for the primary
+    /// selected frame, derived from <see cref="SelectionRevealProgress"/> via
+    /// <see cref="RevealAnimation.HandleAlpha"/> — a linear ramp over the tail of that frame's
+    /// own progress timeline (not a separately-timed animation), so the fade always finishes
+    /// exactly when that frame's shrink does.
+    /// </summary>
+    public float HandleFadeProgress => RevealAnimation.HandleAlpha(SelectionRevealProgress);
+
+    /// <summary>
+    /// Advances every in-flight frame reveal by <paramref name="dtSeconds"/>. Returns
+    /// <c>true</c> while any frame is still animating, <c>false</c> once all are settled. Live
+    /// timers and tests both call this per-host (tests skip the timer for determinism).
+    /// </summary>
+    public bool StepSelectionReveal(float dtSeconds)
+    {
+        bool anyAnimating = false;
+        foreach (var host in _frameReveals.Values)
+            if (host.Step(dtSeconds)) anyAnimating = true;
+        return anyAnimating;
+    }
+
+    /// <summary>Runs <see cref="StepSelectionReveal"/> to completion synchronously for every tracked frame.</summary>
+    public void SettleSelectionReveal()
+    {
+        foreach (var host in _frameReveals.Values)
+            host.Settle();
+    }
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public WireframeControl()
     {
-        _selectionReveal = new RevealHost(InvalidateVisual);
-        DetachedFromVisualTree += (_, _) => _selectionReveal.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            foreach (var host in _frameReveals.Values)
+                host.Stop();
+        };
 
         // Right-click opens this menu with a "View <filename> in Explorer" item for the
         // currently loaded texture (mirrors PreviewControl's context menu — issue #573).
@@ -717,6 +775,16 @@ public class WireframeControl : TextureViewport
     {
         var path = DetermineTexturePath();
 
+        // Nothing to show for the current selection: no frame selected, and nothing anywhere in
+        // this document to borrow (an empty chain, or a chain-less document). Keep whatever
+        // texture is already loaded instead of blanking it, so the #618 "seed the first frame"
+        // texture survives selecting a brand-new empty chain instead of vanishing the instant it's
+        // created. A frame that IS selected but has no texture is a different case -- that must
+        // still blank so the canvas doesn't imply a texture the frame doesn't have (#616) -- so
+        // this substitution only applies when no frame is selected at all.
+        if (path is null && _selectedState?.SelectedFrame is null)
+            path = LoadedTexturePathCasePreserved;
+
         SKBitmap? known = null;
         if (_thumbnailService != null)
         {
@@ -810,7 +878,7 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var sel = PrimaryFrameRect();
-        if (sel is null || _bitmap is null) return;
+        if (sel is null || _bitmap is null || IsFrameLocked(sel.Frame)) return;
 
         _draggingRect    = sel;
         _draggingHandle  = handle;
@@ -852,7 +920,7 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var primary = _frameRects.FirstOrDefault(fr => fr.Frame == targetFrame);
-        if (primary is null || _bitmap is null) return;
+        if (primary is null || _bitmap is null || IsFrameLocked(primary.Frame)) return;
 
         _draggingRect    = primary;
         _draggingHandle  = handle;
@@ -863,11 +931,16 @@ public class WireframeControl : TextureViewport
         _dragBeforeR = primary.Frame.RightCoordinate;
         _dragBeforeB = primary.Frame.BottomCoordinate;
 
+        // A locked chain among the visible frames keeps its own frames still (bulk
+        // skip-locked-entries pattern).
         _bulkHandleDragStarts.Clear();
         foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
             _bulkHandleDragStarts.Add((fr, fr.Bounds,
                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
 
         ApplyHandleDrag(new Point(endScreenX, endScreenY));
 
@@ -906,14 +979,19 @@ public class WireframeControl : TextureViewport
         float endScreenX,   float endScreenY)
     {
         var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
 
         _draggingChain = true;
         _chainDragStarts.Clear();
+        // A locked chain among the visible frames keeps its own frames still (bulk
+        // skip-locked-entries pattern, matching SimulateBulkHandleDrag).
         foreach (var fr in _frameRects)
+        {
+            if (IsFrameLocked(fr.Frame)) continue;
             _chainDragStarts.Add((fr, fr.Bounds,
                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+        }
         _dragStartWorld = ScreenToTexture(startScreenX, startScreenY);
 
         ApplyChainDrag(new Point(endScreenX, endScreenY));
@@ -946,7 +1024,7 @@ public class WireframeControl : TextureViewport
     public void SimulateHandleDragBegin(HandleKind handle, float startScreenX, float startScreenY)
     {
         var sel = PrimaryFrameRect();
-        if (sel is null || _bitmap is null) return;
+        if (sel is null || _bitmap is null || IsFrameLocked(sel.Frame)) return;
 
         _draggingRect    = sel;
         _draggingHandle  = handle;
@@ -968,7 +1046,7 @@ public class WireframeControl : TextureViewport
     public void SimulateChainDragBegin(float startScreenX, float startScreenY)
     {
         var chain = _selectedState?.SelectedChain;
-        if (chain is null || _bitmap is null || _frameRects.Count == 0) return;
+        if (chain is null || _bitmap is null || _frameRects.Count == 0 || chain.IsLocked) return;
 
         _draggingChain = true;
         _chainDragStarts.Clear();
@@ -1165,7 +1243,7 @@ public class WireframeControl : TextureViewport
         snap.PreviewRect = _previewRect;
 
         foreach (var fr in _frameRects)
-            snap.Frames.Add((fr.Bounds, fr.IsSelected));
+            snap.Frames.Add((fr.Bounds, fr.IsSelected, GetSelectionRevealProgress(fr.Frame)));
 
         if (_hoverFrame != null)
         {
@@ -1174,11 +1252,10 @@ public class WireframeControl : TextureViewport
         }
 
         snap.PendingCutFrameBounds.AddRange(BuildPendingCutFrameBounds());
-        snap.SelectionRevealProgress = _selectionReveal.Progress;
-        snap.HandleAlpha = RevealAnimation.HandleAlpha(_selectionReveal.Progress);
+        snap.HandleAlpha = RevealAnimation.HandleAlpha(SelectionRevealProgress);
 
         var sel = PrimaryFrameRect();
-        if (sel != null && !_isMagicWandMode)
+        if (sel != null && !_isMagicWandMode && !IsFrameLocked(sel.Frame))
         {
             snap.SelectedHandleBounds = sel.Bounds;
 
@@ -1241,6 +1318,9 @@ public class WireframeControl : TextureViewport
             {
                 if (hitFrame != null)
                 {
+                    // A locked chain's frame is inert to the handle drag: refuse to start it.
+                    if (IsFrameLocked(hitFrame.Frame)) return;
+
                     // Single-frame drag (or bulk handle drag when multi-chain selected)
                     _draggingRect = hitFrame;
                     _draggingHandle = hitHandle;
@@ -1251,26 +1331,38 @@ public class WireframeControl : TextureViewport
                     _dragBeforeR = hitFrame.Frame.RightCoordinate;
                     _dragBeforeB = hitFrame.Frame.BottomCoordinate;
 
-                    // In multi-chain mode, capture before-state of ALL visible frames for
-                    // bulk apply and a single atomic undo command.
+                    // In multi-chain mode, capture before-state of every visible UNLOCKED frame
+                    // for bulk apply and a single atomic undo command -- a locked chain among the
+                    // selection keeps its own frames still (bulk skip-locked-entries pattern).
                     _bulkHandleDragStarts.Clear();
                     if ((_selectedState?.SelectedChains?.Count ?? 0) > 1)
                     {
                         foreach (var fr in _frameRects)
+                        {
+                            if (IsFrameLocked(fr.Frame)) continue;
                             _bulkHandleDragStarts.Add((fr, fr.Bounds,
                                 fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                                 fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                        }
                     }
                 }
                 else
                 {
-                    // Chain drag: move all chain frames together
+                    // Chain drag: move all chain frames together. A locked selected chain is
+                    // inert to the drag: refuse to start it.
+                    if (_selectedState?.SelectedChain?.IsLocked == true) return;
+
                     _draggingChain = true;
                     _chainDragStarts.Clear();
+                    // A locked chain among the visible frames keeps its own frames still (bulk
+                    // skip-locked-entries pattern, matching the resize-handle branch above).
                     foreach (var fr in _frameRects)
+                    {
+                        if (IsFrameLocked(fr.Frame)) continue;
                         _chainDragStarts.Add((fr, fr.Bounds,
                             fr.Frame.LeftCoordinate, fr.Frame.TopCoordinate,
                             fr.Frame.RightCoordinate, fr.Frame.BottomCoordinate));
+                    }
                     _dragStartWorld = ScreenToTexture((float)pos.X, (float)pos.Y);
                 }
                 _lastPointerPos = pos;
@@ -1371,7 +1463,7 @@ public class WireframeControl : TextureViewport
     /// Hit-tests <paramref name="pos"/> against <see cref="_frameRects"/> (#718) and updates
     /// <see cref="_hoverFrame"/> for the "Frame N" hover notch. Only invalidates when the hovered
     /// frame identity actually changes, mirroring the reveal's identity-diffing (see
-    /// <see cref="SelectedFramesIdentityChanged"/>) so a move within the same frame's bounds
+    /// <see cref="UpdateSelectionReveals"/>) so a move within the same frame's bounds
     /// doesn't repaint every tick.
     /// </summary>
     private void UpdateHoverFrame(Point pos)
@@ -1423,20 +1515,56 @@ public class WireframeControl : TextureViewport
 
     private void UpdateHoverCursor(Point pos, bool isCtrl = false)
     {
-        // When Ctrl is held and a bitmap is loaded, any click will create a new frame.
-        IsShowingAddFrameCursor = isCtrl && _bitmap != null;
+        // When Ctrl is held and a bitmap is loaded, any click will create a new frame in the
+        // chain the click would target -- suppressed when that chain is locked (#1032 follow-up),
+        // mirroring MainWindow.OnFrameCreatedFromRegion's own chain resolution.
+        IsShowingAddFrameCursor = isCtrl && _bitmap != null && !IsAddFrameTargetLocked();
         if (IsShowingAddFrameCursor)
         {
             Cursor = AddFrameCursor;
             return;
         }
 
-        var (_, hitHandle) = HitTestHandle(pos);
-        var cursorType = HandleCursorMapper.CursorTypeFor(hitHandle);
+        var cursorType = ResolveHandleCursorType(pos);
         Cursor = cursorType is null
             ? Cursor.Default
             : new Cursor(cursorType.Value);
     }
+
+    /// <summary>
+    /// Pure cursor-type decision behind <see cref="UpdateHoverCursor"/>'s handle branch --
+    /// extracted so tests can assert the plain <see cref="StandardCursorType"/> instead of the
+    /// Avalonia <see cref="Control.Cursor"/> property, which exposes no equality on it. Returns
+    /// <c>null</c> (default arrow) when the hit target's chain is locked (#1032 follow-up): a
+    /// locked frame/chain is inert to the drag <see cref="HitTestHandle"/> would start, so no
+    /// resize/move affordance should imply otherwise.
+    /// </summary>
+    private StandardCursorType? ResolveHandleCursorType(Point pos)
+    {
+        var (hitFrame, hitHandle) = HitTestHandle(pos);
+        bool isLockedHit = hitFrame != null
+            ? IsFrameLocked(hitFrame.Frame)
+            : hitHandle != HandleKind.None && _selectedState?.SelectedChain?.IsLocked == true;
+        return isLockedHit ? null : HandleCursorMapper.CursorTypeFor(hitHandle);
+    }
+
+    /// <summary>
+    /// True when a Ctrl+click's add-frame target is locked. Resolved the same way MainWindow's
+    /// <c>OnFrameCreatedFromRegion</c> picks the target chain: the first of
+    /// <see cref="ISelectedState.SelectedChains"/>, falling back to <see cref="ISelectedState.SelectedChain"/>.
+    /// </summary>
+    private bool IsAddFrameTargetLocked()
+    {
+        var chains = _selectedState?.SelectedChains;
+        var target = chains is { Count: > 0 } ? chains[0] : _selectedState?.SelectedChain;
+        return target?.IsLocked == true;
+    }
+
+    /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/>'s handle branch would
+    /// resolve to at the given screen point, without touching the Avalonia <see cref="Control.Cursor"/>
+    /// property. Does not account for the Ctrl add-frame branch -- see <see cref="IsShowingAddFrameCursor"/>.</summary>
+    internal StandardCursorType? GetHoverCursorTypeForTest(float screenX, float screenY)
+        => ResolveHandleCursorType(new Point(screenX, screenY));
 
     /// <summary>
     /// Test-only: true when the add-frame cursor (Ctrl held over a loaded bitmap) is currently
@@ -1509,7 +1637,10 @@ public class WireframeControl : TextureViewport
                 float aT = _draggingRect.Frame.TopCoordinate;
                 float aR = _draggingRect.Frame.RightCoordinate;
                 float aB = _draggingRect.Frame.BottomCoordinate;
-                if (RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
+                // Defense-in-depth: OnEditPointerPressed/Simulate* already refuse to start a
+                // drag on a locked chain's frame, so this should never fire for one.
+                if (!IsFrameLocked(_draggingRect.Frame) &&
+                    RegionChanged(_dragBeforeL, _dragBeforeT, _dragBeforeR, _dragBeforeB, aL, aT, aR, aB))
                 {
                     FrameRegionChanged?.Invoke(_draggingRect.Frame);
                     _undoManager!.Record(new FrameRegionChangedCommand(
@@ -1527,7 +1658,8 @@ public class WireframeControl : TextureViewport
         if (_draggingChain)
         {
             var chain = _selectedState!.SelectedChain;
-            if (chain != null)
+            // Defense-in-depth: see the comment above for the single/bulk-frame drag case.
+            if (chain != null && !chain.IsLocked)
             {
                 if (_chainDragStarts.Count > 0)
                 {
@@ -1633,6 +1765,9 @@ public class WireframeControl : TextureViewport
 
         foreach (var (fr, startBounds, _, _, _, _) in _chainDragStarts)
         {
+            // Defense-in-depth: population above already skips locked frames.
+            if (IsFrameLocked(fr.Frame)) continue;
+
             float newL = startBounds.Left   + dx;
             float newT = startBounds.Top    + dy;
             float newR = startBounds.Right  + dx;

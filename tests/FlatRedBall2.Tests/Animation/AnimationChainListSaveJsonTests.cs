@@ -31,6 +31,30 @@ public class AnimationChainListSaveJsonTests
     }
 
     [Fact]
+    public void ToJsonString_FromJsonString_ChainIsLockedTrue_RoundTrips()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", IsLocked = true });
+
+        var json = save.ToJsonString();
+        var roundTripped = AnimationChainListSave.FromJsonString(json);
+
+        json.ShouldContain("\"locked\": true");
+        roundTripped.AnimationChains.Single().IsLocked.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ToJsonString_ChainNotLocked_OmitsLockedKey()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+
+        var json = save.ToJsonString();
+
+        json.ShouldNotContain("locked");
+    }
+
+    [Fact]
     public void ToJsonString_FromJsonString_RoundTripsFrameFields()
     {
         var save = new AnimationChainListSave();

@@ -54,10 +54,21 @@ public static class ClipboardPayload
     public static string Serialize(CircleSave circle)
         => Encode(circle);
 
-  public static string SerializeFromPayload(CopySelectionPayload payload) => payload.Kind switch
+    /// <param name="payload">The items to serialize.</param>
+    /// <param name="sourceAchxFolder">
+    /// The directory of the <c>.achx</c> the copy/cut originated from. When given, every copied
+    /// frame's <c>TextureName</c> is resolved to an absolute path before being embedded, so the
+    /// same physical texture is still found after a paste into a document that lives in a
+    /// different folder (#1026) -- relative-to-source paths would otherwise resolve against the
+    /// destination folder instead. Pass <see langword="null"/> (e.g. an unsaved document with no
+    /// folder yet) to embed <c>TextureName</c> unchanged.
+    /// </param>
+    public static string SerializeFromPayload(CopySelectionPayload payload, string? sourceAchxFolder = null) => payload.Kind switch
     {
-        CopySelectionKind.Chain => Serialize(payload.Chains.Select(AnimationCloneHelper.CloneChain).ToList()),
-        CopySelectionKind.Frame => Serialize(payload.Frames.Select(AnimationCloneHelper.CloneFrame).ToList()),
+        CopySelectionKind.Chain => Serialize(ResolveChainTextures(
+            payload.Chains.Select(AnimationCloneHelper.CloneChain).ToList(), sourceAchxFolder)),
+        CopySelectionKind.Frame => Serialize(ResolveFrameTextures(
+            payload.Frames.Select(AnimationCloneHelper.CloneFrame).ToList(), sourceAchxFolder)),
         CopySelectionKind.Shape => payload.Shapes.Count == 1 && payload.Shapes[0] is AARectSave r
             ? Serialize((AARectSave)AnimationCloneHelper.CloneShape(r)!)
             : payload.Shapes.Count == 1 && payload.Shapes[0] is CircleSave c
@@ -67,6 +78,25 @@ public static class ClipboardPayload
                 .ToList()),
         _ => throw new System.ArgumentOutOfRangeException(nameof(payload)),
     };
+
+    private static List<AnimationChainSave> ResolveChainTextures(
+        List<AnimationChainSave> chains, string? sourceAchxFolder)
+    {
+        if (!string.IsNullOrEmpty(sourceAchxFolder))
+            foreach (var chain in chains)
+                ResolveFrameTextures(chain.Frames, sourceAchxFolder);
+        return chains;
+    }
+
+    private static List<AnimationFrameSave> ResolveFrameTextures(
+        List<AnimationFrameSave> frames, string? sourceAchxFolder)
+    {
+        if (!string.IsNullOrEmpty(sourceAchxFolder))
+            foreach (var frame in frames)
+                if (!string.IsNullOrEmpty(frame.TextureName))
+                    frame.TextureName = TexturePathHelper.ResolveDisplayPath(frame.TextureName, sourceAchxFolder);
+        return frames;
+    }
 
     // ── Deserialization ───────────────────────────────────────────────────
 

@@ -101,6 +101,18 @@ public class PerformanceMonitor
     /// </summary>
     public PerformanceStat Fps => ComputeStat(static p => p.FrameTotalMs > 0 ? 1000.0 / p.FrameTotalMs : 0);
 
+    /// <summary>Rolling stats for <see cref="FrameProfile.DrawCallCount"/>.</summary>
+    public PerformanceStat DrawCallCount => ComputeStat(static p => p.DrawCallCount);
+
+    /// <summary>Rolling stats for <see cref="FrameProfile.SpriteCount"/>.</summary>
+    public PerformanceStat SpriteCount => ComputeStat(static p => p.SpriteCount);
+
+    /// <summary>Rolling stats for <see cref="FrameProfile.PrimitiveCount"/>.</summary>
+    public PerformanceStat PrimitiveCount => ComputeStat(static p => p.PrimitiveCount);
+
+    /// <summary>Rolling stats for <see cref="FrameProfile.TextureCount"/>.</summary>
+    public PerformanceStat TextureCount => ComputeStat(static p => p.TextureCount);
+
     /// <summary>
     /// Records one committed frame into the rolling window. Called by the engine at the single
     /// point a frame's <see cref="FrameProfile"/> is fully consistent — never call this yourself.
@@ -162,6 +174,13 @@ public class PerformanceMonitor
         AppendPhase(sb, "Collision", CollisionMs);
         AppendPhase(sb, "GumUpdate", GumUpdateMs);
 
+        sb.AppendLine();
+        sb.AppendLine("GPU               Current      Avg");
+        AppendCount(sb, "DrawCalls", DrawCallCount);
+        AppendCount(sb, "Sprites", SpriteCount);
+        AppendCount(sb, "Primitives", PrimitiveCount);
+        AppendCount(sb, "Textures", TextureCount);
+
         var collisionReport = GetCollisionReport();
         if (collisionReport.Count > 0)
         {
@@ -213,6 +232,12 @@ public class PerformanceMonitor
     {
         sb.AppendLine(FormattableString.Invariant(
             $"{name,-16}  {stat.Current,9:F2}  {stat.Average,7:F2}"));
+    }
+
+    private static void AppendCount(StringBuilder sb, string name, PerformanceStat stat)
+    {
+        sb.AppendLine(FormattableString.Invariant(
+            $"{name,-16}  {stat.Current,9:F0}  {stat.Average,7:F1}"));
     }
 
     private PerformanceStat ComputeStat(Func<FrameProfile, double> selector)

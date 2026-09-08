@@ -17,6 +17,30 @@ public class AnimationChainListSaveTests
             _ => new MemoryStream(Encoding.UTF8.GetBytes(xml)));
 
     [Fact]
+    public void ToXmlString_FromString_ChainIsLockedTrue_RoundTrips()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", IsLocked = true });
+
+        var xml = save.ToXmlString();
+        var roundTripped = AnimationChainListSave.FromString(xml);
+
+        xml.ShouldContain("<Locked>true</Locked>");
+        roundTripped.AnimationChains.Single().IsLocked.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ToXmlString_ChainNotLocked_OmitsLockedElement()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+
+        var xml = save.ToXmlString();
+
+        xml.ShouldNotContain("Locked");
+    }
+
+    [Fact]
     public void FromFile_SingleChainWithTwoFrames_PreservesNamesAndFrameCount()
     {
         string xml =

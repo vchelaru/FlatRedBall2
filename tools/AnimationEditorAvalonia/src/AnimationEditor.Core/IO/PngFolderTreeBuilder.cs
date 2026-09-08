@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace AnimationEditor.Core.IO;
@@ -9,7 +10,13 @@ namespace AnimationEditor.Core.IO;
 /// </summary>
 public static class PngFolderTreeBuilder
 {
-    public static IReadOnlyList<PngFilesTreeNode> Build(IReadOnlyList<PngFileEntry> files)
+    /// <param name="filesRoot">
+    /// Absolute root the scan started from -- combined with each folder's path to give folder
+    /// nodes an <see cref="PngFilesTreeNode.AbsolutePath"/> too (issue #1059: needed so "View in
+    /// Explorer" works on a folder row, not just a file row). Pass null/empty only when no
+    /// filesystem reveal will ever be attempted (e.g. a test that only checks names/hierarchy).
+    /// </param>
+    public static IReadOnlyList<PngFilesTreeNode> Build(IReadOnlyList<PngFileEntry> files, string? filesRoot = null)
     {
         var root = new BuilderNode();
         foreach (var file in files)
@@ -18,7 +25,7 @@ public static class PngFolderTreeBuilder
             root.Insert(parts, file);
         }
 
-        return root.ToSortedNodes();
+        return root.ToSortedNodes(filesRoot);
     }
 
     private sealed class BuilderNode
@@ -45,17 +52,19 @@ public static class PngFolderTreeBuilder
             child.Insert(remaining, file);
         }
 
-        public List<PngFilesTreeNode> ToSortedNodes()
+        public List<PngFilesTreeNode> ToSortedNodes(string? folderAbsolutePath)
         {
             var nodes = new List<PngFilesTreeNode>();
 
             foreach (var (name, folder) in _folders.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
             {
+                var childAbsolutePath = folderAbsolutePath is null ? null : Path.Combine(folderAbsolutePath, name);
                 nodes.Add(new PngFilesTreeNode
                 {
                     Name = name,
-                    AbsolutePath = null,
-                    Children = folder.ToSortedNodes(),
+                    IsFolder = true,
+                    AbsolutePath = childAbsolutePath,
+                    Children = folder.ToSortedNodes(childAbsolutePath),
                 });
             }
 
@@ -64,6 +73,7 @@ public static class PngFolderTreeBuilder
                 nodes.Add(new PngFilesTreeNode
                 {
                     Name = file.FileName,
+                    IsFolder = false,
                     AbsolutePath = file.AbsolutePath,
                     RelativePath = file.RelativePath,
                     Children = Array.Empty<PngFilesTreeNode>(),
@@ -76,14 +86,15 @@ public static class PngFolderTreeBuilder
 }
 
 /// <summary>
-/// A folder or PNG file node in the files-panel tree. Folders have a null
-/// <see cref="AbsolutePath"/>; file nodes carry the on-disk path for drag/reveal.
+/// A folder or PNG file node in the files-panel tree. <see cref="AbsolutePath"/> is populated for
+/// both -- use <see cref="IsFolder"/>, not its nullability, to tell them apart (issue #1059: a
+/// folder's path is needed too, for "View in Explorer").
 /// </summary>
 public sealed class PngFilesTreeNode
 {
     public required string Name { get; init; }
+    public required bool IsFolder { get; init; }
     public string? AbsolutePath { get; init; }
     public string? RelativePath { get; init; }
     public IReadOnlyList<PngFilesTreeNode> Children { get; init; } = Array.Empty<PngFilesTreeNode>();
-    public bool IsFolder => AbsolutePath is null;
 }
