@@ -1,4 +1,5 @@
 using AnimationEditor.Core.IO;
+using System.IO;
 using Xunit;
 
 namespace AnimationEditor.Core.Tests;
@@ -39,6 +40,26 @@ public class PngFolderTreeBuilderTests
         Assert.Equal("hero.png", tree[0].Children[1].Name);
         Assert.False(tree[1].IsFolder);
         Assert.Equal("root.png", tree[1].Name);
+    }
+
+    // Issue #1059: a folder row needs its own AbsolutePath so "View in Explorer" can open it --
+    // previously only file nodes carried one.
+    [Fact]
+    public void Build_WithFilesRoot_GivesFolderNodesAbsolutePaths()
+    {
+        var files = new[]
+        {
+            new PngFileEntry(@"C:\proj\Sprites\Enemies\goblin.png", "Sprites/Enemies/goblin.png"),
+        };
+
+        const string root = @"C:\proj";
+        var tree = PngFolderTreeBuilder.Build(files, root);
+
+        // Path.Combine (matching production) rather than a hardcoded separator -- the CI runner
+        // is Linux, where combining with '/' still leaves the Windows-style literal root's own
+        // backslashes untouched.
+        Assert.Equal(Path.Combine(root, "Sprites"), tree[0].AbsolutePath);
+        Assert.Equal(Path.Combine(root, "Sprites", "Enemies"), tree[0].Children[0].AbsolutePath);
     }
 
     [Fact]

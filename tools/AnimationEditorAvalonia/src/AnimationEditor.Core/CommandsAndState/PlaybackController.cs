@@ -49,6 +49,13 @@ public class PlaybackController
     /// </summary>
     public double SpeedMultiplier { get; set; } = 1.0;
 
+    /// <summary>
+    /// When <c>true</c> (the default), <see cref="Advance"/> wraps back to the start once the
+    /// chain's total duration elapses. When <c>false</c>, playback freezes on the last frame and
+    /// pauses (firing <see cref="IsPlayingChanged"/>) instead of wrapping.
+    /// </summary>
+    public bool Loop { get; set; } = true;
+
     // ── Events ────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -81,10 +88,25 @@ public class PlaybackController
         Reset();
     }
 
-    /// <summary>Resume playback (undoes <see cref="Pause"/>).</summary>
+    /// <summary>
+    /// Resume playback (undoes <see cref="Pause"/>). When <see cref="Loop"/> is <c>false</c> and
+    /// playback had already reached the end (frozen on the last frame), restarts from the
+    /// beginning instead of resuming a no-op animation — so repeatedly pressing play/pause acts
+    /// like a replay button instead of requiring a manual seek back to the start first.
+    /// </summary>
     public void Play()
     {
         if (IsPlaying) return;
+
+        if (!Loop && _chain is not null && _chain.Frames.Count > 0)
+        {
+            double totalTime = 0;
+            foreach (var f in _chain.Frames)
+                totalTime += FrameLength(f);
+            if (totalTime > 0 && _animTime >= totalTime)
+                Reset();
+        }
+
         IsPlaying = true;
         IsPlayingChanged?.Invoke(true);
     }
@@ -151,18 +173,20 @@ public class PlaybackController
         var chain = _chain;
         if (chain is null || chain.Frames.Count <= 1) return;
 
-        _animTime += deltaSeconds * SpeedMultiplier;
-
         double totalTime = 0;
         foreach (var f in chain.Frames)
             totalTime += FrameLength(f);
         if (totalTime <= 0) return;
 
-        _animTime %= totalTime;
+        _animTime += deltaSeconds * SpeedMultiplier;
+
+        bool reachedEnd = _animTime >= totalTime;
+        if (reachedEnd)
+            _animTime = Loop ? _animTime % totalTime : totalTime;
 
         double t = 0;
         int newIdx = chain.Frames.Count - 1;
-        double newFrameStart = 0;
+        double newFrameStart = totalTime - FrameLength(chain.Frames[newIdx]);
         for (int i = 0; i < chain.Frames.Count; i++)
         {
             double fl = FrameLength(chain.Frames[i]);
@@ -181,6 +205,10 @@ public class PlaybackController
         }
 
         PlaybackTicked?.Invoke();
+
+        // Pausing after the tick so subscribers see the final frame/time before the transport
+        // button flips to "play" — matches how a manual Pause() behaves mid-playback.
+        if (reachedEnd && !Loop) Pause();
     }
 
     // Zero/negative authored lengths fall back to 100 ms so playback still steps through them.

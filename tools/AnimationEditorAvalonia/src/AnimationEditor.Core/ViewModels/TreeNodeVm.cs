@@ -71,6 +71,32 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// </summary>
     public bool IsChainNode { get; set; }
 
+    private bool _isLocked;
+    /// <summary>
+    /// Mirrors <see cref="FlatRedBall2.AnimationEditorCommon.AnimationChainSave.IsLocked"/> for a
+    /// chain node. Always <c>false</c> on non-chain nodes.
+    /// </summary>
+    public bool IsLocked
+    {
+        get => _isLocked;
+        set
+        {
+            if (_isLocked != value)
+            {
+                _isLocked = value;
+                Notify();
+                Notify(nameof(CanAddFrame));
+            }
+        }
+    }
+
+    /// <summary>
+    /// True when the tree's inline Add-Frame button should show. <c>AppCommands.AddFrame</c>
+    /// already no-ops against a locked chain, so the button would otherwise sit there doing
+    /// nothing once a chain is locked (#1035).
+    /// </summary>
+    public bool CanAddFrame => IsChainNode && !IsLocked;
+
     private string _meta = string.Empty;
     /// <summary>Short metadata string displayed beside the node header (e.g. frame count or duration).</summary>
     public string Meta

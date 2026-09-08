@@ -1,5 +1,7 @@
 using AnimationEditor.App.Services;
 using AnimationEditor.Core.IO;
+using AnimationEditor.Core.Paths;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -33,6 +35,11 @@ public partial class ProjectPanelControl : UserControl
     private ProjectTreeThumbnailService? _thumbnailService;
     private CancellationTokenSource? _thumbnailLoadCts;
     private AchxTreeNodeVm? _contextNode;
+
+    // The un-committed "New Animation File" row and the folder it sits under (issue #1018). Both
+    // null whenever no inline edit is in progress; a Rebuild drops the row with the rest of the tree.
+    private AchxTreeNodeVm? _pendingNode;
+    private AchxTreeNodeVm? _pendingParent;
 
     // Guards against re-entrant SelectionChanged while a selection change is programmatic rather
     // than a real user click -- ClearSearchAndReveal restoring post-rebuild, or SyncSelectionToActiveFile
@@ -99,6 +106,14 @@ public partial class ProjectPanelControl : UserControl
     public event Action? NewAnimationRequested;
 
     /// <summary>
+    /// Raised when the user commits a name for "New Animation File" on a folder row (issue
+    /// #1018). The host creates the file and opens it -- this control only picks the name and the
+    /// extension, and has no way to write anything itself. Never raised for a name that collides
+    /// with a sibling: the inline editor stays open showing the error instead.
+    /// </summary>
+    public event Action<NewAnimationFileRequest>? NewAnimationFileRequested;
+
+    /// <summary>
     /// Completes once every thumbnail from the most recent <see cref="Rebuild"/> has finished
     /// loading (or been cancelled by a newer one). Test seam for awaiting the async thumbnail
     /// load -- production code never needs to await this.
@@ -146,6 +161,8 @@ public partial class ProjectPanelControl : UserControl
 
     private void Rebuild()
     {
+        _pendingNode = null;
+        _pendingParent = null;
         TreeRoots.Clear();
 
         var excludeBinObj = ExcludeBinObjCheck.IsChecked == true;
@@ -348,15 +365,23 @@ public partial class ProjectPanelControl : UserControl
             return;
         }
 
-        if (!SupportsRevealInExplorer) return;
-
         if (_contextNode is { IsFolder: true } folderNode)
         {
+            // Not gated on SupportsRevealInExplorer: creating a file works on both hosts, only
+            // the OS-shell reveal below is desktop-only (issue #1018).
+            var newFileItem = new MenuItem { Header = "New Animation File" };
+            newFileItem.Click += (_, _) => BeginNewAnimationFile(folderNode);
+            ProjectTree.ContextMenu.Items.Add(newFileItem);
+
+            if (!SupportsRevealInExplorer) return;
+
             var revealItem = new MenuItem { Header = "View in Explorer" };
             revealItem.Click += (_, _) => FolderRevealRequested?.Invoke(folderNode.RelativePath);
             ProjectTree.ContextMenu.Items.Add(revealItem);
             return;
         }
+
+        if (!SupportsRevealInExplorer) return;
 
         if (_contextNode is { IsFile: true } fileNode)
         {
@@ -378,6 +403,81 @@ public partial class ProjectPanelControl : UserControl
         }
     }
 
+    /// <summary>
+    /// Adds a placeholder row under <paramref name="folderNode"/> and puts it straight into inline
+    /// edit mode (issue #1018). Nothing is written until the name is committed -- an abandoned edit
+    /// leaves no file behind, so Escape only has to drop the row.
+    /// </summary>
+    private void BeginNewAnimationFile(AchxTreeNodeVm folderNode)
+    {
+        CancelPendingNewAnimationFile();
+
+        var extension = NewAnimationFileNaming.ResolveExtension(
+            _allEntries
+                .Where(f => ExcludeBinObjCheck.IsChecked != true || !BinObjPathFilter.IsExcluded(f.RelativePath))
+                .Select(f => f.FileName));
+        var suggested = NewAnimationFileNaming.SuggestFileName(SiblingFileNames(folderNode), extension);
+
+        _pendingNode = AchxTreeNodeVm.CreatePending(suggested, folderNode.RelativePath);
+        _pendingParent = folderNode;
+        folderNode.IsExpanded = true;
+        folderNode.Children.Add(_pendingNode);
+    }
+
+    private void OnPendingNameKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) { CommitPendingNewAnimationFile(); e.Handled = true; }
+        else if (e.Key == Key.Escape) { CancelPendingNewAnimationFile(); e.Handled = true; }
+    }
+
+    // Clicking away abandons the new file rather than committing it -- a half-typed name is far
+    // more likely than a deliberate commit-by-defocus, and the row is trivially re-created.
+    private void OnPendingNameLostFocus(object? sender, RoutedEventArgs e) =>
+        CancelPendingNewAnimationFile();
+
+    // Every row's template carries this TextBox, collapsed -- an unguarded Focus() here would let
+    // any newly-realized row steal focus (from the search box, say), not just the pending one.
+    private void OnPendingNameAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: AchxTreeNodeVm { IsEditing: true } } textBox) return;
+
+        textBox.Focus();
+        textBox.SelectAll();
+    }
+
+    private void CommitPendingNewAnimationFile()
+    {
+        if (_pendingNode is null || _pendingParent is null) return;
+
+        var extension = new FilePath(_pendingNode.Name).Extension;
+        var result = NewAnimationFileNaming.Resolve(
+            _pendingNode.EditText, SiblingFileNames(_pendingParent), extension);
+
+        if (result.Error is not null)
+        {
+            _pendingNode.ErrorMessage = result.Error;
+            return;
+        }
+
+        var request = new NewAnimationFileRequest(_pendingParent.RelativePath, result.FileName!);
+        CancelPendingNewAnimationFile();
+        NewAnimationFileRequested?.Invoke(request);
+    }
+
+    private void CancelPendingNewAnimationFile()
+    {
+        if (_pendingNode is not null && _pendingParent is not null)
+            _pendingParent.Children.Remove(_pendingNode);
+
+        _pendingNode = null;
+        _pendingParent = null;
+    }
+
+    // Only files directly inside the folder -- the collision that matters is a name clash on disk,
+    // which is per-directory.
+    private static IEnumerable<string> SiblingFileNames(AchxTreeNodeVm folderNode) =>
+        folderNode.Children.Where(n => n.IsFile).Select(n => n.Name);
+
     private void OnFolderExpanderToggled(object? sender, EventArgs e)
     {
         if (sender is not Control control) return;
@@ -388,16 +488,74 @@ public partial class ProjectPanelControl : UserControl
     }
 }
 
+/// <summary>
+/// A committed "New Animation File" name (issue #1018): the file to create, and the folder to
+/// create it in as a project-root-relative, forward-slash-separated path (empty for the root).
+/// </summary>
+public readonly record struct NewAnimationFileRequest(string FolderRelativePath, string FileName);
+
 /// <summary>Tree node view-model for <see cref="ProjectPanelControl"/>'s <c>TreeView</c>.</summary>
 public sealed class AchxTreeNodeVm : INotifyPropertyChanged
 {
     private bool _isExpanded = true;
     private Bitmap? _thumbnail;
+    private bool _isEditing;
+    private string _editText = string.Empty;
+    private string? _errorMessage;
 
     public string Name { get; }
     public AchxFileEntry? Entry { get; }
-    public bool IsFolder => Entry is null;
+
+    /// <summary>
+    /// True for the placeholder row a "New Animation File" edit adds (issue #1018). It has no
+    /// <see cref="Entry"/> because nothing exists on disk yet, so it would otherwise read as a
+    /// folder -- hence this flag rather than inferring from <see cref="Entry"/> alone.
+    /// </summary>
+    public bool IsPending { get; private init; }
+
+    public bool IsFolder => Entry is null && !IsPending;
     public bool IsFile => Entry is not null;
+
+    /// <summary>Name shown in the inline editor, without the extension.</summary>
+    public string EditText
+    {
+        get => _editText;
+        set
+        {
+            if (_editText == value) return;
+            _editText = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set
+        {
+            if (_isEditing == value) return;
+            _isEditing = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsNotEditing));
+        }
+    }
+
+    public bool IsNotEditing => !_isEditing;
+
+    /// <summary>Why the typed name was rejected, shown beside the inline editor; null when valid.</summary>
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set
+        {
+            if (_errorMessage == value) return;
+            _errorMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasError));
+        }
+    }
+
+    public bool HasError => _errorMessage is not null;
 
     /// <summary>Path from the project root, forward-slash separated -- see
     /// <see cref="AchxTreeNode.RelativePath"/>. Used to resolve a folder row's absolute path for
@@ -445,6 +603,19 @@ public sealed class AchxTreeNodeVm : INotifyPropertyChanged
         Entry = entry;
         RelativePath = relativePath;
     }
+
+    /// <summary>
+    /// The un-committed row a "New Animation File" edit starts on (issue #1018).
+    /// <paramref name="suggestedFileName"/> carries the extension the project's convention
+    /// resolved to; the editor itself only shows the stem.
+    /// </summary>
+    public static AchxTreeNodeVm CreatePending(string suggestedFileName, string folderRelativePath) =>
+        new(suggestedFileName, entry: null, folderRelativePath)
+        {
+            IsPending = true,
+            EditText = new FilePath(suggestedFileName).NoPathNoExtension,
+            IsEditing = true,
+        };
 
     public static AchxTreeNodeVm FromNode(AchxTreeNode node)
     {

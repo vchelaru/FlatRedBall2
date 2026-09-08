@@ -91,14 +91,4 @@ public class AppStateTests
 
         Assert.Null(ctx.AppState.CurrentFrame);
     }
-
-    [Fact]
-    public void ProjectFolder_WhenSet_StoresValue()
-    {
-        var ctx = TestHelpers.SetupFreshAcls();
-
-        ctx.AppState.ProjectFolder = "C:/MyGame/Content";
-
-        Assert.Equal("C:/MyGame/Content", ctx.AppState.ProjectFolder);
-    }
 }

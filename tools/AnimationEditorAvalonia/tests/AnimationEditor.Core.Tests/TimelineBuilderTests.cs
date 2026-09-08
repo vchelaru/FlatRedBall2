@@ -145,6 +145,40 @@ public class TimelineBuilderTests
         Assert.True(pps > TimelineBuilder.PixelsPerSecond);
     }
 
+    [Fact]
+    public void ComputeEffectivePps_MultipleChains_UsesGlobalShortestFrame()
+    {
+        // #1056: two chains shown together in the multi-track timeline must share one pps,
+        // derived from the shortest frame across ALL of them, not each chain's own shortest.
+        var chainA = new AnimationChainSave { Name = "A" };
+        chainA.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
+        var chainB = new AnimationChainSave { Name = "B" };
+        chainB.Frames.Add(new AnimationFrameSave { FrameLength = 0.01f });
+
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB });
+
+        Assert.Equal(TimelineBuilder.MinCellWidth / 0.01, sharedPps, precision: 3);
+    }
+
+    [Fact]
+    public void BuildFrameItems_WithExplicitPps_SameDurationGivesSameWidthAcrossChains()
+    {
+        // A 1-second frame in two different chains must render at the same width when both
+        // are built against a shared pps — this is what makes the multi-track timeline comparable.
+        var chainA = new AnimationChainSave { Name = "A" };
+        chainA.Frames.Add(new AnimationFrameSave { FrameLength = 0.1f });
+        chainA.Frames.Add(new AnimationFrameSave { FrameLength = 1.0f });
+        var chainB = new AnimationChainSave { Name = "B" };
+        chainB.Frames.Add(new AnimationFrameSave { FrameLength = 0.01f });
+        chainB.Frames.Add(new AnimationFrameSave { FrameLength = 1.0f });
+
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(new[] { chainA, chainB });
+        var itemsA = TimelineBuilder.BuildFrameItems(chainA, sharedPps);
+        var itemsB = TimelineBuilder.BuildFrameItems(chainB, sharedPps);
+
+        Assert.Equal(itemsA[1].Width, itemsB[1].Width, precision: 6);
+    }
+
     // ── TotalSeconds & FormatSeconds ─────────────────────────────────────────
 
     [Fact]

@@ -56,22 +56,6 @@ namespace AnimationEditor.Core.Models
         public bool SuppressDefaultHandlerPrompt { get; set; }
 
         /// <summary>
-        /// UTC time of the last update check (startup or forced). <c>null</c> means never
-        /// checked. See <see cref="Update.UpdateCheckPolicy"/> for the cache window this backs.
-        /// </summary>
-        public System.DateTime? LastUpdateCheckUtc { get; set; }
-
-        /// <summary>
-        /// The latest released version as of <see cref="LastUpdateCheckUtc"/>, or <c>null</c>
-        /// if no update was known at that time. Lets a cache-hit path (within the check window)
-        /// report the same result without re-hitting the GitHub API.
-        /// </summary>
-        public string? LatestKnownUpdateVersion { get; set; }
-
-        /// <summary>Release page URL paired with <see cref="LatestKnownUpdateVersion"/>.</summary>
-        public string? LatestKnownUpdateUrl { get; set; }
-
-        /// <summary>
         /// The folder last picked via File → Open Project Folder (#770). Rescanned on the next
         /// launch to repopulate the Project tab without requiring a re-pick. Left stale (not
         /// cleared) if the folder no longer exists -- the startup check just skips it, same as
@@ -86,6 +70,12 @@ namespace AnimationEditor.Core.Models
         /// is checked against before use.
         /// </summary>
         public double? PreviewPaneHeight { get; set; }
+
+        /// <summary>
+        /// Whether the window was maximized when the editor last closed (#1045). Applied on the
+        /// next launch so the window reopens in the same maximized/restored state it was left in.
+        /// </summary>
+        public bool WindowMaximized { get; set; }
 
         public void AddFile(FilePath filePath)
         {

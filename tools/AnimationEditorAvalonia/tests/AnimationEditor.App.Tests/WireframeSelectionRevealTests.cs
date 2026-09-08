@@ -289,4 +289,75 @@ public class WireframeSelectionRevealTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    // ── Per-frame reveal: only newly-added frames replay (#1027) ──────────────────────────────
+
+    /// <summary>
+    /// Extending a multi-frame selection (e.g. Shift+Arrow, #1023) from [f0] to [f0, f1] must
+    /// only play the reveal on the newly-added frame f1 — f0 was already settled and must stay
+    /// that way, not replay just because the highlighted *set* changed.
+    /// </summary>
+    [AvaloniaFact]
+    public void ExtendingMultiFrameSelection_OnlyNewFrameReplaysReveal()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, f0, f1, dir) = BuildTwoFrameCtrl(ctx);
+        try
+        {
+            // BuildTwoFrameCtrl's initial SelectedFrame=f0 assignment happens before the control
+            // subscribes to SelectionChanged, so f0 was never actually tracked/revealed yet.
+            // Re-assign it (the setter always fires SelectionChanged, even for the same value) to
+            // establish it as a real, settled reveal before testing the extension below.
+            ctx.SelectedState.SelectedFrame = f0;
+            Dispatcher.UIThread.RunJobs();
+            ctrl.SettleSelectionReveal();
+            Assert.Equal(1f, ctrl.GetSelectionRevealProgress(f0));
+            Assert.False(ctrl.IsSelectionRevealAnimating);
+
+            // Real Shift+Arrow extension (#1023) syncs the tree's multi-selection into
+            // SelectedNodes, which is what ComputeHighlightedFrames actually reads once more
+            // than one frame is selected (SelectedFrame itself may also get reassigned to
+            // whichever row is now the range's focused end, but that doesn't change the
+            // resulting highlighted set here).
+            ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 };
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(ctrl.IsSelectionRevealAnimating,
+                "Extending the selection must start the reveal for the newly-added frame.");
+            Assert.Equal(1f, ctrl.GetSelectionRevealProgress(f0));
+            Assert.Equal(0f, ctrl.GetSelectionRevealProgress(f1));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    /// <summary>
+    /// Shrinking a multi-frame selection back down must drop the removed frame's reveal state
+    /// entirely (no lingering timer/host) while leaving the still-selected frame untouched.
+    /// </summary>
+    [AvaloniaFact]
+    public void ShrinkingMultiFrameSelection_DropsRemovedFramesRevealState()
+    {
+        var ctx = ResetSingletons();
+        var (ctrl, f0, f1, dir) = BuildTwoFrameCtrl(ctx);
+        try
+        {
+            ctx.SelectedState.SelectedNodes = new List<object> { f0, f1 };
+            Dispatcher.UIThread.RunJobs();
+            ctrl.SettleSelectionReveal();
+
+            // Real single-selection narrowing (e.g. Shift+Up back down to one row) syncs both
+            // SelectedNodes and SelectedFrame to the sole remaining row (MainWindow.OnTreeSelectionChanged
+            // always does both, via RouteNodeSelection).
+            ctx.SelectedState.SelectedNodes = new List<object> { f0 };
+            ctx.SelectedState.SelectedFrame = f0;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(ctrl.IsSelectionRevealAnimating,
+                "Shrinking the selection must not replay the reveal on the still-selected frame.");
+            Assert.Equal(1f, ctrl.GetSelectionRevealProgress(f0));
+            Assert.True(ctrl.GetSelectionRevealProgress(f1) == 1f,
+                "A frame no longer highlighted has no reveal state, which reads as settled (1f).");
+        }
+        finally { Directory.Delete(dir, true); }
+    }
 }
