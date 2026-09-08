@@ -154,9 +154,9 @@ public class FlatRedBallService
     // A directory we cannot enumerate is simply not a match — keep walking up rather than taking
     // the game down. macOS App Translocation runs a quarantined .app from a read-only nullfs mount
     // at /var/folders/.../AppTranslocation/<uuid>/d, and enumerating that mount point throws
-    // IOException "Result too large" (EOVERFLOW out of getdirentries), so every FlatRedBall2 game
-    // double-clicked straight out of a download aborted in this static constructor. A shipping
-    // build has no source roots to find anyway; the documented result there is an empty list.
+    // IOException "Result too large" (ERANGE, errno 34), so every FlatRedBall2 game double-clicked
+    // straight out of a download aborted in this static constructor. A shipping build has no
+    // source roots to find anyway; the documented result there is an empty list.
     private static FileInfo[] SafeGetFiles(DirectoryInfo dir, string searchPattern)
     {
         try
