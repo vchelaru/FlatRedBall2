@@ -86,10 +86,12 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
         private readonly TextureViewportSnapshot _s;
         private readonly CanvasPalette _palette;
         private readonly RollingAverage? _drawTimes;   // non-null only when diagnostics are on
+        private readonly GpuCacheReadings _gpuCache;
 
-        public DrawOp(TextureViewportSnapshot s, CanvasPalette palette, RollingAverage? drawTimes)
+        public DrawOp(TextureViewportSnapshot s, CanvasPalette palette, RollingAverage? drawTimes,
+            GpuCacheReadings gpuCache)
         {
-            _s = s; _palette = palette; _drawTimes = drawTimes;
+            _s = s; _palette = palette; _drawTimes = drawTimes; _gpuCache = gpuCache;
             Bounds = new Rect(0, 0, s.Width, s.Height);
         }
 
@@ -108,8 +110,16 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
             {
                 // Raise the GPU cache budget so Skia retains the sheet's texture across frames
                 // instead of re-uploading it (#514). Idempotent — the setter just stores the cap.
-                if (lease.GrContext is { } gr && gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
-                    gr.SetResourceCacheLimit(GpuResourceCacheBytes);
+                if (lease.GrContext is { } gr)
+                {
+                    if (gr.GetResourceCacheLimit() < GpuResourceCacheBytes)
+                        gr.SetResourceCacheLimit(GpuResourceCacheBytes);
+
+                    // #949: publish the cache size so the memory probe can attribute native
+                    // growth. Counter reads only — no GPU work, safe to do every frame.
+                    gr.GetResourceCacheUsage(out _, out long usedBytes);
+                    _gpuCache.Report(usedBytes, gr.GetResourceCacheLimit());
+                }
 
                 DrawTimeOverlay.TimeAndDraw(lease, _drawTimes,
                     canvas => RenderSk(canvas, _s, _palette));
@@ -332,6 +342,14 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
             InvalidateVisual();
         }
     }
+
+    private readonly GpuCacheReadings _gpuCache = new();
+
+    /// <summary>
+    /// Skia GPU resource-cache readings published by the render thread, for the memory probe
+    /// (issue #949). Reads -1 until the first accelerated frame draws.
+    /// </summary>
+    internal GpuCacheReadings GpuCache => _gpuCache;
 
     /// <summary>
     /// Shows/hides the render-diagnostics overlay (draw-time readout + camera stats). Toggled at
@@ -867,7 +885,7 @@ public class TextureViewport : Control, IZoomTarget, IPanScrollTarget
     {
         UpdatePalette();
         var snap = BuildSnapshot(Bounds.Width, Bounds.Height);
-        ctx.Custom(new DrawOp(snap, _palette, _diagnostics.ActiveSampler));
+        ctx.Custom(new DrawOp(snap, _palette, _diagnostics.ActiveSampler, _gpuCache));
         DrawDebugOverlay(ctx);
     }
 

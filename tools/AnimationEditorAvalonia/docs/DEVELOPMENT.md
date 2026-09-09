@@ -92,3 +92,28 @@ TestPaths.InvalidPath("recovery.achx")
 ```
 
 `TestPaths` is defined in each test project's root (e.g., `AnimationEditor.Core.Tests/TestPaths.cs`). Add `AbsDir` / `InvalidPath` to `AnimationEditor.App.Tests/TestPaths.cs` if needed there too.
+
+## Measuring memory (`--memory-probe`)
+
+The app can drive its own open/close cycles and record memory at each phase, so a leak claim is
+measured rather than eyeballed in Task Manager:
+
+```
+AnimationEditor.exe --memory-probe --probe-file <file.achx> [--probe-cycles N]
+                    [--probe-file2 <other.achx>] [--probe-keep-open] [--probe-out <path.ndjson>]
+```
+
+It writes one NDJSON line per snapshot (private bytes, managed heap, Skia CPU/font caches, Skia
+GPU resource cache) plus a final per-cycle growth summary, then exits without saving settings.
+Defaults to `%TEMP%/ae-memory-probe.ndjson`. `--probe-keep-open` skips the close step;
+`--probe-file2` alternates two files so the run exercises two textures instead of re-focusing one
+already-open tab.
+
+**Only `Settled` (post-close, post-GC) rows are comparable across cycles.** Comparing raw
+readings without forcing a collection measures how lazy the GC is, not what the app retains — at
+these sizes there is no memory pressure, so gen2 may not run for many cycles and private bytes
+drift upward with no leak present.
+
+**Measure the standalone exe, not a debugger-hosted run.** Under Visual Studio the same session
+reports several times the private bytes, because the debugger and Diagnostic Tools commit their
+own memory into the target process.
