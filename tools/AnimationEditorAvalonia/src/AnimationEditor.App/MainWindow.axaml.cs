@@ -5,6 +5,7 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.Data;
+using AnimationEditor.Core.Diagnostics;
 using AnimationEditor.Core.Diff;
 using AnimationEditor.Core.DragDrop;
 using AnimationEditor.Core.HotReload;
@@ -973,6 +974,18 @@ public partial class MainWindow : Window
 
     private async Task HandleStartupAsync()
     {
+        if (MemoryProbeOptions.TryParse(Environment.GetCommandLineArgs(), out var probeOptions))
+        {
+            // The probe measures what loading a project costs, so it has to start from a window
+            // with nothing restored — skip recovery, the CLI file, and saved tabs entirely.
+            _projectManager.AnimationChainListSave = new AnimationChainListSave();
+            await new MemoryProbeRunner(this, probeOptions!).RunAsync();
+
+            // Exit hard rather than Close(): the Closed handler persists recent files and open
+            // tabs, and a probe run must not overwrite the developer's real settings.
+            Environment.Exit(0);
+        }
+
         // Consume any crash-recovery file up front, but open it *after* the normal startup
         // branches below (#1020). Restoring it used to early-out of this whole block, so
         // accepting the old Restore/Delete prompt silently dropped every other open tab.
