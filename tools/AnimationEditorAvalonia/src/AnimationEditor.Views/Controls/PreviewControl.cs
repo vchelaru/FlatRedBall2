@@ -913,15 +913,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             _shapeDragStartX = r.X;
             _shapeDragStartY = r.Y;
-            r.X += worldDx;
-            r.Y += worldDy;
+            r.X = SnapToPixel(r.X + worldDx);
+            r.Y = SnapToPixel(r.Y + worldDy);
         }
         else if (_draggingShape is CircleSave c)
         {
             _shapeDragStartX = c.X;
             _shapeDragStartY = c.Y;
-            c.X += worldDx;
-            c.Y += worldDy;
+            c.X = SnapToPixel(c.X + worldDx);
+            c.Y = SnapToPixel(c.Y + worldDy);
         }
         CommitShapeDrag();
     }
@@ -2288,8 +2288,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
-            float newX = _shapeDragStartX + dx;
-            float newY = _shapeDragStartY + dy;
+            float newX = SnapToPixel(_shapeDragStartX + dx);
+            float newY = SnapToPixel(_shapeDragStartY + dy);
             if (_draggingShape is AARectSave r) { r.X = newX; r.Y = newY; }
             else if (_draggingShape is CircleSave c)          { c.X = newX; c.Y = newY; }
             InvalidateVisual();
