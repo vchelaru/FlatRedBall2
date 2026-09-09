@@ -44,7 +44,12 @@ public class DynamicFontGenerationTests
         if (GumIsOwnedElsewhere)
             return;
 
-        using var game = TryCreateGame();
+        // Deliberately not disposed: disposing this ad-hoc Game tears down process-wide GL/SDL
+        // state that the shared GraphicsDeviceFixture's device depends on, breaking shader
+        // compilation for every GraphicsDeviceFixture-based test that runs afterward in this
+        // process (see SpriteAddColorRenderTests, discovered while adding it). The process exits
+        // once the test run finishes, so leaking this one Game for the run's lifetime is fine.
+        var game = TryCreateGame();
         if (game is null)
             return;
 
