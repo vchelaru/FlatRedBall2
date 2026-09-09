@@ -35,11 +35,9 @@ public abstract class AnimationFrameBase
     public float RelativeX;
 
     /// <summary>
-    /// Per-frame Y offset applied while this frame is displayed. Unscaled source pixels from the .achx.
-    /// Raised in Y-up world space (FRB <c>Sprite</c> at <c>Sprite.cs</c>, the Animation Editor preview):
-    /// positive <c>RelativeY</c> shifts up. Renderers that draw in Y-down screen space (MonoGame
-    /// <c>SpriteBatch</c> via <c>SpriteBatchExtensions.DrawAnimation</c>, Gum child
-    /// <c>PixelsFromMiddle</c>) must negate it — positive shifts down there.
+    /// Per-frame Y offset applied while this frame is displayed. Unscaled source pixels from the .achx,
+    /// defined in a Y-up coordinate space: positive <c>RelativeY</c> shifts up. A renderer that draws in
+    /// Y-down screen space must negate it before applying it.
     /// </summary>
     public float RelativeY;
 
