@@ -63,6 +63,22 @@ public class PreviewShapeDragTests
         Assert.Equal(-7f, circle.Y, precision: 3);
     }
 
+    [AvaloniaFact]
+    public void DragCircle_SubPixelDelta_SnapsPositionToPixel()
+    {
+        var ctx    = TestHelpers.BuildServices();
+        var circle = new CircleSave { X = 0f, Y = 0f, Radius = 10f };
+        var frame  = MakeFrame(circle: circle);
+        ctx.SelectedState.SelectedFrame  = frame;
+        ctx.SelectedState.SelectedCircle = circle;
+
+        var ctrl = ctx.CreatePreviewControl();
+        ctrl.SimulateShapeDrag(10.6f, -5.4f);
+
+        Assert.Equal(11f, circle.X, precision: 3);
+        Assert.Equal(-5f, circle.Y, precision: 3);
+    }
+
     // ── Rectangle drag ────────────────────────────────────────────────────────
 
     [AvaloniaFact]

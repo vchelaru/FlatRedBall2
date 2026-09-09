@@ -74,6 +74,51 @@ public class AppCommandsFrameTests
         Assert.Equal(string.Empty, chain.Frames[0].TextureName);
     }
 
+    // A brand-new document has nothing in its ACLS to inherit from, but the wireframe canvas may
+    // already be showing a "default" texture (borrowed from a previous document, or kept alive
+    // when an empty chain is selected -- see WireframeControl.RefreshAll). AddFrame must fall
+    // through to that canvas default rather than leaving the new frame textureless.
+    [Fact]
+    public void AddFrame_NothingToInherit_FallsBackToCanvasDefaultTexturePath()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "NewAnimation"); // empty document, empty chain
+        ctx.AppCommands.CanvasDefaultTexturePath = () => "sheet.png";
+
+        ctx.AppCommands.AddFrame(chain);
+
+        Assert.Equal("sheet.png", chain.Frames[0].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_ChainHasFrames_IgnoresCanvasDefaultTexturePath()
+    {
+        // The chain's own last frame always wins over the canvas fallback.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run");
+        ctx.AppCommands.AddFrame(chain, "first.png");
+        ctx.AppCommands.CanvasDefaultTexturePath = () => "sheet.png";
+
+        ctx.AppCommands.AddFrame(chain);
+
+        Assert.Equal("first.png", chain.Frames[^1].TextureName);
+    }
+
+    [Fact]
+    public void AddFrame_OtherChainHasTexture_IgnoresCanvasDefaultTexturePath()
+    {
+        // Borrowing from another chain in the same document always wins over the canvas fallback.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var withTexture = TestHelpers.MakeChain(ctx.Acls, "Walk");
+        ctx.AppCommands.AddFrame(withTexture, "hero.png");
+        var empty = TestHelpers.MakeChain(ctx.Acls, "Idle");
+        ctx.AppCommands.CanvasDefaultTexturePath = () => "sheet.png";
+
+        ctx.AppCommands.AddFrame(empty);
+
+        Assert.Equal("hero.png", empty.Frames[0].TextureName);
+    }
+
     [Fact]
     public void AddFrame_LeavesShapesSaveNull()
     {

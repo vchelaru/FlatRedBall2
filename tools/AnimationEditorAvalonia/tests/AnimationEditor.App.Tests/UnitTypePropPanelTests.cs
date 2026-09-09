@@ -77,8 +77,10 @@ public class UnitTypePropPanelTests
     }
 
     [AvaloniaFact]
-    public void PropNoneLabel_WhenChainSelected_ShowsContextHint()
+    public void PropChainPanel_WhenChainSelectedWithNoFrame_IsVisible()
     {
+        // #1032: a chain selected with no frame/shape shows PropChainPanel (its Locked
+        // checkbox) instead of PropNoneLabel's old "Select a frame or shape..." hint.
         var window = CreateWindowWithFrame(out _);
         try
         {
@@ -86,9 +88,10 @@ public class UnitTypePropPanelTests
             ctx.SelectedState.SelectedChain = new AnimationChainSave { Name = "Walk" };
             Dispatcher.UIThread.RunJobs();
 
-            var label = FindCtrl<TextBlock>(window, "PropNoneLabel");
-            Assert.True(label.IsVisible);
-            Assert.Equal("Select a frame or shape to edit its properties.", label.Text);
+            var chainPanel = FindCtrl<StackPanel>(window, "PropChainPanel");
+            var noneLabel  = FindCtrl<TextBlock>(window, "PropNoneLabel");
+            Assert.True(chainPanel.IsVisible);
+            Assert.False(noneLabel.IsVisible);
         }
         finally { window.Close(); }
     }

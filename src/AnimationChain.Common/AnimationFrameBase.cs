@@ -34,7 +34,11 @@ public abstract class AnimationFrameBase
     /// <summary>Per-frame X offset applied while this frame is displayed. Unscaled source pixels from the .achx; positive shifts right.</summary>
     public float RelativeX;
 
-    /// <summary>Per-frame Y offset applied while this frame is displayed. Unscaled source pixels from the .achx; positive shifts down.</summary>
+    /// <summary>
+    /// Per-frame Y offset applied while this frame is displayed. Unscaled source pixels from the .achx,
+    /// defined in a Y-up coordinate space: positive <c>RelativeY</c> shifts up. A renderer that draws in
+    /// Y-down screen space must negate it before applying it.
+    /// </summary>
     public float RelativeY;
 
     /// <summary>

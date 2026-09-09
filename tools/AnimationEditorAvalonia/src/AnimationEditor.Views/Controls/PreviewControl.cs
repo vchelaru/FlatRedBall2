@@ -253,6 +253,20 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         }
     }
 
+    /// <summary>
+    /// Whether the preview loops back to the start when a chain finishes, or freezes/pauses on
+    /// the last frame instead. Applies to the singular preview and every active group track.
+    /// </summary>
+    public bool Loop
+    {
+        get => _playback.Loop;
+        set
+        {
+            _playback.Loop = value;
+            foreach (var c in _groupPlayback.Values) c.Loop = value;
+        }
+    }
+
     public void Play()
     {
         _playback.Play();
@@ -348,7 +362,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         foreach (var chain in toRemove) _groupPlayback.Remove(chain);
         foreach (var chain in toAdd)
         {
-            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier };
+            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier, Loop = _playback.Loop };
             controller.SetChain(chain);
             _groupPlayback[chain] = controller;
         }
@@ -594,6 +608,47 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     private Action<string>? _showError;
 
     private static readonly SKColor CutOutlineColor = new(224, 112, 48, 220);
+
+    // -- Chain lock (#1032) -----------------------------------------------------
+    // A locked chain must be inert to drag gestures: it can be displayed (e.g. as a multi-
+    // selected "background reference" alongside an unlocked chain being edited) but must never
+    // move. Gated at drag-start (both here and in the Simulate* test hooks) rather than only at
+    // commit, so a locked target never starts following the pointer in the first place.
+
+    /// <summary>
+    /// Resolves <paramref name="frame"/>'s owning chain. Prefers <see cref="ISelectedState.SelectedChain"/>
+    /// when it actually contains the frame (covers callers/tests that never added the chain to
+    /// <see cref="IProjectManager.AnimationChainListSave"/>), falling back to a full ACLS search
+    /// (covers a multi-frame selection spanning chains other than the one pinned as SelectedChain).
+    /// </summary>
+    private AnimationChainSave? FindOwningChain(AnimationFrameSave? frame)
+    {
+        if (frame is null) return null;
+        var selectedChain = _selectedState?.SelectedChain;
+        if (selectedChain is not null && selectedChain.Frames.Contains(frame))
+            return selectedChain;
+        return _projectManager?.AnimationChainListSave?.AnimationChains
+            .FirstOrDefault(c => c.Frames.Contains(frame));
+    }
+
+    private AnimationFrameSave? FindOwningFrame(object? shape)
+    {
+        if (shape is null) return null;
+        var selectedFrame = _selectedState?.SelectedFrame;
+        if (selectedFrame?.ShapesSave?.Shapes.Contains(shape) == true) return selectedFrame;
+
+        var chains = _projectManager?.AnimationChainListSave?.AnimationChains;
+        if (chains is null) return null;
+        foreach (var chain in chains)
+            foreach (var frame in chain.Frames)
+                if (frame.ShapesSave?.Shapes.Contains(shape) == true)
+                    return frame;
+        return null;
+    }
+
+    private bool IsFrameLocked(AnimationFrameSave? frame) => FindOwningChain(frame)?.IsLocked == true;
+
+    private bool IsShapeLocked(object? shape) => IsFrameLocked(FindOwningFrame(shape));
 
     /// <summary>
     /// Called from MainWindow after DI container wires all services.
@@ -850,22 +905,23 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     internal void SimulateShapeDrag(float worldDx, float worldDy)
     {
-        _draggingShape = _selectedState!.SelectedShape;
-        if (_draggingShape is null) return;
+        var shape = _selectedState!.SelectedShape;
+        if (shape is null || IsShapeLocked(shape)) return;
+        _draggingShape = shape;
 
         if (_draggingShape is AARectSave r)
         {
             _shapeDragStartX = r.X;
             _shapeDragStartY = r.Y;
-            r.X += worldDx;
-            r.Y += worldDy;
+            r.X = SnapToPixel(r.X + worldDx);
+            r.Y = SnapToPixel(r.Y + worldDy);
         }
         else if (_draggingShape is CircleSave c)
         {
             _shapeDragStartX = c.X;
             _shapeDragStartY = c.Y;
-            c.X += worldDx;
-            c.Y += worldDy;
+            c.X = SnapToPixel(c.X + worldDx);
+            c.Y = SnapToPixel(c.Y + worldDy);
         }
         CommitShapeDrag();
     }
@@ -878,8 +934,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// </summary>
     internal void SimulateShapeResize(HandleKind handle, float newParam1, float newParam2 = 0f)
     {
-        _draggingShape = _selectedState!.SelectedShape;
-        if (_draggingShape is null) return;
+        var shape = _selectedState!.SelectedShape;
+        if (shape is null || IsShapeLocked(shape)) return;
+        _draggingShape = shape;
 
         _shapeResizeHandle = handle;
 
@@ -910,11 +967,15 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// commits. Bypasses coordinate conversion, so results are independent of zoom/pan/
     /// OffsetMultiplier. No-op unless exactly one frame is selected, mirroring the gate
     /// <see cref="OnPointerPressed"/> applies before starting a live frame drag.
+    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
+    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateFrameDrag(float worldDx, float worldDy)
+    internal void SimulateFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         var frame = _selectedState!.SelectedFrame;
-        if (frame is null || _selectedState!.SelectedFrames.Count > 1) return;
+        if (frame is null || _selectedState!.SelectedFrames.Count > 1 || IsFrameLocked(frame)) return;
+
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
 
         _draggingFrame   = frame;
         _frameDragStartX = frame.RelativeX;
@@ -927,17 +988,24 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// <summary>
     /// Test-only: applies a world-space drag delta to every frame in the selected chain's
     /// <see cref="AnimationFrameSave.RelativeX"/>/<see cref="AnimationFrameSave.RelativeY"/>,
-    /// each frame keeping its own starting offset, and commits as one undo step. Bypasses
-    /// coordinate conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op
-    /// unless <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate
-    /// <see cref="OnPointerPressed"/> applies before starting a live whole-animation drag.
+    /// each frame keeping its own starting offset, and commits as one undo step. When 2+ chains
+    /// are selected (<see cref="ISelectedState.SelectedChains"/>), every unlocked one moves
+    /// together — see <see cref="ResolveWholeChainDragFrames"/> (issue #1052). Bypasses coordinate
+    /// conversion, so results are independent of zoom/pan/OffsetMultiplier. No-op unless
+    /// <see cref="IsWholeChainDragTarget"/> holds, mirroring the gate <see cref="OnPointerPressed"/>
+    /// applies before starting a live whole-animation drag. <paramref name="shiftHeld"/> mirrors the
+    /// live Shift-axis-lock (#1022) applied in <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateChainDrag(float worldDx, float worldDy)
+    internal void SimulateChainDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         if (!IsWholeChainDragTarget) return;
 
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
+
         var chain = _selectedState!.SelectedChain!;
-        _draggingChainFrames = chain.Frames.ToArray();
+        if (chain.IsLocked) return;
+
+        _draggingChainFrames = ResolveWholeChainDragFrames(chain);
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
@@ -956,12 +1024,20 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// No-op unless <see cref="IsMultiFrameDragTarget"/> holds, mirroring the gate
     /// <see cref="OnPointerPressed"/> applies before starting a live multi-frame drag. Mirrors
     /// <see cref="SimulateChainDrag"/>, scoped to the multi-selection instead of the whole chain.
+    /// <paramref name="shiftHeld"/> mirrors the live Shift-axis-lock (#1022) applied in
+    /// <see cref="OnPointerMoved"/> via <see cref="AxisLock"/>.
     /// </summary>
-    internal void SimulateMultiFrameDrag(float worldDx, float worldDy)
+    internal void SimulateMultiFrameDrag(float worldDx, float worldDy, bool shiftHeld = false)
     {
         if (!IsMultiFrameDragTarget) return;
 
-        _draggingChainFrames = _selectedState!.SelectedFrames.ToArray();
+        (worldDx, worldDy) = AxisLock.Apply(worldDx, worldDy, shiftHeld);
+
+        // A locked chain in the selection keeps its frames still: drag only the unlocked
+        // subset rather than aborting the whole gesture (mirrors the bulk skip-locked-entries
+        // pattern used elsewhere for a selection spanning multiple chains).
+        _draggingChainFrames = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
+        if (_draggingChainFrames.Length == 0) { _draggingChainFrames = null; return; }
         _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
         _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
         for (int i = 0; i < _draggingChainFrames.Length; i++)
@@ -1330,18 +1406,39 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (_draggingFrame is not null || _draggingChainFrames is not null)
             return StandardCursorType.SizeAll;
 
+        // A locked chain is inert to every drag gesture below (OnPointerPressed's ~2081-2161
+        // guards via IsShapeLocked/IsFrameLocked) -- the hover cursor must not imply otherwise
+        // (#1032 follow-up).
         var handle = HitTestShapeHandle((float)pos.X, (float)pos.Y);
-        if (handle != HandleKind.None)
+        if (handle != HandleKind.None && !IsShapeLocked(_selectedState!.SelectedShape))
             return GetResizeCursor(handle);
 
         StandardCursorType? cursorType = _draggedGuideIdx >= 0
             ? (_draggingHGuide ? StandardCursorType.SizeNorthSouth : StandardCursorType.SizeWestEast)
             : GetGuideCursorAt((float)pos.X, (float)pos.Y);
-        if (cursorType is null && HitTestShape((float)pos.X, (float)pos.Y) is not null)
+        var hitShape = HitTestShape((float)pos.X, (float)pos.Y);
+        if (cursorType is null && hitShape is not null && !IsShapeLocked(hitShape))
             cursorType = StandardCursorType.SizeAll;
-        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y))
+        if (cursorType is null && HitTestFrameSprite((float)pos.X, (float)pos.Y) && !IsHoverFrameSpriteFullyLocked())
             cursorType = StandardCursorType.SizeAll;
         return cursorType;
+    }
+
+    /// <summary>
+    /// True when the frame-sprite drag <see cref="HitTestFrameSprite"/> resolved to would be a
+    /// complete no-op due to locking -- mirrors <see cref="OnPointerPressed"/>'s frame-sprite
+    /// branch exactly, so the hover cursor and the real drag-start guard agree on what's
+    /// draggable. A multi-frame selection with at least one unlocked frame still drags (the
+    /// unlocked subset), so only "every candidate frame is locked" suppresses the cursor. The
+    /// whole-chain case needs no branch here: <see cref="ResolveWholeChainDragTarget"/> already
+    /// only lets <see cref="HitTestFrameSprite"/> hit on an unlocked chain, so by the time this
+    /// runs it can never be "fully locked" (#1032 follow-up).
+    /// </summary>
+    private bool IsHoverFrameSpriteFullyLocked()
+    {
+        if (IsMultiFrameDragTarget)
+            return _selectedState!.SelectedFrames.All(IsFrameLocked);
+        return IsFrameLocked(_selectedState!.SelectedFrame);
     }
 
     /// <summary>Test-only: the cursor type <see cref="UpdateHoverCursor"/> would apply at the
@@ -1381,23 +1478,36 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             if (_selectedState!.SelectedCircle is { } sc) selectedCircles.Add(sc);
         }
 
+        bool frameLocked = IsFrameLocked(frame);
         var list = new List<PreviewShapeInfo>();
         var pendingShapes = _pendingCutState?.WireframeShapes.ToHashSet() ?? [];
         foreach (var r in frame.ShapesSave!.AARectSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Rect, r.X, r.Y, r.ScaleX, r.ScaleY,
-                selectedRects.Contains(r), pendingShapes.Contains(r)));
+                selectedRects.Contains(r), pendingShapes.Contains(r), frameLocked));
         foreach (var c in frame.ShapesSave!.CircleSaves)
             list.Add(new PreviewShapeInfo(PreviewShapeKind.Circle, c.X, c.Y, c.Radius, 0f,
-                selectedCircles.Contains(c), pendingShapes.Contains(c)));
+                selectedCircles.Contains(c), pendingShapes.Contains(c), frameLocked));
         return list.ToArray();
     }
 
     /// <summary>Returns the frame in <see cref="ISelectedState.SelectedChain"/> at the current playback index.</summary>
     private AnimationFrameSave? GetCurrentPlaybackFrame()
+        => _selectedState!.SelectedChain is { } chain ? GetCurrentPlaybackFrame(chain) : null;
+
+    /// <summary>
+    /// Returns <paramref name="chain"/>'s current playback frame: the shared single-chain
+    /// controller when <paramref name="chain"/> is the pinned <see cref="ISelectedState.SelectedChain"/>,
+    /// or that chain's own group-playback controller (see <see cref="GroupTracks"/>) for any other
+    /// selected-and-shown chain. Null when the chain has no frames or isn't currently playing.
+    /// </summary>
+    private AnimationFrameSave? GetCurrentPlaybackFrame(AnimationChainSave chain)
     {
-        var chain = _selectedState!.SelectedChain;
-        if (chain is null || chain.Frames.Count == 0) return null;
-        int idx = Math.Clamp(_playback.CurrentFrameIndex, 0, chain.Frames.Count - 1);
+        if (chain.Frames.Count == 0) return null;
+        var controller = ReferenceEquals(chain, _selectedState!.SelectedChain)
+            ? _playback
+            : _groupPlayback.GetValueOrDefault(chain);
+        if (controller is null) return null;
+        int idx = Math.Clamp(controller.CurrentFrameIndex, 0, chain.Frames.Count - 1);
         return chain.Frames[idx];
     }
 
@@ -1541,7 +1651,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (MathF.Abs(newX - _shapeDragStartX) > eps || MathF.Abs(newY - _shapeDragStartY) > eps)
         {
             var frame = _selectedState!.SelectedFrame;
-            if (frame is not null)
+            // Defense-in-depth: OnPointerPressed/Simulate* already refuse to start a drag on a
+            // locked chain's shape, so this should never fire for one — kept in case a future
+            // code path sets _draggingShape without going through those gates.
+            if (frame is not null && !IsFrameLocked(frame))
                 _undoManager!.Record(new MoveShapeCommand(
                     frame, _draggingShape, _shapeDragStartX, _shapeDragStartY, newX, newY,
                     _appCommands!, _events!));
@@ -1568,7 +1681,9 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         float newY = _draggingFrame.RelativeY;
 
         const float eps = 1e-4f;
-        if (MathF.Abs(newX - _frameDragStartX) > eps || MathF.Abs(newY - _frameDragStartY) > eps)
+        // Defense-in-depth: see the comment in CommitShapeDrag.
+        if ((MathF.Abs(newX - _frameDragStartX) > eps || MathF.Abs(newY - _frameDragStartY) > eps)
+            && !IsFrameLocked(_draggingFrame))
         {
             _undoManager!.Record(new MoveFrameOffsetCommand(
                 _draggingFrame, _frameDragStartX, _frameDragStartY, newX, newY,
@@ -1595,6 +1710,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         for (int i = 0; i < _draggingChainFrames.Length; i++)
         {
             var frame = _draggingChainFrames[i];
+            // Defense-in-depth: see the comment in CommitShapeDrag.
+            if (IsFrameLocked(frame)) continue;
             float newX = frame.RelativeX;
             float newY = frame.RelativeY;
             if (MathF.Abs(newX - _chainFrameStartX![i]) > eps || MathF.Abs(newY - _chainFrameStartY![i]) > eps)
@@ -1754,7 +1871,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (changed)
         {
             var frame = _selectedState!.SelectedFrame;
-            if (frame is not null)
+            // Defense-in-depth: see the comment in CommitShapeDrag.
+            if (frame is not null && !IsFrameLocked(frame))
                 _undoManager!.Record(new ResizeShapeCommand(
                     frame, _draggingShape,
                     _shapeDragStartX, _shapeDragStartY, _shapeDragStartScaleX, _shapeDragStartScaleY,
@@ -1827,11 +1945,28 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// <see cref="ISelectedState.SelectedFrame"/> is null and nothing more specific is
     /// multi-selected. Mirrors <see cref="AnimationEditor.App.Controls.WireframeControl"/>'s
     /// <c>PrimaryFrameRect</c>-returns-null fallback into "drag the whole chain" (issue #912).
+    /// When <see cref="ISelectedState.SelectedChains"/> holds 2+ chains (group preview, #576),
+    /// <see cref="ResolveWholeChainDragFrames"/> extends this into a bulk drag of every unlocked
+    /// selected chain together (issue #1052 follow-up to #917) — not just the one under the cursor.
     /// </summary>
     private bool IsWholeChainDragTarget =>
         _selectedState!.SelectedFrame is null &&
         _selectedState!.SelectedFrames.Count == 0 &&
         _selectedState!.SelectedChain is not null;
+
+    /// <summary>
+    /// Frames to move for a whole-chain drag once <paramref name="hitChain"/> — the chain actually
+    /// under the cursor, from <see cref="ResolveWholeChainDragTarget"/> or the pinned
+    /// <see cref="ISelectedState.SelectedChain"/> — is known. A single selected chain keeps the
+    /// original single-chain behavior; 2+ selected chains (<see cref="ISelectedState.SelectedChains"/>)
+    /// drag every unlocked one together, mirroring how <see cref="IsMultiFrameDragTarget"/> drags
+    /// the whole multi-selection when the user grabs any one of its members (issue #1052).
+    /// </summary>
+    private AnimationFrameSave[] ResolveWholeChainDragFrames(AnimationChainSave hitChain)
+    {
+        if (_selectedState!.SelectedChains.Count <= 1) return hitChain.Frames.ToArray();
+        return _selectedState!.SelectedChains.Where(c => !c.IsLocked).SelectMany(c => c.Frames).ToArray();
+    }
 
     /// <summary>
     /// <c>true</c> when 2+ individual frames are multi-selected via
@@ -1850,11 +1985,12 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
     /// footprint of the drag target's sprite, in screen space. Gates the frame-offset drag
     /// fallback in <see cref="OnPointerPressed"/>. The target is the pinned <see cref="ISelectedState.SelectedFrame"/>
     /// when one is set (whether alone or as part of a multi-selection — see
-    /// <see cref="IsMultiFrameDragTarget"/>); when none is pinned, it falls back to the
-    /// currently-playing frame, gated by <see cref="IsWholeChainDragTarget"/> (drag the whole
-    /// chain) or <see cref="IsMultiFrameDragTarget"/> (drag just the multi-selection — only if the
-    /// playing frame is actually one of <see cref="ISelectedState.SelectedFrames"/>). Requires the
-    /// target frame's texture to already be decoded (mirrors <see cref="ComputeContentExtentScreenPx"/>'s
+    /// <see cref="IsMultiFrameDragTarget"/>); when none is pinned, it falls back to
+    /// <see cref="ResolveWholeChainDragTarget"/> (drag the whole chain — only an unlocked
+    /// candidate counts as a hit) or the currently-playing frame gated by
+    /// <see cref="IsMultiFrameDragTarget"/> (drag just the multi-selection — only if the playing
+    /// frame is actually one of <see cref="ISelectedState.SelectedFrames"/>). Requires the target
+    /// frame's texture to already be decoded (mirrors <see cref="ComputeContentExtentScreenPx"/>'s
     /// own frame-footprint math).
     /// </summary>
     private bool HitTestFrameSprite(float px, float py)
@@ -1864,7 +2000,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             if (IsWholeChainDragTarget)
             {
-                frame = GetCurrentPlaybackFrame();
+                return ResolveWholeChainDragTarget(px, py) is not null;
             }
             else if (IsMultiFrameDragTarget)
             {
@@ -1880,7 +2016,46 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             return false;
         }
-        if (frame is null) return false;
+        return HitTestFrameFootprint(frame, px, py);
+    }
+
+    /// <summary>
+    /// Resolves which whole selected-and-shown chain a hover/drag at (<paramref name="px"/>,
+    /// <paramref name="py"/>) should target: the pinned <see cref="ISelectedState.SelectedChain"/>
+    /// when it is unlocked and its current-playback frame's sprite is under the cursor, else the
+    /// first other chain in <see cref="ISelectedState.SelectedChains"/> (e.g. a group-preview
+    /// multi-selection, see <see cref="IsGroupPreviewActive"/>) that is unlocked and hits. A locked
+    /// chain shown alongside an unlocked one at the same screen position must never swallow the
+    /// unlocked chain's hit (#1032 follow-up). Only meaningful when
+    /// <see cref="IsWholeChainDragTarget"/> holds; returns null when nothing unlocked is under the
+    /// cursor.
+    /// </summary>
+    private AnimationChainSave? ResolveWholeChainDragTarget(float px, float py)
+    {
+        var pinned = _selectedState!.SelectedChain;
+        if (pinned is not null && !pinned.IsLocked &&
+            GetCurrentPlaybackFrame(pinned) is { } pinnedFrame &&
+            HitTestFrameFootprint(pinnedFrame, px, py))
+        {
+            return pinned;
+        }
+
+        foreach (var chain in _selectedState!.SelectedChains)
+        {
+            if (ReferenceEquals(chain, pinned) || chain.IsLocked) continue;
+            if (GetCurrentPlaybackFrame(chain) is { } frame && HitTestFrameFootprint(frame, px, py))
+                return chain;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if (<paramref name="px"/>, <paramref name="py"/>) lands on
+    /// <paramref name="frame"/>'s rendered sprite footprint, in screen space. Pure geometry — does
+    /// not consider whether the frame or its owning chain is locked.
+    /// </summary>
+    private bool HitTestFrameFootprint(AnimationFrameSave frame, float px, float py)
+    {
         if (px < RulerSize || py < RulerSize) return false;
 
         string? texPath = _thumbnailService!.ResolveTexturePath(frame);
@@ -1999,24 +2174,27 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         if (handleKind != HandleKind.None)
         {
             var sel = _selectedState!.SelectedShape!;
-            _draggingShape   = sel;
-            _shapeDragAnchor = pos;
-            if (sel is AARectSave dhr)
+            if (!IsShapeLocked(sel))
             {
-                _shapeDragStartX      = dhr.X;
-                _shapeDragStartY      = dhr.Y;
-                _shapeDragStartScaleX = dhr.ScaleX;
-                _shapeDragStartScaleY = dhr.ScaleY;
+                _draggingShape   = sel;
+                _shapeDragAnchor = pos;
+                if (sel is AARectSave dhr)
+                {
+                    _shapeDragStartX      = dhr.X;
+                    _shapeDragStartY      = dhr.Y;
+                    _shapeDragStartScaleX = dhr.ScaleX;
+                    _shapeDragStartScaleY = dhr.ScaleY;
+                }
+                else if (sel is CircleSave dhc)
+                {
+                    _shapeDragStartX      = dhc.X;
+                    _shapeDragStartY      = dhc.Y;
+                    _shapeDragStartScaleX = dhc.Radius;
+                    _shapeDragStartScaleY = 0f;
+                }
+                _shapeResizeHandle = handleKind;
+                e.Pointer.Capture(this);
             }
-            else if (sel is CircleSave dhc)
-            {
-                _shapeDragStartX      = dhc.X;
-                _shapeDragStartY      = dhc.Y;
-                _shapeDragStartScaleX = dhc.Radius;
-                _shapeDragStartScaleY = 0f;
-            }
-            _shapeResizeHandle = handleKind;
-            e.Pointer.Capture(this);
             return;
         }
         var hitShape = HitTestShape(px, py);
@@ -2025,11 +2203,14 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             _selectedState!.SelectedNodes = new System.Collections.Generic.List<object>();
             if (hitShape is AARectSave hr) _selectedState!.SelectedRectangle = hr;
             else if (hitShape is CircleSave hc)          _selectedState!.SelectedCircle    = hc;
-            _draggingShape   = hitShape;
-            _shapeDragAnchor = pos;
-            if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
-            else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
-            e.Pointer.Capture(this);
+            if (!IsShapeLocked(hitShape))
+            {
+                _draggingShape   = hitShape;
+                _shapeDragAnchor = pos;
+                if (hitShape is AARectSave dsr) { _shapeDragStartX = dsr.X; _shapeDragStartY = dsr.Y; }
+                else if (hitShape is CircleSave dsc)          { _shapeDragStartX = dsc.X; _shapeDragStartY = dsc.Y; }
+                e.Pointer.Capture(this);
+            }
             return;
         }
 
@@ -2043,22 +2224,32 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         {
             if (IsWholeChainDragTarget)
             {
-                var chain = _selectedState!.SelectedChain!;
-                _draggingChainFrames = chain.Frames.ToArray();
+                // ResolveWholeChainDragTarget considers every chain in SelectedChains, not just
+                // the pinned SelectedChain, so a locked chain shown alongside an unlocked one at
+                // this same screen position doesn't swallow the unlocked chain's drag (#1032
+                // follow-up). HitTestFrameSprite above already required a non-null result.
+                var chain = ResolveWholeChainDragTarget(px, py);
+                if (chain is null) return;
+                _draggingChainFrames = ResolveWholeChainDragFrames(chain);
                 _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
                 _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
                 _frameDragAnchor     = pos;
             }
             else if (IsMultiFrameDragTarget)
             {
-                _draggingChainFrames = _selectedState!.SelectedFrames.ToArray();
-                _chainFrameStartX    = _draggingChainFrames.Select(f => f.RelativeX).ToArray();
-                _chainFrameStartY    = _draggingChainFrames.Select(f => f.RelativeY).ToArray();
+                // A locked chain in the selection keeps its frames still: drag only the
+                // unlocked subset rather than aborting the whole gesture.
+                var draggable = _selectedState!.SelectedFrames.Where(f => !IsFrameLocked(f)).ToArray();
+                if (draggable.Length == 0) return;
+                _draggingChainFrames = draggable;
+                _chainFrameStartX    = draggable.Select(f => f.RelativeX).ToArray();
+                _chainFrameStartY    = draggable.Select(f => f.RelativeY).ToArray();
                 _frameDragAnchor     = pos;
             }
             else
             {
                 var frame = _selectedState!.SelectedFrame!;
+                if (IsFrameLocked(frame)) return;
                 _draggingFrame   = frame;
                 _frameDragAnchor = pos;
                 _frameDragStartX = frame.RelativeX;
@@ -2097,8 +2288,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _shapeDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _shapeDragAnchor.Y) / om;
-            float newX = _shapeDragStartX + dx;
-            float newY = _shapeDragStartY + dy;
+            float newX = SnapToPixel(_shapeDragStartX + dx);
+            float newY = SnapToPixel(_shapeDragStartY + dy);
             if (_draggingShape is AARectSave r) { r.X = newX; r.Y = newY; }
             else if (_draggingShape is CircleSave c)          { c.X = newX; c.Y = newY; }
             InvalidateVisual();
@@ -2110,6 +2301,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
+            (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _draggingFrame.RelativeX = SnapToPixel(_frameDragStartX + dx);
             _draggingFrame.RelativeY = SnapToPixel(_frameDragStartY + dy);
             InvalidateVisual();
@@ -2122,6 +2314,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
             float om = _appState!.OffsetMultiplier * _zoom;
             float dx = (float)(pos.X - _frameDragAnchor.X) / om;
             float dy = -(float)(pos.Y - _frameDragAnchor.Y) / om;
+            (dx, dy) = AxisLock.Apply(dx, dy, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             for (int i = 0; i < _draggingChainFrames.Length; i++)
             {
                 _draggingChainFrames[i].RelativeX = SnapToPixel(_chainFrameStartX![i] + dx);
@@ -2231,7 +2424,10 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         float X, float Y,
         float Param1, float Param2,
         bool IsSelected,
-        bool IsPendingCut = false);
+        bool IsPendingCut = false,
+        // A locked chain's shape still shows the gold "selected" highlight via IsSelected --
+        // only the resize handles (implying it can be dragged) are suppressed (#1032 follow-up).
+        bool IsLocked = false);
 
     private record RenderSnapshot(
         AnimationFrameSave? Frame,
@@ -2384,7 +2580,7 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                 {
                     float hw = sh.Param1 * om;
                     float hh = sh.Param2 * om;
-                    if (sh.IsSelected)
+                    if (sh.IsSelected && !sh.IsLocked)
                         DrawShapeHandles(canvas, sx - hw, sy - hh, sx + hw, sy + hh);
                     canvas.DrawRect(new SKRect(sx - hw, sy - hh, sx + hw, sy + hh), paint);
                 }
@@ -2401,7 +2597,8 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
                             StrokeWidth = 1f,
                             PathEffect  = SKPathEffect.CreateDash(new float[] { 4f, 4f }, 0f),
                         };
-                        DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
+                        if (!sh.IsLocked)
+                            DrawShapeHandles(canvas, sx - sr, sy - sr, sx + sr, sy + sr);
                         canvas.DrawRect(new SKRect(sx - sr, sy - sr, sx + sr, sy + sr), boxPaint);
                     }
                     canvas.DrawCircle(sx, sy, sh.Param1 * om, paint);

@@ -4,7 +4,6 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
-using AnimationEditor.Core.Update;
 
 namespace AnimationEditor.App.Tests;
 
@@ -33,18 +32,6 @@ internal sealed class FakeApplicationUpdater : IApplicationUpdater
     public void ApplyUpdateAndRestart() => RestartCount++;
 }
 
-internal sealed class FakeUpdateChecker : IUpdateChecker
-{
-    public UpdateCheckResult Result { get; set; } = UpdateCheckResult.NoUpdate;
-    public int CallCount { get; private set; }
-
-    public Task<UpdateCheckResult> CheckAsync(Version currentVersion, CancellationToken cancellationToken = default)
-    {
-        CallCount++;
-        return Task.FromResult(Result);
-    }
-}
-
 /// <summary>
 /// Per-test service graph for headless App tests. Each call builds a brand-new
 /// set of services — no static state. Use <see cref="CreateMainWindow"/> to get
@@ -66,7 +53,6 @@ internal sealed class TestServices
     // (same rationale as SettingsRoot's isolation -- see class doc).
     public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
     public IFileAssociationService FileAssociationService { get; set; } = new NullFileAssociationService();
-    public IUpdateChecker UpdateChecker { get; set; } = new FakeUpdateChecker();
     public IApplicationUpdater ApplicationUpdater { get; set; } = new FakeApplicationUpdater();
 
     /// <summary>
@@ -101,7 +87,7 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, UpdateChecker, SettingsRoot, ApplicationUpdater);
+            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot, ApplicationUpdater);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

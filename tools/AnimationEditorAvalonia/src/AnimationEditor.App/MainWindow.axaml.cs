@@ -14,7 +14,6 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Layout;
 using AnimationEditor.Core.Models;
 using AnimationEditor.Core.Rendering;
-using AnimationEditor.Core.Update;
 using AnimationEditor.Core.Utilities;
 using AnimationEditor.Core.ViewModels;
 using AnimationEditor.Views.Controls;
@@ -58,7 +57,6 @@ public partial class MainWindow : Window
     private readonly Services.ThumbnailService _thumbnailService;
     private readonly ProjectTreeThumbnailService _projectTreeThumbnailService;
     private readonly IFileAssociationService _fileAssociation;
-    private readonly IUpdateChecker _updateChecker;
     private readonly IApplicationUpdater _applicationUpdater;
     private readonly IEditorDialogHost _dialogHost;
     private readonly FolderWatcher _pngFolderWatcher = new(PngFolderScanner.IsPngPath);
@@ -181,6 +179,13 @@ public partial class MainWindow : Window
     private bool _suppressCompanionSave;
     private bool _suppressInterpolateSync;
     private bool _suppressGuideVisibilitySync;
+
+    // Shift+Up/Down range-select (#1023): the row a range grows from. Reset to whatever
+    // OnTreeSelectionChanged sees as the plain (non-shift-range) selection so a stale anchor
+    // never causes a surprising jump on the next Shift+Arrow. _isApplyingShiftRangeSelection
+    // guards the handler's own AnimTree.SelectedItems mutation from resetting the anchor.
+    private TreeNodeVm? _treeSelectionAnchor;
+    private bool _isApplyingShiftRangeSelection;
     private readonly AltMenuActivationSuppressor _altMenuActivationSuppressor = new();
 
     // The platform application-data root under which settings live. Injected (not read from
@@ -207,7 +212,6 @@ public partial class MainWindow : Window
         Services.ThumbnailService thumbnailService,
         ProjectTreeThumbnailService projectTreeThumbnailService,
         IFileAssociationService fileAssociation,
-        IUpdateChecker updateChecker,
         string applicationDataRoot,
         IApplicationUpdater? applicationUpdater = null)
     {
@@ -225,7 +229,6 @@ public partial class MainWindow : Window
         _thumbnailService = thumbnailService;
         _projectTreeThumbnailService = projectTreeThumbnailService;
         _fileAssociation = fileAssociation;
-        _updateChecker = updateChecker;
         _applicationUpdater = applicationUpdater ?? new NoOpApplicationUpdater();
         _dialogHost = new WindowEditorDialogHost(this);
         // Desktop renders the tree with its own _treeRoots collection, so the controller
@@ -245,6 +248,7 @@ public partial class MainWindow : Window
         ApplyPersistedTheme();
         ApplyPersistedCanvasColors();
         ApplyPersistedPreviewPaneHeight();
+        ApplyPersistedWindowState();
         WireMenuEvents();
         WireWireframeToolbar();
         WireWireframeControl();
@@ -260,6 +264,7 @@ public partial class MainWindow : Window
         WireKeyboard();
         WireTabBar();
         WireDefaultHandlerBanner();
+        WireRecoveredDocumentBanner();
         WireUpdateAvailableBanner();
 
         WireframeCtrl.InitializeServices(_selectedState, _appState, _appCommands, _events, _projectManager, _undoManager, _pendingCutState, _objectFinder, msg => ShowStatusMessage(msg, isError: true));
@@ -278,6 +283,7 @@ public partial class MainWindow : Window
         // Right-clicking blank space in the tree offers "New Animation" (#908) -- same flow as
         // File > New.
         ProjectPanel.NewAnimationRequested += () => OnNewClick(null, null!);
+        ProjectPanel.NewAnimationFileRequested += request => _ = CreateNewAnimationFileAsync(request);
         // On scope toggle, re-supply the current referenced-texture set so "This File" reflects
         // the live .achx instead of the snapshot cached at the last refresh.
         FilesPanel.ScopeChanged += (_, _) => RefreshFilesPanel();
@@ -319,6 +325,7 @@ public partial class MainWindow : Window
         {
             // Piggyback on SaveTabsToSettings' write rather than a separate SaveSettingsFile call.
             _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value;
+            _appSettings.WindowMaximized = WindowState == WindowState.Maximized;
             SaveTabsToSettings();
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
@@ -721,7 +728,9 @@ public partial class MainWindow : Window
     {
         if (tab == _tabManager.ActiveTab) return;
 
-        ClearPendingCut();
+        // A pending cut deliberately survives a tab switch (#1026) -- paste on a different tab
+        // completes it as a cross-tab move; ResolveCompletion decides staleness lazily at paste
+        // time, so this is no longer a "just tidy up the highlight" clear.
 
         // Save the leaving tab's undo history and in-memory model before the editor switches.
         // PNG tabs carry no model or undo stack, so only capture when leaving the achx editor.
@@ -765,7 +774,7 @@ public partial class MainWindow : Window
 
     private void ActivateUntitledTabContent(TabEntry tab)
     {
-        ClearPendingCut();
+        // See the comment in ActivateTabAsync (#1026) -- a pending cut survives this switch too.
         _projectManager.AnimationChainListSave =
             tab.CachedEditorModel ?? new AnimationChainListSave();
         _projectManager.FileName = null;
@@ -783,7 +792,13 @@ public partial class MainWindow : Window
         TabEntry? tab = path != null
             ? _tabManager.Tabs.FirstOrDefault(t => t.Path == new FilePath(path))
             : _tabManager.ActiveTab;
-        if (tab != null)
+        // EditorProjectModelChanged is handled via Dispatcher.UIThread.InvokeAsync (#1038), so by
+        // the time this runs the live document may have already moved on to a different tab (e.g.
+        // two documents loaded back-to-back during startup, before the dispatcher catches up).
+        // CaptureTabEditorState always captures whatever is *currently* live -- only safe when
+        // `tab` is still the active one, or it silently poisons `tab`'s cache with someone else's
+        // content, which a later cache-hit reactivation then serves back as if it were `tab`'s own.
+        if (tab != null && tab == _tabManager.ActiveTab)
             _appCommands.CaptureTabEditorState(tab);
     }
 
@@ -793,6 +808,19 @@ public partial class MainWindow : Window
     /// a second process.
     /// </summary>
     public async Task OpenFileAsTab(string filePath) => await LoadAnimationFileAsync(filePath);
+
+    /// <summary>
+    /// Restores the window if minimized and requests OS focus. Called from <see cref="App"/>
+    /// alongside <see cref="OpenFileAsTab"/> when a second process hands off a file path over
+    /// the single-instance pipe (issue #1009) -- without this, the file opens as a new tab but
+    /// the window stays behind whatever else has focus.
+    /// </summary>
+    public void BringToForeground()
+    {
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Activate();
+    }
 
     /// <summary>
     /// Closes <paramref name="tab"/>, prompting to save first when it is an untitled tab that
@@ -958,22 +986,31 @@ public partial class MainWindow : Window
             Environment.Exit(0);
         }
 
-        if (!await TryRestoreRecoveryFileAsync())
+        // Consume any crash-recovery file up front, but open it *after* the normal startup
+        // branches below (#1020). Restoring it used to early-out of this whole block, so
+        // accepting the old Restore/Delete prompt silently dropped every other open tab.
+        var recovered = TakeRecoveryFileContent();
+
+        var args = Environment.GetCommandLineArgs();
+        if (args.Length >= 2 && File.Exists(args[1]))
         {
-            var args = Environment.GetCommandLineArgs();
-            if (args.Length >= 2 && File.Exists(args[1]))
-            {
-                _ = LoadAnimationFileAsync(args[1]);
-            }
-            else if (_appSettings.OpenTabPaths.Count > 0)
-            {
-                _ = RestoreTabsAsync();
-            }
-            else
-            {
-                _projectManager.AnimationChainListSave =
-                    new AnimationChainListSave();
-            }
+            await LoadAnimationFileAsync(args[1]);
+        }
+        else if (_appSettings.OpenTabPaths.Count > 0)
+        {
+            await RestoreTabsAsync();
+        }
+        else if (recovered is null)
+        {
+            _projectManager.AnimationChainListSave =
+                new AnimationChainListSave();
+        }
+
+        if (recovered is not null)
+        {
+            // Awaited above, so nothing is still in flight to clobber the restored document.
+            OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
+            RecoveredDocumentBanner.IsVisible = true;
         }
 
         // Independent of which branch above ran -- the Project tab tree isn't tied to which
@@ -981,11 +1018,10 @@ public partial class MainWindow : Window
         if (_appSettings.LastProjectFolderPath is { } lastProjectFolder && Directory.Exists(lastProjectFolder))
             await LoadProjectFolderAsync(lastProjectFolder);
 
-        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, or
-        // neither) did so directly rather than through ActivateTabAsync, so it never synced the
-        // Project list's own selection (#910 follow-up) -- do it once here, now the tree is
-        // populated. TabManager.ActiveTab is set synchronously by those paths even though their
-        // content load may still be in flight, so this doesn't need to wait on them.
+        // Whichever branch above set the active tab (RestoreTabsAsync, the CLI-arg open, the
+        // recovered document, or none of them) did so directly rather than through
+        // ActivateTabAsync, so it never synced the Project list's own selection (#910
+        // follow-up) -- do it once here, now the tree is populated.
         if (_tabManager.ActiveTab is { } activeTab)
             SyncProjectPanelSelectionTo(activeTab);
 
@@ -999,45 +1035,43 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Checks for a crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/> after
-    /// an unclean shutdown of an unsaved document (see <see cref="AppCommands.SaveCurrentAnimationChainList"/>).
-    /// When found, asks the user via <see cref="IAppCommands.ConfirmAsync"/> whether to restore it.
-    /// Returns <c>true</c> when recovered content was loaded as the active document (still
-    /// unsaved — <see cref="ProjectManager.FileName"/> stays null, matching the pre-crash state),
-    /// so the caller should skip its normal open-file / restore-tabs / blank-document startup.
-    /// Returns <c>false</c> when there was nothing to restore, the user declined, or the file
-    /// could not be parsed — in the latter two cases the stale recovery file is deleted first.
+    /// Reads and deletes any crash-recovery file left by <see cref="IIoManager.WriteRecoveryFile"/>
+    /// after an unclean shutdown of an unsaved document (see
+    /// <see cref="AppCommands.SaveCurrentAnimationChainList"/>), returning its content for the
+    /// caller to open as an unsaved document. Returns null when there was nothing to recover or
+    /// the file could not be parsed; the unparseable file is deleted rather than re-offered on
+    /// every subsequent launch.
     /// </summary>
-    private async Task<bool> TryRestoreRecoveryFileAsync()
+    /// <remarks>
+    /// Deleting on read is safe because the content lives in the restored tab from here on, and
+    /// closing that tab is what the user does to discard it (<see cref="CloseTabCore"/>). There is
+    /// deliberately no "delete permanently?" prompt: the old modal made that call from memory,
+    /// before the user could see what was in the file (#1020).
+    /// </remarks>
+    private AnimationChainListSave? TakeRecoveryFileContent()
     {
-        if (!_ioManager.RecoveryFileExists()) return false;
-
-        bool restore = await ShowTwoButtonDialogAsync(
-            "The editor closed unexpectedly last time with unsaved changes. Restore them into a new unsaved tab, or delete them permanently?",
-            "Restore Recovery File", "Restore", "Delete");
-
-        if (!restore)
-        {
-            _ioManager.DeleteRecoveryFile();
-            return false;
-        }
+        if (!_ioManager.RecoveryFileExists()) return null;
 
         var recovered = _ioManager.TryReadRecoveryFile();
-        if (recovered is null)
-        {
-            _ioManager.DeleteRecoveryFile();
-            return false;
-        }
-
         _ioManager.DeleteRecoveryFile();
-        OpenAsNewUnsavedDocument(recovered, recovered.AnimationChains.FirstOrDefault());
-        return true;
+        return recovered;
     }
+
+    // ── Recovered-document banner ─────────────────────────────────────────────
+
+    /// <summary>
+    /// The banner is informational only, so dismissing it just hides it (#1020). It carries no
+    /// "don't show again" setting: it appears exactly when a document was recovered, which is
+    /// never routine noise the user would want suppressed permanently.
+    /// </summary>
+    private void WireRecoveredDocumentBanner() =>
+        DismissRecoveredDocumentBtn.Click += (_, _) => RecoveredDocumentBanner.IsVisible = false;
 
     // ── Default-handler prompt banner ─────────────────────────────────────────
 
     private void WireDefaultHandlerBanner()
     {
+
         MakeDefaultBtn.Click += (_, _) => RegisterAsDefaultAchxHandler(hideBanner: true);
 
         DismissDefaultHandlerBtn.Click += (_, _) =>
@@ -1068,25 +1102,28 @@ public partial class MainWindow : Window
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────
 
-    private bool _isDownloadingUpdate;
-
     private void WireUpdateAvailableBanner()
     {
-        RestartForUpdateBtn.Click += (_, _) =>
-        {
-            try
-            {
-                SaveTabsToSettings();
-                _applicationUpdater.ApplyUpdateAndRestart();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Animation Editor update restart failed: {ex}");
-                ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
-            }
-        };
-
+        RestartForUpdateBtn.Click += (_, _) => RestartToApplyUpdate();
         RetryUpdateBtn.Click += (_, _) => _ = RunStartupUpdateDownloadAsync();
+    }
+
+    /// <summary>
+    /// Applies a downloaded update and restarts. Shared by the persistent banner's Restart
+    /// button and the About dialog's (issue #1033) — one restart action, not a copy per surface.
+    /// </summary>
+    private void RestartToApplyUpdate()
+    {
+        try
+        {
+            SaveTabsToSettings();
+            _applicationUpdater.ApplyUpdateAndRestart();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Animation Editor update restart failed: {ex}");
+            ShowUpdateDownloadFailure("The update is ready, but restarting to install it failed. Please try again.");
+        }
     }
 
     private void ShowUpdateDownloadFailure(string message)
@@ -1099,7 +1136,7 @@ public partial class MainWindow : Window
 
     private void ShowUpdateDownloadProgress(int percent)
     {
-        if (!_isDownloadingUpdate)
+        if (_updateCheckInFlight is null)
             return;
 
         UpdateAvailableBannerText.Text = $"Downloading Animation Editor update ({percent}%)…";
@@ -1115,7 +1152,6 @@ public partial class MainWindow : Window
         _appCommands.DoOnUiThread = action => Dispatcher.UIThread.InvokeAsync(action);
         _appCommands.ConfirmAsync = ShowConfirmDialogAsync;
         _appCommands.PromptStringAsync = ShowStringInputDialogAsync;
-        ShowTwoButtonDialogAsync = ShowTwoButtonDialogAsyncCore;
         ShowSaveDiscardCancelDialogAsync = ShowSaveDiscardCancelDialogAsyncCore;
 
         // File dialog service
@@ -1130,7 +1166,7 @@ public partial class MainWindow : Window
         _appCommands.EditorProjectModelChanged += path =>
             LastEditorProjectModelChangedTask = Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                ClearPendingCut();
+                // A pending cut deliberately survives this (#1026) -- see ActivateTabAsync.
                 SyncTabCacheFromEditor(path);
                 await InvalidateProjectPanelThumbnailIfTrackedAsync(path);
             });
@@ -1146,23 +1182,31 @@ public partial class MainWindow : Window
         _appCommands.RefreshAnimationFrameDisplayRequested += () => PreviewCtrl.InvalidateVisual();
         // RefreshWireframeRequested is handled by WireframeControl directly
 
-        _events.CurrentFileChanged     += path => Dispatcher.UIThread.InvokeAsync(() =>
+        _events.CurrentFileChanged     += path =>
         {
-            _appSettings.AddFile(new FilePath(path));
-            SaveSettingsFile();
-            RefreshRecentFiles();
-            UpdateTitle();
-            UpdateStatusBar();
-            RefreshFilesPanel();
-
-            // If the active tab was an Untitled sentinel, promote it to the real file path.
-            var active = _tabManager.ActiveTab;
-            if (active != null && IsUntitledTab(active))
+            // Capture the promotion candidate synchronously, at raise time. The continuation
+            // below is queued, and whichever tab is active by the time it runs is not
+            // necessarily the one this file was loaded into -- startup opens a crash-recovered
+            // document immediately after a restored tab's load raises this, and the queued
+            // continuation would otherwise rename the recovered tab to the restored file.
+            var toPromote = _tabManager.ActiveTab;
+            Dispatcher.UIThread.InvokeAsync(() =>
             {
-                _tabManager.Rename(active.Path, new FilePath(path));
-                RebuildTabStrip();
-            }
-        });
+                _appSettings.AddFile(new FilePath(path));
+                SaveSettingsFile();
+                RefreshRecentFiles();
+                UpdateTitle();
+                UpdateStatusBar();
+                RefreshFilesPanel();
+
+                // If that tab was an Untitled sentinel, promote it to the real file path.
+                if (toPromote != null && IsUntitledTab(toPromote))
+                {
+                    _tabManager.Rename(toPromote.Path, new FilePath(path));
+                    RebuildTabStrip();
+                }
+            });
+        };
         _events.AvailableTexturesChanged += () => Dispatcher.UIThread.InvokeAsync(RefreshTextureCombo);
 
         _undoManager.StackChanged         += () => Dispatcher.UIThread.InvokeAsync(UpdateStatusBar);
@@ -1302,6 +1346,13 @@ public partial class MainWindow : Window
         WireframeCtrl.FrameCreatedFromRegion += OnFrameCreatedFromRegion;
         // Same apply path the ANIMATIONS tree's PNG drop uses (issue #560).
         WireframeCtrl.HandlePngDrop          = HandlePngDropAsync;
+        // "Add Frame" (menu/button, no explicit texture) falls back to whatever the canvas is
+        // currently showing when the document has nothing else to offer.
+        _appCommands.CanvasDefaultTexturePath = () =>
+        {
+            var texPath = WireframeCtrl.LoadedTexturePathCasePreserved;
+            return string.IsNullOrEmpty(texPath) ? null : RelativizeTexturePath(texPath);
+        };
         // WireframeZoom follows the live zoom itself (ZoomControl.Attach subscribes ZoomChanged);
         // this handler only persists the settled state — once the smooth wheel-zoom (#425) stops
         // animating (IsZoomAnimating == false), not on every frame.
@@ -1717,11 +1768,7 @@ public partial class MainWindow : Window
         var (bitmapW, bitmapH) = WireframeCtrl.BitmapSize;
         if (bitmapW == 0 || bitmapH == 0) return;
 
-        string relPath = !string.IsNullOrEmpty(_projectManager.FileName)
-            ? Path.GetRelativePath(
-                Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
-                texPath).Replace('\\', '/')
-            : texPath;
+        string relPath = RelativizeTexturePath(texPath);
 
         var chainsToAddTo = selectedChains.Count > 1 ? selectedChains : new List<AnimationChainSave> { primaryChain };
 
@@ -1739,6 +1786,14 @@ public partial class MainWindow : Window
             _selectedState.SelectedFrame = priorFrame;
         }
     }
+
+    /// <summary>Converts an absolute texture path to .achx-relative form (unsaved project: verbatim).</summary>
+    private string RelativizeTexturePath(string absolutePath) =>
+        !string.IsNullOrEmpty(_projectManager.FileName)
+            ? Path.GetRelativePath(
+                Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty,
+                absolutePath).Replace('\\', '/')
+            : absolutePath;
 
     // ── Core event handlers ───────────────────────────────────────────────────
 
@@ -2190,6 +2245,35 @@ public partial class MainWindow : Window
     /// </summary>
     internal Func<string, string?> DeleteToRecycleBin { get; set; } = RecycleBin.Delete;
 
+    /// <summary>
+    /// Issue #1018: right-click "New Animation File" on a Project-tree folder row, after the user
+    /// named it inline. The panel has already rejected a name colliding with anything it can see,
+    /// but the scan behind the tree can be stale (an external <c>git pull</c>, another editor), so
+    /// this writes with <see cref="FileMode.CreateNew"/> and reports rather than overwriting. No
+    /// explicit tree refresh -- the project folder watcher rescans on any create under the watched
+    /// folder, same as <see cref="DeleteProjectFileAsync"/> relies on for a delete. Internal
+    /// (not private) so tests can drive it without a real context menu.
+    /// </summary>
+    internal async Task CreateNewAnimationFileAsync(NewAnimationFileRequest request)
+    {
+        var folder = ResolveProjectFolderAbsolutePath(request.FolderRelativePath);
+        if (folder is null) return;
+
+        var absolutePath = Path.Combine(folder, request.FileName);
+        try
+        {
+            using (var stream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write))
+                NewAnimationFileWriter.WriteEmpty(stream, request.FileName);
+        }
+        catch (Exception ex)
+        {
+            ShowStatusMessage($"⚠ Could not create {request.FileName}: {ex.Message}", isError: true);
+            return;
+        }
+
+        await LoadAnimationFileAsync(absolutePath);
+    }
+
     private void OnTitleFileCopyPathClick(object? sender, RoutedEventArgs e)
     {
         if (!string.IsNullOrEmpty(_projectManager.FileName))
@@ -2354,7 +2438,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Replaces the in-memory document with <paramref name="content"/> as a new, unsaved
     /// (Untitled) document, resets selection/undo/tree state, and opens/activates a tab for it.
-    /// Shared by <see cref="OnNewClick"/> and <see cref="TryRestoreRecoveryFileAsync"/> so both
+    /// Shared by <see cref="OnNewClick"/> and the startup crash-recovery path so both
     /// "start editing from a fresh in-memory document" paths can't drift apart again — #892 was
     /// exactly that: the recovery path duplicated everything except the tab-opening step.
     /// </summary>
@@ -2608,32 +2692,88 @@ public partial class MainWindow : Window
         => _ = ShowAboutDialogAsync();
 
     /// <summary>
-    /// Opening the About dialog is the manual "check for updates" action — it always forces a
-    /// fresh check (bypassing <see cref="UpdateCheckPolicy"/>'s cache) rather than adding a
-    /// separate button, since opening this dialog is already an infrequent, explicit user action.
+    /// Opening the About dialog behaves as if its "Check for Updates" button were already clicked:
+    /// it starts the real update check-and-download immediately and shows a spinner until the
+    /// result is in. This is the exact same mechanism (<see cref="RunApplicationUpdateCheckAsync"/>)
+    /// and restart action (<see cref="RestartToApplyUpdate"/>) the persistent startup banner uses —
+    /// About previously ran its own separate GitHub-release comparison whose "Get Update" button
+    /// only opened a browser tab, so it never actually fetched anything (issue #1033).
     /// </summary>
     private async Task ShowAboutDialogAsync()
     {
-        var result = await GetUpdateCheckResultAsync(forceRefresh: true);
-        await BuildAboutWindow(result).ShowDialog(this);
+        var window = BuildAboutWindowWithLiveRefresh(
+            refresh: () => RunApplicationUpdateCheckAsync(),
+            onRestart: RestartToApplyUpdate);
+        await window.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Builds the About window and immediately starts a check, rendering the spinner state before
+    /// returning. <paramref name="refresh"/> is invoked both for that initial check and every later
+    /// click of the "Check for Updates"/"Retry" button that replaces the spinner once it resolves —
+    /// one code path drives both, rather than a separate pre-fetch-before-show and a separate
+    /// in-place refresh. Extracted from <see cref="ShowAboutDialogAsync"/> for testability without
+    /// invoking <see cref="Window.ShowDialog"/>.
+    /// </summary>
+    internal static Window BuildAboutWindowWithLiveRefresh(Func<Task<ApplicationUpdateResult>> refresh, Action onRestart)
+    {
+        var window = new Window
+        {
+            Title = "About AnimationEditor",
+            Width = 420,
+            Height = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+
+        ApplicationUpdateResult? current = null;
+
+        async Task RunCheckAsync()
+        {
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: true, onRestart);
+            current = await refresh();
+            window.Content = BuildAboutContent(current, RunCheckAsync, isChecking: false, onRestart);
+        }
+
+        _ = RunCheckAsync();
+        return window;
+    }
+
+    private Task<ApplicationUpdateResult>? _updateCheckInFlight;
+
+    /// <summary>
+    /// Runs the real update check + download via <see cref="_applicationUpdater"/> — the single
+    /// mechanism shared by the startup banner (<see cref="RunStartupUpdateDownloadAsync"/>) and the
+    /// About dialog (issue #1033). A caller that arrives while a check is already running (e.g.
+    /// About opened during the startup check) shares that same in-flight task instead of racing a
+    /// second concurrent download.
+    /// </summary>
+    private Task<ApplicationUpdateResult> RunApplicationUpdateCheckAsync(Action<int>? onProgress = null)
+    {
+        if (_updateCheckInFlight is { IsCompleted: false } running)
+            return running;
+
+        async Task<ApplicationUpdateResult> RunAsync()
+        {
+            try
+            {
+                return await _applicationUpdater.DownloadUpdateAsync(percent =>
+                    Dispatcher.UIThread.Post(() => onProgress?.Invoke(percent)));
+            }
+            finally
+            {
+                _updateCheckInFlight = null;
+            }
+        }
+
+        var task = RunAsync();
+        _updateCheckInFlight = task;
+        return task;
     }
 
     private async Task RunStartupUpdateDownloadAsync()
     {
-        if (_isDownloadingUpdate)
-            return;
-
-        _isDownloadingUpdate = true;
-        ApplicationUpdateResult result;
-        try
-        {
-            result = await _applicationUpdater.DownloadUpdateAsync(percent =>
-                Dispatcher.UIThread.Post(() => ShowUpdateDownloadProgress(percent)));
-        }
-        finally
-        {
-            _isDownloadingUpdate = false;
-        }
+        var result = await RunApplicationUpdateCheckAsync(ShowUpdateDownloadProgress);
 
         switch (result.Status)
         {
@@ -2641,7 +2781,7 @@ public partial class MainWindow : Window
                 UpdateAvailableBanner.IsVisible = false;
                 break;
             case ApplicationUpdateStatus.ReadyToRestart:
-                UpdateAvailableBannerText.Text = $"Animation Editor v{result.Version} is ready. Restart to install it.";
+                UpdateAvailableBannerText.Text = DescribeUpdateStatus(result);
                 RestartForUpdateBtn.IsVisible = true;
                 RetryUpdateBtn.IsVisible = false;
                 UpdateAvailableBanner.IsVisible = true;
@@ -2652,29 +2792,13 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// Runs the update check (or reuses the cached result if <see cref="UpdateCheckPolicy"/>
-    /// says it's still fresh and <paramref name="forceRefresh"/> is false), persisting the
-    /// outcome to <see cref="AppSettingsModel"/> so it survives restarts.
-    /// </summary>
-    private async Task<UpdateCheckResult> GetUpdateCheckResultAsync(bool forceRefresh)
+    /// <summary>Status text shared by the startup banner and the About dialog (issue #1033).</summary>
+    private static string DescribeUpdateStatus(ApplicationUpdateResult result) => result.Status switch
     {
-        var currentVersion = typeof(MainWindow).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);
-        var now = DateTime.UtcNow;
-
-        if (!forceRefresh && !UpdateCheckPolicy.ShouldCheck(_appSettings.LastUpdateCheckUtc, now))
-        {
-            return UpdateCheckResult.FromCached(
-                _appSettings.LatestKnownUpdateVersion, _appSettings.LatestKnownUpdateUrl, currentVersion);
-        }
-
-        var result = await _updateChecker.CheckAsync(currentVersion);
-        _appSettings.LastUpdateCheckUtc = now;
-        _appSettings.LatestKnownUpdateVersion = result.LatestVersion?.ToString();
-        _appSettings.LatestKnownUpdateUrl = result.ReleaseUrl;
-        SaveSettingsFile();
-        return result;
-    }
+        ApplicationUpdateStatus.ReadyToRestart => $"Animation Editor v{result.Version} is ready. Restart to install it.",
+        ApplicationUpdateStatus.Failed => result.FailureMessage!,
+        _ => "You're up to date.",
+    };
 
     private void OnSettingsClick(object? sender, RoutedEventArgs e)
     {
@@ -2743,44 +2867,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Returns a fully-configured About window centered on its owner. <paramref name="updateCheck"/>
-    /// is <c>null</c> when no check has run yet (default text: "Check here for updates").
+    /// Builds the content panel for the About dialog. <paramref name="updateStatus"/> is <c>null</c>
+    /// when no check has run yet (default text: "Check for updates:"). <paramref name="onRefresh"/>,
+    /// when given, drives a "Check for Updates"/"Retry" button (issue #1033) that reruns the real
+    /// update check without closing the dialog — replaced by a spinner while
+    /// <paramref name="isChecking"/> is true, or by a "Restart Now" button (via
+    /// <paramref name="onRestart"/>) once a download is <see cref="ApplicationUpdateStatus.ReadyToRestart"/>.
     /// Extracted for testability.
     /// </summary>
-    internal static Window BuildAboutWindow(UpdateCheckResult? updateCheck = null) =>
-        new Window
-        {
-            Title = "About AnimationEditor",
-            Width = 420,
-            Height = 240,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Content = BuildAboutContent(updateCheck),
-        };
-
-    /// <summary>
-    /// Builds the content panel for the About dialog. <paramref name="updateCheck"/> is <c>null</c>
-    /// when no check has run yet; a non-null result with a populated <see cref="UpdateCheckResult.LatestVersion"/>
-    /// and <see cref="UpdateCheckResult.IsUpdateAvailable"/> <c>false</c> means the check succeeded
-    /// and the running version is already current (issue #845 — this used to be indistinguishable
-    /// from "never checked").
-    /// Extracted for testability.
-    /// </summary>
-    internal static Control BuildAboutContent(UpdateCheckResult? updateCheck = null)
+    internal static Control BuildAboutContent(
+        ApplicationUpdateResult? updateStatus = null,
+        Func<Task>? onRefresh = null,
+        bool isChecking = false,
+        Action? onRestart = null)
     {
         var ver = typeof(MainWindow).Assembly.GetName().Version;
         var versionText = ver is null ? "unknown" : $"{ver.Major}.{ver.Minor}.{ver.Build}";
+        var statusText = updateStatus is null ? "Check for updates:" : DescribeUpdateStatus(updateStatus);
 
-        var updatePromptText = updateCheck switch
-        {
-            { IsUpdateAvailable: true } => $"Update available: v{updateCheck.LatestVersion}",
-            { LatestVersion: not null } => $"You're up to date (v{updateCheck.LatestVersion})",
-            _ => "Check here for updates:",
-        };
-        var releaseUrl = updateCheck?.ReleaseUrl ?? ReleasesUrl;
-        var buttonLabel = updateCheck?.IsUpdateAvailable == true ? "Get Update" : "View Releases on GitHub";
-
-        return new StackPanel
+        var panel = new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
             Spacing = 8,
@@ -2789,11 +2894,52 @@ public partial class MainWindow : Window
                 new TextBlock { Text = "AnimationEditor", FontSize = 16 },
                 new TextBlock { Text = $"Version {versionText}" },
                 new TextBlock { Text = "© FlatRedBall Contributors" },
-                new TextBlock { Text = updatePromptText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
-                BuildOpenUrlButton(releaseUrl, buttonLabel),
+                new TextBlock { Text = statusText, Margin = new Avalonia.Thickness(0, 12, 0, 0) },
+                BuildOpenUrlButton(ReleasesUrl, "View Releases on GitHub"),
             }
         };
+
+        if (isChecking)
+            panel.Children.Add(BuildCheckingIndicator());
+        else if (updateStatus?.Status == ApplicationUpdateStatus.ReadyToRestart && onRestart is not null)
+            panel.Children.Add(BuildRestartButton(onRestart));
+        else if (onRefresh is not null)
+            panel.Children.Add(BuildRefreshButton(onRefresh,
+                updateStatus?.Status == ApplicationUpdateStatus.Failed ? "Retry" : "Check for Updates"));
+
+        return panel;
     }
+
+    /// <summary>Builds the About dialog's "Check for Updates"/"Retry" button (issue #1033).</summary>
+    private static Button BuildRefreshButton(Func<Task> onRefresh, string label)
+    {
+        var button = new Button { Name = "AboutRefreshBtn", Content = label };
+        button.Click += (_, _) => _ = onRefresh();
+        return button;
+    }
+
+    /// <summary>Builds the About dialog's "Restart Now" button once a download is ready — calls the
+    /// exact same <see cref="RestartToApplyUpdate"/> the persistent banner's button does (issue #1033).</summary>
+    private static Button BuildRestartButton(Action onRestart)
+    {
+        var button = new Button { Name = "AboutRestartBtn", Content = "Restart Now" };
+        button.Click += (_, _) => onRestart();
+        return button;
+    }
+
+    /// <summary>Replaces the "Check for Updates" button while a check is in flight (issue #1033).</summary>
+    private static Control BuildCheckingIndicator() =>
+        new StackPanel
+        {
+            Name = "AboutRefreshSpinner",
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new ProgressBar { IsIndeterminate = true, Width = 16, Height = 16 },
+                new TextBlock { Text = "Checking for updates…" },
+            }
+        };
 
     /// <summary>
     /// Opens a URL in the user's default browser. Network/shell failures are swallowed —
@@ -2853,6 +2999,9 @@ public partial class MainWindow : Window
             InterpolateToggle.IsChecked = isOn;
             _suppressInterpolateSync = false;
         };
+
+        LoopToggle.IsCheckedChanged += (_, _) =>
+            PreviewCtrl.Loop = LoopToggle.IsChecked == true;
 
         TimelineStrip.ItemsSource = _timelineFrames;
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
@@ -3012,6 +3161,15 @@ public partial class MainWindow : Window
             OnInlineRenameKeyDown,
             RoutingStrategies.Tunnel);
 
+        // Tunnel-phase Shift+Up/Down (#1023): intercept before TreeViewItem's own arrow-key
+        // handling, which otherwise just moves the single selection to the next/previous row
+        // and discards the rest. Registered after OnInlineRenameKeyDown so a rename in progress
+        // (which already swallows Up/Down via e.Handled) takes precedence.
+        AnimTree.AddHandler(
+            InputElement.KeyDownEvent,
+            OnAnimTreeShiftArrowKeyDown,
+            RoutingStrategies.Tunnel);
+
         // Bubble-phase LostFocus from the inline TextBox: commit
         AnimTree.AddHandler(
             InputElement.LostFocusEvent,
@@ -3157,6 +3315,15 @@ public partial class MainWindow : Window
     // Marking handled here mirrors how the header TextBlock suppresses the fallback handler.
     private void OnAddFrameBtnDoubleTapped(object? _, TappedEventArgs e) => e.Handled = true;
 
+    private void OnLockBtnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn) return;
+        if (btn.DataContext is not TreeNodeVm vm) return;
+        if (vm.Data is not AnimationChainSave chain) return;
+        _appCommands.SetChainLocked(chain, !chain.IsLocked);
+        e.Handled = true;
+    }
+
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
         // Internal frame reorder drag — distinct from the external .png file drag below.
@@ -3281,8 +3448,7 @@ public partial class MainWindow : Window
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
-        if (!string.IsNullOrEmpty(achxFolder) &&
-            TextureCopyDecider.ShouldPromptToCopy(droppedFilePath, achxFolder, _appState.ProjectFolder))
+        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, droppedFilePath))
         {
             var choice = await ShowTextureCopyDialogAsync(droppedFilePath);
             if (choice == TextureCopyChoice.Cancel) return false;
@@ -3804,6 +3970,12 @@ public partial class MainWindow : Window
         if (_suppressTreeSelectionHandling) return;
         if (AnimTree.SelectedItem is not TreeNodeVm vm) return;
 
+        // Any selection change that isn't our own Shift+Arrow range mutation re-anchors
+        // range-select at the row Avalonia now reports as SelectedItem (matches Explorer:
+        // a plain click, Ctrl+click, or native arrow-key move all become the new anchor).
+        if (!_isApplyingShiftRangeSelection)
+            _treeSelectionAnchor = vm;
+
         // Sync multi-select into SelectedState
         _selectedState.SelectedNodes = AnimTree.SelectedItems
             .OfType<TreeNodeVm>()
@@ -3949,6 +4121,7 @@ public partial class MainWindow : Window
             {
                 node.Header = chain.Name;
                 node.Meta   = TreeBuilder.BuildChainMeta(chain);
+                node.IsLocked = chain.IsLocked;
                 TreeBuilder.SyncFramesInto(node, chain.Frames);
                 // Grow-only: keep it visible if it already was, or if it now matches.
                 node.PinnedVisible = node.PinnedVisible
@@ -4239,9 +4412,14 @@ public partial class MainWindow : Window
     {
         _groupTimelineTracks.Clear();
 
+        // Shared across every row (#1056) so a frame of equal duration renders at equal width in
+        // every chain's row, instead of each chain scaling independently to its own shortest frame.
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
+            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+
         foreach (var (chain, _) in PreviewCtrl.GroupTracks)
         {
-            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain));
+            var track = new ChainTimelineTrackVm(chain, TimelineBuilder.BuildFrameItems(chain, sharedPps));
             if (chain.Frames.Count > 0)
             {
                 var colors = EffectiveFrameColor.ResolveAll(chain.Frames);
@@ -4261,6 +4439,11 @@ public partial class MainWindow : Window
     /// </summary>
     private void RefreshGroupTimelineScrubbers()
     {
+        // Must match the shared pps RefreshGroupTimelineTracks built the frame widths with (#1056) —
+        // recomputing per-chain here would desync the sub-frame playhead offset from those widths.
+        double sharedPps = TimelineBuilder.ComputeSharedEffectivePixelsPerSecond(
+            PreviewCtrl.GroupTracks.Select(t => t.Chain));
+
         foreach (var (chain, playback) in PreviewCtrl.GroupTracks)
         {
             var track = _groupTimelineTracks.FirstOrDefault(t => ReferenceEquals(t.Chain, chain));
@@ -4270,9 +4453,8 @@ public partial class MainWindow : Window
             for (int i = 0; i < track.Frames.Count; i++)
                 track.Frames[i].IsCurrent = i == idx;
 
-            double pps = TimelineBuilder.ComputeEffectivePixelsPerSecond(chain);
             double travelWidth = Math.Max(0, track.Frames[idx].Width - TimelineFrameVm.PlayheadWidth);
-            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * pps, travelWidth);
+            track.Frames[idx].ScrubberOffset = Math.Min(playback.FrameElapsed * sharedPps, travelWidth);
         }
     }
 
@@ -4380,6 +4562,15 @@ public partial class MainWindow : Window
         }
         else if (props.IsLeftButtonPressed && e.ClickCount == 1)
         {
+            // A press on a button embedded in the row template (lock-btn, add-frame-btn) is that
+            // button's own click, not a press on the row -- let it flow through untouched.
+            // Otherwise this handler treats it as a row press: when the row is already part of a
+            // multi-selection, the branches below capture the pointer and mark the event Handled
+            // to defer to a single-select-on-release, which both suppresses the button's Click
+            // and collapses the multi-selection down to just this row on release (#1042).
+            if (e.Source is Control btnSrc && btnSrc.FindAncestorOfType<Button>(includeSelf: true) is not null)
+                return;
+
             // Arm a frame-drag candidate. Snapshot the selection BEFORE the TreeView mutates
             // it on press, so dragging a frame that is part of a multi-selection can move the
             // whole set. Tunnel phase runs ahead of the TreeView's own selection handling.
@@ -4387,16 +4578,19 @@ public partial class MainWindow : Window
                 src.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext
                     is TreeNodeVm { Data: AnimationFrameSave frame })
             {
-                // Re-clicking an already-selected frame must still replay the reveal (#716) —
-                // WireframeControl.OnSelectionChanged only restarts it when the highlighted
-                // frame *set* changes, and re-selecting the same frame reproduces the identical
-                // set, so it would otherwise silently no-op. Only fire this when the frame is
-                // *already* the selection: this call runs synchronously at Tunnel-phase, before
-                // AnimTree's own selection update and the async SelectionChanged→RefreshFrames
-                // catch-up, so calling it for a switch to a *different* frame would restart the
-                // reveal while WireframeControl still shows the previous frame's rects — a
-                // visible flash of the wrong frame growing before the highlight moves.
-                if (ReferenceEquals(_selectedState.SelectedFrame, frame))
+                // A click that will reproduce the exact same one-frame highlight it found must
+                // still replay the reveal (#716) — WireframeControl's per-frame diffing (#1027)
+                // only starts a frame's reveal the first time it becomes highlighted, and both
+                // re-clicking the already-selected frame AND clicking the lone frame of an
+                // already-selected single-frame chain reproduce an identical highlighted set, so
+                // either would otherwise silently no-op. Only fire this when the *pre-click*
+                // highlighted set is already just this frame: this call runs synchronously at
+                // Tunnel-phase, before AnimTree's own selection update and the async
+                // SelectionChanged→RefreshFrames catch-up, so calling it for a switch to a
+                // *different* frame would restart the reveal while WireframeControl still shows
+                // the previous frame's rects — a visible flash of the wrong frame growing before
+                // the highlight moves.
+                if (WireframeCtrl.IsSoleHighlightedFrame(frame))
                     WireframeCtrl.ReplaySelectionReveal();
 
                 ClearChainDragCandidate();
@@ -4603,6 +4797,7 @@ public partial class MainWindow : Window
 
     private void WirePropertyPanel()
     {
+        PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -4743,38 +4938,35 @@ public partial class MainWindow : Window
         // resolvedAbsPath tracks the actual file we will use (may change if user copies it)
         string resolvedAbsPath = pickedPath;
 
-        if (!string.IsNullOrEmpty(achxFolder))
+        if (TextureCopyDecider.ShouldPromptToCopyForProject(_projectManager, pickedPath))
         {
-            if (TextureCopyDecider.ShouldPromptToCopy(pickedPath, achxFolder, _appState.ProjectFolder))
-            {
-                var choice = await ShowTextureCopyDialogAsync(pickedPath);
-                if (choice == TextureCopyChoice.Cancel) return;
+            var choice = await ShowTextureCopyDialogAsync(pickedPath);
+            if (choice == TextureCopyChoice.Cancel) return;
 
-                if (choice == TextureCopyChoice.Copy)
+            if (choice == TextureCopyChoice.Copy)
+            {
+                string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
+                try
                 {
-                    string destination = Path.Combine(achxFolder, Path.GetFileName(pickedPath));
-                    try
+                    File.Copy(pickedPath, destination, overwrite: true);
+                    resolvedAbsPath = destination;
+                }
+                catch (Exception ex)
+                {
+                    var capturedSource = pickedPath;
+                    var capturedDest   = destination;
+                    ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
                     {
-                        File.Copy(pickedPath, destination, overwrite: true);
-                        resolvedAbsPath = destination;
-                    }
-                    catch (Exception ex)
-                    {
-                        var capturedSource = pickedPath;
-                        var capturedDest   = destination;
-                        ShowToast($"Could not copy: {ex.Message}", retryAction: () =>
+                        try
                         {
-                            try
-                            {
-                                File.Copy(capturedSource, capturedDest, overwrite: true);
-                                CommitFrameTexture(new[] { frame }, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
-                            }
-                            catch (Exception retryEx)
-                            {
-                                ShowToast($"Retry failed: {retryEx.Message}");
-                            }
-                        });
-                    }
+                            File.Copy(capturedSource, capturedDest, overwrite: true);
+                            CommitFrameTexture(new[] { frame }, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
+                        }
+                        catch (Exception retryEx)
+                        {
+                            ShowToast($"Retry failed: {retryEx.Message}");
+                        }
+                    });
                 }
             }
         }
@@ -4896,6 +5088,18 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>True when <paramref name="frame"/>'s owning chain is locked (#1032 follow-up).</summary>
+    private bool IsFrameLocked(AnimationFrameSave? frame) =>
+        frame is not null && _objectFinder.GetAnimationChainContaining(frame)?.IsLocked == true;
+
+    /// <summary>True when the shape's owning frame's chain is locked (#1032 follow-up).</summary>
+    private bool IsShapeLocked(object? shape) => shape switch
+    {
+        AARectSave r => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(r)),
+        CircleSave c => IsFrameLocked(_objectFinder.GetAnimationFrameContaining(c)),
+        _ => false,
+    };
+
     private void RefreshPropertyPanel()
     {
         // Deliberately does NOT call SealPendingEdits here -- this method also runs after every
@@ -4909,17 +5113,29 @@ public partial class MainWindow : Window
             var circ  = _selectedState.SelectedCircle;
             var hasShapeSelection = rect is not null || circ is not null;
 
-            bool noneVisible = frame is null && rect is null && circ is null;
-            PropNoneLabel.IsVisible = noneVisible;
-            if (noneVisible)
-            {
-                PropNoneLabel.Text = _selectedState.SelectedChain is not null
-                    ? "Select a frame or shape to edit its properties."
-                    : "No selection";
-            }
+            bool noneSelected = frame is null && rect is null && circ is null;
+            var selectedChain = _selectedState.SelectedChain;
+            // A chain selected with no frame/shape shows PropChainPanel (its own Locked
+            // checkbox) instead of PropNoneLabel's generic placeholder (#1032).
+            bool chainOnly = noneSelected && selectedChain is not null;
+            PropNoneLabel.IsVisible = noneSelected && !chainOnly;
+            if (PropNoneLabel.IsVisible)
+                PropNoneLabel.Text = "No selection";
+            PropChainPanel.IsVisible = chainOnly;
+            if (chainOnly)
+                PropChainLocked.IsChecked = selectedChain!.IsLocked;
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;
+
+            // Disable (not just visually leave typeable) whichever panel is showing when its
+            // owning chain is locked -- AppCommands already no-ops the edit, so a still-enabled
+            // panel would silently discard input with no indication why (#1032 follow-up).
+            // PropChainPanel is deliberately never disabled here: its own Locked checkbox is the
+            // only way to unlock a chain from the inspector.
+            PropFramePanel.IsEnabled  = !IsFrameLocked(frame);
+            PropRectPanel.IsEnabled   = !IsShapeLocked(rect);
+            PropCirclePanel.IsEnabled = !IsShapeLocked(circ);
 
             if (frame is not null && !hasShapeSelection)
             {
@@ -5037,6 +5253,14 @@ public partial class MainWindow : Window
     }
 
     // ── Property apply methods ────────────────────────────────────────────────
+
+    private void ApplyChainLocked()
+    {
+        if (_suppressPropRefresh) return;
+        var chain = _selectedState.SelectedChain;
+        if (chain is null || PropChainLocked.IsChecked is not { } locked) return;
+        _appCommands.SetChainLocked(chain, locked);
+    }
 
     private void ApplyFrameFlip()
     {
@@ -5512,6 +5736,13 @@ public partial class MainWindow : Window
         AchxEditorPane.RowDefinitions[3].Height = new GridLength(resolved, GridUnitType.Pixel);
     }
 
+    /// <summary>Restores the maximized/restored window state from the last session (#1045).</summary>
+    private void ApplyPersistedWindowState()
+    {
+        if (_appSettings.WindowMaximized)
+            WindowState = WindowState.Maximized;
+    }
+
     private static uint ToArgb(SKColor color) =>
         (uint)((color.Alpha << 24) | (color.Red << 16) | (color.Green << 8) | color.Blue);
 
@@ -5631,28 +5862,10 @@ public partial class MainWindow : Window
         EditorDialogs.ConfirmAsync(_dialogHost, message, title);
 
     /// <summary>
-    /// Test seam for <see cref="ShowTwoButtonDialogAsyncCore"/> -- assigned to the real dialog in
-    /// <see cref="WireAppCommands"/>, mirroring <c>IAppCommands.ConfirmAsync</c>'s pattern. Not a
-    /// property on <c>IAppCommands</c> itself: that delegate is shared by ~20 test stubs across
-    /// unrelated tests, and this is UI-layer-only (used by exactly one caller,
-    /// <see cref="TryRestoreRecoveryFileAsync"/>) so it doesn't need that shared indirection.
-    /// </summary>
-    internal Func<string, string, string, string, Task<bool>> ShowTwoButtonDialogAsync { get; set; } = null!;
-
-    /// <summary>
-    /// Same as <see cref="ShowConfirmDialogAsync"/> but with caller-chosen button text instead of
-    /// generic Yes/No, for prompts where "Yes"/"No" would force the user to mentally map a named
-    /// choice (e.g. Restore/Delete) back onto Yes/No.
-    /// </summary>
-    private Task<bool> ShowTwoButtonDialogAsyncCore(
-        string message, string title, string confirmLabel, string cancelLabel) =>
-        EditorDialogs.ConfirmAsync(_dialogHost, message, title, confirmLabel, cancelLabel);
-
-    /// <summary>
     /// Test seam for the Save / Don't Save / Cancel prompt shown by
-    /// <see cref="CloseTabAsync"/> when closing an untitled tab that has content. Same
-    /// reasoning as <see cref="ShowTwoButtonDialogAsync"/> for living here instead of on the
-    /// shared <c>IAppCommands</c> delegate surface.
+    /// <see cref="CloseTabAsync"/> when closing an untitled tab that has content. Lives here
+    /// rather than on the shared <c>IAppCommands</c> delegate surface: that delegate is stubbed
+    /// by ~20 tests across unrelated fixtures, and this prompt is UI-layer-only.
     /// </summary>
     internal Func<string, string, Task<SaveDiscardCancelChoice>> ShowSaveDiscardCancelDialogAsync { get; set; } = null!;
 
@@ -6067,6 +6280,16 @@ public partial class MainWindow : Window
     private Task HandleCutAsync()   => RunGuardedAsync(HandleCutCoreAsync,   "Cut");
     private Task HandlePasteAsync() => RunGuardedAsync(HandlePasteCoreAsync, "Paste");
 
+    /// <summary>
+    /// The directory of the currently active <c>.achx</c>, or empty for an unsaved document.
+    /// Used to make copied/cut frame texture references self-contained (#1026) so a paste into
+    /// a document in a different folder still finds the same physical texture.
+    /// </summary>
+    private string CurrentAchxFolder =>
+        string.IsNullOrEmpty(_projectManager.FileName)
+            ? string.Empty
+            : new FilePath(_projectManager.FileName).GetDirectoryContainingThis().FullPath;
+
     private async Task HandleCopyCoreAsync()
     {
         if (IsTextInputFocused()) return;
@@ -6085,7 +6308,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
         _pendingCutState.Clear();
         SyncPendingCutHighlights();
     }
@@ -6108,8 +6331,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload));
-        _pendingCutState.Set(payload);
+        await clipboard.SetTextAsync(ClipboardPayload.SerializeFromPayload(payload, CurrentAchxFolder));
+        _pendingCutState.Set(payload, _projectManager.AnimationChainListSave!);
         SyncPendingCutHighlights();
     }
 
@@ -6130,19 +6353,25 @@ public partial class MainWindow : Window
         if (acls is null) return;
 
         var selectedData = SelectedData;
-        bool completingCut = _pendingCutState.IsActive;
-        if (completingCut && !_pendingCutState.SourcesBelongToProject(acls, _objectFinder))
+        var cutCompletion = _pendingCutState.ResolveCompletion(acls);
+        bool completingCut = cutCompletion is CutCompletion.SameDocument or CutCompletion.CrossDocument;
+        bool completingCutAcrossDocuments = cutCompletion == CutCompletion.CrossDocument;
+        if (cutCompletion == CutCompletion.Stale)
         {
             _pendingCutState.Clear();
             SyncPendingCutHighlights();
-            completingCut = false;
         }
 
         if (chains is { Count: > 0 })
         {
             if (completingCut && _pendingCutState.Kind != CopySelectionKind.Chain) return;
             QueuePastedChainExpandFromSources(chains, chains);
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteChains(chains);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
                 _appCommands.PasteChainsCut(chains, _pendingCutState.Chains);
             else
                 _appCommands.PasteChains(chains);
@@ -6154,7 +6383,12 @@ public partial class MainWindow : Window
                 acls, selectedData, _objectFinder, _selectedState);
             if (targetChain is null) return;
 
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteFrames(targetChain, frames, insertIndex);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
                 _appCommands.PasteFramesCut(targetChain, frames, insertIndex, _pendingCutState.Frames);
             else
                 _appCommands.PasteFrames(targetChain, frames, insertIndex);
@@ -6168,7 +6402,12 @@ public partial class MainWindow : Window
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
 
-            if (completingCut)
+            if (completingCutAcrossDocuments)
+            {
+                _appCommands.PasteShapes(frame, rectangles ?? [], circles ?? []);
+                _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
+            }
+            else if (completingCut)
             {
                 var sourceFrame = _pendingCutState.Shapes[0] switch
                 {
@@ -6207,13 +6446,6 @@ public partial class MainWindow : Window
             Walk(root);
         WireframeCtrl.InvalidateVisual();
         PreviewCtrl.InvalidateVisual();
-    }
-
-    private void ClearPendingCut()
-    {
-        if (!_pendingCutState.IsActive) return;
-        _pendingCutState.Clear();
-        SyncPendingCutHighlights();
     }
 
     private bool TreeMultiSelectionAlreadySynced(IReadOnlyList<object> dataObjects)
@@ -6662,6 +6894,59 @@ public partial class MainWindow : Window
             // TreeViewItem doesn't navigate to a sibling row and end the rename via focus loss.
             e.Handled = true;
         }
+    }
+
+    /// <summary>
+    /// Shift+Up/Down range-select (#1023): extends the selection by one visible row from a
+    /// fixed anchor (<see cref="_treeSelectionAnchor"/>), the far end moving with each key
+    /// press — the same semantics as Shift+Click range-select. Plain Up/Down (no Shift) is
+    /// untouched and falls through to Avalonia's native single-selection navigation.
+    /// </summary>
+    private void OnAnimTreeShiftArrowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift)) return;
+        if (e.Key is not (Key.Up or Key.Down)) return;
+        if (e.Source is TextBox) return; // inline rename owns Up/Down; see OnInlineRenameKeyDown
+
+        var visible = TreeBuilder.FlattenVisible(_treeRoots);
+        if (visible.Count == 0) return;
+
+        var anchor = _treeSelectionAnchor ?? AnimTree.SelectedItem as TreeNodeVm;
+        if (anchor is null) return;
+        int anchorIndex = visible.IndexOf(anchor);
+        if (anchorIndex < 0) return;
+
+        // The current selection's far end is whichever bound of its index range isn't the
+        // anchor — this lets the range's growth direction be read back from AnimTree.SelectedItems
+        // itself rather than tracking a second piece of state.
+        var selectedIndices = AnimTree.SelectedItems!.OfType<TreeNodeVm>()
+            .Select(n => visible.IndexOf(n))
+            .Where(i => i >= 0)
+            .ToList();
+        int lo = selectedIndices.Count > 0 ? selectedIndices.Min() : anchorIndex;
+        int hi = selectedIndices.Count > 0 ? selectedIndices.Max() : anchorIndex;
+        int farIndex = lo == anchorIndex ? hi : lo;
+
+        int newFarIndex = e.Key == Key.Down
+            ? Math.Min(visible.Count - 1, farIndex + 1)
+            : Math.Max(0, farIndex - 1);
+
+        int rangeLo = Math.Min(anchorIndex, newFarIndex);
+        int rangeHi = Math.Max(anchorIndex, newFarIndex);
+
+        _isApplyingShiftRangeSelection = true;
+        try
+        {
+            AnimTree.SelectedItems!.Clear();
+            for (int i = rangeLo; i <= rangeHi; i++)
+                AnimTree.SelectedItems.Add(visible[i]);
+        }
+        finally
+        {
+            _isApplyingShiftRangeSelection = false;
+        }
+
+        e.Handled = true;
     }
 
     // AnimTree (the TreeView itself) has Focusable=false — only its TreeViewItem containers

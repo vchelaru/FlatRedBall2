@@ -3,7 +3,6 @@ using AnimationEditor.Core;
 using AnimationEditor.Core.CommandsAndState;
 using AnimationEditor.Core.CommandsAndState.Commands;
 using AnimationEditor.Core.IO;
-using AnimationEditor.Core.Update;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -39,30 +38,114 @@ public partial class App : Application
         // through the dispatcher). The background-thread handlers are installed in Program.Main.
         Services.CrashLogging.InstallDispatcherHandler();
 
-        var services = BuildServices();
-
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var window = services.GetRequiredService<MainWindow>();
-            window.Icon = LoadAppIcon();
-            desktop.MainWindow = window;
-            RegisterNativeMenu(window);
-
-            // Wire single-instance IPC: file paths received from a second process open as tabs.
-            if (SingleInstance != null)
-            {
-                SingleInstance.FileOpenRequested += path =>
-                    Dispatcher.UIThread.InvokeAsync(() => window.OpenFileAsTab(path));
-            }
-
-            // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
-            // may clear NSApplication.applicationIconImage during window assignment
-            // (when WindowDecorations="None" bypasses the native title-bar path), so
-            // we set it AFTER Avalonia's own initialisation has finished.
-            Dispatcher.UIThread.Post(SetMacOSDockIcon);
+            // Program.Main only reaches here as a non-owner when its pipe hand-off to the
+            // primary instance failed (#1049) — show a recovery dialog instead of the normal
+            // MainWindow/DI graph, which would be overkill for a two-button prompt.
+            if (SingleInstance is { IsOwner: false })
+                HandleUnreachablePrimary(desktop);
+            else
+                StartAsOwner(desktop);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Classifies why the primary was unreachable and shows the matching recovery dialog. Called
+    /// only when <see cref="SingleInstance"/> is not the mutex owner and its pipe hand-off
+    /// already failed in <see cref="Program.Main"/>.
+    /// </summary>
+    private void HandleUnreachablePrimary(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var hangResult = PrimaryInstanceHangChecker.Check();
+        var action = SingleInstanceRecoveryDecision.Decide(reachedPrimary: false, hangResult);
+
+        switch (action)
+        {
+            case SingleInstanceRecoveryAction.ShowBusyMessage:
+                ShowRecoveryDialog(desktop, SingleInstanceRecoveryWindow.CreateBusyDialog(), onRestartConfirmed: null);
+                break;
+
+            case SingleInstanceRecoveryAction.OfferRestart:
+                ShowRecoveryDialog(desktop, SingleInstanceRecoveryWindow.CreateHungDialog(),
+                    onRestartConfirmed: () => RestartAndTakeOver(desktop));
+                break;
+
+            default:
+                // SilentExit only happens when reachedPrimary is true, which can't be the case
+                // here — Program.Main already returned in that branch without booting Avalonia.
+                desktop.Shutdown(0);
+                break;
+        }
+    }
+
+    private static void ShowRecoveryDialog(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        SingleInstanceRecoveryWindow window,
+        Action? onRestartConfirmed)
+    {
+        desktop.MainWindow = window;
+        window.Closed += (_, _) =>
+        {
+            if (window.RestartRequested && onRestartConfirmed != null)
+                onRestartConfirmed();
+            else
+                desktop.Shutdown(0);
+        };
+        window.Show();
+    }
+
+    /// <summary>
+    /// Kills the frozen primary, reacquires the single-instance mutex, and falls through into
+    /// the normal owner startup — all within this process, without a second Avalonia boot.
+    /// </summary>
+    private void RestartAndTakeOver(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        PrimaryInstanceHangChecker.KillOtherInstance();
+
+        SingleInstance?.Dispose();
+        SingleInstance = new SingleInstanceServer();
+
+        if (!SingleInstance.IsOwner)
+        {
+            // Race: something else still holds the mutex — give up cleanly rather than looping.
+            desktop.Shutdown(0);
+            return;
+        }
+
+        SingleInstance.StartListening();
+        StartAsOwner(desktop);
+    }
+
+    private void StartAsOwner(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var services = BuildServices();
+        var window = services.GetRequiredService<MainWindow>();
+        window.Icon = LoadAppIcon();
+        desktop.MainWindow = window;
+        RegisterNativeMenu(window);
+
+        // Wire single-instance IPC: file paths received from a second process open as tabs
+        // and bring the window forward (#1009) -- otherwise it opens behind whatever else
+        // currently has focus.
+        if (SingleInstance != null)
+        {
+            SingleInstance.FileOpenRequested += path =>
+                Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await window.OpenFileAsTab(path);
+                    window.BringToForeground();
+                });
+        }
+
+        // Post the Dock icon update to the next UI tick. Avalonia's macOS backend
+        // may clear NSApplication.applicationIconImage during window assignment
+        // (when WindowDecorations="None" bypasses the native title-bar path), so
+        // we set it AFTER Avalonia's own initialisation has finished.
+        Dispatcher.UIThread.Post(SetMacOSDockIcon);
+        window.Show();
     }
 
     private static void SetMacOSDockIcon()
@@ -195,8 +278,6 @@ public partial class App : Application
         else
             sc.AddSingleton<IFileAssociationService, NullFileAssociationService>();
 
-        sc.AddSingleton<IGitHubReleaseClient, HttpGitHubReleaseClient>();
-        sc.AddSingleton<IUpdateChecker, UpdateChecker>();
         sc.AddSingleton<IApplicationUpdater, VelopackApplicationUpdater>();
 
         sc.AddTransient<MainWindow>(sp => new MainWindow(
@@ -212,7 +293,6 @@ public partial class App : Application
             sp.GetRequiredService<ThumbnailService>(),
             sp.GetRequiredService<ProjectTreeThumbnailService>(),
             sp.GetRequiredService<IFileAssociationService>(),
-            sp.GetRequiredService<IUpdateChecker>(),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             sp.GetRequiredService<IApplicationUpdater>()));
 

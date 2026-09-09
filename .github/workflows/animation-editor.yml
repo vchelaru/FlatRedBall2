@@ -27,9 +27,15 @@ jobs:
         id: meta
         shell: pwsh
         run: |
-          # Velopack package versions use SemVer, whose numeric components cannot have leading
-          # zeroes. The assembly version receives this same three-part date value.
-          $version = (Get-Date).ToString('yyyy.M.d')
+          # Velopack's --packVersion requires strict 3-part SemVer2 (a 4th component, e.g.
+          # 2026.9.7.7, is rejected), so date and run number must fit into 3 components. Month+day
+          # are fused into the 2nd component (M then dd, e.g. Sept 7 -> "907") - the 100-per-month
+          # gap keeps it monotonic across month boundaries within a year. The 3rd component is the
+          # workflow run number, which never resets, so two releases cut on the same day still get
+          # strictly increasing versions - otherwise the second same-day release is invisible to
+          # the Velopack updater on clients already on the first one.
+          $date = Get-Date
+          $version = "$($date.Year).$($date.ToString('%M') + $date.ToString('dd')).$($env:GITHUB_RUN_NUMBER)"
           $kind = "${{ github.event.inputs.release_kind }}"
           switch ($kind) {
             'release'    { $prefix='Release';    $prerelease='false'; $draft='false' }
@@ -268,9 +274,7 @@ jobs:
 
       # Moves a floating tag so /releases/tag/animationeditor-latest always resolves to the
       # newest release/prerelease build. Skipped for 'test' (draft) runs so the public link
-      # never points at a draft. Tag is force-moved (not created fresh each time) since
-      # softprops/action-gh-release updates the existing "latest" release in place rather
-      # than creating a new one when the tag already has a release.
+      # never points at a draft.
       - name: Move animationeditor-latest tag
         if: github.event.inputs.release_kind != 'test'
         shell: pwsh
@@ -279,6 +283,19 @@ jobs:
           git config user.email "actions@github.com"
           git tag -f animationeditor-latest
           git push origin animationeditor-latest --force
+
+      # Delete the previous "latest" release object (not the tag) before recreating it below.
+      # softprops/action-gh-release updates an existing release in place, which (a) leaves
+      # GitHub's published_at stuck at the release's original creation date, so the listing
+      # shows it as "released N weeks ago" even right after a same-day update, and (b) merges
+      # new asset files in alongside old ones instead of replacing them, leaving stale nupkgs
+      # from prior versions attached. Deleting first forces a fresh release object with a
+      # current published_at and only this run's assets.
+      - name: Delete previous animationeditor-latest release
+        if: github.event.inputs.release_kind != 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete animationeditor-latest --yes || true
 
       - name: Update animationeditor-latest release
         if: github.event.inputs.release_kind != 'test'

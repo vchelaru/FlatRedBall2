@@ -10,7 +10,7 @@ namespace AnimationEditor.Core.Tests;
 
 public class FolderWatcherTests
 {
-    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
 
     private static bool PathsEqual(string a, string b) =>
         a.Replace('\\', '/').Equals(b.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);

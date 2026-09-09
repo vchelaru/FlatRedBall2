@@ -28,16 +28,24 @@ class Program
         var singleInstance = new SingleInstanceServer();
         if (!singleInstance.IsOwner)
         {
-            // Another instance is running — forward the file path and exit.
-            if (fileArg != null)
-                SingleInstanceServer.SendToRunningInstanceAsync(fileArg).GetAwaiter().GetResult();
-            singleInstance.Dispose();
-            return;
+            // Another instance is running. A successful hand-off means it's alive and well, so
+            // exit immediately without paying Avalonia's startup cost, same as before (#1049).
+            // A failed hand-off is ambiguous — could be a slow-but-fine primary, could be a
+            // frozen one — so it falls through into the Avalonia boot below, which shows a
+            // recovery dialog instead of the normal MainWindow (see App.OnFrameworkInitializationCompleted).
+            bool reachedPrimary = SingleInstanceServer.SendToRunningInstanceAsync(fileArg).GetAwaiter().GetResult();
+            if (reachedPrimary)
+            {
+                singleInstance.Dispose();
+                return;
+            }
         }
-
-        // We are the primary instance. Start the pipe listener before Avalonia so requests
-        // that arrive during startup are queued in the server.
-        singleInstance.StartListening();
+        else
+        {
+            // We are (immediately) the primary instance. Start the pipe listener before Avalonia
+            // so requests that arrive during startup are queued in the server.
+            singleInstance.StartListening();
+        }
 
         // Set the Dock label BEFORE Avalonia calls [NSApplication sharedApplication]
         // (inside UsePlatformDetect). The Dock caches the process name at that point;
@@ -60,7 +68,10 @@ class Program
         }
         finally
         {
-            singleInstance.Dispose();
+            // App.SingleInstance may have been replaced with a freshly-acquired instance if the
+            // user restarted a frozen primary (App.RestartAndTakeOver) — dispose whichever one
+            // is current, not the local var captured before that could have happened.
+            App.SingleInstance?.Dispose();
         }
     }
 

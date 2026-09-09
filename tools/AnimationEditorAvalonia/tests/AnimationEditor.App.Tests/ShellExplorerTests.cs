@@ -28,4 +28,20 @@ public class ShellExplorerTests
     {
         Assert.Equal(@"C:\proj\textures\hero.png", ShellExplorer.ToWindowsSelectPath(@"C:/proj\textures/hero.png"));
     }
+
+    // Issue #1059: OpenFolder backs "View in Explorer" on a folder row. Only the guard clauses
+    // are unit-testable without actually launching the shell.
+    [Fact]
+    public void OpenFolder_MissingFolder_ReturnsError()
+    {
+        var missing = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+
+        Assert.Equal($"Folder not found: {missing}", ShellExplorer.OpenFolder(missing));
+    }
+
+    [Fact]
+    public void OpenFolder_EmptyPath_ReturnsError()
+    {
+        Assert.Equal("No folder path was provided.", ShellExplorer.OpenFolder(string.Empty));
+    }
 }

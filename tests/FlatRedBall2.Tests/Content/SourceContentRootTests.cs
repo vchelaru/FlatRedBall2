@@ -145,4 +145,33 @@ public class SourceContentRootTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void SourceContentRoots_AutoDetect_SkipsDirectoriesItCannotEnumerate()
+    {
+        // A directory in the walk-up chain that cannot be listed must not abort detection. macOS
+        // App Translocation is the real case: a quarantined .app runs from a read-only nullfs
+        // mount whose root throws IOException "Result too large" on enumeration, which used to
+        // take the FlatRedBallService static constructor -- and the whole game -- down at launch.
+        // Unix permissions stand in for it here; on Windows the walk is simply unobstructed and
+        // the same expected result holds.
+        var root = Path.Combine(Path.GetTempPath(), "frb2-srcroot-blocked-" + System.Guid.NewGuid().ToString("N"));
+        var blocked = Path.Combine(root, "blocked");
+        var bin = Path.Combine(blocked, "bin", "Debug", "net10.0");
+        Directory.CreateDirectory(bin);
+        File.WriteAllText(Path.Combine(root, "FakeGame.csproj"), "<Project />");
+        if (!System.OperatingSystem.IsWindows())
+            File.SetUnixFileMode(blocked, UnixFileMode.None);
+
+        try
+        {
+            FlatRedBallService.DetectSourceContentRoots(bin).ShouldBe(new[] { root });
+        }
+        finally
+        {
+            if (!System.OperatingSystem.IsWindows())
+                File.SetUnixFileMode(blocked, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

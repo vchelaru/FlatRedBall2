@@ -1,4 +1,5 @@
 ﻿using AnimationEditor.Core.CommandsAndState.Commands;
+using AnimationEditor.Core.Data;
 using AnimationEditor.Core.HotReload;
 using AnimationEditor.Core.IO;
 using AnimationEditor.Core.Models;
@@ -67,6 +68,39 @@ namespace AnimationEditor.Core.CommandsAndState
             if (!string.IsNullOrEmpty(_pm.FileName))
                 SaveCurrentAnimationChainList();
         }
+
+        // ── Chain lock (#1032) ────────────────────────────────────────────────────
+        // A locked chain's frame/shape *content* cannot be edited (add/delete/move/duplicate/
+        // flip/reorder frames; add/delete/move/resize/duplicate shapes; any property edit on a
+        // frame or shape belonging to the chain). Chain-level container operations (rename,
+        // delete, reorder, duplicate-the-whole-chain) are NOT gated here — only content edits.
+
+        /// <summary>True when <paramref name="chain"/> is non-null and locked.</summary>
+        private static bool IsChainLocked(AnimationChainSave? chain) => chain?.IsLocked == true;
+
+        /// <summary>True when <paramref name="frame"/>'s owning chain is locked.</summary>
+        private bool IsFrameLocked(AnimationFrameSave frame) =>
+            IsChainLocked(_objectFinder.GetAnimationChainContaining(frame));
+
+        /// <summary>
+        /// True when the shape's owning chain is locked. <paramref name="knownFrame"/> is used
+        /// when the caller already resolved it (avoids a second lookup); falls back to resolving
+        /// the frame from <paramref name="shape"/> (an <see cref="AARectSave"/> or <see cref="CircleSave"/>)
+        /// when <c>null</c>.
+        /// </summary>
+        private bool IsShapeLocked(AnimationFrameSave? knownFrame, object shape)
+        {
+            var frame = knownFrame ?? shape switch
+            {
+                AARectSave r => _objectFinder.GetAnimationFrameContaining(r),
+                CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
+                _ => null,
+            };
+            return frame is not null && IsFrameLocked(frame);
+        }
+
+        public void SetChainLocked(AnimationChainSave chain, bool locked) =>
+            _undoManager.Execute(new SetChainLockedCommand(chain, locked, this, _events));
         // Delegates wired up by the Avalonia app layer ----------------------------
 
         /// <summary>
@@ -527,6 +561,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddAxisAlignedRectangle(AnimationFrameSave frame)
         {
+            if (IsFrameLocked(frame)) return;
+
             var rectangleSave = new AARectSave
             {
                 ScaleX = 8,
@@ -541,6 +577,8 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddCircle(AnimationFrameSave frame)
         {
+            if (IsFrameLocked(frame)) return;
+
             var circleSave = new CircleSave
             {
                 Radius = 8,
@@ -558,6 +596,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void MatchRectangleToFrame(AARectSave rectangle, AnimationFrameSave animationFrame)
         {
+            if (IsFrameLocked(animationFrame)) return;
             _undoManager.Execute(new MoveShapeCommand(
                 animationFrame, rectangle, rectangle.X, rectangle.Y,
                 animationFrame.RelativeX, animationFrame.RelativeY, this, _events));
@@ -569,6 +608,7 @@ namespace AnimationEditor.Core.CommandsAndState
         /// </summary>
         public void MatchCircleToFrame(CircleSave circle, AnimationFrameSave animationFrame)
         {
+            if (IsFrameLocked(animationFrame)) return;
             _undoManager.Execute(new MoveShapeCommand(
                 animationFrame, circle, circle.X, circle.Y,
                 animationFrame.RelativeX, animationFrame.RelativeY, this, _events));
@@ -586,7 +626,7 @@ namespace AnimationEditor.Core.CommandsAndState
             foreach (var rect in rectangles.ToArray())
             {
                 var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
-                if (ownerFrame is null) continue;
+                if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
                 commands.Add(new MoveShapeCommand(
                     ownerFrame, rect, rect.X, rect.Y,
                     ownerFrame.RelativeX, ownerFrame.RelativeY, this, _events));
@@ -613,16 +653,20 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteCircle(CircleSave circle, AnimationFrameSave owner)
         {
+            if (IsFrameLocked(owner)) return;
             _undoManager.Execute(new DeleteCircleCommand(circle, owner, this, _events, _selectedState));
         }
 
         public void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner)
         {
+            if (IsFrameLocked(owner)) return;
             _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events, _selectedState));
         }
 
         public void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles)
         {
+            if (IsFrameLocked(frame)) return;
+
             var commands = new List<IUndoableCommand>();
             foreach (var rect in rectangles.ToArray())
                 commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events, _selectedState));
@@ -644,18 +688,31 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void DeleteFrames(List<AnimationFrameSave> frames)
         {
-            var chain = _selectedState.SelectedChain;
-            if (chain != null)
-            {
-                var validFrames = frames.Where(f => chain.Frames.Contains(f)).ToList();
-                string label = validFrames.Count == 1
-                    ? $"Frame {chain.Frames.IndexOf(validFrames[0]) + 1}"
-                    : $"{validFrames.Count} frames";
-                _undoManager.Execute(new DeleteFramesCommand(frames, chain, this, _events, _selectedState));
-                if (validFrames.Count > 0)
-                    ItemsDeleted?.Invoke(label);
-            }
+            // The incoming frames can span multiple chains (a cross-chain tree multi-select,
+            // MainWindow.HandleDelete). A locked chain among them keeps its own frames --
+            // group by owning chain and skip only the locked groups, rather than vetoing the
+            // whole delete when any one chain involved is locked (bulk skip-locked-entries
+            // pattern, matching PasteFramesCut).
+            var groups = frames
+                .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
+                .Where(x => x.Chain is not null && x.Chain.Frames.Contains(x.Frame) && !IsChainLocked(x.Chain))
+                .GroupBy(x => x.Chain!)
+                .ToList();
+            if (groups.Count == 0) return;
 
+            var validFrames = groups.SelectMany(g => g).Select(x => x.Frame).ToList();
+            string label = validFrames.Count == 1
+                ? $"Frame {groups[0].Key.Frames.IndexOf(validFrames[0]) + 1}"
+                : $"{validFrames.Count} frames";
+
+            var commands = groups
+                .Select(g => (IUndoableCommand)new DeleteFramesCommand(
+                    g.Select(x => x.Frame).ToList(), g.Key, this, _events, _selectedState))
+                .ToList();
+            string desc = commands.Count == 1 ? commands[0].Description : $"Delete {validFrames.Count} Frames";
+            _undoManager.Execute(new CompositeCommand(commands, desc));
+
+            ItemsDeleted?.Invoke(label);
             RefreshWireframeRequested?.Invoke();
             _events.RaiseAnimationChainsChanged();
         }
@@ -732,8 +789,12 @@ namespace AnimationEditor.Core.CommandsAndState
             return true;
         }
 
+        public Func<string?>? CanvasDefaultTexturePath { get; set; }
+
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
+            if (IsChainLocked(chain)) return;
+
             // When no texture is passed, inherit both the texture and the sub-region from a
             // source frame so the new frame lands on the same sheet cell the user is working in,
             // rather than snapping back to the whole texture. An explicit texture (e.g. drag-drop
@@ -742,9 +803,16 @@ namespace AnimationEditor.Core.CommandsAndState
                 ? ResolveInheritedFrame(chain, _pm.AnimationChainListSave)
                 : null;
 
+            // Nothing in the document to inherit from (a brand-new document, or a chain-less
+            // selection) -- fall back to whatever the wireframe canvas is already showing rather
+            // than leaving the new frame textureless.
+            var resolvedTextureName = textureName ?? source?.TextureName;
+            if (string.IsNullOrEmpty(resolvedTextureName))
+                resolvedTextureName = CanvasDefaultTexturePath?.Invoke();
+
             var frame = new AnimationFrameSave
             {
-                TextureName  = textureName ?? source?.TextureName ?? string.Empty,
+                TextureName  = resolvedTextureName ?? string.Empty,
                 LeftCoordinate   = source?.LeftCoordinate   ?? 0f,
                 RightCoordinate  = source?.RightCoordinate  ?? 1f,
                 TopCoordinate    = source?.TopCoordinate    ?? 0f,
@@ -768,15 +836,7 @@ namespace AnimationEditor.Core.CommandsAndState
             if (chain.Frames.Count > 0)
                 return chain.Frames[^1];
 
-            if (chainList is not null)
-            {
-                foreach (var otherChain in chainList.AnimationChains)
-                    foreach (var frame in otherChain.Frames)
-                        if (!string.IsNullOrEmpty(frame.TextureName))
-                            return frame;
-            }
-
-            return null;
+            return TextureListBuilder.FindFirstTexturedFrame(chainList);
         }
 
         /// <summary>
@@ -890,6 +950,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void MoveFrame(AnimationFrameSave frame, AnimationChainSave chain, int delta)
         {
+            if (IsChainLocked(chain)) return;
             int idx    = chain.Frames.IndexOf(frame);
             int newIdx = Math.Clamp(idx + delta, 0, chain.Frames.Count - 1);
             if (newIdx == idx) return;
@@ -904,6 +965,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void MoveFrameToTop(AnimationFrameSave frame, AnimationChainSave chain)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Insert(0, frame); },
@@ -913,6 +975,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void MoveFrameToBottom(AnimationFrameSave frame, AnimationChainSave chain)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => { chain.Frames.Remove(frame); chain.Frames.Add(frame); },
@@ -924,7 +987,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFrames(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave sourceChain, AnimationChainSave targetChain, int insertIndex)
         {
-            if (frames.Count == 0) return;
+            if (frames.Count == 0 || IsChainLocked(sourceChain) || IsChainLocked(targetChain)) return;
             _undoManager.Execute(new MoveFramesCommand(
                 frames, sourceChain, targetChain, insertIndex, this, _events, _selectedState));
         }
@@ -933,7 +996,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void MoveFramesRelative(IReadOnlyList<AnimationFrameSave> frames,
             AnimationChainSave chain, int delta)
         {
-            if (delta == 0 || frames.Count == 0) return;
+            if (delta == 0 || frames.Count == 0 || IsChainLocked(chain)) return;
 
             var indices = frames
                 .Select(f => chain.Frames.IndexOf(f))
@@ -1042,6 +1105,7 @@ namespace AnimationEditor.Core.CommandsAndState
         }
         public void MoveShape(object shape, AnimationFrameSave frame, int delta)
         {
+            if (IsFrameLocked(frame)) return;
             var shapes = frame.ShapesSave?.Shapes;
             if (shapes is null) return;
             int idx    = shapes.IndexOf(shape);
@@ -1059,6 +1123,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void MoveShapeToTop(object shape, AnimationFrameSave frame)
         {
+            if (IsFrameLocked(frame)) return;
             var shapes = frame.ShapesSave?.Shapes;
             if (shapes is null || !shapes.Contains(shape)) return;
             _undoManager.Execute(new ReorderCommand<object>(
@@ -1070,6 +1135,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void MoveShapeToBottom(object shape, AnimationFrameSave frame)
         {
+            if (IsFrameLocked(frame)) return;
             var shapes = frame.ShapesSave?.Shapes;
             if (shapes is null || !shapes.Contains(shape)) return;
             _undoManager.Execute(new ReorderCommand<object>(
@@ -1138,23 +1204,24 @@ namespace AnimationEditor.Core.CommandsAndState
             // get flipped (and their offset/shapes mirrored), so a frame already at the target state
             // is untouched. Reuses FlipCommand's toggle for exactly those frames, grouped into one
             // undo step via CompositeCommand.
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
             var commands = new List<IUndoableCommand>();
 
             if (flipHorizontal.HasValue)
             {
-                var toFlip = frames.Where(f => f.FlipHorizontal != flipHorizontal.Value).ToArray();
+                var toFlip = unlockedFrames.Where(f => f.FlipHorizontal != flipHorizontal.Value).ToArray();
                 if (toFlip.Length > 0)
                     commands.Add(new FlipCommand(toFlip, FlipAxis.Horizontal, this, _events, RefreshWireframe));
             }
             if (flipVertical.HasValue)
             {
-                var toFlip = frames.Where(f => f.FlipVertical != flipVertical.Value).ToArray();
+                var toFlip = unlockedFrames.Where(f => f.FlipVertical != flipVertical.Value).ToArray();
                 if (toFlip.Length > 0)
                     commands.Add(new FlipCommand(toFlip, FlipAxis.Vertical, this, _events, RefreshWireframe));
             }
             if (flipDiagonal.HasValue)
             {
-                var toFlip = frames.Where(f => f.FlipDiagonal != flipDiagonal.Value).ToArray();
+                var toFlip = unlockedFrames.Where(f => f.FlipDiagonal != flipDiagonal.Value).ToArray();
                 if (toFlip.Length > 0)
                     commands.Add(new FlipCommand(toFlip, FlipAxis.Diagonal, this, _events, RefreshWireframe));
             }
@@ -1165,6 +1232,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void FlipChainHorizontally(AnimationChainSave chain)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new FlipCommand(
                 chain.Frames.ToArray(), FlipAxis.Horizontal, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
@@ -1172,6 +1240,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void FlipChainVertically(AnimationChainSave chain)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new FlipCommand(
                 chain.Frames.ToArray(), FlipAxis.Vertical, this, _events,
                 () => { RefreshTreeNode(chain); RefreshWireframe(); }));
@@ -1179,6 +1248,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void InvertFrameOrder(AnimationChainSave chain)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new ReorderCommand<AnimationFrameSave>(
                 chain.Frames,
                 () => chain.Frames.Reverse(),
@@ -1188,6 +1258,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetAllFrameLengths(AnimationChainSave chain, float frameLength)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => { foreach (var frame in chain.Frames) frame.FrameLength = frameLength; },
@@ -1255,7 +1326,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public AnimationFrameSave? DuplicateFrame(AnimationFrameSave source, AnimationChainSave chain)
         {
-            if (!chain.Frames.Contains(source)) return null;
+            if (!chain.Frames.Contains(source) || IsChainLocked(chain)) return null;
             var copies = DuplicateFramesBatch(new[] { source });
             return copies.Count > 0 ? copies[0] : null;
         }
@@ -1320,7 +1391,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
             var grouped = sources
                 .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
-                .Where(x => x.Chain is not null)
+                .Where(x => x.Chain is not null && !IsChainLocked(x.Chain))
                 .GroupBy(x => x.Chain!);
 
             foreach (var group in grouped)
@@ -1364,7 +1435,7 @@ namespace AnimationEditor.Core.CommandsAndState
                 CircleSave c => _objectFinder.GetAnimationFrameContaining(c),
                 _ => null,
             };
-            if (frame is null) return Array.Empty<object>();
+            if (frame is null || IsFrameLocked(frame)) return Array.Empty<object>();
 
             frame.ShapesSave ??= new ShapesSave();
             var existingNames = GetShapeNames(frame);
@@ -1432,6 +1503,7 @@ namespace AnimationEditor.Core.CommandsAndState
             Func<AnimationFrameSave, float?> getTextureHeight,
             float offsetMultiplier = 1f)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () =>
@@ -1457,6 +1529,7 @@ namespace AnimationEditor.Core.CommandsAndState
             float? deltaY,
             bool relative)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => AdjustOffsetCalculator.ApplyAdjustAll(chain.Frames, deltaX, deltaY, relative),
@@ -1474,6 +1547,7 @@ namespace AnimationEditor.Core.CommandsAndState
             AnimationChainSave chain,
             float targetTotalDuration)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplyKeepProportional(chain.Frames, targetTotalDuration),
@@ -1489,6 +1563,7 @@ namespace AnimationEditor.Core.CommandsAndState
             AnimationChainSave chain,
             float targetTotalDuration)
         {
+            if (IsChainLocked(chain)) return;
             _undoManager.Execute(new BulkFrameEditCommand(
                 chain.Frames,
                 () => FrameTimeScaler.ApplySetAllSame(chain.Frames, targetTotalDuration),
@@ -1509,6 +1584,8 @@ namespace AnimationEditor.Core.CommandsAndState
             int count,
             bool incrementUV)
         {
+            if (IsChainLocked(chain)) return false;
+
             var lastFrame = chain.Frames.Count > 0 ? chain.Frames[^1] : null;
             var result    = BatchFrameBuilder.BuildBatch(lastFrame, count, incrementUV);
 
@@ -1614,6 +1691,8 @@ namespace AnimationEditor.Core.CommandsAndState
             int minX, int minY, int maxX, int maxY,
             int bitmapWidth, int bitmapHeight)
         {
+            if (IsChainLocked(chain)) return;
+
             var frame = new AnimationFrameSave
             {
                 TextureName         = textureName,
@@ -1638,14 +1717,15 @@ namespace AnimationEditor.Core.CommandsAndState
         /// <param name="textureName">Relative texture path to assign (may be null to clear).</param>
         public void SetFrameTextureName(AnimationFrameSave frame, string? textureName)
         {
-            if (frame == null) return;
+            if (frame == null || IsFrameLocked(frame)) return;
             _undoManager.Execute(new SetFrameTextureNameCommand(frame, frame.TextureName, textureName, this, _events));
         }
 
         public void SetFrameTextureName(IReadOnlyList<AnimationFrameSave> frames, string? textureName)
         {
-            if (frames.Count == 0) return;
-            var cmds = frames
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToArray();
+            if (unlockedFrames.Length == 0) return;
+            var cmds = unlockedFrames
                 .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, this, _events))
                 .ToArray();
             _undoManager.Execute(new CompositeCommand(cmds, "Set Frame Texture"));
@@ -1653,7 +1733,7 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetAllFramesTextureName(AnimationChainSave chain, string? textureName)
         {
-            if (chain.Frames.Count == 0) return;
+            if (chain.Frames.Count == 0 || IsChainLocked(chain)) return;
             var cmds = chain.Frames
                 .Select(f => (IUndoableCommand)new SetFrameTextureNameCommand(f, f.TextureName, textureName, this, _events))
                 .ToArray();
@@ -1662,18 +1742,22 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameLength(IReadOnlyList<AnimationFrameSave> frames, float newLength)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             var desc = $"Set Length: {newLength:0.###}s";
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () => { foreach (var f in frames) f.FrameLength = newLength; },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) f.FrameLength = newLength; },
                 this, _events, false, desc, coalesceKind: "Length"));
         }
 
         public void SetFrameRelative(IReadOnlyList<AnimationFrameSave> frames, float? newRelX, float? newRelY)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () =>
+                unlockedFrames, () =>
                 {
-                    foreach (var f in frames)
+                    foreach (var f in unlockedFrames)
                     {
                         if (newRelX.HasValue) f.RelativeX = newRelX.Value;
                         if (newRelY.HasValue) f.RelativeY = newRelY.Value;
@@ -1684,38 +1768,46 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetFrameColor(IReadOnlyList<AnimationFrameSave> frames, int? red, int? green, int? blue)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             // Color tints the preview and the timeline/tree thumbnails but not the wireframe, so no
             // wireframe refresh is needed. The AnimationChainsChanged raised here rebuilds those.
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () => { foreach (var f in frames) { f.Red = red; f.Green = green; f.Blue = blue; } },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) { f.Red = red; f.Green = green; f.Blue = blue; } },
                 this, _events, false, "Set Frame Color", coalesceKind: "Color"));
         }
 
         public void SetFrameColorOperation(IReadOnlyList<AnimationFrameSave> frames, ColorOperation? operation)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             // Mode drives how the preview + timeline/tree thumbnails tint; it doesn't touch the
             // wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () => { foreach (var f in frames) f.ColorOperation = operation; },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) f.ColorOperation = operation; },
                 this, _events, false, "Set Frame Color Mode"));
         }
 
         public void SetFrameAlpha(IReadOnlyList<AnimationFrameSave> frames, int? alpha)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             // Alpha is straight transparency; it fades the preview + timeline/tree thumbnails but not
             // the wireframe, so no wireframe refresh is needed.
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () => { foreach (var f in frames) f.Alpha = alpha; },
+                unlockedFrames, () => { foreach (var f in unlockedFrames) f.Alpha = alpha; },
                 this, _events, false, "Set Frame Alpha", coalesceKind: "Alpha"));
         }
 
         public void SetFramePixelRegion(IReadOnlyList<AnimationFrameSave> frames,
             int? pixelX, int? pixelY, int? pixelW, int? pixelH, int bmpW, int bmpH)
         {
+            var unlockedFrames = frames.Where(f => !IsFrameLocked(f)).ToList();
+            if (unlockedFrames.Count == 0) return;
             _undoManager.Execute(new BulkFrameEditCommand(
-                frames, () =>
+                unlockedFrames, () =>
                 {
-                    foreach (var f in frames)
+                    foreach (var f in unlockedFrames)
                     {
                         // Order matters: SetX/SetY preserve each frame's own current width/height, so
                         // they must run before SetWidth/SetHeight overwrite Right/Bottom using the
@@ -1730,16 +1822,23 @@ namespace AnimationEditor.Core.CommandsAndState
         }
 
         public void SetRectProps(AnimationFrameSave? frame, AARectSave rect,
-            string name, float x, float y, float scaleX, float scaleY) =>
+            string name, float x, float y, float scaleX, float scaleY)
+        {
+            if (IsShapeLocked(frame, rect)) return;
             _undoManager.Execute(SetShapePropsCommand.ForRect(frame, rect, name, x, y, scaleX, scaleY, this, _events));
+        }
 
         public void SetCircleProps(AnimationFrameSave? frame, CircleSave circ,
-            string name, float x, float y, float radius) =>
+            string name, float x, float y, float radius)
+        {
+            if (IsShapeLocked(frame, circ)) return;
             _undoManager.Execute(SetShapePropsCommand.ForCircle(frame, circ, name, x, y, radius, this, _events));
+        }
 
         public void SetRectPropsBulk(IReadOnlyList<AARectSave> rects,
             string? name, float? x, float? y, float? scaleX, float? scaleY)
         {
+            rects = rects.Where(r => !IsShapeLocked(null, r)).ToList();
             if (rects.Count == 0) return;
             _undoManager.Execute(new BulkShapePropsCommand(
                 rects.Cast<object>().ToList(),
@@ -1760,6 +1859,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void SetCirclePropsBulk(IReadOnlyList<CircleSave> circles,
             string? name, float? x, float? y, float? radius)
         {
+            circles = circles.Where(c => !IsShapeLocked(null, c)).ToList();
             if (circles.Count == 0) return;
             _undoManager.Execute(new BulkShapePropsCommand(
                 circles.Cast<object>().ToList(),
@@ -1804,6 +1904,7 @@ namespace AnimationEditor.Core.CommandsAndState
         public void PasteFrames(AnimationChainSave chain, IReadOnlyList<AnimationFrameSave> frames,
             int? insertIndex = null)
         {
+            if (IsChainLocked(chain)) return;
             var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
             _undoManager.Execute(new AddFramesCommand(clones, chain, this, _events, _selectedState, insertIndex));
         }
@@ -1848,15 +1949,17 @@ namespace AnimationEditor.Core.CommandsAndState
             IReadOnlyList<AnimationFrameSave> frames, int? insertIndex,
             IReadOnlyList<AnimationFrameSave> sourcesToRemove)
         {
-            if (frames.Count == 0) return;
+            if (frames.Count == 0 || IsChainLocked(targetChain)) return;
             var clones = frames.Select(AnimationCloneHelper.CloneFrame).ToArray();
             var cmds = new List<IUndoableCommand>
             {
                 new AddFramesCommand(clones, targetChain, this, _events, _selectedState, insertIndex),
             };
+            // A locked source chain keeps its originals: the paste still happens, but the "cut"
+            // half is skipped only for the locked source chain's frames (bulk skip-locked-entries).
             foreach (var group in sourcesToRemove
                          .Select(f => (Frame: f, Chain: _objectFinder.GetAnimationChainContaining(f)))
-                         .Where(x => x.Chain is not null)
+                         .Where(x => x.Chain is not null && !IsChainLocked(x.Chain))
                          .GroupBy(x => x.Chain!))
             {
                 cmds.Add(new DeleteFramesCommand(
@@ -1885,22 +1988,29 @@ namespace AnimationEditor.Core.CommandsAndState
             var clones = BuildShapeClones(targetFrame, rectangles, circles);
             if (clones.Count == 0) return;
 
+            // A locked source keeps its originals: the paste still happens, but the "cut"
+            // half (removing the source) is skipped, same as any other bulk operation
+            // skipping only its locked entries.
+            bool sourceLocked = IsFrameLocked(sourceFrame);
             var deleteCmds = new List<IUndoableCommand>();
-            foreach (var shape in sourcesToRemove)
+            if (!sourceLocked)
             {
-                switch (shape)
+                foreach (var shape in sourcesToRemove)
                 {
-                    case AARectSave r:
-                        deleteCmds.Add(new DeleteAxisAlignedRectangleCommand(
-                            r, sourceFrame, this, _events, _selectedState));
-                        break;
-                    case CircleSave c:
-                        deleteCmds.Add(new DeleteCircleCommand(
-                            c, sourceFrame, this, _events, _selectedState));
-                        break;
+                    switch (shape)
+                    {
+                        case AARectSave r:
+                            deleteCmds.Add(new DeleteAxisAlignedRectangleCommand(
+                                r, sourceFrame, this, _events, _selectedState));
+                            break;
+                        case CircleSave c:
+                            deleteCmds.Add(new DeleteCircleCommand(
+                                c, sourceFrame, this, _events, _selectedState));
+                            break;
+                    }
                 }
+                if (deleteCmds.Count == 0) return;
             }
-            if (deleteCmds.Count == 0) return;
 
             var cmds = new List<IUndoableCommand>
             {
@@ -1916,6 +2026,8 @@ namespace AnimationEditor.Core.CommandsAndState
         private List<object> BuildShapeClones(AnimationFrameSave frame,
             IReadOnlyList<AARectSave> rectangles, IReadOnlyList<CircleSave> circles)
         {
+            if (IsFrameLocked(frame)) return new List<object>();
+
             frame.ShapesSave ??= new ShapesSave();
             var existingNames = GetShapeNames(frame);
             var clones = new List<object>();

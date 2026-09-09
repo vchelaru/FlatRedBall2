@@ -6,6 +6,7 @@ using AnimationEditor.Core.IO;
 using AnimationEditor.Views.Controls;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -330,6 +331,71 @@ public class AnimationTreeControlTests
         control.RaiseAddFrameForTest(walkNode);
 
         Assert.Equal(3, acls.AnimationChains[0].Frames.Count);
+    }
+
+    // ── Meta text vs. icon overlap (#1035) ────────────────────────────────────
+    // Mirrors AnimationEditor.App.Tests.ChainLockTests' desktop coverage for the same bug in
+    // this control's own (duplicate) tree template: the lock icon's lane must not overlap the
+    // meta text ("7 fr · 2.95s").
+
+    [AvaloniaFact]
+    public void AddFrameBtn_HiddenWhenChainLocked()
+    {
+        var (control, commands, acls) = BuildWithCommands();
+        var chain = acls.AnimationChains[0];
+
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        try
+        {
+            window.Show();
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var addBtn = control.TreeView.GetVisualDescendants()
+                .OfType<Button>()
+                .First(b => b.Classes.Contains("add-frame-btn") &&
+                            b.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, chain));
+            Assert.True(addBtn.IsVisible);
+
+            commands.SetChainLocked(chain, true);
+            control.Refresh();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(addBtn.IsVisible);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void MetaTextMargin_ReflectsLockedState()
+    {
+        var (control, commands, acls) = BuildWithCommands();
+        var chain = acls.AnimationChains[0];
+
+        var window = new Window { Content = control, Width = 400, Height = 400 };
+        try
+        {
+            window.Show();
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var meta = control.TreeView.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .First(t => t.Classes.Contains("meta") &&
+                            t.DataContext is AnimationEditor.Core.ViewModels.TreeNodeVm vm &&
+                            ReferenceEquals(vm.Data, chain));
+            Assert.Equal(8, meta.Margin.Right); // unlocked, not hovered: tight
+
+            commands.SetChainLocked(chain, true);
+            control.Refresh();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(56, meta.Margin.Right); // locked: clears the lock icon's lane
+        }
+        finally { window.Close(); }
     }
 
     // ── Multi-select (#757) ───────────────────────────────────────────────────

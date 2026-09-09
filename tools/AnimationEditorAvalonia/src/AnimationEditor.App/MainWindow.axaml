@@ -271,6 +271,45 @@
             </DockPanel>
         </Border>
 
+        <!-- ── Recovered-document banner (issue #1020): a crash-recovery file is restored into
+             a tab automatically on startup, and this announces it instead of the old blocking
+             Restore/Delete modal — the user can look at the content before deciding, and
+             discards it by closing the tab rather than from memory. ── -->
+        <Border x:Name="RecoveredDocumentBanner"
+                DockPanel.Dock="Top"
+                IsVisible="False"
+                Background="{DynamicResource InfoBannerBg}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1">
+            <DockPanel>
+                <Border DockPanel.Dock="Left"
+                        Width="3"
+                        Background="{DynamicResource AccentCool}" />
+                <DockPanel Margin="12,6">
+                    <Button x:Name="DismissRecoveredDocumentBtn"
+                            DockPanel.Dock="Right"
+                            Content="OK"
+                            Padding="10,3"
+                            FontSize="12"
+                            VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Path Width="16"
+                              Height="16"
+                              VerticalAlignment="Center"
+                              Stretch="Uniform"
+                              Fill="{DynamicResource AccentCool}"
+                              Data="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+                        <TextBlock Text="This file was unsaved when the editor last closed. It has been restored into this tab. Save it to keep it."
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Ink}" />
+                    </StackPanel>
+                </DockPanel>
+            </DockPanel>
+        </Border>
+
         <!-- ── Automatic-update banner (issue #982) ── only shown while a managed install
              downloads an update, waits for an explicit restart, or needs a safe retry. ── -->
         <Border x:Name="UpdateAvailableBanner"
@@ -588,6 +627,43 @@
                             <Setter Property="IsHitTestVisible" Value="True" />
                             <Setter Property="Focusable" Value="True" />
                         </Style>
+                        <!-- #1032: chain lock icon. Hover-reveal like add-frame-btn when unlocked,
+                             but always visible (via the .locked class, bound to
+                             TreeNodeVm.IsLocked) so a locked chain is recognizable at a glance
+                             without hovering. -->
+                        <Style Selector="Button.lock-btn">
+                            <Setter Property="Opacity" Value="0" />
+                            <Setter Property="IsHitTestVisible" Value="False" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover Button.lock-btn">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                        <Style Selector="Button.lock-btn.locked">
+                            <Setter Property="Opacity" Value="1" />
+                            <Setter Property="IsHitTestVisible" Value="True" />
+                            <Setter Property="Focusable" Value="True" />
+                        </Style>
+                        <!-- #1035: the meta text's right margin must clear whichever icon lane(s)
+                             are actually visible, not always assume one. Locking a chain hides
+                             the add-frame button (CanAddFrame) and always shows the lock icon, so
+                             only two cases exist: no icon lane visible (tight), or the lock
+                             icon's lane visible (locked, or hovered while unlocked, since hover
+                             reveals both add-frame and lock together). The lock lane sits further
+                             from the edge than add-frame's, so clearing it clears both. The
+                             ":not(.locked)" on the hover rule keeps a locked+hovered row on the
+                             locked margin rather than depending on style declaration order. -->
+                        <Style Selector="TextBlock.meta">
+                            <Setter Property="Margin" Value="8,0,8,0" />
+                        </Style>
+                        <Style Selector="TextBlock.meta.locked">
+                            <Setter Property="Margin" Value="8,0,56,0" />
+                        </Style>
+                        <Style Selector="TreeViewItem:pointerover TextBlock.meta:not(.locked)">
+                            <Setter Property="Margin" Value="8,0,56,0" />
+                        </Style>
                         <!-- Pending cut (Ctrl+X): light orange wash across the full row -->
                         <Style Selector="Border.cut-pending">
                             <Setter Property="Background" Value="#28E07030" />
@@ -668,13 +744,15 @@
                                                  VerticalContentAlignment="Center"
                                                  HorizontalAlignment="Stretch" />
                                     </Panel>
-                                <!-- Meta reserves a right margin the width of the Add-Frame button lane so
-                                     chain and frame rows align on the same right edge (#623). -->
+                                <!-- Meta's right margin clears whichever icon lane(s) are visible
+                                     (see the TextBlock.meta styles above, #1035) so it never
+                                     overlaps the add-frame/lock buttons floated on top. -->
                                 <TextBlock Grid.Column="2"
+                                           Classes="meta"
+                                           Classes.locked="{Binding IsLocked}"
                                            Text="{Binding Meta}"
                                            Foreground="{DynamicResource AccentCool}"
                                            FontSize="11"
-                                           Margin="8,0,30,0"
                                            TextAlignment="Right"
                                            VerticalAlignment="Center"
                                            IsVisible="{Binding Meta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -685,7 +763,7 @@
                                      layout on hover. 22px pointer target (Fitts's Law); zero vertical margin
                                      keeps it under the 32px Fluent row height (TreeViewItemMinHeight). -->
                                 <Button Classes="add-frame-btn plus"
-                                        IsVisible="{Binding IsChainNode}"
+                                        IsVisible="{Binding CanAddFrame}"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
                                         Width="22" Height="22"
@@ -696,6 +774,19 @@
                                         ToolTip.Tip="Add Frame"
                                         Click="OnAddFrameBtnClick"
                                         DoubleTapped="OnAddFrameBtnDoubleTapped" />
+                                <Button Classes="lock-btn lock-icon"
+                                        Classes.locked="{Binding IsLocked}"
+                                        IsVisible="{Binding IsChainNode}"
+                                        AutomationProperties.AutomationId="chain-lock-btn"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Width="22" Height="22"
+                                        Padding="0"
+                                        Margin="0,0,30,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        ToolTip.Tip="Lock Animation"
+                                        Click="OnLockBtnClick" />
                             </Grid>
                             </Border>
                         </TreeDataTemplate>
@@ -812,6 +903,25 @@
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
                                                Margin="0,12,0,0" />
+
+                                    <!-- ── Chain properties (#1032) ── shown when a chain is
+                                         selected but no frame/shape is (replacing PropNoneLabel's
+                                         "Select a frame or shape..." placeholder). -->
+                                    <StackPanel x:Name="PropChainPanel" IsVisible="False" Spacing="0">
+                                        <Border BorderBrush="{DynamicResource LineBrush}"
+                                                BorderThickness="0,0,0,1"
+                                                Padding="12,8,12,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="ANIMATION"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkMid}" />
+                                                <CheckBox x:Name="PropChainLocked"
+                                                          Content="Locked"
+                                                          AutomationProperties.AutomationId="prop-chain-locked" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
 
                                     <!-- ── Frame properties ── -->
                                     <StackPanel x:Name="PropFramePanel" IsVisible="False" Spacing="0">
@@ -1540,6 +1650,18 @@
                                              CurrentColor="{DynamicResource IconInk}"
                                              VerticalAlignment="Center" HorizontalAlignment="Center" />
                                 </Button>
+                                <ToggleButton x:Name="LoopToggle"
+                                              Classes="toolbarToggle"
+                                              Height="26" Width="32"
+                                              Foreground="{DynamicResource Ink}"
+                                              VerticalAlignment="Center"
+                                              IsChecked="True"
+                                              ToolTip.Tip="Loop playback (not persisted)">
+                                    <svg:Svg Width="14" Height="14"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
+                                             CurrentColor="{DynamicResource IconInk}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </ToggleButton>
                                 <viewsControls:FlankerNumericField x:Name="SpeedInput"
                                                                     Width="92" VerticalAlignment="Center"
                                                                     ToolTip.Tip="Playback speed (1.0 = runtime speed)"

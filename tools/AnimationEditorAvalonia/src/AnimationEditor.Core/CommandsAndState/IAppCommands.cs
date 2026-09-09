@@ -138,7 +138,25 @@ namespace AnimationEditor.Core.CommandsAndState
         AnimationChainSave? AddAnimationChainWithName(string name);
         AnimationChainSave? AddNewAnimationChain();
         bool RenameChain(AnimationChainSave chain, string newName);
+
+        /// <summary>
+        /// Locks or unlocks <paramref name="chain"/> against frame/shape content edits (issue
+        /// #1032). Chain-level container operations (rename, delete, reorder, duplicate) are not
+        /// affected by the lock. Undoable, same as any other mutating command.
+        /// </summary>
+        void SetChainLocked(AnimationChainSave chain, bool locked);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
+
+        /// <summary>
+        /// Last-resort texture for <see cref="AddFrame"/> when the target chain has no frames and
+        /// no other chain in the document has a texture to borrow (a brand-new document or a
+        /// chain-less selection). The host wires this to whatever the wireframe canvas is
+        /// currently showing -- see <c>WireframeControl.RefreshAll</c> -- so a frame added via the
+        /// "Add Frame" menu/button uses the same default the canvas already displays, instead of
+        /// coming up textureless. Left <c>null</c> in headless/Core-only contexts.
+        /// </summary>
+        Func<string?>? CanvasDefaultTexturePath { get; set; }
+
         void MoveChain(AnimationChainSave chain, int delta);
 
         /// <summary>

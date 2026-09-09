@@ -200,8 +200,9 @@ public class ProjectPanelControlTests
         {
             RightClick(window, control, control.TreeRoots[0]); // "Sprites" folder
 
-            var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>().Single();
-            Assert.Equal("View in Explorer", item.Header);
+            var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Select(i => i.Header).ToArray();
+            Assert.Equal(new object?[] { "New Animation File", "View in Explorer" }, headers);
         }
         finally { window.Close(); }
     }
@@ -220,7 +221,8 @@ public class ProjectPanelControlTests
             string? requested = null;
             control.FolderRevealRequested += path => requested = path;
 
-            var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>().Single();
+            var item = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Single(i => (string)i.Header! == "View in Explorer");
             item.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Equal("Sprites", requested);
@@ -330,23 +332,6 @@ public class ProjectPanelControlTests
         try
         {
             RightClick(window, control, control.TreeRoots[0]); // "hero.achx" file
-
-            Assert.Empty(control.ProjectTree.ContextMenu!.Items);
-        }
-        finally { window.Close(); }
-    }
-
-    [AvaloniaFact]
-    public void RightClickingFolderRow_WithRevealNotSupported_ShowsNoItems()
-    {
-        var control = new Controls.ProjectPanelControl(); // SupportsRevealInExplorer defaults false
-        var root = new FakeFolder("Content");
-        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
-
-        var window = ShowInWindow(control);
-        try
-        {
-            RightClick(window, control, control.TreeRoots[0]); // "Sprites" folder
 
             Assert.Empty(control.ProjectTree.ContextMenu!.Items);
         }
@@ -472,6 +457,178 @@ public class ProjectPanelControlTests
         await control.ThumbnailLoadTask;
 
         Assert.True(control.TreeRoots[0].HasThumbnail);
+    }
+
+    // Issue #1018: right-click a folder row -> "New Animation File", named inline in the tree.
+    // Shown regardless of SupportsRevealInExplorer -- the browser build has real folder access
+    // via NativeReadWriteFolder, it just can't reveal in an OS shell.
+    [AvaloniaFact]
+    public void ClickingNewAnimationFile_AddsPendingRowInEditModeWithSuggestedName()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]); // "Sprites" folder
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            Assert.True(pending.IsEditing);
+            // Project is all-.achx, so the convention resolves to .achx rather than the .achj default.
+            Assert.Equal("NewAnimation.achx", pending.Name);
+            Assert.Equal("NewAnimation", pending.EditText);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CommittingPendingName_RaisesNewAnimationFileRequestedWithFolderAndFileName()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achj"), root, "Sprites/hero.achj") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]); // "Sprites"
+            Controls.NewAnimationFileRequest? requested = null;
+            control.NewAnimationFileRequested += r => requested = r;
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            pending.EditText = "Enemy";
+            PressKey(control, pending, Key.Enter);
+
+            Assert.Equal("Sprites", requested!.Value.FolderRelativePath);
+            Assert.Equal("Enemy.achj", requested!.Value.FileName);
+            Assert.DoesNotContain(control.TreeRoots[0].Children, n => n.IsPending);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CommittingPendingName_CollidingWithOtherExtension_ShowsErrorAndStaysInEditMode()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]); // "Sprites"
+            var raised = false;
+            control.NewAnimationFileRequested += _ => raised = true;
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            pending.EditText = "hero"; // hero.achx already exists, so hero.achj collides too
+            PressKey(control, pending, Key.Enter);
+
+            Assert.False(raised);
+            Assert.True(pending.IsEditing);
+            Assert.Equal("\"hero\" already exists in this folder.", pending.ErrorMessage);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void CancellingPendingName_RemovesRowWithoutRequestingAFile()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]); // "Sprites"
+            var raised = false;
+            control.NewAnimationFileRequested += _ => raised = true;
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            PressKey(control, pending, Key.Escape);
+
+            Assert.False(raised);
+            Assert.DoesNotContain(control.TreeRoots[0].Children, n => n.IsPending);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void RightClickingFolderRow_WithRevealNotSupported_StillShowsNewAnimationFileItem()
+    {
+        var control = new Controls.ProjectPanelControl(); // browser build leaves this false
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            RightClick(window, control, control.TreeRoots[0]); // "Sprites" folder
+
+            var headers = control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+                .Select(i => i.Header).ToArray();
+            Assert.Equal(new object?[] { "New Animation File" }, headers);
+        }
+        finally { window.Close(); }
+    }
+
+    // The inline editor must fit the 24px tree row (see the TreeViewItem MinHeight setter in the
+    // XAML). Fluent's default TextBox is far taller than that, which left the box overflowing the
+    // row with its text stranded at the top.
+    [AvaloniaFact]
+    public void PendingRowEditor_FitsWithinTreeRowHeight()
+    {
+        var control = new Controls.ProjectPanelControl();
+        var root = new FakeFolder("Content");
+        control.SetEntries(new[] { new AchxFileEntry(new FakeFile("hero.achx"), root, "Sprites/hero.achx") });
+
+        var window = ShowInWindow(control);
+        try
+        {
+            BeginNewAnimationFile(window, control, control.TreeRoots[0]);
+            window.Measure(new Size(400, 400));
+            window.Arrange(new Rect(0, 0, 400, 400));
+            Dispatcher.UIThread.RunJobs();
+
+            var pending = control.TreeRoots[0].Children.Single(n => n.IsPending);
+            var textBox = control.ProjectTree.GetVisualDescendants().OfType<TextBox>()
+                .First(t => ReferenceEquals(t.DataContext, pending));
+
+            Assert.True(textBox.Bounds.Height <= 24, $"editor is {textBox.Bounds.Height}px tall");
+            // The height above comes from the TextBox's own setters, but the border/background
+            // setters target PART_BorderElement inside the template -- a rename there is a silent
+            // no-op, so confirm that selector actually matched something.
+            var border = textBox.GetVisualDescendants().OfType<Border>()
+                .Single(b => b.Name == "PART_BorderElement");
+            Assert.Equal(new Thickness(1), border.BorderThickness);
+        }
+        finally { window.Close(); }
+    }
+
+    private static MenuItem NewAnimationFileMenuItem(Controls.ProjectPanelControl control) =>
+        control.ProjectTree.ContextMenu!.Items.OfType<MenuItem>()
+            .Single(i => (string)i.Header! == "New Animation File");
+
+    private static void BeginNewAnimationFile(
+        Window window, Controls.ProjectPanelControl control, Controls.AchxTreeNodeVm folderNode)
+    {
+        RightClick(window, control, folderNode);
+        NewAnimationFileMenuItem(control).RaiseEvent(
+            new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    // Drives the real TextBox in the pending row rather than calling a commit method directly, so
+    // the Enter/Escape key wiring is part of what's under test.
+    private static void PressKey(Controls.ProjectPanelControl control, Controls.AchxTreeNodeVm pending, Key key)
+    {
+        var textBox = control.ProjectTree.GetVisualDescendants().OfType<TextBox>()
+            .First(t => ReferenceEquals(t.DataContext, pending));
+        textBox.RaiseEvent(new KeyEventArgs { Key = key, RoutedEvent = InputElement.KeyDownEvent });
+        Dispatcher.UIThread.RunJobs();
     }
 
     private sealed class FakeFile : IEditorFile

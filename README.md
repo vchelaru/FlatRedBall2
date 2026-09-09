@@ -7,6 +7,8 @@
 
 [![NuGet](https://img.shields.io/nuget/vpre/FlatRedBall.AnimationChain.KNI?label=AnimationEditor%20KNI)](https://www.nuget.org/packages/FlatRedBall.AnimationChain.KNI)
 
+[![Join the chat](https://img.shields.io/discord/586997072373481494)](https://discord.gg/tG5RBgw)
+
 > **Early Preview** — This engine is in active development. APIs will change between releases.
 
 FlatRedBall2 is the next generation of [FlatRedBall](https://github.com/vchelaru/FlatRedBall)  — a 2D game engine with 20+ years of iteration behind it, rebuilt from the ground up on modern .NET. It runs on two backends: [MonoGame](https://monogame.net) for desktop and [KNI](https://github.com/kniEngine/kni) for browser (via Blazor WASM), sharing a single codebase.
