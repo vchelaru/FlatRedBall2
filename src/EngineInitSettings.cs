@@ -51,4 +51,16 @@ public class EngineInitSettings
     /// during startup or only produce a warning.
     /// </summary>
     public MissingGumFontFileBehavior MissingGumFontFileBehavior { get; init; } = MissingGumFontFileBehavior.Warn;
+
+    /// <summary>
+    /// Whether Gum text automatically rebuilds its font at a higher raster size under
+    /// <c>Camera.Zoom</c>, for crisper text instead of a stretched/blurry bitmap. Off by default,
+    /// matching Gum's own <c>TextRuntime.UseFontOversampling</c> default — pixel-art games want
+    /// blocky/nearest-neighbor text, and it's a project-wide call the game should make, not the
+    /// engine. Turning it on also means any <c>Font</c>/<c>FontFamily</c> left at Gum's system-font
+    /// default ("Arial") now needs KernSmith to resolve that family at runtime, which fails on
+    /// BlazorGL/WASM where there is no OS font store — set an explicit bundled font before opting in
+    /// on a web target.
+    /// </summary>
+    public bool UseFontOversampling { get; init; } = false;
 }
