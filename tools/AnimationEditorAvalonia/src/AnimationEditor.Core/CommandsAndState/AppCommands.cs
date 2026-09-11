@@ -1670,6 +1670,9 @@ namespace AnimationEditor.Core.CommandsAndState
             RefreshTreeViewRequested?.Invoke();
         }
 
+        /// <inheritdoc cref="IAppCommands.HandleApplicationClosing"/>
+        public void HandleApplicationClosing() => _ioManager.DeleteRecoveryFile();
+
         // ── WF09: Create frame from magic-wand pixel bounds ───────────────────
 
         /// <summary>

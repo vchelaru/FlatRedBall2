@@ -327,6 +327,9 @@ public partial class MainWindow : Window
             _appSettings.PreviewPaneHeight = AchxEditorPane.RowDefinitions[3].Height.Value;
             _appSettings.WindowMaximized = WindowState == WindowState.Maximized;
             SaveTabsToSettings();
+            // A normal close is not a crash -- clear any stray recovery file so the next
+            // launch doesn't falsely report "closed unexpectedly" (#894).
+            _appCommands.HandleApplicationClosing();
             _appCommands.HotReloadWatcher.Dispose();
             PreviewCtrl.Playback.FrameIndexChanged -= OnPreviewPlaybackFrameIndexChanged;
             PreviewCtrl.IsPlayingChanged -= UpdatePlayPauseIcon;
