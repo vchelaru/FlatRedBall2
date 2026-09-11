@@ -277,6 +277,16 @@ namespace AnimationEditor.Core.CommandsAndState
         /// separately.
         /// </summary>
         void CloseProject();
+
+        /// <summary>
+        /// Call when the application window is closing normally (not a crash). Deletes any
+        /// crash-recovery file for an unsaved document (<c>ProjectManager.FileName</c> is null) so
+        /// a clean close doesn't leave a stray recovery file that falsely triggers the "closed
+        /// unexpectedly" prompt on next launch (#894). A no-op once the document has a
+        /// <c>FileName</c>, since <see cref="AppCommands.SaveCurrentAnimationChainList"/> only ever
+        /// writes a recovery file for a nameless document.
+        /// </summary>
+        void HandleApplicationClosing();
         void AddFrameFromPixelBounds(AnimationChainSave chain, string textureName, int minX, int minY, int maxX, int maxY, int bitmapWidth, int bitmapHeight);
         void SetFrameTextureName(AnimationFrameSave frame, string? textureName);
 

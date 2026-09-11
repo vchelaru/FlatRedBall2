@@ -92,4 +92,31 @@ public class AppCommandsRecoveryTests : IDisposable
 
         Assert.True(ctx.IoManager.RecoveryFileExists(), "Recovery should be preserved when user cancels Save As");
     }
+
+    // ── Recovery deletion on a normal window close (#894) ────────────────────
+
+    [Fact]
+    public void HandleApplicationClosing_WhenFileNameIsNull_DeletesRecoveryFile()
+    {
+        // Simulates an unsaved document (FileName never set) that picked up a
+        // recovery file from an earlier edit, then closed normally rather than crashing.
+        ctx.ProjectManager.FileName = null;
+        ctx.IoManager.WriteRecoveryFile(new AnimationChainListSave());
+        Assert.True(ctx.IoManager.RecoveryFileExists());
+
+        ctx.AppCommands.HandleApplicationClosing();
+
+        Assert.False(ctx.IoManager.RecoveryFileExists(),
+            "A normal close should not leave a stray recovery file behind to falsely trigger the 'closed unexpectedly' prompt on next launch.");
+    }
+
+    [Fact]
+    public void HandleApplicationClosing_WhenFileNameIsSet_LeavesNoRecoveryFileBehind()
+    {
+        ctx.ProjectManager.FileName = _dir.Path + "/hero.achx";
+
+        ctx.AppCommands.HandleApplicationClosing();
+
+        Assert.False(ctx.IoManager.RecoveryFileExists());
+    }
 }
