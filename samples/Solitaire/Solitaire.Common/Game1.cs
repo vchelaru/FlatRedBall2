@@ -43,10 +43,13 @@ public class Game1 : Game
         FlatRedBallService.Default.Initialize(this, new EngineInitSettings
         {
 #if GUM_BUNDLE
-            GumProjectFile = "GumProject/GumProject.gumpkg"
+            GumProjectFile = "GumProject/GumProject.gumpkg",
 #else
-            GumProjectFile = "GumProject/GumProject.gumj"
+            GumProjectFile = "GumProject/GumProject.gumj",
 #endif
+            // Solitaire's cards zoom with Camera.Zoom, so crisp re-rasterized text matters here —
+            // most FRB2 projects default this off (see EngineInitSettings.UseFontOversampling).
+            UseFontOversampling = true
         });
         FlatRedBallService.Default.Start<GameScreen>();
     }

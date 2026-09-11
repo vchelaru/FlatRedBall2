@@ -349,6 +349,14 @@ public class FlatRedBallService
         isBrowser ? RasterizerBackend.StbTrueType : null;
 
     /// <summary>
+    /// Reads <see cref="EngineInitSettings.UseFontOversampling"/>, defaulting to <c>false</c> when no
+    /// settings were given. Extracted as a pure function so the opt-in default is testable without a
+    /// real <c>GraphicsDevice</c>.
+    /// </summary>
+    internal static bool ResolveUseFontOversampling(EngineInitSettings? settings) =>
+        settings?.UseFontOversampling ?? false;
+
+    /// <summary>
     /// Reads the <c>.gluj</c> and its element files from <see cref="OutputContentRoot"/> rather than
     /// the process working directory, which is the project folder under <c>dotnet run</c> and the
     /// output folder under a debugger — so the plain-relative read would find a different (stale)
@@ -547,12 +555,12 @@ public class FlatRedBallService
         CustomSetPropertyOnRenderable.InMemoryFontCreator =
             new KernSmithFontCreator(game.GraphicsDevice, fontRasterizerBackend);
         // Rebuilds each visible TextRuntime's font at its zoomed size instead of stretching the
-        // baked bitmap, fixing blur under Camera.Zoom and window resize (issue #1000). Safe to turn
-        // on unconditionally because it only acts on the Gum Camera.Zoom GumRenderBatch already
-        // drives from Camera.PixelsPerUnit — screen-space layers (Zoom == 1, e.g. AddOverlay) never
-        // trigger a rebuild — and the KernSmithFontCreator above is always present as the
-        // IInMemoryFontCreator oversampling needs to rasterize the new size.
-        TextRuntime.UseFontOversampling = true;
+        // baked bitmap, fixing blur under Camera.Zoom and window resize (issue #1000). Opt-in via
+        // EngineInitSettings.UseFontOversampling (default false, matching Gum's own default) rather
+        // than unconditional: it's a project-wide call the game should make (pixel-art games want
+        // blocky text), and turning it on for a Font left at Gum's "Arial" default requires KernSmith
+        // to resolve a system font, which fails on BlazorGL/WASM.
+        TextRuntime.UseFontOversampling = ResolveUseFontOversampling(settings);
 
         if ((settings?.GumProjectFile ?? ResolveGlueGumProjectFile(GlueProject, game.Content.RootDirectory))
             is string gumProjectFile)
