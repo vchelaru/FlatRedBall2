@@ -6,9 +6,9 @@ namespace FlatRedBall2.Rendering;
 /// layer, regardless of <see cref="IRenderable.Z"/>; within a single layer, Z and the
 /// screen's <see cref="SortMode"/> determine ordering.
 /// <para>
-/// Create layers via <c>Screen.AddLayer(name)</c> and assign them by passing the layer
-/// to <c>Screen.Add(renderable, layer)</c> or <c>Entity.Add(child, layer)</c>, or by
-/// setting <see cref="IRenderable.Layer"/> directly.
+/// Create a layer with <c>new Layer(name)</c>, add it to <c>Screen.Layers</c> so it takes part in
+/// draw-order sorting, and assign it by passing the layer to <c>Screen.Add(renderable, layer)</c>
+/// or <c>Entity.Add(child, layer)</c>, or by setting <see cref="IRenderable.Layer"/> directly.
 /// </para>
 /// </summary>
 public class Layer
@@ -16,8 +16,12 @@ public class Layer
     /// <summary>Creates a new layer with the given diagnostic name.</summary>
     public Layer(string name) => Name = name;
 
-    /// <summary>Diagnostic name shown in tooling and <see cref="ToString"/>.</summary>
-    public string Name { get; }
+    /// <summary>
+    /// Diagnostic name shown in tooling and <see cref="ToString"/>. The setter is internal because
+    /// it exists only for the Glue loader, which builds a <see cref="Layer"/> before it knows the
+    /// authored instance name.
+    /// </summary>
+    public string Name { get; internal set; }
 
     /// <summary>
     /// When <c>true</c> and passed to <c>Camera.Add</c>/<c>Screen.Add</c>, the Gum visual is
