@@ -97,11 +97,21 @@ public sealed class GlueProject
     /// <remarks>
     /// Stands in for FRB1's per-entity factory list, and is what a collision relationship binds to.
     /// Pooling and spatial partitioning are <em>not</em> wired — see the Phase 8 notes.
+    /// <para>Returns the actual backing <c>List&lt;GlueEntity&gt;</c>, creating and caching an empty
+    /// one on first call for a name with no instances yet. This is load-bearing for a relationship
+    /// registered before any instance of that type exists (e.g. an enemy type spawned purely by a
+    /// runtime factory): the caller must get back the same live list every time, not a throwaway
+    /// empty array, or an instance created later has nothing to be added to.</para>
     /// </remarks>
-    public IReadOnlyList<GlueEntity> InstancesOf(string glueName) =>
-        _instances.TryGetValue(Normalize(glueName), out var list)
-            ? list
-            : Array.Empty<GlueEntity>();
+    public IReadOnlyList<GlueEntity> InstancesOf(string glueName)
+    {
+        string normalized = Normalize(glueName);
+
+        if (!_instances.TryGetValue(normalized, out var list))
+            _instances[normalized] = list = new List<GlueEntity>();
+
+        return list;
+    }
 
     /// <summary>
     /// The screen <paramref name="screen"/> names as the one to advance to, or null when it names
