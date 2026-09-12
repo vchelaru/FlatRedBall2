@@ -2,4 +2,5 @@
   <Project Path="MyGame.Desktop/MyGame.Desktop.csproj" DefaultStartup="true" />
   <Project Path="MyGame.BlazorGL/MyGame.BlazorGL.csproj" />
   <Project Path="MyGame.Common/MyGame.Common.csproj" />
+  <Project Path="MyGame.Common/Kni/MyGame.Common.Kni.csproj" />
 </Solution>
