@@ -1275,14 +1275,14 @@ public partial class MainWindow : Window
 
         WireframeCtrl.LoadTexture(absolutePath);
 
-        var frame = _selectedState.SelectedFrame;
-        if (frame == null) return;
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
 
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? string.Empty
             : (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
         string storePath = TexturePathHelper.ComputeStorePath(absolutePath, achxFolder);
-        _appCommands.SetFrameTextureName(frame, storePath);
+        _appCommands.SetFrameTextureName(frames, storePath);
         RefreshPropertyPanel();
     }
 
