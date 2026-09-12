@@ -649,20 +649,18 @@ public partial class AnimationTreeControl : UserControl
             }
             case AARectSave rectToDel:
             {
-                var frame = _selectedState!.SelectedFrame!;
-                var rects = _selectedState.SelectedRectangles;
+                var rects = _selectedState!.SelectedRectangles;
                 var circles = _selectedState.SelectedCircles;
                 _appCommands!.DeleteShapes(
-                    frame, rects.Count > 0 ? rects : new List<AARectSave> { rectToDel }, circles);
+                    rects.Count > 0 ? rects : new List<AARectSave> { rectToDel }, circles);
                 break;
             }
             case CircleSave circleToDel:
             {
-                var frame = _selectedState!.SelectedFrame!;
-                var circles = _selectedState.SelectedCircles;
+                var circles = _selectedState!.SelectedCircles;
                 var rects = _selectedState.SelectedRectangles;
                 _appCommands!.DeleteShapes(
-                    frame, rects, circles.Count > 0 ? circles : new List<CircleSave> { circleToDel });
+                    rects, circles.Count > 0 ? circles : new List<CircleSave> { circleToDel });
                 break;
             }
         }

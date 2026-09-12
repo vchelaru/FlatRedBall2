@@ -750,10 +750,10 @@ public partial class App : Application
 
         deleteSelectedButton.Click += (_, _) =>
         {
-            if (selectedState.SelectedRectangle is { } rect && selectedState.SelectedFrame is { } rectFrame)
-                appCommands.DeleteShapes(rectFrame, new List<AARectSave> { rect }, new List<CircleSave>());
-            else if (selectedState.SelectedCircle is { } circle && selectedState.SelectedFrame is { } circleFrame)
-                appCommands.DeleteShapes(circleFrame, new List<AARectSave>(), new List<CircleSave> { circle });
+            if (selectedState.SelectedRectangle is { } rect)
+                appCommands.DeleteShapes(new List<AARectSave> { rect }, new List<CircleSave>());
+            else if (selectedState.SelectedCircle is { } circle)
+                appCommands.DeleteShapes(new List<AARectSave>(), new List<CircleSave> { circle });
             else if (selectedState.SelectedFrame is { } frame)
                 appCommands.DeleteFrames(new List<AnimationFrameSave> { frame });
             else if (selectedState.SelectedChain is { } selectedChain)

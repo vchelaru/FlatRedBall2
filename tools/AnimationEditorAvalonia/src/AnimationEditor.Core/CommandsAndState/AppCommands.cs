@@ -663,15 +663,29 @@ namespace AnimationEditor.Core.CommandsAndState
             _undoManager.Execute(new DeleteAxisAlignedRectangleCommand(rectangle, owner, this, _events, _selectedState));
         }
 
-        public void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles)
+        /// <summary>
+        /// Deletes a multi-selection of shapes. Each shape's own owning frame is resolved via
+        /// <see cref="ObjectFinder"/> rather than assuming a single shared frame, so a selection
+        /// spanning multiple frames (e.g. Ctrl+click across frames, then Delete) deletes correctly
+        /// instead of silently dropping shapes that don't belong to one caller-supplied frame
+        /// (#1102). A shape whose owning chain is locked is skipped; the rest of the batch still
+        /// proceeds -- mirrors <see cref="MatchRectanglesToFrames"/>.
+        /// </summary>
+        public void DeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles)
         {
-            if (IsFrameLocked(frame)) return;
-
             var commands = new List<IUndoableCommand>();
             foreach (var rect in rectangles.ToArray())
-                commands.Add(new DeleteAxisAlignedRectangleCommand(rect, frame, this, _events, _selectedState));
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(rect);
+                if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
+                commands.Add(new DeleteAxisAlignedRectangleCommand(rect, ownerFrame, this, _events, _selectedState));
+            }
             foreach (var circle in circles.ToArray())
-                commands.Add(new DeleteCircleCommand(circle, frame, this, _events, _selectedState));
+            {
+                var ownerFrame = _objectFinder.GetAnimationFrameContaining(circle);
+                if (ownerFrame is null || IsFrameLocked(ownerFrame)) continue;
+                commands.Add(new DeleteCircleCommand(circle, ownerFrame, this, _events, _selectedState));
+            }
             if (commands.Count == 0) return;
 
             int total = commands.Count;

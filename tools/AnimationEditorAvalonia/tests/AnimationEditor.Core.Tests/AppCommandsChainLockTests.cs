@@ -115,6 +115,32 @@ public class AppCommandsChainLockTests
         Assert.True(ctx.UndoManager.CanUndo);
     }
 
+    /// <summary>
+    /// A multi-selection spanning a locked chain's frame and an unlocked chain's frame (e.g.
+    /// Ctrl+click a shape in each, then Delete) must skip only the locked chain's shape, not
+    /// veto the whole batch -- mirrors <see cref="DeleteFrames_CrossChainSelectionWithLockedChain_DeletesOnlyUnlockedChainFrames"/>.
+    /// </summary>
+    [Fact]
+    public void DeleteShapes_CrossChainSelectionWithLockedChain_DeletesOnlyUnlockedChainShape()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var lockedChain = TestHelpers.MakeChain(ctx.Acls, "Walk", frameCount: 1);
+        lockedChain.IsLocked = true;
+        var unlockedChain = TestHelpers.MakeChain(ctx.Acls, "Run", frameCount: 1);
+        var lockedFrame = lockedChain.Frames[0];
+        var unlockedFrame = unlockedChain.Frames[0];
+        var lockedRect = new AARectSave { Name = "LockedRect" };
+        var unlockedCircle = new CircleSave { Name = "UnlockedCircle", Radius = 10 };
+        lockedFrame.ShapesSave!.Shapes.Add(lockedRect);
+        unlockedFrame.ShapesSave!.Shapes.Add(unlockedCircle);
+
+        ctx.AppCommands.DeleteShapes(new() { lockedRect }, new() { unlockedCircle });
+
+        Assert.Single(lockedFrame.ShapesSave!.Shapes);
+        Assert.Empty(unlockedFrame.ShapesSave!.Shapes);
+        Assert.True(ctx.UndoManager.CanUndo);
+    }
+
     [Fact]
     public void PasteShapes_TargetFrameChainLocked_IsNoOp()
     {
