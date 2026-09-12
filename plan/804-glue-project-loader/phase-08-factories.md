@@ -153,6 +153,9 @@ registers a polymorphic list, which is exactly what an entity-inheritance projec
 cases. Note `TmxCodeGenerator.cs:198` *temporarily swaps* `ListsToAddTo` so tile-spawned entities
 land in an owning entity's list rather than the screen's (FRB1 issue #582) — Phase 10 will hit this.
 
+**Revisited in epic #838 (item 23, issue #1088) — the multi-list case is no longer just diagnosed.**
+See §10.
+
 ### G83 — Pooling changes the entity, not just the factory
 
 `PooledCodeGenerator.cs:12-18`: a poolable entity **implements `IPoolable`** and gains `Index` and
@@ -316,3 +319,40 @@ than an empty arena. That was blocked on nothing but the missing project context
 
 Revisit the registry change if a project actually needs pooling; the seam to change is
 `FlatRedBallService._factories`, and G80 still describes it accurately.
+
+---
+
+## 10. G82 revisited — multi-list membership (epic #838, item 23, issue #1088)
+
+G82 deferred this: "map the single-list case directly; diagnose the multi-list ... case." KidDefense
+needs the multi-list case for real: an entity can be a declared member of any number of named lists
+at once (e.g. a general `EnemyList` plus a separate cross-cutting list), each side of its own
+independent collision relationship. `GlueCollisionBuilder`/`GlueProject` (post-#1082) resolve a
+named list to `InstancesOf(entityTypeName)` — one shared bucket per **type** — so two differently
+named lists of the same type collapse into the same collection and can't be told apart.
+
+**This is not new engine design.** Checked before deciding: `Screen.AddCollisionRelationship<A,B>`
+(`src/Screen.cs:974`) already takes any `IReadOnlyList<A>`/`IReadOnlyList<B>`, not specifically a
+`Factory<T>`. Hand-written FRB2 code already has unlimited multi-list membership for free — nothing
+stops a game from keeping a `Factory<Enemy>` for the full population *and* its own plain
+`List<Enemy>` fields for arbitrary subsets, `Add()`-ing the same entity into as many of them as it
+wants, with zero engine bookkeeping. The only reason Glue-loaded entities didn't get that same
+freedom is that `GlueProject.CreateEntity` funnels every spawn through one call with no hook for
+"also add me to these lists" — a Glue-import-layer gap, not a missing engine primitive.
+
+**Decision.** Stay in the layer §9/D80 already established (`GlueProject` bypasses `Factory<T>`'s
+CLR-type registry entirely) rather than touching `Factory<T>`, `Screen.AddCollisionRelationship`, or
+`Entity`:
+
+- `GlueProject` owns one real backing list per **authored list name** (not per entity type), for
+  every list flagged `AssociateWithFactory=true`.
+- `AssociateWithFactory` is finally consulted — previously parsed and ignored (§9: "with one
+  instance list per name there is nothing to associate"). A newly spawned entity is added to
+  *every* list associated with its type, matching FRB1's `ListsToAddTo` (G82) and mirroring the
+  hand-written pattern above, just automated.
+- Collision relationships bind to the named list's own backing collection, not a type-wide bucket —
+  this supersedes `InstancesOf(entityTypeName)` resolution as shipped in #1082.
+- Out of scope, same as before: dynamic list membership changes after spawn (e.g. "move this entity
+  from list A to list B on a state change") — no such instruction exists in the Glue format today.
+
+Implementation tracked on issue #1088.
