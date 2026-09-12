@@ -474,6 +474,14 @@ public class FlatRedBallService
     /// </remarks>
     public void Initialize(Game game, EngineInitSettings? settings = null)
     {
+        // Before the first BeginPhase below: settings is the only place profiling can be turned on
+        // early enough to see the phases this method opens.
+        if (settings?.ProfileStartup == true)
+            StartupTiming.IsEnabled = true;
+
+        StartupTiming.BeginPhase("Engine.Initialize");
+        StartupTiming.BeginPhase("Graphics and content setup");
+
         _game = game;
         _graphicsManager = game.Services.GetService(typeof(IGraphicsDeviceManager)) as GraphicsDeviceManager;
         _spriteBatch = new SpriteBatch(game.GraphicsDevice);
@@ -491,6 +499,8 @@ public class FlatRedBallService
         Input.SetCameras((IReadOnlyList<Rendering.Camera>)CurrentScreen.Cameras);
 
         game.Window.ClientSizeChanged += HandleClientSizeChanged;
+
+        StartupTiming.EndPhase();
 
 #if KNI
         // KNI/Blazor has no real filesystem — content lives behind TitleContainer (HTTP on
@@ -529,7 +539,9 @@ public class FlatRedBallService
         // project is read here, before Gum initializes, purely to learn that path.
         if (settings?.GlueProjectFile is string glueProjectFile)
         {
+            StartupTiming.BeginPhase("Glue project load");
             LoadGlueProject(glueProjectFile);
+            StartupTiming.EndPhase();
         }
 
         // KernSmith generates BitmapFonts in memory for any (family, size, style)
@@ -541,6 +553,7 @@ public class FlatRedBallService
         // Font/FontSize, so any TextRuntime Gum constructs while loading the project needs
         // InMemoryFontCreator already registered, or it falls through to the on-disk FontCache
         // lookup and fails (issue #1000 follow-up).
+        StartupTiming.BeginPhase("Font rasterizer setup");
         var fontRasterizerBackend = ResolveFontRasterizerBackend(OperatingSystem.IsBrowser());
 #if KNI
         if (fontRasterizerBackend == RasterizerBackend.StbTrueType)
@@ -561,23 +574,32 @@ public class FlatRedBallService
         // blocky text), and turning it on for a Font left at Gum's "Arial" default requires KernSmith
         // to resolve a system font, which fails on BlazorGL/WASM.
         TextRuntime.UseFontOversampling = ResolveUseFontOversampling(settings);
+        StartupTiming.EndPhase();
 
         if ((settings?.GumProjectFile ?? ResolveGlueGumProjectFile(GlueProject, game.Content.RootDirectory))
             is string gumProjectFile)
         {
+            // Covers Gum's runtime-type registration as well as the file read: the generated
+            // RegisterRuntimeType module initializers fire while the project loads, so there is no
+            // engine-side seam between the two.
+            StartupTiming.BeginPhase("Gum project load");
             _gum.Initialize(game, gumProjectFile);
 #pragma warning disable CS0618 // Gum marks this as obsolete, but it's just because it's still experimental. It's okay.
             _gum.LoadAnimations();
 #pragma warning restore CS0618 // Type or member is obsolete
+            StartupTiming.EndPhase();
         }
         else
         {
+            StartupTiming.BeginPhase("Gum default visuals init");
             _gum.Initialize(game, DefaultVisualsVersion.V3);
+            StartupTiming.EndPhase();
         }
 
         if (settings is not null)
             ValidateConfiguredGumFontFiles(settings);
 
+        StartupTiming.BeginPhase("Gum render batch init");
         GumRenderBatch.Instance.Initialize();
         GumRenderBatch.ScreenSpaceInstance.Initialize();
         // Guarded because ShapeRenderer is a Gum-side singleton that throws on a second Initialize,
@@ -588,6 +610,7 @@ public class FlatRedBallService
         // which already resets its sibling renderers.
         if (!ShapeRenderer.Self.IsInitialized)
             ShapeRenderer.Self.Initialize(game.GraphicsDevice, game.Content);
+        StartupTiming.EndPhase();
 
         // Route Gum Forms popups (ComboBox dropdowns, MenuItem submenus) opened by a control on a
         // camera to that camera's per-camera PopupRoot/ModalRoot, so they draw in that camera's pass
@@ -604,6 +627,8 @@ public class FlatRedBallService
                 (IReadOnlyList<Rendering.Camera>)CurrentScreen.Cameras,
                 _gum.PopupRoot,
                 _gum.ModalRoot);
+
+        StartupTiming.EndPhase();
 
         System.Diagnostics.Debug.WriteLine("FlatRedBall2 initialized.");
     }
@@ -842,6 +867,8 @@ public class FlatRedBallService
 
     private void ActivateScreen(Screen screen, bool applyWindowSettings)
     {
+        StartupTiming.BeginPhase("Screen load");
+
         foreach (var factory in _factories.Values)
             factory.DestroyAll();
         _factories.Clear();
@@ -937,6 +964,20 @@ public class FlatRedBallService
             if (entity is Entities.CameraControllingEntity cam && cam.Targets.Count > 0)
                 cam.ForceToTarget();
         }
+
+        StartupTiming.EndPhase();
+        EmitStartupReportIfFirstScreen();
+    }
+
+    // The report answers "where did startup go", so it is emitted once — a mid-game screen change
+    // runs through ActivateScreen too and must not print another.
+    private void EmitStartupReportIfFirstScreen()
+    {
+        if (_hasEmittedStartupReport || !StartupTiming.HasRecordedPhases)
+            return;
+
+        _hasEmittedStartupReport = true;
+        StartupReportWriter(StartupTiming.GenerateReport());
     }
 
     private void ApplyCameraSettingsFrom(DisplaySettings source)
@@ -1231,6 +1272,22 @@ public class FlatRedBallService
 
     /// <summary>Rolling FPS/timing/collision instrumentation. Off by default — see <see cref="Diagnostics.PerformanceMonitor.IsEnabled"/>.</summary>
     public PerformanceMonitor Performance { get; } = new PerformanceMonitor();
+
+    /// <summary>
+    /// Boot and load-time breakdown, reported once as an indented tree after the start-up screen
+    /// finishes loading. Off by default — enable with <see cref="EngineInitSettings.ProfileStartup"/>
+    /// rather than here, since <see cref="Initialize(Game, EngineInitSettings)"/> is itself the
+    /// thing being measured.
+    /// </summary>
+    public StartupProfiler StartupTiming { get; } = new StartupProfiler();
+
+    // Defaults to Debug.WriteLine (per .claude/code-style.md), matching the warn sink in
+    // ValidateConfiguredGumFontFiles. Swapped in tests so the emitted report can be asserted
+    // without depending on the test run being a Debug build.
+    internal Action<string> StartupReportWriter { get; set; } =
+        static message => System.Diagnostics.Debug.WriteLine(message);
+
+    private bool _hasEmittedStartupReport;
 
     /// <summary>
     /// The Gum UI service owned by this engine instance. Use this to access the root element,
