@@ -136,6 +136,12 @@ internal static class GlueTileBuilder
     /// <see cref="TileMap.CreateEntities{T}"/>: the latter needs a <c>Factory&lt;T&gt;</c>, and every
     /// loaded entity is a <see cref="GlueEntity"/>, so one factory could not tell a Door from a
     /// Player (Phase 8 G80).</para>
+    /// <para>FRB1's <c>TileEntityInstantiator.ApplyPropertiesTo</c> tries every one of a tile's
+    /// properties against the entity via reflection, silently dropping whichever don't match an
+    /// existing member. A loaded <see cref="GlueEntity"/> has no compiled members for its authored
+    /// variables, so the equivalent of "an existing member" here is a declared
+    /// <see cref="CustomVariable"/> by that name — a property with no matching variable is
+    /// likewise dropped rather than landing in the entity's runtime bag.</para>
     /// </remarks>
     /// <returns>Every entity spawned, across all types.</returns>
     internal static List<GlueEntity> CreateEntitiesFromTiles(
@@ -182,6 +188,11 @@ internal static class GlueTileBuilder
                     // The tile's own centre, so the entity lands where it was painted.
                     instance.X = tile.X;
                     instance.Y = tile.Y;
+
+                    var properties = map.GetPaintedTileClassProperties(column, row, leafName);
+                    if (properties is not null)
+                        ApplyTileProperties(instance, properties);
+
                     spawned.Add(instance);
                 }
             }
@@ -396,6 +407,27 @@ internal static class GlueTileBuilder
         // either way so a collection is findable by the name its author gave it.
         shapes.Name = save.InstanceName;
         return shapes;
+    }
+
+    /// <summary>
+    /// Copies a spawning tile's properties onto the entity, one per declared
+    /// <see cref="CustomVariable"/> they name.
+    /// </summary>
+    /// <remarks>
+    /// A property with no matching variable is skipped rather than falling into the entity's
+    /// runtime bag — see <see cref="CreateEntitiesFromTiles"/>'s remarks for why that mirrors FRB1.
+    /// </remarks>
+    private static void ApplyTileProperties(GlueEntity entity, IReadOnlyDictionary<string, object> properties)
+    {
+        var variables = entity.Save?.CustomVariables;
+        if (variables is null)
+            return;
+
+        foreach (var (name, value) in properties)
+        {
+            if (variables.Exists(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)))
+                entity[name] = value;
+        }
     }
 
     private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;

@@ -1196,6 +1196,76 @@ public class TileMap
                string.Equals(objectClass, className, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The class-level Tiled properties of the painted tile at (<paramref name="col"/>,
+    /// <paramref name="row"/>), if any tile layer there has a tile whose tileset Class matches
+    /// <paramref name="className"/>. Used by Glue's tile-typed entity spawning
+    /// (<see cref="Glue.GlueTileBuilder"/>), which locates spawn points via
+    /// <see cref="GenerateCollisionFromClass"/> rather than <see cref="CreateEntities{T}"/> and so
+    /// needs this separately. Painted tiles carry no per-instance property bag, so only the
+    /// tileset's own class-level properties apply — the same limit <see cref="CreateEntities{T}"/>
+    /// documents for painted cells.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="col"/>/<paramref name="row"/> use <see cref="TileShapes"/>' own cell
+    /// numbering (row 0 at the map's <b>bottom</b>, matching <see cref="TileShapes.GetTileAtCell"/>
+    /// and what <see cref="GenerateCollisionFromClass"/> returns) — <b>not</b>
+    /// <see cref="GetCellAt"/>'s Tiled-native convention (row 0 at the top). The two disagree
+    /// because <c>TileMapCollisions</c> flips the row when building a <see cref="TileShapes"/> to
+    /// go from Tiled's Y-down layer data to this engine's Y-up world space; this method un-flips it
+    /// before indexing the raw layer.
+    /// <para>
+    /// Values keep their native CLR type (<c>string</c>/<c>int</c>/<c>float</c>/<c>bool</c>) rather
+    /// than being stringified — unlike <see cref="GetObjectLayerData"/>'s <c>Properties</c>, whose
+    /// <c>AsString()</c>-based conversion throws for a non-string-typed property. Color, file, and
+    /// object-reference properties are omitted; nothing in this codebase applies them to a
+    /// spawned entity.
+    /// </para>
+    /// </remarks>
+    internal IReadOnlyDictionary<string, object>? GetPaintedTileClassProperties(
+        int col, int row, string className)
+    {
+        if (_tilemap == null)
+            return null;
+
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is not TilemapTileLayer tileLayer ||
+                col < 0 || row < 0 || col >= tileLayer.Width || row >= tileLayer.Height)
+                continue;
+
+            int tiledRow = tileLayer.Height - 1 - row;
+            var tileNullable = tileLayer.GetTile(col, tiledRow);
+            if (!tileNullable.HasValue || tileNullable.Value.GlobalId == 0)
+                continue;
+
+            var tileData = tileNullable.Value.GetTileData(_tilemap.Tilesets);
+            if (tileData == null || !MatchesClassName(tileData.Class, className))
+                continue;
+
+            var merged = BuildMergedPropertySnapshot(tileData.Properties, instanceProps: null);
+            var result = new Dictionary<string, object>(merged.Count, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (key, value) in merged)
+            {
+                object? converted = value.Type switch
+                {
+                    TilemapPropertyType.String => value.AsString(),
+                    TilemapPropertyType.Int => value.AsInt(),
+                    TilemapPropertyType.Float => value.AsFloat(),
+                    TilemapPropertyType.Bool => value.AsBool(),
+                    _ => null,
+                };
+
+                if (converted != null)
+                    result[key] = converted;
+            }
+
+            return result;
+        }
+
+        return null;
+    }
 
     private static Dictionary<string, PropertyInfo> BuildPropertyMap<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>()
     {
