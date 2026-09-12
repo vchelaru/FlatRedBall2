@@ -427,6 +427,12 @@ namespace AnimationEditor.Core.CommandsAndState
         void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
             IReadOnlyList<CircleSave> circles);
 
+        /// <summary>Adds multiple clipboard shapes to every frame in <paramref name="frames"/> in one
+        /// undo step — each frame gets its own independent clone. Frames in a locked chain are
+        /// skipped (bulk skip-locked-entries), same as other multi-target paste/delete operations.</summary>
+        void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<AARectSave> rectangles,
+            IReadOnlyList<CircleSave> circles);
+
         /// <summary>Paste chains then remove <paramref name="sourcesToRemove"/> in one undo step.</summary>
         void PasteChainsCut(IReadOnlyList<AnimationChainSave> chains,
             IReadOnlyList<AnimationChainSave> sourcesToRemove);

@@ -1920,13 +1920,40 @@ namespace AnimationEditor.Core.CommandsAndState
         public void PasteRectangle(AnimationFrameSave frame, AARectSave rectangle) =>
             PasteShapes(frame, new[] { rectangle }, Array.Empty<CircleSave>());
 
-        /// <inheritdoc cref="IAppCommands.PasteShapes"/>
+        /// <inheritdoc cref="IAppCommands.PasteShapes(AnimationFrameSave, IReadOnlyList{AARectSave}, IReadOnlyList{CircleSave})"/>
         public void PasteShapes(AnimationFrameSave frame, IReadOnlyList<AARectSave> rectangles,
             IReadOnlyList<CircleSave> circles)
         {
             var clones = BuildShapeClones(frame, rectangles, circles);
             if (clones.Count == 0) return;
             _undoManager.Execute(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+        }
+
+        /// <inheritdoc cref="IAppCommands.PasteShapes(IReadOnlyList{AnimationFrameSave}, IReadOnlyList{AARectSave}, IReadOnlyList{CircleSave})"/>
+        public void PasteShapes(IReadOnlyList<AnimationFrameSave> frames, IReadOnlyList<AARectSave> rectangles,
+            IReadOnlyList<CircleSave> circles)
+        {
+            if (frames.Count == 0) return;
+            if (frames.Count == 1)
+            {
+                PasteShapes(frames[0], rectangles, circles);
+                return;
+            }
+
+            var cmds = new List<IUndoableCommand>();
+            foreach (var frame in frames)
+            {
+                var clones = BuildShapeClones(frame, rectangles, circles);
+                if (clones.Count > 0)
+                    cmds.Add(new PasteShapesCommand(frame, clones, this, _events, _selectedState));
+            }
+            if (cmds.Count == 0) return;
+
+            int shapeCount = rectangles.Count + circles.Count;
+            string desc = shapeCount == 1
+                ? $"Paste {ShapeUndoLabel.Format((object?)rectangles.FirstOrDefault() ?? circles[0])} into {cmds.Count} Frames"
+                : $"Paste {shapeCount} Shapes into {cmds.Count} Frames";
+            _undoManager.Execute(new CompositeCommand(cmds, desc));
         }
 
         /// <inheritdoc cref="IAppCommands.PasteChainsCut"/>
