@@ -142,7 +142,7 @@ public class AppCommandsDeleteTests
         frame.ShapesSave!.Shapes.Add(rect);
         frame.ShapesSave!.Shapes.Add(circle);
 
-        ctx.AppCommands.DeleteShapes(frame,
+        ctx.AppCommands.DeleteShapes(
             new List<AARectSave> { rect }, new List<CircleSave> { circle });
 
         Assert.Empty(frame.ShapesSave!.AARectSaves);
@@ -151,6 +151,32 @@ public class AppCommandsDeleteTests
         ctx.UndoManager.Undo();
         Assert.Equal(new[] { rect }, frame.ShapesSave!.AARectSaves);
         Assert.Equal(new[] { circle }, frame.ShapesSave!.CircleSaves);
+        Assert.False(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
+    public void DeleteShapes_CrossFrameSelection_DeletesFromEachShapesOwnFrame()
+    {
+        // Regression test for #1102: a multi-selection spanning two frames used to pass a
+        // single shared "owner" frame, so IndexOf silently failed (returned false, dropped
+        // the sub-command) for whichever shape didn't belong to that frame.
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Run", 2);
+        var frameA = chain.Frames[0];
+        var frameB = chain.Frames[1];
+        var rect = new AARectSave { Name = "RectInA" };
+        var circle = new CircleSave { Name = "CircleInB", Radius = 10 };
+        frameA.ShapesSave!.Shapes.Add(rect);
+        frameB.ShapesSave!.Shapes.Add(circle);
+
+        ctx.AppCommands.DeleteShapes(new List<AARectSave> { rect }, new List<CircleSave> { circle });
+
+        Assert.Empty(frameA.ShapesSave!.Shapes);
+        Assert.Empty(frameB.ShapesSave!.Shapes);
+
+        ctx.UndoManager.Undo();
+        Assert.Equal(new[] { rect }, frameA.ShapesSave!.AARectSaves);
+        Assert.Equal(new[] { circle }, frameB.ShapesSave!.CircleSaves);
         Assert.False(ctx.UndoManager.CanUndo);
     }
 
@@ -167,7 +193,7 @@ public class AppCommandsDeleteTests
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 
-        ctx.AppCommands.DeleteShapes(frame,
+        ctx.AppCommands.DeleteShapes(
             new List<AARectSave> { rect }, new List<CircleSave> { circle });
 
         Assert.Equal("2 shapes", label);
@@ -184,7 +210,7 @@ public class AppCommandsDeleteTests
         string? label = null;
         ctx.AppCommands.ItemsDeleted += l => label = l;
 
-        ctx.AppCommands.DeleteShapes(frame,
+        ctx.AppCommands.DeleteShapes(
             new List<AARectSave> { rect }, new List<CircleSave>());
 
         Assert.Equal("BodyCollision", label);

@@ -224,7 +224,7 @@ public class UndoCoverageRosterTests
         yield return Row(nameof(IAppCommands.DeleteAxisAlignedRectangle),
             ctx => Sync(() => ctx.AppCommands.DeleteAxisAlignedRectangle(Rect(ctx), Zebra(ctx).Frames[0])));
         yield return Row(nameof(IAppCommands.DeleteShapes),
-            ctx => Sync(() => ctx.AppCommands.DeleteShapes(Zebra(ctx).Frames[0], new() { Rect(ctx) }, new() { Circle(ctx) })));
+            ctx => Sync(() => ctx.AppCommands.DeleteShapes(new() { Rect(ctx) }, new() { Circle(ctx) })));
         yield return Row(nameof(IAppCommands.DeleteFrames),
             ctx => Sync(() => ctx.AppCommands.DeleteFrames(new() { Zebra(ctx).Frames[1] })));
         yield return Row(nameof(IAppCommands.AddAnimationChain),

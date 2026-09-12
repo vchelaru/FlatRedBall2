@@ -132,7 +132,7 @@ namespace AnimationEditor.Core.CommandsAndState
         void MatchRectanglesToFrames(List<AARectSave> rectangles);
         void DeleteCircle(CircleSave circle, AnimationFrameSave owner);
         void DeleteAxisAlignedRectangle(AARectSave rectangle, AnimationFrameSave owner);
-        void DeleteShapes(AnimationFrameSave frame, List<AARectSave> rectangles, List<CircleSave> circles);
+        void DeleteShapes(List<AARectSave> rectangles, List<CircleSave> circles);
         void DeleteFrames(List<AnimationFrameSave> frames);
         Task AddAnimationChain();
         AnimationChainSave? AddAnimationChainWithName(string name);
