@@ -249,6 +249,52 @@ public class MultiCopyPasteAppTests
         finally { window.Close(); }
     }
 
+    // #1099: copying a shape then multi-selecting frames and pasting must paste into every
+    // selected frame, not just one.
+    [AvaloniaFact]
+    public async Task Paste_ShapeIntoMultipleSelectedFrames_PastesIntoEveryFrame()
+    {
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var chain = new AnimationChainSave { Name = "Walk" };
+            var sourceFrame = new AnimationFrameSave { TextureName = "a.png", FrameLength = 0.1f };
+            sourceFrame.ShapesSave = new ShapesSave();
+            sourceFrame.ShapesSave.Shapes.Add(new AARectSave { Name = "Hit" });
+            var targetFrame1 = new AnimationFrameSave { TextureName = "b.png", FrameLength = 0.1f };
+            var targetFrame2 = new AnimationFrameSave { TextureName = "c.png", FrameLength = 0.1f };
+            chain.Frames.AddRange(new[] { sourceFrame, targetFrame1, targetFrame2 });
+            ctx.ProjectManager.AnimationChainListSave!.AnimationChains.Add(chain);
+            RebuildTree(window);
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var frameNodes = FirstChainNode(tree).Children;
+            var shapeNode = frameNodes[0].Children[0];
+
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(shapeNode);
+            FlushUi();
+            tree.Focus();
+            window.KeyPress(Key.C, RawInputModifiers.Control, PhysicalKey.None, null);
+            FlushUi();
+
+            tree.SelectedItems!.Clear();
+            tree.SelectedItems.Add(frameNodes[1]);
+            tree.SelectedItems.Add(frameNodes[2]);
+            FlushUi();
+            tree.Focus();
+            window.KeyPress(Key.V, RawInputModifiers.Control, PhysicalKey.None, null);
+            FlushUi();
+
+            Assert.Single(targetFrame1.ShapesSave!.Shapes);
+            Assert.Single(targetFrame2.ShapesSave!.Shapes);
+            Assert.NotSame(targetFrame1.ShapesSave.Shapes[0], targetFrame2.ShapesSave.Shapes[0]);
+            Assert.IsType<AARectSave>(targetFrame1.ShapesSave.Shapes[0]);
+            Assert.IsType<AARectSave>(targetFrame2.ShapesSave.Shapes[0]);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaFact]
     public void CtrlD_ThreeFrames_SelectsAllDuplicatesInTree()
     {

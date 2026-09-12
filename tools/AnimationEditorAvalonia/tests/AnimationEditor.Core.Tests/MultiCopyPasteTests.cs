@@ -72,6 +72,50 @@ public class MultiCopyPasteTests
     }
 
     [Fact]
+    public void PasteShapes_MultiFrame_PastesIntoEverySelectedFrame()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var chain = TestHelpers.MakeChain(ctx.Acls, "Walk", 3);
+        var f0 = chain.Frames[0];
+        var f1 = chain.Frames[1];
+        var f2 = chain.Frames[2];
+        var rect = new AARectSave { Name = "Hit" };
+        var circle = new CircleSave { Name = "Hurt", Radius = 2 };
+
+        ctx.AppCommands.PasteShapes(new[] { f0, f1, f2 }, new[] { rect }, new[] { circle });
+
+        Assert.Equal(2, f0.ShapesSave!.Shapes.Count);
+        Assert.Equal(2, f1.ShapesSave!.Shapes.Count);
+        Assert.Equal(2, f2.ShapesSave!.Shapes.Count);
+        // Each frame gets its own clone, not a shared reference to the same shape instance.
+        Assert.NotSame(f0.ShapesSave.Shapes[0], f1.ShapesSave.Shapes[0]);
+        Assert.NotSame(f1.ShapesSave.Shapes[0], f2.ShapesSave.Shapes[0]);
+
+        ctx.UndoManager.Undo();
+        Assert.Empty(f0.ShapesSave!.Shapes);
+        Assert.Empty(f1.ShapesSave!.Shapes);
+        Assert.Empty(f2.ShapesSave!.Shapes);
+    }
+
+    [Fact]
+    public void PasteShapes_MultiFrame_SkipsFramesInLockedChainButPastesRest()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        var lockedChain = TestHelpers.MakeChain(ctx.Acls, "Locked", 1);
+        lockedChain.IsLocked = true;
+        var unlockedChain = TestHelpers.MakeChain(ctx.Acls, "Walk", 1);
+        var lockedFrame = lockedChain.Frames[0];
+        var unlockedFrame = unlockedChain.Frames[0];
+        var rect = new AARectSave { Name = "Hit" };
+
+        ctx.AppCommands.PasteShapes(new[] { lockedFrame, unlockedFrame }, new[] { rect }, []);
+
+        Assert.Empty(lockedFrame.ShapesSave!.Shapes);
+        Assert.Single(unlockedFrame.ShapesSave!.Shapes);
+        Assert.True(ctx.UndoManager.CanUndo);
+    }
+
+    [Fact]
     public void DuplicateFrames_SameChain_AdjacentBlock_OneUndo()
     {
         var ctx = TestHelpers.SetupFreshAcls();

@@ -6404,10 +6404,16 @@ public partial class MainWindow : Window
             if (completingCut && _pendingCutState.Kind != CopySelectionKind.Shape) return;
             var frame = _selectedState.SelectedFrame;
             if (frame is null) return;
+            // Cut/paste (same-document or cross-document) keeps a single-target destination
+            // (see #1099 follow-up); a plain paste applies to every selected frame, not just
+            // the last-clicked one.
+            IReadOnlyList<AnimationFrameSave> targetFrames = completingCut
+                ? new[] { frame }
+                : _selectedState.SelectedFrames;
 
             if (completingCutAcrossDocuments)
             {
-                _appCommands.PasteShapes(frame, rectangles ?? [], circles ?? []);
+                _appCommands.PasteShapes(targetFrames, rectangles ?? [], circles ?? []);
                 _pendingCutState.RemoveSourcesFrom(_pendingCutState.SourceDocument!);
             }
             else if (completingCut)
@@ -6424,9 +6430,10 @@ public partial class MainWindow : Window
             }
             else
             {
-                _appCommands.PasteShapes(frame, rectangles ?? [], circles ?? []);
+                _appCommands.PasteShapes(targetFrames, rectangles ?? [], circles ?? []);
             }
-            RefreshFrameNode(frame);
+            foreach (var targetFrame in targetFrames)
+                RefreshFrameNode(targetFrame);
             SyncTreeSelection();
         }
 
