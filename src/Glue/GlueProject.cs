@@ -36,6 +36,8 @@ public sealed class GlueProject
 
         foreach (var entity in result.Project.Entities.Where(e => !string.IsNullOrEmpty(e.Name)))
             _entities[entity.Name!] = entity;
+
+        content?.LoadGlobalFiles(result.Project.GlobalFiles, _diagnostics);
     }
 
     /// <summary>The raw load result.</summary>

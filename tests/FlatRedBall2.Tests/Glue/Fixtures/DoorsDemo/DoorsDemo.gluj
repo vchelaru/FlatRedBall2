@@ -40,6 +40,9 @@
       "DestroyOnUnload": false,
       "HasPublicProperty": true,
       "ProjectsToExcludeFrom": []
+    },
+    {
+      "Name": "StandardTilesetIcons.png"
     }
   ],
   "GlobalContentSettingsSave": {
