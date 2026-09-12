@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using FlatRedBall2.Collision;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
 using Shouldly;
@@ -179,6 +180,35 @@ public class GlueCollisionTests
         var settings = GlueCollisionSettings.From(save);
 
         settings.FirstCollisionName.ShouldBe(settings.SecondCollisionName);
+    }
+
+    // The relationship binds "PlayerBallList" at build time. A ball a runtime Factory spawns
+    // afterwards must still be visible to it — not just the two balls placed in Glue.
+    [Fact]
+    public void BuildObjects_EntitySpawnedAfterRegistration_ParticipatesInCollision()
+    {
+        var engine = new FlatRedBallService();
+        var project = GlueProject.Load(Gluj("Beefball"));
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
+
+        var screen = (GlueScreen)engine.CurrentScreen;
+        var relationship =
+            (CollisionRelationship<GlueEntity, GlueEntity>)screen.Objects["PlayerBallVsPuck"];
+
+        var puck = project.InstancesOf(@"Entities\Puck").Single();
+        puck.X = 0f;
+        puck.Y = 0f;
+
+        var spawnedBall = project.CreateEntity(@"Entities\PlayerBall", screen);
+        spawnedBall.X = 0f;
+        spawnedBall.Y = 0f;
+
+        GlueEntity? collidedBall = null;
+        relationship.CollisionOccurred += (ball, _) => collidedBall = ball;
+        relationship.RunCollisions();
+
+        collidedBall.ShouldBeSameAs(spawnedBall);
     }
 
     [Fact]
