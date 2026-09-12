@@ -161,6 +161,35 @@ public static class TileMapCollisions
             obj => obj.Properties.TryGetValue(propertyName, out _));
     }
 
+    /// <summary>
+    /// Scans a single <see cref="TilemapObjectLayer"/> and adds a collision shape for every
+    /// rectangle and polygon object on it, regardless of class — the whole layer becomes the
+    /// collection's geometry. Used for Glue's <c>FromMapCollision</c> creation option, where an
+    /// object layer is authored directly as collision rather than tagged with a type or property for
+    /// <see cref="GenerateFromClass(Tilemap, string, float, float)"/> to match.
+    /// </summary>
+    /// <param name="tilemap">The parsed tilemap — provides map dimensions for Y-up conversion.</param>
+    /// <param name="layer">The object layer to convert.</param>
+    /// <param name="mapX">Left edge of the map in world space.</param>
+    /// <param name="mapY">Top edge of the map in world space (Tiled convention).</param>
+    /// <returns>A <see cref="TileShapes"/> containing one shape per rectangle/polygon on the layer.</returns>
+    internal static TileShapes GenerateFromObjectLayer(
+        Tilemap tilemap,
+        TilemapObjectLayer layer,
+        float mapX = 0f,
+        float mapY = 0f)
+    {
+        var collection = new TileShapes
+        {
+            X = mapX,
+            Y = mapY - tilemap.Height * tilemap.TileHeight,
+            GridSize = tilemap.TileWidth
+        };
+
+        AddMatchingObjects(layer, mapX, mapY, static _ => true, collection);
+        return collection;
+    }
+
     // TileShapes is a fixed-size rectangular broad-phase grid — it has no representation for the
     // diamond/staggered cell footprints that isometric, staggered, and hexagonal maps use. Rather
     // than emit silently-wrong axis-aligned rectangles for those orientations, refuse up front.

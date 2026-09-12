@@ -84,6 +84,15 @@ internal static class GlueTileDefaults
     internal static string? CollisionLayerName(NamedObjectSave save) =>
         save.Properties.GetValue<string>("CollisionLayerName");
 
+    /// <summary>
+    /// The object layer whose rectangle/polygon objects become collision, under
+    /// <see cref="CollisionCreationOptions.FromMapCollision"/>. The whole layer is used regardless of
+    /// each object's own class — this is Glue's key for "the map's own hand-authored shapes", not a
+    /// filter like <see cref="CollisionLayerName"/>.
+    /// </summary>
+    internal static string? MapCollisionName(NamedObjectSave save) =>
+        save.Properties.GetValue<string>("TmxCollisionName");
+
     /// <summary>Grid size. Absent means 16, never 0.</summary>
     internal static float CollisionTileSize(NamedObjectSave save) =>
         Or(save, "CollisionTileSize", 16f);

@@ -435,6 +435,79 @@ public class GlueTiledTests
         screen.Objects["Map"].ShouldBeOfType<TileMap>();
     }
 
+    // FromMapCollision authors collision as free-form object-layer geometry in Tiled — rectangles or
+    // polygons drawn directly on an object layer, not tied to any tile type or property. Level1Map's
+    // own CameraBoundsLayer is exactly this shape (three plain rectangles, no Class), so the fixture
+    // needs no editing to exercise it.
+    private static NamedObjectSave MapCollisionSave(string instanceName, string? tmxCollisionName)
+    {
+        var save = new NamedObjectSave
+        {
+            InstanceName = instanceName,
+            SourceClassType = "FlatRedBall.TileCollisions.TileShapeCollection",
+            SourceType = SourceType.FlatRedBallType,
+        };
+        save.Properties.Add(new PropertySave
+        {
+            Name = "SourceTmxName",
+            Value = JsonDocument.Parse("\"Map\"").RootElement,
+        });
+        // 6 is CollisionCreationOptions.FromMapCollision.
+        save.Properties.Add(new PropertySave
+        {
+            Name = "CollisionCreationOptions",
+            Value = JsonDocument.Parse("6").RootElement,
+        });
+        if (tmxCollisionName is not null)
+        {
+            save.Properties.Add(new PropertySave
+            {
+                Name = "TmxCollisionName",
+                Value = JsonDocument.Parse($"\"{tmxCollisionName}\"").RootElement,
+            });
+        }
+        return save;
+    }
+
+    [Fact]
+    public void BuildObjects_ACollectionFromMapCollision_BuildsShapesFromTheObjectLayer()
+    {
+        var screen = Level1With(MapCollisionSave("CameraBounds", "CameraBoundsLayer"));
+        if (screen is null)
+            return;
+
+        var map = (TileMap)screen.Objects["Map"];
+        var shapes = screen.Objects["CameraBounds"].ShouldBeOfType<TileShapes>();
+
+        // Final Name is the author's instance name, matching FromType's own behavior — not the
+        // object layer name passed in TmxCollisionName.
+        shapes.Name.ShouldBe("CameraBounds");
+
+        // CameraBoundsLayer's first rectangle in Level1Map.tmx: x=0, y=0, width=480, height=464
+        // (Tiled pixels, Y-down from the map's top-left). It divides evenly into 16px cells, so the
+        // cell at its center holds one full 16x16 collision rect.
+        float x = 0f, y = 0f, width = 480f, height = 464f;
+        float centerX = map.X + x + width / 2f;
+        float centerY = map.Y - y - height / 2f;
+        var (col, row) = shapes.GetCellAt(new System.Numerics.Vector2(centerX, centerY));
+
+        var rects = shapes.GetRectangleTilesAtCell(col, row);
+        rects.ShouldNotBeEmpty();
+        rects[0].Width.ShouldBe(16f);
+        rects[0].Height.ShouldBe(16f);
+    }
+
+    [Fact]
+    public void BuildObjects_AMapCollisionNamingNoLayer_WarnsRatherThanBuilding()
+    {
+        var screen = Level1With(MapCollisionSave("CameraBounds", tmxCollisionName: null));
+        if (screen is null)
+            return;
+
+        screen.Objects.ShouldNotContainKey("CameraBounds");
+        screen.BuildDiagnostics.ShouldContain(d => d.Message.Contains("names none"));
+    }
+
     [Fact]
     public void BuildObjects_ACollectionReadingAFileSourcedMap_BuildsItsCollision()
     {

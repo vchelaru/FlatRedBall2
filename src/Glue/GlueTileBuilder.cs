@@ -369,6 +369,28 @@ internal static class GlueTileBuilder
                 shapes = map.GenerateCollisionFromProperty(property, NullIfEmpty(layer));
                 break;
 
+            case CollisionCreationOptions.FromMapCollision:
+                string? mapCollisionName = GlueTileDefaults.MapCollisionName(save);
+
+                if (string.IsNullOrEmpty(mapCollisionName))
+                {
+                    Warn(diagnostics, elementName,
+                        $"'{save.InstanceName}' builds collision from a map object layer but names none.");
+                    return null;
+                }
+
+                shapes = map.GenerateCollisionFromObjectLayer(mapCollisionName);
+
+                if (shapes is null)
+                {
+                    Warn(diagnostics, elementName,
+                        $"'{save.InstanceName}' reads from object layer '{mapCollisionName}', which " +
+                        "does not exist in the map; no collision was built.");
+                    return null;
+                }
+
+                break;
+
             default:
                 Warn(diagnostics, elementName,
                     $"'{save.InstanceName}' uses collision creation option '{options}', which this " +

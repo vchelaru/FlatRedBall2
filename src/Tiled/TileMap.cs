@@ -765,6 +765,29 @@ public class TileMap
     }
 
     /// <summary>
+    /// Generates a <see cref="TileShapes"/> from every rectangle and polygon object on the object
+    /// layer named <paramref name="layerName"/> (case-insensitive), regardless of class — the whole
+    /// layer becomes the collection's geometry. Used for Glue's <c>FromMapCollision</c> creation
+    /// option, where the layer itself (not a tile type or property) is authored as collision.
+    /// </summary>
+    /// <returns><c>null</c> if no object layer with that name exists.</returns>
+    internal TileShapes? GenerateCollisionFromObjectLayer(string layerName)
+    {
+        foreach (var layer in _tilemap.Layers)
+        {
+            if (layer is TilemapObjectLayer objectLayer &&
+                string.Equals(objectLayer.Name, layerName, StringComparison.OrdinalIgnoreCase))
+            {
+                var tsc = TileMapCollisions.GenerateFromObjectLayer(_tilemap, objectLayer, _x, _y);
+                tsc.Name = layerName;
+                return tsc;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Repositions the map so its center aligns with the given world-space point.
     /// </summary>
     public void CenterOn(float worldX, float worldY)
