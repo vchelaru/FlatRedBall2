@@ -85,10 +85,12 @@ internal static class GlueTileDefaults
         save.Properties.GetValue<string>("CollisionLayerName");
 
     /// <summary>
-    /// The object layer whose rectangle/polygon objects become collision, under
-    /// <see cref="CollisionCreationOptions.FromMapCollision"/>. The whole layer is used regardless of
-    /// each object's own class — this is Glue's key for "the map's own hand-authored shapes", not a
-    /// filter like <see cref="CollisionLayerName"/>.
+    /// The tile type whose tiles become geometry, under
+    /// <see cref="CollisionCreationOptions.FromMapCollision"/>. Despite the name, this is the same
+    /// kind of value as <see cref="CollisionTileTypeName"/> (a tile Class) — FRB1's own codegen
+    /// clones an already-built <c>TileShapeCollection</c> out of the map's <c>Collisions</c> list by
+    /// this name rather than querying tiles on demand, but the geometry it produces is identical to
+    /// <see cref="CollisionCreationOptions.FromType"/> with the same Class.
     /// </summary>
     internal static string? MapCollisionName(NamedObjectSave save) =>
         save.Properties.GetValue<string>("TmxCollisionName");

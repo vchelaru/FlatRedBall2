@@ -370,25 +370,19 @@ internal static class GlueTileBuilder
                 break;
 
             case CollisionCreationOptions.FromMapCollision:
+                // FRB1's own codegen clones an already-built TileShapeCollection out of the map's
+                // Collisions list, keyed by tile Class — the same source FromType queries on demand.
+                // TmxCollisionName is that Class name; it is not an object-layer name.
                 string? mapCollisionName = GlueTileDefaults.MapCollisionName(save);
 
                 if (string.IsNullOrEmpty(mapCollisionName))
                 {
                     Warn(diagnostics, elementName,
-                        $"'{save.InstanceName}' builds collision from a map object layer but names none.");
+                        $"'{save.InstanceName}' builds collision from a tile type but names none.");
                     return null;
                 }
 
-                shapes = map.GenerateCollisionFromObjectLayer(mapCollisionName);
-
-                if (shapes is null)
-                {
-                    Warn(diagnostics, elementName,
-                        $"'{save.InstanceName}' reads from object layer '{mapCollisionName}', which " +
-                        "does not exist in the map; no collision was built.");
-                    return null;
-                }
-
+                shapes = map.GenerateCollisionFromClass(mapCollisionName, NullIfEmpty(layer));
                 break;
 
             default:

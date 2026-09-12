@@ -435,10 +435,12 @@ public class GlueTiledTests
         screen.Objects["Map"].ShouldBeOfType<TileMap>();
     }
 
-    // FromMapCollision authors collision as free-form object-layer geometry in Tiled — rectangles or
-    // polygons drawn directly on an object layer, not tied to any tile type or property. Level1Map's
-    // own CameraBoundsLayer is exactly this shape (three plain rectangles, no Class), so the fixture
-    // needs no editing to exercise it.
+    // FromMapCollision clones an already-built TileShapeCollection out of the map's own Collisions
+    // list, keyed by tile Class (TmxCollisionName) — the same source FromType queries on demand via
+    // CollisionTileTypeName. It is not object-layer geometry: confirmed against FRB1's own
+    // TileShapeCollectionCodeGenerator.GenerateFromMapCollision (map.Collisions.FirstOrDefault by
+    // name) and against real KidDefense data, whose FromMapCollision collections set
+    // TmxCollisionName to the same tile-type string as a sibling CollisionTileTypeName property.
     private static NamedObjectSave MapCollisionSave(string instanceName, string? tmxCollisionName)
     {
         var save = new NamedObjectSave
@@ -470,41 +472,45 @@ public class GlueTiledTests
     }
 
     [Fact]
-    public void BuildObjects_ACollectionFromMapCollision_BuildsShapesFromTheObjectLayer()
+    public void BuildObjects_ACollectionFromMapCollision_BuildsTheSameShapesAsFromType()
     {
-        var screen = Level1With(MapCollisionSave("CameraBounds", "CameraBoundsLayer"));
+        // Level1's own "SolidCollision" object already builds via FromType + CollisionTileTypeName
+        // "SolidCollision" (see Level1.glsj). A second collection built via FromMapCollision +
+        // TmxCollisionName "SolidCollision" must land on the exact same tiles.
+        var screen = Level1With(MapCollisionSave("SolidCollisionViaMapCollision", "SolidCollision"));
         if (screen is null)
             return;
 
         var map = (TileMap)screen.Objects["Map"];
-        var shapes = screen.Objects["CameraBounds"].ShouldBeOfType<TileShapes>();
+        var fromType = (TileShapes)screen.Objects["SolidCollision"];
+        var fromMapCollision = screen.Objects["SolidCollisionViaMapCollision"].ShouldBeOfType<TileShapes>();
 
-        // Final Name is the author's instance name, matching FromType's own behavior — not the
-        // object layer name passed in TmxCollisionName.
-        shapes.Name.ShouldBe("CameraBounds");
+        int columns = (int)(map.Width / map.TileWidth) + 1;
+        int rows = (int)(map.Height / map.TileHeight) + 1;
+        int matched = 0;
 
-        // CameraBoundsLayer's first rectangle in Level1Map.tmx: x=0, y=0, width=480, height=464
-        // (Tiled pixels, Y-down from the map's top-left). It divides evenly into 16px cells, so the
-        // cell at its center holds one full 16x16 collision rect.
-        float x = 0f, y = 0f, width = 480f, height = 464f;
-        float centerX = map.X + x + width / 2f;
-        float centerY = map.Y - y - height / 2f;
-        var (col, row) = shapes.GetCellAt(new System.Numerics.Vector2(centerX, centerY));
+        for (int col = -columns; col <= columns; col++)
+        {
+            for (int row = -rows; row <= rows; row++)
+            {
+                bool hasTile = fromType.GetTileAtCell(col, row) is not null;
+                (fromMapCollision.GetTileAtCell(col, row) is not null).ShouldBe(hasTile);
+                if (hasTile)
+                    matched++;
+            }
+        }
 
-        var rects = shapes.GetRectangleTilesAtCell(col, row);
-        rects.ShouldNotBeEmpty();
-        rects[0].Width.ShouldBe(16f);
-        rects[0].Height.ShouldBe(16f);
+        matched.ShouldBeGreaterThan(0, "the fixture's map has SolidCollision tiles, so some must match");
     }
 
     [Fact]
-    public void BuildObjects_AMapCollisionNamingNoLayer_WarnsRatherThanBuilding()
+    public void BuildObjects_AMapCollisionNamingNoType_WarnsRatherThanBuilding()
     {
-        var screen = Level1With(MapCollisionSave("CameraBounds", tmxCollisionName: null));
+        var screen = Level1With(MapCollisionSave("SolidCollisionViaMapCollision", tmxCollisionName: null));
         if (screen is null)
             return;
 
-        screen.Objects.ShouldNotContainKey("CameraBounds");
+        screen.Objects.ShouldNotContainKey("SolidCollisionViaMapCollision");
         screen.BuildDiagnostics.ShouldContain(d => d.Message.Contains("names none"));
     }
 
