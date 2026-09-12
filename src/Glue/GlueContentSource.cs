@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using FlatRedBall2.AnimationEditorCommon;
 using FlatRedBall2.Glue.Model;
 using FlatRedBall2.IO;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Media;
 
 namespace FlatRedBall2.Glue;
 
@@ -185,13 +189,104 @@ public sealed class GlueContentSource
 
             if (file.Name.Contains('*'))
             {
-                Warn(diagnostics, elementName,
-                    $"'{file.Name}' is a wildcard reference, which this loader does not expand.");
+                LoadWildcard(file.Name, elementName, diagnostics);
                 continue;
             }
 
             LoadOne(file, elementName, diagnostics);
         }
+    }
+
+    /// <summary>
+    /// Expands a <c>Name</c> like <c>GlobalContent/Audio/Sfx/**/*.wav</c> against the files actually
+    /// on disk under <see cref="ContentRoot"/>, then loads each match through the normal per-extension
+    /// path. <c>**</c> matches any depth of subdirectories (including none); a bare <c>*</c> matches
+    /// anything within one path segment. Matching is case-insensitive, matching how the rest of this
+    /// loader keys its lookups (<see cref="_assets"/>, <see cref="_text"/>).
+    /// </summary>
+    /// <remarks>
+    /// Unlike every other read in this type, this walks the real filesystem rather than going through
+    /// <c>ContentLoader.StreamProvider</c> — expanding a glob means listing a directory, and
+    /// <c>TitleContainer</c> has no such operation on any backend (the browser target has no
+    /// directory listing at all). Wildcard <c>GlobalFiles</c> entries are a desktop-authoring feature;
+    /// each expanded match is loaded normally afterward, so the result is browser-safe even though the
+    /// expansion step itself is not.
+    /// </remarks>
+    private void LoadWildcard(string pattern, string? elementName, List<GlueLoadDiagnostic> diagnostics)
+    {
+        string absoluteRoot = Path.Combine(AppContext.BaseDirectory, ContentRoot);
+
+        if (!Directory.Exists(absoluteRoot))
+        {
+            Warn(diagnostics, elementName,
+                $"'{pattern}' is a wildcard reference, but its content root could not be found to " +
+                "expand it.");
+            return;
+        }
+
+        var regex = BuildWildcardRegex(pattern);
+        var matches = Directory.EnumerateFiles(absoluteRoot, "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(absoluteRoot, f).Replace('\\', '/'))
+            .Where(relative => regex.IsMatch(relative))
+            .OrderBy(relative => relative, StringComparer.Ordinal)
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            Warn(diagnostics, elementName, $"'{pattern}' is a wildcard reference that matched no files.");
+            return;
+        }
+
+        foreach (var relative in matches)
+        {
+            LoadOne(
+                new ReferencedFileSave { Name = relative, IsCreatedByWildcard = true },
+                elementName, diagnostics);
+        }
+    }
+
+    /// <summary>
+    /// Converts a Glue wildcard pattern into a regex matched against forward-slashed relative paths.
+    /// </summary>
+    /// <remarks>
+    /// Walks the pattern one character at a time rather than round-tripping through
+    /// <see cref="Regex.Escape(string)"/> on the whole string, so a literal <c>*</c> never has to be
+    /// disguised behind a placeholder — every character is either a wildcard token handled here or an
+    /// ordinary character escaped on its own.
+    /// </remarks>
+    private static Regex BuildWildcardRegex(string pattern)
+    {
+        string normalized = pattern.Replace('\\', '/');
+        var regexPattern = new StringBuilder("^");
+        int i = 0;
+
+        while (i < normalized.Length)
+        {
+            bool isRecursiveSegment =
+                normalized[i] == '*' && i + 2 < normalized.Length &&
+                normalized[i + 1] == '*' && normalized[i + 2] == '/';
+
+            if (isRecursiveSegment)
+            {
+                // "**/" - zero or more whole directory segments, so "a/**/*.wav" also matches "a/x.wav".
+                regexPattern.Append("(?:.*/)?");
+                i += 3;
+            }
+            else if (normalized[i] == '*')
+            {
+                // A bare "*" stays within one path segment.
+                regexPattern.Append("[^/]*");
+                i++;
+            }
+            else
+            {
+                regexPattern.Append(Regex.Escape(normalized[i].ToString()));
+                i++;
+            }
+        }
+
+        regexPattern.Append('$');
+        return new Regex(regexPattern.ToString(), RegexOptions.IgnoreCase);
     }
 
     private void LoadOne(ReferencedFileSave file, string? elementName, List<GlueLoadDiagnostic> diagnostics)
@@ -231,6 +326,26 @@ public sealed class GlueContentSource
                                 "kept as raw text."));
                     }
 
+                    break;
+
+                case ".wav":
+                    // SoundEffect.FromStream is WAV-only (PCM), but it does go through the loader's
+                    // own StreamProvider seam, so this works on every backend including the browser.
+                    using (var stream = _content.StreamProvider(path))
+                    {
+                        var soundEffect = SoundEffect.FromStream(stream);
+                        _content.Track(soundEffect);
+                        _assets[instanceName] = soundEffect;
+                    }
+                    break;
+
+                case ".ogg":
+                    // Song.FromUri is OGG-only on DesktopGL and needs a real file:// URI rather than
+                    // a stream, so — unlike every other case here — it bypasses StreamProvider and
+                    // resolves straight against the title location. Desktop-only for the same reason
+                    // wildcard expansion is: no browser equivalent exists.
+                    _assets[instanceName] = Song.FromUri(
+                        instanceName, new Uri(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path))));
                     break;
 
                 default:
