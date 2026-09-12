@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
+using FlatRedBall2.Math;
 using XnaColor = Microsoft.Xna.Framework.Color;
 
 namespace FlatRedBall2.Glue;
@@ -167,6 +168,13 @@ internal static class GlueValueConverter
         if (target == typeof(long) && value.TryGetInt64(out long l)) { converted = l; return true; }
         if (target == typeof(decimal) && value.TryGetDecimal(out decimal m)) { converted = m; return true; }
         if (target == typeof(byte) && value.TryGetByte(out byte b)) { converted = b; return true; }
+
+        // Glue authors RotationZ as a raw radian float; FRB2's Rotation is unit-safe Angle.
+        if (target == typeof(Angle) && value.TryGetSingle(out float radians))
+        {
+            converted = Angle.FromRadians(radians);
+            return true;
+        }
 
         return false;
     }

@@ -8,6 +8,7 @@ using FlatRedBall2.Tiled;
 using Shouldly;
 using Xunit;
 using XnaColor = Microsoft.Xna.Framework.Color;
+using XnaRectangle = Microsoft.Xna.Framework.Rectangle;
 
 namespace FlatRedBall2.Tests.Glue;
 
@@ -91,6 +92,46 @@ public class GlueObjectBuilderTests
     }
 
     [Fact]
+    public void Create_AllFourTexturePixelInstructionsInReverseOrder_ProduceCombinedSourceRectangle()
+    {
+        // Right/Bottom are authored before Left/Top to confirm the edges combine into the same
+        // rectangle regardless of instruction order, since Glue does not guarantee ordering.
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [
+                { ""Type"": ""float"", ""Member"": ""RightTexturePixel"", ""Value"": 54.0 },
+                { ""Type"": ""float"", ""Member"": ""BottomTexturePixel"", ""Value"": 37.0 },
+                { ""Type"": ""float"", ""Member"": ""LeftTexturePixel"", ""Value"": 10.0 },
+                { ""Type"": ""float"", ""Member"": ""TopTexturePixel"", ""Value"": 5.0 }
+            ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.SourceRectangle.ShouldBe(new XnaRectangle(10, 5, 44, 32));
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Create_BottomTexturePixelInstruction_SetsSourceRectangleBottomEdge()
+    {
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [ { ""Type"": ""float"", ""Member"": ""BottomTexturePixel"", ""Value"": 37.0 } ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.SourceRectangle!.Value.Y.ShouldBe(0);
+        sprite.SourceRectangle!.Value.Height.ShouldBe(37);
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Create_Circle_ProducesARealCircle()
     {
         var (builder, _) = NewBuilder();
@@ -118,6 +159,22 @@ public class GlueObjectBuilderTests
     }
 
     [Fact]
+    public void Create_LeftTexturePixelInstruction_SetsSourceRectangleLeftEdge()
+    {
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [ { ""Type"": ""float"", ""Member"": ""LeftTexturePixel"", ""Value"": 10.0 } ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.SourceRectangle!.Value.X.ShouldBe(10);
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Create_RadiusInstruction_IsApplied()
     {
         var (builder, _) = NewBuilder();
@@ -133,6 +190,40 @@ public class GlueObjectBuilderTests
     }
 
     [Fact]
+    public void Create_RightTexturePixelInstruction_SetsSourceRectangleWidthFromOrigin()
+    {
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [ { ""Type"": ""float"", ""Member"": ""RightTexturePixel"", ""Value"": 54.0 } ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.SourceRectangle!.Value.X.ShouldBe(0);
+        sprite.SourceRectangle!.Value.Width.ShouldBe(54);
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Create_RotationZInstruction_MapsOntoRotationInRadians()
+    {
+        // Glue's member is "RotationZ" (a raw radian float); FRB2's is "Rotation" (an Angle).
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [ { ""Type"": ""float"", ""Member"": ""RotationZ"", ""Value"": 1.5707963267948966 } ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.Rotation.Radians.ShouldBe(1.5707963f, tolerance: 0.0001f);
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Create_Shape_IsVisibleByDefault()
     {
         // FRB2 shapes default to invisible because they are primarily collision volumes. A shape
@@ -145,6 +236,22 @@ public class GlueObjectBuilderTests
         }");
 
         ((AARect)builder.Create(save)!).IsVisible.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Create_TopTexturePixelInstruction_SetsSourceRectangleTopEdge()
+    {
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""SpriteInstance"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""InstructionSaves"": [ { ""Type"": ""float"", ""Member"": ""TopTexturePixel"", ""Value"": 5.0 } ]
+        }");
+
+        var sprite = (Sprite)builder.Create(save)!;
+
+        sprite.SourceRectangle!.Value.Y.ShouldBe(5);
+        diagnostics.ShouldBeEmpty();
     }
 
     [Fact]

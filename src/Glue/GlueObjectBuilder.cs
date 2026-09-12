@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using FlatRedBall2.Glue.Model;
 
@@ -251,6 +252,9 @@ public sealed class GlueObjectBuilder
             if (IsShiftMapToMoveGameplayLayerToZ0NoOp(instance, memberName))
                 continue;
 
+            if (TryApplyAsSourceRectangleEdge(instance, memberName, instruction, save, elementName))
+                continue;
+
             var property = GlueMemberWriter.FindProperty(instance, memberName);
 
             if (property is null || !property.CanWrite)
@@ -429,6 +433,50 @@ public sealed class GlueObjectBuilder
     /// <summary>Whether a property holds a loaded asset rather than a plain value.</summary>
     private static bool IsAssetType(Type type) =>
         type == typeof(Texture2D) || type == typeof(Animation.AnimationChainList);
+
+    /// <summary>
+    /// Applies one edge of a Sprite's <see cref="Rendering.Sprite.SourceRectangle"/> from a Glue
+    /// pixel-edge instruction (<c>LeftTexturePixel</c>, <c>RightTexturePixel</c>,
+    /// <c>TopTexturePixel</c>, <c>BottomTexturePixel</c>).
+    /// </summary>
+    /// <remarks>
+    /// FRB2 has no per-edge properties, only one <c>Rectangle?</c>, and Glue authors these four as
+    /// separate instructions in no guaranteed order — a sprite might set only Left+Right, or all
+    /// four. Each edge is computed from the <em>opposite</em> edge of whatever rectangle already
+    /// exists (defaulting to zero) rather than from the edge it shares an axis with, so the final
+    /// rectangle comes out the same no matter which edge instruction runs first.
+    /// </remarks>
+    private bool TryApplyAsSourceRectangleEdge(
+        object instance, string memberName, InstructionSave instruction,
+        NamedObjectSave save, string? elementName)
+    {
+        if (instance is not Rendering.Sprite sprite)
+            return false;
+
+        if (memberName is not ("LeftTexturePixel" or "RightTexturePixel" or "TopTexturePixel" or "BottomTexturePixel"))
+            return false;
+
+        if (!GlueValueConverter.TryConvert(instruction.Value, typeof(float), out object? converted) ||
+            converted is not float pixels)
+        {
+            Warn($"'{save.InstanceName}.{memberName}' could not take the authored value " +
+                 $"'{instruction.Value}' as a pixel edge; the default was kept.", elementName);
+            return true;
+        }
+
+        int edge = (int)MathF.Round(pixels);
+        Rectangle current = sprite.SourceRectangle ?? new Rectangle(0, 0, 0, 0);
+
+        sprite.SourceRectangle = memberName switch
+        {
+            "LeftTexturePixel" => new Rectangle(edge, current.Y, current.Right - edge, current.Height),
+            "RightTexturePixel" => new Rectangle(current.X, current.Y, edge - current.X, current.Height),
+            "TopTexturePixel" => new Rectangle(current.X, edge, current.Width, current.Bottom - edge),
+            _ /* BottomTexturePixel */ => new Rectangle(current.X, current.Y, current.Width, edge - current.Y),
+        };
+
+        return true;
+    }
 
     private void Warn(string message, string? elementName) =>
         _diagnostics.Add(new GlueLoadDiagnostic(GlueDiagnosticSeverity.Warning, message, elementName));

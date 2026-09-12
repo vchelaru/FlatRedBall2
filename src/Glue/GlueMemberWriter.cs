@@ -26,6 +26,7 @@ internal static class GlueMemberWriter
     private static readonly Dictionary<string, string> MemberAliases = new(StringComparer.Ordinal)
     {
         ["Visible"] = "IsVisible",
+        ["RotationZ"] = "Rotation",
     };
 
     /// <summary>What the trimmer must keep: the properties assigned, and the constructor.</summary>
