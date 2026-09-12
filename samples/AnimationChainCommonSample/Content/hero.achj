@@ -1,0 +1,20 @@
+{
+  "fileRelativeTextures": true,
+  "timeMeasurementUnit": "Second",
+  "coordinateType": "Pixel",
+  "animationChains": [
+    {
+      "name": "Walk",
+      "frames": [
+        { "textureName": "AnimatedSpritesheet.png", "frameLength": 0.1, "leftCoordinate": 0, "rightCoordinate": 16, "topCoordinate": 0, "bottomCoordinate": 32 },
+        { "textureName": "AnimatedSpritesheet.png", "frameLength": 0.1, "leftCoordinate": 16, "rightCoordinate": 32, "topCoordinate": 0, "bottomCoordinate": 32 }
+      ]
+    },
+    {
+      "name": "Idle",
+      "frames": [
+        { "textureName": "AnimatedSpritesheet.png", "frameLength": 0.5, "leftCoordinate": 0, "rightCoordinate": 16, "topCoordinate": 0, "bottomCoordinate": 32 }
+      ]
+    }
+  ]
+}

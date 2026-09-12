@@ -15,10 +15,12 @@
         handle, so a renderer only has to close the generic over its own texture type (see
         FlatRedBall.AnimationChain.MonoGame's AnimationFrame : AnimationFrameBase&lt;Texture2D&gt;).
 
-    The runtime bridge that converts the .achx data model into MonoGame-backed engine types
-    (AnimationChainList/AnimationFrame with real Texture2D instances) lives in the main engine
-    project, in AnimationChainListSaveExtensions; that's the only part that actually needs
-    MonoGame.
+    The runtime bridge that converts the .achx data model into MonoGame-backed types
+    (AnimationChainList/AnimationFrame with real Texture2D instances) lives in the
+    FlatRedBall.AnimationChain.MonoGame package, in AnimationChainListSaveExtensions; that's the
+    only part that actually needs MonoGame. A caller who wants neither that package nor the main
+    FlatRedBall2 engine can instead close AnimationFrameBase&lt;TTexture&gt; over their own texture
+    type directly — see samples/AnimationChainCommonSample.
 
     Published as its own NuGet package (FlatRedBall.AnimationChain.Common) in lockstep with
     FlatRedBall2.MonoGame/FlatRedBall2.Kni, see .github/workflows/publish.yml. This is required
