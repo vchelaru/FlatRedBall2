@@ -66,6 +66,11 @@ public sealed class GlueObjectBuilder
             return null;
         }
 
+        // A Layer's identity is its Glue instance name, not an authored instruction — the
+        // parameterless factory in GlueTypeMap has no way to see it, so it is set here instead.
+        if (instance is Rendering.Layer layer)
+            layer.Name = save.InstanceName ?? layer.Name;
+
         ApplyShapeVisibilityDefault(instance);
         ApplyInstructions(instance, save, elementName);
 
@@ -89,11 +94,16 @@ public sealed class GlueObjectBuilder
     {
         object? instance = Create(save, elementName);
 
+        if (instance is null)
+            return null;
+
+        var layer = ResolveLayerOn(_owningScreen, save, elementName);
+
         // A Gum visual is not IAttachable — it is parented through the entity's own Gum support,
         // which is what keeps it following the entity.
         if (instance is Gum.Wireframe.GraphicalUiElement visual)
         {
-            container.Add(visual);
+            container.Add(visual, layer);
             return instance;
         }
 
@@ -108,13 +118,13 @@ public sealed class GlueObjectBuilder
         {
             switch (instance)
             {
-                case Collision.AARect rect: container.Add(rect, isDefaultCollision: false); return instance;
-                case Collision.Circle circle: container.Add(circle, isDefaultCollision: false); return instance;
-                case Collision.Polygon polygon: container.Add(polygon, isDefaultCollision: false); return instance;
+                case Collision.AARect rect: container.Add(rect, isDefaultCollision: false, layer); return instance;
+                case Collision.Circle circle: container.Add(circle, isDefaultCollision: false, layer); return instance;
+                case Collision.Polygon polygon: container.Add(polygon, isDefaultCollision: false, layer); return instance;
             }
         }
 
-        container.Add(attachable);
+        container.Add(attachable, layer);
         return instance;
     }
 
@@ -127,6 +137,7 @@ public sealed class GlueObjectBuilder
     public object? AddTo(Screen container, NamedObjectSave save, string? elementName = null)
     {
         object? instance = Create(save, elementName);
+        var layer = instance is null ? null : ResolveLayerOn(container, save, elementName);
 
         switch (instance)
         {
@@ -140,6 +151,9 @@ public sealed class GlueObjectBuilder
             case Entity entity:
                 container.Register(entity);
 
+                if (layer is not null)
+                    entity.Layer = layer;
+
                 // Register wires the entity up but does not initialise it — the engine's own
                 // Factory does that as a separate step. Skipping it leaves an engine entity in a
                 // half-built state: a camera controller resolves its Camera in CustomInitialize and
@@ -151,16 +165,50 @@ public sealed class GlueObjectBuilder
 
                 break;
 
+            // A Layer itself joins the screen's layer registry rather than its render list — it is
+            // the bucket other objects render into, not a renderable of its own.
+            case Rendering.Layer newLayer:
+                container.Layers.Add(newLayer);
+                break;
+
             case Gum.Wireframe.GraphicalUiElement visual:
-                container.Add(visual);
+                container.Add(visual, layer);
                 break;
 
             case Rendering.IRenderable renderable:
-                container.Add(renderable);
+                container.Add(renderable, layer);
                 break;
         }
 
         return instance;
+    }
+
+    /// <summary>
+    /// Resolves an object's authored <see cref="NamedObjectSave.LayerOn"/> to the built
+    /// <see cref="Rendering.Layer"/> it names, so the caller can pass it to the layer-aware
+    /// <c>Add</c> overload instead of falling through to the container's default layer.
+    /// </summary>
+    /// <remarks>
+    /// Looked up by name on <paramref name="screen"/>'s <see cref="Screen.Layers"/> rather than a
+    /// builder-local table, because that is the same registry
+    /// <see cref="AddTo(Screen, NamedObjectSave, string?)"/> adds a built <c>Layer</c> object to — so
+    /// this depends on the Layer having already been built, which matches Glue's own authoring
+    /// convention of declaring layers before the objects placed on them.
+    /// </remarks>
+    private Rendering.Layer? ResolveLayerOn(Screen? screen, NamedObjectSave save, string? elementName)
+    {
+        if (string.IsNullOrEmpty(save.LayerOn))
+            return null;
+
+        var layer = screen?.Layers.Find(l => l.Name == save.LayerOn);
+
+        if (layer is null)
+        {
+            Warn($"'{save.InstanceName}' names the layer '{save.LayerOn}', which was not found; " +
+                 "it was added to the default layer instead.", elementName);
+        }
+
+        return layer;
     }
 
     /// <summary>

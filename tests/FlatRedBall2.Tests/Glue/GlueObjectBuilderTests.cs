@@ -3,6 +3,7 @@ using System.Text.Json;
 using FlatRedBall2.Collision;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
+using FlatRedBall2.Rendering;
 using Shouldly;
 using Xunit;
 using XnaColor = Microsoft.Xna.Framework.Color;
@@ -205,6 +206,46 @@ public class GlueObjectBuilderTests
         circle.X.ShouldBe(10f);
         circle.AbsoluteX.ShouldBe(110f);
         circle.AbsoluteY.ShouldBe(195f);
+    }
+
+    [Fact]
+    public void AddTo_LayerNamedObject_AddsToScreenLayers()
+    {
+        var diagnostics = new List<GlueLoadDiagnostic>();
+        var screen = new Screen();
+        var builder = new GlueObjectBuilder(diagnostics, owningScreen: screen);
+        var save = Save(@"{
+            ""InstanceName"": ""Foreground"",
+            ""SourceClassType"": ""FlatRedBall.Graphics.Layer""
+        }");
+
+        var layer = (Layer)builder.AddTo(screen, save)!;
+
+        screen.Layers.ShouldContain(layer);
+        layer.Name.ShouldBe("Foreground");
+    }
+
+    [Fact]
+    public void AddTo_ObjectWithLayerOn_PlacesItOnTheNamedLayer()
+    {
+        var diagnostics = new List<GlueLoadDiagnostic>();
+        var screen = new Screen();
+        var builder = new GlueObjectBuilder(diagnostics, owningScreen: screen);
+        var layerSave = Save(@"{
+            ""InstanceName"": ""Foreground"",
+            ""SourceClassType"": ""FlatRedBall.Graphics.Layer""
+        }");
+        var layer = (Layer)builder.AddTo(screen, layerSave)!;
+        layer.ShouldNotBeNull();
+        var spriteSave = Save(@"{
+            ""InstanceName"": ""Hero"",
+            ""SourceClassType"": ""FlatRedBall.Sprite"",
+            ""LayerOn"": ""Foreground""
+        }");
+
+        var sprite = (FlatRedBall2.Rendering.Sprite)builder.AddTo(screen, spriteSave)!;
+
+        sprite.Layer.ShouldBe(layer);
     }
 
     [Fact]
