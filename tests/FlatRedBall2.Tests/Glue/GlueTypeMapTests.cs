@@ -35,6 +35,24 @@ public class GlueTypeMapTests
     }
 
     [Fact]
+    public void TryGetType_Line_MapsToCollisionLine()
+    {
+        GlueTypeMap.TryGetType("FlatRedBall.Math.Geometry.Line", out var type).ShouldBeTrue();
+
+        type.ShouldBe(typeof(FlatRedBall2.Collision.Line));
+    }
+
+    [Fact]
+    public void TryGetType_PositionedObject_MapsToEntity()
+    {
+        // A bare PositionedObject is an attachment anchor with no visual — FRB2's Entity is the
+        // equivalent: it has position/attachment but no required shape or sprite.
+        GlueTypeMap.TryGetType("FlatRedBall.PositionedObject", out var type).ShouldBeTrue();
+
+        type.ShouldBe(typeof(FlatRedBall2.Entity));
+    }
+
+    [Fact]
     public void TryGetType_Sprite_MapsToRenderingSprite()
     {
         GlueTypeMap.TryGetType("FlatRedBall.Sprite", out var type).ShouldBeTrue();
@@ -54,21 +72,20 @@ public class GlueTypeMapTests
     }
 
     [Fact]
-    public void Load_DoorsDemo_ReportsUnmappedTypesAsWarningsAndNoErrors()
+    public void Load_DoorsDemo_HasNoUnmappedTypeWarningsAndNoErrors()
     {
-        // Most of this fixture belongs to later phases, so a pile of warnings is the expected,
-        // correct outcome. Pinning the count turns it into a progress metric: each phase that lands
-        // should drive it down. Under a fail-fast policy this project could not load at all.
-        // It went 13 -> 18 when inheritance landed, and that is progress rather than regression:
-        // Level1 previously declared four objects and now honestly carries all nine it inherits, so
-        // the unmapped ones are counted in both screens instead of only in the base.
+        // Pinning the count turns it into a progress metric: each phase that lands should drive it
+        // down. Under a fail-fast policy this project could not load at all.
+        // Dropped to 0 once #1073 exempted PositionedObjectList<T> from this report the same way tile
+        // and collision objects already were -- every "cannot be built" warning this fixture produced
+        // was a list, which already builds correctly.
         var glujPath = Path.Combine(
             AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj");
 
         var result = GlueProjectLoader.Load(glujPath);
 
         result.HasErrors.ShouldBeFalse();
-        result.Diagnostics.Count(d => d.Message.Contains("cannot be built by this build")).ShouldBe(4);
+        result.Diagnostics.Count(d => d.Message.Contains("cannot be built by this build")).ShouldBe(0);
     }
 
     // FileVersion 54 projects write SourceClassType in short form, and mix both spellings inside one

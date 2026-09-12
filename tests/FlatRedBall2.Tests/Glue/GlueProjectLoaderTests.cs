@@ -100,6 +100,36 @@ public class GlueProjectLoaderTests
     }
 
     [Fact]
+    public void Load_ListObject_IsExemptFromUnbuildableTypeWarning()
+    {
+        // A list's element type (Entities\Enemy) does not resolve to anything in this project, so
+        // without the IsList exemption the list itself would also be reported as unbuildable even
+        // though FlatRedBall.Math.PositionedObjectList<T> already builds fine.
+        var files = new Dictionary<string, string>
+        {
+            [@"C:\proj\Test.gluj"] = @"{
+                ""FileVersion"": 68,
+                ""ScreenReferences"": [ { ""Name"": ""Screens\\Level1"" } ]
+            }",
+            [@"C:\proj\Screens/Level1.glsj"] = @"{
+                ""Name"": ""Screens\\Level1"",
+                ""NamedObjects"": [
+                    {
+                        ""InstanceName"": ""EnemyList"",
+                        ""SourceClassType"": ""FlatRedBall.Math.PositionedObjectList<T>"",
+                        ""SourceType"": 2,
+                        ""SourceClassGenericType"": ""Entities\\Enemy""
+                    }
+                ]
+            }",
+        };
+
+        var result = GlueProjectLoader.Load(@"C:\proj\Test.gluj", InMemory(files));
+
+        result.Diagnostics.ShouldNotContain(d => d.Message.Contains("cannot be built by this build"));
+    }
+
+    [Fact]
     public void Load_MissingElementFile_WarnsAndKeepsLoadingTheRest()
     {
         var files = new Dictionary<string, string>
