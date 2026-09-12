@@ -4917,9 +4917,6 @@ public partial class MainWindow : Window
 
     private async Task BrowseForFrameTexture()
     {
-        var frame = _selectedState.SelectedFrame;
-        if (frame is null) return;
-
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Select Texture",
@@ -4933,6 +4930,19 @@ public partial class MainWindow : Window
 
         var pickedPath = files?.FirstOrDefault()?.TryGetLocalPath();
         if (string.IsNullOrEmpty(pickedPath)) return;
+
+        await ApplyPickedTextureAsync(pickedPath);
+    }
+
+    /// <summary>
+    /// Dialog-free core of <see cref="BrowseForFrameTexture"/>: applies <paramref name="pickedPath"/>
+    /// as the texture for every currently selected frame. Split out so tests can drive it directly
+    /// without going through the real OS file picker.
+    /// </summary>
+    internal async Task ApplyPickedTextureAsync(string pickedPath)
+    {
+        var frames = _selectedState.SelectedFrames;
+        if (frames.Count == 0) return;
 
         string achxFolder = string.IsNullOrEmpty(_projectManager.FileName)
             ? string.Empty
@@ -4963,7 +4973,7 @@ public partial class MainWindow : Window
                         try
                         {
                             File.Copy(capturedSource, capturedDest, overwrite: true);
-                            CommitFrameTexture(new[] { frame }, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
+                            CommitFrameTexture(frames, TexturePathHelper.ComputeStorePath(capturedDest, achxFolder), capturedDest);
                         }
                         catch (Exception retryEx)
                         {
@@ -4980,7 +4990,7 @@ public partial class MainWindow : Window
             ? resolvedAbsPath
             : TexturePathHelper.ComputeStorePath(resolvedAbsPath, achxFolder);
 
-        CommitFrameTexture(new[] { frame }, storePath, resolvedAbsPath);
+        CommitFrameTexture(frames, storePath, resolvedAbsPath);
     }
 
     private enum TextureCopyChoice { Copy, Keep, Cancel }
