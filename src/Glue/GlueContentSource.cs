@@ -161,19 +161,35 @@ public sealed class GlueContentSource
         if (!_loaded.Add(element))
             return;
 
-        foreach (var file in element.ReferencedFiles)
+        LoadFiles(element.ReferencedFiles, element.Name, diagnostics);
+    }
+
+    /// <summary>
+    /// Loads a project's <c>GlobalFiles</c> — the same <see cref="ReferencedFileSave"/> shape as an
+    /// element's own <see cref="GlueElement.ReferencedFiles"/>, but declared at the project root
+    /// rather than under a screen or entity. <see cref="GlueGumResolver"/> already pulls the Gum
+    /// project out of this same list; this loads everything else in it the same way an element's
+    /// own referenced files are loaded.
+    /// </summary>
+    internal void LoadGlobalFiles(List<ReferencedFileSave> files, List<GlueLoadDiagnostic> diagnostics) =>
+        LoadFiles(files, elementName: null, diagnostics);
+
+    private void LoadFiles(
+        List<ReferencedFileSave> files, string? elementName, List<GlueLoadDiagnostic> diagnostics)
+    {
+        foreach (var file in files)
         {
             if (string.IsNullOrEmpty(file.Name) || !file.LoadedAtRuntime)
                 continue;
 
             if (file.Name.Contains('*'))
             {
-                Warn(diagnostics, element.Name,
+                Warn(diagnostics, elementName,
                     $"'{file.Name}' is a wildcard reference, which this loader does not expand.");
                 continue;
             }
 
-            LoadOne(file, element.Name, diagnostics);
+            LoadOne(file, elementName, diagnostics);
         }
     }
 

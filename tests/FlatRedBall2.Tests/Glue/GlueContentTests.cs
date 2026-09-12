@@ -159,6 +159,24 @@ public class GlueContentTests
     }
 
     [Fact]
+    public void Load_ProjectGlobalFiles_LoadsEntriesOtherThanTheGumProjectToo()
+    {
+        // GlobalFiles is a project-level ReferencedFileSave list, same shape as an element's own
+        // ReferencedFiles. GlueGumResolver has always pulled the .gumx out of it; every other entry
+        // (DoorsDemo.gluj now also declares StandardTilesetIcons.png) needs the same loading an
+        // element's ReferencedFiles already gets.
+        if (!_graphics.IsAvailable)
+            return;
+
+        var project = FlatRedBall2.Glue.GlueProject.Load(
+            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj"),
+            new GlueContentSource(
+                _graphics.ContentLoader!, FixtureDirectory("DoorsDemo"), _graphics.GraphicsDevice));
+
+        project.Content!.Get<Texture2D>("StandardTilesetIcons").ShouldNotBeNull();
+    }
+
+    [Fact]
     public void Load_ReferencedFileNotLoadedAtRuntime_IsSkipped()
     {
         var source = SourceFor("DoorsDemo");
