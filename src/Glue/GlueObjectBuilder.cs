@@ -248,6 +248,9 @@ public sealed class GlueObjectBuilder
             if (TryApplyAsAsset(instance, memberName, instruction, save, elementName))
                 continue;
 
+            if (IsShiftMapToMoveGameplayLayerToZ0NoOp(instance, memberName))
+                continue;
+
             var property = GlueMemberWriter.FindProperty(instance, memberName);
 
             if (property is null || !property.CanWrite)
@@ -411,6 +414,17 @@ public sealed class GlueObjectBuilder
         property.SetValue(instance, asset);
         return true;
     }
+
+    /// <summary>
+    /// FRB1's <c>ShiftMapToMoveGameplayLayerToZ0</c> generates code that shifts a map's Z so its
+    /// "GameplayLayer" sub-layer lands at Z = 0. FRB2's <see cref="Tiled.TileMap"/> does this
+    /// unconditionally on every load (see its <c>AssignDefaultZ</c>), and has no map-level Z to
+    /// shift in the first place — only per-layer Z exists. The flag's requested effect already
+    /// always holds, so recognize it on a map and consume it instead of warning about a missing
+    /// property.
+    /// </summary>
+    private static bool IsShiftMapToMoveGameplayLayerToZ0NoOp(object instance, string memberName) =>
+        memberName == "ShiftMapToMoveGameplayLayerToZ0" && instance is Tiled.TileMap;
 
     /// <summary>Whether a property holds a loaded asset rather than a plain value.</summary>
     private static bool IsAssetType(Type type) =>
