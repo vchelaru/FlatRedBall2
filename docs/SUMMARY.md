@@ -1,6 +1,14 @@
 # Table of contents
 
-* [Setup](setup.md)
-* [Animation Editor](README.md)
-* [Your First Animation](your-first-animation.md)
-* [Loading and Drawing .achx/.achj Animations in MonoGame](loading-and-drawing-achx-animations.md)
+## FlatRedBall 2
+
+* [Setup](README.md)
+
+## AnimationEditor
+
+* [Animation Editor](animationeditor/readme.md)
+* [Your First Animation](animationeditor/your-first-animation.md)
+* [API](animationeditor/api/README.md)
+  * [Animations in MonoGame](animationeditor/api/loading-and-drawing-achx-animations.md)
+  * [Reading Raw Animation Data](animationeditor/api/reading-raw-animation-data.md)
+* [Page 1](animationeditor/page-1.md)

@@ -1,16 +1,24 @@
-# Loading and Drawing .achx/.achj Animations in MonoGame
+# Animations in MonoGame
 
 The Animation Editor saves animations as `.achx` (XML) or `.achj` (JSON) files. The `FlatRedBall.AnimationChain.MonoGame` NuGet package loads and plays these files in any MonoGame project. It has no dependency on the FlatRedBall2 engine or a game project structure — it works in a plain `Game` class.
 
-This page assumes you already have a `.achx` or `.achj` file and its spritesheet PNG, exported from Animation Editor.
+This page assumes you already have a `.achx` or `.achj` file and its spritesheet PNG, exported from Animation Editor. This page also assumes that you have an existing _XNA-like_ (MonoGame or KNI) project.
 
 ## Install the package
 
+{% tabs %}
+{% tab title="First Tab" %}
 ```
 dotnet add package FlatRedBall.AnimationChain.MonoGame
 ```
+{% endtab %}
 
-Targeting KNI or Blazor WASM instead? Use `FlatRedBall.AnimationChain.KNI`.
+{% tab title="KNI" %}
+```
+dotnet add package FlatRedBall.AnimationChain.Kni
+```
+{% endtab %}
+{% endtabs %}
 
 ## Add your files to the project
 
