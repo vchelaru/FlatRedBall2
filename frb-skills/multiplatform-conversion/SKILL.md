@@ -42,6 +42,8 @@ Desktop and BlazorGL both now target `net10.0`, so a single Common project can n
 
 See `samples/Solitaire/Solitaire.Common/` for a working example, including how its Gum content-copy `<Content Include>` items pick up `Link` metadata once the source path (`..\Content\...`) no longer matches the project's own directory.
 
+**Landmine: list every `ProjectReference` target as its own `<Project Path>` in the `.slnx`.** Visual Studio's IDE-hosted NuGet restore only walks `ProjectReference`s among projects that are themselves listed as solution members — a project that exists on disk and is correctly referenced but missing from the `.slnx` builds fine via `dotnet build`/CLI `msbuild` (both walk the full reference closure regardless of solution membership) but fails with NU1105 ("not part of the current solution") the moment someone opens the `.slnx` in Visual Studio. So `GameName.slnx` needs `GameName.Common\Kni\GameName.Common.Kni.csproj` listed explicitly alongside `GameName.Common.csproj`, not just the projects a human would think of as "the heads." `tests/FlatRedBall2.Tests/Packaging/SolutionMembershipTests.cs` checks this for every `.slnx` in this repo; there's no equivalent check for a downstream game project, so verify it by hand when scaffolding one.
+
 No `Version` attribute — the repo uses NuGet Central Package Management, so versions are pinned once in `Directory.Packages.props`, not per `PackageReference`.
 
 Common must NOT add `MonoGame.Content.Builder.Task` — that belongs on the heads that drive content compilation. `Apos.Shapes` needs no content-pipeline wiring at all — its shader is embedded in the assembly.

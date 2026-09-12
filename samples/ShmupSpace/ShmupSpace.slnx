@@ -1,8 +1,10 @@
 <Solution>
   <Project Path="../../src/FlatRedBall2.csproj" />
   <Project Path="../../src/FlatRedBall2.BlazorGL/FlatRedBall2.BlazorGL.csproj" />
+  <Project Path="../../src/Kni/FlatRedBall2.Kni.csproj" />
   <Project Path="../../src/AnimationChain.Common/AnimationChain.Common.csproj" />
   <Project Path="ShmupSpace.Common/ShmupSpace.Common.csproj" />
+  <Project Path="ShmupSpace.Common/Kni/ShmupSpace.Common.Kni.csproj" />
   <Project Path="ShmupSpace.Desktop/ShmupSpace.Desktop.csproj" />
   <Project Path="ShmupSpace.BlazorGL/ShmupSpace.BlazorGL.csproj" />
 </Solution>
