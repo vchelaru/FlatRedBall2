@@ -41,8 +41,8 @@ public enum TextureCoordinateType
 /// Deserialized representation of a .achx (XML) or .achj (JSON) animation file — the two
 /// on-disk dialects of the same data model. Load with <see cref="FromFile(string)"/> /
 /// <see cref="FromJsonFile(string)"/> and convert to runtime types with
-/// <c>ToAnimationChainList</c> (an extension method in the main FlatRedBall2 engine
-/// assembly — this type itself has no MonoGame dependency so tooling, like the
+/// <c>ToAnimationChainList</c> (an extension method in the <c>FlatRedBall.AnimationChain.MonoGame</c>
+/// package — this type itself has no MonoGame dependency so tooling, like the
 /// Animation Editor, can reference it without pulling MonoGame in at all).
 /// </summary>
 public class AnimationChainListSave

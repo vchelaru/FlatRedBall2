@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Only the pure-C# data/runtime package — no FlatRedBall2 engine, no AnimationChain.MonoGame. -->
+    <ProjectReference Include="..\..\src\AnimationChain.Common\AnimationChain.Common.csproj" />
+  </ItemGroup>
+  <!-- .achj is raw JSON — copy as-is, not through the content pipeline -->
+  <ItemGroup>
+    <Content Include="Content\hero.achj">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

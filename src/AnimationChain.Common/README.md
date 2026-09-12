@@ -10,7 +10,8 @@ its own texture handle type.
 
 Most users should install `FlatRedBall2.MonoGame` or `FlatRedBall2.Kni` instead; both reference
 this package automatically and provide the runtime bridge that turns these types into playable
-animations backed by real textures.
+animations backed by real textures. For the minimal DIY path -- raw MonoGame, no engine, no
+`FlatRedBall.AnimationChain.MonoGame` -- see `samples/AnimationChainCommonSample`.
 
 ## License
 
