@@ -63,4 +63,15 @@ public class EngineInitSettings
     /// on a web target.
     /// </summary>
     public bool UseFontOversampling { get; init; } = false;
+
+    /// <summary>
+    /// Records a load-time breakdown during boot and prints it once the start-up screen has
+    /// finished loading — see <see cref="FlatRedBallService.StartupTiming"/>. Off by default.
+    /// <para>
+    /// Enabling has to happen here rather than on the profiler itself: the phases worth measuring
+    /// run inside <see cref="FlatRedBallService.Initialize(Microsoft.Xna.Framework.Game, EngineInitSettings)"/>,
+    /// so switching it on afterwards would miss all of them.
+    /// </para>
+    /// </summary>
+    public bool ProfileStartup { get; init; } = false;
 }

@@ -1,6 +1,6 @@
 ---
 name: performance
-description: FlatRedBallService.Performance — opt-in rolling FPS/timing/collision stats. Triggers: PerformanceMonitor, GenerateReport, FPS, frame time, DeepCollisionCount, "why is my game slow".
+description: FlatRedBallService.Performance — opt-in rolling FPS/timing/collision stats; StartupProfiler for one-time boot/load timing. Triggers: PerformanceMonitor, GenerateReport, FPS, frame time, DeepCollisionCount, StartupProfiler, ProfileStartup, "why is my game slow", "slow to load".
 ---
 
 # Performance Monitoring
@@ -32,3 +32,13 @@ Set `PlatformLabel` from the host — the engine targets `net10.0` and cannot re
 Every row in the collision report carries a `PartitionStatus`. `Unpartitioned` is the only value worth acting on, and the fix is to set the same `Factory<T>.PartitionAxis` on both sides of the relationship. `NotApplicable` means one side is not a factory, such as a `TileShapes`, a single entity, or a plain `List<T>`, so no axis setting would change it. See the `collision-relationships` skill.
 
 See `src/Diagnostics/FrameProfile.cs` for the underlying per-frame timing struct.
+
+## Startup timing (boot, not per-frame)
+
+`FlatRedBallService.Default.StartupTiming` (a `StartupProfiler`, `src/Diagnostics/StartupProfiler.cs`) times boot and load once — for "why does my game take so long to start," not runtime FPS.
+
+Enable via `EngineInitSettings.ProfileStartup = true` passed to `Initialize`, not on the profiler itself — profiling must be on before `Initialize` opens its first phase, so there's no turning it on afterward.
+
+The report prints itself automatically, once, right after the first screen finishes loading — don't call `GenerateReport()` yourself, and it won't fire again on later screen transitions.
+
+Game code can wrap its own slow `CustomInitialize` work in `BeginPhase`/`EndPhase` to show up in the same report.
