@@ -4,6 +4,7 @@ using FlatRedBall2.Collision;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
 using FlatRedBall2.Rendering;
+using FlatRedBall2.Tiled;
 using Shouldly;
 using Xunit;
 using XnaColor = Microsoft.Xna.Framework.Color;
@@ -21,6 +22,49 @@ public class GlueObjectBuilderTests
     {
         var diagnostics = new List<GlueLoadDiagnostic>();
         return (new GlueObjectBuilder(diagnostics), diagnostics);
+    }
+
+    [Fact]
+    public void ApplyInstructions_ShiftMapToMoveGameplayLayerToZ0OnATileMap_DoesNotWarnAndLeavesGameplayLayerAtZ0()
+    {
+        // FRB1 generates code that shifts the whole map's Z so "GameplayLayer" lands at Z = 0.
+        // FRB2's TileMap does this unconditionally on every load (AssignDefaultZ), so the instruction
+        // has nothing to write to but nothing left to do either — it should be consumed, not warned
+        // about. "Background" ahead of it in TMX order gives GameplayLayer a nonzero index to shift
+        // away from, so the assertion is not trivially true regardless of the fix.
+        var (builder, diagnostics) = NewBuilder();
+        var layers = new List<TileMapLayer> { new("Background"), new("GameplayLayer") };
+        var map = new TileMap(width: 160f, height: 160f, tileWidth: 16, tileHeight: 16, layers);
+        var save = Save(@"{
+            ""InstanceName"": ""Map"",
+            ""InstructionSaves"": [
+                { ""Type"": ""bool"", ""Member"": ""ShiftMapToMoveGameplayLayerToZ0"", ""Value"": true }
+            ]
+        }");
+
+        builder.ApplyInstructions(map, save, elementName: null);
+
+        diagnostics.ShouldBeEmpty();
+        map.GetLayer("GameplayLayer").Z.ShouldBe(0f);
+    }
+
+    [Fact]
+    public void ApplyInstructions_ShiftMapToMoveGameplayLayerToZ0OnANonTileMap_StillWarns()
+    {
+        // The no-op is scoped to TileMap specifically -- on any other instance the name is still an
+        // unrecognized member and should warn like any other, so a real typo elsewhere isn't masked.
+        var (builder, diagnostics) = NewBuilder();
+        var save = Save(@"{
+            ""InstanceName"": ""CircleInstance"",
+            ""SourceClassType"": ""FlatRedBall.Math.Geometry.Circle"",
+            ""InstructionSaves"": [
+                { ""Type"": ""bool"", ""Member"": ""ShiftMapToMoveGameplayLayerToZ0"", ""Value"": true }
+            ]
+        }");
+
+        builder.Create(save).ShouldNotBeNull();
+
+        diagnostics.ShouldContain(d => d.Message.Contains("ShiftMapToMoveGameplayLayerToZ0"));
     }
 
     [Fact]
