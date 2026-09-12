@@ -249,14 +249,16 @@ public static class GlueProjectLoader
             // unmapped — it is built from that element's own data.
             bool isKnownElement = elementNames.Contains(typeName.ToElementNameCandidate());
 
-            // Tile objects and collision relationships are not in GlueTypeMap because they are not
-            // constructed from a CLR type — a map comes from a file, a collection is derived from a
-            // map, and a relationship is registered rather than instantiated. Counting them as
-            // unmapped would report as missing the very things that now work.
+            // Tile objects, collision relationships, and lists are not in GlueTypeMap because they
+            // are not constructed from a CLR type — a map comes from a file, a collection is derived
+            // from a map, a relationship is registered rather than instantiated, and a list is a
+            // plain List<object> GlueElementBuilder builds directly. Counting them as unmapped would
+            // report as missing the very things that now work.
             bool isBuiltElsewhere =
                 GlueTileBuilder.IsTileObject(namedObject) ||
                 GlueCollisionBuilder.IsRelationship(namedObject) ||
-                GlueGumResolver.IsGumObject(namedObject);
+                GlueGumResolver.IsGumObject(namedObject) ||
+                namedObject.IsList;
 
             if (!isKnownElement && !isBuiltElsewhere && !GlueTypeMap.TryGetType(typeName, out _))
             {
