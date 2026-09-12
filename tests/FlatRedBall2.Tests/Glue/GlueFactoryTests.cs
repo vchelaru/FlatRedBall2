@@ -128,4 +128,22 @@ public class GlueFactoryTests
         player.ShouldNotBeSameAs(door);
         player.GlueName.ShouldBe(playerName);
     }
+
+    // TwoLists' ListA and ListC are both Entities\Blob and both AssociateWithFactory=true (G82): a
+    // spawn naming no particular list is FRB1's ListsToAddTo, one instance feeding every associated
+    // list of its type at once, not a single owner.
+    [Fact]
+    public void CreateEntity_WithNoExplicitList_JoinsEveryAssociatedListOfItsType()
+    {
+        var engine = new FlatRedBallService();
+        var project = GlueProject.Load(Path.Combine(
+            AppContext.BaseDirectory, "Glue", "Fixtures", "TwoLists", "TwoLists.gluj"));
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s => { s.Save = project.StartUpScreen; s.Project = project; });
+
+        var spawned = project.CreateEntity(@"Entities\Blob", engine.CurrentScreen);
+
+        project.InstancesOfList("ListA").ShouldContain(spawned);
+        project.InstancesOfList("ListC").ShouldContain(spawned);
+    }
 }

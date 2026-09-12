@@ -22,6 +22,8 @@ public sealed class GlueProject
     private readonly Dictionary<string, ScreenSave> _screens = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, EntitySave> _entities = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntity>> _instances = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<GlueEntity>> _listInstances = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<string>> _factoryListsByEntityType = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<GlueEntity>> _pool = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<GlueLoadDiagnostic> _diagnostics = new();
 
@@ -38,6 +40,39 @@ public sealed class GlueProject
             _entities[entity.Name!] = entity;
 
         content?.LoadGlobalFiles(result.Project.GlobalFiles, _diagnostics);
+
+        foreach (var screen in result.Project.Screens)
+            IndexFactoryLists(screen.NamedObjects);
+
+        foreach (var entity in result.Project.Entities)
+            IndexFactoryLists(entity.NamedObjects);
+    }
+
+    /// <summary>
+    /// Indexes every list whose author opted it into factory spawning
+    /// (<see cref="Model.NamedObjectSave.AssociateWithFactory"/>), keyed by the entity type it holds.
+    /// </summary>
+    /// <remarks>
+    /// Top-level only, matching where Glue actually declares lists — the same scope
+    /// <see cref="GlueElementBuilder"/> uses. A type can have any number of associated lists at once
+    /// (G82): a generic spawn (<see cref="CreateEntity(string, Screen, string?)"/> with no explicit
+    /// list) joins every one of them, mirroring FRB1's <c>ListsToAddTo</c>.
+    /// </remarks>
+    private void IndexFactoryLists(List<NamedObjectSave> namedObjects)
+    {
+        foreach (var save in namedObjects)
+        {
+            if (!save.IsList || !save.AssociateWithFactory ||
+                string.IsNullOrEmpty(save.SourceClassGenericType) || string.IsNullOrEmpty(save.InstanceName))
+            {
+                continue;
+            }
+
+            if (!_factoryListsByEntityType.TryGetValue(save.SourceClassGenericType, out var listNames))
+                _factoryListsByEntityType[save.SourceClassGenericType] = listNames = new List<string>();
+
+            listNames.Add(save.InstanceName);
+        }
     }
 
     /// <summary>The raw load result.</summary>
@@ -113,6 +148,28 @@ public sealed class GlueProject
         return list;
     }
 
+    /// <summary>Every live instance tracked under the named Glue list <paramref name="listName"/>.</summary>
+    /// <remarks>
+    /// Distinct from <see cref="InstancesOf"/>, which is keyed by entity type and so cannot tell two
+    /// differently-named lists of the same type apart. This is keyed by the list's own Glue instance
+    /// name instead — the identity a collision relationship actually binds to — so
+    /// <c>WaveOneEnemies</c> and <c>WaveTwoEnemies</c>, both <c>Entities\Enemy</c>, stay separate
+    /// collections even though they hold the same type.
+    /// <para>An entity can be live in more than one named list at once: one it was declared a member
+    /// of, and/or any list of its type that opted into
+    /// <see cref="Model.NamedObjectSave.AssociateWithFactory"/> — see
+    /// <see cref="CreateEntity(string, Screen, string?)"/>. Same lazy-create-and-cache behavior as
+    /// <see cref="InstancesOf"/>: a relationship can bind to a list name before anything has been
+    /// spawned into it.</para>
+    /// </remarks>
+    public IReadOnlyList<GlueEntity> InstancesOfList(string listName)
+    {
+        if (!_listInstances.TryGetValue(listName, out var list))
+            _listInstances[listName] = list = new List<GlueEntity>();
+
+        return list;
+    }
+
     /// <summary>
     /// The screen <paramref name="screen"/> names as the one to advance to, or null when it names
     /// none — Glue's own idiom for level progression.
@@ -148,14 +205,25 @@ public sealed class GlueProject
     /// entity. Registration order matches the engine's: the screen owns it, and destroying it
     /// removes it from this project's instance list.
     /// </remarks>
+    /// <param name="glueName">The entity's Glue name, e.g. <c>Entities\Enemy</c>.</param>
+    /// <param name="screen">The screen to register the entity on.</param>
+    /// <param name="listName">
+    /// The one Glue list this instance is already known to be a declared member of — used when
+    /// building a list's own authored member, whose placement is unambiguous. Leave this null for an
+    /// ordinary spawn (the call game code makes at runtime, mirroring FRB1's
+    /// <c>&lt;Entity&gt;Factory.CreateNew()</c>): the instance then joins every list of this entity
+    /// type that opted into <see cref="Model.NamedObjectSave.AssociateWithFactory"/> — none, one, or
+    /// several. Either way the entity is always tracked under <see cref="InstancesOf"/> by type. See
+    /// <see cref="InstancesOfList"/>.
+    /// </param>
     /// <exception cref="ArgumentException">No element has that name.</exception>
     /// <exception cref="InvalidOperationException">The element is abstract.</exception>
-    public GlueEntity CreateEntity(string glueName, Screen screen)
+    public GlueEntity CreateEntity(string glueName, Screen screen, string? listName = null)
     {
         var save = FindEntity(glueName)
             ?? throw UnknownName(glueName, "entity", _entities.Keys);
 
-        return CreateEntity(save, screen);
+        return CreateEntity(save, screen, listName);
     }
 
     /// <summary>
@@ -165,7 +233,7 @@ public sealed class GlueProject
     /// For callers already iterating the project's elements — looking the name back up would repeat
     /// work, and would fail outright for a save whose name no longer matches its dictionary key.
     /// </remarks>
-    internal GlueEntity CreateEntity(EntitySave save, Screen screen)
+    internal GlueEntity CreateEntity(EntitySave save, Screen screen, string? listName = null)
     {
         if (save.IsAbstract)
         {
@@ -189,7 +257,34 @@ public sealed class GlueProject
         entity._onDestroy = () => Release(entity);
 
         Track(save.Name!, entity);
+        JoinLists(save, entity, listName);
+
         return entity;
+    }
+
+    /// <summary>
+    /// Adds a newly created entity to the named list(s) it belongs to.
+    /// </summary>
+    /// <remarks>
+    /// A list's own declared member always names its list explicitly (threaded down from
+    /// <see cref="GlueElementBuilder"/>), so its placement is never inferred here. An ordinary spawn
+    /// gives no list — that is the signal to fall back to
+    /// <see cref="Model.NamedObjectSave.AssociateWithFactory"/> and join every associated list of this
+    /// type, which may be none, one, or several (G82).
+    /// </remarks>
+    private void JoinLists(EntitySave save, GlueEntity entity, string? listName)
+    {
+        if (listName is not null)
+        {
+            TrackInList(listName, entity);
+            return;
+        }
+
+        if (save.Name is not null && _factoryListsByEntityType.TryGetValue(save.Name, out var listNames))
+        {
+            foreach (var name in listNames)
+                TrackInList(name, entity);
+        }
     }
 
     /// <summary>
@@ -247,6 +342,14 @@ public sealed class GlueProject
         list.Add(entity);
     }
 
+    private void TrackInList(string listName, GlueEntity entity)
+    {
+        if (!_listInstances.TryGetValue(listName, out var list))
+            _listInstances[listName] = list = new List<GlueEntity>();
+
+        list.Add(entity);
+    }
+
     /// <summary>
     /// Drops a destroyed instance from the live list, and keeps its shell if the element is pooled.
     /// </summary>
@@ -267,10 +370,18 @@ public sealed class GlueProject
     }
 
     /// <summary>Forgets a destroyed instance, so a relationship does not keep collecting corpses.</summary>
+    /// <remarks>
+    /// Removed from every named list, not just its type-wide one — an entity can be live in several
+    /// lists at once (G82) and nothing records which, so this checks them all. Lists per project are
+    /// few, so the scan costs nothing worth avoiding.
+    /// </remarks>
     internal void Forget(GlueEntity entity)
     {
         if (entity.GlueName is not null && _instances.TryGetValue(entity.GlueName, out var list))
             list.Remove(entity);
+
+        foreach (var namedList in _listInstances.Values)
+            namedList.Remove(entity);
     }
 
     /// <summary>

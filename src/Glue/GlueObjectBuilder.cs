@@ -45,8 +45,16 @@ public sealed class GlueObjectBuilder
     /// <summary>
     /// Constructs and configures an instance without attaching or registering it.
     /// </summary>
+    /// <param name="save">The object to build.</param>
+    /// <param name="elementName">The owning screen or entity's Glue name, for diagnostics.</param>
+    /// <param name="listName">
+    /// The Glue list <paramref name="save"/> is a member of, if any — threaded through to
+    /// <see cref="GlueProject.CreateEntity(string, Screen, string?)"/> when this builds a nested
+    /// entity, so a design-time-placed list member is as visible to a relationship bound to that
+    /// list's name as one spawned into it at runtime.
+    /// </param>
     /// <returns>The configured instance, or null if this build cannot construct that type.</returns>
-    public object? Create(NamedObjectSave save, string? elementName = null)
+    public object? Create(NamedObjectSave save, string? elementName = null, string? listName = null)
     {
         var typeName = GlueTypeName.Parse(save.SourceClassType);
 
@@ -58,7 +66,7 @@ public sealed class GlueObjectBuilder
         // An object whose type names another element is a nested entity — built from that element's
         // own data rather than constructed from a CLR type.
         if (typeName.IsElementReference)
-            return CreateNestedEntity(save, elementName);
+            return CreateNestedEntity(save, elementName, listName);
 
         if (!GlueTypeMap.TryCreate(typeName, out object? instance))
         {
@@ -286,7 +294,7 @@ public sealed class GlueObjectBuilder
     /// either, this reports and skips — which is what every build did before a project context
     /// existed.
     /// </remarks>
-    private object? CreateNestedEntity(NamedObjectSave save, string? elementName)
+    private object? CreateNestedEntity(NamedObjectSave save, string? elementName, string? listName)
     {
         if (_project is null || _owningScreen is null)
         {
@@ -311,7 +319,7 @@ public sealed class GlueObjectBuilder
             return null;
         }
 
-        var entity = _project.CreateEntity(referenced.Name!, _owningScreen);
+        var entity = _project.CreateEntity(referenced.Name!, _owningScreen, listName);
 
         // The instance's own instructions layer on top of the entity's authored values.
         ApplyInstructions(entity, save, elementName);

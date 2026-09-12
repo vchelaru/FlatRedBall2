@@ -132,7 +132,7 @@ internal static class GlueTileBuilder
     /// Glue matches a tile's type against an entity's name, so a tile typed <c>Door</c> spawns
     /// <c>Entities\Door</c>. Tiles are located with the same by-class query collision uses, which is
     /// what keeps the two consistent.
-    /// <para>Spawning goes through <see cref="GlueProject.CreateEntity(EntitySave, Screen)"/> rather than
+    /// <para>Spawning goes through <see cref="GlueProject.CreateEntity(EntitySave, Screen, string?)"/> rather than
     /// <see cref="TileMap.CreateEntities{T}"/>: the latter needs a <c>Factory&lt;T&gt;</c>, and every
     /// loaded entity is a <see cref="GlueEntity"/>, so one factory could not tell a Door from a
     /// Player (Phase 8 G80).</para>

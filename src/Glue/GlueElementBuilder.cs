@@ -106,9 +106,10 @@ internal static class GlueElementBuilder
     /// and this phase does not need one.
     /// </summary>
     /// <remarks>
-    /// Members are built but not registered anywhere: a list in Glue is usually a spawn pool whose
-    /// contents an entity factory owns, which is Phase 8. Anything unbuildable — most commonly a
-    /// nested entity, which needs Phase 6 — is reported and skipped.
+    /// Members are built but not registered anywhere here. A nested entity member is the exception —
+    /// it is registered on its owning screen as a side effect of being created (see
+    /// <see cref="GlueObjectBuilder.Create"/>), and is told which list it joined so a collision
+    /// relationship bound to this list's name (<see cref="GlueProject.InstancesOfList"/>) sees it.
     /// </remarks>
     private static object BuildList(
         GlueObjectBuilder builder,
@@ -120,7 +121,7 @@ internal static class GlueElementBuilder
 
         foreach (var contained in save.ContainedObjects)
         {
-            object? item = builder.Create(contained, elementName);
+            object? item = builder.Create(contained, elementName, listName: save.InstanceName);
             if (item is not null)
                 items.Add(item);
         }
