@@ -103,6 +103,17 @@ public class ReferencedFileSave
         TreatAsCsv ||
         (Name is not null && Name.EndsWith(".csv", System.StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// Whether a CSV should load as a dictionary keyed by its required column, rather than as plain
+    /// text. Glue writes this two ways depending on which UI authored the file: <see cref="CreatesDictionary"/>
+    /// directly, or a <c>CreationOptions</c> property. The property's value is the JSON string
+    /// <c>"\"Dictionary\""</c> — Glue double-quotes it, so the decoded string itself still has
+    /// literal quote characters around <c>Dictionary</c>.
+    /// </summary>
+    [JsonIgnore]
+    public bool CreatesCsvDictionary =>
+        CreatesDictionary || Properties.GetValue<string>("CreationOptions") == "\"Dictionary\"";
+
     /// <inheritdoc />
     public override string ToString() => Name ?? base.ToString()!;
 }

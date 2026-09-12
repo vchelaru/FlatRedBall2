@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
+using FlatRedBall2.IO;
 using Microsoft.Xna.Framework.Graphics;
 using Shouldly;
 using Xunit;
@@ -37,6 +39,38 @@ public class GlueContentTests
             return null;
 
         return new GlueContentSource(_graphics.ContentLoader!, FixtureDirectory(project));
+    }
+
+    [Fact]
+    public void CreatesCsvDictionary_CreationOptionsPropertyIsTheQuotedStringDictionary_ReturnsTrue()
+    {
+        // Glue writes this flag two ways depending on which UI authored the file. Real projects
+        // (e.g. KidDefense's LocalizationDatabase.csv) use this one, and the property's JSON value
+        // is a string that itself contains literal quote characters: "\"Dictionary\"".
+        string json = @"{
+            ""Name"": ""GlobalContent/Localization.csv"",
+            ""Properties"": [ { ""Name"": ""CreationOptions"", ""Value"": ""\""Dictionary\"""" } ]
+        }";
+
+        var file = JsonSerializer.Deserialize(json, GlueJsonContext.Default.ReferencedFileSave)!;
+
+        file.CreatesCsvDictionary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CreatesCsvDictionary_CreatesDictionaryIsTrue_ReturnsTrue()
+    {
+        var file = new ReferencedFileSave { Name = "GlobalContent/TechTreeUnlocks.csv", CreatesDictionary = true };
+
+        file.CreatesCsvDictionary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CreatesCsvDictionary_NeitherFlagSet_ReturnsFalse()
+    {
+        var file = new ReferencedFileSave { Name = "GlobalContent/Plain.csv" };
+
+        file.CreatesCsvDictionary.ShouldBeFalse();
     }
 
     [Fact]
@@ -111,6 +145,32 @@ public class GlueContentTests
 
         csv.ShouldNotBeNull();
         csv.ShouldContain("MaxSpeedX");
+    }
+
+    [Fact]
+    public void Load_CsvReferencedFileWithCreatesDictionary_IsAddressableAsATypedRowDictionary()
+    {
+        // PlatformerValuesStatic.csv's ReferencedFileSave sets CreatesDictionary: true, so its rows
+        // should also be reachable as CsvRows keyed by the required "Name" column, each column
+        // converted per its header's declared type rather than left as text.
+        var source = SourceFor("DoorsDemo");
+        if (source is null)
+            return;
+
+        var entity = new GlueEntity
+        {
+            Save = LoadFixtureEntity("DoorsDemo", "Player.glej"),
+            Content = source,
+        };
+
+        entity.BuildObjects();
+
+        var rows = entity.Content!.Get<Dictionary<string, CsvRow>>("PlatformerValuesStatic");
+
+        rows.ShouldNotBeNull();
+        rows.ShouldContainKey("Ground");
+        rows["Ground"].Get<float>("MaxSpeedX").ShouldBe(100f);
+        rows["Ground"].Get<bool>("JumpApplyByButtonHold").ShouldBeTrue();
     }
 
     [Fact]
