@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using FlatRedBall2.AnimationEditorCommon;
 using FlatRedBall2.Glue.Model;
+using FlatRedBall2.IO;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace FlatRedBall2.Glue;
@@ -218,7 +219,18 @@ public sealed class GlueContentSource
                     break;
 
                 case ".csv":
-                    _text[instanceName] = ReadAllText(path);
+                    string text = ReadAllText(path);
+                    _text[instanceName] = text;
+
+                    if (file.CreatesCsvDictionary)
+                    {
+                        _assets[instanceName] = CsvTable.Parse(text).ToDictionary(header =>
+                            Warn(diagnostics, elementName,
+                                $"'{file.Name}' column '{header.Name}' declares type " +
+                                $"'{header.Type}', which could not be resolved; its values are " +
+                                "kept as raw text."));
+                    }
+
                     break;
 
                 default:
