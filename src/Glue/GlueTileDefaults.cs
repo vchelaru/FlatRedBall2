@@ -84,6 +84,17 @@ internal static class GlueTileDefaults
     internal static string? CollisionLayerName(NamedObjectSave save) =>
         save.Properties.GetValue<string>("CollisionLayerName");
 
+    /// <summary>
+    /// The tile type whose tiles become geometry, under
+    /// <see cref="CollisionCreationOptions.FromMapCollision"/>. Despite the name, this is the same
+    /// kind of value as <see cref="CollisionTileTypeName"/> (a tile Class) — FRB1's own codegen
+    /// clones an already-built <c>TileShapeCollection</c> out of the map's <c>Collisions</c> list by
+    /// this name rather than querying tiles on demand, but the geometry it produces is identical to
+    /// <see cref="CollisionCreationOptions.FromType"/> with the same Class.
+    /// </summary>
+    internal static string? MapCollisionName(NamedObjectSave save) =>
+        save.Properties.GetValue<string>("TmxCollisionName");
+
     /// <summary>Grid size. Absent means 16, never 0.</summary>
     internal static float CollisionTileSize(NamedObjectSave save) =>
         Or(save, "CollisionTileSize", 16f);
