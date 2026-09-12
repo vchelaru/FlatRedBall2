@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using FlatRedBall2.Audio;
 using FlatRedBall2.Glue;
 using FlatRedBall2.Glue.Model;
 using FlatRedBall2.IO;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Media;
 using Shouldly;
 using Xunit;
 
@@ -219,6 +222,29 @@ public class GlueContentTests
     }
 
     [Fact]
+    public void Load_OggReferencedFile_ReachesSongFromUriRatherThanTheSilentDefault()
+    {
+        // No vendored fixture decodes to real audio (constructing a valid Vorbis bitstream by hand
+        // isn't practical), so the fixture is a placeholder file that fails to decode. That still
+        // proves the .ogg branch is reached — Song.FromUri reads the container eagerly and throws a
+        // container/codec-specific ArgumentException, caught and reported same as any other asset,
+        // rather than the extension silently falling into the old default: case with no diagnostic
+        // at all.
+        var source = SourceFor("DoorsDemo");
+        if (source is null)
+            return;
+
+        var save = new EntitySave { Name = "Entities/Test" };
+        save.ReferencedFiles.Add(new ReferencedFileSave { Name = "GlobalContent/Audio/Music/Theme.ogg" });
+
+        var entity = new GlueEntity { Save = save, Content = source };
+        entity.BuildObjects();
+
+        entity.BuildDiagnostics.ShouldContain(d =>
+            d.Severity == GlueDiagnosticSeverity.Warning && d.Message.Contains("Theme.ogg"));
+    }
+
+    [Fact]
     public void Load_ProjectGlobalFiles_LoadsEntriesOtherThanTheGumProjectToo()
     {
         // GlobalFiles is a project-level ReferencedFileSave list, same shape as an element's own
@@ -280,5 +306,44 @@ public class GlueContentTests
 
         sprite.Texture.ShouldNotBeNull();
         sprite.Texture.ShouldBeOfType<Texture2D>();
+    }
+
+    [Fact]
+    public void Load_WavReferencedFile_ResolvesAsAPlayableSoundEffect()
+    {
+        var source = SourceFor("DoorsDemo");
+        if (source is null)
+            return;
+
+        var save = new EntitySave { Name = "Entities/Test" };
+        save.ReferencedFiles.Add(new ReferencedFileSave { Name = "GlobalContent/Audio/Sfx/hit.wav" });
+
+        var entity = new GlueEntity { Save = save, Content = source };
+        entity.BuildObjects();
+
+        var soundEffect = source.Get<SoundEffect>("hit");
+        soundEffect.ShouldNotBeNull();
+        Should.NotThrow(() => new AudioManager().Play(soundEffect));
+    }
+
+    [Fact]
+    public void Load_WildcardGlobalFilesEntry_ExpandsAndLoadsEachMatch()
+    {
+        // Mirrors the real GlobalFiles entry from #1085: "GlobalContent/Audio/Sfx/**/*.wav" written
+        // literally as the Name, with two .wav files at different depths under Sfx/.
+        var source = SourceFor("DoorsDemo");
+        if (source is null)
+            return;
+
+        var save = new EntitySave { Name = "Entities/Test" };
+        save.ReferencedFiles.Add(
+            new ReferencedFileSave { Name = "GlobalContent/Audio/Sfx/**/*.wav" });
+
+        var entity = new GlueEntity { Save = save, Content = source };
+        entity.BuildObjects();
+
+        source.Get<SoundEffect>("hit").ShouldNotBeNull();
+        source.Get<SoundEffect>("boom").ShouldNotBeNull();
+        entity.BuildDiagnostics.ShouldNotContain(d => d.Severity == GlueDiagnosticSeverity.Warning);
     }
 }
