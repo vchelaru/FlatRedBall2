@@ -34,7 +34,7 @@ public class SolutionMembershipTests
         {
             var slnxDir = Path.GetDirectoryName(slnxPath)!;
             var listedProjectPaths = Regex.Matches(File.ReadAllText(slnxPath), @"<Project\s+Path=""([^""]+)""")
-                .Select(match => match.Groups[1].Value)
+                .Select(match => ToPortablePath(match.Groups[1].Value))
                 .ToList();
 
             var listedAbsolutePaths = listedProjectPaths
@@ -52,7 +52,7 @@ public class SolutionMembershipTests
                 var csprojDir = Path.GetDirectoryName(csprojPath)!;
                 var referencedPaths = Regex.Matches(
                         File.ReadAllText(csprojPath), @"<ProjectReference\s+Include=""([^""]+)""")
-                    .Select(match => match.Groups[1].Value);
+                    .Select(match => ToPortablePath(match.Groups[1].Value));
 
                 foreach (var referencedPath in referencedPaths)
                 {
@@ -78,4 +78,9 @@ public class SolutionMembershipTests
 
     private static string NormalizePath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+
+    // Project files in this repo use Windows-style '\' separators, which System.IO.Path treats as
+    // a literal character (not a separator) on Linux CI runners. Convert to '/' first so
+    // Path.Combine/GetFullPath resolve identically on every OS.
+    private static string ToPortablePath(string path) => path.Replace('\\', '/');
 }
