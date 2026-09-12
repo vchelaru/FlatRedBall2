@@ -67,6 +67,53 @@ public class GlueContentTests
     }
 
     [Fact]
+    public void Load_ContentRootThatCannotBeOpened_WarnsRatherThanKillingTheLoad()
+    {
+        // An absolute root makes TitleContainer throw ArgumentException rather than an IO error.
+        // Letting it escape takes down the whole element load, which breaks the loader's central
+        // promise that a bad asset costs you that asset and nothing else.
+        if (!_graphics.IsAvailable)
+            return;
+
+        var source = new GlueContentSource(
+            _graphics.ContentLoader!,
+            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "Content"));
+
+        var entity = new GlueEntity
+        {
+            Save = LoadFixtureEntity("DoorsDemo", "Door.glej"),
+            Content = source,
+        };
+
+        Should.NotThrow(() => entity.BuildObjects());
+
+        entity.Objects.ShouldContainKey("SpriteInstance");
+        entity.BuildDiagnostics.ShouldContain(d => d.Severity == GlueDiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void Load_CsvReferencedFile_IsAddressableAsText()
+    {
+        // Phase 4 makes the file available; Phases 11 and 12 parse the rows.
+        var source = SourceFor("DoorsDemo");
+        if (source is null)
+            return;
+
+        var entity = new GlueEntity
+        {
+            Save = LoadFixtureEntity("DoorsDemo", "Player.glej"),
+            Content = source,
+        };
+
+        entity.BuildObjects();
+
+        string? csv = entity.Content!.GetText("PlatformerValuesStatic");
+
+        csv.ShouldNotBeNull();
+        csv.ShouldContain("MaxSpeedX");
+    }
+
+    [Fact]
     public void Load_DoorsDemoDoor_ResolvesItsAnimationChainListAndPlaysTheAuthoredChain()
     {
         // Door.glej names its .achx by instance name in an AnimationChains instruction, then names
@@ -112,31 +159,6 @@ public class GlueContentTests
     }
 
     [Fact]
-    public void Load_ContentRootThatCannotBeOpened_WarnsRatherThanKillingTheLoad()
-    {
-        // An absolute root makes TitleContainer throw ArgumentException rather than an IO error.
-        // Letting it escape takes down the whole element load, which breaks the loader's central
-        // promise that a bad asset costs you that asset and nothing else.
-        if (!_graphics.IsAvailable)
-            return;
-
-        var source = new GlueContentSource(
-            _graphics.ContentLoader!,
-            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "Content"));
-
-        var entity = new GlueEntity
-        {
-            Save = LoadFixtureEntity("DoorsDemo", "Door.glej"),
-            Content = source,
-        };
-
-        Should.NotThrow(() => entity.BuildObjects());
-
-        entity.Objects.ShouldContainKey("SpriteInstance");
-        entity.BuildDiagnostics.ShouldContain(d => d.Severity == GlueDiagnosticSeverity.Warning);
-    }
-
-    [Fact]
     public void Load_ReferencedFileNotLoadedAtRuntime_IsSkipped()
     {
         var source = SourceFor("DoorsDemo");
@@ -152,28 +174,6 @@ public class GlueContentTests
         var sprite = (FlatRedBall2.Rendering.Sprite)entity.Objects["SpriteInstance"];
 
         sprite.AnimationChains.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Load_CsvReferencedFile_IsAddressableAsText()
-    {
-        // Phase 4 makes the file available; Phases 11 and 12 parse the rows.
-        var source = SourceFor("DoorsDemo");
-        if (source is null)
-            return;
-
-        var entity = new GlueEntity
-        {
-            Save = LoadFixtureEntity("DoorsDemo", "Player.glej"),
-            Content = source,
-        };
-
-        entity.BuildObjects();
-
-        string? csv = entity.Content!.GetText("PlatformerValuesStatic");
-
-        csv.ShouldNotBeNull();
-        csv.ShouldContain("MaxSpeedX");
     }
 
     [Fact]
