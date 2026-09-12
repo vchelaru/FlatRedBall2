@@ -197,6 +197,42 @@ public class GlueTiledTests
             d => d.Message.Contains("FromLayer") && d.Message.Contains("does not support"));
     }
 
+    // FRB1's TileEntityInstantiator.ApplyPropertiesTo tries every one of a tile's properties against
+    // the entity via reflection and silently drops whichever don't match an existing member. A loaded
+    // GlueEntity has no compiled members for its authored variables, so the FRB2 equivalent of "an
+    // existing member" is a declared CustomVariable by that name -- StandardTileset's SolidCollision
+    // tile (id 0) carries a real "Worth" property for this reason, rather than an arranged one.
+    [Fact]
+    public void CreateEntitiesFromTiles_ATilePropertyMatchingACustomVariable_AppliesItToTheSpawnedEntity()
+    {
+        if (!_graphics.IsAvailable)
+            return;
+
+        var project = GlueProject.Load(
+            Path.Combine(AppContext.BaseDirectory, "Glue", "Fixtures", "DoorsDemo", "DoorsDemo.gluj"),
+            new GlueContentSource(
+                _graphics.ContentLoader!, Path.Combine("Glue", "Fixtures", "DoorsDemo", "Content"),
+                _graphics.GraphicsDevice));
+
+        var door = project.FindEntity(@"Entities\Door")!;
+        door.Name = @"Entities\SolidCollision";
+        door.CustomVariables.Add(new CustomVariable { Name = "Worth" });
+
+        var engine = new FlatRedBallService();
+        engine.GlueProject = project;
+        engine.Start<GlueScreen>(s =>
+        {
+            s.Save = project.FindScreen(@"Screens\Level1");
+            s.Project = project;
+        });
+
+        var spawned = project.InstancesOf(@"Entities\SolidCollision");
+
+        spawned.ShouldNotBeEmpty();
+        foreach (var instance in spawned)
+            instance.Get<int>("Worth").ShouldBe(50);
+    }
+
     // Glue spawns an entity for every tile whose type names one. No vendored map paints a tile typed
     // after an entity -- DoorsDemo places its doors as NamedObjects -- so the rule is exercised by
     // renaming a real entity to match a tile type the map really does use. The tiles, the lookup and
