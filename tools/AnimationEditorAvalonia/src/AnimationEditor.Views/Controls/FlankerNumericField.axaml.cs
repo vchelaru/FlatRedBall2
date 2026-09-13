@@ -79,12 +79,23 @@ public partial class FlankerNumericField : UserControl
     /// _suppressPropRefresh around SetValueOrMixed).</summary>
     public event EventHandler? ValueChanged;
 
+    /// <summary>Matches ThemeStyles.axaml's global <c>Button:disabled</c> Opacity so a disabled
+    /// field's uniform fade (see <see cref="OnIsEnabledChanged"/>) reads the same as every other
+    /// disabled control in the app.</summary>
+    private const double DisabledOpacity = 0.35;
+
     static FlankerNumericField()
     {
         // Registered once per type (not per instance) -- AvaloniaProperty.Changed is a shared,
         // class-wide observable, so subscribing inside the instance constructor would add one
         // handler per instance created and fire N times once N instances exist.
         ValueProperty.Changed.AddClassHandler<FlankerNumericField>((c, _) => c.OnValueChanged());
+
+        // #1114: dims the whole field as one unit on disable, in code rather than a
+        // Selector="UserControl:disabled" style -- Avalonia type selectors match the exact type,
+        // not subclasses, so that selector never matches a UserControl subclass like this one.
+        IsEnabledProperty.Changed.AddClassHandler<FlankerNumericField>(
+            (c, _) => c.Opacity = c.IsEnabled ? 1.0 : DisabledOpacity);
     }
 
     public FlankerNumericField()

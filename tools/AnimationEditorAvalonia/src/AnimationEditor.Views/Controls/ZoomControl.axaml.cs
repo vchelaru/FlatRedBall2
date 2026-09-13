@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -26,6 +27,20 @@ public partial class ZoomControl : UserControl
     // Breaks the ZoomChanged → SyncCombo → LostFocus/SelectionChanged → commit feedback loop:
     // set while SyncCombo writes the live percent back so the commit path ignores its own echo.
     private bool _suppressComboChanged;
+
+    /// <summary>Matches ThemeStyles.axaml's global <c>Button:disabled</c> Opacity so a disabled
+    /// field's uniform fade (see the static constructor) reads the same as every other disabled
+    /// control in the app.</summary>
+    private const double DisabledOpacity = 0.35;
+
+    static ZoomControl()
+    {
+        // #1114: dims the whole field as one unit on disable, in code rather than a
+        // Selector="UserControl:disabled" style -- Avalonia type selectors match the exact type,
+        // not subclasses, so that selector never matches a UserControl subclass like this one.
+        IsEnabledProperty.Changed.AddClassHandler<ZoomControl>(
+            (c, _) => c.Opacity = c.IsEnabled ? 1.0 : DisabledOpacity);
+    }
 
     public ZoomControl()
     {

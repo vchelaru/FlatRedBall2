@@ -4,24 +4,25 @@
     <!-- Reusable [−][editable %][+] zoom widget. Bound to a TextureViewport via ZoomControl.Attach.
          The percent field is an AutoCompleteBox (not a ComboBox) so it accepts arbitrary text —
          wheel-zoom can land on off-preset values (e.g. 156%) that must display verbatim. -->
-    <Border BorderBrush="{DynamicResource LineBrush}"
+    <!-- #1114 follow-up: disabled state dims via a single Opacity on the whole control, set in
+         code-behind (OnPropertyChanged reacting to IsEnabledProperty) rather than a
+         "Selector=\"UserControl:disabled\"" style. Avalonia type selectors match the exact type,
+         not subclasses, so that selector never matches this UserControl subclass even though the
+         :disabled pseudo-class itself is set correctly. Not a background-color swap either:
+         Fluent's TextControlBackgroundDisabled renders LIGHTER than TextControlBackground in this
+         app's Dark theme, the opposite of "muted", so the background stays one constant color in
+         both states. The Button.flanker:disabled override below cancels ThemeStyles.axaml's global
+         Button:disabled Opacity so the flanker buttons don't double-dim under this control's fade
+         (Button selectors DO match here since MinusBtn/PlusBtn are literal Button instances). -->
+    <UserControl.Styles>
+        <Style Selector="Button.flanker:disabled">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+    </UserControl.Styles>
+    <Border Background="{DynamicResource TextControlBackground}"
+            BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="4" ClipToBounds="True"
             Height="26" Width="130">
-        <!-- Background is set entirely via these styles, never as a local Background="..." value:
-             a local value on the element itself outranks any style/pseudo-class setter in
-             Avalonia's property precedence, so a :disabled setter alongside a local Background
-             attribute is silently dead. Two style rules (base + :disabled) let the more specific
-             pseudo-class match win only while disabled, so the box dims on its own, independent of
-             the flanker buttons' Opacity-based dimming, so it reads as disabled whether or not it
-             currently has text. -->
-        <Border.Styles>
-            <Style Selector="Border">
-                <Setter Property="Background" Value="{DynamicResource TextControlBackground}"/>
-            </Style>
-            <Style Selector="Border:disabled">
-                <Setter Property="Background" Value="{DynamicResource TextControlBackgroundDisabled}"/>
-            </Style>
-        </Border.Styles>
         <DockPanel>
             <Button x:Name="MinusBtn" DockPanel.Dock="Left"
                     Classes="flanker" Content="−" Width="22"
