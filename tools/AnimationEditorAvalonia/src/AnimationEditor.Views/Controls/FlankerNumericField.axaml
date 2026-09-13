@@ -11,7 +11,8 @@
         consumers size the root exactly like they already do for NumericUpDown/the raw TextBox
         versions this replaces.
     -->
-    <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4"
+    <Border Background="{DynamicResource TextControlBackground}"
+            BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4"
             ClipToBounds="True" Height="26">
         <DockPanel>
             <Button x:Name="MinusBtn" DockPanel.Dock="Left"

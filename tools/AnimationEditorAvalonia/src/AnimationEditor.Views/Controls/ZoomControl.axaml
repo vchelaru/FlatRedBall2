@@ -4,7 +4,8 @@
     <!-- Reusable [−][editable %][+] zoom widget. Bound to a TextureViewport via ZoomControl.Attach.
          The percent field is an AutoCompleteBox (not a ComboBox) so it accepts arbitrary text —
          wheel-zoom can land on off-preset values (e.g. 156%) that must display verbatim. -->
-    <Border BorderBrush="{DynamicResource LineBrush}"
+    <Border Background="{DynamicResource TextControlBackground}"
+            BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="4" ClipToBounds="True"
             Height="26" Width="130">
         <DockPanel>
