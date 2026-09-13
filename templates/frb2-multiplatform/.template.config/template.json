@@ -17,6 +17,21 @@
       "datatype": "bool",
       "defaultValue": "true",
       "description": "Include starter Content assets (animation chains, base TMX, platformer/topdown configs). Pass --IncludeStarterContent false to start with an empty Content folder."
+    },
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "isRequired": false,
+      "description": "Root namespace for generated C# code (the <RootNamespace> in each .csproj). Defaults to the project name (-n) — pass this to keep the folder/project name and the root namespace independent, e.g. --namespace Amazing."
+    },
+    "namespaceReplacer": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "namespace",
+        "fallbackVariableName": "name"
+      },
+      "replaces": "GameNamespace"
     }
   },
   "sources": [

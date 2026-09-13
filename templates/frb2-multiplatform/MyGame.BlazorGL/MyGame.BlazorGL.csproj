@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <RootNamespace>MyGame.BlazorGL</RootNamespace>
+    <RootNamespace>GameNamespace.BlazorGL</RootNamespace>
     <AssemblyName>MyGame.BlazorGL</AssemblyName>
     <DefineConstants>$(DefineConstants);BLAZORGL</DefineConstants>
     <KniPlatform>BlazorGL</KniPlatform>

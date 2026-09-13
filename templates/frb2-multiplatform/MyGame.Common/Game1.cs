@@ -2,9 +2,9 @@ using FlatRedBall2;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using MyGame.Screens;
+using GameNamespace.Screens;
 
-namespace MyGame;
+namespace GameNamespace;
 
 public class Game1 : Game
 {

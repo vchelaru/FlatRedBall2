@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Xna.Framework;
 
-namespace MyGame.BlazorGL.Pages;
+namespace GameNamespace.BlazorGL.Pages;
 
 /// <summary>
 /// Hosts the FlatRedBall2 game inside a Blazor WebAssembly page. Wires the JS-side

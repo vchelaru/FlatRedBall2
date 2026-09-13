@@ -2,7 +2,7 @@ using FlatRedBall2;
 using Gum.Forms.Controls;
 using Gum.Wireframe;
 
-namespace MyGame.Screens;
+namespace GameNamespace.Screens;
 
 public class GameScreen : Screen
 {

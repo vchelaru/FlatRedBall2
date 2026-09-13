@@ -7,7 +7,7 @@
     <TieredCompilation>false</TieredCompilation>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>MyGame</RootNamespace>
+    <RootNamespace>GameNamespace</RootNamespace>
     <MonoGamePlatform>DesktopGL</MonoGamePlatform>
   </PropertyGroup>
 

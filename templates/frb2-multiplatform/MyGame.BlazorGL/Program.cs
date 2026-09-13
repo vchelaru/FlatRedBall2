@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 
-namespace MyGame.BlazorGL
+namespace GameNamespace.BlazorGL
 {
     internal class Program
     {
@@ -20,7 +20,7 @@ namespace MyGame.BlazorGL
                 BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
             });
             // Index.razor.cs resolves Func<Game> from DI on the first tick to construct Game1.
-            builder.Services.AddSingleton<Func<Game>>(_ => () => new MyGame.Game1());
+            builder.Services.AddSingleton<Func<Game>>(_ => () => new GameNamespace.Game1());
             await builder.Build().RunAsync();
         }
     }

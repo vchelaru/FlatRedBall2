@@ -76,6 +76,12 @@ The new project's `Content/` folder is pre-populated with starter assets (animat
 dotnet new frb2-desktop -n YourGameName --IncludeStarterContent false
 ```
 
+The project name (`-n`) also sets the root C# namespace (the `RootNamespace` in each `.csproj`) by default. Pass `--namespace` to set a different one, e.g. if your studio name should be the namespace instead of the game's working title:
+
+```
+dotnet new frb2-desktop -n YourGameName --namespace MyStudio
+```
+
 ### Repo setup (`.gitignore`)
 
 Use `frb2-desktop` or `frb2-multiplatform` templates — they already include the recommended `.gitignore`.
@@ -123,6 +129,8 @@ Browse the [`samples/`](../samples/) directory for complete games. See [`frb-ski
 ```
 dotnet new frb2-multiplatform -n YourGameName
 ```
+
+Same `--namespace` override as `frb2-desktop` above applies here too.
 
 This produces three projects sharing one `Common`:
 
