@@ -11,9 +11,24 @@
         consumers size the root exactly like they already do for NumericUpDown/the raw TextBox
         versions this replaces.
     -->
-    <Border Background="{DynamicResource TextControlBackground}"
+    <Border x:Name="RootBorder"
             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4"
             ClipToBounds="True" Height="26">
+        <!-- Background is set entirely via these styles, never as a local Background="..." value:
+             a local value on the element itself outranks any style/pseudo-class setter in
+             Avalonia's property precedence, so a :disabled setter alongside a local Background
+             attribute is silently dead. Two style rules (base + :disabled) let the more specific
+             pseudo-class match win only while disabled, so the box dims on its own, independent of
+             the flanker buttons' Opacity-based dimming, so it reads as disabled whether or not it
+             currently has text. -->
+        <Border.Styles>
+            <Style Selector="Border">
+                <Setter Property="Background" Value="{DynamicResource TextControlBackground}"/>
+            </Style>
+            <Style Selector="Border:disabled">
+                <Setter Property="Background" Value="{DynamicResource TextControlBackgroundDisabled}"/>
+            </Style>
+        </Border.Styles>
         <DockPanel>
             <Button x:Name="MinusBtn" DockPanel.Dock="Left"
                     Classes="flanker" Content="−" Width="22"

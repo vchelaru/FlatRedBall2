@@ -4,10 +4,24 @@
     <!-- Reusable [−][editable %][+] zoom widget. Bound to a TextureViewport via ZoomControl.Attach.
          The percent field is an AutoCompleteBox (not a ComboBox) so it accepts arbitrary text —
          wheel-zoom can land on off-preset values (e.g. 156%) that must display verbatim. -->
-    <Border Background="{DynamicResource TextControlBackground}"
-            BorderBrush="{DynamicResource LineBrush}"
+    <Border BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="4" ClipToBounds="True"
             Height="26" Width="130">
+        <!-- Background is set entirely via these styles, never as a local Background="..." value:
+             a local value on the element itself outranks any style/pseudo-class setter in
+             Avalonia's property precedence, so a :disabled setter alongside a local Background
+             attribute is silently dead. Two style rules (base + :disabled) let the more specific
+             pseudo-class match win only while disabled, so the box dims on its own, independent of
+             the flanker buttons' Opacity-based dimming, so it reads as disabled whether or not it
+             currently has text. -->
+        <Border.Styles>
+            <Style Selector="Border">
+                <Setter Property="Background" Value="{DynamicResource TextControlBackground}"/>
+            </Style>
+            <Style Selector="Border:disabled">
+                <Setter Property="Background" Value="{DynamicResource TextControlBackgroundDisabled}"/>
+            </Style>
+        </Border.Styles>
         <DockPanel>
             <Button x:Name="MinusBtn" DockPanel.Dock="Left"
                     Classes="flanker" Content="−" Width="22"
