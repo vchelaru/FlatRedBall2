@@ -4823,12 +4823,14 @@ public partial class MainWindow : Window
         PropPixelW.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropPixelH.ValueChanged    += (_, _) => ApplyFramePixelCoords();
         PropRectName.LostFocus     += (_, _) => ApplyRectProps();
+        PropRectName.KeyDown       += (_, e) => { if (e.Key == Key.Enter) ApplyRectProps(); };
         PropRectX.ValueChanged     += (_, _) => ApplyRectProps();
         PropRectY.ValueChanged     += (_, _) => ApplyRectProps();
         PropRectScaleX.ValueChanged += (_, _) => ApplyRectProps();
         PropRectScaleY.ValueChanged += (_, _) => ApplyRectProps();
 
         PropCircleName.LostFocus   += (_, _) => ApplyCircleProps();
+        PropCircleName.KeyDown     += (_, e) => { if (e.Key == Key.Enter) ApplyCircleProps(); };
         PropCircleX.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleY.ValueChanged   += (_, _) => ApplyCircleProps();
         PropCircleRadius.ValueChanged += (_, _) => ApplyCircleProps();
