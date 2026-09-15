@@ -17,6 +17,8 @@ When proposing or evaluating a change:
 
 The only relevant question is "is this the right design?" — never "will this break someone?"
 
+**Exception: the `.achx`/`.achj` file formats are not FRB2-owned.** They are shared with Gum and FRB1 and have consumers with years of existing files. `AnimationChainListSave` must keep reading and writing them byte-compatible: element/array schema, chain order, and duplicate chain names all preserved on a load→save round-trip.
+
 ## Key Files
 
 - Main project: `src/FlatRedBall2.csproj` (MonoGame.Framework.DesktopGL, version pinned in the root `Directory.Packages.props`)
