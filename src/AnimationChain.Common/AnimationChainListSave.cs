@@ -58,8 +58,8 @@ public class AnimationChainListSave
     /// <summary>How texture coordinates in frames are specified.</summary>
     public TextureCoordinateType CoordinateType = TextureCoordinateType.UV;
 
-    /// <summary>The list of animation chains.</summary>
-    public List<AnimationChainSave> AnimationChains = new();
+    /// <summary>The dictionary of animation chains.</summary>
+    public Dictionary<string, AnimationChainSave> AnimationChains = new();
 
     /// <summary>Absolute path of the .achx file. Set automatically by <see cref="FromFile(string)"/>;
     /// tooling (Animation Editor) sets this directly when the user picks a Save-As path.</summary>
@@ -217,7 +217,7 @@ public class AnimationChainListSave
             foreach (var frameEl in chainEl.Elements("Frame"))
                 chain.Frames.Add(ParseFrame(frameEl));
 
-            result.AnimationChains.Add(chain);
+            result.AnimationChains[chain.Name] = chain;
         }
 
         var projectFileEl = root.Element("ProjectFile");
@@ -348,7 +348,7 @@ public class AnimationChainListSave
         };
 
         var chainsArray = new JsonArray();
-        foreach (var chain in AnimationChains)
+        foreach (var chain in AnimationChains.Values)
         {
             var framesArray = new JsonArray();
             foreach (var frame in chain.Frames)
@@ -448,7 +448,7 @@ public class AnimationChainListSave
             new XElement("TimeMeasurementUnit", TimeMeasurementUnit.ToString()),
             new XElement("CoordinateType", CoordinateType.ToString()));
 
-        foreach (var chain in AnimationChains)
+        foreach (var chain in AnimationChains.Values)
         {
             var chainEl = new XElement("AnimationChain",
                 new XElement("Name", chain.Name));
@@ -798,7 +798,7 @@ public class AnimationChainListSave
                     foreach (var frameNode in framesArray)
                         chain.Frames.Add(ParseFrameJson(frameNode!.AsObject()));
 
-                result.AnimationChains.Add(chain);
+                result.AnimationChains[chain.Name] = chain;
             }
         }
 
