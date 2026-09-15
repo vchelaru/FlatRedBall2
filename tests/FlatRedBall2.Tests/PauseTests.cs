@@ -59,13 +59,10 @@ public class PauseTests
     {
         var screen = new TestScreen();
         screen.PauseThisScreen();
-        var sprite = new Sprite
-        {
-            IsLooping = false,
-            ShouldAnimationAdvanceOnPause = true,
-        };
+        var sprite = new Sprite { ShouldAnimationAdvanceOnPause = true };
         sprite.AnimationChains = MakeChain("Anim", 2, 0.1f); // total 0.2s
         sprite.PlayAnimation("Anim");
+        sprite.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
         screen.Add(sprite);
 
         // dt = 0.5s is more than enough to complete the 0.2s animation

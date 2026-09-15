@@ -296,6 +296,44 @@ public class PlaybackControllerTests
     }
 
     [Fact]
+    public void Loop_ReflectsChainsPersistedLoopValue()
+    {
+        var chain = MakeChain(2);
+        chain.Loop = false;
+        var ctrl = new PlaybackController();
+
+        ctrl.SetChain(chain);
+
+        Assert.False(ctrl.Loop);
+    }
+
+    [Fact]
+    public void Loop_Setter_WritesBackToChain()
+    {
+        var chain = MakeChain(2);
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(chain);
+
+        ctrl.Loop = false;
+
+        Assert.False(chain.Loop);
+    }
+
+    [Fact]
+    public void Loop_SwitchingToAnotherChain_ReflectsThatChainsOwnValue()
+    {
+        var loopingChain = MakeChain(2);
+        var nonLoopingChain = MakeChain(2);
+        nonLoopingChain.Loop = false;
+        var ctrl = new PlaybackController();
+        ctrl.SetChain(loopingChain);
+
+        ctrl.SetChain(nonLoopingChain);
+
+        Assert.False(ctrl.Loop);
+    }
+
+    [Fact]
     public void Advance_StopsOnLastFrame_WhenLoopIsFalse()
     {
         var ctrl = new PlaybackController();

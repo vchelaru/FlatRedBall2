@@ -145,6 +145,12 @@ namespace AnimationEditor.Core.CommandsAndState
         /// affected by the lock. Undoable, same as any other mutating command.
         /// </summary>
         void SetChainLocked(AnimationChainSave chain, bool locked);
+
+        /// <summary>
+        /// Sets whether <paramref name="chain"/> loops at runtime (issue #1120). Undoable, same
+        /// as <see cref="SetChainLocked"/>.
+        /// </summary>
+        void SetChainLoop(AnimationChainSave chain, bool loop);
         void AddFrame(AnimationChainSave chain, string? textureName = null);
 
         /// <summary>

@@ -21,9 +21,10 @@ public class ScreenUpdateMutationTests
         public Sprite Sprite { get; private set; } = null!;
         public override void CustomInitialize()
         {
-            Sprite = new Sprite { AnimationChains = MakeChain(), IsLooping = false };
+            Sprite = new Sprite { AnimationChains = MakeChain() };
             Add(Sprite);
             Sprite.PlayAnimation("Once");
+            Sprite.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
             Sprite.AnimationFinished += Destroy;
         }
     }

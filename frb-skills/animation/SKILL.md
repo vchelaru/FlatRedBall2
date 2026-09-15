@@ -39,7 +39,7 @@ generic package (namespaces `FlatRedBall.AnimationChain` / `FlatRedBall2.Animati
 | `PlayAnimation(string name)` | — | Looks up by name; no-op if not found |
 | `PlayAnimation(AnimationChain chain)` | — | Play a specific chain directly |
 | `Animate` | `false` | Auto-managed. **Do not write to express idle state** — see Gotchas |
-| `IsLooping` | `true` | `false` for one-shot |
+| `IsLooping` | seeded from `AnimationChain.Loop` on `PlayAnimation` | overridable per-instance after `PlayAnimation` — set it before that and it gets reseeded |
 | `AnimationSpeed` | `1f` | Multiplier |
 | `CurrentAnimation` | — | Read-only; returns the active chain |
 | `AnimationFinished` | — | Fires when a non-looping animation ends |

@@ -211,6 +211,7 @@ public class AnimationChainListSave
             {
                 Name = (string?)chainEl.Element("Name") ?? string.Empty,
                 IsLocked = BoolEl(chainEl, "Locked"),
+                Loop = BoolEl(chainEl, "Loop", true),
             };
 
             foreach (var frameEl in chainEl.Elements("Frame"))
@@ -360,6 +361,8 @@ public class AnimationChainListSave
             };
             if (chain.IsLocked)
                 chainObj["locked"] = true;
+            if (!chain.Loop)
+                chainObj["loop"] = false;
             chainsArray.Add((JsonNode)chainObj);
         }
         root["animationChains"] = chainsArray;
@@ -453,6 +456,10 @@ public class AnimationChainListSave
             // byte-identical (same convention as the frame writer's optional fields below).
             if (chain.IsLocked)
                 chainEl.Add(new XElement("Locked", "true"));
+            // Loop defaults to true, so only write it when false -- an omitted element on load
+            // resolves back to true, keeping every pre-existing .achx a no-op diff.
+            if (!chain.Loop)
+                chainEl.Add(new XElement("Loop", "false"));
             foreach (var frame in chain.Frames)
                 chainEl.Add(WriteFrame(frame));
             root.Add(chainEl);
@@ -784,6 +791,7 @@ public class AnimationChainListSave
                 {
                     Name = chainObj["name"]?.GetValue<string>() ?? string.Empty,
                     IsLocked = BoolProp(chainObj, "locked"),
+                    Loop = BoolProp(chainObj, "loop", true),
                 };
 
                 if (chainObj["frames"] is JsonArray framesArray)

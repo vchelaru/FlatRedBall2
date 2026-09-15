@@ -41,6 +41,43 @@ public class AnimationChainListSaveTests
     }
 
     [Fact]
+    public void ToXmlString_FromString_ChainLoopFalse_RoundTrips()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Loop = false });
+
+        var xml = save.ToXmlString();
+        var roundTripped = AnimationChainListSave.FromString(xml);
+
+        xml.ShouldContain("<Loop>false</Loop>");
+        roundTripped.AnimationChains.Single().Loop.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ToXmlString_ChainLoopTrue_OmitsLoopElement()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+
+        var xml = save.ToXmlString();
+
+        xml.ShouldNotContain("<Loop>");
+    }
+
+    [Fact]
+    public void FromFile_ChainWithNoLoopElement_DefaultsToTrue()
+    {
+        // Reproduces every existing .achx on disk today, which predates the Loop field.
+        var save = Parse(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<AnimationChainArraySave>" +
+            "  <AnimationChain><Name>Walk</Name></AnimationChain>" +
+            "</AnimationChainArraySave>");
+
+        save.AnimationChains.Single().Loop.ShouldBeTrue();
+    }
+
+    [Fact]
     public void FromFile_SingleChainWithTwoFrames_PreservesNamesAndFrameCount()
     {
         string xml =

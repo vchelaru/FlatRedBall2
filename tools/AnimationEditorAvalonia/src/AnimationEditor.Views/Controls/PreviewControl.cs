@@ -362,7 +362,11 @@ public class PreviewControl : Control, IZoomTarget, IPanScrollTarget
         foreach (var chain in toRemove) _groupPlayback.Remove(chain);
         foreach (var chain in toAdd)
         {
-            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier, Loop = _playback.Loop };
+            // Loop is deliberately not seeded from _playback here -- PlaybackController.Loop
+            // proxies the chain assigned via SetChain below, so each group track independently
+            // reflects its own chain's persisted Loop value instead of inheriting the primary
+            // track's.
+            var controller = new PlaybackController { SpeedMultiplier = _playback.SpeedMultiplier };
             controller.SetChain(chain);
             _groupPlayback[chain] = controller;
         }

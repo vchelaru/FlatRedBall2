@@ -101,6 +101,9 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void SetChainLocked(AnimationChainSave chain, bool locked) =>
             _undoManager.Execute(new SetChainLockedCommand(chain, locked, this, _events));
+
+        public void SetChainLoop(AnimationChainSave chain, bool loop) =>
+            _undoManager.Execute(new SetChainLoopCommand(chain, loop, this, _events));
         // Delegates wired up by the Avalonia app layer ----------------------------
 
         /// <summary>

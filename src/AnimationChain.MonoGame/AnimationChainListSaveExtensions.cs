@@ -51,7 +51,7 @@ public static class AnimationChainListSaveExtensions
 
         foreach (var chainSave in save.AnimationChains)
         {
-            var chain = new AnimationChain<AnimationFrame> { Name = chainSave.Name };
+            var chain = new AnimationChain<AnimationFrame> { Name = chainSave.Name, Loop = chainSave.Loop };
 
             // Sticky color resolution: a frame that omits a channel inherits the most recent
             // explicitly-set value from an earlier frame in this chain, rather than resetting to

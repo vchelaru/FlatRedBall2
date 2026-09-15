@@ -89,7 +89,7 @@ public class AnimationChainList<TFrame> : List<AnimationChain<TFrame>> where TFr
         var fresh = new AnimationChainList<TFrame> { Name = save.FileName };
         foreach (var chainSave in save.AnimationChains)
         {
-            var chain = new AnimationChain<TFrame> { Name = chainSave.Name };
+            var chain = new AnimationChain<TFrame> { Name = chainSave.Name, Loop = chainSave.Loop };
             foreach (var frameSave in chainSave.Frames)
                 chain.Add(frameFactory(frameSave));
             fresh.Add(chain);

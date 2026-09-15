@@ -22,6 +22,46 @@ public class AnimationPlayerTests
         return list;
     }
 
+    [Fact]
+    public void Play_ChainLoopFalse_SeedsIsLoopingFalse()
+    {
+        var list = MakeList(("Attack", new[] { 0.1 }));
+        list["Attack"]!.Loop = false;
+        var player = new AnimationPlayer<TestFrame>(list);
+
+        player.Play("Attack");
+
+        player.IsLooping.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Play_ChainLoopTrue_SeedsIsLoopingTrue()
+    {
+        var list = MakeList(("Attack", new[] { 0.1 }));
+        list["Attack"]!.Loop = false;
+        var player = new AnimationPlayer<TestFrame>(list) { IsLooping = false };
+        var loopingChain = new AnimationChain<TestFrame> { Name = "Walk", Loop = true };
+        loopingChain.Add(new TestFrame { FrameLength = TimeSpan.FromSeconds(0.1) });
+        list.Add(loopingChain);
+
+        player.Play("Walk");
+
+        player.IsLooping.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Play_SeededIsLooping_CanStillBeOverridden()
+    {
+        var list = MakeList(("Attack", new[] { 0.1 }));
+        list["Attack"]!.Loop = false;
+        var player = new AnimationPlayer<TestFrame>(list);
+        player.Play("Attack");
+
+        player.IsLooping = true; // game code overrides the seeded value
+
+        player.IsLooping.ShouldBeTrue();
+    }
+
     private static TimeSpan Sec(double s) => TimeSpan.FromSeconds(s);
 
     [Fact]
@@ -173,8 +213,9 @@ public class AnimationPlayerTests
     public void TimeIntoAnimation_Setter_ClampsWhenNotLooping()
     {
         var list = MakeList(("Run", new[] { 0.1, 0.1 })); // total = 0.2
-        var player = new AnimationPlayer<TestFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<TestFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         player.TimeIntoAnimation = Sec(0.25);
 
@@ -212,8 +253,9 @@ public class AnimationPlayerTests
     public void Update_NonLooping_StopsAtLastFrame()
     {
         var list = MakeList(("Run", new[] { 0.1, 0.1 }));
-        var player = new AnimationPlayer<TestFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<TestFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         player.Update(Sec(0.5)); // well past end
 
@@ -225,8 +267,9 @@ public class AnimationPlayerTests
     public void Update_NonLooping_RaisesAnimationFinished()
     {
         var list = MakeList(("Run", new[] { 0.1 }));
-        var player = new AnimationPlayer<TestFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<TestFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
         bool fired = false;
         player.AnimationFinished += () => fired = true;
 
@@ -239,8 +282,9 @@ public class AnimationPlayerTests
     public void Update_AnimationFinished_RaisedOnce()
     {
         var list = MakeList(("Run", new[] { 0.1 }));
-        var player = new AnimationPlayer<TestFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<TestFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
         int count = 0;
         player.AnimationFinished += () => count++;
 

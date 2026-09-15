@@ -19,4 +19,12 @@ public class AnimationChainSave
     /// interpret" rule in the Animation Editor's own docs).
     /// </summary>
     public bool IsLocked;
+
+    /// <summary>
+    /// Whether this chain loops at runtime. Defaults to <c>true</c> so a file that omits this
+    /// field (every .achx/.achj written before this field existed) keeps its prior behavior.
+    /// Runtimes seed their own playback loop flag from this value when the chain starts playing,
+    /// but that flag stays overridable per-instance afterward (see e.g. <c>Sprite.IsLooping</c>).
+    /// </summary>
+    public bool Loop = true;
 }

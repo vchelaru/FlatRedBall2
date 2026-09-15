@@ -1311,10 +1311,13 @@ public class Screen : ILifecycleEvents
         // Add sprite as a child BEFORE Register so Register's child-walk routes the sprite into
         // THIS screen's render list. Calling entity.Add(sprite) after Register would route through
         // entity.Engine.CurrentScreen instead, which may not be this screen during initialization.
-        var sprite = new Sprite { AnimationChains = animations, IsLooping = false };
+        var sprite = new Sprite { AnimationChains = animations };
         entity.Add(sprite);
         Register(entity);
         sprite.PlayAnimation(animationName);
+        // Force one-shot AFTER PlayAnimation, which seeds IsLooping from the chain's own
+        // authored Loop value — setting it before would just get overwritten.
+        sprite.IsLooping = false;
         sprite.AnimationFinished += () => entity.Destroy();
         return entity;
     }

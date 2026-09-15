@@ -51,7 +51,7 @@ public static class AnimationChainListSaveExtensions
 
         foreach (var chainSave in save.AnimationChains)
         {
-            var chain = new AnimationChain { Name = chainSave.Name };
+            var chain = new AnimationChain { Name = chainSave.Name, Loop = chainSave.Loop };
 
             foreach (var frameSave in chainSave.Frames)
             {

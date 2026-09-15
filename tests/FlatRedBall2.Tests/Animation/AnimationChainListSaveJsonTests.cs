@@ -55,6 +55,41 @@ public class AnimationChainListSaveJsonTests
     }
 
     [Fact]
+    public void ToJsonString_FromJsonString_ChainLoopFalse_RoundTrips()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk", Loop = false });
+
+        var json = save.ToJsonString();
+        var roundTripped = AnimationChainListSave.FromJsonString(json);
+
+        json.ShouldContain("\"loop\": false");
+        roundTripped.AnimationChains.Single().Loop.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ToJsonString_ChainLoopTrue_OmitsLoopKey()
+    {
+        var save = new AnimationChainListSave();
+        save.AnimationChains.Add(new AnimationChainSave { Name = "Walk" });
+
+        var json = save.ToJsonString();
+
+        json.ShouldNotContain("\"loop\"");
+    }
+
+    [Fact]
+    public void FromJsonString_ChainWithNoLoopKey_DefaultsToTrue()
+    {
+        // Reproduces every existing .achj on disk today, which predates the Loop field.
+        string json = "{\"animationChains\":[{\"name\":\"Walk\",\"frames\":[]}]}";
+
+        var save = AnimationChainListSave.FromJsonString(json);
+
+        save.AnimationChains.Single().Loop.ShouldBeTrue();
+    }
+
+    [Fact]
     public void ToJsonString_FromJsonString_RoundTripsFrameFields()
     {
         var save = new AnimationChainListSave();

@@ -49,12 +49,34 @@ public class PlaybackController
     /// </summary>
     public double SpeedMultiplier { get; set; } = 1.0;
 
+    // Backing value used only while no chain is set (Loop has nowhere to persist to yet).
+    private bool _loopWithoutChain = true;
+
     /// <summary>
     /// When <c>true</c> (the default), <see cref="Advance"/> wraps back to the start once the
     /// chain's total duration elapses. When <c>false</c>, playback freezes on the last frame and
     /// pauses (firing <see cref="IsPlayingChanged"/>) instead of wrapping.
+    /// <para>
+    /// This is a live proxy onto the active chain's own <see cref="AnimationChainSave.Loop"/>
+    /// (issue #1120) -- reading it returns whatever <see cref="Chain"/> has persisted, and setting
+    /// it writes straight back into that same chain, so any other UI bound to the same chain (e.g.
+    /// the Inspector's Loop checkbox) can never disagree with this control. Switching chains via
+    /// <see cref="SetChain"/> automatically reflects the newly selected chain's own value -- no
+    /// explicit reseeding needed. When no chain is set, falls back to a local default so
+    /// <see cref="Advance"/> still has a sensible value to read.
+    /// </para>
     /// </summary>
-    public bool Loop { get; set; } = true;
+    public bool Loop
+    {
+        get => _chain?.Loop ?? _loopWithoutChain;
+        set
+        {
+            if (_chain is not null)
+                _chain.Loop = value;
+            else
+                _loopWithoutChain = value;
+        }
+    }
 
     // ── Events ────────────────────────────────────────────────────────────────
 

@@ -3003,8 +3003,17 @@ public partial class MainWindow : Window
             _suppressInterpolateSync = false;
         };
 
+        // Mirrors the Inspector's Loop checkbox (#1120) -- both read/write the same
+        // AnimationChainSave.Loop through SetChainLoop, so they can never disagree. Suppressed
+        // while RefreshPropertyPanel is programmatically syncing this control's IsChecked, same
+        // guard PropChainLocked uses.
         LoopToggle.IsCheckedChanged += (_, _) =>
-            PreviewCtrl.Loop = LoopToggle.IsChecked == true;
+        {
+            if (_suppressPropRefresh) return;
+            var chain = _selectedState.SelectedChain;
+            if (chain is null || LoopToggle.IsChecked is not { } loop) return;
+            _appCommands.SetChainLoop(chain, loop);
+        };
 
         TimelineStrip.ItemsSource = _timelineFrames;
         GroupTimelineTracks.ItemsSource = _groupTimelineTracks;
@@ -4801,6 +4810,7 @@ public partial class MainWindow : Window
     private void WirePropertyPanel()
     {
         PropChainLocked.IsCheckedChanged += (_, _) => ApplyChainLocked();
+        PropChainLoop.IsCheckedChanged += (_, _) => ApplyChainLoop();
         PropFlipH.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipV.IsCheckedChanged += (_, _) => ApplyFrameFlip();
         PropFlipD.IsCheckedChanged += (_, _) => ApplyFrameFlip();
@@ -5138,7 +5148,15 @@ public partial class MainWindow : Window
                 PropNoneLabel.Text = "No selection";
             PropChainPanel.IsVisible = chainOnly;
             if (chainOnly)
+            {
                 PropChainLocked.IsChecked = selectedChain!.IsLocked;
+                PropChainLoop.IsChecked = selectedChain.Loop;
+            }
+            // LoopToggle mirrors the selected chain's Loop regardless of whether a frame/shape
+            // within it is also selected (#1120) -- it reflects "the chain currently playing",
+            // not just the chain-only inspector view PropChainLoop above is scoped to.
+            if (selectedChain is not null)
+                LoopToggle.IsChecked = selectedChain.Loop;
             PropFramePanel.IsVisible  = frame is not null && !hasShapeSelection;
             PropRectPanel.IsVisible   = rect  is not null;
             PropCirclePanel.IsVisible = circ  is not null;
@@ -5275,6 +5293,14 @@ public partial class MainWindow : Window
         var chain = _selectedState.SelectedChain;
         if (chain is null || PropChainLocked.IsChecked is not { } locked) return;
         _appCommands.SetChainLocked(chain, locked);
+    }
+
+    private void ApplyChainLoop()
+    {
+        if (_suppressPropRefresh) return;
+        var chain = _selectedState.SelectedChain;
+        if (chain is null || PropChainLoop.IsChecked is not { } loop) return;
+        _appCommands.SetChainLoop(chain, loop);
     }
 
     private void ApplyFrameFlip()

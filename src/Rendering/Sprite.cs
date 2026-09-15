@@ -295,8 +295,11 @@ public class Sprite : IRenderable, IAttachable
     public bool ShouldAnimationAdvanceOnPause { get; set; }
 
     /// <summary>
-    /// Whether the current animation loops. Defaults to <c>true</c>.
-    /// When <c>false</c>, the animation stops on its last frame and fires <see cref="AnimationFinished"/>.
+    /// Whether the current animation loops. Seeded from the played chain's
+    /// <see cref="AnimationChain.Loop"/> each time <see cref="PlayAnimation(string)"/> or
+    /// <see cref="PlayAnimation(AnimationChain)"/> switches to a new chain; set this afterward to
+    /// override per-instance. When <c>false</c>, the animation stops on its last frame and fires
+    /// <see cref="AnimationFinished"/>.
     /// </summary>
     public bool IsLooping { get; set; } = true;
 
@@ -339,6 +342,7 @@ public class Sprite : IRenderable, IAttachable
                 _currentFrameIndex = 0;
                 _timeIntoAnimation = 0;
                 Animate = true;
+                IsLooping = _animationChains[i].Loop;
                 ApplyCurrentFrame();
                 return;
             }
@@ -364,6 +368,7 @@ public class Sprite : IRenderable, IAttachable
                     _currentFrameIndex = 0;
                     _timeIntoAnimation = 0;
                     Animate = true;
+                    IsLooping = chain.Loop;
                     ApplyCurrentFrame();
                     return;
                 }
@@ -378,6 +383,7 @@ public class Sprite : IRenderable, IAttachable
         _currentFrameIndex = 0;
         _timeIntoAnimation = 0;
         Animate = true;
+        IsLooping = chain.Loop;
         ApplyCurrentFrame();
     }
 

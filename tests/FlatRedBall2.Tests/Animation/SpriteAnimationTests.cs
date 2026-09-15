@@ -50,9 +50,9 @@ public class SpriteAnimationTests
     public void AnimateSelf_NonLoopingAnimation_StopsAtEnd()
     {
         var sprite = new Sprite();
-        sprite.IsLooping = false;
         sprite.AnimationChains = MakeChain("Attack", 2, 0.1f); // total = 0.2s
         sprite.PlayAnimation("Attack");
+        sprite.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         sprite.AnimateSelf(0.5);
 
@@ -63,9 +63,9 @@ public class SpriteAnimationTests
     public void AnimateSelf_NonLoopingAnimation_FiresAnimationFinished()
     {
         var sprite = new Sprite();
-        sprite.IsLooping = false;
         sprite.AnimationChains = MakeChain("Attack", 2, 0.1f);
         sprite.PlayAnimation("Attack");
+        sprite.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         bool fired = false;
         sprite.AnimationFinished += () => fired = true;
@@ -220,6 +220,52 @@ public class SpriteAnimationTests
 
         sprite.CurrentAnimation!.Name.ShouldBe("Jump");
         sprite.X.ShouldBe(9f);
+    }
+
+    [Fact]
+    public void PlayAnimation_ChainLoopFalse_SeedsIsLoopingFalse()
+    {
+        var chain = new AnimationChain { Name = "Attack", Loop = false };
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1) });
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Attack");
+
+        sprite.IsLooping.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void PlayAnimation_ChainLoopTrue_SeedsIsLoopingTrue()
+    {
+        var chain = new AnimationChain { Name = "Walk", Loop = true };
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1) });
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite { IsLooping = false };
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Walk");
+
+        sprite.IsLooping.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void PlayAnimation_SeededIsLooping_CanStillBeOverridden()
+    {
+        var chain = new AnimationChain { Name = "Attack", Loop = false };
+        chain.Add(new AnimationFrame { FrameLength = TimeSpan.FromSeconds(0.1) });
+        var list = new AnimationChainList();
+        list.Add(chain);
+
+        var sprite = new Sprite();
+        sprite.AnimationChains = list;
+        sprite.PlayAnimation("Attack");
+        sprite.IsLooping = true; // game code overrides the seeded value
+
+        sprite.IsLooping.ShouldBeTrue();
     }
 
     [Fact]

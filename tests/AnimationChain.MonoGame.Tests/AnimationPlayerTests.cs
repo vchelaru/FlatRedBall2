@@ -175,8 +175,9 @@ public class AnimationPlayerTests
     public void TimeIntoAnimation_Setter_ClampsWhenNotLooping()
     {
         var list = MakeList(("Run", new[] { 0.1, 0.1 })); // total = 0.2
-        var player = new AnimationPlayer<AnimationFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<AnimationFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         player.TimeIntoAnimation = Sec(0.25);
 
@@ -212,8 +213,9 @@ public class AnimationPlayerTests
     public void Update_NonLooping_StopsAtLastFrame()
     {
         var list = MakeList(("Run", new[] { 0.1, 0.1 }));
-        var player = new AnimationPlayer<AnimationFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<AnimationFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
         player.Update(Sec(0.5)); // well past end
         Assert.Equal(list["Run"]![1], player.CurrentFrame);
         Assert.False(player.Animate);
@@ -223,8 +225,9 @@ public class AnimationPlayerTests
     public void Update_NonLooping_RaisesAnimationFinished()
     {
         var list = MakeList(("Run", new[] { 0.1 }));
-        var player = new AnimationPlayer<AnimationFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<AnimationFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         bool fired = false;
         player.AnimationFinished += () => fired = true;
@@ -237,8 +240,9 @@ public class AnimationPlayerTests
     public void Update_AnimationFinished_RaisedOnce()
     {
         var list = MakeList(("Run", new[] { 0.1 }));
-        var player = new AnimationPlayer<AnimationFrame>(list) { IsLooping = false };
+        var player = new AnimationPlayer<AnimationFrame>(list);
         player.Play("Run");
+        player.IsLooping = false; // override the seeded default (chain.Loop defaults to true)
 
         int count = 0;
         player.AnimationFinished += () => count++;

@@ -80,7 +80,12 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
     /// <summary>When <c>true</c> (the default), <see cref="Update"/> advances frames.</summary>
     public bool Animate { get; set; } = true;
 
-    /// <summary>When <c>true</c> (the default), the animation wraps back to frame 0 at the end.</summary>
+    /// <summary>
+    /// When <c>true</c>, the animation wraps back to frame 0 at the end. Seeded from the played
+    /// chain's <see cref="AnimationChain{TFrame}.Loop"/> each time <see cref="Play(string)"/> or
+    /// <see cref="Play(AnimationChain{TFrame})"/> switches to a new chain; set this afterward to
+    /// override per-instance.
+    /// </summary>
     public bool IsLooping { get; set; } = true;
 
     /// <summary>Multiplier applied to frame time. 2.0 plays twice as fast; 0.5 plays half-speed.</summary>
@@ -110,6 +115,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 _currentChainIndex = i;
                 ResetPlaybackPosition();
                 Animate = true;
+                IsLooping = _chains[i].Loop;
                 return;
             }
         }
@@ -131,6 +137,7 @@ public class AnimationPlayer<TFrame> where TFrame : AnimationFrameBase
                 _currentChainIndex = i;
                 ResetPlaybackPosition();
                 Animate = true;
+                IsLooping = chain.Loop;
                 return;
             }
         }

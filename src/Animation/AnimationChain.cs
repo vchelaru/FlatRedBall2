@@ -16,6 +16,13 @@ public class AnimationChain : List<AnimationFrame>
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Whether this chain loops by default. <see cref="FlatRedBall2.Rendering.Sprite.PlayAnimation(string)"/>
+    /// seeds <see cref="FlatRedBall2.Rendering.Sprite.IsLooping"/> from this value when the chain
+    /// starts playing, but that flag stays overridable per-instance afterward.
+    /// </summary>
+    public bool Loop { get; set; } = true;
+
     /// <summary>Total duration of the animation (sum of all frame lengths).</summary>
     public TimeSpan TotalLength
     {

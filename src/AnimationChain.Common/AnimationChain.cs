@@ -15,6 +15,13 @@ public class AnimationChain<TFrame> : List<TFrame> where TFrame : AnimationFrame
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Whether this chain loops by default. <see cref="AnimationPlayer{TFrame}"/> seeds its own
+    /// <see cref="AnimationPlayer{TFrame}.IsLooping"/> from this value when the chain starts
+    /// playing, but that flag stays overridable per-instance afterward.
+    /// </summary>
+    public bool Loop { get; set; } = true;
+
     /// <summary>Total duration of the animation (sum of all frame lengths).</summary>
     public TimeSpan TotalLength
     {

@@ -919,6 +919,9 @@
                                                 <CheckBox x:Name="PropChainLocked"
                                                           Content="Locked"
                                                           AutomationProperties.AutomationId="prop-chain-locked" />
+                                                <CheckBox x:Name="PropChainLoop"
+                                                          Content="Loop"
+                                                          AutomationProperties.AutomationId="prop-chain-loop" />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
@@ -1656,7 +1659,7 @@
                                               Foreground="{DynamicResource Ink}"
                                               VerticalAlignment="Center"
                                               IsChecked="True"
-                                              ToolTip.Tip="Loop playback (not persisted)">
+                                              ToolTip.Tip="Loop playback (mirrors the selected chain's Loop property)">
                                     <svg:Svg Width="14" Height="14"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconLoop.svg"
                                              CurrentColor="{DynamicResource IconInk}"
