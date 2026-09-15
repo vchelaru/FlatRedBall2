@@ -87,7 +87,7 @@ public class AnimationChainList<TFrame> : List<AnimationChain<TFrame>> where TFr
         catch (JsonException) { return false; }
 
         var fresh = new AnimationChainList<TFrame> { Name = save.FileName };
-        foreach (var chainSave in save.AnimationChains)
+        foreach (var chainSave in save.AnimationChains.Values)
         {
             var chain = new AnimationChain<TFrame> { Name = chainSave.Name, Loop = chainSave.Loop };
             foreach (var frameSave in chainSave.Frames)

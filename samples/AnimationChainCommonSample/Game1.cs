@@ -49,9 +49,10 @@ public class Game1 : Game
 
     private AnimationChainSave GetChain(string name)
     {
-        foreach (var chain in _save.AnimationChains)
-            if (chain.Name == name)
-                return chain;
+        if (_save.AnimationChains.TryGetValue(name, out var chain))
+        {
+            return chain;
+        }
         throw new InvalidOperationException($"No chain named '{name}' in {AchjPath}");
     }
 
