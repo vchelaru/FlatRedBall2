@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseAchj, parseAchx, frameDurationMs, mapAchjToTiledAnimations } from "./achj-mapper.mjs";
+import { parseAchj, parseAchx, frameDurationMs, mapAchjToTiledAnimations, collectAnimationChainFiles } from "./achj-mapper.mjs";
 
 const tilesetInfo = {
   tileWidth: 16,
@@ -259,4 +259,39 @@ test("mapAchjToTiledAnimations warns and skips UV frames when the tileset's pixe
   const [result] = mapAchjToTiledAnimations(achj, tilesetInfo);
   assert.equal(result.frames.length, 0);
   assert.match(result.warnings[0], /UV.*pixel dimensions/);
+});
+
+test("mapAchjToTiledAnimations silences the texture-mismatch warning when silentTextureMismatch is set", () => {
+  const achj = parseAchj(
+    achjText({
+      animationChains: [
+        {
+          name: "OtherTexture",
+          frames: [
+            { textureName: "OtherSheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 16, topCoordinate: 0, bottomCoordinate: 32 },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { silentTextureMismatch: true });
+  assert.equal(result.frames.length, 0);
+  assert.equal(result.warnings.length, 0);
+});
+
+test("collectAnimationChainFiles walks a directory tree for .achx/.achj files, case-insensitively", () => {
+  // Fake in-memory filesystem: listDir(path) -> { dirs: string[], files: string[] }.
+  const fakeFs = {
+    "/project": { dirs: ["/project/Hero", "/project/Empty"], files: ["/project/notes.txt"] },
+    "/project/Hero": { dirs: [], files: ["/project/Hero/Walk.achx", "/project/Hero/Idle.ACHJ", "/project/Hero/icon.png"] },
+    "/project/Empty": { dirs: [], files: [] },
+  };
+  const listDir = (path) => fakeFs[path] ?? { dirs: [], files: [] };
+
+  const found = collectAnimationChainFiles("/project", listDir);
+
+  assert.deepEqual(
+    [...found].sort(),
+    ["/project/Hero/Idle.ACHJ", "/project/Hero/Walk.achx"].sort()
+  );
 });

@@ -103,13 +103,17 @@ function frameRectPixels(frame, achj, tilesetInfo) {
   };
 }
 
-function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName) {
+function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName, options) {
   const label = `chain "${chainName}" frame ${frameIndex}`;
 
   const textureBaseName = frame.textureName.split(/[\\/]/).pop();
   const tilesetBaseName = tilesetInfo.imageFileName.split(/[\\/]/).pop();
   if (textureBaseName !== tilesetBaseName) {
-    warnings.push(`${label}: references a different texture ("${frame.textureName}") than the open tileset ("${tilesetInfo.imageFileName}") - skipped.`);
+    // In project-wide bulk mode, most chains belong to some *other* tileset's texture -
+    // that's the expected case, not a warning-worthy one.
+    if (!options.silentTextureMismatch) {
+      warnings.push(`${label}: references a different texture ("${frame.textureName}") than the open tileset ("${tilesetInfo.imageFileName}") - skipped.`);
+    }
     return null;
   }
 
@@ -141,7 +145,7 @@ function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName) {
   return { tileId, duration: frameDurationMs(frame.frameLength, achj.timeMeasurementUnit) };
 }
 
-export function mapAchjToTiledAnimations(achj, tilesetInfo) {
+export function mapAchjToTiledAnimations(achj, tilesetInfo, options = {}) {
   return achj.animationChains.map((chain) => {
     const warnings = [];
 
@@ -151,7 +155,7 @@ export function mapAchjToTiledAnimations(achj, tilesetInfo) {
     }
 
     const frames = chain.frames
-      .map((frame, index) => mapFrame(frame, achj, tilesetInfo, warnings, index, chain.name))
+      .map((frame, index) => mapFrame(frame, achj, tilesetInfo, warnings, index, chain.name, options))
       .filter((frame) => frame !== null);
 
     return {
@@ -161,4 +165,22 @@ export function mapAchjToTiledAnimations(achj, tilesetInfo) {
       warnings,
     };
   });
+}
+
+// Recursively finds every .achx/.achj file under rootPath. `listDir(path)` is injected
+// (`{ dirs: string[], files: string[] }`, both as full paths) rather than calling the
+// `File` scripting global directly, so this can be exercised under plain Node with a
+// fake in-memory tree - see achj-import.mjs for the real Tiled-backed listDir.
+export function collectAnimationChainFiles(rootPath, listDir) {
+  const found = [];
+  const stack = [rootPath];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    const { dirs, files } = listDir(dir);
+    for (const file of files) {
+      if (/\.(achx|achj)$/i.test(file)) found.push(file);
+    }
+    stack.push(...dirs);
+  }
+  return found;
 }

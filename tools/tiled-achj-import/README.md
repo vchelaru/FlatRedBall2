@@ -20,14 +20,15 @@ What this importer does about that, per chain:
   image's actual pixel size (loaded via Tiled's `Image` class); if that load fails,
   UV frames are skipped with a warning instead.
 - Skips frames whose `textureName` doesn't match the tileset's image (a chain can span
-  multiple textures; Tiled tile animations can't).
+  multiple textures; Tiled tile animations can't). Warned about in single-file mode;
+  silent in project-folder mode, where it's the expected case for most files scanned.
 - Keeps a flipped frame's tile but drops the flip, with a warning - the tile still
   looks *close*, not correct.
 - Only maps tilesets with zero margin/spacing (tile-id arithmetic elsewhere assumes a
   plain grid).
-- Sets `frames` on the *first frame's* tile, and stamps a custom property
-  `achjAnimationName` on it so the chain's name survives as metadata, even though
-  Tiled itself never reads it.
+- Sets `frames` on the *first frame's* tile, and stamps custom properties
+  `achjAnimationName` (the chain's name) and `achjSourceFile` (the `.achx`/`.achj` path
+  it came from) on it, since Tiled itself never reads either.
 
 If none of that fits your chain (non-grid frames, per-frame flips that matter,
 multi-texture chains), this tool isn't the answer for it - author the animation in
@@ -51,14 +52,29 @@ already watching.)
 
 ## Use
 
-With a tileset open in Tiled: **Edit > Import AnimationChain Frames...**, pick a
-`.achj` or `.achx` file. Warnings and a summary go to the Console view (**View > Views
-and Toolbars > Console**) and a dialog.
+Two ways to run it, both under **Edit** with a tileset open:
+
+- **Import AnimationChain Frames...** - pick a single `.achj`/`.achx` file.
+- **Set AnimationChain Project Folder...** - pick a project's root folder once. Every
+  `.achx`/`.achj` file under it (recursively) is scanned, and any frame whose
+  `textureName` matches *this tileset's* image is applied - everything else is silently
+  skipped, since in a big project most chains belong to some other tileset. The folder
+  is remembered as a tileset custom property (`achjProjectRoot`) and reapplied
+  automatically every time this tileset is opened in Tiled (`tiled.assetOpened`), so
+  edits made in AnimationEditor since the last session show up without a manual step -
+  though only *on open*, not live while both apps are running side by side (Tiled's
+  scripting engine has no confirmed timer API to poll for changes on an interval). Use
+  **Re-import AnimationChain Project** to force a re-run without reopening the tileset.
+
+Warnings and a summary go to the Console view (**View > Views and Toolbars >
+Console**); manual runs also show a summary dialog. The automatic on-open run only
+logs, since a popup on every tileset open would get old fast.
 
 ## Development
 
 `achj-mapper.mjs` is the pure conversion logic (no dependency on Tiled's `tiled`/
-`Tileset`/`TextFile`/`Image` scripting globals) and is unit tested under plain Node:
+`Tileset`/`TextFile`/`Image`/`File` scripting globals) and is unit tested under plain
+Node:
 
 ```
 node --test
