@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseAchj, frameDurationMs, mapAchjToTiledAnimations } from "./achj-mapper.mjs";
+import { parseAchj, parseAchx, frameDurationMs, mapAchjToTiledAnimations } from "./achj-mapper.mjs";
 
 const tilesetInfo = {
   tileWidth: 16,
@@ -156,4 +156,107 @@ test("mapAchjToTiledAnimations refuses to map a tileset with margin or spacing",
   const [result] = mapAchjToTiledAnimations(achj, marginedTileset);
   assert.equal(result.frames.length, 0);
   assert.match(result.warnings[0], /margin or spacing/);
+});
+
+const achxSample = `<?xml version="1.0" encoding="utf-8"?>
+<AnimationChainArraySave xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <FileRelativeTextures>true</FileRelativeTextures>
+  <TimeMeasurementUnit>Second</TimeMeasurementUnit>
+  <CoordinateType>Pixel</CoordinateType>
+  <AnimationChain>
+    <Name>Walk</Name>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+    <Frame>
+      <FlipHorizontal>true</FlipHorizontal>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.1</FrameLength>
+      <LeftCoordinate>16</LeftCoordinate>
+      <RightCoordinate>32</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+  </AnimationChain>
+  <AnimationChain>
+    <Name>Idle</Name>
+    <Frame>
+      <TextureName>AnimatedSpritesheet.png</TextureName>
+      <FrameLength>0.5</FrameLength>
+      <LeftCoordinate>0</LeftCoordinate>
+      <RightCoordinate>16</RightCoordinate>
+      <TopCoordinate>0</TopCoordinate>
+      <BottomCoordinate>32</BottomCoordinate>
+    </Frame>
+  </AnimationChain>
+</AnimationChainArraySave>`;
+
+test("parseAchx parses a well-formed .achx (FRB1 XML dialect) file", () => {
+  const achx = parseAchx(achxSample);
+  assert.equal(achx.timeMeasurementUnit, "Second");
+  assert.equal(achx.coordinateType, "Pixel");
+  assert.equal(achx.animationChains.length, 2);
+  assert.equal(achx.animationChains[0].name, "Walk");
+  assert.equal(achx.animationChains[0].frames.length, 2);
+  assert.equal(achx.animationChains[0].frames[1].flipHorizontal, true);
+  assert.equal(achx.animationChains[0].frames[1].leftCoordinate, 16);
+  assert.equal(achx.animationChains[1].name, "Idle");
+});
+
+test("parseAchx rejects a file with no AnimationChainArraySave root", () => {
+  assert.throws(() => parseAchx("<NotAnAchx></NotAnAchx>"), /AnimationChainArraySave/);
+});
+
+test("mapAchjToTiledAnimations maps .achx frames the same way as .achj frames", () => {
+  const achx = parseAchx(achxSample);
+  const [walk] = mapAchjToTiledAnimations(achx, tilesetInfo);
+  assert.equal(walk.warnings.length, 1); // the dropped-flip warning on frame 1
+  assert.deepEqual(walk.frames, [
+    { tileId: 0, duration: 100 },
+    { tileId: 1, duration: 100 },
+  ]);
+});
+
+test("mapAchjToTiledAnimations converts UV coordinateType frames using the tileset's pixel size", () => {
+  const achj = parseAchj(
+    achjText({
+      coordinateType: "UV",
+      animationChains: [
+        {
+          name: "Walk",
+          frames: [
+            // 64x32 texture, 16x32 tiles -> column 0 is [0, 0.25) in U
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 0.25, topCoordinate: 0, bottomCoordinate: 1 },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, { ...tilesetInfo, textureWidth: 64, textureHeight: 32 });
+  assert.equal(result.warnings.length, 0);
+  assert.deepEqual(result.frames, [{ tileId: 0, duration: 100 }]);
+});
+
+test("mapAchjToTiledAnimations warns and skips UV frames when the tileset's pixel size isn't available", () => {
+  const achj = parseAchj(
+    achjText({
+      coordinateType: "UV",
+      animationChains: [
+        {
+          name: "Walk",
+          frames: [
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 0.25, topCoordinate: 0, bottomCoordinate: 1 },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo);
+  assert.equal(result.frames.length, 0);
+  assert.match(result.warnings[0], /UV.*pixel dimensions/);
 });

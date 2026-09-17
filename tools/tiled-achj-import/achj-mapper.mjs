@@ -1,6 +1,6 @@
-// Pure logic for converting a FlatRedBall2 AnimationEditor .achj file into Tiled's
-// per-tile animation format ({ tileId, duration }[] assigned to Tile.frames). No
-// dependency on the `tiled` scripting global, so this can run and be tested under
+// Pure logic for converting a FlatRedBall2 AnimationEditor .achj/.achx file into
+// Tiled's per-tile animation format ({ tileId, duration }[] assigned to Tile.frames).
+// No dependency on the `tiled` scripting global, so this can run and be tested under
 // plain Node. See achj-import.mjs for the Tiled-facing wiring that calls this.
 
 const EPSILON = 0.001;
@@ -13,6 +13,72 @@ export function parseAchj(jsonText) {
   return achj;
 }
 
+// Minimal hand-rolled reader for FRB1's .achx XML dialect (root
+// <AnimationChainArraySave>, see AnimationChainListSave.cs's ToXDocument/ParseXml).
+// Not a general XML parser - it only extracts the small fixed set of elements this
+// format uses, none of which nest inside a same-named element, so a non-greedy regex
+// per tag is enough. Written this way (rather than DOMParser/XDocument) because it has
+// to run both under plain Node (for tests) and inside Tiled's embedded JS engine,
+// neither of which is guaranteed to expose a DOM.
+function decodeXmlEntities(text) {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+function xmlChildText(xml, tag) {
+  const match = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(xml);
+  return match ? decodeXmlEntities(match[1]) : null;
+}
+
+function xmlChildBlocks(xml, tag) {
+  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, "g");
+  const blocks = [];
+  let match;
+  while ((match = re.exec(xml)) !== null) blocks.push(match[1]);
+  return blocks;
+}
+
+function xmlFloatChild(xml, tag, defaultValue) {
+  const text = xmlChildText(xml, tag);
+  return text === null ? defaultValue : parseFloat(text);
+}
+
+function parseAchxFrame(xml) {
+  return {
+    textureName: xmlChildText(xml, "TextureName") ?? "",
+    frameLength: xmlFloatChild(xml, "FrameLength", 0),
+    leftCoordinate: xmlFloatChild(xml, "LeftCoordinate", 0),
+    rightCoordinate: xmlFloatChild(xml, "RightCoordinate", 1),
+    topCoordinate: xmlFloatChild(xml, "TopCoordinate", 0),
+    bottomCoordinate: xmlFloatChild(xml, "BottomCoordinate", 1),
+    flipHorizontal: xmlChildText(xml, "FlipHorizontal") === "true",
+    flipVertical: xmlChildText(xml, "FlipVertical") === "true",
+    flipDiagonal: xmlChildText(xml, "FlipDiagonal") === "true",
+  };
+}
+
+export function parseAchx(xmlText) {
+  const rootMatch = /<AnimationChainArraySave\b[^>]*>([\s\S]*)<\/AnimationChainArraySave>/.exec(xmlText);
+  if (!rootMatch) {
+    throw new Error("Not a valid .achx file: missing an <AnimationChainArraySave> root element.");
+  }
+  const root = rootMatch[1];
+
+  return {
+    fileRelativeTextures: xmlChildText(root, "FileRelativeTextures") === "true",
+    timeMeasurementUnit: xmlChildText(root, "TimeMeasurementUnit") ?? "Second",
+    coordinateType: xmlChildText(root, "CoordinateType") ?? "UV",
+    animationChains: xmlChildBlocks(root, "AnimationChain").map((chainXml) => ({
+      name: xmlChildText(chainXml, "Name") ?? "",
+      frames: xmlChildBlocks(chainXml, "Frame").map(parseAchxFrame),
+    })),
+  };
+}
+
 export function frameDurationMs(frameLength, timeMeasurementUnit) {
   if (timeMeasurementUnit === "Millisecond") return frameLength;
   // "Second" and "Undefined" both use seconds (AnimationChainListSaveExtensions treats
@@ -22,9 +88,12 @@ export function frameDurationMs(frameLength, timeMeasurementUnit) {
 
 function frameRectPixels(frame, achj, tilesetInfo) {
   if (achj.coordinateType === "UV") {
-    return null; // UV coordinateType needs the texture's pixel size, which the Tiled
-    // scripting API doesn't expose for tileset images; re-export the .achj with
-    // "coordinateType": "Pixel" instead.
+    return {
+      left: frame.leftCoordinate * tilesetInfo.textureWidth,
+      top: frame.topCoordinate * tilesetInfo.textureHeight,
+      width: (frame.rightCoordinate - frame.leftCoordinate) * tilesetInfo.textureWidth,
+      height: (frame.bottomCoordinate - frame.topCoordinate) * tilesetInfo.textureHeight,
+    };
   }
   return {
     left: frame.leftCoordinate,
@@ -44,11 +113,12 @@ function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName) {
     return null;
   }
 
-  const rect = frameRectPixels(frame, achj, tilesetInfo);
-  if (!rect) {
-    warnings.push(`${label}: "UV" coordinateType is not supported - re-export the .achj as "Pixel" coordinateType - skipped.`);
+  if (achj.coordinateType === "UV" && !(tilesetInfo.textureWidth && tilesetInfo.textureHeight)) {
+    warnings.push(`${label}: "UV" coordinateType needs the tileset image's pixel dimensions, which weren't available - skipped.`);
     return null;
   }
+
+  const rect = frameRectPixels(frame, achj, tilesetInfo);
 
   if (Math.abs(rect.width - tilesetInfo.tileWidth) > EPSILON || Math.abs(rect.height - tilesetInfo.tileHeight) > EPSILON) {
     warnings.push(`${label}: frame rect ${rect.width}x${rect.height} doesn't match tile size ${tilesetInfo.tileWidth}x${tilesetInfo.tileHeight} - skipped.`);
