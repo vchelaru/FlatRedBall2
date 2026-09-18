@@ -32,6 +32,29 @@ internal sealed class FakeApplicationUpdater : IApplicationUpdater
     public void ApplyUpdateAndRestart() => RestartCount++;
 }
 
+internal sealed class FakeTiledExtensionInstaller : ITiledExtensionInstaller
+{
+    public string? DetectedFolder { get; set; }
+    public TiledExtensionInstallStatus Status { get; set; } = TiledExtensionInstallStatus.NotInstalled;
+    public string? InstallError { get; set; }
+    public string? ValidateError { get; set; }
+    public int InstallCount { get; private set; }
+    public string? LastInstalledFolder { get; private set; }
+
+    public string? DetectExtensionsFolder() => DetectedFolder;
+
+    public TiledExtensionInstallStatus GetStatus(string extensionsFolder) => Status;
+
+    public string? Install(string extensionsFolder)
+    {
+        InstallCount++;
+        LastInstalledFolder = extensionsFolder;
+        return InstallError;
+    }
+
+    public string? ValidateFolder(string folderPath) => ValidateError;
+}
+
 /// <summary>
 /// Per-test service graph for headless App tests. Each call builds a brand-new
 /// set of services — no static state. Use <see cref="CreateMainWindow"/> to get
@@ -54,6 +77,7 @@ internal sealed class TestServices
     public ProjectTreeThumbnailService ProjectTreeThumbnailService { get; } = new(diskCacheDirectory: null);
     public IFileAssociationService FileAssociationService { get; set; } = new NullFileAssociationService();
     public IApplicationUpdater ApplicationUpdater { get; set; } = new FakeApplicationUpdater();
+    public FakeTiledExtensionInstaller TiledExtensionInstaller { get; set; } = new();
 
     /// <summary>
     /// Unique-per-instance temp application-data root. Injected into the <see cref="MainWindow"/>
@@ -87,7 +111,8 @@ internal sealed class TestServices
         new MainWindow(
             ProjectManager, SelectedState, AppCommands, AppState,
             ApplicationEvents, IoManager, ObjectFinder, UndoManager, PendingCutState,
-            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot, ApplicationUpdater);
+            ThumbnailService, ProjectTreeThumbnailService, FileAssociationService, SettingsRoot,
+            ApplicationUpdater, TiledExtensionInstaller);
 
     public WireframeControl CreateWireframeControl(System.Action<string>? showError = null)
     {

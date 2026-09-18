@@ -44,6 +44,10 @@ Tiled's own Tile Animation Editor instead.
 
 ## Install
 
+The FlatRedBall2 Animation Editor can install this for you: **Edit > Install Tiled
+Integration…**, or the startup banner it shows when it detects a Tiled install without the
+extension. Manual install below is the fallback for anyone not using that editor.
+
 Copy only **`achj-mapper.mjs` and `achj-import.mjs`** (not `achj-mapper.test.mjs` -
 Tiled auto-loads *every* script file in an extensions folder, and the test file uses
 syntax `node --test` accepts but Tiled's embedded JS engine doesn't) into Tiled's
