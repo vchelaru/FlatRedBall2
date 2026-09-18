@@ -64,6 +64,15 @@ function buildTilesetInfo(tileset) {
   };
 }
 
+// Array.prototype.flatMap isn't available in Tiled's embedded JS engine (throws
+// "Property 'flatMap' ... is not a function" at runtime, despite being valid syntax) -
+// this is the flatMap-free equivalent of `results.flatMap(r => r.warnings)`.
+function collectWarnings(results) {
+  const warnings = [];
+  for (const result of results) warnings.push(...result.warnings);
+  return warnings;
+}
+
 // Applies mapAchjToTiledAnimations's results to `tileset` (must already be inside a
 // tileset.macro callback) and returns how many chains were applied.
 function applyResults(tileset, results, warnings, sourceLabel) {
@@ -99,7 +108,7 @@ function importSingleFile(tileset, path) {
 
   const tilesetInfo = buildTilesetInfo(tileset);
   const results = mapAchjToTiledAnimations(achj, tilesetInfo);
-  const warnings = results.flatMap((result) => result.warnings);
+  const warnings = collectWarnings(results);
   let appliedCount = 0;
 
   tileset.macro(`Import AnimationChain frames from ${path}`, () => {
@@ -145,7 +154,7 @@ function importProjectFolder(tileset, rootPath, interactive) {
       }
       const results = mapAchjToTiledAnimations(achj, tilesetInfo, { silentTextureMismatch: true });
       chainCount += results.length;
-      warnings.push(...results.flatMap((result) => result.warnings));
+      warnings.push(...collectWarnings(results));
       appliedCount += applyResults(tileset, results, warnings, path);
     }
   });

@@ -36,19 +36,27 @@ Tiled's own Tile Animation Editor instead.
 
 ## Install
 
-Both files must stay `.mjs` (not `.js`) - Tiled only allows `import`/`export` between
-extension files when they're loaded as ES modules, which requires the `.mjs`
-extension.
+Copy only **`achj-mapper.mjs` and `achj-import.mjs`** (not `achj-mapper.test.mjs` -
+Tiled auto-loads *every* script file in an extensions folder, and the test file uses
+syntax `node --test` accepts but Tiled's embedded JS engine doesn't) into Tiled's
+extensions directory. Both must stay `.mjs` (not `.js`) - Tiled only allows
+`import`/`export` between extension files when they're loaded as ES modules, which
+requires the `.mjs` extension.
 
-Copy this folder into Tiled's extensions directory. Tiled loads extensions on startup;
-use **Edit > Reload Extensions** if your version has that menu item, otherwise restart
-Tiled:
+Tiled loads extensions on startup and auto-reloads them when a file there changes,
+so no restart is needed after the first install:
 
 - Windows: `%LOCALAPPDATA%\Tiled\extensions\`
 - Linux/macOS: `~/.local/share/Tiled/extensions/`
 
 (Or **Edit > Preferences > Plugins and Extensions** to find the folder Tiled is
 already watching.)
+
+Tiled's embedded JS engine is also missing some newer `Array.prototype` methods that
+exist under Node (confirmed so far: `flatMap`, which throws a runtime `TypeError`
+despite being valid syntax) - if you see a similar `TypeError: Property '...' ... is
+not a function` in the Console after editing either file, that's most likely another
+one; replace it with an equivalent built from `.map`/`.filter`/`.reduce`/spread instead.
 
 ## Use
 
