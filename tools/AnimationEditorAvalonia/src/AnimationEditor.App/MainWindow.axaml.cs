@@ -1210,9 +1210,13 @@ public partial class MainWindow : Window
     private void InstallTiledExtensionAndReport(string folder)
     {
         string? error = _tiledExtensionInstaller.Install(folder);
-        ShowStatusMessage(
-            error ?? $"Installed the Tiled .achj import extension to {folder}.",
-            isError: error is not null);
+        if (error is not null)
+        {
+            ShowStatusMessage(error, isError: true);
+            return;
+        }
+
+        Notifications.ShowToast($"Installed the Tiled .achj import extension to {folder}.");
     }
 
     // ── Automatic-update banner (issue #982) ──────────────────────────────────

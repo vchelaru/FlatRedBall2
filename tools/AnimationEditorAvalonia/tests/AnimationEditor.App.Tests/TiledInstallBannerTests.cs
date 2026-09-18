@@ -32,6 +32,8 @@ public class TiledInstallBannerTests
         Assert.Equal(@"C:\Fake\Tiled\extensions", ctx.TiledExtensionInstaller.LastInstalledFolder);
         var banner = window.FindControl<Border>("TiledInstallBanner");
         Assert.False(banner!.IsVisible);
+        Assert.True(window.Notifications.ToastPanel.IsVisible);
+        Assert.Contains(@"C:\Fake\Tiled\extensions", window.Notifications.ToastMessage.Text);
     }
 
     [AvaloniaFact]
@@ -108,5 +110,8 @@ public class TiledInstallBannerTests
 
         Assert.Equal(1, ctx.TiledExtensionInstaller.InstallCount);
         Assert.Equal(@"C:\SomePickedFolder", ctx.TiledExtensionInstaller.LastInstalledFolder);
+        // Same shared InstallTiledExtensionAndReport as the banner path -- confirms the menu's
+        // manual-pick route shows the same confirmation toast, not a separate copy.
+        Assert.True(window.Notifications.ToastPanel.IsVisible);
     }
 }
