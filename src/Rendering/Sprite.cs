@@ -502,7 +502,6 @@ public class Sprite : IRenderable, IAttachable
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var r = new AARect { Name = name };
                     ApplyRectangle(r, rect);
-                    r.IsVisible = true;
                     Parent.Add(r);
                 }
                 else if (existing is AARect r)
@@ -526,7 +525,6 @@ public class Sprite : IRenderable, IAttachable
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var c = new Circle { Name = name };
                     ApplyCircle(c, circle);
-                    c.IsVisible = true;
                     Parent.Add(c);
                 }
                 else if (existing is Circle c)
@@ -550,7 +548,6 @@ public class Sprite : IRenderable, IAttachable
                             $"Animation frame references shape '{name}' which is not on the entity, and AutoCreateShapes is false.");
                     var p = new Polygon { Name = name };
                     ApplyPolygon(p, poly);
-                    p.IsVisible = true;
                     Parent.Add(p);
                 }
                 else if (existing is Polygon p)
@@ -588,7 +585,8 @@ public class Sprite : IRenderable, IAttachable
         }
     }
 
-    // Geometry-only — callers that just created the shape set IsVisible = true themselves.
+    // Geometry-only — visibility is owned by the game. Auto-created collision shapes retain
+    // the invisible-by-default behavior of their respective constructors.
     private static void ApplyRectangle(AARect r, AnimationAARectFrame entry)
     {
         r.Width = entry.Width;

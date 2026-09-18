@@ -92,17 +92,18 @@ public class SpriteAnimationShapesTests
         sprite.AnimationChains = list;
         sprite.PlayAnimation("Attack");
 
-        // Auto-created on frame 0 (AutoCreateShapes = true by default)
+        // Auto-created on frame 0 (AutoCreateShapes = true by default). Collision-only
+        // shapes remain invisible unless game code deliberately opts into rendering them.
         AARect? sword = null;
         foreach (var c in entity.Children)
             if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
-        sword!.IsVisible.ShouldBeTrue();
+        sword!.IsVisible.ShouldBeFalse();
 
         // Advance to frame 1 — no Sword listed, collision disabled but visibility untouched
         sprite.AnimateSelf(0.15);
 
-        sword.IsVisible.ShouldBeTrue();
+        sword.IsVisible.ShouldBeFalse();
         entity.CollidesWith(new AARect { X = 0f, Y = 0f, Width = 100f, Height = 100f }).ShouldBeFalse();
     }
 
@@ -156,13 +157,13 @@ public class SpriteAnimationShapesTests
         foreach (var c in entity.Children)
             if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
-        sword!.IsVisible.ShouldBeTrue();
+        sword!.IsVisible.ShouldBeFalse();
 
         sprite.PlayAnimation("Idle");
 
         // Sword is owned by the chainlist (Attack mentions it), Idle does not list it → collision
         // disabled, but visibility is never the animation system's business.
-        sword.IsVisible.ShouldBeTrue();
+        sword.IsVisible.ShouldBeFalse();
         entity.CollidesWith(new AARect { X = 0f, Y = 0f, Width = 100f, Height = 100f }).ShouldBeFalse();
     }
 
@@ -192,13 +193,13 @@ public class SpriteAnimationShapesTests
         foreach (var c in entity.Children)
             if (c is AARect r && r.Name == "Sword") sword = r;
         sword.ShouldNotBeNull();
-        sword!.IsVisible.ShouldBeTrue();
+        sword!.IsVisible.ShouldBeFalse();
 
         // Swap chainlists. Movement does not own "Sword", so it must not touch it.
         sprite.AnimationChains = movement;
         sprite.PlayAnimation("Walk");
 
-        sword.IsVisible.ShouldBeTrue();
+        sword.IsVisible.ShouldBeFalse();
         sword.Width.ShouldBe(30f);
     }
 
