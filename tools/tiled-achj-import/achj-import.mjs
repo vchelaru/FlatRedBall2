@@ -74,8 +74,13 @@ function collectWarnings(results) {
 }
 
 // Applies mapAchjToTiledAnimations's results to `tileset` (must already be inside a
-// tileset.macro callback) and returns how many chains were applied.
-function applyResults(tileset, results, warnings, sourceLabel) {
+// tileset.macro callback) and returns how many chains were applied. `sourceLabel` is
+// the absolute .achx/.achj path (used as-is in warnings, for debugging); it's stored on
+// each tile's achjSourceFile property relative to `baseDir` (the tileset's own
+// directory) instead, for the same portability reason as achjProjectRoot - `baseDir`
+// null (tileset never saved) falls back to storing the absolute path.
+function applyResults(tileset, results, warnings, sourceLabel, baseDir) {
+  const storedSourceLabel = baseDir ? relativePath(baseDir, sourceLabel) : sourceLabel;
   let appliedCount = 0;
   for (const result of results) {
     if (result.entryTileId === null) continue;
@@ -86,7 +91,7 @@ function applyResults(tileset, results, warnings, sourceLabel) {
     }
     entryTile.frames = result.frames;
     entryTile.setProperty("achjAnimationName", result.chainName);
-    entryTile.setProperty("achjSourceFile", sourceLabel);
+    entryTile.setProperty("achjSourceFile", storedSourceLabel);
     appliedCount++;
   }
   return appliedCount;
@@ -109,10 +114,11 @@ function importSingleFile(tileset, path) {
   const tilesetInfo = buildTilesetInfo(tileset);
   const results = mapAchjToTiledAnimations(achj, tilesetInfo);
   const warnings = collectWarnings(results);
+  const baseDir = projectRootDir(tileset);
   let appliedCount = 0;
 
   tileset.macro(`Import AnimationChain frames from ${path}`, () => {
-    appliedCount = applyResults(tileset, results, warnings, path);
+    appliedCount = applyResults(tileset, results, warnings, path, baseDir);
   });
 
   const summary = `Applied ${appliedCount} of ${results.length} animation chain(s) from "${path}".`;
@@ -139,6 +145,7 @@ function listDirTiled(path) {
 function importProjectFolder(tileset, rootPath, interactive) {
   const filePaths = collectAnimationChainFiles(rootPath, listDirTiled);
   const tilesetInfo = buildTilesetInfo(tileset);
+  const baseDir = projectRootDir(tileset);
   const warnings = [];
   let appliedCount = 0;
   let chainCount = 0;
@@ -155,7 +162,7 @@ function importProjectFolder(tileset, rootPath, interactive) {
       const results = mapAchjToTiledAnimations(achj, tilesetInfo, { silentTextureMismatch: true });
       chainCount += results.length;
       warnings.push(...collectWarnings(results));
-      appliedCount += applyResults(tileset, results, warnings, path);
+      appliedCount += applyResults(tileset, results, warnings, path, baseDir);
     }
   });
 

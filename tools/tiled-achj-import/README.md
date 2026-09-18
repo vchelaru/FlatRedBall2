@@ -28,7 +28,8 @@ What this importer does about that, per chain:
   plain grid).
 - Sets `frames` on the *first frame's* tile, and stamps custom properties
   `achjAnimationName` (the chain's name) and `achjSourceFile` (the `.achx`/`.achj` path
-  it came from) on it, since Tiled itself never reads either.
+  it came from, stored relative to the tileset for the same portability reason as
+  `achjProjectRoot`) on it, since Tiled itself never reads either.
 
 If none of that fits your chain (non-grid frames, per-frame flips that matter,
 multi-texture chains), this tool isn't the answer for it - author the animation in
