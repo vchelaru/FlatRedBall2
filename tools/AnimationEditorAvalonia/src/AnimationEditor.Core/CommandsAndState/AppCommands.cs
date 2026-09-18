@@ -810,8 +810,6 @@ namespace AnimationEditor.Core.CommandsAndState
 
         public void AddFrame(AnimationChainSave chain, string? textureName = null)
         {
-            if (IsChainLocked(chain)) return;
-
             // When no texture is passed, inherit both the texture and the sub-region from a
             // source frame so the new frame lands on the same sheet cell the user is working in,
             // rather than snapping back to the whole texture. An explicit texture (e.g. drag-drop
@@ -827,13 +825,32 @@ namespace AnimationEditor.Core.CommandsAndState
             if (string.IsNullOrEmpty(resolvedTextureName))
                 resolvedTextureName = CanvasDefaultTexturePath?.Invoke();
 
+            CreateAndAddFrame(
+                chain, resolvedTextureName ?? string.Empty,
+                source?.LeftCoordinate ?? 0f, source?.TopCoordinate ?? 0f,
+                source?.RightCoordinate ?? 1f, source?.BottomCoordinate ?? 1f);
+        }
+
+        /// <summary>
+        /// Shared tail end of <see cref="AddFrame"/> and <see cref="AddFrameFromPixelBounds"/>:
+        /// builds the <see cref="AnimationFrameSave"/> from already-resolved UV coordinates and
+        /// executes the undoable add. The two callers differ only in how they arrive at those UV
+        /// coordinates (a copied/inherited region vs. a pixel rect divided by bitmap size), not in
+        /// what happens once they have them.
+        /// </summary>
+        private void CreateAndAddFrame(
+            AnimationChainSave chain, string textureName,
+            float left, float top, float right, float bottom)
+        {
+            if (IsChainLocked(chain)) return;
+
             var frame = new AnimationFrameSave
             {
-                TextureName  = resolvedTextureName ?? string.Empty,
-                LeftCoordinate   = source?.LeftCoordinate   ?? 0f,
-                RightCoordinate  = source?.RightCoordinate  ?? 1f,
-                TopCoordinate    = source?.TopCoordinate    ?? 0f,
-                BottomCoordinate = source?.BottomCoordinate ?? 1f,
+                TextureName      = textureName,
+                LeftCoordinate   = left,
+                TopCoordinate    = top,
+                RightCoordinate  = right,
+                BottomCoordinate = bottom,
                 FrameLength      = 0.1f,
             };
             _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
@@ -1711,19 +1728,10 @@ namespace AnimationEditor.Core.CommandsAndState
             int minX, int minY, int maxX, int maxY,
             int bitmapWidth, int bitmapHeight)
         {
-            if (IsChainLocked(chain)) return;
-
-            var frame = new AnimationFrameSave
-            {
-                TextureName         = textureName,
-                LeftCoordinate      = minX / (float)bitmapWidth,
-                RightCoordinate     = maxX / (float)bitmapWidth,
-                TopCoordinate       = minY / (float)bitmapHeight,
-                BottomCoordinate    = maxY / (float)bitmapHeight,
-                FrameLength         = 0.1f,
-            };
-
-            _undoManager.Execute(new AddFrameCommand(frame, chain, this, _events, _selectedState));
+            CreateAndAddFrame(
+                chain, textureName,
+                minX / (float)bitmapWidth, minY / (float)bitmapHeight,
+                maxX / (float)bitmapWidth, maxY / (float)bitmapHeight);
         }
 
         // ── Texture assignment (WF10b — write direction) ─────────────────────────

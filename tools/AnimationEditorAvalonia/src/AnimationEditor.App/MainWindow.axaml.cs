@@ -2138,6 +2138,10 @@ public partial class MainWindow : Window
 
             string achxFolder = (Path.GetDirectoryName(_projectManager.FileName) ?? string.Empty);
 
+            // Case-preserved (FullPath, not Standardized) -- these values get written back into
+            // frame TextureNames by Ctrl+click/"+" Add Frame, and Standardized is lowercased for
+            // cache-key comparison only. De-dupe case-insensitively so a texture referenced with
+            // inconsistent casing across frames still collapses to one dropdown entry.
             var paths = acls.AnimationChains
                 .SelectMany(c => c.Frames)
                 .Where(f => !string.IsNullOrEmpty(f.TextureName))
@@ -2146,10 +2150,10 @@ public partial class MainWindow : Window
                     var abs = System.IO.Path.IsPathRooted(f.TextureName)
                         ? f.TextureName
                         : Path.Combine(achxFolder, f.TextureName);
-                    return new FilePath(abs).Standardized;
+                    return new FilePath(abs).FullPath;
                 })
-                .Union(_projectManager.ReferencedPngs.Select(p => p.Standardized))
-                .Distinct()
+                .Union(_projectManager.ReferencedPngs.Select(p => p.FullPath))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             foreach (var p in paths)
@@ -2191,7 +2195,8 @@ public partial class MainWindow : Window
             var abs = System.IO.Path.IsPathRooted(textureName)
                 ? textureName
                 : Path.Combine(achxFolder, textureName);
-            texPath = new FilePath(abs).Standardized;
+            // Case-preserved -- see RefreshTextureCombo's comment.
+            texPath = new FilePath(abs).FullPath;
         }
 
         if (texPath != null && TextureCombo.Items.Contains(texPath))
