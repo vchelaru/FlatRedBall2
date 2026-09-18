@@ -289,6 +289,7 @@ test("mapAchjToTiledAnimations tallies (instead of itemizing) skip reasons when 
     uvMissingPixelSize: 0,
     sizeMismatch: 1,
     notGridAligned: 1,
+    flipDropped: 0,
   });
 });
 
@@ -309,6 +310,25 @@ test("mapAchjToTiledAnimations tallies a UV-without-pixel-size skip when tallySk
   const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { tallySkips: true });
   assert.equal(result.warnings.length, 0);
   assert.equal(result.skipCounts.uvMissingPixelSize, 1);
+});
+
+test("mapAchjToTiledAnimations tallies a dropped flip (instead of itemizing) when tallySkips is set", () => {
+  const achj = parseAchj(
+    achjText({
+      animationChains: [
+        {
+          name: "Flipped",
+          frames: [
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 16, topCoordinate: 0, bottomCoordinate: 32, flipHorizontal: true },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { tallySkips: true });
+  assert.equal(result.frames.length, 1); // still applied - flip is dropped, not skipped
+  assert.equal(result.warnings.length, 0);
+  assert.equal(result.skipCounts.flipDropped, 1);
 });
 
 test("mapAchjToTiledAnimations still itemizes skip warnings by default (tallySkips unset)", () => {

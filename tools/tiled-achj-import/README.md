@@ -26,8 +26,11 @@ What this importer does about that, per chain:
 - `"coordinateType": "UV"` frames are converted to pixels using the tileset image's
   actual pixel size (loaded via Tiled's `Image` class); if that load fails, UV frames
   are skipped (same itemized-vs-tallied treatment as above).
-- Keeps a flipped frame's tile but drops the flip, with a warning - the tile still
-  looks *close*, not correct.
+- Keeps a flipped frame's tile but drops the flip - the tile still looks *close*, not
+  correct. Itemized in single-file mode; tallied into its own summary sentence in
+  project-folder mode (it's not a skip - the frame is still applied - so it gets a
+  separate count from the skip reasons above, e.g. `12 applied frame(s) had a flip
+  dropped (Tiled can't flip per-frame).`).
 - Only maps tilesets with zero margin/spacing (tile-id arithmetic elsewhere assumes a
   plain grid).
 - Sets `frames` on the *first frame's* tile, and stamps custom properties

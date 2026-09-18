@@ -108,7 +108,7 @@ function frameRectPixels(frame, achj, tilesetInfo) {
 // with many .achx/.achj files, most frames scanned fall in here, so itemizing every one
 // as a warning drowns out the warnings that are actually actionable. See tallySkips.
 function emptySkipCounts() {
-  return { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0 };
+  return { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0, flipDropped: 0 };
 }
 
 function mapFrame(frame, achj, tilesetInfo, warnings, skipCounts, frameIndex, chainName, options) {
@@ -141,10 +141,12 @@ function mapFrame(frame, achj, tilesetInfo, warnings, skipCounts, frameIndex, ch
   }
 
   if (frame.flipHorizontal || frame.flipVertical || frame.flipDiagonal) {
-    // Only reached by a frame that's about to be applied - a much smaller, more
-    // relevant set than the skip reasons above, so this stays itemized regardless of
-    // tallySkips.
-    warnings.push(`${label}: uses a flip flag; Tiled tile animation frames can't flip per-frame, so the flip is dropped.`);
+    // Not a skip (the frame is still applied below) but the same "common in bulk mode,
+    // noisy when itemized" story as the skips above, so it shares tallySkips.
+    skipCounts.flipDropped++;
+    if (!options.tallySkips) {
+      warnings.push(`${label}: uses a flip flag; Tiled tile animation frames can't flip per-frame, so the flip is dropped.`);
+    }
   }
 
   const column = Math.round(rect.left / tilesetInfo.tileWidth);

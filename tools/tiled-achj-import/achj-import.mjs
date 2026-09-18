@@ -73,23 +73,30 @@ function collectWarnings(results) {
   return warnings;
 }
 
-const SKIP_COUNT_LABELS = [
+// textureMismatch/sizeMismatch/notGridAligned/uvMissingPixelSize are actual skips (the
+// frame never becomes a tile animation); flipDropped is different - that frame IS
+// applied, just with its flip lost - so it gets its own sentence in the summary rather
+// than being folded into "skipped".
+const SKIP_REASON_LABELS = [
   ["textureMismatch", "different texture"],
   ["sizeMismatch", "wrong size"],
   ["notGridAligned", "not grid-aligned"],
   ["uvMissingPixelSize", "UV without pixel size"],
 ];
+const ALL_SKIP_COUNT_KEYS = [...SKIP_REASON_LABELS.map(([key]) => key), "flipDropped"];
 
 function addSkipCounts(total, counts) {
-  for (const [key] of SKIP_COUNT_LABELS) total[key] += counts[key];
+  for (const key of ALL_SKIP_COUNT_KEYS) total[key] += counts[key];
 }
 
 function describeSkipCounts(counts) {
   const parts = [];
-  for (const [key, label] of SKIP_COUNT_LABELS) {
+  for (const [key, label] of SKIP_REASON_LABELS) {
     if (counts[key] > 0) parts.push(`${counts[key]} ${label}`);
   }
-  return parts.join(", ");
+  const skippedSentence = parts.length > 0 ? ` Skipped frames not meant for this tileset: ${parts.join(", ")}.` : "";
+  const flipSentence = counts.flipDropped > 0 ? ` ${counts.flipDropped} applied frame(s) had a flip dropped (Tiled can't flip per-frame).` : "";
+  return skippedSentence + flipSentence;
 }
 
 // Applies mapAchjToTiledAnimations's results to `tileset` (must already be inside a
@@ -166,7 +173,7 @@ function importProjectFolder(tileset, rootPath, interactive) {
   const tilesetInfo = buildTilesetInfo(tileset);
   const baseDir = projectRootDir(tileset);
   const warnings = [];
-  const totalSkipCounts = { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0 };
+  const totalSkipCounts = { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0, flipDropped: 0 };
   let appliedCount = 0;
   let chainCount = 0;
 
@@ -192,10 +199,9 @@ function importProjectFolder(tileset, rootPath, interactive) {
     }
   });
 
-  const skipSummary = describeSkipCounts(totalSkipCounts);
   const summary =
     `AnimationChain project import: applied ${appliedCount} animation(s) (of ${chainCount} chains seen) from ${filePaths.length} file(s) under "${rootPath}".` +
-    (skipSummary ? ` Skipped frames not meant for this tileset: ${skipSummary}.` : "");
+    describeSkipCounts(totalSkipCounts);
   tiled.log(summary);
   if (warnings.length > 0) tiled.log(warnings.join("\n"));
   if (interactive) {
