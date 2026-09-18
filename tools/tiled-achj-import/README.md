@@ -15,13 +15,17 @@ starting tile, not a name.
 What this importer does about that, per chain:
 
 - Matches each frame's pixel rect to a tile in the open tileset by position. Frames
-  must be grid-aligned and exactly one tile in size - anything else is skipped with a
-  warning. `"coordinateType": "UV"` frames are converted to pixels using the tileset
-  image's actual pixel size (loaded via Tiled's `Image` class); if that load fails,
-  UV frames are skipped with a warning instead.
-- Skips frames whose `textureName` doesn't match the tileset's image (a chain can span
-  multiple textures; Tiled tile animations can't). Warned about in single-file mode;
-  silent in project-folder mode, where it's the expected case for most files scanned.
+  must be grid-aligned and exactly one tile in size, and reference the same texture as
+  the open tileset (a chain can span multiple textures; Tiled tile animations can't) -
+  anything else is skipped. In single-file mode each skip is an itemized warning; in
+  project-folder mode, where most `.achx`/`.achj` files scanned were never meant to
+  become tile animations at all, skips are tallied by reason instead and reported as
+  one summary line (e.g. `Skipped frames not meant for this tileset: 142 different
+  texture, 38 wrong size, 6 not grid-aligned.`) so the itemized warnings that remain are
+  the ones actually worth reading.
+- `"coordinateType": "UV"` frames are converted to pixels using the tileset image's
+  actual pixel size (loaded via Tiled's `Image` class); if that load fails, UV frames
+  are skipped (same itemized-vs-tallied treatment as above).
 - Keeps a flipped frame's tile but drops the flip, with a warning - the tile still
   looks *close*, not correct.
 - Only maps tilesets with zero margin/spacing (tile-id arithmetic elsewhere assumes a

@@ -103,38 +103,47 @@ function frameRectPixels(frame, achj, tilesetInfo) {
   };
 }
 
-function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName, options) {
+// A frame gets skipped for one of these reasons whenever it wasn't meant to become a
+// Tiled tile animation at all (wrong texture, not tile-sized, off-grid) - in a project
+// with many .achx/.achj files, most frames scanned fall in here, so itemizing every one
+// as a warning drowns out the warnings that are actually actionable. See tallySkips.
+function emptySkipCounts() {
+  return { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0 };
+}
+
+function mapFrame(frame, achj, tilesetInfo, warnings, skipCounts, frameIndex, chainName, options) {
   const label = `chain "${chainName}" frame ${frameIndex}`;
+
+  function skip(reason, message) {
+    skipCounts[reason]++;
+    if (!options.tallySkips) warnings.push(message);
+    return null;
+  }
 
   const textureBaseName = frame.textureName.split(/[\\/]/).pop();
   const tilesetBaseName = tilesetInfo.imageFileName.split(/[\\/]/).pop();
   if (textureBaseName !== tilesetBaseName) {
-    // In project-wide bulk mode, most chains belong to some *other* tileset's texture -
-    // that's the expected case, not a warning-worthy one.
-    if (!options.silentTextureMismatch) {
-      warnings.push(`${label}: references a different texture ("${frame.textureName}") than the open tileset ("${tilesetInfo.imageFileName}") - skipped.`);
-    }
-    return null;
+    return skip("textureMismatch", `${label}: references a different texture ("${frame.textureName}") than the open tileset ("${tilesetInfo.imageFileName}") - skipped.`);
   }
 
   if (achj.coordinateType === "UV" && !(tilesetInfo.textureWidth && tilesetInfo.textureHeight)) {
-    warnings.push(`${label}: "UV" coordinateType needs the tileset image's pixel dimensions, which weren't available - skipped.`);
-    return null;
+    return skip("uvMissingPixelSize", `${label}: "UV" coordinateType needs the tileset image's pixel dimensions, which weren't available - skipped.`);
   }
 
   const rect = frameRectPixels(frame, achj, tilesetInfo);
 
   if (Math.abs(rect.width - tilesetInfo.tileWidth) > EPSILON || Math.abs(rect.height - tilesetInfo.tileHeight) > EPSILON) {
-    warnings.push(`${label}: frame rect ${rect.width}x${rect.height} doesn't match tile size ${tilesetInfo.tileWidth}x${tilesetInfo.tileHeight} - skipped.`);
-    return null;
+    return skip("sizeMismatch", `${label}: frame rect ${rect.width}x${rect.height} doesn't match tile size ${tilesetInfo.tileWidth}x${tilesetInfo.tileHeight} - skipped.`);
   }
 
   if (Math.abs(rect.left % tilesetInfo.tileWidth) > EPSILON || Math.abs(rect.top % tilesetInfo.tileHeight) > EPSILON) {
-    warnings.push(`${label}: frame rect origin (${rect.left}, ${rect.top}) is not aligned to the tile grid - skipped.`);
-    return null;
+    return skip("notGridAligned", `${label}: frame rect origin (${rect.left}, ${rect.top}) is not aligned to the tile grid - skipped.`);
   }
 
   if (frame.flipHorizontal || frame.flipVertical || frame.flipDiagonal) {
+    // Only reached by a frame that's about to be applied - a much smaller, more
+    // relevant set than the skip reasons above, so this stays itemized regardless of
+    // tallySkips.
     warnings.push(`${label}: uses a flip flag; Tiled tile animation frames can't flip per-frame, so the flip is dropped.`);
   }
 
@@ -148,14 +157,15 @@ function mapFrame(frame, achj, tilesetInfo, warnings, frameIndex, chainName, opt
 export function mapAchjToTiledAnimations(achj, tilesetInfo, options = {}) {
   return achj.animationChains.map((chain) => {
     const warnings = [];
+    const skipCounts = emptySkipCounts();
 
     if (tilesetInfo.margin || tilesetInfo.tileSpacing) {
       warnings.push(`chain "${chain.name}": tileset has non-zero margin or spacing, which this importer can't account for when computing tile ids - skipped.`);
-      return { chainName: chain.name, frames: [], entryTileId: null, warnings };
+      return { chainName: chain.name, frames: [], entryTileId: null, warnings, skipCounts };
     }
 
     const frames = chain.frames
-      .map((frame, index) => mapFrame(frame, achj, tilesetInfo, warnings, index, chain.name, options))
+      .map((frame, index) => mapFrame(frame, achj, tilesetInfo, warnings, skipCounts, index, chain.name, options))
       .filter((frame) => frame !== null);
 
     return {
@@ -163,6 +173,7 @@ export function mapAchjToTiledAnimations(achj, tilesetInfo, options = {}) {
       frames,
       entryTileId: frames.length > 0 ? frames[0].tileId : null,
       warnings,
+      skipCounts,
     };
   });
 }

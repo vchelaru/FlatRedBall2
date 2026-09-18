@@ -73,6 +73,25 @@ function collectWarnings(results) {
   return warnings;
 }
 
+const SKIP_COUNT_LABELS = [
+  ["textureMismatch", "different texture"],
+  ["sizeMismatch", "wrong size"],
+  ["notGridAligned", "not grid-aligned"],
+  ["uvMissingPixelSize", "UV without pixel size"],
+];
+
+function addSkipCounts(total, counts) {
+  for (const [key] of SKIP_COUNT_LABELS) total[key] += counts[key];
+}
+
+function describeSkipCounts(counts) {
+  const parts = [];
+  for (const [key, label] of SKIP_COUNT_LABELS) {
+    if (counts[key] > 0) parts.push(`${counts[key]} ${label}`);
+  }
+  return parts.join(", ");
+}
+
 // Applies mapAchjToTiledAnimations's results to `tileset` (must already be inside a
 // tileset.macro callback) and returns how many chains were applied. `sourceLabel` is
 // the absolute .achx/.achj path (used as-is in warnings, for debugging); it's stored on
@@ -147,9 +166,15 @@ function importProjectFolder(tileset, rootPath, interactive) {
   const tilesetInfo = buildTilesetInfo(tileset);
   const baseDir = projectRootDir(tileset);
   const warnings = [];
+  const totalSkipCounts = { textureMismatch: 0, uvMissingPixelSize: 0, sizeMismatch: 0, notGridAligned: 0 };
   let appliedCount = 0;
   let chainCount = 0;
 
+  // tallySkips: true - in a project with many .achx/.achj files, most frames scanned
+  // were never meant to become tile animations at all (wrong texture, wrong size,
+  // off-grid). Itemizing each one as a warning buries the warnings that are actually
+  // actionable, so these get tallied into totalSkipCounts and reported as one line
+  // instead (see describeSkipCounts below).
   tileset.macro(`Import AnimationChain project from ${rootPath}`, () => {
     for (const path of filePaths) {
       let achj;
@@ -159,14 +184,18 @@ function importProjectFolder(tileset, rootPath, interactive) {
         warnings.push(`"${path}": couldn't read - ${error.message}`);
         continue;
       }
-      const results = mapAchjToTiledAnimations(achj, tilesetInfo, { silentTextureMismatch: true });
+      const results = mapAchjToTiledAnimations(achj, tilesetInfo, { tallySkips: true });
       chainCount += results.length;
       warnings.push(...collectWarnings(results));
+      for (const result of results) addSkipCounts(totalSkipCounts, result.skipCounts);
       appliedCount += applyResults(tileset, results, warnings, path, baseDir);
     }
   });
 
-  const summary = `AnimationChain project import: applied ${appliedCount} animation(s) (of ${chainCount} chains seen) from ${filePaths.length} file(s) under "${rootPath}".`;
+  const skipSummary = describeSkipCounts(totalSkipCounts);
+  const summary =
+    `AnimationChain project import: applied ${appliedCount} animation(s) (of ${chainCount} chains seen) from ${filePaths.length} file(s) under "${rootPath}".` +
+    (skipSummary ? ` Skipped frames not meant for this tileset: ${skipSummary}.` : "");
   tiled.log(summary);
   if (warnings.length > 0) tiled.log(warnings.join("\n"));
   if (interactive) {

@@ -261,7 +261,57 @@ test("mapAchjToTiledAnimations warns and skips UV frames when the tileset's pixe
   assert.match(result.warnings[0], /UV.*pixel dimensions/);
 });
 
-test("mapAchjToTiledAnimations silences the texture-mismatch warning when silentTextureMismatch is set", () => {
+test("mapAchjToTiledAnimations tallies (instead of itemizing) skip reasons when tallySkips is set", () => {
+  const achj = parseAchj(
+    achjText({
+      animationChains: [
+        {
+          name: "Mixed",
+          frames: [
+            // different texture
+            { textureName: "OtherSheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 16, topCoordinate: 0, bottomCoordinate: 32 },
+            // wrong size
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 20, topCoordinate: 0, bottomCoordinate: 32 },
+            // not grid-aligned
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 4, rightCoordinate: 20, topCoordinate: 0, bottomCoordinate: 32 },
+            // matches fine - should still be applied and not counted as a skip
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 16, topCoordinate: 0, bottomCoordinate: 32 },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { tallySkips: true });
+  assert.equal(result.warnings.length, 0);
+  assert.equal(result.frames.length, 1);
+  assert.deepEqual(result.skipCounts, {
+    textureMismatch: 1,
+    uvMissingPixelSize: 0,
+    sizeMismatch: 1,
+    notGridAligned: 1,
+  });
+});
+
+test("mapAchjToTiledAnimations tallies a UV-without-pixel-size skip when tallySkips is set", () => {
+  const achj = parseAchj(
+    achjText({
+      coordinateType: "UV",
+      animationChains: [
+        {
+          name: "Walk",
+          frames: [
+            { textureName: "AnimatedSpritesheet.png", frameLength: 0.1, leftCoordinate: 0, rightCoordinate: 0.25, topCoordinate: 0, bottomCoordinate: 1 },
+          ],
+        },
+      ],
+    })
+  );
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { tallySkips: true });
+  assert.equal(result.warnings.length, 0);
+  assert.equal(result.skipCounts.uvMissingPixelSize, 1);
+});
+
+test("mapAchjToTiledAnimations still itemizes skip warnings by default (tallySkips unset)", () => {
   const achj = parseAchj(
     achjText({
       animationChains: [
@@ -274,9 +324,9 @@ test("mapAchjToTiledAnimations silences the texture-mismatch warning when silent
       ],
     })
   );
-  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo, { silentTextureMismatch: true });
-  assert.equal(result.frames.length, 0);
-  assert.equal(result.warnings.length, 0);
+  const [result] = mapAchjToTiledAnimations(achj, tilesetInfo);
+  assert.equal(result.warnings.length, 1);
+  assert.equal(result.skipCounts.textureMismatch, 1);
 });
 
 test("collectAnimationChainFiles walks a directory tree for .achx/.achj files, case-insensitively", () => {
