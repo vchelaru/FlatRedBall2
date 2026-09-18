@@ -20,7 +20,7 @@
 // Linux / %LOCALAPPDATA%/Tiled/extensions on Windows). Tiled loads extensions on
 // startup and reloads them automatically when a file here changes.
 
-import { mapAchjToTiledAnimations, parseAchj, parseAchx, collectAnimationChainFiles } from "./achj-mapper.mjs";
+import { mapAchjToTiledAnimations, parseAchj, parseAchx, collectAnimationChainFiles, relativePath, resolvePath, dirname } from "./achj-mapper.mjs";
 
 const PROJECT_ROOT_PROPERTY = "achjProjectRoot";
 
@@ -177,6 +177,15 @@ tiled.registerAction("ImportAchjAnimation", () => {
   importSingleFile(tileset, path);
 }).text = "Import AnimationChain Frames...";
 
+// The stored property is relative to the tileset's own .tsx location (see
+// relativePath/resolvePath in achj-mapper.mjs), so the .tsx stays portable across
+// machines/checkouts instead of baking in one absolute path. A tileset with no
+// fileName yet (never saved) has nothing to be relative to, so it falls back to
+// storing the absolute path outright.
+function projectRootDir(tileset) {
+  return tileset.fileName ? dirname(tileset.fileName) : null;
+}
+
 tiled.registerAction("SetAchjProjectFolder", () => {
   const tileset = requireOpenTileset("Set AnimationChain Project Folder");
   if (!tileset) return;
@@ -184,7 +193,8 @@ tiled.registerAction("SetAchjProjectFolder", () => {
   const rootPath = tiled.promptDirectory(null, "Set AnimationChain Project Folder");
   if (!rootPath) return;
 
-  tileset.setProperty(PROJECT_ROOT_PROPERTY, rootPath);
+  const baseDir = projectRootDir(tileset);
+  tileset.setProperty(PROJECT_ROOT_PROPERTY, baseDir ? relativePath(baseDir, rootPath) : rootPath);
   importProjectFolder(tileset, rootPath, true);
 }).text = "Set AnimationChain Project Folder...";
 
@@ -192,12 +202,13 @@ tiled.registerAction("ReimportAchjProject", () => {
   const tileset = requireOpenTileset("Re-import AnimationChain Project");
   if (!tileset) return;
 
-  const rootPath = tileset.property(PROJECT_ROOT_PROPERTY);
-  if (!rootPath) {
+  const storedPath = tileset.property(PROJECT_ROOT_PROPERTY);
+  if (!storedPath) {
     tiled.alert(`This tileset has no AnimationChain project folder set - run "Set AnimationChain Project Folder..." first.`);
     return;
   }
-  importProjectFolder(tileset, rootPath, true);
+  const baseDir = projectRootDir(tileset);
+  importProjectFolder(tileset, baseDir ? resolvePath(baseDir, storedPath) : storedPath, true);
 }).text = "Re-import AnimationChain Project";
 
 // Auto-reimport whenever a tileset with a remembered project folder is (re)opened, so
@@ -206,9 +217,10 @@ tiled.registerAction("ReimportAchjProject", () => {
 // scripting engine has no confirmed timer API to poll the source files on an interval.
 tiled.assetOpened.connect((asset) => {
   if (!asset.isTileset) return;
-  const rootPath = asset.property(PROJECT_ROOT_PROPERTY);
-  if (!rootPath) return;
-  importProjectFolder(asset, rootPath, false);
+  const storedPath = asset.property(PROJECT_ROOT_PROPERTY);
+  if (!storedPath) return;
+  const baseDir = projectRootDir(asset);
+  importProjectFolder(asset, baseDir ? resolvePath(baseDir, storedPath) : storedPath, false);
 });
 
 tiled.extendMenu("Edit", [

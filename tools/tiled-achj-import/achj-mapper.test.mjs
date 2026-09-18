@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseAchj, parseAchx, frameDurationMs, mapAchjToTiledAnimations, collectAnimationChainFiles } from "./achj-mapper.mjs";
+import { parseAchj, parseAchx, frameDurationMs, mapAchjToTiledAnimations, collectAnimationChainFiles, relativePath, resolvePath, dirname } from "./achj-mapper.mjs";
 
 const tilesetInfo = {
   tileWidth: 16,
@@ -294,4 +294,38 @@ test("collectAnimationChainFiles walks a directory tree for .achx/.achj files, c
     [...found].sort(),
     ["/project/Hero/Idle.ACHJ", "/project/Hero/Walk.achx"].sort()
   );
+});
+
+test("relativePath expresses a sibling folder relative to the tileset's directory", () => {
+  const rel = relativePath("C:/Game/Tilesets", "C:/Game/Animations/Pyramid");
+  assert.equal(rel, "../Animations/Pyramid");
+});
+
+test("relativePath expresses a folder underneath the tileset's directory", () => {
+  const rel = relativePath("C:/Game", "C:/Game/Content/Animations");
+  assert.equal(rel, "Content/Animations");
+});
+
+test("relativePath returns '.' when the two directories are the same", () => {
+  assert.equal(relativePath("C:/Game/Tilesets", "C:/Game/Tilesets"), ".");
+});
+
+test("relativePath is case-insensitive when finding the common prefix (Windows paths)", () => {
+  const rel = relativePath("c:/game/tilesets", "C:/Game/Animations");
+  assert.equal(rel, "../Animations");
+});
+
+test("resolvePath resolves a relative path against a base directory", () => {
+  assert.equal(resolvePath("C:/Game/Tilesets", "../Animations/Pyramid"), "C:/Game/Animations/Pyramid");
+  assert.equal(resolvePath("C:/Game", "Content/Animations"), "C:/Game/Content/Animations");
+});
+
+test("resolvePath passes an already-absolute path through unchanged (backward compatibility)", () => {
+  assert.equal(resolvePath("C:/Game/Tilesets", "C:/SomewhereElse/Animations"), "C:/SomewhereElse/Animations");
+  assert.equal(resolvePath("C:/Game/Tilesets", "/SomewhereElse/Animations"), "/SomewhereElse/Animations");
+});
+
+test("dirname strips the file name from a path, normalizing backslashes", () => {
+  assert.equal(dirname("C:\\Game\\Tilesets\\Pyramid.tsx"), "C:/Game/Tilesets");
+  assert.equal(dirname("C:/Game/Tilesets/Pyramid.tsx"), "C:/Game/Tilesets");
 });

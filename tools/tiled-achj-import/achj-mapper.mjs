@@ -171,6 +171,57 @@ export function mapAchjToTiledAnimations(achj, tilesetInfo, options = {}) {
 // (`{ dirs: string[], files: string[] }`, both as full paths) rather than calling the
 // `File` scripting global directly, so this can be exercised under plain Node with a
 // fake in-memory tree - see achj-import.mjs for the real Tiled-backed listDir.
+function toPosixPath(path) {
+  return path.replace(/\\/g, "/");
+}
+
+function isAbsolutePath(path) {
+  return /^[a-zA-Z]:\//.test(path) || path.startsWith("/");
+}
+
+export function dirname(path) {
+  const posix = toPosixPath(path);
+  const lastSlash = posix.lastIndexOf("/");
+  return lastSlash === -1 ? "" : posix.slice(0, lastSlash);
+}
+
+// Expresses `toDir` relative to `fromDir` (both absolute), e.g. for storing a project
+// folder on a tileset without baking in the current machine's absolute path. Path
+// segments are compared case-insensitively since Windows paths are case-insensitive.
+export function relativePath(fromDir, toDir) {
+  const fromParts = toPosixPath(fromDir).split("/").filter(Boolean);
+  const toParts = toPosixPath(toDir).split("/").filter(Boolean);
+
+  let commonLength = 0;
+  while (
+    commonLength < fromParts.length &&
+    commonLength < toParts.length &&
+    fromParts[commonLength].toLowerCase() === toParts[commonLength].toLowerCase()
+  ) {
+    commonLength++;
+  }
+
+  const upSegments = new Array(fromParts.length - commonLength).fill("..");
+  const downSegments = toParts.slice(commonLength);
+  const result = [...upSegments, ...downSegments];
+  return result.length === 0 ? "." : result.join("/");
+}
+
+// The inverse of relativePath: resolves `pathValue` against `baseDir`. If `pathValue`
+// is already absolute, it's returned as-is - this keeps a tileset property saved by an
+// older version of this tool (which stored an absolute path outright) working.
+export function resolvePath(baseDir, pathValue) {
+  if (isAbsolutePath(pathValue)) return toPosixPath(pathValue);
+
+  const resultParts = toPosixPath(baseDir).split("/").filter(Boolean);
+  for (const segment of toPosixPath(pathValue).split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") resultParts.pop();
+    else resultParts.push(segment);
+  }
+  return resultParts.join("/");
+}
+
 export function collectAnimationChainFiles(rootPath, listDir) {
   const found = [];
   const stack = [rootPath];

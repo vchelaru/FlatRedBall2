@@ -59,7 +59,10 @@ Two ways to run it, both under **Edit** with a tileset open:
   `.achx`/`.achj` file under it (recursively) is scanned, and any frame whose
   `textureName` matches *this tileset's* image is applied - everything else is silently
   skipped, since in a big project most chains belong to some other tileset. The folder
-  is remembered as a tileset custom property (`achjProjectRoot`) and reapplied
+  is remembered as a tileset custom property (`achjProjectRoot`), stored *relative to
+  the tileset's own `.tsx` location* so the `.tsx` stays portable across machines and
+  checkouts (a differently-checked-out repo, a teammate's machine) instead of baking in
+  one absolute path, and reapplied
   automatically every time this tileset is opened in Tiled (`tiled.assetOpened`), so
   edits made in AnimationEditor since the last session show up without a manual step -
   though only *on open*, not live while both apps are running side by side (Tiled's
