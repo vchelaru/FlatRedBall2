@@ -40,6 +40,22 @@ public static class TreeBuilder
         return result;
     }
 
+    // ── Tsx validation issues (#1140) ────────────────────────────────────────
+
+    /// <summary>
+    /// Sets <see cref="TreeNodeVm.HasValidationIssue"/> on each chain (root) node whose name
+    /// appears in <paramref name="chainNamesWithIssues"/>, clearing it on every other chain node.
+    /// Non-chain nodes are untouched. Callers pass <see
+    /// cref="ProjectManager.GetChainNamesWithTsxIssues"/>'s result (empty for an achx/achj
+    /// project, so this is always a no-op then).
+    /// </summary>
+    public static void ApplyValidationIssues(IEnumerable<TreeNodeVm> roots, IReadOnlyCollection<string> chainNamesWithIssues)
+    {
+        foreach (var node in roots)
+            if (node.Data is AnimationChainSave chain)
+                node.HasValidationIssue = chainNamesWithIssues.Contains(chain.Name);
+    }
+
     // ── Zebra striping ────────────────────────────────────────────────────────
 
     /// <summary>

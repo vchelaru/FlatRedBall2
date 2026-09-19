@@ -108,6 +108,18 @@ public class TreeNodeVm : INotifyPropertyChanged
     /// <summary>Discriminator for the icon shown in the tree item template.</summary>
     public NodeKind Kind { get; set; } = NodeKind.Frame;
 
+    private bool _hasValidationIssue;
+    /// <summary>
+    /// True when this chain node has a <see cref="Tiled.TsxAnimationValidator"/> issue for a
+    /// native tsx project (issue #1140) -- drives the exclamation-icon decoration in the tree item
+    /// template. Always <c>false</c> for an achx/achj project or a non-chain node.
+    /// </summary>
+    public bool HasValidationIssue
+    {
+        get => _hasValidationIssue;
+        set { if (_hasValidationIssue != value) { _hasValidationIssue = value; Notify(); } }
+    }
+
     /// <summary>True when this node represents an animation frame. Set once at construction time.</summary>
     public bool IsFrameNode  { get; set; }
     /// <summary>True when this node represents an AxisAlignedRectangleSave shape. Set once at construction time.</summary>

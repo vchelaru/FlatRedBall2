@@ -159,6 +159,7 @@ public class TabSwitchCacheTests : IDisposable
         public (int Width, int Height)? TsxTileSize => _inner.TsxTileSize;
         public void LoadTsxProject(FilePath fileName) => _inner.LoadTsxProject(fileName);
         public void SaveTsxProject(string? targetPath = null) => _inner.SaveTsxProject(targetPath);
+        public IReadOnlyList<string> GetChainNamesWithTsxIssues() => _inner.GetChainNamesWithTsxIssues();
 
         public void LoadAnimationChain(
             FilePath fileName,

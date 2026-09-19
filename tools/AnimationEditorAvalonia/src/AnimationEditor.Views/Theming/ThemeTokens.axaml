@@ -40,6 +40,8 @@
             <Color x:Key="IconInk">#e6e8ec</Color>
             <Color x:Key="IconInkMuted">#9098a4</Color>
             <Color x:Key="IconInkDim">#5d6573</Color>
+            <!-- Tsx validation-issue exclamation icon (issue 1140), same amber hue as AccentSoft. -->
+            <Color x:Key="IconWarning">#f0c674</Color>
 
             <!-- Fluent accent -> red -->
             <Color x:Key="SystemAccentColor">#d83a3a</Color>
@@ -79,6 +81,8 @@
             <Color x:Key="IconInk">#2a2e35</Color>
             <Color x:Key="IconInkMuted">#5a626e</Color>
             <Color x:Key="IconInkDim">#8b93a0</Color>
+            <!-- Tsx validation-issue exclamation icon (issue 1140), same amber hue as AccentSoft. -->
+            <Color x:Key="IconWarning">#b8860b</Color>
 
             <!-- Red base kept; shades deepened so hover/pressed read on a light background. -->
             <Color x:Key="SystemAccentColor">#c62f2f</Color>

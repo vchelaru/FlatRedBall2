@@ -4131,6 +4131,7 @@ public partial class MainWindow : Window
                     node.PinnedVisible = visible.Contains(c);
 
             RefreshTreeThumbnails();
+            SyncTsxValidationIssuesIntoTree();
 
             // Re-select to keep visual state
             SyncTreeSelection();
@@ -4140,6 +4141,14 @@ public partial class MainWindow : Window
             _suppressTreeSelectionHandling = false;
         }
     }
+
+    /// <summary>
+    /// Refreshes the exclamation-icon decoration on every chain node from <see
+    /// cref="IProjectManager.GetChainNamesWithTsxIssues"/> (issue #1140). A no-op for an achx/achj
+    /// project, which always returns an empty set.
+    /// </summary>
+    private void SyncTsxValidationIssuesIntoTree() =>
+        TreeBuilder.ApplyValidationIssues(_treeRoots, _projectManager.GetChainNamesWithTsxIssues());
 
     /// <summary>
     /// Fully rebuilds the tree from scratch, expanding only the chains named in
@@ -4186,6 +4195,7 @@ public partial class MainWindow : Window
             RefreshFilesPanel();
 
             RefreshTreeThumbnails();
+            SyncTsxValidationIssuesIntoTree();
             SyncTreeSelection();
         }
         finally

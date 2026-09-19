@@ -35,6 +35,30 @@ public class LoadTsxProjectTests
         </tileset>
         """;
 
+    // Tile 8 is the anchor of a 2-tile group; tile 9's second frame (14) is hand-edited out of
+    // lockstep with the anchor's second frame (12), which should be column 1 of that row (13).
+    private const string InconsistentGroupFixtureXml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <tileset version="1.10" tiledversion="1.12.2" name="Heroes" tilewidth="16" tileheight="16" tilecount="64" columns="4">
+         <image source="Heroes.png" width="64" height="256"/>
+         <tile id="8">
+          <animation>
+           <frame tileid="8" duration="150"/>
+           <frame tileid="12" duration="150"/>
+          </animation>
+         </tile>
+         <tile id="9">
+          <properties>
+           <property name="ParentId" type="int" value="8"/>
+          </properties>
+          <animation>
+           <frame tileid="9" duration="150"/>
+           <frame tileid="14" duration="150"/>
+          </animation>
+         </tile>
+        </tileset>
+        """;
+
     private static (MainWindow Window, TestServices Ctx) CreateWindow()
     {
         var ctx = TestHelpers.BuildServices();
@@ -145,6 +169,35 @@ public class LoadTsxProjectTests
             Assert.True(framePanel.IsVisible);
             Assert.False(transformSection.IsVisible);
             Assert.False(colorSection.IsVisible);
+        }
+        finally
+        {
+            window.Close();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void LoadAnimationFileAsync_InconsistentMultiTileGroup_FlagsAnchorChainWithValidationIssue()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var (window, ctx) = CreateWindow();
+        try
+        {
+            var path = Path.Combine(dir, "Heroes.tsx");
+            File.WriteAllText(path, InconsistentGroupFixtureXml);
+
+            typeof(MainWindow)
+                .GetMethod("LoadAnimationFileAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(window, [path, false]);
+            Dispatcher.UIThread.RunJobs();
+
+            var tree = window.FindControl<TreeView>("AnimTree")!;
+            var roots = (System.Collections.ObjectModel.ObservableCollection<AnimationEditor.Core.ViewModels.TreeNodeVm>)tree.ItemsSource!;
+            var anchorNode = Assert.Single(roots);
+            Assert.Equal("ID:8", anchorNode.Header);
+            Assert.True(anchorNode.HasValidationIssue);
         }
         finally
         {

@@ -614,5 +614,41 @@ namespace AnimationEditor.Core
             Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
             Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
         }
+
+        /// <summary>
+        /// Names of chains that have a <see cref="Tiled.TsxAnimationValidator"/> issue -- a
+        /// multi-tile group whose satellite tile has drifted out of lockstep with its anchor, or a
+        /// dangling <c>ParentId</c> (issue #1140). Empty when no tsx project is loaded or nothing
+        /// is wrong. Correlates the validator's tile-id-keyed issues back to chain names by
+        /// re-running <see cref="Tiled.MultiTileToTiledAnimationMapper"/> on the current in-memory
+        /// chains and matching each chain's own computed entry tile id against an issue's anchor id
+        /// -- the same id math <see cref="SaveTsxProject"/> uses, so this always reflects the
+        /// chains as they'd actually be written, not just as they were on load.
+        /// </summary>
+        public IReadOnlyList<string> GetChainNamesWithTsxIssues()
+        {
+            if (_tsxTileset == null || AnimationChainListSave == null)
+                return Array.Empty<string>();
+
+            var issues = Tiled.TsxAnimationValidator.Validate(_tsxTileset);
+            if (issues.Count == 0)
+                return Array.Empty<string>();
+
+            var anchorTileIdsWithIssues = issues.Select(i => i.AnchorTileId).ToHashSet();
+
+            var image = _tsxTileset.Image;
+            var tilesetInfo = new Tiled.TilesetAnimationInfo
+            {
+                TileWidth = _tsxTileset.TileWidth,
+                TileHeight = _tsxTileset.TileHeight,
+                ColumnCount = _tsxTileset.Columns,
+                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
+            };
+
+            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, tilesetInfo)
+                .Where(r => r.EntryTileId.HasValue && anchorTileIdsWithIssues.Contains(r.EntryTileId.Value))
+                .Select(r => r.ChainName)
+                .ToList();
+        }
     }
 }

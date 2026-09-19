@@ -737,6 +737,17 @@
                                              VerticalAlignment="Center"
                                              Path="avares://AnimationEditor.Views/Assets/icons/svg/IconCircle.svg"
                                              CurrentColor="{DynamicResource IconInkDim}" />
+                                    <!-- Native tsx project validation issue (#1140): a multi-tile group whose
+                                         satellite tile has drifted out of lockstep with its anchor, or a
+                                         dangling ParentId. Only ever set on chain nodes, from
+                                         TreeBuilder.ApplyValidationIssues. -->
+                                    <svg:Svg IsVisible="{Binding HasValidationIssue}"
+                                             ToolTip.Tip="This animation can't be represented correctly in this tsx file - see the tileset's group tiles."
+                                             Width="14" Height="14"
+                                             Margin="0,0,4,0"
+                                             VerticalAlignment="Center"
+                                             Path="avares://AnimationEditor.Views/Assets/icons/svg/IconWarning.svg"
+                                             CurrentColor="{DynamicResource IconWarning}" />
                                 </StackPanel>
                                 <!-- Header lives in the star column so it ellipsizes when the panel is
                                      narrowed instead of forcing a horizontal scrollbar (#623). -->

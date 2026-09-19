@@ -42,6 +42,10 @@ namespace AnimationEditor.Core
         /// loaded. See <see cref="ProjectManager.SaveTsxProject"/>.</summary>
         void SaveTsxProject(string? targetPath = null);
 
+        /// <summary>Names of chains with a tsx validation issue; empty when no tsx project is
+        /// loaded or nothing is wrong. See <see cref="ProjectManager.GetChainNamesWithTsxIssues"/>.</summary>
+        IReadOnlyList<string> GetChainNamesWithTsxIssues();
+
         /// <summary>
         /// Stream-based counterpart to <see cref="SaveAnimationChainList(string)"/> for platforms
         /// with no filesystem path to write (the browser-wasm build). Uses the

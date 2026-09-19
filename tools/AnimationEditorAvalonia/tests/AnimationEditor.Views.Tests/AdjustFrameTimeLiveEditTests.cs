@@ -35,6 +35,7 @@ public class AdjustFrameTimeLiveEditTests
         public (int Width, int Height)? TsxTileSize => null;
         public void LoadTsxProject(FilePath fileName) { }
         public void SaveTsxProject(string? targetPath = null) { }
+        public IReadOnlyList<string> GetChainNamesWithTsxIssues() => Array.Empty<string>();
 
         public void LoadAnimationChain(
             FilePath fileName,
