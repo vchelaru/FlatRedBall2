@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
 
 namespace AnimationEditor.Core.IO
@@ -78,7 +79,8 @@ namespace AnimationEditor.Core.IO
 
             try
             {
-                return XmlFile.Deserialize<AETiledSyncSave>(fileToLoad.FullPath);
+                var json = File.ReadAllText(fileToLoad.FullPath);
+                return JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
             }
             catch
             {
@@ -113,7 +115,8 @@ namespace AnimationEditor.Core.IO
                 var location = GetTiledSyncCompanionFileFor(achxFilePath);
                 try
                 {
-                    XmlFile.Serialize(settings, location.FullPath);
+                    var json = JsonSerializer.Serialize(settings, AETiledSyncJsonContext.Default.AETiledSyncSave);
+                    File.WriteAllText(location.FullPath, json);
                 }
                 catch (Exception e)
                 {

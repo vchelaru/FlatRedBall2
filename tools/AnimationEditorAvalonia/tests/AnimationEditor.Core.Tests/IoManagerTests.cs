@@ -187,6 +187,21 @@ public class IoManagerTests
     }
 
     [Fact]
+    public void AddAssociatedTiledTilesetPath_NewPath_TiledSyncFileContainsJson_NotXml()
+    {
+        var ctx = TestHelpers.SetupFreshAcls();
+        using var dir = new TestHelpers.TempDir();
+        var achxPath = dir.Path + "/hero.achx";
+        var tsxPath = dir.Path + "/Heroes.tsx";
+
+        ctx.IoManager.AddAssociatedTiledTilesetPath(achxPath, tsxPath);
+
+        var contents = File.ReadAllText(dir.Path + "/hero.tiledsync").TrimStart();
+        Assert.StartsWith("{", contents);
+        Assert.DoesNotContain("<TiledTilesetPath>", contents);
+    }
+
+    [Fact]
     public void AddAssociatedTiledTilesetPath_NewPath_IsReturnedByGetAssociatedTiledTilesetPaths()
     {
         var ctx = TestHelpers.SetupFreshAcls();

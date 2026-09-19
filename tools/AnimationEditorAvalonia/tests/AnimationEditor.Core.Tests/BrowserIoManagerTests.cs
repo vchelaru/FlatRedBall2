@@ -3,6 +3,7 @@ using AnimationEditor.Core.Data;
 using AnimationEditor.Core.IO;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
 using FilePath = AnimationEditor.Core.Paths.FilePath;
@@ -194,6 +195,7 @@ public class BrowserIoManagerTests
 
         Assert.True(store.Written.ContainsKey("hero.tiledsync"));
         Assert.False(store.Written.ContainsKey("hero.aeproperties"));
+        Assert.StartsWith("{", store.Written["hero.tiledsync"].TrimStart());
     }
 
     [Fact]
@@ -204,9 +206,9 @@ public class BrowserIoManagerTests
         ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Heroes.tsx");
         ioManager.AddAssociatedTiledTilesetPath("hero.achx", "Enemies.tsx");
 
-        var xml = store.Written["hero.tiledsync"];
-        var deserialized = XmlFile.DeserializeFromString<AETiledSyncSave>(xml);
-        Assert.Equal(["Heroes.tsx", "Enemies.tsx"], deserialized.TiledTilesetPaths);
+        var json = store.Written["hero.tiledsync"];
+        var deserialized = JsonSerializer.Deserialize(json, AETiledSyncJsonContext.Default.AETiledSyncSave);
+        Assert.Equal(["Heroes.tsx", "Enemies.tsx"], deserialized!.TiledTilesetPaths);
     }
 
     [Fact]
