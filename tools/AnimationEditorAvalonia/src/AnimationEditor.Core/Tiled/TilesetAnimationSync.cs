@@ -5,8 +5,10 @@ using System.Linq;
 namespace AnimationEditor.Core.Tiled;
 
 /// <summary>Outcome of <see cref="TilesetAnimationSync.Apply"/>: how many chains were applied to
-/// a tile, plus every mapping warning collected along the way.</summary>
-public sealed record TilesetAnimationSyncResult(int AppliedCount, IReadOnlyList<string> Warnings);
+/// a tile, every mapping warning collected along the way, and whether the tileset was actually
+/// mutated (a tile's animation/properties changed, or a stale tile was cleared) -- callers use
+/// <see cref="Changed"/> to skip rewriting the .tsx file when a re-sync found nothing to change.</summary>
+public sealed record TilesetAnimationSyncResult(int AppliedCount, IReadOnlyList<string> Warnings, bool Changed);
 
 /// <summary>
 /// Applies <see cref="AchjToTiledAnimationMapper.Map"/> results onto a <see cref="Tileset"/>'s
@@ -40,8 +42,11 @@ public static class TilesetAnimationSync
             .Select(r => r.EntryTileId!.Value)
             .ToHashSet();
 
+        var changed = false;
+
         foreach (var staleTileId in previouslyTrackedTileIds.Except(newTileIds))
-            ClearTile(tileset.Tiles.Single(t => t.ID == staleTileId));
+            if (ClearTile(tileset.Tiles.Single(t => t.ID == staleTileId)))
+                changed = true;
 
         var appliedCount = 0;
         var warnings = new List<string>();
@@ -52,37 +57,64 @@ public static class TilesetAnimationSync
                 continue;
 
             var tile = tileset.Tiles.FirstOrDefault(t => t.ID == tileId);
+            var isNewTile = tile == null;
             if (tile == null)
             {
                 tile = new Tile { ID = tileId, Width = 0, Height = 0 };
                 tileset.Tiles.Add(tile);
             }
 
-            tile.Animation = result.Frames.Select(f => new Frame { TileID = f.TileId, Duration = f.Duration }).ToList();
-            SetStringProperty(tile, AnimationNamePropertyName, result.ChainName);
-            SetStringProperty(tile, SourceFilePropertyName, sourceLabel);
+            var newAnimation = result.Frames.Select(f => new Frame { TileID = f.TileId, Duration = f.Duration }).ToList();
+            if (isNewTile || !AnimationEquals(tile.Animation, newAnimation))
+            {
+                tile.Animation = newAnimation;
+                changed = true;
+            }
+            if (SetStringProperty(tile, AnimationNamePropertyName, result.ChainName)) changed = true;
+            if (SetStringProperty(tile, SourceFilePropertyName, sourceLabel)) changed = true;
             appliedCount++;
         }
 
         tileset.Tiles.Sort((a, b) => a.ID.CompareTo(b.ID));
-        return new TilesetAnimationSyncResult(appliedCount, warnings);
+        return new TilesetAnimationSyncResult(appliedCount, warnings, changed);
     }
 
-    private static void ClearTile(Tile tile)
+    /// <summary>Clears a stale tile's animation/tracking properties. Returns whether it actually
+    /// had anything to clear -- a tile only ever enters this path because it's currently tracked
+    /// (i.e. it has <see cref="SourceFilePropertyName"/> set), so in practice this is always
+    /// <c>true</c>, but the check keeps the method honest rather than assuming that invariant.</summary>
+    private static bool ClearTile(Tile tile)
     {
+        var hadAnimation = tile.Animation.Count > 0;
+        var hadTrackingProperties = tile.Properties.Any(p => p.Name is AnimationNamePropertyName or SourceFilePropertyName);
         tile.Animation = [];
         tile.Properties.RemoveAll(p => p.Name is AnimationNamePropertyName or SourceFilePropertyName);
+        return hadAnimation || hadTrackingProperties;
+    }
+
+    private static bool AnimationEquals(List<Frame> a, List<Frame> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++)
+            if (a[i].TileID != b[i].TileID || a[i].Duration != b[i].Duration)
+                return false;
+        return true;
     }
 
     private static string? GetStringProperty(Tile tile, string name) =>
         tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == name)?.Value;
 
-    private static void SetStringProperty(Tile tile, string name, string value)
+    /// <summary>Sets a tile's string property, returning whether the value actually changed.</summary>
+    private static bool SetStringProperty(Tile tile, string name, string value)
     {
         var existing = tile.Properties.OfType<StringProperty>().FirstOrDefault(p => p.Name == name);
         if (existing != null)
+        {
+            if (existing.Value == value) return false;
             existing.Value = value;
-        else
-            tile.Properties.Add(new StringProperty { Name = name, Value = value });
+            return true;
+        }
+        tile.Properties.Add(new StringProperty { Name = name, Value = value });
+        return true;
     }
 }

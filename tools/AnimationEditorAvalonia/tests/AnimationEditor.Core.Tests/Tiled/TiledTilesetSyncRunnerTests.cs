@@ -83,6 +83,31 @@ public class TiledTilesetSyncRunnerTests
     }
 
     [Fact]
+    public void SyncAll_ReSyncWithNoChanges_DoesNotRewriteTsxFile()
+    {
+        var tempDir = Directory.CreateTempSubdirectory().FullName;
+        var tsxPath = WriteFixtureTileset(tempDir);
+        var achxPath = Path.Combine(tempDir, "Hero.achx");
+        var achj = AchjWithWalkChain();
+        TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+        // If SyncAll writes again despite nothing changing, File.Create on a read-only file throws
+        // and the runner reports it as a failure -- a cheap, deterministic way to prove the write
+        // was skipped without relying on file-timestamp granularity.
+        File.SetAttributes(tsxPath, FileAttributes.ReadOnly);
+        try
+        {
+            var outcomes = TiledTilesetSyncRunner.SyncAll(achj, achxPath, [tsxPath]);
+
+            Assert.True(outcomes[0].Success);
+        }
+        finally
+        {
+            File.SetAttributes(tsxPath, FileAttributes.Normal);
+        }
+    }
+
+    [Fact]
     public void SyncAll_UnreadableTsxPath_ReportsFailureWithoutThrowing()
     {
         var tempDir = Directory.CreateTempSubdirectory().FullName;

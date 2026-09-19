@@ -37,11 +37,12 @@ public class TilesetAnimationSyncTests
         tileset.Tiles.Add(otherSourceTile);
 
         // This source's mapping doesn't touch tile 0 at all.
-        TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
 
         var tile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.Equal(999, tile.Animation.Single().Duration);
         Assert.Equal("../OtherChain.achx", tile.GetProperty<StringProperty>("achjSourceFile").Value);
+        Assert.False(syncResult.Changed);
     }
 
     [Fact]
@@ -57,6 +58,20 @@ public class TilesetAnimationSyncTests
         Assert.Equal("Walk", tile.GetProperty<StringProperty>("achjAnimationName").Value);
         Assert.Equal(SourceLabel, tile.GetProperty<StringProperty>("achjSourceFile").Value);
         Assert.Equal(1, syncResult.AppliedCount);
+        Assert.True(syncResult.Changed);
+    }
+
+    [Fact]
+    public void Apply_ReSyncWithIdenticalMapping_ReturnsChangedFalse()
+    {
+        var tileset = EmptyTileset();
+        var results = new[] { Result("Walk", 0, new MappedFrame(0, 100), new MappedFrame(1, 100)) };
+        TilesetAnimationSync.Apply(tileset, results, SourceLabel);
+
+        // Same mapping again -- nothing about tile 0's animation or properties should differ.
+        var syncResult = TilesetAnimationSync.Apply(tileset, results, SourceLabel);
+
+        Assert.False(syncResult.Changed);
     }
 
     [Fact]
@@ -67,11 +82,12 @@ public class TilesetAnimationSyncTests
         TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
 
         // The "Walk" chain no longer exists in the source (deleted or renamed away from tile 0).
-        TilesetAnimationSync.Apply(tileset, [], SourceLabel);
+        var syncResult = TilesetAnimationSync.Apply(tileset, [], SourceLabel);
 
         var tile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.Empty(tile.Animation);
         Assert.DoesNotContain(tile.Properties, p => p.Name is "achjAnimationName" or "achjSourceFile");
+        Assert.True(syncResult.Changed);
     }
 
     [Fact]
@@ -101,9 +117,10 @@ public class TilesetAnimationSyncTests
         TilesetAnimationSync.Apply(tileset, firstSync, SourceLabel);
 
         var secondSync = new[] { Result("Walk", 0, new MappedFrame(0, 250), new MappedFrame(1, 250)) };
-        TilesetAnimationSync.Apply(tileset, secondSync, SourceLabel);
+        var syncResult = TilesetAnimationSync.Apply(tileset, secondSync, SourceLabel);
 
         var tile = tileset.Tiles.Single(t => t.ID == 0);
         Assert.All(tile.Animation, f => Assert.Equal(250, f.Duration));
+        Assert.True(syncResult.Changed);
     }
 }

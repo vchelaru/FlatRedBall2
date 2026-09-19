@@ -51,7 +51,8 @@ public static class TiledTilesetSyncRunner
 
                 var results = AchjToTiledAnimationMapper.Map(achj, tilesetInfo, tallySkips: true);
                 var syncResult = TilesetAnimationSync.Apply(tileset, results, sourceLabel);
-                TsxWriter.Write(tileset, tsxPath);
+                if (syncResult.Changed)
+                    TsxWriter.Write(tileset, tsxPath);
 
                 outcomes.Add(TiledTilesetSyncOutcome.SuccessOutcome(tsxPath, syncResult.AppliedCount, syncResult.Warnings));
             }
