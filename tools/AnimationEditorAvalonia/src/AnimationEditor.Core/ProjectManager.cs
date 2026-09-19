@@ -28,6 +28,24 @@ namespace AnimationEditor.Core
         public string? FileName { get; set; }
 
         /// <summary>
+        /// The tileset behind a native <c>.tsx</c> project (issue #1140), kept in memory (rather
+        /// than re-read from disk) so a load-then-save round trip preserves any tileset content
+        /// AnimationEditor doesn't understand -- same reasoning as <see cref="TilesetAnimationSync"/>
+        /// for the achj-push feature. <see langword="null"/> for an achx/achj project.
+        /// </summary>
+        private DotTiled.Tileset? _tsxTileset;
+
+        /// <summary>Whether the currently loaded project is a native <c>.tsx</c> project (see
+        /// <see cref="LoadTsxProject"/>) rather than an achx/achj project.</summary>
+        public bool IsNativeTsxProject => _tsxTileset != null;
+
+        /// <summary>The tsx's own fixed tile size, or <see langword="null"/> for an achx/achj
+        /// project. A native tsx project's grid size is always this -- it is not user-configurable
+        /// (see issue #1140).</summary>
+        public (int Width, int Height)? TsxTileSize =>
+            _tsxTileset is null ? null : (_tsxTileset.TileWidth, _tsxTileset.TileHeight);
+
+        /// <summary>
         /// The folder explicitly picked via File → Open Project Folder (or restored from
         /// <c>LastProjectFolderPath</c> at startup). Unlike <see cref="ResolveFilesPanelRoot"/>,
         /// this is never inferred from the open .achx -- it stays set (and the Files panel's
@@ -548,6 +566,53 @@ namespace AnimationEditor.Core
         internal void LoadTileMapInformation(string fileName)
         {
             TileMapInformationList = XmlFile.Deserialize<TileMapInformationList>(fileName);
+        }
+
+        /// <summary>
+        /// Opens <paramref name="fileName"/> as a native AnimationEditor project (issue #1140):
+        /// the tsx's own per-tile animations become <see cref="AnimationChainListSave"/> chains via
+        /// <see cref="Tiled.TiledAnimationToAchjMapper"/>, editable the same way achx chains are.
+        /// </summary>
+        /// <exception cref="NotSupportedException">The tsx uses a construct (wangsets,
+        /// transformations, per-tile object layers, unsupported property types) that would be lost
+        /// on the first save -- see <see cref="Tiled.TsxCompatibilityChecker"/>. The project is left
+        /// unchanged when this is thrown.</exception>
+        public void LoadTsxProject(FilePath fileName)
+        {
+            var tileset = DotTiled.Serialization.Loader.Default().LoadTileset(fileName.FullPath);
+
+            if (!Tiled.TsxCompatibilityChecker.CheckOpenCompatibility(tileset, out var blockingReason))
+                throw new NotSupportedException(
+                    $"Can't open \"{fileName.FullPath}\" as a native AnimationEditor project: {blockingReason}");
+
+            _tsxTileset = tileset;
+            AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset);
+            OnDiskCoordinateType = TextureCoordinateType.Pixel;
+            FileName = fileName.FullPath;
+        }
+
+        /// <summary>
+        /// Saves the current <see cref="AnimationChainListSave"/> back to the tsx opened by <see
+        /// cref="LoadTsxProject"/>, via <see cref="Tiled.MultiTileToTiledAnimationMapper"/> and <see
+        /// cref="Tiled.NativeTsxAnimationSync"/>. No-op if no tsx project is loaded.
+        /// </summary>
+        public void SaveTsxProject(string? targetPath = null)
+        {
+            if (_tsxTileset == null || AnimationChainListSave == null)
+                return;
+
+            var image = _tsxTileset.Image;
+            var tilesetInfo = new Tiled.TilesetAnimationInfo
+            {
+                TileWidth = _tsxTileset.TileWidth,
+                TileHeight = _tsxTileset.TileHeight,
+                ColumnCount = _tsxTileset.Columns,
+                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
+            };
+
+            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, tilesetInfo);
+            Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
+            Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
         }
     }
 }
