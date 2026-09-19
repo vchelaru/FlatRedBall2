@@ -28,14 +28,20 @@ public static class TiledAnimationToAchjMapper
     /// <summary>Custom tile property marking a tile as a multi-tile-group satellite, valued with its anchor tile's id.</summary>
     public const string ParentIdPropertyName = "ParentId";
 
+    /// <summary>
+    /// Builds the achx-shaped model in UV (0-1) coordinates and Second-based durations -- the
+    /// same invariant every achx load produces (see <c>ProjectManager.NormalizeCoordinatesToUv</c>'s
+    /// doc comment: the in-memory representation is always UV). Storing raw pixel values here
+    /// with <see cref="TextureCoordinateType.Pixel"/> instead was a real shipped bug (issue #1140
+    /// follow-up): nothing downstream treats <c>Pixel</c> as "already converted, leave it alone,"
+    /// so every consumer re-multiplied an already-in-pixels value by the texture size again (a
+    /// 200ms duration rendered as "200 seconds"; a 864px coordinate rendered as 864*2048).
+    /// </summary>
     public static AnimationChainListSave Map(Tileset tileset)
     {
         var imageFileName = tileset.Image.HasValue ? (tileset.Image.Value.Source.HasValue ? tileset.Image.Value.Source.Value : string.Empty) : string.Empty;
-        var acls = new AnimationChainListSave
-        {
-            CoordinateType = TextureCoordinateType.Pixel,
-            TimeMeasurementUnit = TimeMeasurementUnit.Millisecond,
-        };
+        var (textureWidth, textureHeight) = GetTextureSize(tileset);
+        var acls = new AnimationChainListSave();
 
         var animatedTiles = tileset.Tiles.Where(t => t.Animation.Count > 0).ToList();
         var parentIdByTileId = animatedTiles.ToDictionary(t => t.ID, GetParentId);
@@ -70,11 +76,11 @@ public static class TiledAnimationToAchjMapper
                 chain.Frames.Add(new AnimationFrameSave
                 {
                     TextureName = imageFileName,
-                    LeftCoordinate = col * tileset.TileWidth,
-                    TopCoordinate = row * tileset.TileHeight,
-                    RightCoordinate = (col + footprintColumns) * tileset.TileWidth,
-                    BottomCoordinate = (row + footprintRows) * tileset.TileHeight,
-                    FrameLength = frame.Duration,
+                    LeftCoordinate = (col * tileset.TileWidth) / (float)textureWidth,
+                    TopCoordinate = (row * tileset.TileHeight) / (float)textureHeight,
+                    RightCoordinate = ((col + footprintColumns) * tileset.TileWidth) / (float)textureWidth,
+                    BottomCoordinate = ((row + footprintRows) * tileset.TileHeight) / (float)textureHeight,
+                    FrameLength = frame.Duration / 1000f,
                 });
             }
 
@@ -82,6 +88,25 @@ public static class TiledAnimationToAchjMapper
         }
 
         return acls;
+    }
+
+    /// <summary>
+    /// The image's own pixel dimensions when the tsx records them (as every real Tiled-authored
+    /// file does), otherwise the size implied by the tile grid itself
+    /// (<c>Columns * TileWidth</c> by however many rows <c>TileCount</c> needs) -- keeps UV
+    /// conversion well-defined instead of dividing by a missing/zero size.
+    /// </summary>
+    private static (int Width, int Height) GetTextureSize(Tileset tileset)
+    {
+        if (tileset.Image.HasValue)
+        {
+            var image = tileset.Image.Value;
+            if (image.Width.HasValue && image.Height.HasValue && image.Width.Value > 0 && image.Height.Value > 0)
+                return (image.Width.Value, image.Height.Value);
+        }
+
+        var rows = (tileset.TileCount + tileset.Columns - 1) / tileset.Columns;
+        return (tileset.Columns * tileset.TileWidth, rows * tileset.TileHeight);
     }
 
     private static string ChainName(Tile tile)

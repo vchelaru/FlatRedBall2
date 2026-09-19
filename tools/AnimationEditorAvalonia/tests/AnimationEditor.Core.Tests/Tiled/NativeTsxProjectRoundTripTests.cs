@@ -58,8 +58,9 @@ public class NativeTsxProjectRoundTripTests
         Assert.Equal(2, acls.AnimationChains.Count);
         Assert.Contains(acls.AnimationChains, c => c.Name == "ID:0");
         var groupChain = acls.AnimationChains.Single(c => c.Name == "ID:8");
-        // Anchor tile 8 + satellite tile 9 (one column to the right) -> 32px-wide frame rect.
-        Assert.Equal(32, groupChain.Frames[0].RightCoordinate - groupChain.Frames[0].LeftCoordinate);
+        // Anchor tile 8 + satellite tile 9 (one column to the right) -> 32px-wide frame rect;
+        // the achx model is UV, and the fixture's texture is 64px wide, so that's 32/64 = 0.5.
+        Assert.Equal(0.5f, groupChain.Frames[0].RightCoordinate - groupChain.Frames[0].LeftCoordinate, tolerance: 0.0001f);
 
         var tilesetInfo = new TilesetAnimationInfo
         {
@@ -67,6 +68,8 @@ public class NativeTsxProjectRoundTripTests
             TileHeight = tileset.TileHeight,
             ColumnCount = tileset.Columns,
             ImageFileName = tileset.Image.Value.Source.Value,
+            TextureWidth = tileset.Image.Value.Width.Value,
+            TextureHeight = tileset.Image.Value.Height.Value,
         };
         var mapped = MultiTileToTiledAnimationMapper.Map(acls, tilesetInfo);
         NativeTsxAnimationSync.Apply(tileset, mapped);

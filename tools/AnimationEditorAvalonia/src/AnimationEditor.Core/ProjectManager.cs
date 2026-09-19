@@ -587,7 +587,6 @@ namespace AnimationEditor.Core
 
             _tsxTileset = tileset;
             AnimationChainListSave = Tiled.TiledAnimationToAchjMapper.Map(tileset);
-            OnDiskCoordinateType = TextureCoordinateType.Pixel;
             FileName = fileName.FullPath;
         }
 
@@ -601,16 +600,7 @@ namespace AnimationEditor.Core
             if (_tsxTileset == null || AnimationChainListSave == null)
                 return;
 
-            var image = _tsxTileset.Image;
-            var tilesetInfo = new Tiled.TilesetAnimationInfo
-            {
-                TileWidth = _tsxTileset.TileWidth,
-                TileHeight = _tsxTileset.TileHeight,
-                ColumnCount = _tsxTileset.Columns,
-                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
-            };
-
-            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, tilesetInfo);
+            var mapped = Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset));
             Tiled.NativeTsxAnimationSync.Apply(_tsxTileset, mapped);
             Tiled.TsxWriter.Write(_tsxTileset, targetPath ?? FileName!);
         }
@@ -636,19 +626,33 @@ namespace AnimationEditor.Core
 
             var anchorTileIdsWithIssues = issues.Select(i => i.AnchorTileId).ToHashSet();
 
-            var image = _tsxTileset.Image;
-            var tilesetInfo = new Tiled.TilesetAnimationInfo
-            {
-                TileWidth = _tsxTileset.TileWidth,
-                TileHeight = _tsxTileset.TileHeight,
-                ColumnCount = _tsxTileset.Columns,
-                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
-            };
-
-            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, tilesetInfo)
+            return Tiled.MultiTileToTiledAnimationMapper.Map(AnimationChainListSave, BuildTsxTilesetInfo(_tsxTileset))
                 .Where(r => r.EntryTileId.HasValue && anchorTileIdsWithIssues.Contains(r.EntryTileId.Value))
                 .Select(r => r.ChainName)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Builds a <see cref="Tiled.TilesetAnimationInfo"/> from <paramref name="tileset"/>,
+        /// including <c>TextureWidth</c>/<c>TextureHeight</c> so <see
+        /// cref="Tiled.MultiTileToTiledAnimationMapper"/> can convert the achx model's UV
+        /// coordinates back to pixels -- both <see cref="SaveTsxProject"/> and <see
+        /// cref="GetChainNamesWithTsxIssues"/> need this identically; omitting the texture size
+        /// here was a real shipped bug (issue #1140 follow-up): every frame silently fell into the
+        /// <c>UvMissingPixelSize</c> skip path instead of mapping.
+        /// </summary>
+        private static Tiled.TilesetAnimationInfo BuildTsxTilesetInfo(DotTiled.Tileset tileset)
+        {
+            var image = tileset.Image;
+            return new Tiled.TilesetAnimationInfo
+            {
+                TileWidth = tileset.TileWidth,
+                TileHeight = tileset.TileHeight,
+                ColumnCount = tileset.Columns,
+                ImageFileName = image.HasValue && image.Value.Source.HasValue ? image.Value.Source.Value : string.Empty,
+                TextureWidth = image.HasValue && image.Value.Width.HasValue ? image.Value.Width.Value : null,
+                TextureHeight = image.HasValue && image.Value.Height.HasValue ? image.Value.Height.Value : null,
+            };
         }
     }
 }
