@@ -396,6 +396,9 @@
                     <StackPanel x:Name="TiledSyncStatusPanel"
                                 Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                                 IsVisible="False">
+                        <Image Source="avares://AnimationEditor/Assets/icons/tiled-icon-128.png"
+                               Width="12" Height="12"
+                               IsHitTestVisible="False" />
                         <Ellipse x:Name="TiledSyncDot"
                                  Width="6" Height="6"
                                  Fill="{DynamicResource AccentSoft}" />
