@@ -92,6 +92,14 @@ namespace AnimationEditor.Core.CommandsAndState
         Task OpenTsxWorkflowAsync(string path);
 
         /// <summary>
+        /// Dispatches to <see cref="OpenTsxWorkflowAsync"/> for a <c>.tsx</c> path, otherwise <see
+        /// cref="OpenAchxWorkflowAsync"/> -- the single entry point every tab-open call site should
+        /// use, so a native tsx project needs no changes to <c>TabKind</c>/<c>TabManager</c>
+        /// (<c>TabEntry.InferKind</c> already treats a non-png extension as a full-editor tab).
+        /// </summary>
+        Task OpenProjectWorkflowAsync(string path);
+
+        /// <summary>
         /// Stores the current project model and chain/frame selection on <paramref name="tab"/>
         /// for later tab switches.
         /// </summary>

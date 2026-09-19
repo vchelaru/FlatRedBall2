@@ -963,7 +963,7 @@ public partial class MainWindow : Window
             if (active.Kind == TabKind.Png)
                 ShowPngPane(active);
             else
-                await _appCommands.OpenAchxWorkflowAsync(active.Path.FullPath);
+                await _appCommands.OpenProjectWorkflowAsync(active.Path.FullPath);
             RebuildTabStrip();
         }
     }
@@ -2501,7 +2501,8 @@ public partial class MainWindow : Window
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Animation Chain") { Patterns = new[] { "*.achx", "*.achj" } }
+                new FilePickerFileType("Animation Chain") { Patterns = new[] { "*.achx", "*.achj" } },
+                new FilePickerFileType("Tiled Tileset") { Patterns = new[] { "*.tsx" } },
             }
         });
 
@@ -5613,7 +5614,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            await _appCommands.OpenAchxWorkflowAsync(fileName);
+            await _appCommands.OpenProjectWorkflowAsync(fileName);
             // Restore this tab's prior history if it was previously open (snapshot normally
             // null on first open; non-null if the tab was closed and re-opened mid-session).
             if (arrivedTab?.UndoSnapshot != null)

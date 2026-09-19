@@ -290,6 +290,10 @@ namespace AnimationEditor.Core.CommandsAndState
             return Task.CompletedTask;
         }
 
+        /// <inheritdoc cref="IAppCommands.OpenProjectWorkflowAsync"/>
+        public Task OpenProjectWorkflowAsync(string path) =>
+            new FilePath(path).Extension == "tsx" ? OpenTsxWorkflowAsync(path) : OpenAchxWorkflowAsync(path);
+
         // -------------------------------------------------------------------------
 
         public void LoadAnimationChain(string fileName)
@@ -393,7 +397,7 @@ namespace AnimationEditor.Core.CommandsAndState
             string? chainName = tab.CachedSelectedChainName;
             int? frameIndex = tab.CachedSelectedFrameIndex;
 
-            await OpenAchxWorkflowAsync(tab.Path.FullPath);
+            await OpenProjectWorkflowAsync(tab.Path.FullPath);
 
             tab.CachedSelectedChainName = chainName;
             tab.CachedSelectedFrameIndex = frameIndex;
